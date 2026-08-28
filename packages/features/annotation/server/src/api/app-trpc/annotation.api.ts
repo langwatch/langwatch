@@ -29,16 +29,22 @@
  *
  * Spec: packages/features/annotation/specs/annotation-service.feature.
  */
-import type {
-  Annotation,
-  AnnotationService,
-  AnnotationUser,
-} from "@langwatch/annotation-contract";
+import type { Annotation, AnnotationService, AnnotationUser } from "@langwatch/annotation-contract";
 import {
   AnnotationNotFoundError,
-  annotationAnchorColumnsSchema,
-  annotationAnchorScopeSchema,
-  refineAnnotationAnchorColumns,
+  annotationApiAnnotationScopeSchema,
+  annotationApiByTraceIdInputSchema,
+  annotationApiByTraceIdsInputSchema,
+  annotationApiCreateInputSchema,
+  annotationApiCreateQueueItemInputSchema,
+  annotationApiDeleteQueueItemsInputSchema,
+  annotationApiListAllInputSchema,
+  annotationApiMarkQueueItemDoneInputSchema,
+  annotationApiOptimizedQueuesInputSchema,
+  annotationApiProjectScopeSchema,
+  annotationApiQueueBySlugOrIdInputSchema,
+  annotationApiQueueConfigurationInputSchema,
+  annotationApiUpdateInputSchema,
   resolveAnnotationSuggestionTarget,
   withReadableAnnotationAnchor,
 } from "@langwatch/annotation-contract";
@@ -52,7 +58,6 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { nanoid } from "nanoid";
-import { z } from "zod";
 
 const logger = createLogger("langwatch:api:annotation");
 
@@ -138,20 +143,14 @@ export type AnnotationQueueStore = Readonly<{
     input: Readonly<{ projectId: string; organizationId: string }>,
   ): Promise<ReadonlyArray<Readonly<{ traceId: string }>>>;
   /** Items still open that are the caller's to review, directly or by queue. */
-  countPendingItems(
-    input: Readonly<{ projectId: string; userId: string }>,
-  ): Promise<number>;
+  countPendingItems(input: Readonly<{ projectId: string; userId: string }>): Promise<number>;
   /** Items still open that are assigned to the caller by name. */
-  countAssignedItems(
-    input: Readonly<{ projectId: string; userId: string }>,
-  ): Promise<number>;
+  countAssignedItems(input: Readonly<{ projectId: string; userId: string }>): Promise<number>;
   /** The caller's queues and how much is still open in each. */
   listMemberQueuePendingCounts(
     input: Readonly<{ projectId: string; userId: string }>,
   ): Promise<
-    ReadonlyArray<
-      Readonly<{ id: string; name: string; slug: string; pendingCount: number }>
-    >
+    ReadonlyArray<Readonly<{ id: string; name: string; slug: string; pendingCount: number }>>
   >;
   /** @returns how many items were removed. */
   deleteQueueItems(
@@ -205,9 +204,7 @@ export type AnnotationQueueStore = Readonly<{
       queueIds: readonly string[];
     }>,
   ): Promise<
-    ReadonlyArray<
-      Readonly<{ AnnotationQueueItems: ReadonlyArray<Readonly<{ id: string }>> }>
-    >
+    ReadonlyArray<Readonly<{ AnnotationQueueItems: ReadonlyArray<Readonly<{ id: string }>> }>>
   >;
 }>;
 
@@ -294,105 +291,6 @@ export type AnnotationTrpcPorts = Readonly<{
   toQueueSlug(name: string): string;
 }>;
 
-const scoreOptionSchema = z.object({
-  value: z.union([z.string(), z.array(z.string())]).optional().nullable(),
-  reason: z.string().optional().nullable(),
-});
-
-const scoreOptions = z.record(z.string(), scoreOptionSchema);
-
-const createInputSchema = z
-  .object({
-    projectId: z.string(),
-    comment: z.string().optional().nullable(),
-    isThumbsUp: z.boolean().optional().nullable(),
-    traceId: z.string(),
-    scoreOptions: scoreOptions,
-    expectedOutput: z.string().optional().nullable(),
-  })
-  .merge(annotationAnchorColumnsSchema)
-  .superRefine(refineAnnotationAnchorColumns);
-
-const updateInputSchema = z.object({
-  id: z.string(),
-  traceId: z.string(),
-  projectId: z.string(),
-  comment: z.string().optional().nullable(),
-  isThumbsUp: z.boolean().optional().nullable(),
-  expectedOutput: z.string().optional().nullable(),
-  scoreOptions: scoreOptions,
-});
-
-const byTraceIdInputSchema = z.object({
-  traceId: z.string(),
-  projectId: z.string(),
-  anchor: annotationAnchorScopeSchema.optional().default("all"),
-});
-
-const byTraceIdsInputSchema = z.object({
-  traceIds: z.array(z.string()),
-  projectId: z.string(),
-  anchor: annotationAnchorScopeSchema.optional().default("all"),
-});
-
-const annotationScopeSchema = z.object({
-  annotationId: z.string(),
-  projectId: z.string(),
-});
-
-const projectScopeSchema = z.object({ projectId: z.string() });
-
-const listAllInputSchema = z.object({
-  projectId: z.string(),
-  startDate: z.date().optional(),
-  endDate: z.date().optional(),
-});
-
-const queueConfigurationInputSchema = z.object({
-  projectId: z.string(),
-  name: z.string(),
-  description: z.string(),
-  userIds: z.array(z.string()),
-  scoreTypeIds: z.array(z.string()),
-  queueId: z.string().optional(),
-});
-
-const createQueueItemInputSchema = z.object({
-  traceIds: z.array(z.string()),
-  projectId: z.string(),
-  annotators: z.array(z.string()),
-});
-
-const deleteQueueItemsInputSchema = z.object({
-  projectId: z.string(),
-  queueItemIds: z.array(z.string()).min(1),
-});
-
-const markQueueItemDoneInputSchema = z.object({
-  queueItemId: z.string(),
-  projectId: z.string(),
-});
-
-const queueBySlugOrIdInputSchema = z.object({
-  projectId: z.string(),
-  slug: z.string().optional(),
-  queueId: z.string().optional(),
-});
-
-const optimizedQueuesInputSchema = z.object({
-  projectId: z.string(),
-  selectedAnnotations: z.string(),
-  pageSize: z.number(),
-  pageOffset: z.number(),
-  queueId: z.string().optional(),
-  showQueueAndUser: z.boolean().optional(),
-  allQueueItems: z.boolean().optional(),
-  // The list's date range. A queue item is dated by when it was queued, which
-  // is what the reviewer sees in the list and filters on.
-  startDate: z.date().optional(),
-  endDate: z.date().optional(),
-});
-
 /** Slugs the queue URL space already spends on something else. */
 const RESERVED_QUEUE_SLUGS = new Set(["all", "me", "my-queue"]);
 
@@ -416,9 +314,7 @@ async function enrichAnnotationsWithUsers(
 ): Promise<Array<AnnotationWithFullUser | AnnotationWithUserSummary>> {
   const userIds = [
     ...new Set(
-      annotations.flatMap((annotation) =>
-        annotation.userId === null ? [] : [annotation.userId],
-      ),
+      annotations.flatMap((annotation) => (annotation.userId === null ? [] : [annotation.userId])),
     ),
   ];
   const profiles = await users.getProfiles({ userIds });
@@ -566,63 +462,63 @@ export class AnnotationTrpcApi {
     };
 
     return trpc.router({
-      create: policy("annotations:create")(procedure.input(createInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          const actor = ctx.actor();
+      create: policy("annotations:create")(
+        procedure.input(annotationApiCreateInputSchema),
+      ).mutation(async ({ ctx, input }) => {
+        const actor = ctx.actor();
 
-          await carrySuggestionToOverlay({
-            ctx,
-            ports,
-            projectId: input.projectId,
+        await carrySuggestionToOverlay({
+          ctx,
+          ports,
+          projectId: input.projectId,
+          traceId: input.traceId,
+          expectedOutput: input.expectedOutput,
+          userId: actor.id,
+          anchorKind: input.anchorKind,
+          anchorId: input.anchorId,
+          anchorPath: input.anchorPath,
+        });
+
+        const createdAnnotation = await ctx.app.annotations.create({
+          id: nanoid(),
+          projectId: input.projectId,
+          traceId: input.traceId,
+          userId: actor.id,
+          comment: input.comment ?? "",
+          isThumbsUp: input.isThumbsUp ?? null,
+          scoreOptions: input.scoreOptions ?? {},
+          expectedOutput: input.expectedOutput ?? null,
+          anchorKind: input.anchorKind,
+          anchorId: input.anchorId,
+          anchorPath: input.anchorPath,
+        });
+
+        // Best-effort trace sync: the annotation store is the source of
+        // truth. Failures are logged but don't fail the mutation — the
+        // backfill task can reconcile any missed syncs.
+        //
+        // Anchored comments sync too. This is what answers "has a human
+        // touched this trace", which the has-annotation filter in search
+        // reads, and a comment on one of its spans means yes.
+        try {
+          await ports.recordAnnotationOnTrace(ctx, {
+            tenantId: input.projectId,
             traceId: input.traceId,
-            expectedOutput: input.expectedOutput,
-            userId: actor.id,
-            anchorKind: input.anchorKind,
-            anchorId: input.anchorId,
-            anchorPath: input.anchorPath,
+            annotationId: createdAnnotation.id,
+            occurredAt: Date.now(),
           });
+        } catch (error) {
+          logger.error(
+            { error, traceId: input.traceId, projectId: input.projectId },
+            "Failed to sync annotation to ClickHouse",
+          );
+        }
 
-          const createdAnnotation = await ctx.app.annotations.create({
-            id: nanoid(),
-            projectId: input.projectId,
-            traceId: input.traceId,
-            userId: actor.id,
-            comment: input.comment ?? "",
-            isThumbsUp: input.isThumbsUp ?? null,
-            scoreOptions: input.scoreOptions ?? {},
-            expectedOutput: input.expectedOutput ?? null,
-            anchorKind: input.anchorKind,
-            anchorId: input.anchorId,
-            anchorPath: input.anchorPath,
-          });
-
-          // Best-effort trace sync: the annotation store is the source of
-          // truth. Failures are logged but don't fail the mutation — the
-          // backfill task can reconcile any missed syncs.
-          //
-          // Anchored comments sync too. This is what answers "has a human
-          // touched this trace", which the has-annotation filter in search
-          // reads, and a comment on one of its spans means yes.
-          try {
-            await ports.recordAnnotationOnTrace(ctx, {
-              tenantId: input.projectId,
-              traceId: input.traceId,
-              annotationId: createdAnnotation.id,
-              occurredAt: Date.now(),
-            });
-          } catch (error) {
-            logger.error(
-              { error, traceId: input.traceId, projectId: input.projectId },
-              "Failed to sync annotation to ClickHouse",
-            );
-          }
-
-          return createdAnnotation;
-        },
-      ),
+        return createdAnnotation;
+      }),
 
       updateByTraceId: policy("annotations:update")(
-        procedure.input(updateInputSchema),
+        procedure.input(annotationApiUpdateInputSchema),
       ).mutation(async ({ ctx, input }) => {
         const actor = ctx.actor();
         const service = ctx.app.annotations;
@@ -671,7 +567,7 @@ export class AnnotationTrpcApi {
        * about the trace as a whole asks for `anchor: "trace"` instead.
        */
       getByTraceId: policy("annotations:view")(
-        procedure.input(byTraceIdInputSchema),
+        procedure.input(annotationApiByTraceIdInputSchema),
       ).query(async ({ ctx, input }) => {
         const annotations = await ctx.app.annotations.list({
           projectId: input.projectId,
@@ -690,7 +586,7 @@ export class AnnotationTrpcApi {
 
       /** Same contract as `getByTraceId`, for a page of traces. */
       getByTraceIds: policy("annotations:view")(
-        procedure.input(byTraceIdsInputSchema),
+        procedure.input(annotationApiByTraceIdsInputSchema),
       ).query(async ({ ctx, input }) => {
         const annotations = await ctx.app.annotations.list({
           projectId: input.projectId,
@@ -707,22 +603,22 @@ export class AnnotationTrpcApi {
         return annotationsWithUsers.map(withReadableAnnotationAnchor);
       }),
 
-      getById: policy("annotations:view")(procedure.input(annotationScopeSchema)).query(
-        async ({ ctx, input }) => {
-          try {
-            return await ctx.app.annotations.getById({
-              id: input.annotationId,
-              projectId: input.projectId,
-            });
-          } catch (error) {
-            if (error instanceof AnnotationNotFoundError) return null;
-            throw error;
-          }
-        },
-      ),
+      getById: policy("annotations:view")(
+        procedure.input(annotationApiAnnotationScopeSchema),
+      ).query(async ({ ctx, input }) => {
+        try {
+          return await ctx.app.annotations.getById({
+            id: input.annotationId,
+            projectId: input.projectId,
+          });
+        } catch (error) {
+          if (error instanceof AnnotationNotFoundError) return null;
+          throw error;
+        }
+      }),
 
       deleteById: policy("annotations:delete")(
-        procedure.input(annotationScopeSchema),
+        procedure.input(annotationApiAnnotationScopeSchema),
       ).mutation(async ({ ctx, input }) => {
         const deletedAnnotation = await ctx.app.annotations.delete({
           id: input.annotationId,
@@ -758,7 +654,7 @@ export class AnnotationTrpcApi {
        * answered with silence. Each row carries its anchor, which is what
        * keeps them readable.
        */
-      getAll: policy("annotations:view")(procedure.input(listAllInputSchema)).query(
+      getAll: policy("annotations:view")(procedure.input(annotationApiListAllInputSchema)).query(
         async ({ ctx, input }) => {
           const annotations = await ctx.app.annotations.list({
             projectId: input.projectId,
@@ -772,7 +668,7 @@ export class AnnotationTrpcApi {
       ),
 
       createOrUpdateQueue: policy("annotations:create")(
-        procedure.input(queueConfigurationInputSchema),
+        procedure.input(annotationApiQueueConfigurationInputSchema),
       ).mutation(async ({ ctx, input }) => {
         await ctx.app.annotations.assertQueueConfigurationReferences({
           projectId: input.projectId,
@@ -811,12 +707,12 @@ export class AnnotationTrpcApi {
         return ports.queues(ctx).createQueue(queue);
       }),
 
-      getQueues: policy("annotations:view")(procedure.input(projectScopeSchema)).query(
+      getQueues: policy("annotations:view")(procedure.input(annotationApiProjectScopeSchema)).query(
         async ({ ctx, input }) => ports.queues(ctx).listQueues({ projectId: input.projectId }),
       ),
 
       getQueueItems: policy("annotations:view")(
-        procedure.input(projectScopeSchema),
+        procedure.input(annotationApiProjectScopeSchema),
       ).query(async ({ ctx, input }) => {
         const organizationId = await ctx.app.annotations.getProjectOrganizationId({
           projectId: input.projectId,
@@ -840,7 +736,7 @@ export class AnnotationTrpcApi {
       }),
 
       getPendingItemsCount: policy("annotations:view")(
-        procedure.input(projectScopeSchema),
+        procedure.input(annotationApiProjectScopeSchema),
       ).query(async ({ ctx, input }) =>
         ports.queues(ctx).countPendingItems({
           projectId: input.projectId,
@@ -849,7 +745,7 @@ export class AnnotationTrpcApi {
       ),
 
       getAssignedItemsCount: policy("annotations:view")(
-        procedure.input(projectScopeSchema),
+        procedure.input(annotationApiProjectScopeSchema),
       ).query(async ({ ctx, input }) =>
         ports.queues(ctx).countAssignedItems({
           projectId: input.projectId,
@@ -858,7 +754,7 @@ export class AnnotationTrpcApi {
       ),
 
       getQueueItemsCounts: policy("annotations:view")(
-        procedure.input(projectScopeSchema),
+        procedure.input(annotationApiProjectScopeSchema),
       ).query(async ({ ctx, input }) =>
         ports.queues(ctx).listMemberQueuePendingCounts({
           projectId: input.projectId,
@@ -867,7 +763,7 @@ export class AnnotationTrpcApi {
       ),
 
       createQueueItem: policy("annotations:create")(
-        procedure.input(createQueueItemInputSchema),
+        procedure.input(annotationApiCreateQueueItemInputSchema),
       ).mutation(async ({ ctx, input }) =>
         ports.queueTracesForAnnotation(ctx, {
           traceIds: input.traceIds,
@@ -888,7 +784,7 @@ export class AnnotationTrpcApi {
        * off a queue that is not the caller's to empty.
        */
       deleteQueueItems: policy("annotations:update")(
-        procedure.input(deleteQueueItemsInputSchema),
+        procedure.input(annotationApiDeleteQueueItemsInputSchema),
       ).mutation(async ({ ctx, input }) => {
         const organizationId = await ctx.app.annotations.getProjectOrganizationId({
           projectId: input.projectId,
@@ -908,7 +804,7 @@ export class AnnotationTrpcApi {
        * teammate's item would clear work off a queue that is not the caller's.
        */
       markQueueItemDone: policy("annotations:update")(
-        procedure.input(markQueueItemDoneInputSchema),
+        procedure.input(annotationApiMarkQueueItemDoneInputSchema),
       ).mutation(async ({ ctx, input }) => {
         const organizationId = await ctx.app.annotations.getProjectOrganizationId({
           projectId: input.projectId,
@@ -926,7 +822,7 @@ export class AnnotationTrpcApi {
       }),
 
       getQueueBySlugOrId: policy("annotations:view")(
-        procedure.input(queueBySlugOrIdInputSchema),
+        procedure.input(annotationApiQueueBySlugOrIdInputSchema),
       ).query(async ({ ctx, input }) => {
         const organizationId = await ctx.app.annotations.getProjectOrganizationId({
           projectId: input.projectId,
@@ -940,7 +836,7 @@ export class AnnotationTrpcApi {
       }),
 
       getOptimizedAnnotationQueues: policy("annotations:view")(
-        procedure.input(optimizedQueuesInputSchema),
+        procedure.input(annotationApiOptimizedQueuesInputSchema),
       ).query(async ({ ctx, input }) => {
         const userId = ctx.actor().id;
         const organizationId = await ctx.app.annotations.getProjectOrganizationId({
@@ -981,16 +877,11 @@ export class AnnotationTrpcApi {
         });
 
         const enrichedQueueItems = await enrichQueueItems(ctx, input.projectId, items);
-        const enrichedById = new Map(
-          enrichedQueueItems.map((item) => [item.id, item] as const),
-        );
+        const enrichedById = new Map(enrichedQueueItems.map((item) => [item.id, item] as const));
 
         const processedQueues = queues.map((queue) => ({
           ...queue,
-          AnnotationQueueItems: enrichedInListOrder(
-            queue.AnnotationQueueItems,
-            enrichedById,
-          ),
+          AnnotationQueueItems: enrichedInListOrder(queue.AnnotationQueueItems, enrichedById),
         }));
 
         return {

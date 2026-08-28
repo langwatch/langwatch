@@ -3,6 +3,8 @@ import type {
   PersonalWorkspace,
   PersonalWorkspaceInput,
   OrganizationBillingProfile,
+  OrganizationIntent,
+  OrganizationSettings,
 } from "@langwatch/organization-contract";
 
 export type PersonalWorkspaceResourceIds = {
@@ -22,7 +24,36 @@ export type PersonalWorkspaceFeatureProject = {
   personalFeatures: unknown;
 };
 
+export type StoredOrganizationSettings = {
+  id: string;
+  name: string;
+  slug: string;
+  supportContact: string | null;
+  presenceEnabled: boolean;
+  traceSharingEnabled: boolean;
+  primaryIntent: OrganizationIntent | null;
+  s3Endpoint: string | null;
+  s3AccessKeyId: string | null;
+  s3Bucket: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 export abstract class OrganizationRepository {
+  abstract getSettings(organizationId: string): Promise<OrganizationSettings | null>;
+  abstract findSettings(organizationId: string): Promise<StoredOrganizationSettings | null>;
+  abstract updateSettings(input: {
+    organizationId: string;
+    name?: string;
+    supportContact?: string | null;
+    presenceEnabled?: boolean;
+    traceSharingEnabled?: boolean;
+    primaryIntent?: OrganizationIntent | null;
+    s3Endpoint?: string | null;
+    s3AccessKeyId?: string | null;
+    s3SecretAccessKey?: string | null;
+    s3Bucket?: string | null;
+  }): Promise<void>;
   /** Returns the oldest team or throws OrganizationHasNoTeamError. */
   abstract getOldestTeamId(organizationId: string): Promise<string>;
   abstract getBillingProfile(organizationId: string): Promise<OrganizationBillingProfile>;
@@ -54,11 +85,13 @@ export abstract class OrganizationRepository {
   }): Promise<void>;
 }
 
+export abstract class OrganizationSettingsSecretPort {
+  abstract encrypt(value: string): string;
+  abstract decrypt(value: string): string;
+}
+
 export abstract class PersonalWorkspaceIdentityPort {
-  abstract create(input: {
-    userId: string;
-    organizationId: string;
-  }): PersonalWorkspaceResourceIds;
+  abstract create(input: { userId: string; organizationId: string }): PersonalWorkspaceResourceIds;
 }
 
 export abstract class PersonalWorkspaceDiagnosticsPort {

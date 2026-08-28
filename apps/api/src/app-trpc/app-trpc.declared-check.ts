@@ -16,6 +16,7 @@
 import type {
   AuthzDeclaration,
   AuthzPermission,
+  EnforcedScopeFields,
   ScopeTierField,
 } from "@langwatch/authz-contract";
 
@@ -28,7 +29,17 @@ export type AppAuthzMiddlewareBuilders = Readonly<{
   permissionAny(permissions: readonly AuthzPermission[]): unknown;
   noPermission(input: Readonly<{ reason: string; allow?: Record<string, string> }>): unknown;
   serviceAuthorized(
-    input: Readonly<{ reason: string; permissions: readonly AuthzPermission[] }>,
+    input: Readonly<{
+      reason: string;
+      permissions: readonly AuthzPermission[];
+      /**
+       * Per scope field, WHAT in the resolver enforces it. Forwarded rather
+       * than dropped: the sweep counts a claimed field as covered, so a
+       * declaration that arrives here without its claims reads as a procedure
+       * taking a required scope id nothing checks.
+       */
+      enforces?: EnforcedScopeFields;
+    }>,
   ): unknown;
 }>;
 
@@ -61,6 +72,9 @@ export function declaredCheckFrom(
         return builders.serviceAuthorized({
           reason: declaration.reason,
           permissions: declaration.permissions,
+          ...(declaration.enforces === undefined
+            ? {}
+            : { enforces: declaration.enforces }),
         });
       default:
         throw new Error(

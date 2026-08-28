@@ -1,5 +1,6 @@
 export * from "./billing.errors";
 export * from "./billing-types";
+export * from "./billing-report.commands";
 export * from "./billing.service";
 export * from "./growth-seat-event";
 export * from "./notification-types";

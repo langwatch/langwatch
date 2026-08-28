@@ -16,6 +16,15 @@ with AuthZ, Team, Project, and Organization queries.
 Organization and team lifecycle behaviour is exposed by one portable
 `OrganizationService`. Features receive the process-owned service through
 composition and do not query Organization or Team persistence themselves.
+Membership checks use that same service: normal checks include only active
+members, while the explicit compatibility input can include a retained disabled
+membership.
+
+Organization profile reads and partial settings writes use the same service.
+The private repository encrypts S3 credentials at rest and decrypts only the
+readable fields. A committed transition that disables trace sharing reports the
+required revocation; each transport then asks the composed Project and Share
+services to revoke those links, preserving the acyclic service graph.
 
 `getOldestTeamId` returns a team identifier or throws the Organization-owned
 error. A future optional lookup would use a `try*` name, but no optional form is

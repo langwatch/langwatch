@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-
 import { HandleGenerationError, NotFoundError } from "@langwatch/prompt-contract";
 import { PromptService, type VersionedPrompt } from "../src/services/prompt.service";
+import { createPromptServiceForTest } from "./prompt-service.test-fixture";
 
 const SOURCE_PROMPT: VersionedPrompt = {
   id: "prompt_1h5icu8XRkHHbaQlrOgwq",
@@ -40,7 +39,7 @@ function buildService({
   source?: VersionedPrompt | null;
   takenHandles?: string[];
 } = {}) {
-  const service = new PromptService({} as unknown as PrismaClient);
+  const service = createPromptServiceForTest();
   const taken = new Set(takenHandles);
 
   vi.spyOn(service, "tryGetPromptByIdOrHandle").mockResolvedValue(source);

@@ -13,6 +13,12 @@
  * `organization:view` through the same policy chain as every other feature.
  */
 import {
+  createTrpcApiService,
+  type TrpcApiMount,
+  type TrpcApiPorts,
+  type TrpcApiPublicMount,
+} from "@langwatch/api/trpc";
+import {
   IdentityTrpcApi,
   UserTrpcApi,
   type IdentityTrpcContext,
@@ -20,62 +26,31 @@ import {
   type UserTrpcContext,
   type UserTrpcPorts,
 } from "@langwatch/user-server";
-import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
-import { declaredPolicy, type AppTrpcPolicyMiddlewares } from "../../app-trpc/app-trpc.policy";
-
-type IdentityMount<
-  TContext extends IdentityTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
-> = Readonly<{
-  root: TRPCRootObject<TContext, object, TOptions, TRoot>;
-  protectedProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  middlewares: AppTrpcPolicyMiddlewares;
-  ports: IdentityTrpcPorts;
-}>;
+import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 
 /** Mounts `identity.*` on the app process's tRPC root. */
 export function createIdentityTrpcRouter<
   TContext extends IdentityTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
->(mount: IdentityMount<TContext, TOptions, TRoot>) {
-  return IdentityTrpcApi.create(
-    mount.root,
-    {
-      protected: mount.protectedProcedure,
-      policy: declaredPolicy(mount.middlewares),
-    },
-    mount.ports,
-  );
+>(mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPorts<IdentityTrpcPorts>) {
+  return IdentityTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
 }
 
-type UserMount<
-  TContext extends UserTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
-> = Readonly<{
-  root: TRPCRootObject<TContext, object, TOptions, TRoot>;
-  protectedProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  /** `user.register` runs before an account exists, so it takes no session. */
-  publicProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  middlewares: AppTrpcPolicyMiddlewares;
-  ports: UserTrpcPorts;
-}>;
-
-/** Mounts `user.*` on the app process's tRPC root. */
+/**
+ * Mounts `user.*` on the app process's tRPC root.
+ *
+ * `user.register` runs before an account exists, so this mount takes the
+ * process's public procedure as well as its authenticated one.
+ */
 export function createUserTrpcRouter<
   TContext extends UserTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
->(mount: UserMount<TContext, TOptions, TRoot>) {
-  return UserTrpcApi.create(
-    mount.root,
-    {
-      protected: mount.protectedProcedure,
-      public: mount.publicProcedure,
-      policy: declaredPolicy(mount.middlewares),
-    },
-    mount.ports,
-  );
+>(
+  mount: TrpcApiMount<TContext, TOptions, TRoot> &
+    TrpcApiPublicMount<TContext, TOptions, TRoot> &
+    TrpcApiPorts<UserTrpcPorts>,
+) {
+  return UserTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
 }

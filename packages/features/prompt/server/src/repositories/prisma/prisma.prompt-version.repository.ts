@@ -1,4 +1,3 @@
-import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import type {
   LlmPromptConfig,
@@ -8,7 +7,7 @@ import type {
   User,
 } from "@langwatch/prisma-client/generated";
 
-import type { SchemaVersion } from "@langwatch/prompt-contract";
+import { NotFoundError, type SchemaVersion } from "@langwatch/prompt-contract";
 import { LlmConfigRepository } from "./prisma.prompt.repository";
 import {
   getVersionValidator,
@@ -59,10 +58,7 @@ export class LlmConfigVersionsRepository {
     });
 
     if (!config) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Prompt config not found.",
-      });
+      throw new NotFoundError("Prompt config not found.");
     }
 
     // Get all versions
@@ -98,10 +94,7 @@ export class LlmConfigVersionsRepository {
     });
 
     if (!version) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Prompt config version not found.",
-      });
+      throw new NotFoundError("Prompt config version not found.");
     }
 
     return version;
@@ -145,10 +138,7 @@ export class LlmConfigVersionsRepository {
     });
 
     if (!config) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Prompt config not found.",
-      });
+      throw new NotFoundError("Prompt config not found.");
     }
 
     // Get the latest version
@@ -161,10 +151,7 @@ export class LlmConfigVersionsRepository {
     });
 
     if (!latestVersion) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "No versions found for this config.",
-      });
+      throw new NotFoundError("No versions found for this config.");
     }
 
     return latestVersion;
@@ -189,10 +176,7 @@ export class LlmConfigVersionsRepository {
     });
 
     if (!config) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Prompt config not found.",
-      });
+      throw new NotFoundError("Prompt config not found.");
     }
 
     // Omit the version field from the validator since auto-incremented by the database

@@ -97,7 +97,13 @@ export interface TraceListQuery {
   filterWhere?: { sql: string; params: Record<string, unknown> };
 }
 
-export interface TraceListPage {
+/**
+ * One page as the REPOSITORY answers it: the stored summary rows and the
+ * total. Distinct from `TraceListPage` in `trace-list-view`, which is the
+ * page the LIST VIEW publishes — rows mapped to `TraceListItem`, evaluations
+ * joined on, and a keyset cursor.
+ */
+export interface TraceListRepositoryPage {
   rows: TraceListSummary[];
   totalHits: number;
 }
@@ -156,7 +162,7 @@ export interface BatchedFacetResult {
 }
 
 export interface TraceListReadPort {
-  findAll(query: TraceListQuery): Promise<TraceListPage>;
+  findAll(query: TraceListQuery): Promise<TraceListRepositoryPage>;
 
   findFacetCounts(params: {
     tenantId: string;

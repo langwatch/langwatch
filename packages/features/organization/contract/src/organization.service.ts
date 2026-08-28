@@ -17,10 +17,14 @@ import type {
 } from "./group";
 import type {
   ClaimOrganizationBillingCustomerInput,
+  GetOrganizationSettingsInput,
   GetOldestTeamInput,
   GetOrganizationBillingProfileInput,
   GetOrganizationMembersInput,
   OrganizationBillingProfile,
+  OrganizationSettings,
+  UpdateOrganizationSettingsInput,
+  UpdateOrganizationSettingsResult,
 } from "./organization";
 import type {
   EnsuredPersonalWorkspace,
@@ -51,6 +55,10 @@ import type {
 } from "./team";
 
 export abstract class OrganizationService {
+  abstract getSettings(input: GetOrganizationSettingsInput): Promise<OrganizationSettings>;
+  abstract updateSettings(
+    input: UpdateOrganizationSettingsInput,
+  ): Promise<UpdateOrganizationSettingsResult>;
   /** Returns the requested members or throws UserNotInOrganizationError. */
   abstract getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]>;
   /** Returns whether a user belongs to an organization. */
@@ -68,9 +76,7 @@ export abstract class OrganizationService {
   ): Promise<OrganizationBillingProfile>;
 
   /** Atomically claims the empty billing-customer slot. */
-  abstract claimBillingCustomerId(
-    input: ClaimOrganizationBillingCustomerInput,
-  ): Promise<boolean>;
+  abstract claimBillingCustomerId(input: ClaimOrganizationBillingCustomerInput): Promise<boolean>;
 
   abstract ensurePersonalWorkspace(
     input: PersonalWorkspaceInput,
@@ -107,9 +113,7 @@ export abstract class OrganizationService {
   abstract createTeamWithMembers(
     input: CreateOrganizationTeamWithMembersInput,
   ): Promise<OrganizationTeam>;
-  abstract updateTeamWithMembers(
-    input: UpdateOrganizationTeamWithMembersInput,
-  ): Promise<void>;
+  abstract updateTeamWithMembers(input: UpdateOrganizationTeamWithMembersInput): Promise<void>;
   abstract listTeamAccess(
     input: ListOrganizationTeamAccessInput,
   ): Promise<OrganizationTeamAccess[]>;
@@ -124,9 +128,7 @@ export abstract class OrganizationService {
   abstract deleteGroup(input: DeleteOrganizationGroupInput): Promise<void>;
   abstract addGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void>;
   abstract removeGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void>;
-  abstract listGroupBindings(
-    input: GetOrganizationGroupInput,
-  ): Promise<OrganizationGroupBinding[]>;
+  abstract listGroupBindings(input: GetOrganizationGroupInput): Promise<OrganizationGroupBinding[]>;
   abstract addGroupBinding(
     input: AddOrganizationGroupBindingInput,
   ): Promise<OrganizationGroupBinding>;

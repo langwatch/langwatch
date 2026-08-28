@@ -221,7 +221,17 @@ export function isStorageAnchoredVersion(version: string | undefined): boolean {
 /** Subscribers skip traces older than this threshold to avoid re-processing during resyncs. */
 export const STALE_TRACE_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
 
-export const SYNTHETIC_TRACE_SPAN_NAMES: ReadonlySet<string> = new Set(["langwatch.track_event"]);
+/**
+ * Span name the `/api/track_event` endpoint and the tracked-event sync
+ * subscriber give synthetic event spans.
+ *
+ * These spans represent user-tracked events (a thumbs-up, a rating), not
+ * actual execution, and must be excluded from trace timing calculations.
+ */
+export const TRACK_EVENT_SPAN_NAME = "langwatch.track_event" as const;
+
+/** Span names that represent synthetic events, not real execution. */
+export const SYNTHETIC_TRACE_SPAN_NAMES: ReadonlySet<string> = new Set([TRACK_EVENT_SPAN_NAME]);
 
 export const TRACE_SUMMARY_PROJECTION_VERSIONS = [
   "2026-04-23",

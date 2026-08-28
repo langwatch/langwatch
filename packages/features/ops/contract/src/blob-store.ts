@@ -116,3 +116,17 @@ export type DeleteBlobInput = z.infer<typeof deleteBlobCommandSchema>;
 
 export const deleteBlobResultSchema = z.object({ deleted: z.boolean() });
 export type DeleteBlobResult = z.infer<typeof deleteBlobResultSchema>;
+
+/**
+ * The operator-transport form of the cleanup request: the sweep itself plus
+ * the typed confirmation the destructive (non-dry-run) form requires. A sweep
+ * that reclaims is not something to reach by mis-clicking a toggle.
+ */
+export const runBlobCleanupOperatorInputSchema = runBlobCleanupInputSchema.extend({
+  confirm: z.literal("RECLAIM").optional(),
+});
+
+/** The operator-transport form of the delete: the blob plus its confirmation. */
+export const deleteBlobOperatorInputSchema = deleteBlobInputSchema.extend({
+  confirm: z.literal("DELETE"),
+});

@@ -66,7 +66,6 @@ import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { NOTIFY_TRIGGER_ACTIONS } from "@langwatch/automation-contract";
-import { passesTraceOriginGuards } from "~/server/event-sourcing/pipelines/trace-processing/subscribers/_originGuardedSubscriber";
 import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import type { DatasetNormalizationWorkerPort } from "@langwatch/dataset-contract";
@@ -91,7 +90,6 @@ import type {
   ReportEvaluationCommandData,
 } from "@langwatch/evaluation-contract";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
-import type { BillingCheckpointService } from "../../app-layer/billing/billingCheckpoint.service";
 import type { BroadcastService } from "../../app-layer/broadcast/broadcast.service";
 import type { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-contract";
 import {
@@ -138,11 +136,6 @@ import {
   createGraphTriggerActivityHandler,
 } from "@langwatch/automation-server";
 import type { AutomationDispatchPorts } from "~/runtime/app/features/automation-dispatch.wiring";
-import { ReportUsageForMonthCommand } from "../pipelines/billing-reporting/commands/reportUsageForMonth.command";
-import {
-  BILLING_REPORTING_PIPELINE_NAME,
-  createBillingReportingPipeline,
-} from "../pipelines/billing-reporting/pipeline";
 import {
   createBlobMaintenancePipeline,
   createProcessManagerMaintenancePipeline,
@@ -208,8 +201,26 @@ import {
 import { TopicServerInstaller } from "@langwatch/topic-server";
 import {
   TraceProcessingServerInstaller,
+  createCustomEvaluationSyncHandler,
+  createExperimentMetricsSyncHandler,
+  createProjectMetadataHandler,
+  createSimulationMetricsSyncHandler,
+  createSpanStorageBroadcastHandler,
+  createTraceUpdateBroadcastHandler,
+  createTrackedEventSyncHandler,
+  passesTraceOriginGuards,
   resolveSpanCommandShardCount,
 } from "@langwatch/trace-server";
+import {
+  BILLING_ORG_CACHE_PREFIX,
+  BILLING_ORG_CACHE_TTL_MS,
+  BillingCheckpointPort,
+  EventingBillingReportingAdapter,
+} from "@langwatch/enterprise-billing-server";
+import { AppBillingErrorReporter } from "~/server/app-layer/billing/enterprise/billing-runtime.adapter";
+import { evaluationNameAutoslug } from "~/server/tracer/collector/evaluationNameAutoslug";
+import { trackServerEvent } from "~/server/posthog";
+import { TtlCache } from "~/server/utils/ttlCache";
 import {
   AppTraceProcessingPipeline,
   type TraceProcessingPipelineDeps,
@@ -221,14 +232,7 @@ import { TraceAnalyticsRollupStore } from "@langwatch/trace-server";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 import { AppCodingAgentTraceProcessingAdapter } from "~/runtime/app/features/coding-agent-trace-processing.adapter";
 import type { AppTracePrivacyRuntime } from "~/runtime/app/trace-privacy.runtime";
-import { createCustomEvaluationSyncHandler } from "../pipelines/trace-processing/subscribers/customEvaluationSync.subscriber";
 import { createEvaluationTriggerSubscriber } from "~/runtime/app/trace-evaluation-trigger.adapter";
-import { createExperimentMetricsSyncHandler } from "../pipelines/trace-processing/subscribers/experimentMetricsSync.subscriber";
-import { createProjectMetadataHandler } from "../pipelines/trace-processing/subscribers/projectMetadata.subscriber";
-import { createSimulationMetricsSyncHandler } from "../pipelines/trace-processing/subscribers/simulationMetricsSync.subscriber";
-import { createSpanStorageBroadcastHandler } from "../pipelines/trace-processing/subscribers/spanStorageBroadcast.subscriber";
-import { createTraceUpdateBroadcastHandler } from "../pipelines/trace-processing/subscribers/traceUpdateBroadcast.subscriber";
-import { createTrackedEventSyncHandler } from "../pipelines/trace-processing/subscribers/trackedEventSync.subscriber";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
 
@@ -446,7 +450,7 @@ export interface PipelineRegistryDeps {
   evaluationInputsOffloadConfig: EvaluationInputOffloadConfig;
   organizations: OrganizationService;
   costRecorder: EvaluationCostRecorderPort;
-  billingCheckpoints: BillingCheckpointService;
+  billingCheckpoints: BillingCheckpointPort;
   usageReportingService?: UsageReportingService;
   gatewaySpend?: { port: GatewaySpendEventsPort };
   webhookDelivery?: WebhookDeliveryProcessDeps;
@@ -1095,6 +1099,7 @@ export class PipelineRegistry {
 
     const customEvaluationSyncHandler = createCustomEvaluationSyncHandler({
       reportEvaluation: evalCommands.reportEvaluation,
+      deriveEvaluatorId: evaluationNameAutoslug,
     });
 
     // Live span feedback (langwatch.event) → tracked event. Routes through the
@@ -1117,6 +1122,7 @@ export class PipelineRegistry {
 
     const projectMetadataHandler = createProjectMetadataHandler({
       projects: this.deps.projects,
+      recordProductEvent: trackServerEvent,
       bootstrapTopicClustering: (projectId) => this.bootstrapTopicClustering.fn(projectId),
     });
 
@@ -1415,23 +1421,35 @@ export class PipelineRegistry {
     return simulationPipeline;
   }
 
+  /**
+   * Billing's Eventing graph is composed by the feature and registered here.
+   * `connectSelfDispatch` is not optional: the command re-dispatches itself to
+   * walk a month forward, and until this line runs the proxy it holds throws
+   * rather than dispatching into an unregistered pipeline. Dropping it stalls
+   * the monthly convergence loop after the first Stripe report, and the
+   * handler's own catch swallows the failure — it would show as a flat meter,
+   * not an alarm.
+   */
   private registerBillingReportingPipeline() {
-    const reportUsageForMonthCommand = new ReportUsageForMonthCommand({
+    const billingReporting = EventingBillingReportingAdapter.create({
       organizations: this.deps.organizations,
       billingCheckpoints: this.deps.billingCheckpoints,
       getUsageReportingService: () => this.deps.usageReportingService,
       queryBillableEventsTotal: (input) => getApp().billingQueries.queryBillableEventsTotal(input),
-      selfDispatch: (data) => {
-        const pipeline = this.deps.eventSourcing.getPipeline(BILLING_REPORTING_PIPELINE_NAME);
-        return pipeline.commands.reportUsageForMonth.send(data);
-      },
+      organizationCache: new TtlCache<{
+        id: string;
+        stripeCustomerId: string | null;
+        subscriptions: { id: string }[];
+      }>(BILLING_ORG_CACHE_TTL_MS, BILLING_ORG_CACHE_PREFIX),
+      errorReporter: AppBillingErrorReporter.create(),
     });
 
-    return this.deps.eventSourcing.register(
-      createBillingReportingPipeline({
-        reportUsageForMonthCommand,
-      }),
+    const pipeline = this.deps.eventSourcing.register(billingReporting.buildProcessing());
+    billingReporting.connectSelfDispatch((data) =>
+      pipeline.commands.reportUsageForMonth.send(data),
     );
+
+    return pipeline;
   }
 
   private registerExperimentRunPipeline({

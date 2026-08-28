@@ -24,25 +24,15 @@ import {
   PromptSystemPromptConflictError,
   PromptSystemPromptRequiredError,
 } from "@langwatch/prompt-contract";
-import { describe, expect, it, vi } from "vitest";
-import { PromptService } from "../src/services/prompt.service";
-import { PromptVersionService } from "../src/services/prompt-version.service";
+import { describe, expect, it } from "vitest";
+import { createPromptServiceForTest } from "./prompt-service.test-fixture";
 
 describe("PromptService.createPrompt — missing system prompt (Issue #3196 regression)", () => {
   describe("given a PromptService", () => {
     describe("when creating a prompt with neither a prompt nor a system message", () => {
       /** @scenario "prompts.create returns 400 BAD_REQUEST when both prompt and system message are missing" */
       it("throws a HandledError with httpStatus 400 and code 'system_prompt_required' when no prompt and no system message are supplied", async () => {
-        const service = new PromptService({} as any);
-        (service as any).repository = {
-          createConfigWithInitialVersion: vi.fn(),
-        };
-        (service as any).versionService = {
-          assertNoSystemPromptConflict: vi.fn(),
-        };
-        (service as any).getOrganizationIdFromProjectId = vi
-          .fn()
-          .mockResolvedValue("org-1");
+        const service = createPromptServiceForTest();
 
         const error = await captureError(() =>
           service.createPrompt({
@@ -64,18 +54,7 @@ describe("PromptService.createPrompt — missing system prompt (Issue #3196 regr
     describe("when creating a prompt with both a prompt and a system message", () => {
       /** @scenario "prompts.create still rejects when both prompt and a system message are provided (existing conflict preserved)" */
       it("still throws a HandledError with httpStatus 409 when both prompt and a system message are provided (no regression on AC 5)", async () => {
-        const service = new PromptService({} as any);
-        (service as any).repository = {
-          createConfigWithInitialVersion: vi.fn(),
-        };
-        // Use the real PromptVersionService so we exercise the real conflict
-        // error class, not a synthetic mock. This guards against regression on
-        // AC 5 — both prompt + system message together must still throw the
-        // existing 409 conflict error.
-        (service as any).versionService = new PromptVersionService({} as any);
-        (service as any).getOrganizationIdFromProjectId = vi
-          .fn()
-          .mockResolvedValue("org-1");
+        const service = createPromptServiceForTest();
 
         const error = await captureError(() =>
           service.createPrompt({

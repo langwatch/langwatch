@@ -23,8 +23,12 @@
   "dependencies": {
     "@langwatch/actor": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/identity": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
-    "@langwatch/prisma-client": "workspace:*"
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@trpc/server": "^11.18.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

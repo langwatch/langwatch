@@ -35,11 +35,13 @@ import {
   type JoinLookupDecision,
   type JoinRequestAggregateState,
 } from "@langwatch/identity";
-import type {
-  AnyTRPCRootTypes,
-  TRPCRootObject,
-  TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import {
+  joinRequestApiDecisionInputSchema,
+  joinRequestApiOrganizationScopeSchema,
+  joinRequestApiRequestInputSchema,
+  joinRequestApiWithdrawInputSchema,
+} from "@langwatch/organization-contract";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
 /** The process supplies authentication; authorization arrives as `policy`. */
@@ -180,17 +182,13 @@ const OWN_REQUEST_ONLY: AuthzDeclaration = {
   reason: "the requester withdrawing their own request, matched on the session's user id",
 };
 
-const organizationScopeSchema = z.object({ organizationId: z.string().min(1) });
-
-const requestInputSchema = z.object({ organizationId: z.string().min(1) });
-
-const withdrawInputSchema = z.object({ joinRequestId: z.string().min(1) });
-
-const decisionInputSchema = z.object({
-  organizationId: z.string().min(1),
-  joinRequestId: z.string().min(1),
-});
-
+/**
+ * The one input this surface still builds locally. Its `domainJoin` values are
+ * `DOMAIN_JOIN_SETTINGS`, which the identity package owns; restating those
+ * three words in the organization contract would be a second source of truth
+ * for them, so the shape stays where the constant is in scope. Every other
+ * input on this surface lives in `join-request.api.ts` in the contract.
+ */
 const setJoiningInputSchema = z.object({
   organizationId: z.string().min(1),
   domainJoin: z.enum(DOMAIN_JOIN_SETTINGS),
@@ -245,62 +243,60 @@ export class JoinRequestTrpcApi {
        * Everything this person is waiting on, so a screen can say so rather
        * than offering them an organization they have already asked.
        */
-      mine: policy(OWN_PENDING_REQUESTS)(procedure).query(
-        async ({ ctx }) => {
-          const pending = await ports.pendingForUser(ctx, { userId: ctx.actor().id });
-          return pending.map((request) => ({
-            ...waitingSince(request),
-            organizationId: request.organizationId,
-          }));
-        },
-      ),
+      mine: policy(OWN_PENDING_REQUESTS)(procedure).query(async ({ ctx }) => {
+        const pending = await ports.pendingForUser(ctx, { userId: ctx.actor().id });
+        return pending.map((request) => ({
+          ...waitingSince(request),
+          organizationId: request.organizationId,
+        }));
+      }),
 
       /** Ask one organization to let you in. */
-      request: policy(OFFERED_ORGANIZATION_ONLY)(procedure.input(requestInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          const userId = ctx.actor().id;
-          return ports.request(ctx, {
-            userId,
-            verifiedEmail: await ports.tryResolveVerifiedEmail(ctx, { userId }),
-            organizationId: input.organizationId,
-          });
-        },
-      ),
+      request: policy(OFFERED_ORGANIZATION_ONLY)(
+        procedure.input(joinRequestApiRequestInputSchema),
+      ).mutation(async ({ ctx, input }) => {
+        const userId = ctx.actor().id;
+        return ports.request(ctx, {
+          userId,
+          verifiedEmail: await ports.tryResolveVerifiedEmail(ctx, { userId }),
+          organizationId: input.organizationId,
+        });
+      }),
 
       /** Give up on a request, so nobody is bothered further. */
-      withdraw: policy(OWN_REQUEST_ONLY)(procedure.input(withdrawInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          await ports.withdraw(ctx, {
-            joinRequestId: input.joinRequestId,
-            userId: ctx.actor().id,
-          });
-          return { success: true };
-        },
-      ),
+      withdraw: policy(OWN_REQUEST_ONLY)(
+        procedure.input(joinRequestApiWithdrawInputSchema),
+      ).mutation(async ({ ctx, input }) => {
+        await ports.withdraw(ctx, {
+          joinRequestId: input.joinRequestId,
+          userId: ctx.actor().id,
+        });
+        return { success: true };
+      }),
 
       /** What is waiting on this organization, for the members area. */
-      pending: policy(ORGANIZATION_MANAGE)(procedure.input(organizationScopeSchema)).query(
-        async ({ ctx, input }) => {
-          const pending = await ports.pendingForOrganization(ctx, {
-            organizationId: input.organizationId,
-          });
-          // Who is asking, by name. The requester's ADDRESS is deliberately
-          // not returned: the domain is what was matched and what the admin is
-          // deciding on, and the local part is not the organization's business
-          // until the person is a member.
-          const names = await ports.listUserNames(ctx, {
-            userIds: pending.map((request) => request.userId),
-          });
-          const nameById = new Map(names.map((user) => [user.id, user.name]));
+      pending: policy(ORGANIZATION_MANAGE)(
+        procedure.input(joinRequestApiOrganizationScopeSchema),
+      ).query(async ({ ctx, input }) => {
+        const pending = await ports.pendingForOrganization(ctx, {
+          organizationId: input.organizationId,
+        });
+        // Who is asking, by name. The requester's ADDRESS is deliberately
+        // not returned: the domain is what was matched and what the admin is
+        // deciding on, and the local part is not the organization's business
+        // until the person is a member.
+        const names = await ports.listUserNames(ctx, {
+          userIds: pending.map((request) => request.userId),
+        });
+        const nameById = new Map(names.map((user) => [user.id, user.name]));
 
-          return pending.map((request) => ({
-            ...waitingSince(request),
-            userId: request.userId,
-            name: nameById.get(request.userId) ?? "A colleague",
-            domain: request.domain,
-          }));
-        },
-      ),
+        return pending.map((request) => ({
+          ...waitingSince(request),
+          userId: request.userId,
+          name: nameById.get(request.userId) ?? "A colleague",
+          domain: request.domain,
+        }));
+      }),
 
       /**
        * Approve. No role on this input and never will be: an approval grants
@@ -308,40 +304,41 @@ export class JoinRequestTrpcApi {
        * more sends a formal invitation, which is the flow that owns roles and
        * teams.
        */
-      approve: policy(ORGANIZATION_MANAGE)(procedure.input(decisionInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          await ports.approve(ctx, {
-            joinRequestId: input.joinRequestId,
-            organizationId: input.organizationId,
-            adminUserId: ctx.actor().id,
-          });
-          return { success: true };
-        },
-      ),
+      approve: policy(ORGANIZATION_MANAGE)(
+        procedure.input(joinRequestApiDecisionInputSchema),
+      ).mutation(async ({ ctx, input }) => {
+        await ports.approve(ctx, {
+          joinRequestId: input.joinRequestId,
+          organizationId: input.organizationId,
+          adminUserId: ctx.actor().id,
+        });
+        return { success: true };
+      }),
 
       /**
        * Reject. No reason field: an admin who has to justify a refusal is an
        * admin who hesitates to make one.
        */
-      reject: policy(ORGANIZATION_MANAGE)(procedure.input(decisionInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          await ports.reject(ctx, {
-            joinRequestId: input.joinRequestId,
-            organizationId: input.organizationId,
-            adminUserId: ctx.actor().id,
-          });
-          return { success: true };
-        },
-      ),
+      reject: policy(ORGANIZATION_MANAGE)(
+        procedure.input(joinRequestApiDecisionInputSchema),
+      ).mutation(async ({ ctx, input }) => {
+        await ports.reject(ctx, {
+          joinRequestId: input.joinRequestId,
+          organizationId: input.organizationId,
+          adminUserId: ctx.actor().id,
+        });
+        return { success: true };
+      }),
 
       /**
        * How colleagues on a matching domain currently get in, for the settings
        * card. Behind `organization:manage` like the write: an organization's
        * joining posture is not a stranger's business.
        */
-      joining: policy(ORGANIZATION_MANAGE)(procedure.input(organizationScopeSchema)).query(
-        async ({ ctx, input }) =>
-          ports.readJoining(ctx, { organizationId: input.organizationId }),
+      joining: policy(ORGANIZATION_MANAGE)(
+        procedure.input(joinRequestApiOrganizationScopeSchema),
+      ).query(async ({ ctx, input }) =>
+        ports.readJoining(ctx, { organizationId: input.organizationId }),
       ),
 
       /** How colleagues on a matching domain get in. */

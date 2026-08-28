@@ -23,6 +23,70 @@ export {
   TraceDeferredOriginSchedulerPort,
 } from "./adapters/eventing.deferred-origin.adapter";
 export { TraceProcessingPipelinePort } from "./ports/trace-processing-pipeline.port";
+export {
+  defineOriginGuardedTraceSubscriber,
+  passesTraceOriginGuards,
+  type TraceSummarySubscriber,
+} from "./subscribers/origin-guarded.subscriber";
+export {
+  CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
+  CUSTOM_EVAL_SYNC_DELAY_MS,
+  createCustomEvaluationSyncHandler,
+  customEvaluationSyncDedupId,
+  extractEvaluationsFromSpan,
+  hasSyncableEvaluations,
+  type CustomEvaluationSyncSubscriberDeps,
+} from "./subscribers/custom-evaluation-sync.subscriber";
+export {
+  EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
+  EXPERIMENT_METRICS_SYNC_DELAY_MS,
+  createExperimentMetricsSyncHandler,
+  hasExperimentCostMetrics,
+  type ExperimentMetricsSyncSubscriberDeps,
+} from "./subscribers/experiment-metrics-sync.subscriber";
+export {
+  PROJECT_METADATA_WINDOW_MS,
+  createProjectMetadataHandler,
+  isRealFirstIngest,
+  projectMetadataGroupKey,
+  type ProjectMetadataSubscriberDeps,
+} from "./subscribers/project-metadata.subscriber";
+export {
+  SIMULATION_METRICS_SYNC_DEDUP_TTL_MS,
+  SIMULATION_METRICS_SYNC_DELAY_MS,
+  createSimulationMetricsSyncHandler,
+  hasSimulationMetrics,
+  type SimulationMetricsSyncSubscriberDeps,
+} from "./subscribers/simulation-metrics-sync.subscriber";
+export {
+  SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS,
+  createSpanStorageBroadcastHandler,
+  type SpanStorageBroadcastSubscriberDeps,
+} from "./subscribers/span-storage-broadcast.subscriber";
+export {
+  TRACE_UPDATE_BROADCAST_WINDOW_MS,
+  createTraceUpdateBroadcastHandler,
+  type TraceBroadcastSink,
+  type TraceUpdateBroadcastSubscriberDeps,
+} from "./subscribers/trace-update-broadcast.subscriber";
+export {
+  TRACKED_EVENT_SYNC_DEDUP_TTL_MS,
+  TRACKED_EVENT_SYNC_DELAY_MS,
+  createTrackedEventSyncHandler,
+  hasSyncableFeedback,
+  trackedEventSyncDedupId,
+  type TrackedEventSyncSubscriberDeps,
+} from "./subscribers/tracked-event-sync.subscriber";
+export {
+  normalizeOtlpAttributeMap,
+  parseJsonStringValues,
+  sanitizeInvalidJsonEscapes,
+  TraceRequestUtils,
+  type ParentContext,
+  type TraceFlagsInfo,
+  type TraceStateInfo,
+} from "./services/otlp-trace-request.rules";
+export { IdUtils } from "./services/span-record-identity.rules";
 export { TraceListClickHouseRepository } from "./repositories/clickhouse/trace-list.repository";
 export { TraceSummaryClickHouseRepository } from "./repositories/clickhouse/trace-summary.repository";
 export { TraceAnalyticsClickHouseRepository } from "./repositories/clickhouse/trace-analytics.repository";
@@ -223,3 +287,62 @@ export {
   type TracesTrpcEmitters,
   type TracesTrpcPorts,
 } from "./api/app-trpc/traces.api";
+export {
+  canReadCapturedContent,
+  type CategoryVisibility,
+  type Protections,
+} from "./services/trace-viewer-protections.service";
+export {
+  compileHiddenAttributeMatchers,
+  redactHiddenAttributes,
+  redactHiddenAttributesCompiled,
+} from "./services/trace-attribute-redaction.service";
+export {
+  buildContentPrivacy,
+  buildSpanContentRedactions,
+  contentSearchTermsForViewer,
+  deriveTraceDropPrivacy,
+  gateTraceLogVisibility,
+  mapLegacySpanSummaryToTreeNode,
+  mapSpanToDetail,
+  mapSpansToDetailDtos,
+  mapTraceSummaryToHeader,
+  readDroppedFromParams,
+  readPiiIncompleteFromParams,
+  redactTraceLogContent,
+  redactV2Content,
+  toConversationContextTurn,
+  type TraceContentPrivacyPort,
+  type TraceDerivedAttrPrefixes,
+  type TraceReadMapperPorts,
+  type TraceSpanDisplayPort,
+  type TraceSpanProtectionPort,
+  type V2Protections,
+} from "./api/app-trpc/trace-read-mappers.api";
+export {
+  TracesV2TrpcApi,
+  type TracesV2CodingAgentEnrichmentPort,
+  type TracesV2ListReader,
+  type TracesV2ReadPorts,
+  type TracesV2SessionGroupsReader,
+  type TracesV2SpanReader,
+  type TracesV2TrpcContext,
+  type TracesV2TrpcPorts,
+  type TraceLogRecordReadRow,
+} from "./api/app-trpc/traces-v2.api";
+export {
+  SharedTraceTrpcApi,
+  type SharedTraceTrpcContext,
+  type SharedTraceTrpcPorts,
+} from "./api/app-trpc/shared-trace.api";
+export {
+  gateEvaluations,
+  gateHeaderCost,
+  gateResources,
+  gateSessionCost,
+  gateSessionTitle,
+  gateTreeCost,
+  HIDDEN_RESOURCE_ATTRS,
+  withoutHiddenResourceAttrs,
+  type SessionTitleRedactionFlag,
+} from "./api/app-trpc/trace-view-gates.api";

@@ -5,6 +5,7 @@ import type {
   PersonalWorkspaceDiagnosticsPort,
   PersonalWorkspaceIdentityPort,
   TeamIdentityPort,
+  OrganizationSettingsSecretPort,
 } from "../ports/organization.port";
 import { PrismaGroupRepository } from "../repositories/prisma/prisma.group.repository";
 import { PrismaOrganizationRepository } from "../repositories/prisma/prisma.organization.repository";
@@ -18,21 +19,23 @@ export interface PostgresOrganizationAdapterOptions {
   groupIdentities: GroupIdentityPort;
   authz: AuthzService;
   grants: AuthzGrantsService;
+  settingsSecrets: OrganizationSettingsSecretPort;
   diagnostics?: PersonalWorkspaceDiagnosticsPort;
 }
 
 export class PostgresOrganizationAdapter {
   private constructor(private readonly options: PostgresOrganizationAdapterOptions) {}
 
-  static create(
-    options: PostgresOrganizationAdapterOptions,
-  ): PostgresOrganizationAdapter {
+  static create(options: PostgresOrganizationAdapterOptions): PostgresOrganizationAdapter {
     return new PostgresOrganizationAdapter(options);
   }
 
   build(): OrganizationServiceContract {
     return OrganizationService.create({
-      repository: PrismaOrganizationRepository.create(this.options.database),
+      repository: PrismaOrganizationRepository.create(
+        this.options.database,
+        this.options.settingsSecrets,
+      ),
       teams: PrismaTeamRepository.create(this.options.database),
       groups: PrismaGroupRepository.create(this.options.database),
       identities: this.options.identities,

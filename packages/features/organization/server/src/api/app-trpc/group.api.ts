@@ -34,17 +34,20 @@
 import type { LedgerActor } from "@langwatch/actor";
 import type { AuthzDeclaration } from "@langwatch/authz-contract";
 import {
-  organizationGroupBindingInputSchema,
+  groupApiAddBindingInputSchema,
+  groupApiApplyEditsInputSchema,
+  groupApiCreateInputSchema,
+  groupApiGroupScopeSchema,
+  groupApiMemberInputSchema,
+  groupApiMemberScopeSchema,
+  groupApiRemoveBindingInputSchema,
+  groupApiRenameInputSchema,
+  organizationApiScopeSchema,
   type OrganizationGroupBinding,
   type OrganizationService,
 } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import type {
-  AnyTRPCRootTypes,
-  TRPCRootObject,
-  TRPCRuntimeConfigOptions,
-} from "@trpc/server";
-import { z } from "zod";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 
 /**
  * The thirteen reads and writes this transport makes, named rather than taking
@@ -122,60 +125,6 @@ const ORGANIZATION_MANAGE: AuthzDeclaration = {
   permission: "organization:manage",
 };
 
-const groupNameSchema = z.string().trim().min(1, "Group name is required").max(100);
-
-const organizationScopeSchema = z.object({ organizationId: z.string() });
-
-const groupScopeSchema = z.object({
-  organizationId: z.string(),
-  groupId: z.string(),
-});
-
-const createInputSchema = z.object({
-  organizationId: z.string(),
-  name: groupNameSchema,
-  bindings: z.array(organizationGroupBindingInputSchema).optional(),
-  memberIds: z.array(z.string()).optional(),
-});
-
-const addBindingInputSchema = z.object({
-  organizationId: z.string(),
-  groupId: z.string(),
-  ...organizationGroupBindingInputSchema.shape,
-});
-
-const removeBindingInputSchema = z.object({
-  organizationId: z.string(),
-  bindingId: z.string(),
-});
-
-const groupMemberInputSchema = z.object({
-  organizationId: z.string(),
-  groupId: z.string(),
-  userId: z.string(),
-});
-
-const renameInputSchema = z.object({
-  organizationId: z.string(),
-  groupId: z.string(),
-  name: groupNameSchema,
-});
-
-const memberScopeSchema = z.object({
-  organizationId: z.string(),
-  userId: z.string(),
-});
-
-const applyEditsInputSchema = z.object({
-  organizationId: z.string(),
-  groupId: z.string(),
-  rename: z.object({ name: groupNameSchema }).nullable().optional(),
-  bindingIdsToDelete: z.array(z.string()),
-  bindingsToCreate: z.array(organizationGroupBindingInputSchema),
-  memberUserIdsToAdd: z.array(z.string()),
-  memberUserIdsToRemove: z.array(z.string()),
-});
-
 const ledgerActor = (userId: string): LedgerActor => ({ type: "user", id: userId });
 
 /**
@@ -233,7 +182,7 @@ export class GroupTrpcApi {
     const { protected: procedure, policy } = procedures;
 
     return trpc.router({
-      listAll: policy(ORGANIZATION_MANAGE)(procedure.input(organizationScopeSchema)).query(
+      listAll: policy(ORGANIZATION_MANAGE)(procedure.input(organizationApiScopeSchema)).query(
         async ({ ctx, input }) => {
           await ports.assertScimAllowed(ctx, { organizationId: input.organizationId });
           const page = await ctx.app.organizations.listGroups({
@@ -241,11 +190,7 @@ export class GroupTrpcApi {
             ...GROUP_PAGE,
           });
           const allBindings = page.data.flatMap(({ bindings }) => bindings);
-          const scopeNames = await resolveScopeNames(
-            ctx.app,
-            input.organizationId,
-            allBindings,
-          );
+          const scopeNames = await resolveScopeNames(ctx.app, input.organizationId, allBindings);
           return page.data.map((group) => ({
             id: group.id,
             name: group.name,
@@ -262,14 +207,10 @@ export class GroupTrpcApi {
         },
       ),
 
-      getById: policy(ORGANIZATION_MANAGE)(procedure.input(groupScopeSchema)).query(
+      getById: policy(ORGANIZATION_MANAGE)(procedure.input(groupApiGroupScopeSchema)).query(
         async ({ ctx, input }) => {
           const group = await ctx.app.organizations.getGroup(input);
-          const scopeNames = await resolveScopeNames(
-            ctx.app,
-            input.organizationId,
-            group.bindings,
-          );
+          const scopeNames = await resolveScopeNames(ctx.app, input.organizationId, group.bindings);
           return {
             id: group.id,
             name: group.name,
@@ -285,7 +226,7 @@ export class GroupTrpcApi {
         },
       ),
 
-      create: policy(ORGANIZATION_MANAGE)(procedure.input(createInputSchema)).mutation(
+      create: policy(ORGANIZATION_MANAGE)(procedure.input(groupApiCreateInputSchema)).mutation(
         async ({ ctx, input }) => {
           await ports.assertScimAllowed(ctx, { organizationId: input.organizationId });
           return ctx.app.organizations.createGroup({
@@ -295,21 +236,21 @@ export class GroupTrpcApi {
         },
       ),
 
-      addBinding: policy(ORGANIZATION_MANAGE)(procedure.input(addBindingInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          const { organizationId, groupId, ...binding } = input;
-          const created = await ctx.app.organizations.addGroupBinding({
-            organizationId,
-            groupId,
-            binding,
-            actor: ledgerActor(ctx.actor().id),
-          });
-          return { id: created.id };
-        },
-      ),
+      addBinding: policy(ORGANIZATION_MANAGE)(
+        procedure.input(groupApiAddBindingInputSchema),
+      ).mutation(async ({ ctx, input }) => {
+        const { organizationId, groupId, ...binding } = input;
+        const created = await ctx.app.organizations.addGroupBinding({
+          organizationId,
+          groupId,
+          binding,
+          actor: ledgerActor(ctx.actor().id),
+        });
+        return { id: created.id };
+      }),
 
       removeBinding: policy(ORGANIZATION_MANAGE)(
-        procedure.input(removeBindingInputSchema),
+        procedure.input(groupApiRemoveBindingInputSchema),
       ).mutation(async ({ ctx, input }) => {
         await ctx.app.organizations.removeGroupBinding({
           ...input,
@@ -318,14 +259,14 @@ export class GroupTrpcApi {
         return { success: true };
       }),
 
-      addMember: policy(ORGANIZATION_MANAGE)(procedure.input(groupMemberInputSchema)).mutation(
+      addMember: policy(ORGANIZATION_MANAGE)(procedure.input(groupApiMemberInputSchema)).mutation(
         async ({ ctx, input }) => {
           await ctx.app.organizations.addGroupMember(input);
           return { success: true };
         },
       ),
 
-      delete: policy(ORGANIZATION_MANAGE)(procedure.input(groupScopeSchema)).mutation(
+      delete: policy(ORGANIZATION_MANAGE)(procedure.input(groupApiGroupScopeSchema)).mutation(
         async ({ ctx, input }) => {
           await ctx.app.organizations.deleteGroup({
             ...input,
@@ -336,19 +277,15 @@ export class GroupTrpcApi {
         },
       ),
 
-      rename: policy(ORGANIZATION_MANAGE)(procedure.input(renameInputSchema)).mutation(
+      rename: policy(ORGANIZATION_MANAGE)(procedure.input(groupApiRenameInputSchema)).mutation(
         ({ ctx, input }) => ctx.app.organizations.renameGroup(input),
       ),
 
-      listForMember: policy(ORGANIZATION_MANAGE)(procedure.input(memberScopeSchema)).query(
+      listForMember: policy(ORGANIZATION_MANAGE)(procedure.input(groupApiMemberScopeSchema)).query(
         async ({ ctx, input }) => {
           const groups = await ctx.app.organizations.listGroupsForMember(input);
           const allBindings = groups.flatMap(({ bindings }) => bindings);
-          const scopeNames = await resolveScopeNames(
-            ctx.app,
-            input.organizationId,
-            allBindings,
-          );
+          const scopeNames = await resolveScopeNames(ctx.app, input.organizationId, allBindings);
           return groups.map((group) => ({
             id: group.id,
             name: group.name,
@@ -365,21 +302,21 @@ export class GroupTrpcApi {
       ),
 
       removeMember: policy(ORGANIZATION_MANAGE)(
-        procedure.input(groupMemberInputSchema),
+        procedure.input(groupApiMemberInputSchema),
       ).mutation(async ({ ctx, input }) => {
         await ctx.app.organizations.removeGroupMember(input);
         return { success: true };
       }),
 
-      applyEdits: policy(ORGANIZATION_MANAGE)(procedure.input(applyEditsInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          await ctx.app.organizations.applyGroupEdits({
-            ...input,
-            actor: ledgerActor(ctx.actor().id),
-          });
-          return { success: true };
-        },
-      ),
+      applyEdits: policy(ORGANIZATION_MANAGE)(
+        procedure.input(groupApiApplyEditsInputSchema),
+      ).mutation(async ({ ctx, input }) => {
+        await ctx.app.organizations.applyGroupEdits({
+          ...input,
+          actor: ledgerActor(ctx.actor().id),
+        });
+        return { success: true };
+      }),
     });
   }
 }

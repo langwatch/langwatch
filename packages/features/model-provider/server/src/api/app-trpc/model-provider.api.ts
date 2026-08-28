@@ -33,16 +33,25 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   CODEX_DEFAULT_MODEL,
-  customModelUpdateInputSchema,
-  MODEL_ROLES,
-  modelProviderScopeTypeSchema,
-  modelProviderTestConnectionInputSchema,
-  ROUTING_HANDLE_MAX_LENGTH,
-  ROUTING_HANDLE_RULE,
+  modelDefaultConfigDeleteTrpcInputSchema,
+  modelDefaultConfigSaveTrpcInputSchema,
+  modelDefaultFeatureOverrideTrpcInputSchema,
+  modelDefaultInheritedValuesTrpcInputSchema,
+  modelDefaultResolvedTrpcInputSchema,
+  modelDefaultRoleAssignmentTrpcInputSchema,
+  modelProviderCodexApplyCodingDefaultsTrpcInputSchema,
+  modelProviderCodexSignInPollTrpcInputSchema,
+  modelProviderDeleteTrpcInputSchema,
+  modelProviderIsManagedTrpcInputSchema,
+  modelProviderOrganizationTrpcInputSchema,
+  modelProviderProjectTrpcInputSchema,
+  modelProviderTestConnectionTrpcInputSchema,
+  modelProviderUpdateTrpcInputSchema,
+  modelProviderValidateApiKeyTrpcInputSchema,
+  modelProviderValidateKeyWithCustomUrlTrpcInputSchema,
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
-import { z } from "zod";
 
 type ModelProviderApplication = Readonly<{ modelProviders: ModelProviderService }>;
 
@@ -203,125 +212,6 @@ function toCanonicalModels(value: unknown, type: "chat" | "embedding") {
 }
 
 /**
- * The scope-assignment shape the clients send. Deliberately not the
- * contract's `modelProviderScopeSchema`, which is `.strict()`: this input has
- * always accepted (and dropped) unknown keys, and tightening it here would
- * turn a forward-compatible client into a validation error.
- */
-const scopeAssignmentSchema = z.object({
-  scopeType: modelProviderScopeTypeSchema,
-  scopeId: z.string().min(1),
-});
-
-/**
- * Shared input shape for the provider write paths: name the tenant with
- * either handle, and refuse a request that names neither. A create with
- * no project also has to say where the credential lands, since there is
- * no project to default the scope set from.
- */
-const tenantAnchorSchema = {
-  projectId: z.string().optional(),
-  organizationId: z.string().optional(),
-};
-
-function requireTenantAnchor(
-  input: { projectId?: string; organizationId?: string },
-  ctx: z.RefinementCtx,
-) {
-  if (!input.projectId && !input.organizationId) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Either projectId or organizationId is required.",
-      path: ["projectId"],
-    });
-  }
-}
-
-const updateInputSchema = z
-  .object({
-    id: z.string().optional(),
-    ...tenantAnchorSchema,
-    provider: z.string(),
-    // Human-readable label shown in the settings list and the model
-    // selector group headers. Defaults to the humanized provider name
-    // (e.g. "openai" → "OpenAI") when omitted. Iter 109 added the
-    // column; now exposing it on the write path so operators can
-    // distinguish multiple same-provider instances at different
-    // scopes.
-    name: z.string().trim().min(1).max(128).optional(),
-    enabled: z.boolean(),
-    customKeys: z.object({}).passthrough().optional().nullable(),
-    customModels: customModelUpdateInputSchema.optional().nullable(),
-    customEmbeddingsModels: customModelUpdateInputSchema.optional().nullable(),
-    extraHeaders: z
-      .array(z.object({ key: z.string(), value: z.string() }))
-      .optional()
-      .nullable(),
-    defaultModel: z.string().optional(),
-    // The slug that addresses THIS instance in a gateway model string
-    // ("eu/claude-sonnet-5"). Omitted leaves the stored handle alone;
-    // an empty string clears it. The length and the message both come
-    // from the same module the service validates against, so the schema
-    // cannot start accepting a handle the service will refuse. The shape
-    // and the reserved names are checked in the service, which owns the
-    // rule the gateway reads.
-    routingHandle: z
-      .string()
-      .max(ROUTING_HANDLE_MAX_LENGTH, ROUTING_HANDLE_RULE)
-      .optional()
-      .nullable(),
-    // Multi-scope writes (iter 109). `scopes` is the canonical shape;
-    // `scopeType`/`scopeId` remain for the transition period so older
-    // callers still compile. When both arrive, `scopes` wins. The
-    // service runs the fail-closed authz check on every entry before
-    // persisting — any non-manageable scope aborts the whole write.
-    scopes: z
-      .array(scopeAssignmentSchema)
-      .min(1, "At least one scope must be selected.")
-      .optional(),
-    scopeType: modelProviderScopeTypeSchema.optional(),
-    scopeId: z.string().optional(),
-    // Advanced (Gateway) fields live on the same ModelProvider row.
-    // Accepted on the unified write path so the drawer ships one Save
-    // button across basic + advanced settings.
-    rateLimitRpm: z.number().int().min(0).nullable().optional(),
-    rateLimitTpm: z.number().int().min(0).nullable().optional(),
-    rateLimitRpd: z.number().int().min(0).nullable().optional(),
-    fallbackPriorityGlobal: z.number().int().nullable().optional(),
-    providerConfig: z.object({}).passthrough().nullable().optional(),
-  })
-  .superRefine(requireTenantAnchor);
-
-const deleteInputSchema = z
-  .object({
-    id: z.string().optional(),
-    ...tenantAnchorSchema,
-    provider: z.string(),
-  })
-  .superRefine(requireTenantAnchor);
-
-const validateApiKeyInputSchema = z
-  .object({
-    ...tenantAnchorSchema,
-    provider: z.string(),
-    customKeys: z.record(z.string(), z.string()),
-    // The scopes the credential is being set up for. Required on the
-    // no-project path, where they are what the probe is authorized
-    // against — see the process's credential-probe policy.
-    scopes: z.array(scopeAssignmentSchema).min(1).optional(),
-  })
-  .superRefine(requireTenantAnchor);
-
-const scopedConfigSchema = z
-  .array(
-    z.object({
-      scopeType: modelProviderScopeTypeSchema,
-      scopeId: z.string().min(1),
-    }),
-  )
-  .min(1, "Pick at least one scope.");
-
-/**
  * Installs the complete `modelProvider.*` tRPC surface on a process-owned
  * root. The procedure and the policy bag are injected by the process so its
  * auth, audit, error, logging and tracing policies wrap every feature
@@ -351,7 +241,7 @@ export class ModelProviderTrpcApi {
       // through the masking service method — decrypted customKeys are only
       // for server-internal callers of `getExecutionProviders`.
       getAllForProject: policy("project:view")(
-        procedure.input(z.object({ projectId: z.string() })),
+        procedure.input(modelProviderProjectTrpcInputSchema),
       ).query(async ({ input, ctx }) => {
         const providers = await ctx.app.modelProviders.getForProject({
           projectId: input.projectId,
@@ -360,7 +250,7 @@ export class ModelProviderTrpcApi {
       }),
 
       getAllForProjectForFrontend: policy("project:view")(
-        procedure.input(z.object({ projectId: z.string() })),
+        procedure.input(modelProviderProjectTrpcInputSchema),
       ).query(async ({ input, ctx }) => {
         return toLegacyProviderMap(
           await ctx.app.modelProviders.getForProject({ projectId: input.projectId }),
@@ -376,7 +266,7 @@ export class ModelProviderTrpcApi {
        * "OpenAI" rows at different scopes) appear as two distinct entries.
        */
       listAllForProjectForFrontend: policy("project:view")(
-        procedure.input(z.object({ projectId: z.string() })),
+        procedure.input(modelProviderProjectTrpcInputSchema),
       ).query(async ({ input, ctx }) => {
         return (await ctx.app.modelProviders.listForProject({ projectId: input.projectId })).map(
           toLegacyProvider,
@@ -391,7 +281,7 @@ export class ModelProviderTrpcApi {
        * providers a sibling project's owner has configured.
        */
       listAllForOrganizationForFrontend: policy("organization:view")(
-        procedure.input(z.object({ organizationId: z.string() })),
+        procedure.input(modelProviderOrganizationTrpcInputSchema),
       ).query(async ({ input, ctx }) => {
         return (
           await ctx.app.modelProviders.listForOrganization({
@@ -400,46 +290,46 @@ export class ModelProviderTrpcApi {
         ).map(toLegacyProvider);
       }),
 
-      update: tenantWritePolicy("project:update")(procedure.input(updateInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const result = await ctx.app.modelProviders.upsert({
-            id: input.id,
-            actorId: ctx.actor().id,
-            projectId: input.projectId,
-            organizationId: input.organizationId,
-            provider: input.provider,
-            name: input.name,
-            enabled: input.enabled,
-            customKeys: input.customKeys as Record<string, unknown> | null | undefined,
-            customModels: toCanonicalModels(input.customModels, "chat"),
-            customEmbeddingsModels: toCanonicalModels(input.customEmbeddingsModels, "embedding"),
-            extraHeaders: input.extraHeaders,
-            defaultModel: input.defaultModel,
-            routingHandle: input.routingHandle,
-            scopes:
-              input.scopes ??
-              (input.scopeType && input.scopeId
-                ? [{ scopeType: input.scopeType, scopeId: input.scopeId }]
-                : undefined),
-            rateLimitRpm: input.rateLimitRpm,
-            rateLimitTpm: input.rateLimitTpm,
-            rateLimitRpd: input.rateLimitRpd,
-            fallbackPriorityGlobal: input.fallbackPriorityGlobal,
-            providerConfig: input.providerConfig as Record<string, unknown> | null | undefined,
-          });
+      update: tenantWritePolicy("project:update")(
+        procedure.input(modelProviderUpdateTrpcInputSchema),
+      ).mutation(async ({ input, ctx }) => {
+        const result = await ctx.app.modelProviders.upsert({
+          id: input.id,
+          actorId: ctx.actor().id,
+          projectId: input.projectId,
+          organizationId: input.organizationId,
+          provider: input.provider,
+          name: input.name,
+          enabled: input.enabled,
+          customKeys: input.customKeys as Record<string, unknown> | null | undefined,
+          customModels: toCanonicalModels(input.customModels, "chat"),
+          customEmbeddingsModels: toCanonicalModels(input.customEmbeddingsModels, "embedding"),
+          extraHeaders: input.extraHeaders,
+          defaultModel: input.defaultModel,
+          routingHandle: input.routingHandle,
+          scopes:
+            input.scopes ??
+            (input.scopeType && input.scopeId
+              ? [{ scopeType: input.scopeType, scopeId: input.scopeId }]
+              : undefined),
+          rateLimitRpm: input.rateLimitRpm,
+          rateLimitTpm: input.rateLimitTpm,
+          rateLimitRpd: input.rateLimitRpd,
+          fallbackPriorityGlobal: input.fallbackPriorityGlobal,
+          providerConfig: input.providerConfig as Record<string, unknown> | null | undefined,
+        });
 
-          return toLegacyProvider(result);
-        },
-      ),
+        return toLegacyProvider(result);
+      }),
 
-      delete: tenantWritePolicy("project:delete")(procedure.input(deleteInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          return await ctx.app.modelProviders.delete({
-            ...input,
-            actorId: ctx.actor().id,
-          });
-        },
-      ),
+      delete: tenantWritePolicy("project:delete")(
+        procedure.input(modelProviderDeleteTrpcInputSchema),
+      ).mutation(async ({ input, ctx }) => {
+        return await ctx.app.modelProviders.delete({
+          ...input,
+          actorId: ctx.actor().id,
+        });
+      }),
 
       /**
        * Validates an API key for a given model provider.
@@ -452,12 +342,12 @@ export class ModelProviderTrpcApi {
        * the customer as a validation error against a key that is perfectly good.
        * POSTing the key in a body avoids all of it.
        */
-      validateApiKey: credentialProbePolicy(procedure.input(validateApiKeyInputSchema)).mutation(
-        async ({ input }) => {
-          const { provider, customKeys } = input;
-          return ports.validateProviderApiKey(provider, customKeys);
-        },
-      ),
+      validateApiKey: credentialProbePolicy(
+        procedure.input(modelProviderValidateApiKeyTrpcInputSchema),
+      ).mutation(async ({ input }) => {
+        const { provider, customKeys } = input;
+        return ports.validateProviderApiKey(provider, customKeys);
+      }),
 
       /**
        * Checks a credential that is already saved.
@@ -475,7 +365,7 @@ export class ModelProviderTrpcApi {
        * service for why the absence is the point.
        */
       testConnection: tenantWritePolicy("project:update")(
-        procedure.input(modelProviderTestConnectionInputSchema.superRefine(requireTenantAnchor)),
+        procedure.input(modelProviderTestConnectionTrpcInputSchema),
       ).mutation(async ({ input, ctx }) => {
         return await ctx.app.modelProviders.testConnection({
           ...input,
@@ -490,7 +380,7 @@ export class ModelProviderTrpcApi {
        * Spec: specs/model-providers/codex-account-provider.feature
        */
       codexSignInStart: policy("project:update")(
-        procedure.input(z.object({ projectId: z.string() })),
+        procedure.input(modelProviderProjectTrpcInputSchema),
       ).mutation(async () => {
         return await ports.startCodexDeviceSignIn();
       }),
@@ -505,17 +395,7 @@ export class ModelProviderTrpcApi {
        * account immediately.
        */
       codexSignInPoll: policy("project:update")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            deviceAuthId: z.string(),
-            userCode: z.string(),
-            scopes: z.array(scopeAssignmentSchema).min(1),
-            /** Langy setup + onboarding pass true: also point the allowed
-             *  feature slots at the codex model. Settings passes false. */
-            setAsCodingDefaults: z.boolean().default(false),
-          }),
-        ),
+        procedure.input(modelProviderCodexSignInPollTrpcInputSchema),
       ).mutation(async ({ input, ctx }) => {
         const poll = await ports.pollCodexDeviceSignIn({
           deviceAuthId: input.deviceAuthId,
@@ -586,12 +466,7 @@ export class ModelProviderTrpcApi {
        * "yes" — the same role writes the Langy/onboarding flows perform inline.
        */
       codexApplyCodingDefaults: policy("project:update")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            scopes: z.array(scopeAssignmentSchema).min(1),
-          }),
-        ),
+        procedure.input(modelProviderCodexApplyCodingDefaultsTrpcInputSchema),
       ).mutation(async ({ input, ctx }) => {
         const actorId = ctx.actor().id;
         const scope = input.scopes[0]!;
@@ -622,18 +497,13 @@ export class ModelProviderTrpcApi {
        * connect time from the sign-in mutation's result.
        */
       codexStatus: policy("project:view")(
-        procedure.input(z.object({ projectId: z.string() })),
+        procedure.input(modelProviderProjectTrpcInputSchema),
       ).query(async ({ input, ctx }) => {
         return ctx.app.modelProviders.getCodexStatus(input);
       }),
 
       isManagedProvider: policy("organization:view")(
-        procedure.input(
-          z.object({
-            organizationId: z.string(),
-            provider: z.string(),
-          }),
-        ),
+        procedure.input(modelProviderIsManagedTrpcInputSchema),
       ).query(({ input, ctx }) => {
         return {
           managed: ctx.app.modelProviders.isManagedProvider(input),
@@ -645,13 +515,7 @@ export class ModelProviderTrpcApi {
        * Gets API key from DB or env var and validates against the provided URL (or default if not provided).
        */
       validateKeyWithCustomUrl: policy("project:update")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            provider: z.string(),
-            customBaseUrl: z.string().optional(),
-          }),
-        ),
+        procedure.input(modelProviderValidateKeyWithCustomUrlTrpcInputSchema),
       ).query(async ({ input, ctx }) => {
         const { projectId, provider, customBaseUrl } = input;
         return ports.validateKeyWithCustomUrl({
@@ -679,12 +543,7 @@ export class ModelProviderTrpcApi {
        * without an exception-based control flow.
        */
       getResolvedDefault: policy("project:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            featureKey: z.string(),
-          }),
-        ),
+        procedure.input(modelDefaultResolvedTrpcInputSchema),
       ).query(async ({ input, ctx }) => {
         return ctx.app.modelProviders.tryGetResolvedDefault({
           projectId: input.projectId,
@@ -708,7 +567,7 @@ export class ModelProviderTrpcApi {
        * without a redundant authz check.
        */
       getDefaultModelsForProject: policy("project:view")(
-        procedure.input(z.object({ projectId: z.string() })),
+        procedure.input(modelProviderProjectTrpcInputSchema),
       ).query(async ({ input, ctx }) => {
         return ctx.app.modelProviders.getDefaultSnapshot({
           projectId: input.projectId,
@@ -732,51 +591,37 @@ export class ModelProviderTrpcApi {
         reason:
           "the tier is data: the scope the caller names decides the permission, and the service's assertCanWriteDefault is what checks it",
         permissions: ["organization:manage", "team:manage", "project:manage"],
-      })(
-        procedure.input(
-          z.object({
-            scopeType: modelProviderScopeTypeSchema,
-            scopeId: z.string(),
-            role: z.enum(MODEL_ROLES),
-            model: z.string().nullable(),
-          }),
-        ),
-      ).mutation(async ({ input, ctx }) => {
-        const actorId = ctx.actor().id;
-        await ctx.app.modelProviders.setDefault({
-          scope: { scopeType: input.scopeType, scopeId: input.scopeId },
-          key: input.role,
-          model: input.model,
-          authorId: actorId,
-          actorId,
-        });
-        return { ok: true };
-      }),
+      })(procedure.input(modelDefaultRoleAssignmentTrpcInputSchema)).mutation(
+        async ({ input, ctx }) => {
+          const actorId = ctx.actor().id;
+          await ctx.app.modelProviders.setDefault({
+            scope: { scopeType: input.scopeType, scopeId: input.scopeId },
+            key: input.role,
+            model: input.model,
+            authorId: actorId,
+            actorId,
+          });
+          return { ok: true };
+        },
+      ),
 
       setFeatureOverrideForScope: serviceAuthorizedPolicy({
         reason:
           "the tier is data: the scope the caller names decides the permission, and the service's assertCanWriteDefault is what checks it",
         permissions: ["organization:manage", "team:manage", "project:manage"],
-      })(
-        procedure.input(
-          z.object({
-            scopeType: modelProviderScopeTypeSchema,
-            scopeId: z.string(),
-            featureKey: z.string(),
-            model: z.string().nullable(),
-          }),
-        ),
-      ).mutation(async ({ input, ctx }) => {
-        const actorId = ctx.actor().id;
-        await ctx.app.modelProviders.setDefault({
-          scope: { scopeType: input.scopeType, scopeId: input.scopeId },
-          key: input.featureKey,
-          model: input.model,
-          authorId: actorId,
-          actorId,
-        });
-        return { ok: true };
-      }),
+      })(procedure.input(modelDefaultFeatureOverrideTrpcInputSchema)).mutation(
+        async ({ input, ctx }) => {
+          const actorId = ctx.actor().id;
+          await ctx.app.modelProviders.setDefault({
+            scope: { scopeType: input.scopeType, scopeId: input.scopeId },
+            key: input.featureKey,
+            model: input.model,
+            authorId: actorId,
+            actorId,
+          });
+          return { ok: true };
+        },
+      ),
 
       /**
        * Full-config writer: save (create or update) a whole policy
@@ -800,23 +645,17 @@ export class ModelProviderTrpcApi {
         reason:
           "the tier is data: each scope the caller picks decides its own permission, and the service's assertCanWriteDefault is what checks them",
         permissions: ["organization:manage", "team:manage", "project:manage"],
-      })(
-        procedure.input(
-          z.object({
-            id: z.string().optional(),
-            config: z.record(z.string(), z.string()),
-            scopes: scopedConfigSchema,
-          }),
-        ),
-      ).mutation(async ({ input, ctx }) => {
-        const actorId = ctx.actor().id;
-        const saved = await ctx.app.modelProviders.saveDefaultConfig({
-          ...input,
-          authorId: actorId,
-          actorId,
-        });
-        return { id: saved.id };
-      }),
+      })(procedure.input(modelDefaultConfigSaveTrpcInputSchema)).mutation(
+        async ({ input, ctx }) => {
+          const actorId = ctx.actor().id;
+          const saved = await ctx.app.modelProviders.saveDefaultConfig({
+            ...input,
+            authorId: actorId,
+            actorId,
+          });
+          return { id: saved.id };
+        },
+      ),
 
       /**
        * Delete a config (and all its scope attachments cascade). The
@@ -827,13 +666,15 @@ export class ModelProviderTrpcApi {
         reason:
           "the scopes are the stored row's, not the caller's input, so only the service can know which permissions to require",
         permissions: ["organization:manage", "team:manage", "project:manage"],
-      })(procedure.input(z.object({ id: z.string() }))).mutation(async ({ input, ctx }) => {
-        await ctx.app.modelProviders.deleteDefaultConfig({
-          id: input.id,
-          actorId: ctx.actor().id,
-        });
-        return { ok: true };
-      }),
+      })(procedure.input(modelDefaultConfigDeleteTrpcInputSchema)).mutation(
+        async ({ input, ctx }) => {
+          await ctx.app.modelProviders.deleteDefaultConfig({
+            id: input.id,
+            actorId: ctx.actor().id,
+          });
+          return { ok: true };
+        },
+      ),
 
       /**
        * "What would the cascade hand back for these scopes if I had no
@@ -857,13 +698,7 @@ export class ModelProviderTrpcApi {
        * organization.
        */
       getInheritedValuesForScopes: policy("project:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            scopes: scopedConfigSchema,
-            excludeConfigId: z.string().optional(),
-          }),
-        ),
+        procedure.input(modelDefaultInheritedValuesTrpcInputSchema),
       ).query(async ({ input, ctx }) => {
         return ctx.app.modelProviders.getInheritedValues({
           projectId: input.projectId,

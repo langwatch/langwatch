@@ -14,3 +14,8 @@ export {
   EXPERIMENT_RUN_EVENT_TYPES,
   EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
 } from "./adapters/eventing.experiment-run-event-types.adapter";
+export {
+  ExperimentTrpcApi,
+  type ExperimentTrpcContext,
+  type ExperimentTrpcPorts,
+} from "./api/app-trpc/experiment.api";

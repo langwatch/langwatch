@@ -15,48 +15,23 @@ import {
   type AnnotationTrpcContext,
   type AnnotationTrpcPorts,
 } from "@langwatch/annotation-server";
-import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
-import { appTrpcPolicy, type AppTrpcPolicyMiddlewares } from "../../app-trpc/app-trpc.policy";
+import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
+import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 
-type AnnotationMount<
-  TContext extends AnnotationTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
-  TPorts extends AnnotationTrpcPorts,
-> = Readonly<{
-  root: TRPCRootObject<TContext, object, TOptions, TRoot>;
-  protectedProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  middlewares: AppTrpcPolicyMiddlewares;
-  /**
-   * Forwarded untouched. Their concrete return types are what the client sees,
-   * so this mount is generic over them rather than widening them to the port's
-   * declared minimum.
-   */
-  ports: TPorts;
-}>;
-
-type AnnotationScoreMount<
-  TContext extends AnnotationScoreTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
-> = Readonly<{
-  root: TRPCRootObject<TContext, object, TOptions, TRoot>;
-  protectedProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  middlewares: AppTrpcPolicyMiddlewares;
-}>;
-
-/** Mounts `annotation.*` on the app process's tRPC root. */
+/**
+ * Mounts `annotation.*` on the app process's tRPC root.
+ *
+ * The ports are forwarded untouched. Their concrete return types are what the
+ * client sees, so this mount is generic over them rather than widening them to
+ * the port's declared minimum.
+ */
 export function createAnnotationTrpcRouter<
   TContext extends AnnotationTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
   TPorts extends AnnotationTrpcPorts,
->(mount: AnnotationMount<TContext, TOptions, TRoot, TPorts>) {
-  return AnnotationTrpcApi.create(
-    mount.root,
-    { protected: mount.protectedProcedure, policy: appTrpcPolicy(mount.middlewares) },
-    mount.ports,
-  );
+>(mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPorts<TPorts>) {
+  return AnnotationTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
 }
 
 /** Mounts `annotationScore.*` on the app process's tRPC root. */
@@ -64,9 +39,6 @@ export function createAnnotationScoreTrpcRouter<
   TContext extends AnnotationScoreTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
->(mount: AnnotationScoreMount<TContext, TOptions, TRoot>) {
-  return AnnotationScoreTrpcApi.create(mount.root, {
-    protected: mount.protectedProcedure,
-    policy: appTrpcPolicy(mount.middlewares),
-  });
+>(mount: TrpcApiMount<TContext, TOptions, TRoot>) {
+  return AnnotationScoreTrpcApi.create(mount.root, createTrpcApiService(mount));
 }

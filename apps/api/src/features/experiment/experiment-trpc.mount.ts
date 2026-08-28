@@ -6,41 +6,29 @@
  * the workflow, monitor and identity collaborators an experiment still reaches
  * through the application while those verticals are drained.
  */
+import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
 import {
   ExperimentTrpcApi,
   type ExperimentTrpcContext,
   type ExperimentTrpcPorts,
 } from "@langwatch/experiment-server";
-import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
-import { appTrpcPolicy, type AppTrpcPolicyMiddlewares } from "../../app-trpc/app-trpc.policy";
+import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 
-type ExperimentMount<
-  TContext extends ExperimentTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
-  TWorkbenchState,
-> = Readonly<{
-  root: TRPCRootObject<TContext, object, TOptions, TRoot>;
-  protectedProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  middlewares: AppTrpcPolicyMiddlewares;
-  /**
-   * Forwarded untouched. `TWorkbenchState` is inferred from the host's own
-   * schema, which is built out of its evaluation preconditions and
-   * trace-mapping shapes rather than anything the experiment package owns.
-   */
-  ports: ExperimentTrpcPorts<TWorkbenchState>;
-}>;
-
-/** Mounts `experiments.*` on the app process's tRPC root. */
+/**
+ * Mounts `experiments.*` on the app process's tRPC root.
+ *
+ * The ports are forwarded untouched. `TWorkbenchState` is inferred from the
+ * host's own schema, which is built out of its evaluation preconditions and
+ * trace-mapping shapes rather than anything the experiment package owns.
+ */
 export function createExperimentTrpcRouter<
   TContext extends ExperimentTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
   TWorkbenchState,
->(mount: ExperimentMount<TContext, TOptions, TRoot, TWorkbenchState>) {
-  return ExperimentTrpcApi.create(
-    mount.root,
-    { protected: mount.protectedProcedure, policy: appTrpcPolicy(mount.middlewares) },
-    mount.ports,
-  );
+>(
+  mount: TrpcApiMount<TContext, TOptions, TRoot> &
+    TrpcApiPorts<ExperimentTrpcPorts<TWorkbenchState>>,
+) {
+  return ExperimentTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
 }

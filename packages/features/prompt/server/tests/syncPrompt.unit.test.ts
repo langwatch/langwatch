@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getLatestConfigVersionSchema } from "@langwatch/prompt-contract";
+import type { z } from "zod";
 import { PromptService, type VersionedPrompt } from "../src/services/prompt.service";
+import { createPromptServiceForTest } from "./prompt-service.test-fixture";
+
+type SyncConfigData = z.infer<ReturnType<typeof getLatestConfigVersionSchema>>["configData"];
 
 /**
  * Tests for syncPrompt covering:
@@ -9,9 +14,7 @@ import { PromptService, type VersionedPrompt } from "../src/services/prompt.serv
 describe("PromptService", () => {
   describe("syncPrompt()", () => {
     let promptService: PromptService;
-    let mockPrisma: any;
-    let mockRepository: any;
-    let mockVersionService: any;
+    let compareConfigContent: ReturnType<typeof vi.spyOn>;
 
     const projectId = "project-1";
     const organizationId = "org-1";
@@ -19,9 +22,7 @@ describe("PromptService", () => {
     /**
      * Build a VersionedPrompt with all sampling parameters populated.
      */
-    function buildExistingPrompt(
-      overrides: Partial<VersionedPrompt> = {},
-    ): VersionedPrompt {
+    function buildExistingPrompt(overrides: Partial<VersionedPrompt> = {}): VersionedPrompt {
       return {
         id: "config-1",
         name: "test-prompt",
@@ -63,36 +64,8 @@ describe("PromptService", () => {
     beforeEach(() => {
       vi.clearAllMocks();
 
-      mockPrisma = {
-        $transaction: vi.fn(),
-        project: {
-          findUnique: vi.fn(),
-        },
-      } as any;
-
-      mockRepository = {
-        compareConfigContent: vi.fn(),
-        getConfigVersionByNumber: vi.fn(),
-        getConfigByIdOrHandleWithLatestVersion: vi.fn(),
-        checkModifyPermission: vi.fn().mockResolvedValue({
-          hasPermission: true,
-        }),
-        createConfigWithInitialVersion: vi.fn(),
-        updateConfig: vi.fn(),
-        versions: {
-          getLatestVersion: vi.fn(),
-        },
-        createHandle: vi.fn(),
-      };
-
-      mockVersionService = {
-        assertNoSystemPromptConflict: vi.fn(),
-        createVersion: vi.fn(),
-      };
-
-      promptService = new PromptService(mockPrisma);
-      (promptService as any).repository = mockRepository;
-      (promptService as any).versionService = mockVersionService;
+      promptService = createPromptServiceForTest();
+      compareConfigContent = vi.spyOn(promptService.repository, "compareConfigContent");
     });
 
     describe("when remote prompt exists with all sampling parameters and local matches", () => {
@@ -100,12 +73,10 @@ describe("PromptService", () => {
         const existingPrompt = buildExistingPrompt();
 
         // Spy on tryGetPromptByIdOrHandle to return our prompt with all params
-        vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(
-          existingPrompt,
-        );
+        vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(existingPrompt);
 
         // The local config data matches what the server has (in snake_case DB format)
-        const localConfigData = {
+        const localConfigData: SyncConfigData = {
           model: "gpt-4",
           prompt: "You are a helpful assistant",
           messages: [{ role: "user" as const, content: "Hello {{input}}" }],
@@ -125,11 +96,11 @@ describe("PromptService", () => {
         };
 
         // The comparison should see them as equal
-        mockRepository.compareConfigContent.mockReturnValue({ isEqual: true });
+        compareConfigContent.mockReturnValue({ isEqual: true });
 
         const result = await promptService.syncPrompt({
           idOrHandle: "test-prompt",
-          localConfigData: localConfigData as any,
+          localConfigData,
           localVersion: 1,
           projectId,
           organizationId,
@@ -139,7 +110,7 @@ describe("PromptService", () => {
 
         // Verify that compareConfigContent was called with remoteConfigData
         // that includes ALL sampling parameters, not just temperature
-        const [, remoteArg] = mockRepository.compareConfigContent.mock.calls[0]!;
+        const [, remoteArg] = compareConfigContent.mock.calls[0]!;
         expect(remoteArg).toHaveProperty("max_tokens", 1000);
         expect(remoteArg).toHaveProperty("top_p", 0.9);
         expect(remoteArg).toHaveProperty("frequency_penalty", 0.5);
@@ -168,11 +139,9 @@ describe("PromptService", () => {
           verbosity: undefined,
         });
 
-        vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(
-          existingPrompt,
-        );
+        vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(existingPrompt);
 
-        const localConfigData = {
+        const localConfigData: SyncConfigData = {
           model: "gpt-4",
           prompt: "You are a helpful assistant",
           messages: [{ role: "user" as const, content: "Hello {{input}}" }],
@@ -181,18 +150,18 @@ describe("PromptService", () => {
           temperature: 0.7,
         };
 
-        mockRepository.compareConfigContent.mockReturnValue({ isEqual: true });
+        compareConfigContent.mockReturnValue({ isEqual: true });
 
         await promptService.syncPrompt({
           idOrHandle: "test-prompt",
-          localConfigData: localConfigData as any,
+          localConfigData,
           localVersion: 1,
           projectId,
           organizationId,
         });
 
         // remoteConfigData should NOT include undefined fields (to avoid false diffs)
-        const [, remoteArg] = mockRepository.compareConfigContent.mock.calls[0]!;
+        const [, remoteArg] = compareConfigContent.mock.calls[0]!;
         expect(remoteArg).not.toHaveProperty("max_tokens");
         expect(remoteArg).not.toHaveProperty("top_p");
         expect(remoteArg).not.toHaveProperty("frequency_penalty");
@@ -206,20 +175,16 @@ describe("PromptService", () => {
       it("describes the changed fields instead of a generic message", async () => {
         const existingPrompt = buildExistingPrompt();
 
-        vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(
-          existingPrompt,
-        );
+        vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(existingPrompt);
 
-        const updateSpy = vi
-          .spyOn(promptService, "updatePrompt")
-          .mockResolvedValue(existingPrompt);
+        const updateSpy = vi.spyOn(promptService, "updatePrompt").mockResolvedValue(existingPrompt);
 
-        mockRepository.compareConfigContent.mockReturnValue({
+        compareConfigContent.mockReturnValue({
           isEqual: false,
           differences: ["model: gpt-4 → gpt-4o-mini", "temperature: 0.7 → 0.3"],
         });
 
-        const localConfigData = {
+        const localConfigData: SyncConfigData = {
           model: "gpt-4o-mini",
           prompt: "You are a helpful assistant",
           messages: [{ role: "user" as const, content: "Hello {{input}}" }],
@@ -230,7 +195,7 @@ describe("PromptService", () => {
 
         const result = await promptService.syncPrompt({
           idOrHandle: "test-prompt",
-          localConfigData: localConfigData as any,
+          localConfigData,
           localVersion: 1,
           projectId,
           organizationId,
@@ -250,20 +215,16 @@ describe("PromptService", () => {
       it("keeps the caller's commit message when one is provided", async () => {
         const existingPrompt = buildExistingPrompt();
 
-        vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(
-          existingPrompt,
-        );
+        vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(existingPrompt);
 
-        const updateSpy = vi
-          .spyOn(promptService, "updatePrompt")
-          .mockResolvedValue(existingPrompt);
+        const updateSpy = vi.spyOn(promptService, "updatePrompt").mockResolvedValue(existingPrompt);
 
-        mockRepository.compareConfigContent.mockReturnValue({
+        compareConfigContent.mockReturnValue({
           isEqual: false,
           differences: ["model: gpt-4 → gpt-4o-mini"],
         });
 
-        const localConfigData = {
+        const localConfigData: SyncConfigData = {
           model: "gpt-4o-mini",
           prompt: "You are a helpful assistant",
           messages: [{ role: "user" as const, content: "Hello {{input}}" }],
@@ -274,7 +235,7 @@ describe("PromptService", () => {
 
         await promptService.syncPrompt({
           idOrHandle: "test-prompt",
-          localConfigData: localConfigData as any,
+          localConfigData,
           localVersion: 1,
           projectId,
           organizationId,
@@ -295,18 +256,14 @@ describe("PromptService", () => {
           parameters: { max_tokens: 500 },
         });
 
-        vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(
-          existingPrompt,
-        );
+        vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(existingPrompt);
 
-        const updateSpy = vi
-          .spyOn(promptService, "updatePrompt")
-          .mockResolvedValue(existingPrompt);
+        const updateSpy = vi.spyOn(promptService, "updatePrompt").mockResolvedValue(existingPrompt);
 
         // Config content itself is identical - only runtime parameters differ.
-        mockRepository.compareConfigContent.mockReturnValue({ isEqual: true });
+        compareConfigContent.mockReturnValue({ isEqual: true });
 
-        const localConfigData = {
+        const localConfigData: SyncConfigData = {
           model: "gpt-4",
           prompt: "You are a helpful assistant",
           messages: [{ role: "user" as const, content: "Hello {{input}}" }],
@@ -317,7 +274,7 @@ describe("PromptService", () => {
 
         const result = await promptService.syncPrompt({
           idOrHandle: "test-prompt",
-          localConfigData: localConfigData as any,
+          localConfigData,
           localVersion: 1,
           projectId,
           organizationId,
@@ -340,11 +297,9 @@ describe("PromptService", () => {
         vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(null);
 
         const createdPrompt = buildExistingPrompt({ version: 1 });
-        const createSpy = vi
-          .spyOn(promptService, "createPrompt")
-          .mockResolvedValue(createdPrompt);
+        const createSpy = vi.spyOn(promptService, "createPrompt").mockResolvedValue(createdPrompt);
 
-        const localConfigData = {
+        const localConfigData: SyncConfigData = {
           model: "gpt-4",
           prompt: "You are a helpful assistant",
           messages: [{ role: "user" as const, content: "Hello {{input}}" }],
@@ -356,7 +311,7 @@ describe("PromptService", () => {
 
         await promptService.syncPrompt({
           idOrHandle: "test-prompt",
-          localConfigData: localConfigData as any,
+          localConfigData,
           projectId,
           organizationId,
         });
@@ -375,9 +330,7 @@ describe("PromptService", () => {
         expect(hasMaxTokens).toBe(true);
 
         // The value should be 1000, not undefined
-        const maxTokensValue =
-          (createArgs as any).maxTokens ?? (createArgs as any).max_tokens;
-        expect(maxTokensValue).toBe(1000);
+        expect(createArgs.maxTokens).toBe(1000);
       });
     });
   });

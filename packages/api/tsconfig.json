@@ -8,6 +8,8 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/api.tsbuildinfo",
     "rootDir": "src",
     "types": ["node"],
     "noEmit": true

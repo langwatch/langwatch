@@ -1,4 +1,4 @@
-# See ../adrs/001-rpc-first-fluent-registration.md
+# See ../adrs/001-rpc-first-fluent-registration.md (its RPC half is withdrawn)
 # See ../../specs/features/domain-error-contract.feature (the error-event
 # payload contract this transport adopts for mid-stream handled failures)
 Feature: SSE streaming endpoints

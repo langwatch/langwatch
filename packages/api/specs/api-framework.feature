@@ -38,7 +38,7 @@ Feature: API framework boundary and package authoring
 
   @security @unit
   Scenario: Every mounted endpoint has one explicit access policy
-    Given REST, URL-addressed RPC and SSE endpoints built with the framework
+    Given REST and SSE endpoints built with the framework
     When the application composition root receives their mount reports
     Then each mount declares either a required permission or an explicitly
       public policy with a written reason

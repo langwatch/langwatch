@@ -130,3 +130,14 @@ export {
 export { SchedulerWake } from "./ports/scheduler-wake.port";
 export { UnsubscribeTokenVerifier } from "./ports/unsubscribe-token.port";
 export { ScheduledJobStore, type ScheduledJobRecord } from "./ports/scheduled-jobs.port";
+export {
+  AutomationTrpcApi,
+  type AutomationTrpcContext,
+  type AutomationTrpcPorts,
+} from "./api/app-trpc/automation.trpc-schemas";
+export {
+  EmailSuppressionTrpcApi,
+  type EmailSuppressionTrpcContext,
+  type EmailSuppressionTrpcPorts,
+} from "./api/app-trpc/email-suppression.api";
+export { buildRetryAfterMessage } from "./api/app-trpc/retry-after-message";

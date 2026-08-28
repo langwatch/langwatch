@@ -44,6 +44,7 @@ export abstract class TeamRepository {
   abstract getOrganizationMembers(input: {
     userIds: string[];
     organizationId: string;
+    activeOnly?: boolean;
   }): Promise<string[]>;
   abstract fenceMembershipChange(input: {
     teamId: string;

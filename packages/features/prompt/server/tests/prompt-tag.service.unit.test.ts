@@ -263,9 +263,7 @@ describe("PromptTagService", () => {
         const repo = makeRepo({ tryFindById: vi.fn().mockResolvedValue(tag) });
         const service = new PromptTagService(repo);
 
-        await expect(service.tryDelete({ id: tag.id, organizationId })).rejects.toThrow(
-          /latest/,
-        );
+        await expect(service.tryDelete({ id: tag.id, organizationId })).rejects.toThrow(/latest/);
       });
     });
 
@@ -321,18 +319,16 @@ describe("PromptTagService", () => {
         const repo = makeRepo();
         const service = new PromptTagService(repo);
 
-        await expect(
-          service.tryDeleteByName({ organizationId, name: "latest" }),
-        ).rejects.toThrow(PromptTagProtectedError);
+        await expect(service.tryDeleteByName({ organizationId, name: "latest" })).rejects.toThrow(
+          PromptTagProtectedError,
+        );
       });
 
       it("does not call repo.deleteByName when tag is protected", async () => {
         const repo = makeRepo();
         const service = new PromptTagService(repo);
 
-        await expect(
-          service.tryDeleteByName({ organizationId, name: "latest" }),
-        ).rejects.toThrow();
+        await expect(service.tryDeleteByName({ organizationId, name: "latest" })).rejects.toThrow();
         expect(repo.deleteByName).not.toHaveBeenCalled();
       });
     });

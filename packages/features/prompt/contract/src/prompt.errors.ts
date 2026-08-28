@@ -6,10 +6,14 @@ export const promptProblemSchema = z
   .strict();
 export type PromptProblem = z.infer<typeof promptProblemSchema>;
 
-export class PromptNotFoundError extends Error {
-  readonly code = "prompt_not_found";
+export class PromptNotFoundError extends HandledError {
+  declare readonly code: "prompt_not_found";
+
   constructor(message = "Prompt not found") {
-    super(message);
+    super("prompt_not_found", message, {
+      httpStatus: 404,
+      fault: "customer",
+    });
     this.name = "PromptNotFoundError";
   }
 }
@@ -81,13 +85,7 @@ export class HandleGenerationError extends Error {
     this.name = "HandleGenerationError";
   }
 }
-export class NotFoundError extends Error {
-  readonly code = "prompt_not_found";
-  constructor(message: string) {
-    super(message);
-    this.name = "NotFoundError";
-  }
-}
+export { PromptNotFoundError as NotFoundError };
 export {
   PromptSystemPromptConflictError as SystemPromptConflictError,
   PromptSystemPromptRequiredError as SystemPromptRequiredError,

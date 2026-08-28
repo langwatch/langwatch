@@ -5,7 +5,6 @@ import {
   PromptTagValidationError,
   type PromptTag,
 } from "@langwatch/prompt-contract";
-import type { PrismaClient } from "../repositories/prisma/prisma.prompt.repository";
 function isUniqueConstraintError(error: unknown): boolean {
   return (
     typeof error === "object" &&
@@ -65,8 +64,8 @@ export function validateTagName(name: string): void {
 export class PromptTagService {
   constructor(private readonly repo: PromptTagRepository) {}
 
-  static create(prisma: PrismaClient): PromptTagService {
-    return new PromptTagService(new PromptTagRepository(prisma));
+  static create(repository: PromptTagRepository): PromptTagService {
+    return new PromptTagService(repository);
   }
 
   seedForOrganization(input: { organizationId: string }): Promise<void> {
@@ -101,9 +100,7 @@ export class PromptTagService {
       return await this.repo.create({ organizationId, name, createdById });
     } catch (error: unknown) {
       if (isUniqueConstraintError(error)) {
-        throw new PromptTagConflictError(
-          `A tag with name "${name}" already exists in this org.`,
-        );
+        throw new PromptTagConflictError(`A tag with name "${name}" already exists in this org.`);
       }
       throw error;
     }

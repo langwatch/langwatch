@@ -1,9 +1,4 @@
 import type { z } from "zod";
-import type {
-  LlmPromptConfigVersion,
-  Prisma,
-  PrismaClient,
-} from "../repositories/prisma/prisma.prompt.repository";
 import type { messageSchema } from "@langwatch/prompt-contract";
 import type { SchemaVersion } from "@langwatch/prompt-contract";
 import { SystemPromptConflictError } from "@langwatch/prompt-contract";
@@ -18,17 +13,14 @@ import {
  * Handles version creation, validation, and business logic.
  */
 export class PromptVersionService {
-  constructor(private readonly prisma: PrismaClient) {}
+  private constructor() {}
 
-  /**
-   * Create a validated version create input.
-   * Validates the input against the latest schema and returns the proper Prisma input type.
-   *
-   * @param params - The parameters object
-   * @returns The validated version create input
-   * @private
-   */
-  private createValidatedVersionCreateInput(params: {
+  static create(): PromptVersionService {
+    return new PromptVersionService();
+  }
+
+  /** Validates the portable data that will become a persisted prompt version. */
+  validateCreateInput(params: {
     configId: string;
     projectId: string;
     commitMessage: string;
@@ -36,7 +28,7 @@ export class PromptVersionService {
     schemaVersion: SchemaVersion;
     authorId?: string;
     version: number;
-  }): Prisma.LlmPromptConfigVersionUncheckedCreateInput {
+  }): void {
     const validator = getVersionValidator(params.schemaVersion).omit({
       id: true,
       createdAt: true,
@@ -47,15 +39,13 @@ export class PromptVersionService {
       configId: params.configId,
       projectId: params.projectId,
       commitMessage: params.commitMessage,
-      configData: params.configData as Prisma.InputJsonValue,
+      configData: params.configData,
       authorId: params.authorId ?? null,
       schemaVersion: params.schemaVersion,
       version: params.version,
     };
 
     validator.parse(data);
-
-    return data;
   }
 
   /**
@@ -72,44 +62,5 @@ export class PromptVersionService {
     if (params.prompt && params.messages?.some((msg) => msg.role === "system")) {
       throw new SystemPromptConflictError();
     }
-  }
-
-  /**
-   * Create a new version for a prompt configuration.
-   * Handles validation and business logic for version creation.
-   */
-  async createVersion(params: {
-    db?: Prisma.TransactionClient;
-    data: {
-      configId: string;
-      projectId: string;
-      commitMessage: string;
-      configData: LatestConfigVersionSchema["configData"];
-      schemaVersion?: SchemaVersion;
-      authorId?: string;
-      version: number;
-      runtimeParameters?: Record<string, unknown>;
-    };
-  }): Promise<LlmPromptConfigVersion> {
-    const { data, db } = params;
-    const prisma = db ?? this.prisma;
-
-    // Validate system prompt conflicts before creating version
-    this.assertNoSystemPromptConflict({
-      prompt: data.configData.prompt,
-      messages: data.configData.messages,
-    });
-
-    const validatedData = this.createValidatedVersionCreateInput({
-      ...data,
-      schemaVersion: data.schemaVersion ?? LATEST_SCHEMA_VERSION,
-    });
-
-    return await prisma.llmPromptConfigVersion.create({
-      data: {
-        ...validatedData,
-        runtimeParameters: (data.runtimeParameters ?? {}) as Prisma.InputJsonValue,
-      },
-    });
   }
 }

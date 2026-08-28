@@ -134,9 +134,7 @@ describe("PromptTagRepository", () => {
           },
         };
         const mockPrisma = {
-          $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) =>
-            fn(mockTx),
-          ),
+          $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx)),
         } as unknown as PrismaClient;
         const repo = new PromptTagRepository(mockPrisma);
 
@@ -165,9 +163,7 @@ describe("PromptTagRepository", () => {
           promptTagAssignment: { updateMany: vi.fn() },
         };
         const mockPrisma = {
-          $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) =>
-            fn(mockTx),
-          ),
+          $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx)),
         } as unknown as PrismaClient;
         const repo = new PromptTagRepository(mockPrisma);
 

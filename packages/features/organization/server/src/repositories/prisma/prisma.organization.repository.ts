@@ -3,12 +3,14 @@ import {
   OrganizationNotFoundError,
   PersonalProjectNotFoundError,
   type OrganizationBillingProfile,
+  type UpdateOrganizationSettingsInput,
   type PersonalFeatures,
   type PersonalWorkspace,
 } from "@langwatch/organization-contract";
 import { Prisma, type PrismaClient, type Team } from "@langwatch/prisma-client/generated";
 import {
   OrganizationRepository,
+  OrganizationSettingsSecretPort,
   type PersonalWorkspaceFeatureProject,
   type PersonalWorkspaceResourceIds,
 } from "../../ports/organization.port";
@@ -16,12 +18,77 @@ import {
 type Client = Prisma.TransactionClient | PrismaClient;
 
 export class PrismaOrganizationRepository extends OrganizationRepository {
-  private constructor(private readonly database: PrismaClient) {
+  private constructor(
+    private readonly database: PrismaClient,
+    private readonly settingsSecrets: OrganizationSettingsSecretPort,
+  ) {
     super();
   }
 
-  static create(database: object): PrismaOrganizationRepository {
-    return new PrismaOrganizationRepository(database as PrismaClient);
+  static create(
+    database: object,
+    settingsSecrets: OrganizationSettingsSecretPort,
+  ): PrismaOrganizationRepository {
+    return new PrismaOrganizationRepository(database as PrismaClient, settingsSecrets);
+  }
+
+  async findSettings(organizationId: string) {
+    return this.database.organization.findUnique({
+      where: { id: organizationId },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        supportContact: true,
+        presenceEnabled: true,
+        traceSharingEnabled: true,
+        primaryIntent: true,
+        s3Endpoint: true,
+        s3AccessKeyId: true,
+        s3Bucket: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  async getSettings(organizationId: string) {
+    const settings = await this.findSettings(organizationId);
+    if (!settings) return null;
+    return {
+      ...settings,
+      s3Endpoint: settings.s3Endpoint ? this.settingsSecrets.decrypt(settings.s3Endpoint) : null,
+      s3AccessKeyId: settings.s3AccessKeyId
+        ? this.settingsSecrets.decrypt(settings.s3AccessKeyId)
+        : null,
+    };
+  }
+
+  async updateSettings(input: UpdateOrganizationSettingsInput): Promise<void> {
+    await this.database.organization.update({
+      where: { id: input.organizationId },
+      data: {
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.supportContact !== undefined
+          ? { supportContact: input.supportContact?.trim() || null }
+          : {}),
+        ...(input.presenceEnabled !== undefined ? { presenceEnabled: input.presenceEnabled } : {}),
+        ...(input.traceSharingEnabled !== undefined
+          ? { traceSharingEnabled: input.traceSharingEnabled }
+          : {}),
+        ...(input.primaryIntent !== undefined ? { primaryIntent: input.primaryIntent } : {}),
+        ...(input.s3Endpoint !== undefined
+          ? { s3Endpoint: this.encryptOrNull(input.s3Endpoint) }
+          : {}),
+        ...(input.s3AccessKeyId !== undefined
+          ? { s3AccessKeyId: this.encryptOrNull(input.s3AccessKeyId) }
+          : {}),
+        ...(input.s3SecretAccessKey !== undefined
+          ? { s3SecretAccessKey: this.encryptOrNull(input.s3SecretAccessKey) }
+          : {}),
+        ...(input.s3Bucket !== undefined ? { s3Bucket: input.s3Bucket || null } : {}),
+      },
+    });
   }
 
   async getOldestTeamId(organizationId: string): Promise<string> {
@@ -87,10 +154,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
           };
         }
 
-        const reactivated = await this.tryReactivateWorkspace(
-          transaction,
-          input.workspace,
-        );
+        const reactivated = await this.tryReactivateWorkspace(transaction, input.workspace);
         if (reactivated) {
           return {
             workspace: reactivated,
@@ -170,6 +234,10 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     });
   }
 
+  private encryptOrNull(value: string | null): string | null {
+    return value ? this.settingsSecrets.encrypt(value) : null;
+  }
+
   private async createPersonalWorkspace(
     transaction: Prisma.TransactionClient,
     input: {
@@ -180,8 +248,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     },
     resources: PersonalWorkspaceResourceIds,
   ): Promise<PersonalWorkspace> {
-    const displayLabel =
-      input.displayName?.trim() || input.displayEmail?.split("@")[0] || "user";
+    const displayLabel = input.displayName?.trim() || input.displayEmail?.split("@")[0] || "user";
     const team = await transaction.team.create({
       data: {
         id: resources.teamId,

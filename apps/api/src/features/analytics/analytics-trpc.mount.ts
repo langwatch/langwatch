@@ -11,10 +11,7 @@
  * `analytics.*` namespace belong to `@langwatch/dashboard-server`, so their
  * mount is in `../dashboard/dashboard-trpc.mount`, not here.
  */
-import type {
-  AnalyticsReadInput,
-  AnalyticsTimeseriesInput,
-} from "@langwatch/analytics-contract";
+import type { AnalyticsReadInput, AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
 import {
   AnalyticsTrpcApi,
   LangWatchQLTrpcApi,
@@ -23,29 +20,16 @@ import {
   type LangWatchQLTrpcContext,
   type LangWatchQLTrpcPorts,
 } from "@langwatch/analytics-server";
-import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
-import { appTrpcPolicy, type AppTrpcPolicyMiddlewares } from "../../app-trpc/app-trpc.policy";
+import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
+import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 
-type AnalyticsMount<
-  TContext extends AnalyticsTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
-  TTimeseriesInput extends AnalyticsTimeseriesInput,
-  TReadInput extends AnalyticsReadInput,
-  TFilterField extends string,
-> = Readonly<{
-  root: TRPCRootObject<TContext, object, TOptions, TRoot>;
-  protectedProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  middlewares: AppTrpcPolicyMiddlewares;
-  /**
-   * Forwarded untouched. The two schemas are the host's because the same
-   * shapes are the REST analytics body and the traces filter input: one
-   * definition, in the host, is what keeps those surfaces from drifting.
-   */
-  ports: AnalyticsTrpcPorts<TTimeseriesInput, TReadInput, TFilterField>;
-}>;
-
-/** Mounts the `analytics.*` reads on the app process's tRPC root. */
+/**
+ * Mounts the `analytics.*` reads on the app process's tRPC root.
+ *
+ * The ports are forwarded untouched. The two schemas are the host's because
+ * the same shapes are the REST analytics body and the traces filter input: one
+ * definition, in the host, is what keeps those surfaces from drifting.
+ */
 export function createAnalyticsTrpcRouter<
   TContext extends AnalyticsTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
@@ -54,47 +38,23 @@ export function createAnalyticsTrpcRouter<
   TReadInput extends AnalyticsReadInput,
   TFilterField extends string,
 >(
-  mount: AnalyticsMount<
-    TContext,
-    TOptions,
-    TRoot,
-    TTimeseriesInput,
-    TReadInput,
-    TFilterField
-  >,
+  mount: TrpcApiMount<TContext, TOptions, TRoot> &
+    TrpcApiPorts<AnalyticsTrpcPorts<TTimeseriesInput, TReadInput, TFilterField>>,
 ) {
-  return AnalyticsTrpcApi.create(
-    mount.root,
-    { protected: mount.protectedProcedure, policy: appTrpcPolicy(mount.middlewares) },
-    mount.ports,
-  );
+  return AnalyticsTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
 }
 
-type LangWatchQLMount<
-  TContext extends LangWatchQLTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
-> = Readonly<{
-  root: TRPCRootObject<TContext, object, TOptions, TRoot>;
-  protectedProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  middlewares: AppTrpcPolicyMiddlewares;
-  /**
-   * Forwarded untouched. The rollout gate is chained by the feature AFTER the
-   * permission check, so a caller is placed by RBAC first and gated by the
-   * experiment second.
-   */
-  ports: LangWatchQLTrpcPorts;
-}>;
-
-/** Mounts the LangWatchQL workbench surface on the app process's tRPC root. */
+/**
+ * Mounts the LangWatchQL workbench surface on the app process's tRPC root.
+ *
+ * The ports are forwarded untouched. The rollout gate is chained by the feature
+ * AFTER the permission check, so a caller is placed by RBAC first and gated by
+ * the experiment second.
+ */
 export function createLangWatchQLTrpcRouter<
   TContext extends LangWatchQLTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
->(mount: LangWatchQLMount<TContext, TOptions, TRoot>) {
-  return LangWatchQLTrpcApi.create(
-    mount.root,
-    { protected: mount.protectedProcedure, policy: appTrpcPolicy(mount.middlewares) },
-    mount.ports,
-  );
+>(mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPorts<LangWatchQLTrpcPorts>) {
+  return LangWatchQLTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
 }

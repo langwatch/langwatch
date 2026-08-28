@@ -8,55 +8,29 @@
  * `sharedTrace.get`, which ADR-057 keeps separate and which this mount does
  * not touch.
  */
+import { createTrpcApiService, type TrpcApiMount } from "@langwatch/api/trpc";
 import {
   PinnedTraceTrpcApi,
   ShareTrpcApi,
   type PinnedTraceTrpcContext,
   type ShareTrpcContext,
 } from "@langwatch/share-server";
-import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
-import { appTrpcPolicy, type AppTrpcPolicyMiddlewares } from "../../app-trpc/app-trpc.policy";
-
-type ShareMount<
-  TContext extends ShareTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
-> = Readonly<{
-  root: TRPCRootObject<TContext, object, TOptions, TRoot>;
-  protectedProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  middlewares: AppTrpcPolicyMiddlewares;
-}>;
+import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 
 /** Mounts `share.*` on the app process's tRPC root. */
 export function createShareTrpcRouter<
   TContext extends ShareTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
->(mount: ShareMount<TContext, TOptions, TRoot>) {
-  return ShareTrpcApi.create(mount.root, {
-    protected: mount.protectedProcedure,
-    policy: appTrpcPolicy(mount.middlewares),
-  });
+>(mount: TrpcApiMount<TContext, TOptions, TRoot>) {
+  return ShareTrpcApi.create(mount.root, createTrpcApiService(mount));
 }
-
-type PinnedTraceMount<
-  TContext extends PinnedTraceTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
-> = Readonly<{
-  root: TRPCRootObject<TContext, object, TOptions, TRoot>;
-  protectedProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  middlewares: AppTrpcPolicyMiddlewares;
-}>;
 
 /** Mounts `pinnedTrace.*` on the app process's tRPC root. */
 export function createPinnedTraceTrpcRouter<
   TContext extends PinnedTraceTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
->(mount: PinnedTraceMount<TContext, TOptions, TRoot>) {
-  return PinnedTraceTrpcApi.create(mount.root, {
-    protected: mount.protectedProcedure,
-    policy: appTrpcPolicy(mount.middlewares),
-  });
+>(mount: TrpcApiMount<TContext, TOptions, TRoot>) {
+  return PinnedTraceTrpcApi.create(mount.root, createTrpcApiService(mount));
 }

@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/api-type-tests.tsbuildinfo"
+  },
+  "include": ["src/**/*", "type-tests/**/*"]
+}

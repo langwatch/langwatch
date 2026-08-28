@@ -1,9 +1,9 @@
-# See ../adrs/001-rpc-first-fluent-registration.md
+# See ../adrs/001-rpc-first-fluent-registration.md (its RPC half is withdrawn)
 # See ../adrs/003-endpoint-capabilities-are-ports.md
 Feature: Fluent endpoint registration
 
   As a feature author
-  I want to register an endpoint as one call — name, version, handler,
+  I want to register an endpoint as one call — method, path, version, handler,
   definition chain
   So that an endpoint's whole identity is visible in one place and new
   capabilities never change the registration signature
@@ -12,9 +12,9 @@ Feature: Fluent endpoint registration
     Given a service created with createService
 
   @unit
-  Scenario: An endpoint is one register call
-    When the author registers "things.create" at version "2026-08-07" with a
-      handler and a chain declaring input and output
+  Scenario: An endpoint is one registration call
+    When the author registers POST "/things.create" at version "2026-08-07"
+      with a handler and a chain declaring input and output
     Then the endpoint serves POST /api/things/2026-08-07/things.create
     And the handler is called with the Hono context and the validated input
     And the process application is reached as context.app
@@ -29,15 +29,16 @@ Feature: Fluent endpoint registration
     Then omitting withOutput is a TypeScript error
 
   @security @unit
-  Scenario: A project-scoped RPC chooses an authorized target
+  Scenario: A project-scoped endpoint chooses an authorized target
     Given a credential that may access more than one project
     When its request input names a projectId
     Then the handler receives that validated projectId
     And the host rejects the request unless authentication authorized the same project
 
   @unit
-  Scenario: A bare endpoint declares no chain
-    When the author registers "things.ping" at a version with only a handler
+  Scenario: An endpoint that declares no input installs no input validation
+    When the author registers POST "/things.ping" at a version with a chain
+      declaring an output and no input
     Then the endpoint answers with no input validation installed
     And a bodyless POST and an empty-object POST both succeed
 
@@ -47,7 +48,7 @@ Feature: Fluent endpoint registration
     Then it offers withInput, withOutput, withParams, withQuery, withStatus,
       withDocs, withAuth, withResourceLimit, withMiddleware, withMeta,
       withRateLimit, withCache and withDeprecated
-    And adding a capability never changes the register signature
+    And adding a capability never changes the registration signature
 
   @integration
   Scenario: Documentation text reaches the published operation
@@ -68,10 +69,10 @@ Feature: Fluent endpoint registration
       version, a handler and a chain
     Then the endpoint serves GET on that path under the service's versioned
       namespace
-    And new RPC families cannot be expressed through registerRoute's grammar
+    And a bare name with no leading slash is refused
 
   @unit @validation
-  Scenario: REST uses the same validated handler boundary as RPC
+  Scenario: Every route uses one validated handler boundary
     Given a REST route declaring path, query and body schemas
     When a request reaches its handler
     Then the handler receives the transformed fields as one input argument
@@ -121,9 +122,9 @@ Feature: Fluent endpoint registration
   @unit
   Scenario: A group applies its chain to everything registered through it
     Given a group "things" declaring withDocs tags and withRateLimit
-    When "create" and "watch" are registered through the group
-    Then both carry the group's tags and rate limit
-    And their full names are "things.create" and "things.watch"
+    When routes and a stream are registered through the group
+    Then all of them carry the group's tags and rate limit
+    And a stream registered as "watch" is mounted as "things.watch"
 
   @unit
   Scenario: Precedence runs service, group, endpoint
@@ -131,12 +132,6 @@ Feature: Fluent endpoint registration
       the same capability
     Then the endpoint's declaration wins
     And middleware runs service first, group second, endpoint last
-
-  @unit
-  Scenario: A group cannot weaken the name grammar
-    Given a group whose name would fail the RPC grammar on its own
-    When an endpoint is registered through it
-    Then registration fails on the full dotted name
 
   @unit
   Scenario: A group carries no version

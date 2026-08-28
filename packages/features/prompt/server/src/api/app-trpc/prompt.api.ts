@@ -5,16 +5,20 @@
  * need, and delegation to `PromptService`.
  */
 import {
-  handleSchema,
+  createPromptCreateTrpcInputSchema,
+  createPromptUpdateTrpcInputSchema,
   hoistSystemMessage,
-  inputsSchema,
-  messageSchema,
-  outputsSchema,
-  promptingTechniqueSchema,
-  promptScopeSchema,
+  promptAssignTagTrpcInputSchema,
+  promptConfigTagsTrpcInputSchema,
+  promptCopyTrpcInputSchema,
+  promptGetByIdOrHandleTrpcInputSchema,
+  promptHandleUniquenessTrpcInputSchema,
+  promptIdOrHandleTrpcInputSchema,
+  promptProjectTrpcInputSchema,
+  promptPushToCopiesTrpcInputSchema,
+  promptRestoreVersionTrpcInputSchema,
   PromptTagValidationError,
-  responseFormatSchema,
-  runtimeParametersSchema,
+  promptUpdateHandleTrpcInputSchema,
 } from "@langwatch/prompt-contract";
 import { nodeDatasetSchema } from "@langwatch/workflow-contract";
 import {
@@ -23,7 +27,6 @@ import {
   type TRPCRootObject,
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
-import { z } from "zod";
 import type {
   PromptTrpcContext,
   PromptTrpcPorts,
@@ -42,13 +45,22 @@ export class PromptTrpcApi {
     ports: PromptTrpcPorts,
   ) {
     const { protected: procedure, policy } = procedures;
+    // Built here rather than in the contract: `demonstrations` is a workflow
+    // dataset, and the workflow contract already depends on the prompt one, so
+    // the shape takes the schema instead of importing it into a cycle.
+    const createInputSchema = createPromptCreateTrpcInputSchema({
+      demonstrationsSchema: nodeDatasetSchema,
+    });
+    const updateInputSchema = createPromptUpdateTrpcInputSchema({
+      demonstrationsSchema: nodeDatasetSchema,
+    });
 
     return trpc.router({
       /**
        * Get all prompts for project
        */
       getAllPromptsForProject: policy("prompts:view")(
-        procedure.input(z.object({ projectId: z.string() })),
+        procedure.input(promptProjectTrpcInputSchema),
       ).query(async ({ ctx, input }) => {
         const service = ctx.app.prompts;
         return await service.getAllPrompts(input);
@@ -57,60 +69,50 @@ export class PromptTrpcApi {
       /**
        * Get copies of a prompt for push selection
        */
-      getCopies: policy("prompts:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            idOrHandle: z.string(),
-          }),
-        ),
-      ).query(async ({ ctx, input }) => {
-        const service = ctx.app.prompts;
-        const prompt = await service.tryGetPromptByIdOrHandle({
-          idOrHandle: input.idOrHandle,
-          projectId: input.projectId,
-        });
-
-        if (!prompt) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Prompt not found",
+      getCopies: policy("prompts:view")(procedure.input(promptIdOrHandleTrpcInputSchema)).query(
+        async ({ ctx, input }) => {
+          const service = ctx.app.prompts;
+          const prompt = await service.tryGetPromptByIdOrHandle({
+            idOrHandle: input.idOrHandle,
+            projectId: input.projectId,
           });
-        }
 
-        const copies = await service.listCopies({ sourcePromptId: prompt.id });
+          if (!prompt) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Prompt not found",
+            });
+          }
 
-        // Filter copies based on user's prompts:update permission
-        const copiesWithPermissions = await Promise.all(
-          copies.map(async (copy) => {
-            const hasPermission = await ctx.can("prompts:update", { projectId: copy.projectId });
-            return {
-              id: copy.id,
-              handle: copy.handle ?? copy.id,
-              projectId: copy.projectId,
-              projectName: copy.projectName,
-              teamName: copy.teamName,
-              organizationName: copy.organizationName,
-              fullPath: `${copy.organizationName} / ${copy.teamName} / ${copy.projectName}`,
-              hasPermission,
-            };
-          }),
-        );
+          const copies = await service.listCopies({ sourcePromptId: prompt.id });
 
-        // Only return copies where user has permission
-        return copiesWithPermissions.filter((copy) => copy.hasPermission);
-      }),
+          // Filter copies based on user's prompts:update permission
+          const copiesWithPermissions = await Promise.all(
+            copies.map(async (copy) => {
+              const hasPermission = await ctx.can("prompts:update", { projectId: copy.projectId });
+              return {
+                id: copy.id,
+                handle: copy.handle ?? copy.id,
+                projectId: copy.projectId,
+                projectName: copy.projectName,
+                teamName: copy.teamName,
+                organizationName: copy.organizationName,
+                fullPath: `${copy.organizationName} / ${copy.teamName} / ${copy.projectName}`,
+                hasPermission,
+              };
+            }),
+          );
+
+          // Only return copies where user has permission
+          return copiesWithPermissions.filter((copy) => copy.hasPermission);
+        },
+      ),
 
       /**
        * Restore a prompt version
        */
       restoreVersion: policy("prompts:update")(
-        procedure.input(
-          z.object({
-            versionId: z.string(),
-            projectId: z.string(),
-          }),
-        ),
+        procedure.input(promptRestoreVersionTrpcInputSchema),
       ).mutation(async ({ ctx, input }) => {
         const service = ctx.app.prompts;
         const authorId = ctx.actor().id;
@@ -123,126 +125,52 @@ export class PromptTrpcApi {
       /**
        * Create a new prompt
        */
-      create: policy("prompts:create")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            data: z.object({
-              scope: promptScopeSchema.optional(),
-              authorId: z.string().optional(),
-              commitMessage: z.string().optional(),
-              prompt: z.string().optional(),
-              messages: z.array(messageSchema).optional(),
-              inputs: z.array(inputsSchema).optional(),
-              outputs: z.array(outputsSchema).optional(),
-              model: z.string().optional(),
-              temperature: z.number().optional(),
-              maxTokens: z.number().optional(),
-              // Traditional sampling parameters
-              topP: z.number().optional(),
-              frequencyPenalty: z.number().optional(),
-              presencePenalty: z.number().optional(),
-              // Other sampling parameters
-              seed: z.number().optional(),
-              topK: z.number().optional(),
-              minP: z.number().optional(),
-              repetitionPenalty: z.number().optional(),
-              // Reasoning parameter (canonical/unified field)
-              reasoning: z.string().optional(),
-              verbosity: z.string().optional(),
-              promptingTechnique: promptingTechniqueSchema.optional(),
-              responseFormat: responseFormatSchema.optional(),
-              demonstrations: nodeDatasetSchema.optional(),
-              handle: handleSchema,
-              parameters: runtimeParametersSchema.optional(),
-            }),
-          }),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        const service = ctx.app.prompts;
-        const authorId = ctx.actor().id;
+      create: policy("prompts:create")(procedure.input(createInputSchema)).mutation(
+        async ({ ctx, input }) => {
+          const service = ctx.app.prompts;
+          const authorId = ctx.actor().id;
 
-        const result = await service.createPrompt({
-          ...input.data,
-          projectId: input.projectId,
-          authorId,
-        });
+          const result = await service.createPrompt({
+            ...input.data,
+            projectId: input.projectId,
+            authorId,
+          });
 
-        ports.afterPromptCreated({
-          projectId: input.projectId,
-          userId: authorId,
-        });
+          ports.afterPromptCreated({
+            projectId: input.projectId,
+            userId: authorId,
+          });
 
-        return result;
-      }),
+          return result;
+        },
+      ),
 
       /**
        * Update a prompt (creates a new version, requires commitMessage)
        * Scope and handle should not be updated here since they do not create a new version/require a commit message.
        * Use the updateHandle method instead for those.
        */
-      update: policy("prompts:update")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            id: z.string(),
-            data: z.object({
-              commitMessage: z.string(),
-              authorId: z.string().optional(),
-              prompt: z.string().optional(),
-              messages: z.array(messageSchema).optional(),
-              inputs: z.array(inputsSchema).optional(),
-              outputs: z.array(outputsSchema).optional(),
-              model: z.string().optional(),
-              temperature: z.number().optional(),
-              maxTokens: z.number().optional(),
-              // Traditional sampling parameters
-              topP: z.number().optional(),
-              frequencyPenalty: z.number().optional(),
-              presencePenalty: z.number().optional(),
-              // Other sampling parameters
-              seed: z.number().optional(),
-              topK: z.number().optional(),
-              minP: z.number().optional(),
-              repetitionPenalty: z.number().optional(),
-              // Reasoning parameter (canonical/unified field)
-              reasoning: z.string().optional(),
-              verbosity: z.string().optional(),
-              promptingTechnique: promptingTechniqueSchema.optional(),
-              responseFormat: responseFormatSchema.optional(),
-              demonstrations: nodeDatasetSchema.optional(),
-              parameters: runtimeParametersSchema.optional(),
-            }),
-          }),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        const service = ctx.app.prompts;
-        const authorId = ctx.actor().id;
+      update: policy("prompts:update")(procedure.input(updateInputSchema)).mutation(
+        async ({ ctx, input }) => {
+          const service = ctx.app.prompts;
+          const authorId = ctx.actor().id;
 
-        return await service.updatePrompt({
-          idOrHandle: input.id,
-          projectId: input.projectId,
-          data: {
-            ...input.data,
-            authorId,
-          },
-        });
-      }),
+          return await service.updatePrompt({
+            idOrHandle: input.id,
+            projectId: input.projectId,
+            data: {
+              ...input.data,
+              authorId,
+            },
+          });
+        },
+      ),
 
       /**
        * Update only the handle and scope without creating a new version
        */
       updateHandle: policy("prompts:update")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            id: z.string(),
-            data: z.object({
-              handle: handleSchema,
-              scope: promptScopeSchema,
-            }),
-          }),
-        ),
+        procedure.input(promptUpdateHandleTrpcInputSchema),
       ).mutation(async ({ ctx, input }) => {
         const service = ctx.app.prompts;
         return await service.updateHandle({
@@ -256,18 +184,7 @@ export class PromptTrpcApi {
        * Get a prompt by id
        */
       getByIdOrHandle: policy("prompts:view")(
-        procedure.input(
-          z.object({
-            idOrHandle: z.string(),
-            projectId: z.string(),
-            /** Optional: fetch a specific version by ID */
-            versionId: z.string().optional(),
-            /** Optional: fetch a specific version by number */
-            version: z.number().optional(),
-            /** Optional: fetch the version pointed to by this tag */
-            tag: z.string().optional(),
-          }),
-        ),
+        procedure.input(promptGetByIdOrHandleTrpcInputSchema),
       ).query(async ({ ctx, input }) => {
         try {
           const service = ctx.app.prompts;
@@ -291,13 +208,7 @@ export class PromptTrpcApi {
        * Check if a handle is unique for a project
        */
       checkHandleUniqueness: policy("prompts:view")(
-        procedure.input(
-          z.object({
-            handle: handleSchema,
-            projectId: z.string(),
-            scope: promptScopeSchema,
-          }),
-        ),
+        procedure.input(promptHandleUniquenessTrpcInputSchema),
       ).query(async ({ ctx, input }) => {
         const service = ctx.app.prompts;
         return await service.checkHandleUniqueness(input);
@@ -307,12 +218,7 @@ export class PromptTrpcApi {
        * Check if user can modify/delete a prompt
        */
       checkModifyPermission: policy("prompts:view")(
-        procedure.input(
-          z.object({
-            idOrHandle: z.string(),
-            projectId: z.string(),
-          }),
-        ),
+        procedure.input(promptIdOrHandleTrpcInputSchema),
       ).query(async ({ ctx, input }) => {
         const service = ctx.app.prompts;
         return await service.checkModifyPermission(input);
@@ -322,12 +228,7 @@ export class PromptTrpcApi {
        * Get all versions for a prompt
        */
       getAllVersionsForPrompt: policy("prompts:view")(
-        procedure.input(
-          z.object({
-            idOrHandle: z.string(),
-            projectId: z.string(),
-          }),
-        ),
+        procedure.input(promptIdOrHandleTrpcInputSchema),
       ).query(async ({ ctx, input }) => {
         const service = ctx.app.prompts;
         return await service.getAllVersions(input);
@@ -336,74 +237,58 @@ export class PromptTrpcApi {
       /**
        * Delete a prompt
        */
-      delete: policy("prompts:delete")(
-        procedure.input(
-          z.object({
-            idOrHandle: z.string(),
-            projectId: z.string(),
-          }),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        const service = ctx.app.prompts;
-        return await service.deletePrompt(input);
-      }),
+      delete: policy("prompts:delete")(procedure.input(promptIdOrHandleTrpcInputSchema)).mutation(
+        async ({ ctx, input }) => {
+          const service = ctx.app.prompts;
+          return await service.deletePrompt(input);
+        },
+      ),
 
       /**
        * Copy a prompt to another project
        */
-      copy: policy("prompts:create")(
-        procedure.input(
-          z.object({
-            idOrHandle: z.string(),
-            projectId: z.string(),
-            sourceProjectId: z.string(),
-          }),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        // Check that the user has at least prompts:create permission on the source project
-        const hasSourcePermission = await ctx.can("prompts:create", {
-          projectId: input.sourceProjectId,
-        });
-
-        if (!hasSourcePermission) {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "You do not have permission to create prompts in the source project",
+      copy: policy("prompts:create")(procedure.input(promptCopyTrpcInputSchema)).mutation(
+        async ({ ctx, input }) => {
+          // Check that the user has at least prompts:create permission on the source project
+          const hasSourcePermission = await ctx.can("prompts:create", {
+            projectId: input.sourceProjectId,
           });
-        }
 
-        const service = ctx.app.prompts;
-        const authorId = ctx.actor().id;
+          if (!hasSourcePermission) {
+            throw new TRPCError({
+              code: "UNAUTHORIZED",
+              message: "You do not have permission to create prompts in the source project",
+            });
+          }
 
-        // A missing source prompt raises `prompt_not_found`, a HandledError:
-        // `handledErrorMiddleware` gives it the NOT_FOUND tRPC code and the
-        // client reads its copy off that code. Nothing to re-wrap.
-        const copiedPrompt = await service.copyPrompt({
-          idOrHandle: input.idOrHandle,
-          sourceProjectId: input.sourceProjectId,
-          targetProjectId: input.projectId,
-          authorId,
-        });
+          const service = ctx.app.prompts;
+          const authorId = ctx.actor().id;
 
-        ports.afterPromptCreated({
-          projectId: input.projectId,
-          userId: authorId,
-        });
+          // A missing source prompt raises `prompt_not_found`, a HandledError:
+          // `handledErrorMiddleware` gives it the NOT_FOUND tRPC code and the
+          // client reads its copy off that code. Nothing to re-wrap.
+          const copiedPrompt = await service.copyPrompt({
+            idOrHandle: input.idOrHandle,
+            sourceProjectId: input.sourceProjectId,
+            targetProjectId: input.projectId,
+            authorId,
+          });
 
-        return copiedPrompt;
-      }),
+          ports.afterPromptCreated({
+            projectId: input.projectId,
+            userId: authorId,
+          });
+
+          return copiedPrompt;
+        },
+      ),
 
       /**
        * Duplicate a prompt within the project it already belongs to.
        * Unlike `copy`, this never crosses project boundaries.
        */
       duplicate: policy("prompts:create")(
-        procedure.input(
-          z.object({
-            idOrHandle: z.string(),
-            projectId: z.string(),
-          }),
-        ),
+        procedure.input(promptIdOrHandleTrpcInputSchema),
       ).mutation(async ({ ctx, input }) => {
         const service = ctx.app.prompts;
         const authorId = ctx.actor().id;
@@ -426,12 +311,7 @@ export class PromptTrpcApi {
        * Sync a copied prompt from its source
        */
       syncFromSource: policy("prompts:update")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            idOrHandle: z.string(),
-          }),
-        ),
+        procedure.input(promptIdOrHandleTrpcInputSchema),
       ).mutation(async ({ ctx, input }) => {
         const service = ctx.app.prompts;
         const authorId = ctx.actor().id;
@@ -539,13 +419,7 @@ export class PromptTrpcApi {
        * Push a source prompt to all its copies
        */
       pushToCopies: policy("prompts:update")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            idOrHandle: z.string(),
-            copyIds: z.array(z.string()).optional(), // Optional: if provided, only push to selected copies
-          }),
-        ),
+        procedure.input(promptPushToCopiesTrpcInputSchema),
       ).mutation(async ({ ctx, input }) => {
         const service = ctx.app.prompts;
         const authorId = ctx.actor().id;
@@ -680,7 +554,7 @@ export class PromptTrpcApi {
        * Get all tags for a prompt config.
        */
       getTagsForConfig: policy("prompts:view")(
-        procedure.input(z.object({ projectId: z.string(), configId: z.string() })),
+        procedure.input(promptConfigTagsTrpcInputSchema),
       ).query(async ({ ctx, input }) => {
         const service = ctx.app.prompts;
         return service.getTagsForConfig({
@@ -693,36 +567,29 @@ export class PromptTrpcApi {
        * Assign (or reassign) a tag to a specific prompt version.
        * Accepts built-in tags (production, staging) and custom tags defined for the org.
        */
-      assignTag: policy("prompts:update")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            configId: z.string(),
-            versionId: z.string(),
-            tag: z.string().min(1),
-          }),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        const service = ctx.app.prompts;
+      assignTag: policy("prompts:update")(procedure.input(promptAssignTagTrpcInputSchema)).mutation(
+        async ({ ctx, input }) => {
+          const service = ctx.app.prompts;
 
-        try {
-          return await service.assignTag({
-            configId: input.configId,
-            versionId: input.versionId,
-            tag: input.tag,
-            projectId: input.projectId,
-            userId: ctx.actor().id,
-          });
-        } catch (error) {
-          if (error instanceof PromptTagValidationError) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: error.message,
+          try {
+            return await service.assignTag({
+              configId: input.configId,
+              versionId: input.versionId,
+              tag: input.tag,
+              projectId: input.projectId,
+              userId: ctx.actor().id,
             });
+          } catch (error) {
+            if (error instanceof PromptTagValidationError) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: error.message,
+              });
+            }
+            throw error;
           }
-          throw error;
-        }
-      }),
+        },
+      ),
     });
   }
 }

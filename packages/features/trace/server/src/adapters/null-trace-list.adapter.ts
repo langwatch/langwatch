@@ -2,7 +2,7 @@ import type {
   CategoricalFacetResult,
   DiscreteFacetResult,
   FacetCountResult,
-  TraceListPage,
+  TraceListRepositoryPage,
   TraceListRepository,
 } from "@langwatch/trace-contract";
 
@@ -13,7 +13,7 @@ export class NullTraceListAdapter implements TraceListRepository {
     return new NullTraceListAdapter();
   }
 
-  async findAll(): Promise<TraceListPage> {
+  async findAll(): Promise<TraceListRepositoryPage> {
     return { rows: [], totalHits: 0 };
   }
 

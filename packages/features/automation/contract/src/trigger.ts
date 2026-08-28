@@ -18,16 +18,23 @@ export const triggerTemplateSchema = z.object({
   emailBodyTemplate: z.string().nullable(),
 });
 
-const legacyTriggerTemplateSchema = z.object({
+/**
+ * A template set as an author's draft carries it: every column optional,
+ * because the drawer sends only what it has. It is also the legacy wire form
+ * `parseTriggerTemplatesWire` accepts, so the two are one schema rather than
+ * two copies of the same four columns.
+ */
+export const triggerTemplateDraftSchema = z.object({
   slackTemplateType: z.string().nullable().optional(),
   slackTemplate: z.string().nullable().optional(),
   emailSubjectTemplate: z.string().nullable().optional(),
   emailBodyTemplate: z.string().nullable().optional(),
 });
+export type TriggerTemplateDraft = z.infer<typeof triggerTemplateDraftSchema>;
 
 const triggerTemplateWireSchema = z.union([
   z.object({ templates: triggerTemplateSchema }),
-  legacyTriggerTemplateSchema,
+  triggerTemplateDraftSchema,
 ]);
 
 export function parseTriggerTemplatesWire(value: unknown): TriggerTemplate {
@@ -37,7 +44,7 @@ export function parseTriggerTemplatesWire(value: unknown): TriggerTemplate {
     return canonical.data.templates;
   }
 
-  const legacy = legacyTriggerTemplateSchema.parse(parsed);
+  const legacy = triggerTemplateDraftSchema.parse(parsed);
   return {
     slackTemplateType: legacy.slackTemplateType ?? null,
     slackTemplate: legacy.slackTemplate ?? null,

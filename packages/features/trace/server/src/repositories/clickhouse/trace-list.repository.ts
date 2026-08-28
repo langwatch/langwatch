@@ -2,7 +2,7 @@ import { EventUtils } from "@langwatch/eventing";
 import type { TraceClickHouseResolver } from "../../ports/clickhouse.port";
 import {
   type TraceListFacetQuery,
-  type TraceListPage,
+  type TraceListRepositoryPage,
   type TraceListQuery,
   type TraceListRepository,
   type TraceListSummary,
@@ -177,7 +177,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     return new TraceListClickHouseRepository(resolveClient);
   }
 
-  async findAll(query: TraceListQuery): Promise<TraceListPage> {
+  async findAll(query: TraceListQuery): Promise<TraceListRepositoryPage> {
     EventUtils.validateTenantId(
       { tenantId: query.tenantId },
       "TraceListClickHouseRepository.findAll",

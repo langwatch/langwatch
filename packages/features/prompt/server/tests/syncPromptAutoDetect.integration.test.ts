@@ -1,19 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { promptConfigDataSchema, type PromptConfigData } from "@langwatch/prompt-contract";
 import { PromptService, type VersionedPrompt } from "../src/services/prompt.service";
+import { createPromptServiceForTest } from "./prompt-service.test-fixture";
 
 describe("PromptService", () => {
   describe("syncPrompt()", () => {
     let promptService: PromptService;
-    let mockPrisma: any;
-    let mockRepository: any;
-    let mockVersionService: any;
+    let compareConfigContent: ReturnType<typeof vi.spyOn>;
 
     const projectId = "project-1";
     const organizationId = "org-1";
 
-    function buildExistingPrompt(
-      overrides: Partial<VersionedPrompt> = {},
-    ): VersionedPrompt {
+    function buildExistingPrompt(overrides: Partial<VersionedPrompt> = {}): VersionedPrompt {
       return {
         id: "config-1",
         name: "test-prompt",
@@ -45,36 +43,8 @@ describe("PromptService", () => {
     beforeEach(() => {
       vi.clearAllMocks();
 
-      mockPrisma = {
-        $transaction: vi.fn(),
-        project: {
-          findUnique: vi.fn(),
-        },
-      } as any;
-
-      mockRepository = {
-        compareConfigContent: vi.fn(),
-        getConfigVersionByNumber: vi.fn(),
-        getConfigByIdOrHandleWithLatestVersion: vi.fn(),
-        checkModifyPermission: vi.fn().mockResolvedValue({
-          hasPermission: true,
-        }),
-        createConfigWithInitialVersion: vi.fn(),
-        updateConfig: vi.fn(),
-        versions: {
-          getLatestVersion: vi.fn(),
-        },
-        createHandle: vi.fn(),
-      };
-
-      mockVersionService = {
-        assertNoSystemPromptConflict: vi.fn(),
-        createVersion: vi.fn(),
-      };
-
-      promptService = new PromptService(mockPrisma);
-      (promptService as any).repository = mockRepository;
-      (promptService as any).versionService = mockVersionService;
+      promptService = createPromptServiceForTest();
+      compareConfigContent = vi.spyOn(promptService.repository, "compareConfigContent");
     });
 
     describe("given a prompt with auto-detected variables already synced", () => {
@@ -88,11 +58,9 @@ describe("PromptService", () => {
             inputs: [{ identifier: "name", type: "str" as const }],
           });
 
-          vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(
-            existingPrompt,
-          );
+          vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(existingPrompt);
 
-          mockRepository.compareConfigContent.mockReturnValue({
+          compareConfigContent.mockReturnValue({
             isEqual: true,
           });
 
@@ -105,7 +73,7 @@ describe("PromptService", () => {
               inputs: [{ identifier: "input", type: "str" }],
               outputs: [{ identifier: "output", type: "str" }],
               temperature: 0.7,
-            } as any,
+            } satisfies PromptConfigData,
             localVersion: 1,
             projectId,
             organizationId,
@@ -115,10 +83,10 @@ describe("PromptService", () => {
 
           // Verify the local config data passed to compare has the auto-detected
           // inputs merged and sorted, not just the CLI default
-          const [localArg] = mockRepository.compareConfigContent.mock.calls[0]!;
-          const inputIdentifiers = (localArg.inputs as any[]).map(
-            (i: any) => i.identifier,
-          );
+          const [localArg] = compareConfigContent.mock.calls[0]!;
+          const inputIdentifiers = promptConfigDataSchema
+            .parse(localArg)
+            .inputs.map((input) => input.identifier);
           expect(inputIdentifiers).toContain("input");
           expect(inputIdentifiers).toContain("name");
         });
@@ -138,11 +106,9 @@ describe("PromptService", () => {
             ],
           });
 
-          vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(
-            existingPrompt,
-          );
+          vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(existingPrompt);
 
-          mockRepository.compareConfigContent.mockReturnValue({
+          compareConfigContent.mockReturnValue({
             isEqual: true,
           });
 
@@ -155,7 +121,7 @@ describe("PromptService", () => {
               messages: [],
               inputs: [],
               outputs: [{ identifier: "output", type: "str" }],
-            } as any,
+            } satisfies PromptConfigData,
             localVersion: 1,
             projectId,
             organizationId,
@@ -164,14 +130,13 @@ describe("PromptService", () => {
           expect(result.action).toBe("up_to_date");
 
           // Verify both local and remote inputs are sorted identically
-          const [localArg, remoteArg] =
-            mockRepository.compareConfigContent.mock.calls[0]!;
-          const localIdentifiers = (localArg.inputs as any[]).map(
-            (i: any) => i.identifier,
-          );
-          const remoteIdentifiers = (remoteArg.inputs as any[]).map(
-            (i: any) => i.identifier,
-          );
+          const [localArg, remoteArg] = compareConfigContent.mock.calls[0]!;
+          const localIdentifiers = promptConfigDataSchema
+            .parse(localArg)
+            .inputs.map((input) => input.identifier);
+          const remoteIdentifiers = promptConfigDataSchema
+            .parse(remoteArg)
+            .inputs.map((input) => input.identifier);
           expect(localIdentifiers).toEqual(["alpha", "zebra"]);
           expect(remoteIdentifiers).toEqual(["alpha", "zebra"]);
         });
@@ -197,7 +162,7 @@ describe("PromptService", () => {
               messages: [{ role: "user", content: "{{task}}" }],
               inputs: [{ identifier: "input", type: "str" }],
               outputs: [{ identifier: "output", type: "str" }],
-            } as any,
+            } satisfies PromptConfigData,
             projectId,
             organizationId,
           });
@@ -206,9 +171,7 @@ describe("PromptService", () => {
 
           // Verify the create call got auto-detected inputs merged
           const createArgs = createSpy.mock.calls[0]![0];
-          const inputIdentifiers = (createArgs.inputs as any[]).map(
-            (i: any) => i.identifier,
-          );
+          const inputIdentifiers = createArgs.inputs?.map((input) => input.identifier) ?? [];
           expect(inputIdentifiers).toContain("input");
           expect(inputIdentifiers).toContain("name");
           expect(inputIdentifiers).toContain("task");

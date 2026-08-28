@@ -29,12 +29,20 @@ export * from "./trace-processing.events";
 export * from "./trace-log-contribution";
 export * from "./trace-metric-correlation";
 export * from "./trace-message.schemas";
+export { safeUnflatten } from "./trace-attribute-unflatten";
+export { predefinedEventTypes, predefinedEventsSchemas } from "./trace-tracked-event.schemas";
 export * from "./trace-evaluation.contract";
 export * from "./trace-format.schemas";
 export * from "./trace-full-read.contract";
 export * from "./trace-derived-event";
 export * from "./trace-list.repository";
+export * from "./trace-list-view";
+export * from "./trace-media-ref";
 export * from "./trace-read.contract";
+export * from "./trace-session-group";
+export * from "./trace-share.schemas";
+export * from "./trace-span-read-model";
+export * from "./trace-ai-query";
 export * from "./trace-edit-overlay.contract";
 export {
   normalizedSpanSchema,
@@ -94,6 +102,7 @@ export {
   TOPIC_ASSIGNED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
   TOPIC_ASSIGNED_EVENT_VERSIONS,
+  TRACK_EVENT_SPAN_NAME,
   TRACE_CORRELATION_COALESCE_MAX_BATCH,
   TRACE_NAME_CHANGED_EVENT_TYPE,
   TRACE_NAME_CHANGED_EVENT_VERSION_LATEST,

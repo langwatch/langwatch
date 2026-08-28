@@ -3,16 +3,12 @@ import {
   PromptService as PromptServiceContract,
   type PromptCopySource,
   type PromptCopySummary,
+  type PromptScope,
   type PromptTag,
   type PromptTagAssignment,
+  type UpdatePromptCommand,
 } from "@langwatch/prompt-contract";
 import type { z } from "zod";
-import type {
-  LlmPromptConfigVersion,
-  Prisma,
-  PrismaClient,
-  PromptScope,
-} from "../repositories/prisma/prisma.prompt.repository";
 import {
   deriveResponseFormatFromOutputs,
   handleSchema,
@@ -22,7 +18,6 @@ import {
   type promptingTechniqueSchema,
 } from "@langwatch/prompt-contract";
 import { describeLocalFileUpdate } from "../ports/prompt-describe-local-file-update.port";
-import { SchemaVersion } from "@langwatch/prompt-contract";
 import {
   HandleGenerationError,
   NotFoundError,
@@ -35,12 +30,9 @@ import { PromptVersionService } from "./prompt-version.service";
 import { normalizeReasoningFromProviderFields } from "@langwatch/prompt-contract";
 import { PromptTagService } from "./prompt-tag.service";
 import {
-  type CreateLlmConfigParams,
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
 } from "../repositories/prisma/prisma.prompt.repository";
-import type { CreateLlmConfigVersionParams } from "../repositories/prisma/prisma.prompt-version.repository";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import {
   PromptTagAssignmentRepository,
   TagValidationError,
@@ -55,15 +47,18 @@ import {
   runtimeParametersEqual,
 } from "@langwatch/prompt-contract";
 import { PromptTagRepository } from "../repositories/prisma/prisma.prompt-tag.repository";
-import {
-  transformCamelToSnake,
-  transformSnakeToCamel,
-} from "../ports/prompt-transform-db.port";
+import { transformCamelToSnake, transformSnakeToCamel } from "../ports/prompt-transform-db.port";
 
 const logger = createLogger("langwatch:prompt-service");
 
 // Extract the configData type from the schema
 type ConfigData = z.infer<ReturnType<typeof getLatestConfigVersionSchema>>["configData"];
+type PromptUpdateInput = Omit<UpdatePromptCommand, "data"> & {
+  data: UpdatePromptCommand["data"] & {
+    handle?: string;
+    scope?: PromptScope;
+  };
+};
 
 /**
  * Full prompt shape that combines prompt config with version data.
@@ -145,22 +140,28 @@ export class PromptService extends PromptServiceContract {
   readonly tagService: PromptTagService;
 
   static create(options: {
-    database: PrismaClient;
-    modelProvider?: ModelProviderService;
+    repository: LlmConfigRepository;
+    versionService: PromptVersionService;
+    tagRepository: PromptTagAssignmentRepository;
+    promptTagRepository: PromptTagRepository;
+    tagService: PromptTagService;
   }): PromptService {
-    return new PromptService(options.database, options.modelProvider);
+    return new PromptService(options);
   }
 
-  constructor(
-    private readonly prisma: PrismaClient,
-    modelProvider?: ModelProviderService,
-  ) {
+  private constructor(options: {
+    repository: LlmConfigRepository;
+    versionService: PromptVersionService;
+    tagRepository: PromptTagAssignmentRepository;
+    promptTagRepository: PromptTagRepository;
+    tagService: PromptTagService;
+  }) {
     super();
-    this.repository = new LlmConfigRepository(prisma, undefined, modelProvider);
-    this.versionService = new PromptVersionService(prisma);
-    this.tagRepository = new PromptTagAssignmentRepository(prisma);
-    this.promptTagRepository = new PromptTagRepository(prisma);
-    this.tagService = PromptTagService.create(prisma);
+    this.repository = options.repository;
+    this.versionService = options.versionService;
+    this.tagRepository = options.tagRepository;
+    this.promptTagRepository = options.promptTagRepository;
+    this.tagService = options.tagService;
   }
 
   /**
@@ -265,9 +266,7 @@ export class PromptService extends PromptServiceContract {
       });
 
       if (!tagId) {
-        throw new NotFoundError(
-          `Tag "${normalizedTag}" not found for prompt "${idOrHandle}"`,
-        );
+        throw new NotFoundError(`Tag "${normalizedTag}" not found for prompt "${idOrHandle}"`);
       }
 
       const versionTag = await this.tagRepository.tryGetByConfigAndTagId({
@@ -277,9 +276,7 @@ export class PromptService extends PromptServiceContract {
       });
 
       if (!versionTag) {
-        throw new NotFoundError(
-          `Tag "${normalizedTag}" not found for prompt "${idOrHandle}"`,
-        );
+        throw new NotFoundError(`Tag "${normalizedTag}" not found for prompt "${idOrHandle}"`);
       }
 
       resolvedVersionId = versionTag.versionId;
@@ -334,8 +331,7 @@ export class PromptService extends PromptServiceContract {
   }): Promise<VersionedPrompt[]> {
     // If no organizationId is provided, get it from the projectId
     const organizationId: string =
-      params.organizationId ??
-      (await this.getOrganizationIdFromProjectId(params.projectId));
+      params.organizationId ?? (await this.getOrganizationIdFromProjectId(params.projectId));
 
     // Get the config
     const config = await this.repository.tryGetPromptByIdOrHandle({
@@ -433,8 +429,7 @@ export class PromptService extends PromptServiceContract {
     parameters?: Record<string, unknown>;
   }): Promise<VersionedPrompt> {
     const organizationId =
-      params.organizationId ??
-      (await this.getOrganizationIdFromProjectId(params.projectId));
+      params.organizationId ?? (await this.getOrganizationIdFromProjectId(params.projectId));
     // If any of the version data is provided,
     // we should create a version from that data
     // and it's not consideered a draft
@@ -600,8 +595,7 @@ export class PromptService extends PromptServiceContract {
     const baseHandle = this.deriveBaseHandle(source);
     const handle = await this.generateUniqueHandle({
       // The bare handle is free in most target projects, so try it first.
-      candidateFor: (attempt) =>
-        attempt === 0 ? baseHandle : `${baseHandle}_copy${attempt}`,
+      candidateFor: (attempt) => (attempt === 0 ? baseHandle : `${baseHandle}_copy${attempt}`),
       projectId: targetProjectId,
       scope: source.scope,
     });
@@ -669,9 +663,7 @@ export class PromptService extends PromptServiceContract {
   private deriveBaseHandle(source: VersionedPrompt): string {
     const candidate = source.handle ?? source.name;
 
-    return handleSchema.safeParse(candidate).success
-      ? candidate
-      : toHandleSlug(candidate);
+    return handleSchema.safeParse(candidate).success ? candidate : toHandleSlug(candidate);
   }
 
   /**
@@ -717,18 +709,14 @@ export class PromptService extends PromptServiceContract {
     prompt?: string;
     messages?: Array<{ role: string; content: string }> | undefined;
   }): { prompt?: string; messages?: Array<{ role: string; content: string }> } {
-    const messageSystemPrompt = data.messages?.find(
-      (msg) => msg.role === "system",
-    )?.content;
+    const messageSystemPrompt = data.messages?.find((msg) => msg.role === "system")?.content;
     const normalized: {
       prompt?: string;
       messages?: Array<{ role: string; content: string }>;
     } = { ...data };
     if (messageSystemPrompt) {
       normalized.prompt = normalized.prompt ?? messageSystemPrompt;
-      normalized.messages = (normalized.messages ?? []).filter(
-        (msg) => msg.role !== "system",
-      );
+      normalized.messages = (normalized.messages ?? []).filter((msg) => msg.role !== "system");
     }
     return normalized;
   }
@@ -801,28 +789,7 @@ export class PromptService extends PromptServiceContract {
    * @param params.data - The update data (must include commitMessage)
    * @returns The updated prompt configuration with new version
    */
-  async updatePrompt(params: {
-    idOrHandle: string;
-    projectId: string;
-    data: {
-      commitMessage: string;
-      parameters?: Record<string, unknown>;
-    } & Partial<
-      Omit<
-        CreateLlmConfigParams &
-          Omit<CreateLlmConfigVersionParams, "configData"> &
-          CreateLlmConfigVersionParams["configData"],
-        | "id"
-        | "createdAt"
-        | "updatedAt"
-        | "deletedAt"
-        | "configId"
-        | "projectId"
-        | "name"
-        | "commitMessage"
-      >
-    >;
-  }): Promise<VersionedPrompt> {
+  async updatePrompt(params: PromptUpdateInput): Promise<VersionedPrompt> {
     const { idOrHandle, projectId, data } = params;
     const {
       handle,
@@ -836,10 +803,7 @@ export class PromptService extends PromptServiceContract {
 
     // Only normalize system messages if prompt or messages are being updated
     // This prevents undefined values from overwriting existing database values
-    if (
-      configDataUpdates.prompt !== undefined ||
-      configDataUpdates.messages !== undefined
-    ) {
+    if (configDataUpdates.prompt !== undefined || configDataUpdates.messages !== undefined) {
       const normalizedUpdate = this.normalizeSystemMessage(configDataUpdates);
       configDataUpdates.prompt = normalizedUpdate.prompt;
       configDataUpdates.messages = normalizedUpdate.messages as unknown as
@@ -850,72 +814,24 @@ export class PromptService extends PromptServiceContract {
         | undefined;
     }
 
-    // Handle in a transaction to ensure atomicity
-    const result = await this.prisma.$transaction(
-      async (tx: Prisma.TransactionClient) => {
-        // Update the config metadata (handle/scope)
-        const updatedConfig = await this.repository.updateConfig(
-          idOrHandle,
-          projectId,
-          {
-            handle,
-            scope,
-          },
-          { tx },
-        );
+    const updatedConfig = await this.repository.updateConfigAndCreateVersion({
+      idOrHandle,
+      projectId,
+      data: { handle, scope },
+      commitMessage,
+      configDataUpdates: this.transformToDbFormat(configDataUpdates) as Partial<
+        LatestConfigVersionSchema["configData"]
+      >,
+      schemaVersion: LATEST_SCHEMA_VERSION,
+      authorId: data.authorId,
+      runtimeParameters: incomingParameters,
+    });
+    const newVersionId = updatedConfig.latestVersion.id ?? "";
 
-        // Get the latest version
-        // TODO: This should use the version service instead of accessing the repository directly
-        const latestVersionRaw = await this.repository.versions.getLatestVersion(
-          updatedConfig.id,
-          projectId,
-          { tx },
-        );
-        const latestVersion = parseLlmConfigVersion(latestVersionRaw);
-
-        const resolvedParameters =
-          incomingParameters !== undefined
-            ? incomingParameters
-            : parseRuntimeParameters(latestVersionRaw.runtimeParameters);
-
-        // Create the new version with updated configData
-        // Note: Even if only metadata (handle/scope) changed, we create a version
-        // to track the change via commitMessage
-        const updatedVersion: LlmPromptConfigVersion =
-          await this.versionService.createVersion({
-            db: tx,
-            data: {
-              configId: updatedConfig.id,
-              projectId,
-              commitMessage,
-              configData: this.transformToDbFormat({
-                ...latestVersion.configData,
-                ...configDataUpdates,
-              }) as LatestConfigVersionSchema["configData"],
-              schemaVersion: LATEST_SCHEMA_VERSION,
-              version: latestVersion.version + 1,
-              runtimeParameters: resolvedParameters,
-            },
-          });
-
-        // The new version we just created is now the latest. Custom tags
-        // assigned by the route run after this transaction returns, so the
-        // only tag to surface here is the built-in "latest".
-        const newVersionId = updatedVersion.id ?? "";
-        return this.transformToVersionedPrompt(
-          {
-            ...updatedConfig,
-            latestVersion: {
-              ...parseLlmConfigVersion(updatedVersion),
-              runtimeParameters: resolvedParameters,
-            },
-          } as LlmConfigWithLatestVersion,
-          newVersionId ? [{ name: "latest", versionId: newVersionId }] : [],
-        );
-      },
+    return this.transformToVersionedPrompt(
+      updatedConfig,
+      newVersionId ? [{ name: "latest", versionId: newVersionId }] : [],
     );
-
-    return result;
   }
 
   /**
@@ -929,8 +845,7 @@ export class PromptService extends PromptServiceContract {
     organizationId?: string;
   }): Promise<VersionedPrompt> {
     const organizationId =
-      params.organizationId ??
-      (await this.getOrganizationIdFromProjectId(params.projectId));
+      params.organizationId ?? (await this.getOrganizationIdFromProjectId(params.projectId));
 
     const newVersion = await this.repository.versions.restoreVersion({
       id: params.versionId,
@@ -969,33 +884,15 @@ export class PromptService extends PromptServiceContract {
     excludeId?: string;
   }): Promise<boolean> {
     const organizationId =
-      params.organizationId ??
-      (await this.getOrganizationIdFromProjectId(params.projectId));
-    // Check if handle exists (excluding current config if editing)
-    const existingConfig = await this.prisma.llmPromptConfig.findUnique({
-      where: {
-        scope: params.scope,
-        handle: this.repository.createHandle({
-          handle: params.handle,
-          scope: params.scope,
-          projectId: params.projectId,
-          organizationId,
-        }),
-        // Double check just to make sure the prompt belongs to the project or organization the user is from
-        OR: [
-          {
-            projectId: params.projectId,
-          },
-          {
-            organizationId: params.organizationId,
-            scope: "ORGANIZATION",
-          },
-        ],
-      },
+      params.organizationId ?? (await this.getOrganizationIdFromProjectId(params.projectId));
+    return this.repository.isHandleUnique({
+      handle: params.handle,
+      projectId: params.projectId,
+      organizationId,
+      organizationIdForScopeCheck: params.organizationId,
+      scope: params.scope,
+      excludeId: params.excludeId,
     });
-
-    // Return true if unique (no existing config or it's the same config being edited)
-    return !existingConfig || existingConfig.id === params.excludeId;
   }
 
   /**
@@ -1147,45 +1044,38 @@ export class PromptService extends PromptServiceContract {
 
     // Case 2: Same version - check content
     if (localVersion === remoteVersion) {
-      const comparison = this.repository.compareConfigContent(
-        resolvedConfigData,
-        remoteConfigData,
-      );
+      const comparison = this.repository.compareConfigContent(resolvedConfigData, remoteConfigData);
 
-      const parametersEqual = runtimeParametersEqual(
-        params.parameters,
-        existingPrompt.parameters,
-      );
+      const parametersEqual = runtimeParametersEqual(params.parameters, existingPrompt.parameters);
 
       if (comparison.isEqual && parametersEqual) {
         // Content is the same - up to date
         return { action: "up_to_date", prompt: existingPrompt };
-      } else {
-        // Content differs - create new version
-        const allDifferences = [
-          ...(comparison.differences ?? []),
-          ...diffRuntimeParameters({
-            localParameters: params.parameters,
-            remoteParameters: existingPrompt.parameters,
-          }),
-        ];
-        const updatedPrompt = await this.updatePrompt({
-          idOrHandle: existingPrompt.id,
-          projectId,
-          data: {
-            authorId,
-            commitMessage: commitMessage ?? describeLocalFileUpdate(allDifferences),
-            ...this.transformToDbFormat(resolvedConfigData),
-            schemaVersion: SchemaVersion.V1_0,
-            parameters: params.parameters,
-          },
-        });
-
-        return {
-          action: "updated",
-          prompt: updatedPrompt,
-        };
       }
+
+      // Content differs - create new version
+      const allDifferences = [
+        ...(comparison.differences ?? []),
+        ...diffRuntimeParameters({
+          localParameters: params.parameters,
+          remoteParameters: existingPrompt.parameters,
+        }),
+      ];
+      const updatedPrompt = await this.updatePrompt({
+        idOrHandle: existingPrompt.id,
+        projectId,
+        data: {
+          authorId,
+          commitMessage: commitMessage ?? describeLocalFileUpdate(allDifferences),
+          ...this.transformToDbFormat(resolvedConfigData),
+          parameters: params.parameters,
+        },
+      });
+
+      return {
+        action: "updated",
+        prompt: updatedPrompt,
+      };
     }
 
     // Case 3: Different versions
@@ -1237,8 +1127,8 @@ export class PromptService extends PromptServiceContract {
         localVersion: localVersion ?? 0,
         remoteVersion,
         differences:
-          this.repository.compareConfigContent(resolvedConfigData, remoteConfigData)
-            .differences ?? [],
+          this.repository.compareConfigContent(resolvedConfigData, remoteConfigData).differences ??
+          [],
         remoteConfigData,
         remoteParameters: existingPrompt.parameters ?? {},
       },
@@ -1257,8 +1147,7 @@ export class PromptService extends PromptServiceContract {
     organizationId?: string;
   }): Promise<{ success: boolean }> {
     const organizationId =
-      params.organizationId ??
-      (await this.getOrganizationIdFromProjectId(params.projectId));
+      params.organizationId ?? (await this.getOrganizationIdFromProjectId(params.projectId));
 
     await this.assertModifyPermission({
       idOrHandle: params.idOrHandle,
@@ -1348,20 +1237,7 @@ export class PromptService extends PromptServiceContract {
   }
 
   private async getOrganizationIdFromProjectId(projectId: string): Promise<string> {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      include: {
-        team: {
-          include: { organization: true },
-        },
-      },
-    });
-
-    if (!project?.team?.organizationId) {
-      throw new Error(`Organization not found for project ${projectId}`);
-    }
-
-    return project.team.organizationId;
+    return this.repository.getOrganizationIdForProject(projectId);
   }
 
   /**
@@ -1392,8 +1268,7 @@ export class PromptService extends PromptServiceContract {
     organizationId?: string;
   }): Promise<void> {
     const organizationId =
-      params.organizationId ??
-      (await this.getOrganizationIdFromProjectId(params.projectId));
+      params.organizationId ?? (await this.getOrganizationIdFromProjectId(params.projectId));
 
     const permission = await this.repository.checkModifyPermission({
       idOrHandle: params.idOrHandle,
@@ -1402,9 +1277,7 @@ export class PromptService extends PromptServiceContract {
     });
 
     if (!permission.hasPermission) {
-      throw new Error(
-        permission.reason ?? "You don't have permission to modify this prompt",
-      );
+      throw new Error(permission.reason ?? "You don't have permission to modify this prompt");
     }
   }
 
@@ -1418,8 +1291,7 @@ export class PromptService extends PromptServiceContract {
     organizationId?: string;
   }): Promise<{ hasPermission: boolean; reason?: string }> {
     const organizationId =
-      params.organizationId ??
-      (await this.getOrganizationIdFromProjectId(params.projectId));
+      params.organizationId ?? (await this.getOrganizationIdFromProjectId(params.projectId));
 
     return await this.repository.checkModifyPermission({
       idOrHandle: params.idOrHandle,
@@ -1471,43 +1343,11 @@ export class PromptService extends PromptServiceContract {
   }
 
   async listCopies(input: { sourcePromptId: string }): Promise<PromptCopySummary[]> {
-    const rows = await this.prisma.llmPromptConfig.findMany({
-      where: { copiedFromPromptId: input.sourcePromptId, deletedAt: null },
-      select: {
-        id: true,
-        handle: true,
-        projectId: true,
-        project: {
-          select: {
-            name: true,
-            team: { select: { name: true, organization: { select: { name: true } } } },
-          },
-        },
-      },
-    });
-    return rows.map((row) => ({
-      id: row.id,
-      handle: row.handle,
-      projectId: row.projectId,
-      projectName: row.project.name,
-      teamName: row.project.team.name,
-      organizationName: row.project.team.organization.name,
-    }));
+    return this.repository.listCopies(input);
   }
 
   async tryGetCopySource(input: { promptId: string }): Promise<PromptCopySource | null> {
-    const prompt = await this.prisma.llmPromptConfig.findUnique({
-      where: { id: input.promptId },
-      select: { copiedFromPromptId: true },
-    });
-    if (!prompt?.copiedFromPromptId) return null;
-    const source = await this.prisma.llmPromptConfig.findUnique({
-      where: { id: prompt.copiedFromPromptId },
-      select: { id: true, projectId: true, deletedAt: true },
-    });
-    return source && !source.deletedAt
-      ? { sourcePromptId: source.id, sourceProjectId: source.projectId }
-      : null;
+    return this.repository.tryGetCopySource(input);
   }
 
   getNamesByIds(input: {
@@ -1554,10 +1394,7 @@ export class PromptService extends PromptServiceContract {
     return this.tagService.tryDelete(input);
   }
 
-  tryDeleteTagByName(input: {
-    organizationId: string;
-    name: string;
-  }): Promise<PromptTag | null> {
+  tryDeleteTagByName(input: { organizationId: string; name: string }): Promise<PromptTag | null> {
     return this.tagService.tryDeleteByName(input);
   }
 

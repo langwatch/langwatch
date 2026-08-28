@@ -16,6 +16,7 @@
  * They answer from Enterprise services, and a core package may not depend on an
  * Enterprise one, so their composition lives in `@langwatch/enterprise-api`.
  */
+import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
 import {
   GatewayBudgetTrpcApi,
   GatewayCacheRuleTrpcApi,
@@ -36,12 +37,7 @@ import {
   type VirtualKeyTrpcContext,
   type VirtualKeyTrpcPorts,
 } from "@langwatch/gateway-server";
-import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
-import {
-  appTrpcPolicy,
-  appTrpcServiceAuthorizedPolicy,
-  type AppTrpcPolicyMiddlewares,
-} from "../../app-trpc/app-trpc.policy";
+import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 
 /** Every context requirement the six surfaces place on the process. */
 export type GatewayTrpcContext = GatewayBudgetTrpcContext &
@@ -67,62 +63,35 @@ export type GatewayTrpcPorts = Readonly<{
   virtualKeys: VirtualKeyTrpcPorts;
 }>;
 
-type GatewayMount<
-  TContext extends GatewayTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
-  TPorts extends GatewayTrpcPorts,
-> = Readonly<{
-  root: TRPCRootObject<TContext, object, TOptions, TRoot>;
-  protectedProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  middlewares: AppTrpcPolicyMiddlewares;
-  ports: TPorts;
-}>;
-
 /**
  * Mounts `virtualKeys.*`, `gatewayUsage.*`, `gatewayBudgets.*`,
  * `gatewayCacheRules.*`, `gatewayGuardrails.*` and `gatewaySpendEvents.*` on the
  * app process's tRPC root, under the keys the clients already call.
+ *
+ * Two of the six authorize in their resolver rather than from the input, and
+ * take the same chain under the name their package declares it by.
  */
 export function createGatewayTrpcRouters<
   TContext extends GatewayTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
   TPorts extends GatewayTrpcPorts,
->(mount: GatewayMount<TContext, TOptions, TRoot, TPorts>) {
-  const policy = appTrpcPolicy(mount.middlewares);
-  const resolverAuthorizedPolicy = appTrpcServiceAuthorizedPolicy(mount.middlewares);
-  const procedure = mount.protectedProcedure;
+>(mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPorts<TPorts>) {
+  const service = createTrpcApiService(mount);
+  const resolverAuthorized = {
+    protected: service.protected,
+    resolverAuthorizedPolicy: service.serviceAuthorized,
+  };
 
   return {
-    virtualKeys: VirtualKeyTrpcApi.create(
-      mount.root,
-      { protected: procedure, resolverAuthorizedPolicy },
-      mount.ports.virtualKeys,
-    ),
-    gatewayUsage: GatewayUsageTrpcApi.create(
-      mount.root,
-      { protected: procedure, resolverAuthorizedPolicy },
-      mount.ports.usage,
-    ),
-    gatewayBudgets: GatewayBudgetTrpcApi.create(
-      mount.root,
-      { protected: procedure, policy },
-      mount.ports.budgets,
-    ),
-    gatewayCacheRules: GatewayCacheRuleTrpcApi.create(
-      mount.root,
-      { protected: procedure, policy },
-      mount.ports.cacheRules,
-    ),
-    gatewayGuardrails: GatewayGuardrailTrpcApi.create(
-      mount.root,
-      { protected: procedure, policy },
-      mount.ports.guardrails,
-    ),
+    virtualKeys: VirtualKeyTrpcApi.create(mount.root, resolverAuthorized, mount.ports.virtualKeys),
+    gatewayUsage: GatewayUsageTrpcApi.create(mount.root, resolverAuthorized, mount.ports.usage),
+    gatewayBudgets: GatewayBudgetTrpcApi.create(mount.root, service, mount.ports.budgets),
+    gatewayCacheRules: GatewayCacheRuleTrpcApi.create(mount.root, service, mount.ports.cacheRules),
+    gatewayGuardrails: GatewayGuardrailTrpcApi.create(mount.root, service, mount.ports.guardrails),
     gatewaySpendEvents: GatewaySpendEventTrpcApi.create(
       mount.root,
-      { protected: procedure, policy },
+      service,
       mount.ports.spendEvents,
     ),
   };

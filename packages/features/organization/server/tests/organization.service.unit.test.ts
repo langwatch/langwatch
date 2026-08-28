@@ -15,6 +15,7 @@ import {
   TeamMembershipNotFoundError,
   UserNotInOrganizationError,
   type OrganizationBillingProfile,
+  type OrganizationSettings,
   type OrganizationTeam,
   type OrganizationTeamPage,
   type PersonalFeatures,
@@ -27,11 +28,15 @@ import {
   TeamIdentityPort,
   type PersonalWorkspaceFeatureProject,
   type PersonalWorkspaceResourceIds,
+  type StoredOrganizationSettings,
 } from "../src/ports/organization.port";
 import { TeamRepository } from "../src/repositories/team.repository";
 import { OrganizationService } from "../src/services/organization.service";
 
 class StubRepository extends OrganizationRepository {
+  settings: OrganizationSettings | null = null;
+  storedSettings: StoredOrganizationSettings | null = null;
+  settingsUpdate: Record<string, unknown> | null = null;
   constructor(
     private readonly teamId: string | null,
     private billingProfile: OrganizationBillingProfile | null = {
@@ -46,6 +51,19 @@ class StubRepository extends OrganizationRepository {
   async getOldestTeamId(organizationId: string): Promise<string> {
     if (!this.teamId) throw new OrganizationHasNoTeamError(organizationId);
     return this.teamId;
+  }
+
+  getSettings(): Promise<OrganizationSettings | null> {
+    return Promise.resolve(this.settings);
+  }
+
+  findSettings(): Promise<StoredOrganizationSettings | null> {
+    return Promise.resolve(this.storedSettings);
+  }
+
+  updateSettings(input: Record<string, unknown>): Promise<void> {
+    this.settingsUpdate = input;
+    return Promise.resolve();
   }
 
   async getBillingProfile(): Promise<OrganizationBillingProfile> {
@@ -271,6 +289,7 @@ const sharedTeam: OrganizationTeam = {
 class MemoryTeams extends TeamRepository {
   team: OrganizationTeam = sharedTeam;
   member = true;
+  activeMember = true;
   organizationMemberReads = 0;
 
   get(): Promise<OrganizationTeam> {
@@ -308,9 +327,9 @@ class MemoryTeams extends TeamRepository {
     this.team = { ...this.team, archivedAt: new Date(2) };
     return Promise.resolve(this.team);
   }
-  getOrganizationMembers(input: { userIds: string[] }): Promise<string[]> {
+  getOrganizationMembers(input: { userIds: string[]; activeOnly?: boolean }): Promise<string[]> {
     this.organizationMemberReads += 1;
-    if (!this.member && input.userIds[0]) {
+    if ((!this.member || (input.activeOnly && !this.activeMember)) && input.userIds[0]) {
       return Promise.reject(new UserNotInOrganizationError(input.userIds[0]));
     }
     return Promise.resolve(input.userIds);
@@ -331,6 +350,64 @@ class MemoryTeams extends TeamRepository {
 }
 
 describe("OrganizationService", () => {
+  it("returns management settings through the canonical service", async () => {
+    const repository = new StubRepository("team");
+    repository.settings = {
+      id: "org",
+      name: "Acme",
+      slug: "acme",
+      supportContact: null,
+      presenceEnabled: true,
+      traceSharingEnabled: true,
+      primaryIntent: null,
+      s3Endpoint: "https://storage.example.com",
+      s3AccessKeyId: "key",
+      s3Bucket: "bucket",
+      createdAt: new Date(1),
+      updatedAt: new Date(2),
+    };
+
+    await expect(createService(repository).getSettings({ organizationId: "org" })).resolves.toEqual(
+      repository.settings,
+    );
+  });
+
+  it("returns committed trace-share revocations after disabling sharing", async () => {
+    const repository = new StubRepository("team");
+    repository.storedSettings = {
+      id: "org",
+      name: "Acme",
+      slug: "acme",
+      supportContact: null,
+      presenceEnabled: true,
+      traceSharingEnabled: true,
+      primaryIntent: null,
+      s3Endpoint: null,
+      s3AccessKeyId: null,
+      s3Bucket: null,
+      createdAt: new Date(1),
+      updatedAt: new Date(2),
+    };
+    await expect(
+      createService(repository).updateSettings({
+        organizationId: "org",
+        traceSharingEnabled: false,
+      }),
+    ).resolves.toEqual({ traceShareRevocationRequired: true });
+    expect(repository.settingsUpdate).toEqual({
+      organizationId: "org",
+      traceSharingEnabled: false,
+    });
+  });
+
+  it("does not request trace-share revocation for settings updates without a sharing transition", async () => {
+    const repository = new StubRepository("team");
+
+    await expect(
+      createService(repository).updateSettings({ organizationId: "org", name: "Renamed" }),
+    ).resolves.toEqual({ traceShareRevocationRequired: false });
+    expect(repository.settingsUpdate).toEqual({ organizationId: "org", name: "Renamed" });
+  });
   it("reads requested organization members with one repository call", async () => {
     const teams = new MemoryTeams();
     const members = await createService(
@@ -341,6 +418,19 @@ describe("OrganizationService", () => {
 
     expect(members).toEqual(["user-1", "user-2"]);
     expect(teams.organizationMemberReads).toBe(1);
+  });
+
+  it("distinguishes active membership from a disabled membership", async () => {
+    const teams = new MemoryTeams();
+    teams.activeMember = false;
+    const service = createService(new StubRepository("team"), new RecordingGrants(), teams);
+
+    await expect(service.isMember({ organizationId: "org", userId: "user-1" })).resolves.toBe(
+      false,
+    );
+    await expect(
+      service.isMember({ organizationId: "org", userId: "user-1", includeDeactivated: true }),
+    ).resolves.toBe(true);
   });
 
   it("returns the required oldest team", async () => {

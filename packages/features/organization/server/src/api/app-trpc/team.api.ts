@@ -31,7 +31,13 @@
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
-  organizationTeamMemberInputSchema,
+  organizationApiScopeSchema,
+  teamApiCreateWithMembersInputSchema,
+  teamApiRemoveMemberInputSchema,
+  teamApiSlugSchema,
+  teamApiSlugWithOrganizationSchema,
+  teamApiTeamScopeSchema,
+  teamApiUpdateInputSchema,
   type OrganizationService,
 } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -40,7 +46,6 @@ import {
   type TRPCRootObject,
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
-import { z } from "zod";
 
 /**
  * The nine reads and writes this transport makes, named rather than taking
@@ -126,34 +131,6 @@ type TeamTrpcPorts = Readonly<{
 /** The page size the two project lookups read the organization at. */
 const ORGANIZATION_PROJECT_PAGE = { page: 1, limit: 1_000 } as const;
 
-const organizationScopeSchema = z.object({ organizationId: z.string() });
-
-const teamSlugSchema = z.object({ organizationId: z.string(), slug: z.string() });
-
-const teamSlugWithOrganizationSchema = z.object({
-  slug: z.string(),
-  organizationId: z.string(),
-});
-
-const updateInputSchema = z.object({
-  teamId: z.string(),
-  name: z.string(),
-  members: z.array(organizationTeamMemberInputSchema),
-});
-
-const createTeamWithMembersInputSchema = z.object({
-  organizationId: z.string(),
-  name: z.string(),
-  members: z.array(organizationTeamMemberInputSchema),
-});
-
-const teamScopeSchema = z.object({ teamId: z.string() });
-
-const removeMemberInputSchema = z.object({
-  teamId: z.string(),
-  userId: z.string(),
-});
-
 /**
  * Installs the complete `team.*` tRPC surface on a process-owned root. The
  * procedure and the policy are injected by the process so its auth, audit,
@@ -173,7 +150,7 @@ export class TeamTrpcApi {
     const { protected: procedure, policy } = procedures;
 
     return trpc.router({
-      getBySlug: policy("organization:view")(procedure.input(teamSlugSchema)).query(
+      getBySlug: policy("organization:view")(procedure.input(teamApiSlugSchema)).query(
         ({ input, ctx }) =>
           ctx.app.organizations.getTeamBySlugForMember({
             ...input,
@@ -182,7 +159,7 @@ export class TeamTrpcApi {
       ),
 
       getTeamsWithMembers: policy("organization:view")(
-        procedure.input(organizationScopeSchema),
+        procedure.input(organizationApiScopeSchema),
       ).query(async ({ input, ctx }) => {
         const callerCanManage = await ports.probeOrganizationPermission(
           ctx,
@@ -207,7 +184,7 @@ export class TeamTrpcApi {
       }),
 
       getTeamsWithRoleBindings: policy("organization:manage")(
-        procedure.input(organizationScopeSchema),
+        procedure.input(organizationApiScopeSchema),
       ).query(async ({ input, ctx }) => {
         const projects = await ctx.app.projects.listByOrganization({
           organizationId: input.organizationId,
@@ -224,7 +201,7 @@ export class TeamTrpcApi {
       }),
 
       getTeamWithMembers: policy("organization:view")(
-        procedure.input(teamSlugWithOrganizationSchema),
+        procedure.input(teamApiSlugWithOrganizationSchema),
       ).query(async ({ input, ctx }) => {
         const callerCanManage = await ports.probeOrganizationPermission(
           ctx,
@@ -243,7 +220,7 @@ export class TeamTrpcApi {
         return { ...team, projects };
       }),
 
-      update: policy("team:manage")(procedure.input(updateInputSchema)).mutation(
+      update: policy("team:manage")(procedure.input(teamApiUpdateInputSchema)).mutation(
         async ({ input, ctx }) => {
           const team = await ctx.app.organizations.getTeamById({
             teamId: input.teamId,
@@ -261,7 +238,7 @@ export class TeamTrpcApi {
       ),
 
       createTeamWithMembers: policy("organization:manage")(
-        procedure.input(createTeamWithMembersInputSchema),
+        procedure.input(teamApiCreateWithMembersInputSchema),
       ).mutation(async ({ input, ctx }) => {
         await ports.assertCustomRolesAllowed(ctx, {
           organizationId: input.organizationId,
@@ -273,7 +250,7 @@ export class TeamTrpcApi {
         });
       }),
 
-      archiveById: policy("team:manage")(procedure.input(teamScopeSchema)).mutation(
+      archiveById: policy("team:manage")(procedure.input(teamApiTeamScopeSchema)).mutation(
         async ({ input, ctx }) => {
           const team = await ctx.app.organizations.getTeamById(input);
           await ctx.app.organizations.archiveTeam({
@@ -284,7 +261,7 @@ export class TeamTrpcApi {
         },
       ),
 
-      removeMember: policy("team:manage")(procedure.input(removeMemberInputSchema)).mutation(
+      removeMember: policy("team:manage")(procedure.input(teamApiRemoveMemberInputSchema)).mutation(
         async ({ input, ctx }) => {
           const team = await ctx.app.organizations.getTeamById({
             teamId: input.teamId,

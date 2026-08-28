@@ -8,8 +8,15 @@
 [ADR-128](../../../dev/docs/adr/128-public-rest-and-internal-trpc.md)
 
 **Behavioural contracts:**
-[../specs/rpc-endpoints.feature](../specs/rpc-endpoints.feature),
 [../specs/fluent-registration.feature](../specs/fluent-registration.feature)
+
+> **The RPC half of this ADR is withdrawn.** `register(name, version, ...)`,
+> the `RpcName` grammar and the `rpc.discover` catalogues it fed were removed
+> from `@langwatch/api`: no service ever registered a dotted operation, so
+> every catalogue answered empty. `rpc-endpoints.feature` went with them. The
+> fluent contract, the version namespaces and the definition chain this ADR
+> also decided are unchanged and still in force for `registerRoute` and
+> `registerSse`.
 
 **Related:**
 [the API framework boundary](./20260820-api-framework-boundary.md),

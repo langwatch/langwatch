@@ -10,9 +10,6 @@ import { personalSessionsRouter } from "./routers/governance/personalSessions";
 import { sessionPolicyRouter } from "./routers/governance/sessionPolicy";
 import { createTRPCRouter } from "~/server/api/trpc";
 import {
-  appTrpcNoPermissionPolicy,
-  appTrpcPolicy,
-  appTrpcServiceAuthorizedPolicy,
   createAuthzTrpcRouter,
   createAutomationTrpcRouter,
   createCodingAgentTrpcRouter,
@@ -42,9 +39,14 @@ import {
   createTranslateTrpcRouter,
   declaredCheckFrom,
   type AppTrpcPolicyKit,
-  type AppTrpcPolicyMiddlewares,
   type GatewayTrpcPorts,
 } from "@langwatch/platform-api/app-trpc";
+import {
+  appTrpcNoPermissionPolicy,
+  appTrpcPolicy,
+  appTrpcServiceAuthorizedPolicy,
+  type AppTrpcPolicyMiddlewares,
+} from "@langwatch/api/trpc";
 import {
   checkDeclaredPermission,
   checkDeclaredPermissionAny,

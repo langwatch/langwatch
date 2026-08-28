@@ -2,8 +2,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 /** The transport boundary accepts any Standard Schema implementation. */
 export type ApiSchema = StandardSchemaV1<unknown, unknown>;
-export type ApiSchemaOutput<TSchema extends ApiSchema> =
-  StandardSchemaV1.InferOutput<TSchema>;
+export type ApiSchemaOutput<TSchema extends ApiSchema> = StandardSchemaV1.InferOutput<TSchema>;
 
 export type ApiSchemaIssue = Readonly<{
   code?: string;
@@ -40,16 +39,11 @@ export function parseApiSchemaSync(schema: ApiSchema, value: unknown): ApiSchema
     : { success: true, data: result.value };
 }
 
-export async function parseApiSchema(
-  schema: ApiSchema,
-  value: unknown,
-): Promise<ApiSchemaResult> {
+export async function parseApiSchema(schema: ApiSchema, value: unknown): Promise<ApiSchemaResult> {
   const zodLike = schema as {
     safeParseAsync?: (
       input: unknown,
-    ) => Promise<
-      { success: true; data: unknown } | { success: false; error: ApiSchemaError }
-    >;
+    ) => Promise<{ success: true; data: unknown } | { success: false; error: ApiSchemaError }>;
   };
   if (zodLike.safeParseAsync) return zodLike.safeParseAsync(value);
 

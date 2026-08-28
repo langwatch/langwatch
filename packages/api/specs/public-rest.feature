@@ -2,7 +2,8 @@
 Feature: Public REST is a first-class API surface
 
   As an API author
-  I want REST to use the same fluent, validated contract as RPC
+  I want the public REST surface to use the same fluent, validated contract
+  as the versioned compatibility surface
   So that HTTP source plumbing and version negotiation cannot drift by endpoint
 
   @typecheck @unit

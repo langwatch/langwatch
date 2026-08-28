@@ -26,9 +26,7 @@ describe("LlmConfigRepository", () => {
   describe("deleteConfig()", () => {
     describe("when prompt exists and belongs to the project", () => {
       it("soft-deletes by setting deletedAt and frees the handle for reuse", async () => {
-        const mockUpdate = vi.fn(() =>
-          Promise.resolve({ id: "prompt_1", deletedAt: new Date() }),
-        );
+        const mockUpdate = vi.fn(() => Promise.resolve({ id: "prompt_1", deletedAt: new Date() }));
         const prisma = makeMockPrisma({ update: mockUpdate });
 
         // Mock tryGetConfigByIdOrHandleWithLatestVersion to return a config with
@@ -64,9 +62,7 @@ describe("LlmConfigRepository", () => {
       });
 
       it("falls back to the unprefixed handle when name is empty", async () => {
-        const mockUpdate = vi.fn(() =>
-          Promise.resolve({ id: "prompt_1", deletedAt: new Date() }),
-        );
+        const mockUpdate = vi.fn(() => Promise.resolve({ id: "prompt_1", deletedAt: new Date() }));
         const prisma = makeMockPrisma({ update: mockUpdate });
 
         const repo = new LlmConfigRepository(prisma);

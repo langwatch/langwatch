@@ -24,12 +24,15 @@
  */
 import type { AuthzPermission, EnforcedScopeFields } from "@langwatch/authz-contract";
 import {
-  modelProviderScopeTypeSchema,
+  createModelCostPreviewTrpcInputSchema,
+  createModelCostWriteTrpcInputSchema,
+  modelCostDeleteTrpcInputSchema,
+  modelCostModelLimitsTrpcInputSchema,
+  modelCostProjectTrpcInputSchema,
   type ModelProviderScopeType,
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
-import { z } from "zod";
 
 /**
  * The process's span reader, opaque here. The preview port below owns its
@@ -109,9 +112,6 @@ type LlmModelCostTrpcPorts = Readonly<{
   }): Promise<unknown>;
 }>;
 
-const UNSAFE_REGEX_MESSAGE =
-  "Invalid or unsafe regular expression (avoid nested quantifiers like (a+)+)";
-
 /**
  * Installs the complete `llmModelCost.*` tRPC surface on a process-owned
  * root. The procedure and the policy bag are injected by the process so its
@@ -131,18 +131,14 @@ export class LlmModelCostTrpcApi {
   ) {
     const { protected: procedure, policy, resolverAuthorizedPolicy } = procedures;
     // Built here rather than at module scope: the safety predicate is a port,
-    // so the schema cannot exist before the process has supplied one.
-    const safeRegexSchema = z.string().refine((value) => ports.isSafeRegex(value), {
-      message: UNSAFE_REGEX_MESSAGE,
-    });
+    // so the schemas cannot exist before the process has supplied one.
+    const isSafeRegex = (pattern: string) => ports.isSafeRegex(pattern);
+    const createOrUpdateInputSchema = createModelCostWriteTrpcInputSchema({ isSafeRegex });
+    const previewMatchingSpansInputSchema = createModelCostPreviewTrpcInputSchema({ isSafeRegex });
 
     return trpc.router({
       getAllForProject: policy("project:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-          }),
-        ),
+        procedure.input(modelCostProjectTrpcInputSchema),
       ).query(async ({ input, ctx }) => {
         return await ctx.app.modelProviders.listCosts(input);
       }),
@@ -150,26 +146,7 @@ export class LlmModelCostTrpcApi {
       createOrUpdate: resolverAuthorizedPolicy({
         projectId:
           "assertCanManageScope: manage is required on the written scope, which defaults to this project; the scope then resolves to a single organization the cost is anchored to",
-      })(
-        procedure.input(
-          z.object({
-            id: z.string().optional(),
-            projectId: z.string(),
-            // Optional scope target. Defaults to the page's own project so the
-            // existing project-level flow keeps working unchanged; an org admin
-            // can pass ORGANIZATION/TEAM to push a cost down the cascade.
-            scopeType: modelProviderScopeTypeSchema.optional(),
-            scopeId: z.string().optional(),
-            model: z.string(),
-            inputCostPerToken: z.number().optional(),
-            outputCostPerToken: z.number().optional(),
-            cacheReadCostPerToken: z.number().optional(),
-            cacheCreationCostPerToken: z.number().optional(),
-            cacheCreation1hCostPerToken: z.number().optional(),
-            regex: safeRegexSchema,
-          }),
-        ),
-      ).mutation(async ({ input, ctx }) => {
+      })(procedure.input(createOrUpdateInputSchema)).mutation(async ({ input, ctx }) => {
         const {
           id,
           projectId,
@@ -207,16 +184,14 @@ export class LlmModelCostTrpcApi {
       delete: resolverAuthorizedPolicy({
         projectId:
           "not trusted — the scope is derived from the stored row and assertCanManageScope runs against that scope, never the caller-supplied projectId",
-      })(procedure.input(z.object({ projectId: z.string(), id: z.string() }))).mutation(
-        async ({ input, ctx }) => {
-          // Derive the scope from the row itself, then authorize manage on that
-          // scope. Never trust a caller-supplied scope for a delete.
-          return await ctx.app.modelProviders.deleteCost({
-            ...input,
-            actorId: ctx.actor().id,
-          });
-        },
-      ),
+      })(procedure.input(modelCostDeleteTrpcInputSchema)).mutation(async ({ input, ctx }) => {
+        // Derive the scope from the row itself, then authorize manage on that
+        // scope. Never trust a caller-supplied scope for a delete.
+        return await ctx.app.modelProviders.deleteCost({
+          ...input,
+          actorId: ctx.actor().id,
+        });
+      }),
 
       /**
        * Get model limits for a given model
@@ -225,7 +200,7 @@ export class LlmModelCostTrpcApi {
        * @returns Model limits or null if not found
        */
       getModelLimits: policy("project:view")(
-        procedure.input(z.object({ projectId: z.string(), model: z.string() })),
+        procedure.input(modelCostModelLimitsTrpcInputSchema),
       ).query(async ({ input }) => ports.getModelLimits(input.model)),
 
       /**
@@ -235,24 +210,7 @@ export class LlmModelCostTrpcApi {
        * metadata (model names, token counts, trace ids), not cost-rule config.
        */
       previewMatchingSpans: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            model: z.string().max(512).optional(),
-            regex: z
-              .string()
-              .min(1)
-              .max(512)
-              .refine((value) => ports.isSafeRegex(value), {
-                message: UNSAFE_REGEX_MESSAGE,
-              }),
-            inputCostPerToken: z.number().nonnegative().optional(),
-            outputCostPerToken: z.number().nonnegative().optional(),
-            cacheReadCostPerToken: z.number().nonnegative().optional(),
-            cacheCreationCostPerToken: z.number().nonnegative().optional(),
-            cacheCreation1hCostPerToken: z.number().nonnegative().optional(),
-          }),
-        ),
+        procedure.input(previewMatchingSpansInputSchema),
       ).query(async ({ input, ctx }) =>
         ports.previewMatchingSpans({ spans: ctx.app.traces.spans, input }),
       ),

@@ -15,6 +15,19 @@ export { ModelProviderKeysService } from "./services/model-provider-keys.service
 export { resolveMaxTokensCeiling } from "./adapters/resolve-max-tokens-ceiling.adapter";
 export { ModelProviderExecutionAdapter } from "./adapters/model-provider-execution.adapter";
 export {
+  getModelMetadataForFrontend,
+  getProjectModelProviders,
+  getProjectModelProvidersForFrontend,
+  type LegacyModelProviderExecution,
+  listOrgModelProvidersForFrontend,
+  listProjectModelProvidersForFrontend,
+  mergeCustomModelMetadata,
+  prepareEnvKeys,
+  prepareLitellmParams,
+  toLegacyExecutionProvider,
+  toLegacyProviderSummary,
+} from "./adapters/legacy-model-provider.adapter";
+export {
   isKnownModelId,
   isRankableByPrice,
   partitionTierAliases,
@@ -30,3 +43,8 @@ export {
   LlmModelCostTrpcApi,
   type LlmModelCostTrpcContext,
 } from "./api/app-trpc/llm-model-cost.api";
+export {
+  TranslateTrpcApi,
+  type TranslateTrpcContext,
+  type TranslateTrpcPorts,
+} from "./api/app-trpc/translate.api";

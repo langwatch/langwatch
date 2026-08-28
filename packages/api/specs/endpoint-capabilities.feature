@@ -34,7 +34,7 @@ Feature: Endpoint capabilities — rate limiting, response caching, deprecation
 
   @unit
   Scenario: The cache key is the complete call
-    Given an RPC endpoint with withCache
+    Given a POST endpoint with withCache
     When two calls differ only in one input field
     Then they are distinct cache entries
     And the same call under a different version namespace is distinct too

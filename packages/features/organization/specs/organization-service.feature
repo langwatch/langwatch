@@ -17,6 +17,18 @@ Feature: Shared organization service
     Then it receives the process-owned organization service
     And it does not query Organization or Team persistence directly
 
+  Scenario: A disabled member is checked for active access
+    Given the user still has a disabled organization membership
+    When a feature checks whether the user is a member without including deactivated members
+    Then the organization service returns false
+    And the same check can include the retained disabled membership when required
+
+  Scenario: Trace sharing is disabled for an organization
+    Given trace sharing is currently enabled
+    When a management transport commits the organization settings update
+    Then the organization service reports that trace-share revocation is required
+    And the transport lists each project and revokes its trace shares after the commit
+
   Scenario: A request manages a shared team
     Given an organization-authenticated request has the required team permission
     When it creates, reads, updates, or archives a shared team

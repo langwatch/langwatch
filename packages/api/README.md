@@ -1,10 +1,22 @@
 # @langwatch/api
 
-The contract-sealed service framework for LangWatch HTTP, RPC and streaming APIs: explicit version namespaces, input/output validation, OpenAPI documentation, capability ports, SSE streaming, and error formatting.
+LangWatch's API framework, in three entry points.
 
-Built on top of [Hono](https://hono.dev) and [hono-openapi](https://github.com/rhinobase/hono-openapi). Existing services accept Standard Schema; the public REST surface requires Zod 4 so it can derive HTTP documentation from one input object.
+| Import                | What it is                                                                                                                                                                                                                                                                    |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@langwatch/api`      | The transport-agnostic vocabulary: the handled-error classes and their wire envelope, the access-policy vocabulary (`requires`, `publicEndpoint`, `credentialClassFor`, …), the rate-limit and cache ports, and the Standard Schema boundary. Imports no transport framework. |
+| `@langwatch/api/rest` | The contract-sealed Hono service framework: explicit version namespaces, input/output validation, OpenAPI documentation, capability middleware, SSE streaming, the route-policy registry and the REST service builder.                                                        |
+| `@langwatch/api/trpc` | The typed tRPC root and the policy spine every procedure runs through: tracing, request logging, handled-error translation, scope lineage, declared authorization and audit, all over injected ports.                                                                         |
 
-The lasting decisions live in [adrs/](./adrs), including [the fluent handler contract](./adrs/001-rpc-first-fluent-registration.md) and [public REST versioning](./adrs/004-public-rest-v1-and-date-negotiation.md). Behaviour lives in [specs/](./specs); this README is usage.
+The three do not re-export one another. A consumer that wants the error
+vocabulary imports `@langwatch/api`; one that wants the REST builder imports
+`@langwatch/api/rest`; one wiring tRPC imports `@langwatch/api/trpc`. Most REST
+call sites need two of the three, and that is the point — the import says which
+half of the framework a file depends on.
+
+REST is built on top of [Hono](https://hono.dev) and [hono-openapi](https://github.com/rhinobase/hono-openapi). Existing services accept Standard Schema; the public REST surface requires Zod 4 so it can derive HTTP documentation from one input object. tRPC is built on [@trpc/server](https://trpc.io) and chooses none of its concretes.
+
+The lasting decisions live in [adrs/](./adrs), including [the fluent handler contract](./adrs/001-rpc-first-fluent-registration.md), [public REST versioning](./adrs/004-public-rest-v1-and-date-negotiation.md) and [the tRPC framework boundary](./adrs/20260828-trpc-framework-boundary.md). Behaviour lives in [specs/](./specs); this README is usage.
 
 ## Public REST (opt-in)
 
@@ -12,7 +24,7 @@ The lasting decisions live in [adrs/](./adrs), including [the fluent handler con
 family opts in during the API app migration.
 
 ```ts
-import { createRestService } from "@langwatch/api";
+import { createRestService } from "@langwatch/api/rest";
 import { z } from "zod";
 
 const app = createRestService({ name: "thing" })
@@ -47,9 +59,9 @@ JSON body. The complete input and output are validated at runtime.
 If URL and header versions are both present, they must match. The OpenAPI
 document includes the optional path, registered dates and `latest`.
 
-## RPC and compatibility HTTP
+## Versioned HTTP services
 
-A service is one file exporting a built Hono app. An endpoint is one `register` call carrying its name, its version, its handler and its definition chain:
+A service is one file exporting a built Hono app. An endpoint is one `registerRoute` call carrying its method, its path, its version, its handler and its definition chain:
 
 ```ts
 // src/app/api/things/[[...route]]/app.ts
@@ -62,8 +74,9 @@ export const app = createProjectApiService({
   name: "things",
   basePath: "/api/things",
 })
-  .register(
-    "things.create",
+  .registerRoute(
+    "post",
+    "/things.create",
     "2026-08-07",
     async (context, input: { projectId: string; name: string }) =>
       context.app.things.create({
@@ -82,8 +95,9 @@ export const app = createProjectApiService({
         .withStatus(201)
         .withDocs({ operationId: "createThing", tags: ["Things"] }),
   )
-  .register(
-    "things.list",
+  .registerRoute(
+    "post",
+    "/things.list",
     "2026-08-07",
     async (context, input: { projectId: string }) => context.app.things.list(input),
     (b) =>
@@ -110,12 +124,11 @@ api.route("/", thingsApp);
 
 ## Compatibility registration methods
 
-- **`register(name, version, handler, define?)`** — an RPC endpoint. The name is an identifier, not a URL: slash-less, dotted lower-camelCase, at least one dot — `^[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)+$`, so `things.create` ✓ and `/things.create`, `things/:id`, `things.RollSecret` ✗. The grammar is checked twice: by the types in the editor and by an assert at registration, with one test table (`rpc-types.unit.test.ts`) driving both. Every RPC is a POST, reads included, and every argument travels in the JSON body via `withInput` — `withParams`/`withQuery` are not offered on the RPC chain, and declaring them behind an `any` fails registration. An RPC with no required arguments declares no `withInput`: the pipeline installs the JSON validator only when input is declared, so a bodyless POST and a `{}` POST both succeed.
-- **`registerRoute(method, path, version, handler, define)`** — the existing HTTP endpoint API. It retains explicit path, query and body schemas until migrated to `createRestService`.
-- **`registerSse(name, version, handler, define?)`** — a dotted name mounted as a GET, with `.withEvents({...})` / `.withQuery(...)`. See SSE streaming below.
+- **`registerRoute(method, path, version, handler, define)`** — the existing HTTP endpoint API. It retains explicit path, query and body schemas until migrated to `createRestService`. Every route declares `withOutput`; use `z.void()` for an endpoint with no response body.
+- **`registerSse(name, version, handler, define?)`** — a dotted name mounted as a GET, with `.withEvents({...})` / `.withQuery(...)`. The name is an identifier, not a URL: slash-less, dotted lower-camelCase, at least one dot — `^[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)+$`, checked by `assertSseName` at registration. See SSE streaming below.
 - **`withdraw(name, version)`** — answers 410 Gone from that version onward, on every mount, with the withdrawn endpoint's config still on the mount report.
 
-`isRpcPath` exports the name grammar for consumers that must recognise an RPC name after the fact — the discovery catalogues ask it rather than writing a second regex that agrees until one of them changes.
+An earlier revision offered a third style: `register(name, version, ...)` mounted a dotted RPC operation as a POST, with a compile-time name grammar and a raw-`Response` escape hatch. No service ever registered one, so it and the `rpc.discover` catalogues derived from it were removed.
 
 ## The handler contract
 
@@ -136,7 +149,7 @@ Compatibility `registerRoute` uses `withParams`, `withQuery` and `withInput`.
 Public REST uses one `withInput`; its method selects query or JSON.
 
 A feature handler never creates a repository, constructs a service or awaits a
-service resolver. Project-scoped RPCs include `projectId` in their validated
+service resolver. Project-scoped operations include `projectId` in their validated
 input. The application authentication middleware must authorize that exact
 project before the handler runs, which lets multi-project credentials choose a
 target without trusting an arbitrary tenant id.
@@ -150,8 +163,8 @@ is the argument _after_ the handler — TypeScript checks arguments in order, so
 the chain cannot flow back into the handler's parameter type. Annotate `input`
 (or delegate to a typed domain function) as above; the declared schema is
 always the runtime guarantee. The registration type requires a declared input
-source whenever the handler declares the input parameter. RPC value handlers
-require `withOutput`; every REST route requires it. A handler with no request
+source whenever the handler declares the input parameter. Every route requires
+`withOutput`. A handler with no request
 values takes only `context`.
 
 Return raw data: the framework validates and serializes it. A REST handler
@@ -186,9 +199,9 @@ The chain is the only extension point — a new capability is a new chain call a
 
 ### Service-level defaults and groups
 
-A `.withX()` on the service builder is the default for every endpoint; endpoint re-declaration wins; middleware stacks. `service.group(name, define?)` returns a registrar (`register`/`registerSse`/`registerRoute`/`withdraw`) whose chain declares defaults for everything registered through it, prefixing dotted names (`things.register("create", ...)` → `things.create`, grammar-checked on the full name). Precedence runs service < group < endpoint. Groups do not nest and carry no version.
+A `.withX()` on the service builder is the default for every endpoint; endpoint re-declaration wins; middleware stacks. `service.group(name, define?)` returns a registrar (`registerSse`/`registerRoute`/`withdraw`) whose chain declares defaults for everything registered through it. `registerRoute` paths are used as-is; `registerSse` and `withdraw` prefix the group name onto a dotted name (`things.registerSse("watch", ...)` → `things.watch`). Precedence runs service < group < endpoint. Groups do not nest and carry no version.
 
-## RPC and compatibility versioning
+## Version namespaces
 
 Every `createService` URL names its version namespace; there is no bare alias:
 
@@ -196,7 +209,7 @@ Every `createService` URL names its version namespace; there is no bare alias:
 /api/{service}/{YYYY-MM-DD|latest|preview}/{name}
 ```
 
-The version catalogue is the union of versions named in `register` calls. An endpoint serves at version V its latest registration dated on or before V — including a real date nobody registered (`/api/things/2026-03-01/...` is served by the newest older registration, with the requested date in the header). `latest` serves the newest registrations. `preview` is separate and never part of `latest`. An unknown namespace — a non-date, an impossible date, a date before the first registration, or no version segment at all — answers 404 from the namespace guards.
+The version catalogue is the union of versions named in registration calls. An endpoint serves at version V its latest registration dated on or before V — including a real date nobody registered (`/api/things/2026-03-01/...` is served by the newest older registration, with the requested date in the header). `latest` serves the newest registrations. `preview` is separate and never part of `latest`. An unknown namespace — a non-date, an impossible date, a date before the first registration, or no version segment at all — answers 404 from the namespace guards.
 
 Every response carries `X-API-Version-Status` (`stable` | `latest` | `preview`) and, on versioned mounts, `X-API-Version` naming the namespace that was asked for. Both are set in a `finally`, so validation errors and 410 withdrawals carry them too.
 
@@ -204,13 +217,7 @@ Every response carries `X-API-Version-Status` (`stable` | `latest` | `preview`) 
 
 The document publishes **every dated version plus `latest`** of each documented endpoint, so a pinned client sees the schemas its version actually serves — and never `preview`, never a bare path. An endpoint is documented when its chain declares `withOutput` or `withDocs` and does not set `docs.hide: true`; withdrawn endpoints leave the document at the version they were withdrawn from. Set `docs.operationId` explicitly on every documented endpoint: generated ids leak URL shapes into SDK function names. `latest` keeps that declared id, while each dated mount appends its version (for example, `createThing_2026_08_07`) so operation ids remain unique across the document.
 
-Hosts generate framework service specs with `generateApiSpecs` exported by `@langwatch/api`, and MUST pass `excludeStaticFile: false` for RPC endpoints. hono-openapi stores route metadata under a package-local symbol, so importing its generator separately may not see framework routes when the workspace resolves two peer variants. Every RPC name is also dotted and parameterless, so hono-openapi's default filter drops the family as static files, silently. The traps are pinned by the package tests and the application spec-generation task.
-
-## rpc.discover
-
-Every `createService` service serves its own RPC catalogue at `POST /api/{service}/{version}/rpc.discover`, mounted by `build()` under every version namespace and derived from the same registrations the document is generated from — a projection, not a registry, so it cannot report an operation that does not exist or disagree about a schema. Per operation: `name`, `path`, `operationId?`, `summary?`, `description?`, `input`/`output` JSON Schemas (or `null`), and `status`. The documented-only rule is the document's own: an operation reaches the catalogue exactly when it would reach the document, so a preview catalogue is empty and a hidden endpoint is nowhere. A catalogue is meta: never documented itself, and no catalogue lists another. Set `openapiUrl` on the service config and each catalogue points back at the full document. Public REST relies on OpenAPI and does not add an RPC catalogue.
-
-The platform's root `POST /api/rpc.discover` is the second level: it lists every service with the URL of that service's catalogue, and repeats no operation.
+Hosts generate framework service specs with `generateApiSpecs` exported by `@langwatch/api/rest`, and MUST pass `excludeStaticFile: false`. hono-openapi stores route metadata under a package-local symbol, so importing its generator separately may not see framework routes when the workspace resolves two peer variants. A dotted, parameterless path is also dropped by hono-openapi's default filter as a static file, silently. The traps are pinned by the package tests and the application spec-generation task.
 
 ## Capabilities are ports
 
@@ -240,18 +247,17 @@ The pipeline positions are fixed: rate limit after auth, before validation (429 
 
 `onRouteMounted` fires synchronously during `build()` for every route the service mounts, so a host can register route policies (authorization registries, coverage gates) without re-deriving the route table:
 
-| Field                | Meaning                                                                                                            |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `method`             | Mounted HTTP method. SSE endpoints report `"get"`, guards `"all"`, catalogues `"post"`.                            |
-| `path`               | Absolute path including the base path, byte-identical to what the Hono route table (`app.routes[i].path`) reports. |
-| `version`            | `"2026-08-07"`, `"latest"`, `"preview"`, or `null` for the guards.                                                 |
-| `status`             | `"stable"`, `"latest"`, `"preview"`, or `null` for the guards.                                                     |
-| `withdrawn`          | `true` for mounts answering 410 Gone. Their `config` is the inherited one, `meta` included.                        |
-| `isNamespaceGuard`   | `true` for the two version-namespace catch-alls.                                                                   |
-| `isDiscoverEndpoint` | `true` for the `rpc.discover` catalogue mounts.                                                                    |
-| `config`             | The resolved endpoint definition behind the mount; `null` for guards and catalogues.                               |
+| Field              | Meaning                                                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `method`           | Mounted HTTP method. SSE endpoints report `"get"`, guards `"all"`.                                                 |
+| `path`             | Absolute path including the base path, byte-identical to what the Hono route table (`app.routes[i].path`) reports. |
+| `version`          | `"2026-08-07"`, `"latest"`, `"preview"`, or `null` for the guards.                                                 |
+| `status`           | `"stable"`, `"latest"`, `"preview"`, or `null` for the guards.                                                     |
+| `withdrawn`        | `true` for mounts answering 410 Gone. Their `config` is the inherited one, `meta` included.                        |
+| `isNamespaceGuard` | `true` for the two version-namespace catch-alls.                                                                   |
+| `config`           | The resolved endpoint definition behind the mount; `null` for guards.                                              |
 
-Completeness is the point: every dated version, `latest`, `preview`, withdrawn (410) endpoints, the catalogue mounts, and both version-namespace guards report. A policy registry that fails on unknown routes must receive all of them.
+Completeness is the point: every dated version, `latest`, `preview`, withdrawn (410) endpoints, and both version-namespace guards report. A policy registry that fails on unknown routes must receive all of them.
 
 ## Error handling
 
@@ -332,21 +338,36 @@ Unit tests: `pnpm --filter @langwatch/api test:unit`
 
 ```
 src/
-  builder.ts          # createService(), ServiceBuilder, GroupRegistrar
-  definition.ts       # The definition chain (withInput/withOutput/withStatus/withAuth/...), precedence merge, status invariant
-  rpc-name.ts         # The RPC name grammar: RpcName<T> type + assertRpcName, one rule stated twice
-  ports.ts            # RateLimiter + ResponseCache capability ports (app supplies the substrate)
-  capabilities.ts     # Rate-limit and cache middleware (keys, 429, validated-bytes caching, failure degradation)
-  discover.ts         # rpc.discover: the per-service RPC catalogue projection
-  versioning.ts       # Version catalogue from registrations; forward-copy + withdrawal resolution
-  route-mounting.ts   # Mounts dated/latest/preview namespaces + discover + guards; date-namespace fallback; onRouteMounted
-  pipeline.ts         # Per-endpoint middleware stack (auth, rate limit, docs, validation, cache read, handler)
-  response.ts         # Output validation + serialization
-  middleware.ts       # Built-in tracer + logger (uses @langwatch/observability)
-  errors.ts           # Error handler (HandledError, ZodError; one clean format)
-  sse.ts              # registerSse() typed event stream
-  types.ts            # ServiceConfig, EndpointDef, EndpointDocs, MountedRoute, ServiceContext, ...
-  index.ts            # Public re-exports + routeHandlers() (legacy Next-style hosts)
+  index.ts                # "." -- the transport-agnostic entry point
+  errors.ts               # HandledError subclasses, the wire envelope, createErrorHandler
+  access-policy.ts        # What credential an operation accepts, and what it can reach
+  ports.ts                # RateLimiter + ResponseCache capability ports (the app supplies the substrate)
+  schema.ts               # The Standard Schema boundary (parse, issue shape, flatten)
+
+  rest/
+    index.ts              # "./rest" -- the Hono service framework, plus routeHandlers() for legacy Next-style hosts
+    builder.ts            # createService(), createRestService(), ServiceBuilder, GroupRegistrar
+    definition.ts         # The definition chain (withInput/withOutput/withStatus/withAuth/...), precedence merge, status invariant
+    capabilities.ts       # Rate-limit and cache middleware (keys, 429, validated-bytes caching, failure degradation)
+    versioning.ts         # Version catalogue from registrations; forward-copy + withdrawal resolution
+    route-mounting.ts     # Mounts dated/latest/preview namespaces + guards; date-namespace fallback; onRouteMounted
+    pipeline.ts           # Per-endpoint middleware stack (auth, rate limit, docs, validation, cache read, handler)
+    public-rest-routing.ts, public-rest-input.ts, rest-version-selector.ts
+    response.ts           # Output validation + serialization
+    middleware.ts         # Built-in tracer + logger (uses @langwatch/observability)
+    sse.ts                # registerSse() typed event stream
+    types.ts              # ServiceConfig, EndpointDef, EndpointDocs, MountedRoute, ServiceContext, ...
+    security/             # Route-policy registry, OpenAPI security projection, SecuredApp
+
+  trpc/
+    index.ts              # "./trpc" -- the tRPC root and policy spine
+    trpc-root.ts          # TrpcRootDefinition: a typed root that keeps context and input concrete
+    trpc-permission-builder.ts   # After .input(), no .query/.mutation until authorization is declared
+    trpc-declared-authz.ts       # permission / permissionAny / noPermission / authorizeInService
+    trpc-runtime-policy.ts, trpc-policy-ports.ts, trpc-policy-context.ts
+    trpc-audit.ts, trpc-audit-redaction.ts    # The audit trail and its action-keyed redaction table
+    trpc-call-logging.ts, trpc-caller-trace.ts, trpc-failure-trace.ts, trpc-error-formatter.ts
+    trpc-scope-lineage.ts
 ```
 
 ## LLM instructions
@@ -355,12 +376,12 @@ When creating a new API service using this framework:
 
 1. Create `src/app/api/{name}/[[...route]]/app.ts` exporting the built app: `export const app = createService({ name })...build()`
 2. Mount it in `src/server/api-router.ts` with `api.route("/", app)` next to the other services (do not create a `route.ts`; `routeHandlers()` is only for legacy Next-style hosts)
-3. Use `createService({ name })` with the service name matching the URL path segment
+3. Use `createService({ name })` from `@langwatch/api/rest`, with the service name matching the URL path segment
 4. Pass auth and organization middleware through `createService({ auth, _legacy: { organizationMiddleware } })`; pass capability ports through `createService({ rateLimiter, cache })` when any endpoint declares them — declaring without the port fails the build
-5. Use `register(name, version, handler, define?)` for dotted RPC operations, `createRestService().get/post/put/patch/delete` for new public REST, compatibility `registerRoute` for existing HTTP, and `registerSse` for streams
+5. Use `createRestService().get/post/put/patch/delete` for new public REST, compatibility `registerRoute` for existing HTTP, and `registerSse` for streams
 6. Compose one application instance at process boot and expose it as `context.app`; expose the authenticated request principal as `context.actor()`. Feature handlers must not construct or resolve services per request. Handler signature is `(context, input)`; REST path, query and body fields are already merged into `input`
 7. Declare capabilities on the definition chain. Public REST has one `withInput` and one `withOutput`; compatibility HTTP retains `withParams`/`withQuery`
 8. Handlers return raw data when `withOutput` is declared; the framework validates and serializes
 9. Throw `NotFoundError` / `HandledError` for error responses, never a manual `c.json({ error }, 404)`
 10. Test the URL family you declared: `/api/{name}/{date|latest}/...` for `createService`, or `/api/v1/{name}/{optional date|latest}/...` for public REST
-11. Every mount reports through `onRouteMounted`, including withdrawn endpoints, the rpc.discover catalogue mounts, and both version-namespace guards
+11. Every mount reports through `onRouteMounted`, including withdrawn endpoints and both version-namespace guards

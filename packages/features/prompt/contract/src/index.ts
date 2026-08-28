@@ -1,5 +1,6 @@
 export * from "./prompt";
 export * from "./prompt.commands";
+export * from "./prompt.trpc-schemas";
 export * from "./prompt.errors";
 export * from "./prompt.service";
 export * from "./prompt.shorthand";

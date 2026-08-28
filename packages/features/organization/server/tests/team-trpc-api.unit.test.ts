@@ -16,7 +16,7 @@ import type { ProjectService } from "@langwatch/project-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { TeamTrpcApi } from "../src/api/app-trpc/team.api";
+import { TeamTrpcApi } from "../src/api/app-trpc/team.trpc-schemas";
 
 type TestContext = {
   app: { organizations: OrganizationService; projects: ProjectService };

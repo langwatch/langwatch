@@ -6,14 +6,14 @@
  * custom-evaluator read runs on, and the application ports the evaluation
  * package does not own.
  */
+import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
 import {
   EvaluationTrpcApi,
   type EvaluationTrpcContext,
   type EvaluationTrpcPorts,
 } from "@langwatch/evaluation-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
-import { appTrpcPolicy, type AppTrpcPolicyMiddlewares } from "../../app-trpc/app-trpc.policy";
+import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { listCustomEvaluators } from "./custom-evaluators";
 
 /**
@@ -29,20 +29,8 @@ export type EvaluationMountPorts<TMappingsIn, TMappingsOut> = Omit<
   "listCustomEvaluators"
 >;
 
-type EvaluationMount<
-  TContext extends EvaluationTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
-  TMappingsIn,
-  TMappingsOut,
-> = Readonly<{
-  root: TRPCRootObject<TContext, object, TOptions, TRoot>;
-  protectedProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  middlewares: AppTrpcPolicyMiddlewares;
-  /** The client the custom-evaluator read runs on. */
-  prisma: PrismaClient;
-  ports: EvaluationMountPorts<TMappingsIn, TMappingsOut>;
-}>;
+/** The client the custom-evaluator read runs on. */
+type EvaluationMountClient = Readonly<{ prisma: PrismaClient }>;
 
 /** Mounts `evaluations.*` on the app process's tRPC root. */
 export function createEvaluationTrpcRouter<
@@ -51,14 +39,14 @@ export function createEvaluationTrpcRouter<
   TRoot extends AnyTRPCRootTypes,
   TMappingsIn,
   TMappingsOut,
->(mount: EvaluationMount<TContext, TOptions, TRoot, TMappingsIn, TMappingsOut>) {
-  return EvaluationTrpcApi.create(
-    mount.root,
-    { protected: mount.protectedProcedure, policy: appTrpcPolicy(mount.middlewares) },
-    {
-      ...mount.ports,
-      listCustomEvaluators: ({ projectId }) =>
-        listCustomEvaluators({ prisma: mount.prisma, projectId }),
-    },
-  );
+>(
+  mount: TrpcApiMount<TContext, TOptions, TRoot> &
+    EvaluationMountClient &
+    TrpcApiPorts<EvaluationMountPorts<TMappingsIn, TMappingsOut>>,
+) {
+  return EvaluationTrpcApi.create(mount.root, createTrpcApiService(mount), {
+    ...mount.ports,
+    listCustomEvaluators: ({ projectId }) =>
+      listCustomEvaluators({ prisma: mount.prisma, projectId }),
+  });
 }

@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
@@ -32,6 +33,7 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
+    "@trpc/server": "^11.18.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

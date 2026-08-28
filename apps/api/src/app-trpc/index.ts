@@ -6,15 +6,9 @@
  * and any process side effects the feature needs; the feature package owns
  * procedure names, schemas and delegation.
  */
-export {
-  appTrpcCustomPolicy,
-  appTrpcNoPermissionPolicy,
-  appTrpcPolicy,
-  appTrpcPolicyAny,
-  appTrpcServiceAuthorizedPolicy,
-  type AppTrpcPolicy,
-  type AppTrpcPolicyMiddlewares,
-} from "./app-trpc.policy";
+// The policy chain now lives in `@langwatch/api/trpc` beside
+// `createTrpcApiService`, which is the only thing that composes it. Import it
+// from there rather than re-exporting it through this barrel.
 export { createApiKeyTrpcRouter } from "../features/api-key/api-key-trpc.mount";
 export {
   createAutomationTrpcRouter,
@@ -51,7 +45,10 @@ export {
   createTracesV2TrpcRouter,
 } from "../features/trace/traces-v2-trpc.mount";
 export { declaredCheckFrom, type AppAuthzMiddlewareBuilders } from "./app-trpc.declared-check";
-export { createFrontDoorTrpcRouter } from "../features/auth/auth-trpc.mount";
+export {
+  createFrontDoorTrpcRouter,
+  createPublicEnvTrpcProcedure,
+} from "../features/auth/auth-trpc.mount";
 export {
   createGroupTrpcRouter,
   createJoinRequestTrpcRouter,

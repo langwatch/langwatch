@@ -11,6 +11,7 @@
  * single public trace read on its own surface, and nothing in this file is
  * reachable without a session.
  */
+import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
 import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
 import {
   SpansTrpcApi,
@@ -24,87 +25,49 @@ import {
   type TracesTrpcContext,
   type TracesTrpcPorts,
 } from "@langwatch/trace-server";
-import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
-import { appTrpcPolicy, type AppTrpcPolicyMiddlewares } from "../../app-trpc/app-trpc.policy";
+import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 
-type SpansMount<
-  TContext extends SpansTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
-> = Readonly<{
-  root: TRPCRootObject<TContext, object, TOptions, TRoot>;
-  protectedProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  middlewares: AppTrpcPolicyMiddlewares;
-  /** Forwarded untouched: the viewer's redactions are the process's to resolve. */
-  ports: SpansTrpcPorts;
-}>;
-
-/** Mounts `spans.*` on the app process's tRPC root. */
+/**
+ * Mounts `spans.*` on the app process's tRPC root.
+ *
+ * The ports are forwarded untouched: the viewer's redactions are the process's
+ * to resolve.
+ */
 export function createSpansTrpcRouter<
   TContext extends SpansTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
->(mount: SpansMount<TContext, TOptions, TRoot>) {
-  return SpansTrpcApi.create(
-    mount.root,
-    { protected: mount.protectedProcedure, policy: appTrpcPolicy(mount.middlewares) },
-    mount.ports,
-  );
+>(mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPorts<SpansTrpcPorts>) {
+  return SpansTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
 }
 
-type TraceEditOverlayMount<
-  TContext extends TraceEditOverlayTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
-  TProtections extends TraceEditOverlayVisibilityWindow,
-> = Readonly<{
-  root: TRPCRootObject<TContext, object, TOptions, TRoot>;
-  protectedProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  middlewares: AppTrpcPolicyMiddlewares;
-  /**
-   * Forwarded untouched. Both redaction rules are the ones the legacy trace
-   * read applies to the captured value, so a correction can never be handed
-   * over more freely than the content it corrects.
-   */
-  ports: TraceEditOverlayTrpcPorts<TProtections>;
-}>;
-
-/** Mounts `traceEditOverlay.*` on the app process's tRPC root. */
+/**
+ * Mounts `traceEditOverlay.*` on the app process's tRPC root.
+ *
+ * The ports are forwarded untouched. Both redaction rules are the ones the
+ * legacy trace read applies to the captured value, so a correction can never be
+ * handed over more freely than the content it corrects.
+ */
 export function createTraceEditOverlayTrpcRouter<
   TContext extends TraceEditOverlayTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
   TProtections extends TraceEditOverlayVisibilityWindow,
->(mount: TraceEditOverlayMount<TContext, TOptions, TRoot, TProtections>) {
-  return TraceEditOverlayTrpcApi.create(
-    mount.root,
-    { protected: mount.protectedProcedure, policy: appTrpcPolicy(mount.middlewares) },
-    mount.ports,
-  );
+>(
+  mount: TrpcApiMount<TContext, TOptions, TRoot> &
+    TrpcApiPorts<TraceEditOverlayTrpcPorts<TProtections>>,
+) {
+  return TraceEditOverlayTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
 }
 
-type TracesMount<
-  TContext extends TracesTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
-  TListInput extends TraceLegacyListInput,
-  TListInputRaw,
-  TFilterInput extends TraceLegacyFilterInput,
-  TFilterInputRaw,
-  TPrecondition,
-> = Readonly<{
-  root: TRPCRootObject<TContext, object, TOptions, TRoot>;
-  protectedProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  middlewares: AppTrpcPolicyMiddlewares;
-  /**
-   * Forwarded untouched. The two filter schemas are the process's because the
-   * same shapes are the v1 REST search body and the analytics read input: one
-   * definition, in the process, is what keeps those surfaces from drifting.
-   */
-  ports: TracesTrpcPorts<TListInput, TListInputRaw, TFilterInput, TFilterInputRaw, TPrecondition>;
-}>;
-
-/** Mounts `traces.*` on the app process's tRPC root. */
+/**
+ * Mounts `traces.*` on the app process's tRPC root.
+ *
+ * The ports are forwarded untouched. The two filter schemas are the process's
+ * because the same shapes are the v1 REST search body and the analytics read
+ * input: one definition, in the process, is what keeps those surfaces from
+ * drifting.
+ */
 export function createTracesTrpcRouter<
   TContext extends TracesTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
@@ -115,20 +78,10 @@ export function createTracesTrpcRouter<
   TFilterInputRaw,
   TPrecondition,
 >(
-  mount: TracesMount<
-    TContext,
-    TOptions,
-    TRoot,
-    TListInput,
-    TListInputRaw,
-    TFilterInput,
-    TFilterInputRaw,
-    TPrecondition
-  >,
+  mount: TrpcApiMount<TContext, TOptions, TRoot> &
+    TrpcApiPorts<
+      TracesTrpcPorts<TListInput, TListInputRaw, TFilterInput, TFilterInputRaw, TPrecondition>
+    >,
 ) {
-  return TracesTrpcApi.create(
-    mount.root,
-    { protected: mount.protectedProcedure, policy: appTrpcPolicy(mount.middlewares) },
-    mount.ports,
-  );
+  return TracesTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
 }

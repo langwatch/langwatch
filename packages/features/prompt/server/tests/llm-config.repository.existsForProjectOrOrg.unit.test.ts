@@ -42,10 +42,7 @@ describe("LlmConfigRepository", () => {
           where: {
             id: "prompt_org",
             deletedAt: null,
-            OR: [
-              { projectId: "proj_1" },
-              { organizationId: "org_1", scope: "ORGANIZATION" },
-            ],
+            OR: [{ projectId: "proj_1" }, { organizationId: "org_1", scope: "ORGANIZATION" }],
           },
           select: { id: true },
         });
@@ -131,10 +128,7 @@ describe("LlmConfigRepository", () => {
           where: {
             id: "prompt_org_b",
             deletedAt: null,
-            OR: [
-              { projectId: "proj_a" },
-              { organizationId: "org_A", scope: "ORGANIZATION" },
-            ],
+            OR: [{ projectId: "proj_a" }, { organizationId: "org_A", scope: "ORGANIZATION" }],
           },
           select: { id: true },
         });

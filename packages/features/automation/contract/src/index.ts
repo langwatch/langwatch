@@ -1,4 +1,5 @@
 export * from "./automation";
+export * from "./automation.trpc-schemas";
 export * from "./automation.events";
 export * from "./automation.commands";
 export * from "./automation.errors";
@@ -13,9 +14,10 @@ export {
   triggerActionSchema,
   triggerKindSchema,
   triggerSchema,
+  triggerTemplateDraftSchema,
   triggerTemplateSchema,
 } from "./trigger";
-export type { Trigger, TriggerKind, TriggerTemplate } from "./trigger";
+export type { Trigger, TriggerKind, TriggerTemplate, TriggerTemplateDraft } from "./trigger";
 export * from "./trigger.commands";
 export * from "./trigger.queries";
 export * from "./trigger-policies";

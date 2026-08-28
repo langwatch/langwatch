@@ -10,6 +10,7 @@ import {
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import {
   OrganizationService as OrganizationServiceContract,
+  OrganizationNotFoundError,
   GroupBindingAlreadyExistsError,
   GroupBindingNotFoundError,
   GroupCustomRoleRequiredError,
@@ -49,6 +50,7 @@ import {
   getOldestTeamInputSchema,
   getOrganizationBillingProfileInputSchema,
   getOrganizationMembersInputSchema,
+  getOrganizationSettingsInputSchema,
   listMemberOrganizationGroupsInputSchema,
   listOrganizationGroupsInputSchema,
   listOrganizationTeamsInputSchema,
@@ -62,6 +64,7 @@ import {
   renameOrganizationGroupInputSchema,
   updateOrganizationTeamInputSchema,
   updateOrganizationTeamWithMembersInputSchema,
+  updateOrganizationSettingsInputSchema,
   type AddOrganizationGroupBindingInput,
   type AddOrganizationTeamMemberInput,
   type ApplyOrganizationGroupEditsInput,
@@ -103,6 +106,7 @@ import {
   type OrganizationTeamMemberInput,
   type OrganizationTeamPage,
   type OrganizationTeamWithMembers,
+  type OrganizationSettings,
   type PersonalFeatures,
   type PersonalWorkspace,
   type PersonalWorkspaceFeaturesInput,
@@ -112,6 +116,8 @@ import {
   type RemoveOrganizationTeamMemberInput,
   type UpdateOrganizationTeamInput,
   type UpdateOrganizationTeamWithMembersInput,
+  type UpdateOrganizationSettingsInput,
+  type UpdateOrganizationSettingsResult,
 } from "@langwatch/organization-contract";
 import type {
   GroupIdentityPort,
@@ -136,7 +142,6 @@ const ALL_PERSONAL_FEATURES_ENABLED: PersonalFeatures = {
   annotations: true,
   automations: true,
 };
-
 const TEAM_ROLE_PRIORITY = {
   ADMIN: 0,
   MEMBER: 1,
@@ -203,10 +208,7 @@ function planTeamMembership(
       (left, right) => TEAM_ROLE_PRIORITY[left.role] - TEAM_ROLE_PRIORITY[right.role],
     )[0]!;
     const target = memberTarget(member);
-    if (
-      displayed.role === target.role &&
-      displayed.customRoleId === target.customRoleId
-    ) {
+    if (displayed.role === target.role && displayed.customRoleId === target.customRoleId) {
       continue;
     }
     const targetAlreadyHeld = bindings.some(
@@ -229,9 +231,7 @@ function directAdminIdsAfterPlan(
   plan: TeamMembershipPlan,
 ): Set<string> {
   const removed = new Set(plan.bindingIdsToRemove);
-  const changed = new Map(
-    plan.bindingsToChange.map((binding) => [binding.bindingId, binding]),
-  );
+  const changed = new Map(plan.bindingsToChange.map((binding) => [binding.bindingId, binding]));
   const administrators = new Set<string>();
   for (const binding of currentBindings) {
     if (!binding.userId || removed.has(binding.id)) continue;
@@ -278,6 +278,7 @@ export class OrganizationService extends OrganizationServiceContract {
       await this.teams.getOrganizationMembers({
         organizationId: input.organizationId,
         userIds: [input.userId],
+        activeOnly: input.includeDeactivated !== true,
       });
       return true;
     } catch (error) {
@@ -287,8 +288,26 @@ export class OrganizationService extends OrganizationServiceContract {
   }
 
   getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]> {
-    const parsed = getOrganizationMembersInputSchema.parse(input);
-    return this.teams.getOrganizationMembers(parsed);
+    return this.teams.getOrganizationMembers(getOrganizationMembersInputSchema.parse(input));
+  }
+
+  async getSettings(input: { organizationId: string }): Promise<OrganizationSettings> {
+    const parsed = getOrganizationSettingsInputSchema.parse(input);
+    const settings = await this.repository.getSettings(parsed.organizationId);
+    if (!settings) throw new OrganizationNotFoundError();
+    return settings;
+  }
+
+  async updateSettings(
+    input: UpdateOrganizationSettingsInput,
+  ): Promise<UpdateOrganizationSettingsResult> {
+    const parsed = updateOrganizationSettingsInputSchema.parse(input);
+    const wasSharingEnabled =
+      parsed.traceSharingEnabled === false
+        ? (await this.repository.findSettings(parsed.organizationId))?.traceSharingEnabled === true
+        : false;
+    await this.repository.updateSettings(parsed);
+    return { traceShareRevocationRequired: wasSharingEnabled };
   }
 
   static create(options: {
@@ -323,8 +342,9 @@ export class OrganizationService extends OrganizationServiceContract {
   getBillingProfile(
     input: GetOrganizationBillingProfileInput,
   ): Promise<OrganizationBillingProfile> {
-    const parsed = getOrganizationBillingProfileInputSchema.parse(input);
-    return this.repository.getBillingProfile(parsed.organizationId);
+    return this.repository.getBillingProfile(
+      getOrganizationBillingProfileInputSchema.parse(input).organizationId,
+    );
   }
 
   claimBillingCustomerId(input: ClaimOrganizationBillingCustomerInput): Promise<boolean> {
@@ -333,9 +353,7 @@ export class OrganizationService extends OrganizationServiceContract {
     );
   }
 
-  async ensurePersonalWorkspace(
-    input: PersonalWorkspaceInput,
-  ): Promise<EnsuredPersonalWorkspace> {
+  async ensurePersonalWorkspace(input: PersonalWorkspaceInput): Promise<EnsuredPersonalWorkspace> {
     const parsed = personalWorkspaceInputSchema.parse(input);
     const resources = this.identities.create(parsed);
     const result = await this.repository.ensurePersonalWorkspace({
@@ -375,12 +393,8 @@ export class OrganizationService extends OrganizationServiceContract {
     return { ...result.workspace, created: result.created };
   }
 
-  tryFindPersonalWorkspace(
-    input: FindPersonalWorkspaceInput,
-  ): Promise<PersonalWorkspace | null> {
-    return this.repository.tryFindPersonalWorkspace(
-      findPersonalWorkspaceInputSchema.parse(input),
-    );
+  tryFindPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null> {
+    return this.repository.tryFindPersonalWorkspace(findPersonalWorkspaceInputSchema.parse(input));
   }
 
   async getPersonalWorkspaceFeatures(
@@ -549,11 +563,7 @@ export class OrganizationService extends OrganizationServiceContract {
   ): Promise<OrganizationTeamWithMembers> {
     const parsed = getOrganizationTeamWithMembersInputSchema.parse(input);
     const team = await this.teams.getBySlug(parsed);
-    if (
-      !parsed.callerCanManage &&
-      team.isPersonal &&
-      team.ownerUserId !== parsed.callerUserId
-    ) {
+    if (!parsed.callerCanManage && team.isPersonal && team.ownerUserId !== parsed.callerUserId) {
       throw new TeamNotFoundError(team.id);
     }
     const bindings = await this.authz.listTeamMemberBindings({
@@ -613,9 +623,7 @@ export class OrganizationService extends OrganizationServiceContract {
     return team;
   }
 
-  async updateTeamWithMembers(
-    input: UpdateOrganizationTeamWithMembersInput,
-  ): Promise<void> {
+  async updateTeamWithMembers(input: UpdateOrganizationTeamWithMembersInput): Promise<void> {
     const parsed = updateOrganizationTeamWithMembersInputSchema.parse(input);
     const team = await this.teams.getById(parsed.teamId);
     if (team.isPersonal) {
@@ -666,9 +674,7 @@ export class OrganizationService extends OrganizationServiceContract {
     });
   }
 
-  async listTeamAccess(
-    input: ListOrganizationTeamAccessInput,
-  ): Promise<OrganizationTeamAccess[]> {
+  async listTeamAccess(input: ListOrganizationTeamAccessInput): Promise<OrganizationTeamAccess[]> {
     const parsed = listOrganizationTeamAccessInputSchema.parse(input);
     const teams = await this.teams.listActive({
       organizationId: parsed.organizationId,
@@ -691,9 +697,7 @@ export class OrganizationService extends OrganizationServiceContract {
     ]);
     const allBindings = [...teamBindings, ...projectBindings];
     const groupIds = [
-      ...new Set(
-        allBindings.flatMap((binding) => (binding.groupId ? [binding.groupId] : [])),
-      ),
+      ...new Set(allBindings.flatMap((binding) => (binding.groupId ? [binding.groupId] : []))),
     ];
     const groupMembers = await this.groups.listMembersForGroups({
       organizationId: parsed.organizationId,
@@ -710,10 +714,7 @@ export class OrganizationService extends OrganizationServiceContract {
     );
   }
 
-  private teamBindings(
-    organizationId: string,
-    teamId: string,
-  ): Promise<AuthzAccessBinding[]> {
+  private teamBindings(organizationId: string, teamId: string): Promise<AuthzAccessBinding[]> {
     return this.authz.listScopeBindings({
       organizationId,
       scopeType: "TEAM",
@@ -753,10 +754,7 @@ export class OrganizationService extends OrganizationServiceContract {
     const displayedByUser = new Map<string, AuthzTeamMemberBinding>();
     for (const binding of input.bindings) {
       const displayed = displayedByUser.get(binding.userId);
-      if (
-        !displayed ||
-        TEAM_ROLE_PRIORITY[binding.role] < TEAM_ROLE_PRIORITY[displayed.role]
-      ) {
+      if (!displayed || TEAM_ROLE_PRIORITY[binding.role] < TEAM_ROLE_PRIORITY[displayed.role]) {
         displayedByUser.set(binding.userId, binding);
       }
     }
@@ -773,8 +771,7 @@ export class OrganizationService extends OrganizationServiceContract {
           id: binding.user.id,
           name: binding.user.name,
           email:
-            input.visibleEmailUserId === undefined ||
-            input.visibleEmailUserId === binding.userId
+            input.visibleEmailUserId === undefined || input.visibleEmailUserId === binding.userId
               ? binding.user.email
               : null,
           image: binding.user.image,
@@ -869,9 +866,7 @@ export class OrganizationService extends OrganizationServiceContract {
     groupMembers: Map<string, OrganizationGroupMember[]>;
   }): OrganizationTeamAccess {
     const projectIds = new Set(input.projects.map(({ id }) => id));
-    const projectBindings = input.projectBindings.filter(({ scopeId }) =>
-      projectIds.has(scopeId),
-    );
+    const projectBindings = input.projectBindings.filter(({ scopeId }) => projectIds.has(scopeId));
     const groupBindings = input.teamBindings.filter(({ groupId }) => groupId);
     const directUserBindings = input.teamBindings.filter(({ userId }) => userId);
     const directUserIds = new Set(
@@ -879,16 +874,11 @@ export class OrganizationService extends OrganizationServiceContract {
     );
     const seenExpandedUserIds = new Set<string>();
     const expandedGroupMembers = [...groupBindings]
-      .sort(
-        (left, right) => TEAM_ROLE_PRIORITY[left.role] - TEAM_ROLE_PRIORITY[right.role],
-      )
+      .sort((left, right) => TEAM_ROLE_PRIORITY[left.role] - TEAM_ROLE_PRIORITY[right.role])
       .flatMap((binding): OrganizationTeamAccessMember[] => {
         if (!binding.groupId) return [];
         return (input.groupMembers.get(binding.groupId) ?? []).flatMap((member) => {
-          if (
-            directUserIds.has(member.userId) ||
-            seenExpandedUserIds.has(member.userId)
-          ) {
+          if (directUserIds.has(member.userId) || seenExpandedUserIds.has(member.userId)) {
             return [];
           }
           seenExpandedUserIds.add(member.userId);
@@ -916,8 +906,7 @@ export class OrganizationService extends OrganizationServiceContract {
         groupId: null,
         viaGroupId: null,
         viaGroupName: null,
-        name:
-          binding.user?.name ?? binding.user?.email ?? binding.apiKey?.name ?? "Unknown",
+        name: binding.user?.name ?? binding.user?.email ?? binding.apiKey?.name ?? "Unknown",
         email: binding.user?.email ?? null,
         image: binding.user?.image ?? null,
         role: binding.role,
@@ -929,9 +918,7 @@ export class OrganizationService extends OrganizationServiceContract {
       const byName = left.name.localeCompare(right.name);
       if (byName !== 0) return byName;
       const byEmail = (left.email ?? "").localeCompare(right.email ?? "");
-      return byEmail !== 0
-        ? byEmail
-        : (left.userId ?? "").localeCompare(right.userId ?? "");
+      return byEmail !== 0 ? byEmail : (left.userId ?? "").localeCompare(right.userId ?? "");
     });
     const teamBoundUserIds = new Set(
       directMembers.flatMap(({ userId }) => (userId ? [userId] : [])),
@@ -966,9 +953,7 @@ export class OrganizationService extends OrganizationServiceContract {
     );
     for (const project of input.projects) {
       const bindings = projectBindings.filter(({ scopeId }) => scopeId === project.id);
-      const overriddenUserIds = new Set(
-        bindings.flatMap(({ userId }) => (userId ? [userId] : [])),
-      );
+      const overriddenUserIds = new Set(bindings.flatMap(({ userId }) => (userId ? [userId] : [])));
       for (const binding of bindings) {
         if (!binding.groupId) continue;
         for (const member of input.groupMembers.get(binding.groupId) ?? []) {
@@ -993,11 +978,7 @@ export class OrganizationService extends OrganizationServiceContract {
           userId: binding.userId,
           groupId: binding.groupId,
           viaGroupName: binding.groupId ? (binding.group?.name ?? null) : null,
-          name:
-            binding.user?.name ??
-            binding.group?.name ??
-            binding.apiKey?.name ??
-            "Unknown",
+          name: binding.user?.name ?? binding.group?.name ?? binding.apiKey?.name ?? "Unknown",
           email: binding.user?.email ?? null,
           image: binding.user?.image ?? null,
           role: binding.role,
@@ -1142,9 +1123,7 @@ export class OrganizationService extends OrganizationServiceContract {
     await this.groups.removeMember(parsed);
   }
 
-  async listGroupBindings(
-    input: GetOrganizationGroupInput,
-  ): Promise<OrganizationGroupBinding[]> {
+  async listGroupBindings(input: GetOrganizationGroupInput): Promise<OrganizationGroupBinding[]> {
     const parsed = getOrganizationGroupInputSchema.parse(input);
     await this.groups.get(parsed);
     return this.readGroupBindings(parsed);
@@ -1288,9 +1267,7 @@ export class OrganizationService extends OrganizationServiceContract {
       ...new Set(customBindings.map(({ customRoleId }) => customRoleId as string)),
     ];
     const roles =
-      customRoleIds.length === 0
-        ? []
-        : await this.authz.listUserCreatedRoles({ organizationId });
+      customRoleIds.length === 0 ? [] : await this.authz.listUserCreatedRoles({ organizationId });
     const rolesById = new Map(roles.map((role) => [role.id, role]));
     const missingRole = customRoleIds.find((id) => !rolesById.has(id));
     if (missingRole) throw new GroupRoleNotAssignableError(missingRole);
@@ -1427,9 +1404,7 @@ export class OrganizationService extends OrganizationServiceContract {
     input: PersonalWorkspaceFeaturesInput,
   ): Promise<PersonalWorkspaceFeatureProject> {
     const parsed = personalWorkspaceFeaturesInputSchema.parse(input);
-    const project = await this.repository.getPersonalWorkspaceFeatureProject(
-      parsed.projectId,
-    );
+    const project = await this.repository.getPersonalWorkspaceFeatureProject(parsed.projectId);
     if (!project.isPersonal || project.ownerUserId !== parsed.callerUserId) {
       throw new PersonalProjectOwnerMismatchError();
     }

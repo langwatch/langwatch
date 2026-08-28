@@ -79,11 +79,11 @@ export const useComparisonMode = ({
         );
 
         return true;
-      } else {
-        // Exiting compare mode - clear selection
-        setSelectedRunIds([]);
-        return false;
       }
+
+      // Exiting compare mode - clear selection
+      setSelectedRunIds([]);
+      return false;
     });
   }, [currentRunId, runIds]);
 
@@ -98,9 +98,9 @@ export const useComparisonMode = ({
           return [];
         }
         return prev.filter((id) => id !== runId);
-      } else {
-        return [...prev, runId];
       }
+
+      return [...prev, runId];
     });
   }, []);
 

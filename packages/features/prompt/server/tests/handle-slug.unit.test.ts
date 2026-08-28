@@ -13,9 +13,7 @@ describe("toHandleSlug", () => {
 
   describe("given a prompt id", () => {
     it("lowercases the nanoid so the handle stays valid", () => {
-      expect(toHandleSlug("prompt_1h5icu8XRkHHbaQlrOgwq")).toBe(
-        "prompt_1h5icu8xrkhhbaqlrogwq",
-      );
+      expect(toHandleSlug("prompt_1h5icu8XRkHHbaQlrOgwq")).toBe("prompt_1h5icu8xrkhhbaqlrogwq");
     });
   });
 

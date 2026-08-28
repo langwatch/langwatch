@@ -190,12 +190,14 @@ export class PrismaTeamRepository extends TeamRepository {
   async getOrganizationMembers(input: {
     userIds: string[];
     organizationId: string;
+    activeOnly?: boolean;
   }): Promise<string[]> {
     if (input.userIds.length === 0) return [];
     const memberships = await this.database.organizationUser.findMany({
       where: {
         organizationId: input.organizationId,
         userId: { in: input.userIds },
+        ...(input.activeOnly ? { disabledAt: null } : {}),
       },
       select: { userId: true },
     });
