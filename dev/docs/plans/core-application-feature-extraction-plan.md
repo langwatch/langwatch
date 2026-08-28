@@ -4,28 +4,45 @@
 
 **Branch:** `feat/strict-feature-layout-v0`
 
-**Working checkpoint:** `6ec280aec8`
+**Working checkpoint:** `367178c4be`
 
 **Current execution waves:** Wave 3 internal tRPC + strict-layout hygiene
 
-**State as of `5343bdee6e`.** 64 package-owned tRPC APIs are written across
-`packages/**/server/src/api/app-trpc/`. Nineteen verticals are wired and
-committed, mounted from `platform/app/src/runtime/app/internal-api/`. Fifteen
-`apps/api` mount files exist for the rest and are not yet wired into the
-universal root.
+**State as of `367178c4be`.** Fifty-one package-owned tRPC APIs are written
+across `packages/**/server/src/api/app-trpc/`, in thirty-five feature packages.
+The transport surface now stands in three shapes, and the difference between
+them is the whole remaining job:
 
-The gap between 64 written and 19 wired is not lost work — it is on disk,
-uncommitted, and it is the next thing to finish. The old routers were restored
-from `HEAD` for every unwired vertical so that `server/api/root.ts` resolves and
-the branch is not left broken; each restored router is deleted again as its
-mount lands.
+| Shape | Count | Where the mount lives | Imports from `platform/app` |
+| --- | --- | --- | --- |
+| Mounted from `apps/api` | 9 routers | `apps/api/src/features/*/…-trpc.mount.ts` | none |
+| Mounted from `platform/app` | 19 routers | `platform/app/src/runtime/app/internal-api/*.router.ts` | root, policy chain, some services |
+| Not yet moved | 44 routers | `platform/app/src/server/api/routers/*.ts` | everything |
 
-The `apps/api` mount shape is the one to copy, and it is deliberately different
-from the `platform/app` one it replaces:
-`create<Feature>TrpcRouter({ root, protectedProcedure, middlewares })` takes the
-process's tRPC root and authenticated procedure as parameters and imports
-nothing from `platform/app`. That is what lets a mount live in `apps/api`
-without inverting the dependency direction.
+Seventy-two router files remain under `server/api/routers/`. Nine of them are
+already thin compositions that import their behaviour from
+`@langwatch/platform-api/app-trpc` and hold no logic; the other sixty-three
+still own their procedures outright.
+
+**The `apps/api` shape is the target, and it is already reachable.**
+`platform/app` declares `@langwatch/platform-api` as a workspace dependency and
+the `./app-trpc` subpath is exported, so a mount placed in `apps/api` can be
+consumed by `root.ts` today — nothing needs to be built or published first.
+`apps/api/src/app-trpc/app-trpc.policy.ts` imports only types from
+`@langwatch/authz-contract` and takes the process's concrete middlewares as a
+parameter, which is what keeps the dependency pointing the right way.
+
+**The nineteen `internal-api` mounts are not yet movable, and the reason is
+specific.** Each one reaches into `~/server/api/trpc.root`,
+`~/server/api/trpc.runtime-policy`, `~/server/api/trpc.scope-lineage-middleware`
+and `~/server/app-layer/authz/trpc-middleware` — roughly 1,900 lines of policy
+spine that still lives in `platform/app`. Several also reach feature services
+that have not been extracted yet (`~/server/modelProviders/*`,
+`~/server/app-layer/traces/*`, `~/utils/modelLimits`, `~/utils/safeRegex`).
+Moving the spine into `@langwatch/trpc` unblocks all nineteen at once; moving
+those services is a separate, smaller wave. Until then, a mount in
+`internal-api` is the correct intermediate rather than a regression: it holds a
+policy chain and a service handoff, and no feature behaviour.
 
 Waves 1 and 2 are closed. Wave 3's internal-tRPC column is now the active
 front, running beside the architecture-lint hygiene the strict layout needs in
