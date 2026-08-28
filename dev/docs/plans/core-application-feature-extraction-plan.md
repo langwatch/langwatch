@@ -4,7 +4,7 @@
 
 **Branch:** `feat/strict-feature-layout-v0`
 
-**Working checkpoint:** `faf6db77e1`
+**Working checkpoint:** `39f1de6dff`
 
 **Goal:** delete `platform/app` after its UI, API, worker, configuration,
 backend, tests, assets and deployment responsibilities have canonical owners.
@@ -89,15 +89,17 @@ The exit is complete only when all of the following are true:
 | `7cca0848fb` | Added internal Trace full-read and Topic-assignment ports without route cutover. |
 | `0322204dea` | Added reusable path/header/latest REST version selection.                        |
 | `faf6db77e1` | Exposed Secret through the four direct REST prefixes and retained main parity.   |
+| `02457aaebd` | Moved Agent and Secret tRPC behaviour into package-owned app adapters.           |
+| `39f1de6dff` | Routed Topic clustering through Eventing and composed a producer-safe worker.    |
 
 ### Active, uncommitted slices
 
-| Slice                          | Current fact                                                                                                                                                                     | Next gate                                                                                                                                                              |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| API Secret/Agent               | `@langwatch/trpc`, package-owned Agent/Secret app-tRPC adapters and AuthZ scope-lineage extraction exist in the working tree. The physical API process root is also implemented. | Review the whole request graph, prove auth/audit/error/log/trace parity, delete displaced Agent/Secret router implementations and commit one direct-cutover batch.     |
-| Worker Topic                   | Production worker composition, Topic Eventing adapters, deterministic process-manager flow, retry-safe run intent and Trace assignment exist in the working tree.                | Prove Topic has no non-Eventing execution path, identify the honest partial worker activation boundary, delete displaced Topic task/registry/runtime paths and commit. |
-| Process observability adoption | The reusable package foundation is committed, while API/worker process integration is being completed in their respective slices.                                                | Align the LangWatch SDK boundary, preserve disabled/configured instrumentation behaviour and prove drain-before-flush ordering at each process root.                   |
-| Workspace reconciliation       | Several active slices touch app/package manifests and `pnpm-lock.yaml`; unrelated Evaluation, Model Provider, Identity and generated-artefact changes also share the tree.       | Attribute lockfile hunks to a committed slice, stage only exact files/hunks and leave unrelated work untouched.                                                        |
+| Slice                          | Current fact                                                                                                                                                                                                                       | Next gate                                                                                                                                                                            |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| API physical activation        | Package-owned Agent/Secret app-tRPC adapters and the preparatory `ApiApplication`/`ApiProcess` are committed. The universal app root remains live because the physical process has no standalone listener/bootstrap or HTTP drain. | Compose the process-owned listener, policy and lifecycle graph, prove mixed-batch and REST parity, then directly activate it and delete each displaced compatibility router.         |
+| Worker physical activation     | Topic manual/bootstrap/API paths now produce only durable Eventing commands. The new worker composition is deliberately producer-only; the legacy full registry remains the sole shared-queue consumer.                            | Compose the complete shared Eventing registry, including Trace `assignTopic`, prove shutdown/redelivery parity, enable the worker consumer and delete displaced legacy worker paths. |
+| Process observability adoption | The reusable package foundation is committed, while API/worker process integration is being completed in their respective slices.                                                                                                  | Align the LangWatch SDK boundary, preserve disabled/configured instrumentation behaviour and prove drain-before-flush ordering at each process root.                                 |
+| Workspace reconciliation       | The API and Worker/Topic importer hunks are committed. Unrelated Evaluation, Identity, generated-artefact, SDK and formatting changes still share the tree.                                                                        | Attribute every later lockfile/baseline hunk to its owning slice, stage exact paths or hunks and leave unrelated work untouched.                                                     |
 
 Only reviewed and committed deletions count as application-exit progress. The
 active table names the remaining shared-tree batches and their next safe
@@ -110,19 +112,24 @@ them up as dependency-closed work when their owning wave reaches the affected
 surface. A failing check remains reported as failing even when its repair is
 deferred.
 
-| ID            | Finding and evidence                                                                                                                                                                                                                                                   | Owning wave              |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| `F-API-01`    | The checked-in branch OpenAPI artefacts are stale. Semantic comparison with `main` reports its five deployed `/api/secrets` operations as absent even though the canonical source now retains them. Do not regenerate or call parity green until generation completes. | Wave 3 and Wave 9        |
-| `F-API-03`    | The global authz declaration sweep currently stops before discovery on an undefined analytics `lwqlTimeWindowSchema`. Agent/Secret focused policy tests are green, but the global sweep has not proved the new package mounts.                                         | Wave 2 and Wave 3        |
-| `F-API-04`    | OpenAPI generation constructs `signInDomainRoutingPort` before the generation task initialises environment/configuration, so the task fails before Secret route composition. Fix this in the OpenAPI ownership move rather than coupling Secret back to app boot.      | Wave 3 and Wave 9        |
-| `F-SECRET-01` | TypeScript Secret CLI commands do not forward the resolved project ID when building auth headers for the modern REST calls. Add multi-project/user-key header characterisation.                                                                                        | Wave 3 clients           |
-| `F-SECRET-02` | The legacy Secret adapter changed project-key write actor handling and duplicate-error text from `main`. Characterise and decide the compatibility policy before retiring `/api/secrets`.                                                                              | Wave 3 compatibility     |
-| `F-SECRET-03` | The four Secret prefixes have focused sub-app coverage, but no full `createApiRouter` regression proves all collection/item mounts, header selection, conflicts and response headers together.                                                                         | Wave 3 compatibility     |
-| `F-TRACE-01`  | The extracted full-read path trusts a stale storage-anchor hint, can return an empty span set, and does not yet preserve every legacy field/nullability case, including earliest start, topic IDs and reserved metrics. It has no production caller yet.               | Trace vertical in Wave 6 |
-| `F-OBS-01`    | Process observability and Eventing currently resolve different LangWatch SDK versions. Align one SDK/OTel graph before final process activation.                                                                                                                       | Wave 1                   |
-| `F-OBS-02`    | Preserve legacy instrumentation, disabled/no-key behaviour, metrics/profiling and drain-before-flush ordering when API and worker adopt process observability. Add process-level boot/shutdown proof.                                                                  | Wave 1                   |
-| `F-AGENT-01`  | `specs/agents/AUDIT_MANIFEST.md` still points at deleted management UI paths and does not bind the moved scenario tests. Refresh it when the next Agent vertical updates feature documentation.                                                                        | Wave 6 and Wave 7        |
-| `F-AGENT-02`  | Agent management replacement coverage does not directly assert every former dialog success/close/toast/invalidation and error outcome. The legacy host remains a named temporary app adapter until UI owns those platform ports.                                       | Wave 6 and Wave 7        |
+| ID            | Finding and evidence                                                                                                                                                                                                                                                                | Owning wave              |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| `F-API-01`    | The checked-in branch OpenAPI artefacts are stale. Semantic comparison with `main` reports its five deployed `/api/secrets` operations as absent even though the canonical source now retains them. Do not regenerate or call parity green until generation completes.              | Wave 3 and Wave 9        |
+| `F-API-03`    | The global authz declaration sweep currently stops before discovery on an undefined analytics `lwqlTimeWindowSchema`. Agent/Secret focused policy tests are green, but the global sweep has not proved the new package mounts.                                                      | Wave 2 and Wave 3        |
+| `F-API-04`    | OpenAPI generation constructs `signInDomainRoutingPort` before the generation task initialises environment/configuration, so the task fails before Secret route composition. Fix this in the OpenAPI ownership move rather than coupling Secret back to app boot.                   | Wave 3 and Wave 9        |
+| `F-API-05`    | `ApiApplication` and `ApiProcess` have no standalone listener/bootstrap, HTTP intake drain or executable consumer. They are package-owned transport preparation, not a live physical API cutover.                                                                                   | Wave 1 and Wave 3        |
+| `F-AUTHZ-01`  | The compatibility permission decision path does not always preserve the legacy `denialReason`; access remains denied, but specialised membership-disabled and lite-member errors can lose their exact client-visible cause. Characterise this before the universal root is retired. | Wave 2 and Wave 3        |
+| `F-AUTHZ-02`  | Two existing app AuthZ middleware tests import `BlankScopeIdError`, which is not exported by the AuthZ contract. This predates the Agent/Secret adapter commit and remains an exact known failing diagnostic.                                                                       | Wave 2                   |
+| `F-SECRET-01` | TypeScript Secret CLI commands do not forward the resolved project ID when building auth headers for the modern REST calls. Add multi-project/user-key header characterisation.                                                                                                     | Wave 3 clients           |
+| `F-SECRET-02` | The legacy Secret adapter changed project-key write actor handling and duplicate-error text from `main`. Characterise and decide the compatibility policy before retiring `/api/secrets`.                                                                                           | Wave 3 compatibility     |
+| `F-SECRET-03` | The four Secret prefixes have focused sub-app coverage, but no full `createApiRouter` regression proves all collection/item mounts, header selection, conflicts and response headers together.                                                                                      | Wave 3 compatibility     |
+| `F-TRACE-01`  | The extracted full-read path trusts a stale storage-anchor hint, can return an empty span set, and does not yet preserve every legacy field/nullability case, including earliest start, topic IDs and reserved metrics. It has no production caller yet.                            | Trace vertical in Wave 6 |
+| `F-OBS-01`    | Process observability and Eventing currently resolve different LangWatch SDK versions. Align one SDK/OTel graph before final process activation.                                                                                                                                    | Wave 1                   |
+| `F-OBS-02`    | Preserve legacy instrumentation, disabled/no-key behaviour, metrics/profiling and drain-before-flush ordering when API and worker adopt process observability. Add process-level boot/shutdown proof.                                                                               | Wave 1                   |
+| `F-WORKER-01` | The shared `event-sourcing/jobs` queue contains every pipeline. A Topic-only consumer would reject and redeliver unrelated jobs, so `apps/worker` must remain producer-only until it mounts the complete registry, including Trace `assignTopic`.                                   | Wave 4                   |
+| `F-WORKER-02` | The preparatory Worker application currently closes its runtime lifecycle before feature handles and Eventing. This is harmless while consumers are disabled, but activation must prove intake/consumer drain before infrastructure and observability shutdown.                     | Wave 1 and Wave 4        |
+| `F-AGENT-01`  | `specs/agents/AUDIT_MANIFEST.md` still points at deleted management UI paths and does not bind the moved scenario tests. Refresh it when the next Agent vertical updates feature documentation.                                                                                     | Wave 6 and Wave 7        |
+| `F-AGENT-02`  | Agent management replacement coverage does not directly assert every former dialog success/close/toast/invalidation and error outcome. The legacy host remains a named temporary app adapter until UI owns those platform ports.                                                    | Wave 6 and Wave 7        |
 
 Resolved during the Secret REST batch: aliases now have unique operation IDs,
 the documented alias set is fixed to the four prefixes above and generator
@@ -131,9 +138,11 @@ remains a general generation gate in Wave 9.
 
 ## Measured exit inventory
 
-At the working checkpoint, `platform/app` contains 6,301 tracked files,
-including 5,945 under `src`. Counts include tests unless identified as
-production-only and will be refreshed after each committed wave.
+At the working checkpoint, `platform/app` contains 6,308 tracked files,
+including 5,952 under `src`. Counts include tests unless identified as
+production-only and will be refreshed after each committed wave. The temporary
+increase reflects explicit compatibility composition and coverage added before
+safe deletion; only reviewed production deletion counts as exit progress.
 
 ### Source cohorts
 
@@ -236,24 +245,25 @@ User or app composition.
 8. **Trace full-read:** keep canonical full-read internal and all-visible.
    Public actor/viewer protection is a separate service/trust boundary that
    composes canonical read, protection and edit overlays later.
+9. **Worker activation:** keep the new worker producer-only while the legacy
+   registry remains the sole consumer of the shared Eventing queue. Mount the
+   complete package-composed registry, including Trace `assignTopic`, then make
+   one tested consumer switch; never run a Topic-only consumer on that queue.
 
 ## Decisions approaching
 
-These decisions are not blockers for the two active cutover batches, but their
+These decisions are not blockers for the active migration lanes, but their
 answers will be needed before the named later boundary can close:
 
 1. **Secret compatibility retirement:** whether legacy project-key write actor
    handling and duplicate-error text must remain byte-for-byte compatible, or
    may converge on the canonical Secret service when `/api/secrets` is retired.
-2. **Worker physical activation:** how the new worker process and the remaining
-   legacy jobs coexist during the staged worker drain. Topic itself must have
-   exactly one Eventing-driven consumer path throughout.
-3. **Observability SDK ownership:** which single LangWatch SDK/OTel entry owns
+2. **Observability SDK ownership:** which single LangWatch SDK/OTel entry owns
    API, worker and Eventing instrumentation before process activation.
-4. **Auth package owner:** whether the absent catalogue `auth` package owns the
+3. **Auth package owner:** whether the absent catalogue `auth` package owns the
    Better Auth/session cohort or whether the catalogue entry needs an explicit
    correction before Wave 2.
-5. **UI platform ports:** the stable small ports for routing, overlays, session,
+4. **UI platform ports:** the stable small ports for routing, overlays, session,
    notifications and transport hooks that let `apps/ui` delete temporary
    feature host adapters without creating another global context bag.
 
@@ -286,16 +296,16 @@ are already green; it need not wait for unrelated features in an earlier wave.
 
 ### Wave 0: reconcile and commit current work
 
-| ID     | Work                                                                                     | Exit gate                                                                                                                                            |
-| ------ | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `C-01` | Reconcile workspace links and `pnpm-lock.yaml` after all active manifest writers finish. | **Active.** New workspace imports resolve; lock diff contains only required importers/resolutions.                                                   |
-| `C-02` | Review and commit Agent UI.                                                              | **Committed `2d5066fcd7`.** Retained drawers and coverage/documentation follow-ups are recorded above.                                               |
-| `C-03` | Review and commit Trace full-read.                                                       | **Committed `7cca0848fb` as preparation, not cutover.** The internal/all-visible boundary has no production caller; `F-TRACE-01` remains.            |
-| `C-04` | Review and commit process observability.                                                 | **Committed `bcf05be631`.** Process adoption and the two observability follow-ups remain in Wave 1 and the active API/worker slices.                 |
-| `C-05` | Finish Secret REST correction.                                                           | **Committed `faf6db77e1`.** All four direct prefixes are present; deferred generated-artefact, client and compatibility findings are recorded above. |
-| `C-06` | Finish tRPC/AuthZ/API Secret+Agent direct cutover.                                       | One live API graph, complete routers, auth/audit/error/log/trace proof and old router deletion.                                                      |
-| `C-07` | Finish Eventing server and Enterprise worker composition.                                | **Committed `555ec3fe07` and `8e57032744`.** Production factories are ready for the active Worker Topic composition batch.                           |
-| `C-08` | Finish Worker Topic cutover.                                                             | Durable queue/store composition plus Topic and Trace-assignment consumers green; live app Topic paths deleted.                                       |
+| ID     | Work                                                                                     | Exit gate                                                                                                                                                                      |
+| ------ | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `C-01` | Reconcile workspace links and `pnpm-lock.yaml` after all active manifest writers finish. | **Committed for API and Worker/Topic.** Continue exact-hunk attribution for later shared-tree slices.                                                                          |
+| `C-02` | Review and commit Agent UI.                                                              | **Committed `2d5066fcd7`.** Retained drawers and coverage/documentation follow-ups are recorded above.                                                                         |
+| `C-03` | Review and commit Trace full-read.                                                       | **Committed `7cca0848fb` as preparation, not cutover.** The internal/all-visible boundary has no production caller; `F-TRACE-01` remains.                                      |
+| `C-04` | Review and commit process observability.                                                 | **Committed `bcf05be631`.** Process adoption and the two observability follow-ups remain in Wave 1 and the active API/worker slices.                                           |
+| `C-05` | Finish Secret REST correction.                                                           | **Committed `faf6db77e1`.** All four direct prefixes are present; deferred generated-artefact, client and compatibility findings are recorded above.                           |
+| `C-06` | Finish tRPC/AuthZ/API Secret+Agent direct cutover.                                       | **Package adapters committed `02457aaebd`; physical activation remains.** Add the listener/lifecycle and policy parity, then delete compatibility routers.                     |
+| `C-07` | Finish Eventing server and Enterprise worker composition.                                | **Committed `555ec3fe07` and `8e57032744`.** Production factories are ready for the active Worker Topic composition batch.                                                     |
+| `C-08` | Finish Worker Topic cutover.                                                             | **Eventing-only producer path committed `39f1de6dff`; physical activation remains.** Mount the full shared registry before enabling consumers or deleting the live app worker. |
 
 ### Wave 1: process foundations
 
