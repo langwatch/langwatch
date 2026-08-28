@@ -111,6 +111,15 @@ Feature: Stored Objects service and API
     And it does not expose public upload or migration operations
     And it does not construct a second service
 
+  @integration @delivery @compatibility
+  Scenario: Historical id-only delivery resolves the owner without masking degradation
+    Given a historical GET or HEAD /api/files/:id URL has no project scope
+    When the server-only owner resolver fans out to the configured ClickHouse instances
+    Then a healthy matching instance identifies the project before byte authorization
+    And a miss across healthy instances remains not found
+    And a miss with any failed instance is mapped to the existing 502 response
+    And a project-scoped URL does not invoke the cross-tenant resolver
+
   @integration @migration
   Scenario: The system migration copies legacy ClickHouse rows directly
     Given an organization has stored_objects rows in ClickHouse

@@ -3,6 +3,7 @@ export * from "./ids";
 export * from "./metadata";
 export * from "./references";
 export * from "./stored-object.commands";
+export * from "./stored-object-owner-resolver";
 export * from "./stored-object.errors";
 export * from "./stored-object.queries";
 export * from "./stored-object.service";

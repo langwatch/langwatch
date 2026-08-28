@@ -167,6 +167,19 @@ require `project:update`, get requires `project:view`, and delete requires
 `project:manage`. Stored Objects does not persist a second audience-grant model;
 feature-specific authorization remains with the feature resolving the object.
 
+#### Legacy id-only delivery owner resolution
+
+The historical `GET` and `HEAD /api/files/:id` transport has no project scope,
+so process composition also creates one server-only `StoredObjectOwnerResolver`.
+This is a distinct trust boundary from the ordinary project-scoped service: it
+may fan out to every configured ClickHouse instance only to identify the owner,
+then the transport authorizes that project before reading bytes. The resolver's
+private adapter preserves the current parallel fan-out, first healthy hit,
+per-target failure collection and degraded-without-hit error. The transport
+maps that concrete error to its existing `502` response; it never treats a
+partially unavailable fan-out as object absence. Project-scoped URLs do not
+invoke this resolver.
+
 ### Contracts and validation
 
 The contract package owns portable Zod 4 schemas, commands, results, concrete
@@ -226,7 +239,10 @@ this is operational rather than analytical state.
 
 ## Consequences
 
-- Stored Objects has one table, one store, one service and one migration class.
+- Stored Objects has one table, one store, one ordinary service and one migration class.
+- The legacy id-only delivery compatibility path additionally has one
+  process-owned, server-only owner resolver with its own cross-tenant trust
+  boundary; it does not expose a public Stored Objects operation.
 - Existing provider code remains the only provider implementation.
 - Postgres becomes ordinary read and lifecycle authority after migration.
 - ClickHouse migration requires an explicit old-writer drain before cutover.

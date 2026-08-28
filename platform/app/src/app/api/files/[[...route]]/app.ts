@@ -1,5 +1,6 @@
 import { Readable } from "node:stream";
 import { HandledError } from "@langwatch/handled-error";
+import { StoredObjectOwnerLookupUnavailableError } from "@langwatch/stored-object-contract";
 import type { MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { anyAuthenticated, createServiceApp } from "~/server/api/security";
@@ -12,7 +13,6 @@ import {
   safeMediaType,
   sanitizeFilenameSegment,
 } from "~/server/stored-objects/media-response";
-import { StoredObjectOwnerLookupUnavailableError } from "~/server/stored-objects/stored-object-owner-lookup.service";
 import type { DualAuthVariables } from "../../middleware/dual-auth";
 import { dualAuth } from "../../middleware/dual-auth";
 
@@ -363,12 +363,8 @@ secured
   .head("/:projectId/:id", (c) => handleFileRead(c, { method: "HEAD" }));
 
 // Legacy id-only routes — retained for URLs minted before #4947.
-secured
-  .access(anyAuthenticated())
-  .get("/:id", (c) => handleFileRead(c, { method: "GET" }));
-secured
-  .access(anyAuthenticated())
-  .head("/:id", (c) => handleFileRead(c, { method: "HEAD" }));
+secured.access(anyAuthenticated()).get("/:id", (c) => handleFileRead(c, { method: "GET" }));
+secured.access(anyAuthenticated()).head("/:id", (c) => handleFileRead(c, { method: "HEAD" }));
 
 export const app = secured.hono;
 export type FilesAppType = typeof app;

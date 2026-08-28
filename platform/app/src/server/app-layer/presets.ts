@@ -265,8 +265,9 @@ import { AppLangevalsRuntime } from "~/runtime/app/langevals.runtime";
 import { resolveLangevalsRuntimeConfig } from "~/runtime/langevals.config";
 import { configureProcessOutboundProxy } from "~/server/outboundProxy";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
-import { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
-import { StoredObjectOwnerLookupService } from "~/server/stored-objects/stored-object-owner-lookup.service";
+import { StoredObjectOwnerLookupRuntime } from "@langwatch/stored-object-server";
+import { AppStoredObjectOwnerInstanceDirectory } from "~/runtime/app/features/stored-object-owner-instance-directory.adapter";
+import { AppStoredObjectOwnerLookupTracingAdapter } from "~/runtime/app/features/stored-object-owner-lookup.tracing.adapter";
 import { AppUserAvatarReadCompatibilityAdapter } from "~/runtime/app/features/user-avatar-read.compatibility.adapter";
 import { AppUserAvatarStorageInfrastructureAdapter } from "~/runtime/app/features/user-avatar-storage-infrastructure.adapter";
 import { createProcessUserAvatarStoredObjectService } from "~/runtime/app/features/user-avatar-stored-object-service.composition";
@@ -2440,9 +2441,10 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     github: githubService,
     storedObjects: storedObjectsService,
     userAvatarObjects,
-    storedObjectOwners: StoredObjectOwnerLookupService.create(
-      new StoredObjectOwnerClickHouseRepository(getAllClickHouseInstances),
-    ),
+    storedObjectOwners: StoredObjectOwnerLookupRuntime.create({
+      instanceDirectory: AppStoredObjectOwnerInstanceDirectory.create(),
+      telemetry: AppStoredObjectOwnerLookupTracingAdapter.create(),
+    }).resolver,
     opsExplain: {
       service: new OpsExplainService(
         new OpsExplainClickHouseRepository(
@@ -3114,9 +3116,10 @@ export function createTestApp(
     github: testGithub,
     storedObjects: storedObjectsService,
     userAvatarObjects,
-    storedObjectOwners: StoredObjectOwnerLookupService.create(
-      new StoredObjectOwnerClickHouseRepository(async () => []),
-    ),
+    storedObjectOwners: StoredObjectOwnerLookupRuntime.create({
+      instanceDirectory: AppStoredObjectOwnerInstanceDirectory.createUnavailableForTests(),
+      telemetry: AppStoredObjectOwnerLookupTracingAdapter.create(),
+    }).resolver,
     opsExplain: {
       service: new OpsExplainService(
         new OpsExplainClickHouseRepository(UnavailableOpsExplainClientResolver.create()),

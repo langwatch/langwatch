@@ -34,12 +34,17 @@ const { mockResolveOwnerProject, mockGetById } = vi.hoisted(() => ({
   mockGetById: vi.fn(),
 }));
 
-vi.mock("~/server/stored-objects/stored-object-owner-lookup.service", () => ({
-  StoredObjectOwnerLookupUnavailableError: class extends Error {},
-  StoredObjectOwnerLookupService: {
-    create: () => ({ resolve: mockResolveOwnerProject }),
-  },
-}));
+vi.mock("@langwatch/stored-object-server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/stored-object-server")>();
+  return {
+    ...actual,
+    StoredObjectOwnerLookupRuntime: {
+      create: () => ({
+        resolver: { resolve: mockResolveOwnerProject },
+      }),
+    },
+  };
+});
 
 vi.mock("~/server/stored-objects/stored-objects-factory", () => ({
   createProcessStoredObjectsService: vi.fn(() => ({

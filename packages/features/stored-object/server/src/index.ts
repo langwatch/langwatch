@@ -1,4 +1,5 @@
 export { StoredObjectsInternalApi } from "./api/internal/stored-object.api";
+export { StoredObjectOwnerLookupRuntime } from "./adapters/stored-object-owner-lookup.runtime";
 export {
   StoredObjectsPublicApi,
   STORED_OBJECTS_PUBLIC_API_VERSION,
@@ -22,6 +23,15 @@ export {
   type StoredObjectStorageAddress,
   type StoredObjectUploadTokenClaims,
 } from "./ports/stored-object.port";
+export {
+  StoredObjectOwnerInstanceDirectoryPort,
+  type StoredObjectOwnerClickHouseClient,
+  type StoredObjectOwnerClickHouseInstance,
+} from "./ports/stored-object-owner-instance-directory.port";
+export {
+  StoredObjectOwnerLookupTelemetryPort,
+  type StoredObjectOwnerLookupSpan,
+} from "./ports/stored-object-owner-lookup-telemetry.port";
 export {
   StoredObjectService,
   type StoredObjectServiceOptions,
