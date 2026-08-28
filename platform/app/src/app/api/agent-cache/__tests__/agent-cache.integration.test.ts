@@ -20,6 +20,7 @@ import {
 } from "~/generated/prisma/client";
 import { mintAgentSandboxApiKey } from "~/server/api-key/agent-sandbox-key";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { AGENT_SANDBOX_API_KEY_NAME } from "~/server/api-key/reserved-names";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
@@ -45,10 +46,14 @@ describe("Feature: the agent cache", () => {
   let viewerToken: string;
   let sandboxToken: string;
   let userId: string;
+  let personalOwnerId: string;
+  let personalTeamId: string;
+  let personalProjectId: string;
+  let personalSandboxToken: string;
 
-  const headersFor = (token: string) => ({
+  const headersFor = (token: string, forProjectId: string = projectId) => ({
     Authorization: `Bearer ${token}`,
-    "X-Project-Id": projectId,
+    "X-Project-Id": forProjectId,
   });
 
   const readEntry = (name: string, token: string) =>
@@ -176,6 +181,68 @@ describe("Feature: the agent cache", () => {
       projectId,
       organizationId: testOrganization.id,
     });
+
+    // A personal workspace in the same organization: one owner, a team and a
+    // project both flagged personal, and the owner's ADMIN binding on the
+    // team, the way PersonalWorkspaceService provisions it.
+    const owner = await prisma.user.create({
+      data: { name: "Workspace Owner", email: `owner-${ns}@example.com` },
+    });
+    personalOwnerId = owner.id;
+    await prisma.organizationUser.create({
+      data: {
+        userId: personalOwnerId,
+        organizationId: testOrganization.id,
+        role: OrganizationUserRole.MEMBER,
+      },
+    });
+    const personalTeam = await prisma.team.create({
+      data: {
+        name: "Workspace Owner's Workspace",
+        slug: `--test-personal-team-${ns}`,
+        organizationId: testOrganization.id,
+        isPersonal: true,
+        ownerUserId: personalOwnerId,
+      },
+    });
+    personalTeamId = personalTeam.id;
+    await prisma.teamUser.create({
+      data: {
+        userId: personalOwnerId,
+        teamId: personalTeamId,
+        role: TeamUserRole.ADMIN,
+      },
+    });
+    await prisma.roleBinding.create({
+      data: {
+        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+        organizationId: testOrganization.id,
+        userId: personalOwnerId,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: personalTeamId,
+      },
+    });
+    const personalProject = await prisma.project.create({
+      data: {
+        id: `project_${nanoid()}`,
+        name: "Personal Workspace",
+        slug: `--test-personal-project-${ns}`,
+        language: "typescript",
+        framework: "other",
+        apiKey: `sk-lw-${nanoid(48)}`,
+        teamId: personalTeamId,
+        isPersonal: true,
+        ownerUserId: personalOwnerId,
+      },
+    });
+    personalProjectId = personalProject.id;
+
+    personalSandboxToken = await mintAgentSandboxApiKey({
+      prisma,
+      projectId: personalProjectId,
+      organizationId: testOrganization.id,
+    });
   });
 
   afterAll(async () => {
@@ -186,11 +253,15 @@ describe("Feature: the agent cache", () => {
       // role the organization owns.
       ["customRole", { organizationId: testOrganization.id }],
       ["project", { id: projectId }],
+      ["project", { id: personalProjectId }],
       ["teamUser", { teamId: testTeam.id }],
+      ["teamUser", { teamId: personalTeamId }],
       ["organizationUser", { organizationId: testOrganization.id }],
       ["team", { id: testTeam.id }],
+      ["team", { id: personalTeamId }],
       ["organization", { id: testOrganization.id }],
       ["user", { id: userId }],
+      ["user", { id: personalOwnerId }],
     ]);
   });
 
@@ -447,6 +518,50 @@ describe("Feature: the agent cache", () => {
           headers: headersFor(sandboxToken),
         });
         expect(res.status).toBe(403);
+      });
+    });
+  });
+
+  describe("given a run in a personal workspace", () => {
+    describe("when the run mints its key", () => {
+      /** @scenario "A run in a personal workspace gets a key its owner holds" */
+      it("belongs to the workspace owner and reaches that project's cache", async () => {
+        // A key owned by nobody is a second principal in a private
+        // workspace and the mint refuses it, so the run's key is the owner's
+        // own credential.
+        const minted = await prisma.apiKey.findMany({
+          where: {
+            organizationId: testOrganization.id,
+            name: AGENT_SANDBOX_API_KEY_NAME,
+            roleBindings: { some: { scopeId: personalProjectId } },
+          },
+          select: { userId: true, createdByUserId: true },
+        });
+        expect(minted).toEqual([
+          { userId: personalOwnerId, createdByUserId: personalOwnerId },
+        ]);
+
+        const written = await app.request(
+          "/api/agent-cache/ACME_FROM_PERSONAL_SANDBOX",
+          {
+            method: "PUT",
+            headers: {
+              ...headersFor(personalSandboxToken, personalProjectId),
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ value: "written-in-the-owner-sandbox" }),
+          },
+        );
+        expect(written.status).toBe(200);
+
+        const res = await app.request(
+          "/api/agent-cache/ACME_FROM_PERSONAL_SANDBOX",
+          { headers: headersFor(personalSandboxToken, personalProjectId) },
+        );
+        expect(res.status).toBe(200);
+        expect(((await res.json()) as { value: string }).value).toBe(
+          "written-in-the-owner-sandbox",
+        );
       });
     });
   });

@@ -21,7 +21,20 @@ vi.spyOn(ApiKeyService, "create").mockImplementation(
   () => ({ create }) as unknown as ApiKeyService,
 );
 
-const prisma = {} as PrismaClient;
+const findUnique = vi.fn();
+const prisma = { project: { findUnique } } as unknown as PrismaClient;
+
+const SHARED_PROJECT = {
+  isPersonal: false,
+  ownerUserId: null,
+  team: { isPersonal: false, ownerUserId: null },
+};
+
+const PERSONAL_PROJECT = {
+  isPersonal: true,
+  ownerUserId: "user_owner",
+  team: { isPersonal: true, ownerUserId: "user_owner" },
+};
 
 describe("the agent sandbox key", () => {
   beforeEach(() => {
@@ -30,11 +43,14 @@ describe("the agent sandbox key", () => {
       token: "sk-lw-minted",
       apiKey: { id: "key_1" },
     });
+    findUnique.mockReset();
+    findUnique.mockResolvedValue(SHARED_PROJECT);
   });
 
-  describe("given a project that can mint a key", () => {
-    describe("when a run asks for one", () => {
-      it("asks for the manage grain and nothing else", async () => {
+  describe("given a project in a shared team", () => {
+    describe("when a run asks for a key", () => {
+      /** @scenario "A run in a shared project gets a key no user holds" */
+      it("asks for the manage grain and nothing else, owned by no user", async () => {
         await mintAgentSandboxApiKey({
           prisma,
           projectId: "project_1",
@@ -46,6 +62,7 @@ describe("the agent sandbox key", () => {
           name: AGENT_SANDBOX_API_KEY_NAME,
           isSystemManaged: true,
           userId: null,
+          createdByUserId: null,
           permissionMode: "restricted",
           // Written out rather than read from the constant the code itself
           // passes: a grain added to that list has to fail here, which is the
@@ -66,6 +83,75 @@ describe("the agent sandbox key", () => {
 
         const { expiresAt } = create.mock.calls[0]?.[0] as { expiresAt: Date };
         expect(expiresAt.getTime()).toBeGreaterThan(Date.now());
+      });
+    });
+  });
+
+  describe("given a project in a personal workspace", () => {
+    describe("when a run asks for a key", () => {
+      it("mints the key as the workspace owner's own credential", async () => {
+        findUnique.mockResolvedValue(PERSONAL_PROJECT);
+
+        await mintAgentSandboxApiKey({
+          prisma,
+          projectId: "project_personal",
+          organizationId: "organization_1",
+        });
+
+        expect(findUnique).toHaveBeenCalledWith({
+          where: { id: "project_personal" },
+          select: {
+            isPersonal: true,
+            ownerUserId: true,
+            team: { select: { isPersonal: true, ownerUserId: true } },
+          },
+        });
+        expect(create.mock.calls[0]?.[0]).toMatchObject({
+          userId: "user_owner",
+          createdByUserId: "user_owner",
+          permissions: ["agentCache:manage"],
+          bindings: [
+            {
+              role: "CUSTOM",
+              scopeType: "PROJECT",
+              scopeId: "project_personal",
+            },
+          ],
+        });
+      });
+
+      it("takes the owner from the team when the project records none", async () => {
+        findUnique.mockResolvedValue({
+          isPersonal: false,
+          ownerUserId: null,
+          team: { isPersonal: true, ownerUserId: "user_owner" },
+        });
+
+        await mintAgentSandboxApiKey({
+          prisma,
+          projectId: "project_personal",
+          organizationId: "organization_1",
+        });
+
+        expect(create.mock.calls[0]?.[0]).toMatchObject({
+          userId: "user_owner",
+        });
+      });
+
+      it("leaves the key unowned when the workspace records no owner", async () => {
+        findUnique.mockResolvedValue({
+          isPersonal: true,
+          ownerUserId: null,
+          team: { isPersonal: true, ownerUserId: null },
+        });
+
+        await mintAgentSandboxApiKey({
+          prisma,
+          projectId: "project_personal",
+          organizationId: "organization_1",
+        });
+
+        expect(create.mock.calls[0]?.[0]).toMatchObject({ userId: null });
       });
     });
   });

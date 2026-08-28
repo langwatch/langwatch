@@ -192,10 +192,13 @@ Feature: The agent cache
 
   Rule: A run reaches the cache with a key minted for that run
 
-    # The key belongs to no user, is bound to one project, holds the manage
-    # grain and nothing else, and expires after twelve hours. It is never the
-    # project key. A run that cannot mint one still runs: every row does its
-    # own work, which is what a run without the cache does anyway.
+    # The key is bound to one project, holds the manage grain and nothing
+    # else, and expires after twelve hours. It is never the project key. In a
+    # shared project it belongs to no user. A personal workspace admits no
+    # principal but its owner, so there the key is the owner's own, which is
+    # the owner acting programmatically. A run that cannot mint one still
+    # runs: every row does its own work, which is what a run without the
+    # cache does anyway.
     #
     # The manage grain alone, because it is what all three routes ask for.
     # Adding agentCache:view would reach no route today, and would hand every
@@ -212,6 +215,19 @@ Feature: The agent cache
       Given a key minted for one run of this project
       When the run calls another route in the same project
       Then the request is refused as forbidden
+
+    @integration
+    Scenario: A run in a personal workspace gets a key its owner holds
+      Given a project in a personal workspace
+      When a run of that project mints its key
+      Then the key belongs to the workspace owner
+      And the key reaches the agent cache of that project
+
+    @unit
+    Scenario: A run in a shared project gets a key no user holds
+      Given a project in a shared team
+      When a run of that project mints its key
+      Then the key belongs to no user
 
     @unit
     Scenario: A run whose key could not be minted still runs

@@ -28,11 +28,51 @@ export const AGENT_SANDBOX_PERMISSIONS: readonly string[] = [
 ];
 
 /**
+ * Whose credential the sandbox key is: the workspace owner's in a personal
+ * workspace, nobody's in a shared project.
+ *
+ * A personal workspace admits no principal but its owner, and a key owned by
+ * nobody is a second principal, so `ApiKeyService.create` refuses it there
+ * (`assertPersonalTeamScopesOwnedBy`). The one credential such a workspace
+ * accepts is its owner's own, which is the owner acting programmatically, the
+ * same way the Langy session key is minted. The owner's ceiling then caps the
+ * key, and the owner administers their own workspace, so the manage grain is
+ * inside it.
+ *
+ * A personal workspace with no recorded owner answers null, and the mint is
+ * refused the same way it would be for a stranger: failing closed is the
+ * guard's own rule for incomplete provisioning.
+ */
+async function sandboxKeyOwner({
+  prisma,
+  projectId,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+}): Promise<string | null> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: {
+      isPersonal: true,
+      ownerUserId: true,
+      team: { select: { isPersonal: true, ownerUserId: true } },
+    },
+  });
+  if (!project) return null;
+  if (project.isPersonal || project.team.isPersonal) {
+    return project.ownerUserId ?? project.team.ownerUserId ?? null;
+  }
+  return null;
+}
+
+/**
  * Mint the credential a code agent's sandbox authenticates with.
  *
- * The key belongs to no user, is bound to one project, and holds the agent
- * cache grains only, so it is strictly narrower than the project key that
- * authorized the run. The run mints one and every row of that run shares it.
+ * The key is bound to one project and holds the agent cache grains only, so
+ * it is strictly narrower than the project key that authorized the run. The
+ * run mints one and every row of that run shares it. In a shared project it
+ * belongs to no user; in a personal workspace it belongs to the workspace
+ * owner, see {@link sandboxKeyOwner}.
  *
  * The token is returned once and is unrecoverable afterwards; only its hash is
  * stored. Nothing logs it.
@@ -46,6 +86,7 @@ export async function mintAgentSandboxApiKey({
   projectId: string;
   organizationId: string;
 }): Promise<string> {
+  const ownerUserId = await sandboxKeyOwner({ prisma, projectId });
   const service = ApiKeyService.create(prisma);
   const { token } = await service.create({
     isSystemManaged: true,
@@ -53,10 +94,11 @@ export async function mintAgentSandboxApiKey({
     description:
       "Short-lived key for one code agent run. Reaches the project's agent " +
       "cache and nothing else, and expires by itself.",
-    // No owner: there is no person behind a run's sandbox, and a key with no
-    // owner has no user ceiling to clamp. The grains below are the whole
-    // ceiling instead.
-    userId: null,
+    // In a shared project there is no person behind a run's sandbox, and a
+    // key with no owner has no user ceiling to clamp, so the grains below are
+    // the whole ceiling. A personal workspace takes only its owner's own key.
+    userId: ownerUserId,
+    createdByUserId: ownerUserId,
     organizationId,
     permissionMode: "restricted",
     permissions: [...AGENT_SANDBOX_PERMISSIONS],
