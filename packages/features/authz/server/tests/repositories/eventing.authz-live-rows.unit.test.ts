@@ -35,7 +35,12 @@ describe("authorization reads", () => {
     it("applies it to a grant query that names no where clause at all", async () => {
       const calls: unknown[] = [];
       const prisma = {
-        grant: { findMany: async (args: unknown) => (calls.push(args), []) },
+        grant: {
+          findMany: async (args: unknown) => {
+            calls.push(args);
+            return [];
+          },
+        },
       };
 
       await liveGrants(prisma as never).findMany({});
@@ -47,7 +52,12 @@ describe("authorization reads", () => {
     it("applies it to a role query alongside the caller's own clause", async () => {
       const calls: unknown[] = [];
       const prisma = {
-        role: { findFirst: async (args: unknown) => (calls.push(args), null) },
+        role: {
+          findFirst: async (args: unknown) => {
+            calls.push(args);
+            return null;
+          },
+        },
       };
 
       await liveRoles(prisma as never).findFirst({

@@ -16,7 +16,7 @@ import type { LicenseCryptographyPort } from "../ports/license-cryptography.port
 import type { LicenseLoggerPort } from "../ports/license-logger.port";
 import type { LicenseRetentionPort } from "../ports/license-retention.port";
 import type { LicenseUsagePort } from "../ports/license-usage.port";
-import type { LicenseRepository } from "../repositories/license.repository";
+import type { LicenseStoragePort } from "../ports/license-storage.port";
 
 export type LicenseRetentionConfiguration = {
   categories: readonly string[];
@@ -50,7 +50,7 @@ class SilentLicenseLogger implements LicenseLoggerPort {
 }
 
 export type LicenseServiceOptions = {
-  repository: LicenseRepository;
+  repository: LicenseStoragePort;
   cryptography: LicenseCryptographyPort;
   usage?: LicenseUsagePort;
   retention?: LicenseRetentionPort;
@@ -69,7 +69,7 @@ type LicenseResourceCounts = {
 
 /** Signed-license plan source and lifecycle service. */
 export class LicenseService extends LicensingServiceContract {
-  private readonly repository: LicenseRepository;
+  private readonly repository: LicenseStoragePort;
   private readonly cryptography: LicenseCryptographyPort;
   private readonly usage: LicenseUsagePort | undefined;
   private readonly retention: LicenseRetentionPort | undefined;

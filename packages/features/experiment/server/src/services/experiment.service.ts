@@ -81,14 +81,10 @@ import {
 } from "../repositories/experiment.repository";
 import type { ExperimentRunRepository } from "../repositories/experiment-run.repository";
 import type { ExperimentDspyRepository } from "../repositories/experiment-dspy.repository";
-import {
-  UnavailableExperimentExecutionPort,
-  type ExperimentExecutionPort,
-} from "../ports/experiment-execution.port";
-import {
-  NoopExperimentWorkbenchUpdatesPort,
-  type ExperimentWorkbenchUpdatesPort,
-} from "../ports/experiment-workbench-updates.port";
+import type { ExperimentExecutionPort } from "../ports/experiment-execution.port";
+import type { ExperimentWorkbenchUpdatesPort } from "../ports/experiment-workbench-updates.port";
+import { UnavailableExperimentExecutionAdapter } from "../adapters/unavailable-experiment-execution.adapter";
+import { NoopExperimentWorkbenchUpdatesAdapter } from "../adapters/noop-experiment-workbench-updates.adapter";
 
 export type ExperimentServiceOptions = {
   repository: ExperimentRepository;
@@ -165,8 +161,8 @@ export class ExperimentService extends ExperimentServiceContract {
 
   private constructor(private readonly options: ExperimentServiceOptions) {
     super();
-    this.execution = options.execution ?? new UnavailableExperimentExecutionPort();
-    this.updates = options.updates ?? new NoopExperimentWorkbenchUpdatesPort();
+    this.execution = options.execution ?? new UnavailableExperimentExecutionAdapter();
+    this.updates = options.updates ?? new NoopExperimentWorkbenchUpdatesAdapter();
   }
 
   async getById(input: ExperimentLookup): Promise<Experiment> {

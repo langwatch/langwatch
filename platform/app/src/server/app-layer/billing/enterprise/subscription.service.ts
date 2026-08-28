@@ -1,10 +1,10 @@
 import type Stripe from "stripe";
 import {
   BillingSubscriptionService,
-  type BillingSubscriptionNotifier,
+  type BillingSubscriptionNotifierPort,
   PostgresBillingAdapter,
   type BillingSubscriptionRepository,
-  type BillingOrganizationRepository,
+  type BillingOrganizationPort,
 } from "@langwatch/enterprise-billing-server";
 import type { PrismaClient, Subscription } from "~/generated/prisma/client";
 import { getApp } from "../../app";
@@ -48,16 +48,16 @@ const toBillingRepository = (
 
 const toBillingOrganizationRepository = (
   repository: OrganizationRepository,
-): BillingOrganizationRepository =>
+): BillingOrganizationPort =>
   ({
     tryGetPricingModel: (organizationId) => repository.getPricingModel(organizationId),
     tryGetStripeCustomerId: (organizationId) =>
       repository.getStripeCustomerId(organizationId),
     tryFindName: (organizationId) => repository.findNameById(organizationId),
     tryFindFirstTeamId: async () => null,
-  }) as BillingOrganizationRepository;
+  }) as BillingOrganizationPort;
 
-const createNotifier = (): BillingSubscriptionNotifier => ({
+const createNotifier = (): BillingSubscriptionNotifierPort => ({
   send: async (payload) => {
     await getApp().notifications.sendSlackSubscriptionEvent(payload);
   },

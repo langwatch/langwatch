@@ -10,7 +10,3 @@ export abstract class ExperimentWorkbenchUpdatesPort {
     runId?: string;
   }): Promise<void>;
 }
-
-export class NoopExperimentWorkbenchUpdatesPort extends ExperimentWorkbenchUpdatesPort {
-  async publish(): Promise<void> {}
-}

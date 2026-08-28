@@ -16,27 +16,3 @@ export abstract class ExperimentExecutionPort {
   abstract recordEvaluatorResult(input: RecordEvaluatorResultInput): Promise<void>;
   abstract completeExperimentRun(input: CompleteExperimentRunInput): Promise<void>;
 }
-
-export class UnavailableExperimentExecutionPort extends ExperimentExecutionPort {
-  private unavailable(): never {
-    throw new Error(
-      "Experiment execution is not configured for this application instance",
-    );
-  }
-
-  async startExperimentRun(_input: StartExperimentRunInput): Promise<void> {
-    this.unavailable();
-  }
-
-  async recordTargetResult(_input: RecordTargetResultInput): Promise<void> {
-    this.unavailable();
-  }
-
-  async recordEvaluatorResult(_input: RecordEvaluatorResultInput): Promise<void> {
-    this.unavailable();
-  }
-
-  async completeExperimentRun(_input: CompleteExperimentRunInput): Promise<void> {
-    this.unavailable();
-  }
-}

@@ -1,6 +1,6 @@
 import type { AppendStore, ProjectionStoreContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ExperimentEventingClickHouseResolver } from "../ports/experiment-clickhouse.port";
+import type { ExperimentClickHousePort } from "../ports/experiment-clickhouse.port";
 import type { ClickHouseExperimentRunResultRecord } from "../projections/experiment-run-result-storage.projection";
 
 const TABLE_NAME = "experiment_run_items" as const;
@@ -16,7 +16,7 @@ const logger = createLogger(
  * AppendStore interface used by MapProjection definitions.
  */
 export function createExperimentRunItemAppendStore(
-  resolveClient: ExperimentEventingClickHouseResolver | null,
+  clickhouse: ExperimentClickHousePort | null,
   defaultRetentionDays: number,
 ): AppendStore<ClickHouseExperimentRunResultRecord> {
   return {
@@ -24,7 +24,7 @@ export function createExperimentRunItemAppendStore(
       record: ClickHouseExperimentRunResultRecord,
       context: ProjectionStoreContext,
     ): Promise<void> {
-      if (!resolveClient) {
+      if (!clickhouse) {
         logger.warn(
           { recordId: record.ProjectionId },
           "ClickHouse client not available, skipping experiment run result storage",
@@ -39,7 +39,7 @@ export function createExperimentRunItemAppendStore(
         _retention_days: retentionDays,
       };
 
-      const client = await resolveClient(context.tenantId);
+      const client = await clickhouse.resolveClient(context.tenantId);
       await client.insert({
         table: TABLE_NAME,
         values: [recordWithRetention],

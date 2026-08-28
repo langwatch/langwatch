@@ -10,7 +10,7 @@ export type OrganizationLicenseCandidate = {
 };
 
 /** Persistence and seat-count port. Concrete database adapters stay in apps. */
-export abstract class LicenseRepository {
+export abstract class LicenseStoragePort {
   abstract findOrganizationsWithLicense(): Promise<OrganizationLicenseCandidate[]>;
   abstract tryReadLicense(organizationId: string): Promise<string | null>;
   abstract organizationExists(organizationId: string): Promise<boolean>;

@@ -6,13 +6,13 @@ import { PrismaBillingOrganizationRepository } from "../repositories/prisma/pris
 import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationPricingRepository } from "../ports/organization-pricing.port";
 import type { BillingSubscriptionRepository } from "../ports/subscription.port";
-import type { BillingOrganizationRepository } from "../ports/organization.port";
+import type { BillingOrganizationPort } from "../ports/organization.port";
 
 export type PostgresBillingPersistence = {
   notifications: NotificationService;
   organizationPricing: OrganizationPricingRepository;
   subscriptions: BillingSubscriptionRepository;
-  organization: BillingOrganizationRepository;
+  organization: BillingOrganizationPort;
 };
 
 /** Constructs the feature's Postgres repositories without exposing them. */

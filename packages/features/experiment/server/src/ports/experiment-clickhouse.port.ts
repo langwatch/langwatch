@@ -19,6 +19,12 @@ export type ExperimentEventingClickHouseClient = {
   }): Promise<ExperimentEventingClickHouseResult>;
 };
 
-export type ExperimentEventingClickHouseResolver = (
-  tenantId: string,
-) => Promise<ExperimentEventingClickHouseClient>;
+/**
+ * Runtime boundary between the Experiment feature's ClickHouse persistence and
+ * the tenant-scoped client the application composes. Every read and write
+ * resolves its client through this port, so no persistence module reaches for a
+ * connection of its own.
+ */
+export abstract class ExperimentClickHousePort {
+  abstract resolveClient(tenantId: string): Promise<ExperimentEventingClickHouseClient>;
+}

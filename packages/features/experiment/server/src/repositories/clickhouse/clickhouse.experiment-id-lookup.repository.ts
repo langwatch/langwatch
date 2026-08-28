@@ -1,4 +1,4 @@
-import type { ExperimentEventingClickHouseResolver } from "../../ports/experiment-clickhouse.port";
+import type { ExperimentClickHousePort } from "../../ports/experiment-clickhouse.port";
 
 const TABLE_NAME = "experiment_runs" as const;
 
@@ -15,7 +15,7 @@ export interface ExperimentIdLookup {
  * mapping.
  */
 export class ExperimentIdLookupClickHouseRepository implements ExperimentIdLookup {
-  constructor(private readonly resolveClient: ExperimentEventingClickHouseResolver) {}
+  constructor(private readonly clickhouse: ExperimentClickHousePort) {}
 
   async findExperimentId({
     tenantId,
@@ -24,7 +24,7 @@ export class ExperimentIdLookupClickHouseRepository implements ExperimentIdLooku
     tenantId: string;
     runId: string;
   }): Promise<string | null> {
-    const client = await this.resolveClient(tenantId);
+    const client = await this.clickhouse.resolveClient(tenantId);
     const result = await client.query({
       query: `
         SELECT ExperimentId

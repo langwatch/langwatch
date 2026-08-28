@@ -1,4 +1,4 @@
-// @ts-ignore — no type definitions for geoip-country
+// @ts-expect-error — no type definitions for geoip-country
 import geoip from "geoip-country";
 import {
   Currency,

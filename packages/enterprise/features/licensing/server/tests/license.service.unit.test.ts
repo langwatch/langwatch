@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import {
   LicenseLoggerPort,
-  LicenseRepository,
+  LicenseStoragePort,
   LicenseRetentionPort,
   LicenseService,
   LicenseServiceConfiguration,
@@ -19,7 +19,7 @@ import {
 
 const ORGANIZATION_ID = "org_123";
 
-class MemoryLicenseRepository extends LicenseRepository {
+class MemoryLicenseRepository extends LicenseStoragePort {
   readonly organizations = new Set([ORGANIZATION_ID]);
   readonly stored = new Map<string, StoredLicense>();
   memberCount = 3;

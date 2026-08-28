@@ -3,7 +3,6 @@ export {
   ClickHouseBillingAdapter,
   type BillingClickHouseClientResolver,
 } from "./adapters/clickhouse.clickhouse.adapter";
-export { PrismaBillingOrganizationRepository } from "./repositories/prisma/prisma.organization.repository";
 export {
   PostgresBillingAdapter,
   type PostgresBillingPersistence,
@@ -13,14 +12,10 @@ export {
   BillingErrorReporter,
   NullBillingErrorReporter,
 } from "./ports/error-reporter.port";
-export {
-  BillingOrganizationRepository,
-  NullBillingOrganizationRepository,
-} from "./ports/organization.port";
-export {
-  BillingSubscriptionNotifier,
-  NullBillingSubscriptionNotifier,
-} from "./ports/subscription-notifier.port";
+export { BillingOrganizationPort } from "./ports/organization.port";
+export { NullBillingOrganizationAdapter } from "./adapters/null-organization.adapter";
+export { BillingSubscriptionNotifierPort } from "./ports/subscription-notifier.port";
+export { NullBillingSubscriptionNotifierAdapter } from "./adapters/null-subscription-notifier.adapter";
 export {
   NullUsageLimitEmailAdapter,
   UsageLimitEmailAdapter,

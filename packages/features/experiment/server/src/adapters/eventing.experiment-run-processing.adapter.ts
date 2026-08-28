@@ -22,7 +22,10 @@ import {
 } from "../projections/experiment-run-state.projection";
 import { EXPERIMENT_RUN_PROCESSING_EVENT_TYPES } from "./eventing.experiment-run-event-types.adapter";
 import type { ExperimentRunProcessingEvent } from "./eventing.experiment-run-events.adapter";
-import type { ExperimentEventingClickHouseResolver } from "../ports/experiment-clickhouse.port";
+import {
+  ExperimentClickHouseAdapter,
+  type ExperimentEventingClickHouseResolver,
+} from "./experiment-clickhouse.adapter";
 import {
   ExperimentIdLookupClickHouseRepository,
   NullExperimentIdLookupRepository,
@@ -47,7 +50,7 @@ export class ExperimentEventingAdapter {
   }): ExperimentRunStateRepository {
     return input.clickhouseEnabled
       ? new ExperimentRunStateRepositoryClickHouse(
-          input.resolveClient,
+          ExperimentClickHouseAdapter.create(input.resolveClient),
           input.defaultRetentionDays,
         )
       : new ExperimentRunStateRepositoryMemory();
@@ -58,7 +61,9 @@ export class ExperimentEventingAdapter {
     clickhouseEnabled: boolean;
   }): ExperimentIdLookup {
     return input.clickhouseEnabled
-      ? new ExperimentIdLookupClickHouseRepository(input.resolveClient)
+      ? new ExperimentIdLookupClickHouseRepository(
+          ExperimentClickHouseAdapter.create(input.resolveClient),
+        )
       : new NullExperimentIdLookupRepository();
   }
 
@@ -66,7 +71,10 @@ export class ExperimentEventingAdapter {
     resolveClient: ExperimentEventingClickHouseResolver,
     defaultRetentionDays: number,
   ): AppendStore<ClickHouseExperimentRunResultRecord> {
-    return createExperimentRunItemAppendStore(resolveClient, defaultRetentionDays);
+    return createExperimentRunItemAppendStore(
+      ExperimentClickHouseAdapter.create(resolveClient),
+      defaultRetentionDays,
+    );
   }
 
   static createStateFoldStore(

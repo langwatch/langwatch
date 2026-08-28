@@ -12,7 +12,7 @@ import {
   ValidationError,
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ExperimentEventingClickHouseResolver } from "../../ports/experiment-clickhouse.port";
+import type { ExperimentClickHousePort } from "../../ports/experiment-clickhouse.port";
 import type {
   ExperimentRunState,
   ExperimentRunStateData,
@@ -81,7 +81,7 @@ export class ExperimentRunStateRepositoryClickHouse<
   ProjectionType extends Projection = Projection,
 > implements ExperimentRunStateRepository<ProjectionType> {
   constructor(
-    private readonly resolveClient: ExperimentEventingClickHouseResolver,
+    private readonly clickhouse: ExperimentClickHousePort,
     private readonly defaultRetentionDays: number,
   ) {}
 
@@ -173,7 +173,7 @@ export class ExperimentRunStateRepositoryClickHouse<
     const { experimentId, runId } = parseExperimentRunKey(String(aggregateId));
 
     try {
-      const client = await this.resolveClient(context.tenantId);
+      const client = await this.clickhouse.resolveClient(context.tenantId);
       // IN-tuple dedup over the ReplacingMergeTree (see
       // dev/docs/best_practices/clickhouse-queries.md). UpdatedAt is
       // referenced via table alias because it's also projected as
@@ -276,7 +276,7 @@ export class ExperimentRunStateRepositoryClickHouse<
     }
 
     try {
-      const client = await this.resolveClient(context.tenantId);
+      const client = await this.clickhouse.resolveClient(context.tenantId);
       const { runId } = parseExperimentRunKey(String(projection.aggregateId));
       const projectionRecord = this.mapProjectionDataToClickHouseRecord(
         projection.data as ExperimentRunStateData,
@@ -363,7 +363,7 @@ export class ExperimentRunStateRepositoryClickHouse<
         return record;
       });
 
-      const client = await this.resolveClient(context.tenantId);
+      const client = await this.clickhouse.resolveClient(context.tenantId);
       await client.insert({
         table: TABLE_NAME,
         values: records,

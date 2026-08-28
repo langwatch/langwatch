@@ -1,6 +1,6 @@
 import { getEnvironment, setEnvironment } from "@langwatch/ksuid";
 import { describe, expect, it } from "vitest";
-import { deriveGrantId } from "../../src/repositories/eventing/eventing.authz-grant.mapper";
+import { deriveGrantId } from "../../src/adapters/eventing.authz-grant.adapter";
 
 const ORG = "org_acme";
 const OCCURRED_AT = 1_755_000_000_000;

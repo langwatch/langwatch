@@ -4,7 +4,7 @@ import type {
   StoredObjectService as StoredObjectServiceContract,
 } from "@langwatch/stored-object-contract";
 import {
-  PostgresStoredObjectStore,
+  PostgresStoredObjectAdapter,
   StoredObjectDeliveryPort,
   StoredObjectService as CanonicalStoredObjectService,
   StoredObjectStoragePort,
@@ -44,7 +44,7 @@ export function createProcessUserAvatarStoredObjectService(input: {
   storage: StoredObjectStoragePort;
 }): StoredObjectServiceContract {
   return CanonicalStoredObjectService.create({
-    store: PostgresStoredObjectStore.create(input.database),
+    store: PostgresStoredObjectAdapter.create(input.database),
     storage: input.storage,
     delivery: new AppUnavailableStoredObjectDeliveryPort(),
     uploadTokens: new AppUnavailableStoredObjectUploadTokenPort(),

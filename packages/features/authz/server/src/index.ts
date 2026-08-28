@@ -22,4 +22,4 @@ export {
   ObservabilityAuthzCutoverAdapter,
   type AuthzCutoverCounter,
 } from "./adapters/observability.authz-cutover.adapter";
-export { deriveGrantId as deriveAuthzGrantId } from "./repositories/eventing/eventing.authz-grant.mapper";
+export { deriveGrantId as deriveAuthzGrantId } from "./adapters/eventing.authz-grant.adapter";

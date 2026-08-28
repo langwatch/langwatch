@@ -1,6 +1,6 @@
 import { DEFAULT_LICENSE_PUBLIC_KEY } from "@langwatch/enterprise-licensing-contract";
 import {
-  LicenseRepository,
+  LicenseStoragePort,
   LicenseRetentionPort,
   LicenseService,
   LicenseServiceConfiguration,
@@ -21,7 +21,7 @@ import { LicenseEnforcementRepository } from "~/server/license-enforcement/licen
 
 export * from "@langwatch/enterprise-licensing-server";
 
-class PrismaLicenseRepository extends LicenseRepository {
+class PrismaLicenseRepository extends LicenseStoragePort {
   private readonly counts: LicenseEnforcementRepository;
 
   constructor(private readonly prismaClient: PrismaClient) {

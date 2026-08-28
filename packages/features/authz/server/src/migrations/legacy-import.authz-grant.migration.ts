@@ -78,7 +78,7 @@ import type {
   RoleHeadRow,
   ShareLinkFactRow,
 } from "../repositories/authz-migration.repository";
-import { deriveGrantId } from "../repositories/eventing/eventing.authz-grant.mapper";
+import { deriveGrantId } from "../adapters/eventing.authz-grant.adapter";
 import {
   PRINCIPAL_TO_DB,
   SHARE_LINK_PERMISSION,

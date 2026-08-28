@@ -8,10 +8,10 @@ export { LicenseLoggerPort } from "./ports/license-logger.port";
 export { LicenseRetentionPort, type LicenseRetentionRule } from "./ports/license-retention.port";
 export { LicenseUsagePort, type LicenseUsageCount } from "./ports/license-usage.port";
 export {
-  LicenseRepository,
+  LicenseStoragePort,
   type OrganizationLicenseCandidate,
   type StoredLicense,
-} from "./repositories/license.repository";
+} from "./ports/license-storage.port";
 export { LicenseGenerationService } from "./services/license-generation.service";
 export {
   LicenseService,

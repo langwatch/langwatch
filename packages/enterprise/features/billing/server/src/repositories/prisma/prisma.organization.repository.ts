@@ -1,8 +1,8 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { BillingOrganizationRepository } from "../../ports/organization.port";
+import { BillingOrganizationPort } from "../../ports/organization.port";
 
 /** Prisma implementation of the narrow organization reads Billing needs. */
-export class PrismaBillingOrganizationRepository extends BillingOrganizationRepository {
+export class PrismaBillingOrganizationRepository extends BillingOrganizationPort {
   private constructor(private readonly prisma: PrismaClient) {
     super();
   }

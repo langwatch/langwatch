@@ -16,8 +16,8 @@ import {
   type BillingInterval,
 } from "@langwatch/enterprise-billing-contract";
 import { StripeErrorAdapter } from "../adapters/stripe-error.stripe-error.adapter";
-import type { BillingOrganizationRepository } from "../ports/organization.port";
-import type { BillingSubscriptionNotifier } from "../ports/subscription-notifier.port";
+import type { BillingOrganizationPort } from "../ports/organization.port";
+import type { BillingSubscriptionNotifierPort } from "../ports/subscription-notifier.port";
 import type {
   BillingSubscriptionRecord,
   BillingSubscriptionRepository,
@@ -53,20 +53,20 @@ export class BillingSubscriptionService {
 
   private constructor(
     private readonly repository: BillingSubscriptionRepository,
-    private readonly organizationRepository: BillingOrganizationRepository,
+    private readonly organizationRepository: BillingOrganizationPort,
     private readonly stripe: Stripe,
     private readonly itemCalculator: SubscriptionItemCalculatorService,
     private readonly seatEventService: SeatEventSubscriptionService | undefined,
-    private readonly notifier: BillingSubscriptionNotifier,
+    private readonly notifier: BillingSubscriptionNotifierPort,
   ) {}
 
   static create(options: {
     repository: BillingSubscriptionRepository;
-    organizationRepository: BillingOrganizationRepository;
+    organizationRepository: BillingOrganizationPort;
     stripe: Stripe;
     itemCalculator: SubscriptionItemCalculatorService;
     seatEventService?: SeatEventSubscriptionService;
-    notifier: BillingSubscriptionNotifier;
+    notifier: BillingSubscriptionNotifierPort;
   }): BillingSubscriptionService {
     return new BillingSubscriptionService(
       options.repository,

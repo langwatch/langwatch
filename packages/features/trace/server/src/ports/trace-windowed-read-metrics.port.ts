@@ -12,9 +12,3 @@ export type TraceWindowedReadOutcome =
 export abstract class TraceWindowedReadMetricsPort {
   abstract record(input: { table: string; outcome: TraceWindowedReadOutcome }): void;
 }
-
-export class NullTraceWindowedReadMetricsPort extends TraceWindowedReadMetricsPort {
-  record(_input: { table: string; outcome: TraceWindowedReadOutcome }): void {
-    void _input;
-  }
-}

@@ -53,12 +53,4 @@ export {
   StoredObjectService,
   type StoredObjectServiceOptions,
 } from "./services/stored-object.service";
-export {
-  PostgresStoredObjectStore,
-  type StoredObjectDatabase,
-} from "./stores/postgres/postgres.stored-object.store";
-export {
-  StoredObjectStore,
-  type StoredObjectRecord,
-  type StoredObjectSource,
-} from "./stores/stored-object.store";
+export { PostgresStoredObjectAdapter } from "./adapters/postgres.stored-object.adapter";

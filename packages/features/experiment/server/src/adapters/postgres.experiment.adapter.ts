@@ -15,7 +15,7 @@ import {
 import { ClickHouseExperimentRunRepository } from "../repositories/clickhouse/clickhouse.experiment-run.repository";
 import { ClickHouseExperimentDspyRepository } from "../repositories/clickhouse/clickhouse.experiment-dspy.repository";
 import type { ExperimentDspyRetentionPort } from "../ports/experiment-dspy-retention.port";
-import { UnavailableExperimentExecutionPort } from "../ports/experiment-execution.port";
+import { UnavailableExperimentExecutionAdapter } from "./unavailable-experiment-execution.adapter";
 import { ExperimentService } from "../services/experiment.service";
 
 export type PostgresExperimentAdapterOptions = {
@@ -167,7 +167,7 @@ export class PostgresExperimentAdapter {
         retention: options.dspyRetention,
         telemetry: options.runHistoryTelemetry,
       }),
-      execution: options.execution ?? new UnavailableExperimentExecutionPort(),
+      execution: options.execution ?? new UnavailableExperimentExecutionAdapter(),
     });
   }
 }
