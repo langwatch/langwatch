@@ -67,8 +67,11 @@ import {
   createTestTenantId,
   getTenantIdString,
 } from "~/server/event-sourcing/__tests__/integration/testHelpers";
-import { EventRepositoryClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse";
-import { EventStoreClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventStoreClickHouse";
+import {
+  createEventingRetentionConfiguration,
+  EventingClickHouseEventRepository,
+  EventingClickHouseEventStore,
+} from "@langwatch/eventing/server";
 import { AssignTopicCommand } from "@langwatch/trace-server";
 import { RecordSpanCommand } from "@langwatch/trace-server";
 import { SpanStorageMapProjection } from "@langwatch/trace-server";
@@ -246,9 +249,14 @@ describe.skipIf(!shouldRun)(
         throw new Error("ClickHouse + Redis required.");
       }
 
-      const eventStore = new EventStoreClickHouse(
-        new EventRepositoryClickHouse(async () => clickHouseClient),
-      );
+      const retention = createEventingRetentionConfiguration({ defaultRetentionDays: 49 });
+      const eventStore = EventingClickHouseEventStore.create({
+        repository: EventingClickHouseEventRepository.create({
+          resolveClient: async () => clickHouseClient,
+          retention,
+        }),
+        retention,
+      });
       eventSourcing = createTestEventSourcing({
         eventStore,
         redis: redisConnection,

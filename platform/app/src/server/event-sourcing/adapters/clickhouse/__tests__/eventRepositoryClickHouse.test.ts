@@ -1,9 +1,19 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import { describe, expect, it, vi } from "vitest";
 import {
+  createEventingRetentionConfiguration,
   EVENT_LOG_SELECT_COLUMNS,
-  EventRepositoryClickHouse,
-} from "../eventRepositoryClickHouse";
+  EventingClickHouseEventRepository,
+} from "@langwatch/eventing/server";
+import { describe, expect, it, vi } from "vitest";
+
+const retention = createEventingRetentionConfiguration({ defaultRetentionDays: 49 });
+
+function repositoryFor(client: ClickHouseClient): EventingClickHouseEventRepository {
+  return EventingClickHouseEventRepository.create({
+    resolveClient: async () => client,
+    retention,
+  });
+}
 
 /**
  * A client that answers with the stored row projected through the query's own
@@ -28,9 +38,7 @@ function createMockClient(payload: unknown) {
       const selected = Object.keys(storedRow).filter((column) =>
         new RegExp(`\\b${column}\\b`).test(selectListOf(query)),
       );
-      const projected = Object.fromEntries(
-        selected.map((column) => [column, storedRow[column]]),
-      );
+      const projected = Object.fromEntries(selected.map((column) => [column, storedRow[column]]));
       return { json: vi.fn().mockResolvedValue([projected]) };
     }),
   } as unknown as ClickHouseClient;
@@ -42,13 +50,7 @@ function selectListOf(query: string): string {
 }
 
 /** The query text the repository sent on its Nth call. */
-function queryOf({
-  client,
-  call = 0,
-}: {
-  client: ClickHouseClient;
-  call?: number;
-}): string {
+function queryOf({ client, call = 0 }: { client: ClickHouseClient; call?: number }): string {
   return (client.query as ReturnType<typeof vi.fn>).mock.calls[call]![0].query;
 }
 
@@ -61,7 +63,7 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
       },
     });
 
-    const repository = new EventRepositoryClickHouse(async () => client);
+    const repository = repositoryFor(client);
     const rows = await repository.getEventRecords("tenant", "agg", "id");
 
     expect(rows[0]?.EventPayload).toEqual({
@@ -79,18 +81,16 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
       }),
     );
 
-    const repository = new EventRepositoryClickHouse(async () => client);
+    const repository = repositoryFor(client);
     const rows = await repository.getEventRecords("tenant", "agg", "id");
 
-    expect(rows[0]?.EventPayload).toEqual(
-      '{"data":{"value":"123.45","text":"still-string"}}',
-    );
+    expect(rows[0]?.EventPayload).toEqual('{"data":{"value":"123.45","text":"still-string"}}');
   });
 
   describe("when an occurredAtFromMs lower bound is provided", () => {
     it("adds the EventOccurredAt partition-prune predicate and binds the param", async () => {
       const client = createMockClient({});
-      const repository = new EventRepositoryClickHouse(async () => client);
+      const repository = repositoryFor(client);
 
       await repository.getEventRecords("tenant", "trace", "id", 1700000000000);
 
@@ -107,7 +107,7 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
   describe("when no usable lower bound is provided", () => {
     it("omits the EventOccurredAt predicate and the param", async () => {
       const client = createMockClient({});
-      const repository = new EventRepositoryClickHouse(async () => client);
+      const repository = repositoryFor(client);
 
       await repository.getEventRecords("tenant", "trace", "id");
 
@@ -118,7 +118,7 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
 
     it("treats a zero lower bound as unbounded", async () => {
       const client = createMockClient({});
-      const repository = new EventRepositoryClickHouse(async () => client);
+      const repository = repositoryFor(client);
 
       await repository.getEventRecords("tenant", "trace", "id", 0);
 
@@ -132,7 +132,7 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
 describe("EventRepositoryClickHouse.getEventRecord", () => {
   it("binds the tenant, aggregate and immutable event identity", async () => {
     const client = createMockClient({ value: "expected" });
-    const repository = new EventRepositoryClickHouse(async () => client);
+    const repository = repositoryFor(client);
 
     await repository.getEventRecord({
       tenantId: "tenant-a",
@@ -175,7 +175,7 @@ describe("EventRepositoryClickHouse read projections", () => {
     describe("when any of them runs", () => {
       it("projects every column the record mapper reads", async () => {
         const client = createMockClient({});
-        const repository = new EventRepositoryClickHouse(async () => client);
+        const repository = repositoryFor(client);
 
         await repository.getEventRecords("tenant", "trace", "id");
         await repository.getEventRecordsUpTo(upToRequest);
@@ -194,7 +194,7 @@ describe("EventRepositoryClickHouse read projections", () => {
     describe("when a stored event carries a version", () => {
       it("keeps the version on the record every read returns", async () => {
         const client = createMockClient({});
-        const repository = new EventRepositoryClickHouse(async () => client);
+        const repository = repositoryFor(client);
 
         const [plain] = await repository.getEventRecords("tenant", "trace", "id");
         const [upTo] = await repository.getEventRecordsUpTo(upToRequest);

@@ -7,8 +7,7 @@ import {
   type MfaCommand,
   type MfaFactInput,
 } from "@langwatch/identity";
-import { createTenantId, EventUtils } from "../..";
-import { eventIdempotencyKey } from "../../commands/idempotencyKey";
+import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
 import { USER_IDENTITY_AGGREGATE_TYPE } from "./schemas/constants";
 import type { IdentityEvent } from "./schemas/events";
 import type { MfaEvent } from "./schemas/mfaEvents";

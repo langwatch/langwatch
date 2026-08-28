@@ -7,7 +7,7 @@ import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import { PrismaProcessStore } from "../prismaProcessStore";
+import { PrismaProcessStore } from "@langwatch/eventing/server";
 
 /**
  * The issue #7016 wedge, reproduced against real Postgres leasing: a batch
@@ -19,7 +19,7 @@ import { PrismaProcessStore } from "../prismaProcessStore";
  * behavior: tails are released un-attempted, nothing is delivered twice, a
  * lapse-looping message retires, and a fenced acknowledgement is reported.
  */
-const store = new PrismaProcessStore(prisma);
+const store = PrismaProcessStore.create({ database: prisma });
 let processName: string;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -83,10 +83,7 @@ describe("outbox backlog drain under slow deliveries", () => {
           leaseDurationMs: 1_500,
           handlers: {
             "test.persist": async ({ message }) => {
-              invocations.set(
-                message.messageKey,
-                (invocations.get(message.messageKey) ?? 0) + 1,
-              );
+              invocations.set(message.messageKey, (invocations.get(message.messageKey) ?? 0) + 1);
               await sleep(handlerMs);
             },
           },

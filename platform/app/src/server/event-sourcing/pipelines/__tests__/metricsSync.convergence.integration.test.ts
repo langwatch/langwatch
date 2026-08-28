@@ -22,8 +22,11 @@ import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repos
 import { TraceSummaryClickHouseRepository } from "@langwatch/trace-server";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
-import { EventRepositoryClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse";
-import { EventStoreClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventStoreClickHouse";
+import {
+  createEventingRetentionConfiguration,
+  EventingClickHouseEventRepository,
+  EventingClickHouseEventStore,
+} from "@langwatch/eventing/server";
 import { getTestClickHouseClient } from "../../__tests__/integration/testContainers";
 import {
   cleanupTestDataForTenant,
@@ -113,9 +116,14 @@ describe.skipIf(!hasTestcontainers)(
         throw new Error("ClickHouse required.");
       }
 
-      const eventStore = new EventStoreClickHouse(
-        new EventRepositoryClickHouse(async () => clickHouseClient),
-      );
+      const retention = createEventingRetentionConfiguration({ defaultRetentionDays: 49 });
+      const eventStore = EventingClickHouseEventStore.create({
+        repository: EventingClickHouseEventRepository.create({
+          resolveClient: async () => clickHouseClient,
+          retention,
+        }),
+        retention,
+      });
       // Use in-memory queue (no Redis) so commands are processed synchronously
       eventSourcing = EventSourcing.createWithStores({
         eventStore,

@@ -22,7 +22,8 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
+import { withClickHouseDefaultQuerySettings } from "@langwatch/clickhouse-client";
+import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import { cleanupTestData, getTestClickHouseClient } from "./testContainers";
 import { fetchTracesFromClickHouse } from "@langwatch/topic-server";
 
@@ -87,7 +88,7 @@ describe("fetchTracesFromClickHouse integration", () => {
   beforeAll(async () => {
     const raw = getTestClickHouseClient();
     if (!raw) throw new Error("ClickHouse client not available");
-    ch = wrapWithDefaultSettings(raw);
+    ch = withClickHouseDefaultQuerySettings(raw, DEFAULT_CLICKHOUSE_SETTINGS);
     const input = JSON.stringify("hello world");
     await insertRows(
       ch,

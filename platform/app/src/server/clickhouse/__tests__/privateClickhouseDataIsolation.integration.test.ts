@@ -10,6 +10,10 @@
  */
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import {
+  createEventingRetentionConfiguration,
+  EventingClickHouseEventRepository,
+} from "@langwatch/eventing/server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SpanInsertData } from "@langwatch/trace-contract";
@@ -334,10 +338,11 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
     describe("when inserting events for a private-CH org", () => {
       /** @scenario Events for a private-CH org are stored in the private instance */
       it("stores events in the private instance only", async () => {
-        const { EventRepositoryClickHouse } =
-          await import("~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse");
         const resolver = await buildResolver();
-        const repo = new EventRepositoryClickHouse(resolver);
+        const repo = EventingClickHouseEventRepository.create({
+          resolveClient: resolver,
+          retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
+        });
 
         const record = makeEventRecord({ tenantId: privateProjectId });
         await repo.insertEventRecords([record]);
@@ -353,10 +358,11 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
 
     describe("when inserting events for a shared-CH org", () => {
       it("stores events in the shared instance only", async () => {
-        const { EventRepositoryClickHouse } =
-          await import("~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse");
         const resolver = await buildResolver();
-        const repo = new EventRepositoryClickHouse(resolver);
+        const repo = EventingClickHouseEventRepository.create({
+          resolveClient: resolver,
+          retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
+        });
 
         const record = makeEventRecord({ tenantId: sharedProjectId });
         await repo.insertEventRecords([record]);

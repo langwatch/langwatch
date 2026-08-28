@@ -1,27 +1,19 @@
 import { createHash } from "node:crypto";
-import type {
-  JsonValue,
-  NewOutboxMessage,
-  ProcessCommit,
-  ProcessRef,
-} from "@langwatch/eventing";
+import type { JsonValue, NewOutboxMessage, ProcessCommit, ProcessRef } from "@langwatch/eventing";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import { PrismaProcessStore } from "../prismaProcessStore";
+import { PrismaProcessStore } from "@langwatch/eventing/server";
 
-const store = new PrismaProcessStore(prisma);
+const store = PrismaProcessStore.create({ database: prisma });
 let processName: string;
 
 function ref(processKey = "conversation-1", projectId = "project-1"): ProcessRef {
   return { processName, projectId, processKey };
 }
 
-function message(
-  messageKey: string,
-  overrides: Partial<NewOutboxMessage> = {},
-): NewOutboxMessage {
+function message(messageKey: string, overrides: Partial<NewOutboxMessage> = {}): NewOutboxMessage {
   return {
     messageKey,
     intentType: "langy.test.intent",
@@ -117,10 +109,7 @@ describe("PrismaProcessStore", () => {
       ),
     ]);
 
-    expect(results.map((result) => result.outcome).sort()).toEqual([
-      "committed",
-      "duplicateEvent",
-    ]);
+    expect(results.map((result) => result.outcome).sort()).toEqual(["committed", "duplicateEvent"]);
     expect(
       await prisma.processManagerInstance.count({
         where: { processName, projectId: "project-1" },
@@ -154,9 +143,9 @@ describe("PrismaProcessStore", () => {
     expect(await store.findByRef({ ref: ref() })).toEqual(
       expect.objectContaining({ state: { step: 1 }, revision: 1 }),
     );
-    expect(
-      (await store.findMessagesByRef({ ref: ref() })).map((row) => row.messageKey),
-    ).toEqual(["message-1"]);
+    expect((await store.findMessagesByRef({ ref: ref() })).map((row) => row.messageKey)).toEqual([
+      "message-1",
+    ]);
   });
 
   it("allows exactly one concurrent revision CAS and rolls back the loser", async () => {
@@ -187,9 +176,7 @@ describe("PrismaProcessStore", () => {
       "committed",
       "revisionConflict",
     ]);
-    const conflictIndex = results.findIndex(
-      (result) => result.outcome === "revisionConflict",
-    );
+    const conflictIndex = results.findIndex((result) => result.outcome === "revisionConflict");
     const losingEvent = conflictIndex === 0 ? "event-a" : "event-b";
     const losingMessage = conflictIndex === 0 ? "message-a" : "message-b";
     expect(
@@ -647,8 +634,7 @@ describe("PrismaProcessStore", () => {
       limit: 10,
       leaseDurationMs: 30_000,
     });
-    const leaseFor = (messageKey: string) =>
-      leased.find((row) => row.messageKey === messageKey)!;
+    const leaseFor = (messageKey: string) => leased.find((row) => row.messageKey === messageKey)!;
 
     await store.markDispatched({
       identity: {
@@ -706,13 +692,11 @@ describe("PrismaProcessStore", () => {
       },
       orderBy: { messageKey: "asc" },
     });
-    expect(remaining.map((row) => ({ key: row.messageKey, status: row.status }))).toEqual(
-      [
-        { key: "dead-letter-msg", status: "dead" },
-        { key: "fresh-dispatched-msg", status: "dispatched" },
-        { key: "still-pending-msg", status: "pending" },
-      ],
-    );
+    expect(remaining.map((row) => ({ key: row.messageKey, status: row.status }))).toEqual([
+      { key: "dead-letter-msg", status: "dead" },
+      { key: "fresh-dispatched-msg", status: "dispatched" },
+      { key: "still-pending-msg", status: "pending" },
+    ]);
   });
 
   // A source event id is `idempotencyKey ?? id`, composed by whichever pipeline
@@ -768,9 +752,7 @@ describe("PrismaProcessStore", () => {
     describe("when the process commits its consumption of the event", () => {
       /** @scenario A source event id far past the index limit is still consumed */
       it("commits instead of failing on the index row size", async () => {
-        const result = await store.commit(
-          commit({ sourceEventId: oversized(), messages: [] }),
-        );
+        const result = await store.commit(commit({ sourceEventId: oversized(), messages: [] }));
 
         expect(result.outcome).toBe("committed");
       });
@@ -836,9 +818,7 @@ describe("PrismaProcessStore", () => {
     describe("when a later event arrives for the same process", () => {
       /** @scenario A long source event id no longer blocks the process */
       it("processes the later event instead of wedging on the oversized one", async () => {
-        const first = await store.commit(
-          commit({ sourceEventId: oversized(), messages: [] }),
-        );
+        const first = await store.commit(commit({ sourceEventId: oversized(), messages: [] }));
         expect(first.outcome).toBe("committed");
 
         const later = await store.commit(
@@ -1059,9 +1039,7 @@ describe("PrismaProcessStore", () => {
             limit: 5_000,
           }),
         ).toBe(0);
-        expect(await store.deleteDeadOutboxBatch({ before: cutoff, limit: 5_000 })).toBe(
-          0,
-        );
+        expect(await store.deleteDeadOutboxBatch({ before: cutoff, limit: 5_000 })).toBe(0);
 
         const leased = await store.leaseDueMessages({
           now: recent,
@@ -1109,18 +1087,14 @@ describe("PrismaProcessStore", () => {
             limit: 5_000,
           }),
         ).toBe(0);
-        expect(await store.deleteDeadOutboxBatch({ before: deadAt, limit: 5_000 })).toBe(
-          0,
-        );
+        expect(await store.deleteDeadOutboxBatch({ before: deadAt, limit: 5_000 })).toBe(0);
         expect(
           await prisma.processManagerOutbox.count({
             where: { processName, projectId: "project-1" },
           }),
         ).toBe(1);
 
-        expect(await store.deleteDeadOutboxBatch({ before: recent, limit: 5_000 })).toBe(
-          1,
-        );
+        expect(await store.deleteDeadOutboxBatch({ before: recent, limit: 5_000 })).toBe(1);
         expect(
           await prisma.processManagerOutbox.count({
             where: { processName, projectId: "project-1" },
@@ -1223,15 +1197,9 @@ describe("PrismaProcessStore", () => {
           });
         }
 
-        expect(
-          await store.deleteDispatchedOutboxBatch({ before: cutoff, limit: 2 }),
-        ).toBe(2);
-        expect(
-          await store.deleteDispatchedOutboxBatch({ before: cutoff, limit: 2 }),
-        ).toBe(1);
-        expect(
-          await store.deleteDispatchedOutboxBatch({ before: cutoff, limit: 2 }),
-        ).toBe(0);
+        expect(await store.deleteDispatchedOutboxBatch({ before: cutoff, limit: 2 })).toBe(2);
+        expect(await store.deleteDispatchedOutboxBatch({ before: cutoff, limit: 2 })).toBe(1);
+        expect(await store.deleteDispatchedOutboxBatch({ before: cutoff, limit: 2 })).toBe(0);
       });
     });
   });

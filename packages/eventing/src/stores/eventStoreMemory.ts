@@ -18,7 +18,7 @@ import { EventRepositoryMemory } from "./repositories/eventRepositoryMemory";
  * - Single-threaded environments
  *
  * **DO NOT USE in production with multiple workers/processes.**
- * Use `EventStoreClickHouse` or another thread-safe implementation instead.
+ * Use `EventingClickHouseEventStore` or another thread-safe implementation instead.
  *
  * Extends {@link AbstractEventStore} with:
  * - `postProcessEvents()`: sorts by timestamp then id, then deep clones to prevent mutation

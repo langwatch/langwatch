@@ -1,14 +1,12 @@
 import { emptyIdentityHeads } from "@langwatch/identity";
-import {
-  IdentityGuards,
-  type IdentityHeadsRepository,
-} from "@langwatch/identity-server";
+import { IdentityGuards, type IdentityHeadsRepository } from "@langwatch/identity-server";
 import { describe, expect, it } from "vitest";
 import {
   inMemoryIdentityReservations,
   inMemoryIdentityUsers,
 } from "~/server/app-layer/identity/__tests__/support/identity-test-doubles";
-import { createTenantId } from "../../..";
+import { createTenantId } from "@langwatch/eventing";
+import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { EventSourcing } from "../../../eventSourcing";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import type {
@@ -60,16 +58,8 @@ class ProjectionHeads implements IdentityHeadsRepository {
     return { userId, identifiers: stored.state.identifiers };
   }
 
-  async findIdentifier({
-    userId,
-    identifierId,
-  }: {
-    userId: string;
-    identifierId: string;
-  }) {
-    return (
-      this.store.stored.get(userId)?.state.identifiers[identifierId] ?? null
-    );
+  async findIdentifier({ userId, identifierId }: { userId: string; identifierId: string }) {
+    return this.store.stored.get(userId)?.state.identifiers[identifierId] ?? null;
   }
 
   async findIdentifierIdForAccount() {
@@ -96,7 +86,7 @@ describe("identity pipeline", () => {
   describe("when an attach command is dispatched through the framework", () => {
     /** @scenario "An identity command round-trips the whole pipeline" */
     it("appends under the user tenant, folds into the projection, and advances the cursor", async () => {
-      const eventSourcing = new EventSourcing();
+      const eventSourcing = new EventSourcing({ eventStore: EventStoreMemory.createForTesting() });
       const store = new InMemoryStateStore();
       const pipeline = eventSourcing.register(
         createIdentityPipeline({

@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
-import { PrismaProcessStore } from "~/server/event-sourcing/adapters/postgres/prismaProcessStore";
+import { PrismaProcessStore } from "@langwatch/eventing/server";
 import { ManagerExplorerService } from "../../manager-explorer.service";
 import { ProcessAuditRepository } from "../../process-audit.repository";
 import { ProcessOpsPrismaRepository } from "../../repositories/process-ops.prisma.repository";
@@ -19,7 +19,7 @@ const NOW = Date.now();
 
 const fleet = new ProcessOpsPrismaRepository(prisma);
 const service = new ManagerExplorerService({
-  store: new PrismaProcessStore(prisma),
+  store: PrismaProcessStore.create({ database: prisma }),
   fleet,
   audit: new ProcessAuditRepository(prisma),
 });
@@ -513,7 +513,7 @@ describe("process ops against a real Postgres", () => {
   // ── Dead-letter recovery (specs/ops/dead-letter-recovery.feature) ────────
 
   describe("when the operator discards and bulk-recovers dead letters", () => {
-    const store = new PrismaProcessStore(prisma);
+    const store = PrismaProcessStore.create({ database: prisma });
 
     /** @scenario Discarding a dead message marks it and keeps it */
     it("marks the row discarded, keeps it, audits it, and the dispatcher never leases it", async () => {

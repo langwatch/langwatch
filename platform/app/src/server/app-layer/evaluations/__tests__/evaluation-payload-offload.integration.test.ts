@@ -30,7 +30,10 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { getApp } from "~/server/app-layer/app";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
-import { EventRepositoryClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse";
+import {
+  createEventingRetentionConfiguration,
+  EventingClickHouseEventRepository,
+} from "@langwatch/eventing/server";
 import {
   EVALUATION_REPORTED_EVENT_TYPE,
   EVALUATION_REPORTED_EVENT_VERSION_LATEST,
@@ -51,10 +54,7 @@ import { StorageRegistry } from "~/server/stored-objects/storage-registry";
 import { StoredObjectsRepository } from "~/server/stored-objects/stored-objects.repository";
 import type { MintStorageUri } from "~/server/stored-objects/stored-objects.service";
 import { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
-import {
-  clearClickHouseTestApp,
-  installClickHouseTestApp,
-} from "~/test-utils/clickhouseTestApp";
+import { clearClickHouseTestApp, installClickHouseTestApp } from "~/test-utils/clickhouseTestApp";
 import { getTestClickHouseClient } from "../../../event-sourcing/__tests__/integration/testContainers";
 import type { EvaluationRunData } from "../types";
 
@@ -74,7 +74,7 @@ const tenantId = `test-eval-offload-${nanoid()}`;
 
 let ch: ClickHouseClient;
 let tmpDir: string;
-let eventRepo: EventRepositoryClickHouse;
+let eventRepo: EventingClickHouseEventRepository;
 
 function buildStoredObjects(): StoredObjectsService {
   const driver = new LocalFilesystemDriver();
@@ -125,9 +125,7 @@ async function* readStoredObjectStream(
   for await (const chunk of stream) yield chunk;
 }
 
-function buildOffloadService(
-  storedObjects: StoredObjectsService,
-): EvaluationInputsOffloadService {
+function buildOffloadService(storedObjects: StoredObjectsService): EvaluationInputsOffloadService {
   return EvaluationInputsOffloadService.create({
     storage: new StoredObjectEvaluationInputStorage(storedObjects),
     config: {
@@ -225,7 +223,10 @@ beforeAll(async () => {
   installClickHouseTestApp({ resolveClient: async () => ch });
   vi.mocked(clickhouseClientModule.getClickHouseClientForTenant).mockResolvedValue(ch);
 
-  eventRepo = new EventRepositoryClickHouse(async () => ch);
+  eventRepo = EventingClickHouseEventRepository.create({
+    resolveClient: async () => ch,
+    retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
+  });
 
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "eval-offload-int-"));
 }, 120_000);
@@ -298,9 +299,7 @@ describe("evaluation inputs offload (integration)", () => {
       expect(payloadStr).toContain(STORED_OBJECT_MARKER_KEY);
       // The full blob padding must NOT be inline in the event payload.
       expect(payloadStr).not.toContain(originalInputs.blob);
-      expect(Buffer.byteLength(payloadStr, "utf8")).toBeLessThan(
-        EVAL_INPUTS_INLINE_MAX_BYTES,
-      );
+      expect(Buffer.byteLength(payloadStr, "utf8")).toBeLessThan(EVAL_INPUTS_INLINE_MAX_BYTES);
 
       // (b) evaluation_runs.Inputs row stays bounded (the marker only).
       await getApp().evaluations.upsertRun({
@@ -311,9 +310,7 @@ describe("evaluation inputs offload (integration)", () => {
       expect(rowInputs).toBeTruthy();
       expect(rowInputs!).toContain(STORED_OBJECT_MARKER_KEY);
       expect(rowInputs).not.toContain(originalInputs.blob);
-      expect(Buffer.byteLength(rowInputs!, "utf8")).toBeLessThan(
-        EVAL_INPUTS_INLINE_MAX_BYTES,
-      );
+      expect(Buffer.byteLength(rowInputs!, "utf8")).toBeLessThan(EVAL_INPUTS_INLINE_MAX_BYTES);
 
       // (c) a stored_objects row exists with the correct size_bytes + project_id.
       const marker = markerOf(offloaded);
@@ -335,9 +332,7 @@ describe("evaluation inputs offload (integration)", () => {
       }>();
       expect(soRows.length).toBe(1);
       expect(soRows[0]!.project_id).toBe(tenantId);
-      expect(Number(soRows[0]!.size_bytes)).toBe(
-        Buffer.byteLength(originalSerialized, "utf8"),
-      );
+      expect(Number(soRows[0]!.size_bytes)).toBe(Buffer.byteLength(originalSerialized, "utf8"));
       expect(soRows[0]!.purpose).toBe(EVAL_INPUTS_STORED_OBJECT_PURPOSE);
       expect(soRows[0]!.owner_id).toBe(evaluationId);
 
@@ -404,9 +399,7 @@ describe("evaluation inputs offload (integration)", () => {
         tenantId,
       });
       const rowInputs = await selectInputsRaw(evaluationId);
-      expect(Buffer.byteLength(rowInputs!, "utf8")).toBeLessThan(
-        EVAL_INPUTS_INLINE_MAX_BYTES,
-      );
+      expect(Buffer.byteLength(rowInputs!, "utf8")).toBeLessThan(EVAL_INPUTS_INLINE_MAX_BYTES);
 
       // No new stored object was created for the ceiling case.
       const soAfter = await storedObjects.getStorageUsageByProject({
@@ -421,9 +414,7 @@ describe("evaluation inputs offload (integration)", () => {
     it("keeps event_log bounded with a preview-only marker instead of the raw inputs", async () => {
       const storedObjects = buildStoredObjects();
       const offloadService = buildOffloadService(storedObjects);
-      vi.spyOn(storedObjects, "storeFromBytes").mockRejectedValueOnce(
-        new Error("s3 down"),
-      );
+      vi.spyOn(storedObjects, "storeFromBytes").mockRejectedValueOnce(new Error("s3 down"));
       const evaluationId = `eval-put-fail-${nanoid()}`;
       const originalInputs = inputsOfSize(EVAL_INPUTS_INLINE_MAX_BYTES + 4096);
 
@@ -465,9 +456,7 @@ describe("evaluation inputs offload (integration)", () => {
       expect(payloadStr).toContain("offloadFailed");
       // The raw blob must NOT ride into event_log under the S3-failure path.
       expect(payloadStr).not.toContain(originalInputs.blob);
-      expect(Buffer.byteLength(payloadStr, "utf8")).toBeLessThan(
-        EVAL_INPUTS_INLINE_MAX_BYTES,
-      );
+      expect(Buffer.byteLength(payloadStr, "utf8")).toBeLessThan(EVAL_INPUTS_INLINE_MAX_BYTES);
     });
   });
 

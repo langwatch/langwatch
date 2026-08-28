@@ -1,5 +1,11 @@
 import { EventSourcing, type EventSourcedQueueProcessor } from "@langwatch/eventing";
 import {
+  createEventingRetentionConfiguration,
+  EventingClickHouseEventRepository,
+  EventingClickHouseEventStore,
+  PrismaProcessStore,
+} from "@langwatch/eventing/server";
+import {
   type TopicClusteringRequestedEventData,
   type TopicClusteringRunCompletedEventData,
   type TopicClusteringRunStartedEventData,
@@ -14,9 +20,7 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
-import { PrismaProcessStore } from "~/server/event-sourcing/adapters/postgres/prismaProcessStore";
-import { EventRepositoryClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse";
-import { EventStoreClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventStoreClickHouse";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import { cleanupTestData, getTestClickHouseClient } from "./testContainers";
 
 /**
@@ -151,7 +155,7 @@ describe.skipIf(!hasTestcontainers)(
     const topics = PostgresTopicAdapter.create({
       database: prisma,
       schedule: EventingTopicClusteringScheduleAdapter.create({
-        processStore: new PrismaProcessStore(prisma),
+        processStore: PrismaProcessStore.create({ database: prisma }),
       }),
     });
     // The registered pipeline's command handles (send-capable), assigned in
@@ -178,9 +182,16 @@ describe.skipIf(!hasTestcontainers)(
       const clickhouse = getTestClickHouseClient();
       if (!clickhouse) throw new Error("test ClickHouse not available");
 
-      const eventStore = new EventStoreClickHouse(
-        new EventRepositoryClickHouse(async () => clickhouse),
-      );
+      const retention = createEventingRetentionConfiguration({
+        defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+      });
+      const eventStore = EventingClickHouseEventStore.create({
+        repository: EventingClickHouseEventRepository.create({
+          resolveClient: async () => clickhouse,
+          retention,
+        }),
+        retention,
+      });
       eventSourcing = EventSourcing.createWithStores({
         eventStore,
       });

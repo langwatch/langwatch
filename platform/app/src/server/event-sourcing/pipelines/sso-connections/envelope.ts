@@ -3,8 +3,7 @@ import {
   type SsoConnectionCommand,
   type SsoConnectionFactInput,
 } from "@langwatch/identity";
-import { createTenantId, EventUtils } from "../..";
-import { eventIdempotencyKey } from "../../commands/idempotencyKey";
+import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
 import { SSO_CONNECTION_AGGREGATE_TYPE } from "./schemas/constants";
 import type { SsoConnectionEvent } from "./schemas/events";
 

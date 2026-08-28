@@ -202,15 +202,19 @@ import {
   adoptPrismaConnection,
   closePrismaConnection,
   configurePrismaConnection,
+  getPrismaConnection,
   hasPrismaConnection,
   prisma as globalPrisma,
 } from "~/server/db";
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { createRetentionFloorService } from "~/server/app-layer/clients/clickhouse/retention-floor";
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
-import { EventRepositoryClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse";
-import { EventStoreClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventStoreClickHouse";
-import { PrismaProcessStore } from "~/server/event-sourcing/adapters/postgres/prismaProcessStore";
+import {
+  createEventingRetentionConfiguration,
+  EventingClickHouseEventRepository,
+  EventingClickHouseEventStore,
+  PrismaProcessStore,
+} from "@langwatch/eventing/server";
 import { BILLING_REPORTING_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/billing-reporting/pipeline";
 import type { LangyConversationProcessingEvent } from "@langwatch/langy-server";
 import { createBillingMeterDispatchSubscriber } from "~/server/event-sourcing/registration/global/billingMeterDispatch.subscriber";
@@ -681,6 +685,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
       }),
     );
   }
+  const prismaConnection = getPrismaConnection();
   const prisma = globalPrisma;
   AppAuditLogRuntime.install({ prisma });
   const clickhouseRuntime = AppClickHouseRuntime.create({
@@ -710,7 +715,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     AppLogMetricClickHouseResolver.create(resolveClickHouseClient);
   const gatewayClickHouseResolver = AppGatewayClickHouseResolver.create(resolveClickHouseClient);
 
-  const processStore = new PrismaProcessStore(prisma);
+  const processStore = PrismaProcessStore.create({ database: prismaConnection.client });
 
   // ADR-093: the composition root owns the App's Redis connection, and nothing
   // holds one at module scope. Two entry points outside a serving process build
@@ -1630,11 +1635,18 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     : null;
   const billingQueries = BillableEventsQueryService.create(billableEventsRepository);
 
+  const eventingPersistenceRetention = createEventingRetentionConfiguration({
+    defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+  });
   const eventStore = clickhouseEnabled
-    ? new EventStoreClickHouse(
-        new EventRepositoryClickHouse(resolveClickHouseClient),
-        eventingRetention,
-      )
+    ? EventingClickHouseEventStore.create({
+        repository: EventingClickHouseEventRepository.create({
+          resolveClient: resolveClickHouseClient,
+          retention: eventingPersistenceRetention,
+        }),
+        retention: eventingPersistenceRetention,
+        retentionPolicyResolver: eventingRetention,
+      })
     : undefined;
   const queueFactory = redis
     ? createEventingGroupQueueFactory({
@@ -2480,6 +2492,7 @@ export function createTestApp(
   if (!hasPrismaConnection()) {
     configurePrismaConnection(createProcessPrismaConnection(testPrismaConfiguration));
   }
+  const testPrismaConnection = getPrismaConnection();
   const testPrisma = globalPrisma;
   AppAuditLogRuntime.install({ prisma: testPrisma });
   const noop = async () => {
@@ -2835,10 +2848,11 @@ export function createTestApp(
     executor: null,
     database: DEFAULT_LWQL_DATABASE,
   });
+  const testProcessStore = PrismaProcessStore.create({ database: testPrismaConnection.client });
   const testTopics = PostgresTopicAdapter.create({
     database: testPrisma,
     schedule: EventingTopicClusteringScheduleAdapter.create({
-      processStore: new PrismaProcessStore(testPrisma),
+      processStore: testProcessStore,
     }),
   });
   const testDataRetention: DataRetentionDependencies = testDataRetentionService;

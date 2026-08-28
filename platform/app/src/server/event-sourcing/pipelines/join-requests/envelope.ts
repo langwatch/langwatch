@@ -3,8 +3,7 @@ import {
   type JoinRequestCommand,
   type JoinRequestFactInput,
 } from "@langwatch/identity";
-import { createTenantId, EventUtils } from "../..";
-import { eventIdempotencyKey } from "../../commands/idempotencyKey";
+import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
 import { JOIN_REQUEST_AGGREGATE_TYPE } from "./schemas/constants";
 import type { JoinRequestEvent } from "./schemas/events";
 

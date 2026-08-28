@@ -12,7 +12,7 @@ import {
   inMemoryIdentityReservations,
   inMemoryIdentityUsers,
 } from "~/server/app-layer/identity/__tests__/support/identity-test-doubles";
-import { createTenantId } from "../../..";
+import { createTenantId } from "@langwatch/eventing";
 import type { Command } from "../../../commands/command";
 import { validateEventAggregateType } from "../../../stores/eventStoreUtils";
 import { AttachIdentifierCommand } from "../commands/attachIdentifier.command";

@@ -5,9 +5,12 @@ import {
   type Event,
   REHYDRATION_WINDOW_MS,
 } from "@langwatch/eventing";
+import {
+  createEventingRetentionConfiguration,
+  EventingClickHouseEventRepository,
+  EventingClickHouseEventStore,
+} from "@langwatch/eventing/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EventRepositoryClickHouse } from "../eventRepositoryClickHouse";
-import { EventStoreClickHouse } from "../eventStoreClickHouse";
 
 /**
  * `event_log` is `PARTITION BY toYearWeek(EventOccurredAt)`, but the re-fold
@@ -27,15 +30,18 @@ const OCCURRED_AT = 1_700_000_000_000;
 const TIME_LOCAL: AggregateType = "trace";
 
 let queryMock: ReturnType<typeof vi.fn>;
-let store: EventStoreClickHouse;
+let store: EventingClickHouseEventStore;
 
 beforeEach(() => {
   queryMock = vi.fn().mockResolvedValue({ json: async () => [] });
-  store = new EventStoreClickHouse(
-    new EventRepositoryClickHouse(
-      async () => ({ query: queryMock }) as unknown as ClickHouseClient,
-    ),
-  );
+  const retention = createEventingRetentionConfiguration({ defaultRetentionDays: 49 });
+  store = EventingClickHouseEventStore.create({
+    repository: EventingClickHouseEventRepository.create({
+      resolveClient: async () => ({ query: queryMock }) as unknown as ClickHouseClient,
+      retention,
+    }),
+    retention,
+  });
 });
 
 const upToEvent = {
@@ -63,9 +69,7 @@ describe("re-fold reads prune partitions — unpaged, time-local aggregate", () 
   it("anchors the window on the triggering event, one window back", async () => {
     await store.getEventsUpTo("trace-1", { tenantId }, TIME_LOCAL, upToEvent);
 
-    expect(lastCall().query_params.occurredAtFromMs).toBe(
-      OCCURRED_AT - REHYDRATION_WINDOW_MS,
-    );
+    expect(lastCall().query_params.occurredAtFromMs).toBe(OCCURRED_AT - REHYDRATION_WINDOW_MS);
   });
 
   it("keeps rows with an unknown occurred time, so the bound can never drop one", async () => {
@@ -91,9 +95,7 @@ describe("re-fold reads prune partitions — paged, time-local aggregate", () =>
     await store.getEventsUpToPaged?.(pagedRequest);
 
     expect(lastCall().query).toContain("EventOccurredAt >=");
-    expect(lastCall().query_params.occurredAtFromMs).toBe(
-      OCCURRED_AT - REHYDRATION_WINDOW_MS,
-    );
+    expect(lastCall().query_params.occurredAtFromMs).toBe(OCCURRED_AT - REHYDRATION_WINDOW_MS);
   });
 
   it("keeps rows with an unknown occurred time on the paged path too", async () => {
@@ -114,12 +116,7 @@ describe("re-fold reads prune partitions — paged, time-local aggregate", () =>
  */
 describe("re-fold reads prune partitions — long-lived aggregate type", () => {
   it("issues no lower bound, leaving the scan unbounded", async () => {
-    await store.getEventsUpTo(
-      "global-1",
-      { tenantId },
-      "global" as AggregateType,
-      upToEvent,
-    );
+    await store.getEventsUpTo("global-1", { tenantId }, "global" as AggregateType, upToEvent);
 
     expect(lastCall().query).not.toContain("EventOccurredAt >=");
     expect(lastCall().query_params.occurredAtFromMs).toBeUndefined();

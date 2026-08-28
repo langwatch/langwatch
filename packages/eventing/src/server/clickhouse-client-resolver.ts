@@ -13,7 +13,7 @@ export interface EventingClickHouseClient {
     values: readonly Record<string, unknown>[];
     format: "JSONEachRow";
     clickhouse_settings: Record<string, number>;
-  }): Promise<void>;
+  }): Promise<unknown>;
 }
 
 /**

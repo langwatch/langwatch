@@ -1,8 +1,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { type AggregateType, createTenantId, type Event } from "@langwatch/eventing";
+import {
+  createEventingRetentionConfiguration,
+  EventingClickHouseEventRepository,
+  EventingClickHouseEventStore,
+} from "@langwatch/eventing/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EventRepositoryClickHouse } from "../eventRepositoryClickHouse";
-import { EventStoreClickHouse } from "../eventStoreClickHouse";
 
 /**
  * `event_log` is `ORDER BY (TenantId, AggregateType, AggregateId, IdempotencyKey)`.
@@ -17,16 +20,21 @@ describe("EventStoreClickHouse - empty aggregateId guard", () => {
   const aggregateType: AggregateType = "trace";
 
   let mockClickHouseClient: ClickHouseClient;
-  let store: EventStoreClickHouse;
+  let store: EventingClickHouseEventStore;
 
   beforeEach(() => {
     mockClickHouseClient = {
       query: vi.fn(),
     } as unknown as ClickHouseClient;
 
-    store = new EventStoreClickHouse(
-      new EventRepositoryClickHouse(async () => mockClickHouseClient),
-    );
+    const retention = createEventingRetentionConfiguration({ defaultRetentionDays: 49 });
+    store = EventingClickHouseEventStore.create({
+      repository: EventingClickHouseEventRepository.create({
+        resolveClient: async () => mockClickHouseClient,
+        retention,
+      }),
+      retention,
+    });
   });
 
   const upToEvent = {

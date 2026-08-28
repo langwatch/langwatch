@@ -10,14 +10,13 @@ import {
   type PipelineWithCommandHandlers,
   type RegisteredPipeline,
 } from "@langwatch/eventing";
-import type IORedis from "ioredis";
-import { EventRepositoryClickHouse } from "../../adapters/clickhouse/eventRepositoryClickHouse";
-import { EventStoreClickHouse } from "../../adapters/clickhouse/eventStoreClickHouse";
 import {
-  cleanupTestData,
-  getTestClickHouseClient,
-  getTestRedisConnection,
-} from "./testContainers";
+  createEventingRetentionConfiguration,
+  EventingClickHouseEventRepository,
+  EventingClickHouseEventStore,
+} from "@langwatch/eventing/server";
+import type IORedis from "ioredis";
+import { cleanupTestData, getTestClickHouseClient, getTestRedisConnection } from "./testContainers";
 import type { TestProjection } from "./testPipelines";
 import {
   TEST_EVENT_TYPE,
@@ -81,7 +80,7 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
   RegisteredPipeline<any, any>,
   { testCommand: any }
 > & {
-  eventStore: EventStoreClickHouse;
+  eventStore: EventingClickHouseEventStore;
   pipelineName: string;
   /** Wait for queue workers to be ready before sending commands */
   ready: () => Promise<void>;
@@ -93,9 +92,7 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
   const redisConnection = getTestRedisConnection();
 
   if (!clickHouseClient) {
-    throw new Error(
-      "ClickHouse client not available. Ensure testcontainers are started.",
-    );
+    throw new Error("ClickHouse client not available. Ensure testcontainers are started.");
   }
 
   if (!redisConnection) {
@@ -103,9 +100,14 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
   }
 
   // Create stores
-  const eventStore = new EventStoreClickHouse(
-    new EventRepositoryClickHouse(async () => clickHouseClient),
-  );
+  const retention = createEventingRetentionConfiguration({ defaultRetentionDays: 49 });
+  const eventStore = EventingClickHouseEventStore.create({
+    repository: EventingClickHouseEventRepository.create({
+      resolveClient: async () => clickHouseClient,
+      retention,
+    }),
+    retention,
+  });
 
   const eventSourcing = createTestEventSourcing({
     eventStore,
@@ -136,7 +138,7 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
     // Wait for queue workers to be ready before sending commands
     ready: () => pipeline.service.waitUntilReady(),
   } as PipelineWithCommandHandlers<RegisteredPipeline<any, any>, { testCommand: any }> & {
-    eventStore: EventStoreClickHouse;
+    eventStore: EventingClickHouseEventStore;
     eventSourcing: EventSourcing;
     pipelineName: string;
     ready: () => Promise<void>;
@@ -150,11 +152,7 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
 export async function waitForProjection(
   pipeline: {
     service: {
-      getProjectionByName: (
-        name: string,
-        aggregateId: string,
-        context: any,
-      ) => Promise<any>;
+      getProjectionByName: (name: string, aggregateId: string, context: any) => Promise<any>;
     };
   },
   projectionName: string,
@@ -168,11 +166,9 @@ export async function waitForProjection(
 
   while (Date.now() - startTime < timeoutMs) {
     try {
-      const projection = (await pipeline.service.getProjectionByName(
-        projectionName,
-        aggregateId,
-        { tenantId },
-      )) as TestProjection | null;
+      const projection = (await pipeline.service.getProjectionByName(projectionName, aggregateId, {
+        tenantId,
+      })) as TestProjection | null;
 
       if (projection && projection.data.eventCount >= expectedEventCount) {
         return;
@@ -194,11 +190,9 @@ export async function waitForProjection(
 
   // Final attempt
   try {
-    const projection = (await pipeline.service.getProjectionByName(
-      projectionName,
-      aggregateId,
-      { tenantId },
-    )) as TestProjection | null;
+    const projection = (await pipeline.service.getProjectionByName(projectionName, aggregateId, {
+      tenantId,
+    })) as TestProjection | null;
 
     if (projection && projection.data.eventCount >= expectedEventCount) {
       return;
@@ -290,15 +284,10 @@ export function getTenantIdString(tenantId: ReturnType<typeof createTenantId>): 
 /**
  * Gets the count of processed events for an aggregate from the handler log.
  */
-async function getEventHandlerCount(
-  aggregateId: string,
-  tenantId: string,
-): Promise<number> {
+async function getEventHandlerCount(aggregateId: string, tenantId: string): Promise<number> {
   const clickHouseClient = getTestClickHouseClient();
   if (!clickHouseClient) {
-    throw new Error(
-      "ClickHouse client not available. Integration tests require ClickHouse.",
-    );
+    throw new Error("ClickHouse client not available. Integration tests require ClickHouse.");
   }
 
   try {

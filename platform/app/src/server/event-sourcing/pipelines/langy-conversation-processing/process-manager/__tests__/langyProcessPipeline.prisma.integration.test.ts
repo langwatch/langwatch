@@ -10,7 +10,7 @@ import {
 import { nanoid } from "nanoid";
 import { afterEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
-import { PrismaProcessStore } from "~/server/event-sourcing/adapters/postgres/prismaProcessStore";
+import { PrismaProcessStore } from "@langwatch/eventing/server";
 import type { LangyConversationProcessingEvent } from "@langwatch/langy-server/event-sourcing/langy.events";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
@@ -35,7 +35,7 @@ const conversationId = `${namespace}-conversation`;
 const turnId = `${namespace}-turn`;
 const userId = `${namespace}-user`;
 
-const store = new PrismaProcessStore(prisma);
+const store = PrismaProcessStore.create({ database: prisma });
 const ref: ProcessRef = {
   processName: LANGY_CONVERSATION_PROCESS_NAME,
   projectId,

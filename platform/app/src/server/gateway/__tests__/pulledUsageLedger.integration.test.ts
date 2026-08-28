@@ -22,6 +22,7 @@ import {
   type PulledUsageLedgerRow,
 } from "@langwatch/enterprise-governance-server";
 import { EventSourcing, InMemoryProcessStore, mapCommands } from "@langwatch/eventing";
+import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
@@ -31,10 +32,7 @@ import {
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 
-import {
-  GatewayBudgetClickHouseRepository,
-  PULLED_USAGE_SCOPE,
-} from "@langwatch/gateway-server";
+import { GatewayBudgetClickHouseRepository, PULLED_USAGE_SCOPE } from "@langwatch/gateway-server";
 import { GatewayService } from "@langwatch/gateway-server";
 
 const suffix = nanoid(8);
@@ -236,12 +234,11 @@ beforeAll(async () => {
   eventSourcing = new EventSourcing({
     processStore: InMemoryProcessStore.createForTesting(),
     executionTarget: "all",
+    eventStore: EventStoreMemory.createForTesting(),
   });
   const pipeline = eventSourcing.register(
     PulledUsageEventingAdapter.create({
-      ledger: PulledUsageLedgerProcess.create(
-        new ClickHousePulledUsageLedgerPort(chRepo),
-      ),
+      ledger: PulledUsageLedgerProcess.create(new ClickHousePulledUsageLedgerPort(chRepo)),
     }).build(),
   );
   const commands = mapCommands(pipeline.commands);

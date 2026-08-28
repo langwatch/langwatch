@@ -3,8 +3,7 @@ import {
   type ScimSyncCommand,
   type ScimSyncFactInput,
 } from "@langwatch/identity";
-import { createTenantId, EventUtils } from "../..";
-import { eventIdempotencyKey } from "../../commands/idempotencyKey";
+import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
 import { SCIM_SYNC_AGGREGATE_TYPE } from "./schemas/constants";
 import type { ScimSyncEvent } from "./schemas/events";
 

@@ -10,6 +10,7 @@ import {
   InMemoryProcessStore,
   mapCommands,
 } from "@langwatch/eventing";
+import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { TriggerAction } from "~/generated/prisma/client";
@@ -96,7 +97,10 @@ describe("automations pipeline", () => {
     describe("when both physical events reach the process inbox", () => {
       it("records one logical event and consumes the match once", async () => {
         const processStore = InMemoryProcessStore.createForTesting();
-        eventSourcing = new EventSourcing({ processStore });
+        eventSourcing = new EventSourcing({
+          processStore,
+          eventStore: EventStoreMemory.createForTesting(),
+        });
         const pipeline = eventSourcing.register(createAutomationsPipeline(pipelineDeps()));
         const commands = mapCommands(pipeline.commands);
 
@@ -126,7 +130,10 @@ describe("automations pipeline", () => {
     describe("when the later activity lands in a new settle window", () => {
       it("records and consumes a second evaluation round", async () => {
         const processStore = InMemoryProcessStore.createForTesting();
-        eventSourcing = new EventSourcing({ processStore });
+        eventSourcing = new EventSourcing({
+          processStore,
+          eventStore: EventStoreMemory.createForTesting(),
+        });
         const pipeline = eventSourcing.register(createAutomationsPipeline(pipelineDeps()));
         const commands = mapCommands(pipeline.commands);
 
@@ -172,7 +179,10 @@ describe("automations pipeline", () => {
 
       it("records every match durably in FIFO order", async () => {
         const processStore = InMemoryProcessStore.createForTesting();
-        eventSourcing = new EventSourcing({ processStore });
+        eventSourcing = new EventSourcing({
+          processStore,
+          eventStore: EventStoreMemory.createForTesting(),
+        });
         const pipeline = eventSourcing.register(createAutomationsPipeline(pipelineDeps()));
         const commands = mapCommands(pipeline.commands);
 
@@ -195,7 +205,10 @@ describe("automations pipeline", () => {
     describe("when commands and committed events are delivered", () => {
       it("keeps FIFO ordering through the trigger process", async () => {
         const processStore = InMemoryProcessStore.createForTesting();
-        eventSourcing = new EventSourcing({ processStore });
+        eventSourcing = new EventSourcing({
+          processStore,
+          eventStore: EventStoreMemory.createForTesting(),
+        });
         const pipeline = eventSourcing.register(createAutomationsPipeline(pipelineDeps()));
         const commands = mapCommands(pipeline.commands);
 
@@ -223,7 +236,10 @@ describe("automations pipeline", () => {
   describe("given two triggers in one project match the same trace", () => {
     it("keeps their process-outbox identities isolated", async () => {
       const processStore = InMemoryProcessStore.createForTesting();
-      eventSourcing = new EventSourcing({ processStore });
+      eventSourcing = new EventSourcing({
+        processStore,
+        eventStore: EventStoreMemory.createForTesting(),
+      });
       const pipeline = eventSourcing.register(createAutomationsPipeline(pipelineDeps()));
       const commands = mapCommands(pipeline.commands);
 
@@ -288,6 +304,7 @@ describe.skipIf(!hasRedis)("automations pipeline — coalesced redis-backed disp
         // store backs reads, and we spy on its multi-row write.
         const eventSourcing = new EventSourcing({
           processStore,
+          eventStore: EventStoreMemory.createForTesting(),
           queueFactory: createEventingGroupQueueFactory({
             dependencies: { redis },
             consumersEnabled: true,

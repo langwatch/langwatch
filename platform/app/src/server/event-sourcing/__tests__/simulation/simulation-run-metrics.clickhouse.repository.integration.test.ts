@@ -1,7 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createResilientClickHouseClient } from "~/server/clickhouse/managedClient";
+import { createResilientClickHouseClientForTest as createResilientClickHouseClient } from "~/server/clickhouse/managedClient";
 import { startTestContainers, stopTestContainers } from "../integration/testContainers";
 import {
   type SimulationRunMetricsProjectionRecord,

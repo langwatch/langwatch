@@ -1,10 +1,13 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createTenantId } from "@langwatch/eventing";
 import type { DataRetentionService } from "@langwatch/data-retention-contract";
+import {
+  createEventingRetentionConfiguration,
+  EventingClickHouseEventRepository,
+  EventingClickHouseEventStore,
+} from "@langwatch/eventing/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "../../../../data-retention/retentionPolicy.schema";
-import { EventRepositoryClickHouse } from "../eventRepositoryClickHouse";
-import { EventStoreClickHouse } from "../eventStoreClickHouse";
 
 /**
  * @scenario Trace pipeline stamps _retention_days from traces category
@@ -53,10 +56,17 @@ describe("EventStoreClickHouse retention stamping", () => {
           experiments: null,
         }),
       };
-      const store = new EventStoreClickHouse(
-        new EventRepositoryClickHouse(async () => mockClient),
-        resolver,
-      );
+      const retention = createEventingRetentionConfiguration({
+        defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+      });
+      const store = EventingClickHouseEventStore.create({
+        repository: EventingClickHouseEventRepository.create({
+          resolveClient: async () => mockClient,
+          retention,
+        }),
+        retention,
+        retentionPolicyResolver: resolver,
+      });
 
       await store.storeEvents(
         [makeEvent(), { ...makeEvent(), id: "evt_2" }],
@@ -77,9 +87,16 @@ describe("EventStoreClickHouse retention stamping", () => {
 
   describe("when no resolver is wired (e.g. tests)", () => {
     it("falls back to the platform default", async () => {
-      const store = new EventStoreClickHouse(
-        new EventRepositoryClickHouse(async () => mockClient),
-      );
+      const retention = createEventingRetentionConfiguration({
+        defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+      });
+      const store = EventingClickHouseEventStore.create({
+        repository: EventingClickHouseEventRepository.create({
+          resolveClient: async () => mockClient,
+          retention,
+        }),
+        retention,
+      });
 
       await store.storeEvents([makeEvent()], { tenantId }, aggregateType);
 
@@ -95,10 +112,17 @@ describe("EventStoreClickHouse retention stamping", () => {
       const resolver: Pick<DataRetentionService, "resolve"> = {
         resolve: vi.fn().mockResolvedValue(null),
       };
-      const store = new EventStoreClickHouse(
-        new EventRepositoryClickHouse(async () => mockClient),
-        resolver,
-      );
+      const retention = createEventingRetentionConfiguration({
+        defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+      });
+      const store = EventingClickHouseEventStore.create({
+        repository: EventingClickHouseEventRepository.create({
+          resolveClient: async () => mockClient,
+          retention,
+        }),
+        retention,
+        retentionPolicyResolver: resolver,
+      });
 
       await store.storeEvents([makeEvent()], { tenantId }, aggregateType);
 

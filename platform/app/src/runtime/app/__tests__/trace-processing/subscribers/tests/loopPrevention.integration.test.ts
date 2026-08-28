@@ -50,8 +50,11 @@ import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.ser
 import { createAppTraceSummaryStore } from "~/runtime/app/trace-summary-fold.adapter";
 import { AppTraceProjectionStorageAdapter } from "~/runtime/app/trace-projection-storage.adapter";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import { EventRepositoryClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse";
-import { EventStoreClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventStoreClickHouse";
+import {
+  createEventingRetentionConfiguration,
+  EventingClickHouseEventRepository,
+  EventingClickHouseEventStore,
+} from "@langwatch/eventing/server";
 import { evaluatorLoopBlockedCounter } from "~/server/metrics";
 import { makeQueueName } from "~/server/queues/makeQueueName";
 import {
@@ -219,9 +222,16 @@ describe.skipIf(!hasTestcontainers)(
         throw new Error("ClickHouse + Redis required.");
       }
 
-      const eventStore = new EventStoreClickHouse(
-        new EventRepositoryClickHouse(async () => clickHouseClient),
-      );
+      const retention = createEventingRetentionConfiguration({
+        defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+      });
+      const eventStore = EventingClickHouseEventStore.create({
+        repository: EventingClickHouseEventRepository.create({
+          resolveClient: async () => clickHouseClient,
+          retention,
+        }),
+        retention,
+      });
       eventSourcing = createTestEventSourcing({
         eventStore,
         redis: redisConnection,

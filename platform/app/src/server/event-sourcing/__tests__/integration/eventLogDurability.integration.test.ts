@@ -37,9 +37,12 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { type AggregateType, createTenantId } from "@langwatch/eventing";
+import {
+  createEventingRetentionConfiguration,
+  EventingClickHouseEventRepository,
+  EventingClickHouseEventStore,
+} from "@langwatch/eventing/server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { EventRepositoryClickHouse } from "../../adapters/clickhouse/eventRepositoryClickHouse";
-import { EventStoreClickHouse } from "../../adapters/clickhouse/eventStoreClickHouse";
 import {
   getTestClickHouseClient,
   getTestRedisConnection,
@@ -48,9 +51,7 @@ import {
 } from "./testContainers";
 import { generateTestTenantId } from "./testHelpers";
 
-const hasTestcontainers = !!(
-  process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
-);
+const hasTestcontainers = !!(process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL);
 
 interface SpanReceivedEventRow {
   TenantId: string;
@@ -125,10 +126,7 @@ function buildSpanReceivedEventRow({
   };
 }
 
-async function countEventLogForTenant(
-  client: ClickHouseClient,
-  tenantId: string,
-): Promise<number> {
+async function countEventLogForTenant(client: ClickHouseClient, tenantId: string): Promise<number> {
   const result = await client.query({
     query: `
       SELECT COUNT(*) AS count
@@ -221,10 +219,7 @@ async function deleteStoredSpansForTenant(
   });
 }
 
-async function cleanupTenant(
-  client: ClickHouseClient,
-  tenantIds: string[],
-): Promise<void> {
+async function cleanupTenant(client: ClickHouseClient, tenantIds: string[]): Promise<void> {
   await client.exec({
     query: `ALTER TABLE event_log DELETE WHERE TenantId IN ({ids:Array(String)})`,
     query_params: { ids: tenantIds },
@@ -239,7 +234,7 @@ describe.skipIf(!hasTestcontainers)(
   "event_log durability — non-repudiation foundation for governance compliance",
   () => {
     let client: ClickHouseClient;
-    let eventStore: EventStoreClickHouse;
+    let eventStore: EventingClickHouseEventStore;
     const ownedTenantIds: string[] = [];
 
     beforeAll(async () => {
@@ -247,9 +242,14 @@ describe.skipIf(!hasTestcontainers)(
       client = getTestClickHouseClient()!;
       const redis = getTestRedisConnection();
       if (!redis) throw new Error("Redis not available; testcontainers required.");
-      eventStore = new EventStoreClickHouse(
-        new EventRepositoryClickHouse(async () => client),
-      );
+      const retention = createEventingRetentionConfiguration({ defaultRetentionDays: 49 });
+      eventStore = EventingClickHouseEventStore.create({
+        repository: EventingClickHouseEventRepository.create({
+          resolveClient: async () => client,
+          retention,
+        }),
+        retention,
+      });
     });
 
     afterAll(async () => {

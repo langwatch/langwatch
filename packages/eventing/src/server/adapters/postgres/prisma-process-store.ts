@@ -27,6 +27,22 @@ const PROCESS_MANAGER_INSTANCE_KSUID_RESOURCE = "pminstance";
 const PROCESS_MANAGER_INBOX_KSUID_RESOURCE = "pminbox";
 const PROCESS_MANAGER_OUTBOX_KSUID_RESOURCE = "pmoutbox";
 
+function isProcessPersistencePrismaClient(
+  database: EventingProcessPersistenceDatabase,
+): database is PrismaClient {
+  const hasFunction = (name: string): boolean => typeof Reflect.get(database, name) === "function";
+  const hasObject = (name: string): boolean => typeof Reflect.get(database, name) === "object";
+  return (
+    hasFunction("$executeRaw") &&
+    hasFunction("$queryRaw") &&
+    hasFunction("$transaction") &&
+    hasObject("processManagerInbox") &&
+    hasObject("processManagerInstance") &&
+    hasObject("processManagerOutbox") &&
+    hasObject("processManagerOutboxAttempt")
+  );
+}
+
 class DuplicateInboxRollback extends Error {}
 
 function refWhere(ref: ProcessRef) {
@@ -112,7 +128,7 @@ const COMMIT_TRANSACTION_OPTIONS = {
 /** Durable Postgres implementation of the process state/inbox/outbox port. */
 export class PrismaProcessStore implements ProcessStore {
   static create(options: { database: EventingProcessPersistenceDatabase }): PrismaProcessStore {
-    if (!(options.database instanceof PrismaClient)) {
+    if (!isProcessPersistencePrismaClient(options.database)) {
       throw new Error("PrismaProcessStore requires a generated Prisma client instance.");
     }
     return new PrismaProcessStore(options.database);
