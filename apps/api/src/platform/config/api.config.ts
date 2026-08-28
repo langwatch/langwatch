@@ -17,6 +17,8 @@ import { z } from "zod";
 export const API_PORT_ENV_PRECEDENCE = ["API_PORT", "LANGWATCH_API_PORT", "PORT"] as const;
 
 export const apiConfigDefinition = RuntimeConfig.define({
+  /** A standalone API owns dispatch-only web behaviour. */
+  processRole: Config.value(z.literal("web").default("web"), { env: "API_PROCESS_ROLE" }),
   environment: Config.value(z.string().min(1).default("local"), { env: "ENVIRONMENT" }),
   nodeEnvironment: Config.value(
     z.enum(["development", "test", "production"]).default("development"),

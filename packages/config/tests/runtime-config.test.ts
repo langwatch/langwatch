@@ -5,6 +5,10 @@ import {
   ConfigValue,
   compileRuntimeConfig,
   environmentBooleanSchema,
+  environmentExactOneSchema,
+  environmentLegacyTruthySchema,
+  environmentNotExactOneSchema,
+  environmentPresenceSchema,
   InvalidRuntimeConfigError,
   portSchema,
   RuntimeConfig,
@@ -23,6 +27,16 @@ function unsupportedConfigValueFixture() {
 void unsupportedConfigValueFixture;
 
 describe("RuntimeConfig", () => {
+  it("exports compatibility parsers for legacy process controls", () => {
+    expect(environmentPresenceSchema.parse("0")).toBe(true);
+    expect(environmentPresenceSchema.parse("")).toBe(false);
+    expect(environmentExactOneSchema.parse("1")).toBe(true);
+    expect(environmentExactOneSchema.parse("true")).toBe(false);
+    expect(environmentNotExactOneSchema.parse("1")).toBe(false);
+    expect(environmentLegacyTruthySchema.parse("yes")).toBe(true);
+    expect(environmentLegacyTruthySchema.parse("false")).toBe(false);
+  });
+
   it("resolves nested semantic definitions from environment bindings", () => {
     const definition = RuntimeConfig.define({
       rateLimit: { ttlMs: 15_000, enabled: true },

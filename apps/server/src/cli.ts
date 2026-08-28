@@ -13,6 +13,7 @@ import { openBrowser } from "./animation/open-browser.ts";
 import { resolvePortConflicts } from "./port-conflict/resolve.ts";
 import { inspectPredeps, printDoctorTable } from "./predeps/detect-only.ts";
 import { runPredeps } from "./predeps/runner.ts";
+import { resolveLocalOrchestratorConfig } from "./platform/config/local-orchestrator.config.ts";
 import { captureUserEnv } from "./shared/env.ts";
 import { paths } from "./shared/paths.ts";
 import { detectPlatform } from "./shared/platform.ts";
@@ -25,8 +26,7 @@ import {
 } from "./shared/runtime-placeholder.ts";
 
 declare const __LANGWATCH_VERSION__: string;
-const VERSION =
-  typeof __LANGWATCH_VERSION__ !== "undefined" ? __LANGWATCH_VERSION__ : "0.0.0-dev";
+const VERSION = typeof __LANGWATCH_VERSION__ !== "undefined" ? __LANGWATCH_VERSION__ : "0.0.0-dev";
 
 async function loadRuntime(): Promise<RuntimeApi> {
   try {
@@ -40,9 +40,7 @@ async function loadRuntime(): Promise<RuntimeApi> {
     );
     return placeholderRuntime;
   } catch (err) {
-    console.warn(
-      chalk.yellow(`⚠ failed to load services/runtime.ts: ${(err as Error).message}`),
-    );
+    console.warn(chalk.yellow(`⚠ failed to load services/runtime.ts: ${(err as Error).message}`));
     return placeholderRuntime;
   }
 }
@@ -71,9 +69,7 @@ program
 
 program
   .command("start", { isDefault: true })
-  .description(
-    "install missing predeps, scaffold .env, start every service, open the browser",
-  )
+  .description("install missing predeps, scaffold .env, start every service, open the browser")
   .option("--port-base <n>", "first port slot to use", String(PORT_BASE_DEFAULT))
   .option("-y, --yes", "skip every confirmation prompt", false)
   .option("--no-open", "do not auto-open the browser when ready")
@@ -85,6 +81,7 @@ program
   .action(async (opts) => {
     detectPlatform();
     printBanner(VERSION);
+    const orchestrator = resolveLocalOrchestratorConfig(process.env);
 
     if (opts.dryRun) {
       const base = Number.parseInt(opts.portBase, 10);
@@ -120,15 +117,13 @@ program
     if (!existsSync(paths.bin) && !existsSync(paths.installManifest)) {
       console.log("");
       console.log(
-        chalk.dim(
-          "Setting up ~/.langwatch for the first time, this may take a few minutes.",
-        ),
+        chalk.dim("Setting up ~/.langwatch for the first time, this may take a few minutes."),
       );
       console.log(chalk.dim("Next runs will be much faster."));
       console.log("");
     }
 
-    const predeps = await runPredeps({ yes: opts.yes, version: VERSION });
+    const predeps = await runPredeps({ config: orchestrator, yes: opts.yes, version: VERSION });
 
     const runtime = await loadRuntime();
     const ctx: RuntimeContext = {
@@ -138,6 +133,7 @@ program
       envFile: paths.envFile,
       version: VERSION,
       userEnv: captureUserEnv(),
+      orchestrator,
     };
 
     const envResult = await ensureEnvFile(runtime, ctx, {
@@ -208,7 +204,13 @@ program
     await runtime.waitForHealth(ctx, { timeoutMs: 60_000 });
 
     const url = `http://localhost:${ports.langwatch}`;
-    if (opts.open !== false && !process.env.CI) await openBrowser(url);
+    if (
+      opts.open !== false &&
+      ctx.orchestrator.browser.openEnabled &&
+      !ctx.orchestrator.browser.continuousIntegration
+    ) {
+      await openBrowser(url, ctx.orchestrator.browser);
+    }
 
     // Block forever — drained by the events tee above. SIGINT exits via
     // `onShutdown`; an uncaught crash event in renderEvent ends the
@@ -219,15 +221,15 @@ program
 program
   .command("doctor")
   .description("check which predeps and services are installed; do not change anything")
-  .option(
-    "--port-base <n>",
-    "report the resolved ports for this base",
-    String(PORT_BASE_DEFAULT),
-  )
+  .option("--port-base <n>", "report the resolved ports for this base", String(PORT_BASE_DEFAULT))
   .action(async (opts) => {
     detectPlatform();
     printBanner(VERSION);
-    const rows = await inspectPredeps({ version: VERSION });
+    const orchestrator = resolveLocalOrchestratorConfig(process.env);
+    const rows = await inspectPredeps({
+      version: VERSION,
+      development: orchestrator.development,
+    });
     printDoctorTable(rows);
     const base = Number.parseInt(opts.portBase, 10);
     const ports = allocatePorts(base);
@@ -256,7 +258,8 @@ program
   .action(async (opts) => {
     detectPlatform();
     printBanner(VERSION);
-    await runPredeps({ yes: opts.yes, version: VERSION });
+    const orchestrator = resolveLocalOrchestratorConfig(process.env);
+    await runPredeps({ config: orchestrator, yes: opts.yes, version: VERSION });
     const runtime = await loadRuntime();
     const base = PORT_BASE_DEFAULT;
     const ports = allocatePorts(base);
@@ -267,6 +270,7 @@ program
       envFile: paths.envFile,
       version: VERSION,
       userEnv: captureUserEnv(),
+      orchestrator,
     };
     // No conflict resolution has run for this port table (unlike "start",
     // which calls resolvePortConflicts first): base is just
@@ -279,9 +283,7 @@ program
 
 program
   .command("reset")
-  .description(
-    "delete ~/.langwatch (binaries, data, env) so the next run is a clean install",
-  )
+  .description("delete ~/.langwatch (binaries, data, env) so the next run is a clean install")
   .action(async () => {
     const { confirmed } = await prompts(
       {

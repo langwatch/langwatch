@@ -6,6 +6,7 @@ import { paths } from "../shared/paths.ts";
 import { detectPlatform, type SupportedPlatform } from "../shared/platform.ts";
 import { predepRegistry } from "./registry.ts";
 import type { Predep } from "./types.ts";
+import type { LocalOrchestratorConfig } from "../platform/config/local-orchestrator.config.ts";
 
 export type PredepResult = Record<
   string,
@@ -13,12 +14,14 @@ export type PredepResult = Record<
 >;
 
 export type PredepOptions = {
+  config: LocalOrchestratorConfig;
   yes?: boolean;
   skipConfirm?: boolean;
   version: string;
 };
 
 export async function runPredeps({
+  config,
   yes = false,
   skipConfirm = false,
   version,
@@ -31,7 +34,7 @@ export async function runPredeps({
   mkdirSync(paths.postgresData, { recursive: true });
   mkdirSync(paths.clickhouseData, { recursive: true });
 
-  const predeps = predepRegistry({ version });
+  const predeps = predepRegistry({ version, development: config.development });
   const detection = await detectAll(predeps);
   const missing = predeps.filter((p) => !detection[p.id]?.installed);
 
@@ -50,7 +53,12 @@ export async function runPredeps({
   }
 
   const installResults: Record<string, { version: string; resolvedPath: string }> = {};
-  await runListr({ predeps: missing, platform, installResults });
+  await runListr({
+    predeps: missing,
+    platform,
+    installResults,
+    continuousIntegration: config.browser.continuousIntegration,
+  });
 
   return collectResult(predeps, detection, installResults);
 }
@@ -70,8 +78,7 @@ async function confirmUvInstallPrompt(): Promise<void> {
     {
       type: "confirm",
       name: "ok",
-      message:
-        "LangWatch needs to install `uv` (Astral's Python package manager) — proceed?",
+      message: "LangWatch needs to install `uv` (Astral's Python package manager) — proceed?",
       initial: true,
     },
     { onCancel: () => process.exit(130) },
@@ -86,10 +93,12 @@ async function runListr({
   predeps,
   platform,
   installResults,
+  continuousIntegration,
 }: {
   predeps: Predep[];
   platform: SupportedPlatform;
   installResults: Record<string, { version: string; resolvedPath: string }>;
+  continuousIntegration: boolean;
 }): Promise<void> {
   const remaining = [...predeps];
   // Loop until every predep either installs or the user explicitly skips it.
@@ -125,11 +134,9 @@ async function runListr({
 
     if (failed.length === 0) return;
 
-    const action = await promptOnFailure(failed);
+    const action = await promptOnFailure(failed, continuousIntegration);
     if (action === "abort") {
-      console.error(
-        chalk.red(`✗ aborting — ${failed.length} predep(s) did not install.`),
-      );
+      console.error(chalk.red(`✗ aborting — ${failed.length} predep(s) did not install.`));
       process.exit(1);
     }
     if (action === "skip") {
@@ -148,13 +155,14 @@ async function runListr({
 
 async function promptOnFailure(
   failed: Array<{ predep: Predep; error: Error }>,
+  continuousIntegration: boolean,
 ): Promise<"retry" | "skip" | "abort"> {
   console.error("");
   console.error(chalk.red.bold(`✗ ${failed.length} predep(s) failed:`));
   for (const f of failed) {
     console.error(`  ${chalk.red("✗")} ${f.predep.label}: ${f.error.message}`);
   }
-  if (process.env.CI) return "abort";
+  if (continuousIntegration) return "abort";
   const { action } = await prompts(
     {
       type: "select",

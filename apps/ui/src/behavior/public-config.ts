@@ -6,6 +6,16 @@ import {
 
 export { PUBLIC_APP_CONFIG_META_NAME } from "../model/public-config";
 export { publicAppConfigSchema, type PublicAppConfig } from "../model/public-config";
+export {
+  LOCAL_GATEWAY_URL,
+  PublicAppConfigService,
+  publicAppConfigProjectionDefinition,
+  resolveGatewayBaseUrl,
+  resolvePublicAppConfig,
+  SAAS_GATEWAY_URL,
+  type GatewayBaseUrlSource,
+  type PublicAppConfigSource,
+} from "./public-config.projection";
 
 const BASE64URL_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 

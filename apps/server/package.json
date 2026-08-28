@@ -41,6 +41,7 @@
     "test:invariants": "vitest run test/workspace-invariants.test.ts test/pack-npm-filters.test.ts"
   },
   "dependencies": {
+    "@langwatch/config": "workspace:*",
     "chalk": "^6.0.0",
     "commander": "^15.0.0",
     "concurrently": "^9.1.2",

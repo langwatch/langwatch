@@ -7,6 +7,7 @@ describe("resolveWorkerConfig", () => {
     const config = resolveWorkerConfig({});
 
     expect(config).toEqual({
+      processRole: "worker",
       environment: "local",
       nodeEnvironment: "development",
       serviceName: "langwatch:worker",
@@ -56,6 +57,12 @@ describe("resolveWorkerConfig", () => {
 
   it("rejects invalid configuration before a worker graph can boot", () => {
     expect(() => resolveWorkerConfig({ ENVIRONMENT: "" })).toThrow(InvalidRuntimeConfigError);
+  });
+
+  it("fails closed when a deployment assigns the worker a web role", () => {
+    expect(() => resolveWorkerConfig({ WORKER_PROCESS_ROLE: "web" })).toThrow(
+      InvalidRuntimeConfigError,
+    );
   });
 
   it("fails closed when a deployment attempts to enable partial consumers", () => {

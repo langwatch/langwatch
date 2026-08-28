@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import { paths } from "../shared/paths.ts";
 import { predepRegistry } from "./registry.ts";
+import type { LocalOrchestratorDevelopmentConfig } from "../platform/config/local-orchestrator.config.ts";
 
 export type DoctorRow = {
   id: string;
@@ -13,10 +14,12 @@ export type DoctorRow = {
 
 export async function inspectPredeps({
   version,
+  development,
 }: {
   version: string;
+  development: LocalOrchestratorDevelopmentConfig;
 }): Promise<DoctorRow[]> {
-  const predeps = predepRegistry({ version });
+  const predeps = predepRegistry({ version, development });
   const rows: DoctorRow[] = [];
   for (const p of predeps) {
     const det = await p.detect(paths);
@@ -44,9 +47,7 @@ export function printDoctorTable(rows: DoctorRow[]): void {
         `  ${chalk.green("✓")} ${r.id.padEnd(12)} ${r.version ?? ""} ${chalk.dim(r.resolvedPath ?? "")}`,
       );
     } else {
-      console.log(
-        `  ${chalk.red("✗")} ${r.id.padEnd(12)} ${chalk.dim(r.reason ?? "missing")}`,
-      );
+      console.log(`  ${chalk.red("✗")} ${r.id.padEnd(12)} ${chalk.dim(r.reason ?? "missing")}`);
     }
   }
   console.log("");

@@ -15,6 +15,7 @@ describe("API process configuration", () => {
         API_HTTP_DRAIN_GRACE_MS: "9000",
       }),
     ).toEqual({
+      processRole: "web",
       environment: "production",
       nodeEnvironment: "development",
       serviceName: "langwatch-api",
@@ -38,6 +39,12 @@ describe("API process configuration", () => {
 
   it("rejects invalid executable ports before a listener is constructed", () => {
     expect(() => resolveApiConfig({ API_PORT: "0" })).toThrow("Invalid api configuration");
+  });
+
+  it("fails closed when a deployment tries to assign the API a worker role", () => {
+    expect(() => resolveApiConfig({ API_PROCESS_ROLE: "worker" })).toThrow(
+      "Invalid api configuration",
+    );
   });
 
   it("uses standalone compatibility aliases in deterministic precedence", () => {

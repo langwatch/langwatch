@@ -141,6 +141,10 @@ function fakeCtx(): RuntimeContext {
     envFile: "/tmp/.langwatch-test/.env",
     version: "test",
     userEnv: {},
+    orchestrator: {
+      browser: { openEnabled: true, continuousIntegration: false },
+      development: { aiGatewayDevBuild: false, forceBundledPostgres: false },
+    },
   };
 }
 

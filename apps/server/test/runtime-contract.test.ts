@@ -3,6 +3,7 @@ import { placeholderRuntime } from "../src/shared/runtime-placeholder.ts";
 import type { RuntimeApi, RuntimeContext } from "../src/shared/runtime-contract.ts";
 import { allocatePorts } from "../src/shared/ports.ts";
 import { paths } from "../src/shared/paths.ts";
+import { resolveLocalOrchestratorConfig } from "../src/platform/config/local-orchestrator.config.ts";
 
 const ctx: RuntimeContext = {
   ports: allocatePorts(5560),
@@ -10,6 +11,8 @@ const ctx: RuntimeContext = {
   predeps: {},
   envFile: paths.envFile,
   version: "3.1.0",
+  userEnv: {},
+  orchestrator: resolveLocalOrchestratorConfig({}),
 };
 
 describe("placeholder runtime", () => {

@@ -4,6 +4,7 @@
 // adding fields is fine, removing or renaming is a coordinated change.
 
 import type { PredepResult } from "../predeps/runner.ts";
+import type { LocalOrchestratorConfig } from "../platform/config/local-orchestrator.config.ts";
 import type { LangwatchPaths } from "../shared/paths.ts";
 import type { PortAllocation } from "../shared/ports.ts";
 
@@ -15,6 +16,8 @@ export type RuntimeContext = {
   version: string;
   /** Pass-through env from the user shell (OPENAI_API_KEY, …), propagated to children, never persisted. */
   userEnv: Record<string, string>;
+  /** Immutable launcher settings projected during CLI composition. */
+  orchestrator: LocalOrchestratorConfig;
 };
 
 export type ServiceHandle = {

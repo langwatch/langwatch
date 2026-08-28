@@ -3,6 +3,7 @@ import { chmodSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { downloadWithProgress } from "./_download.ts";
+import type { LocalOrchestratorDevelopmentConfig } from "../platform/config/local-orchestrator.config.ts";
 import type { Predep } from "./types.ts";
 
 // The Go AI Gateway monobinary is built per-platform in CI and uploaded to a
@@ -78,7 +79,13 @@ async function buildFromCheckout(
   chmodSync(out, 0o755);
 }
 
-export function makeAigatewayPredep(version: string): Predep {
+export function makeAigatewayPredep({
+  version,
+  development,
+}: {
+  version: string;
+  development: LocalOrchestratorDevelopmentConfig;
+}): Predep {
   return {
     id: "aigateway",
     label: "langwatch ai-gateway",
@@ -117,12 +124,7 @@ export function makeAigatewayPredep(version: string): Predep {
 
       const url = downloadUrl(version, platform);
       try {
-        await downloadWithProgress(
-          url,
-          out,
-          task,
-          `downloading langwatch ai-gateway ${version}`,
-        );
+        await downloadWithProgress(url, out, task, `downloading langwatch ai-gateway ${version}`);
         chmodSync(out, 0o755);
         const v = (await resolveVersion(out)) ?? version;
         return { version: v, resolvedPath: out };
@@ -130,7 +132,7 @@ export function makeAigatewayPredep(version: string): Predep {
         const is404 = err instanceof Error && /HTTP 404/.test(err.message);
         if (!is404) throw err;
 
-        if (process.env.LANGWATCH_AIGATEWAY_DEV_BUILD === "1") {
+        if (development.aiGatewayDevBuild) {
           const repoRoot = findRepoRoot();
           if (repoRoot) {
             await buildFromCheckout(repoRoot, paths.bin, task);

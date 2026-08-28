@@ -3,14 +3,34 @@ import { z } from "zod";
 export const nodeEnvironmentSchema = z.enum(["development", "test", "production"]);
 
 export const environmentBooleanSchema = z
-  .union([
-    z.boolean(),
-    z.literal("true"),
-    z.literal("false"),
-    z.literal("1"),
-    z.literal("0"),
-  ])
+  .union([z.boolean(), z.literal("true"), z.literal("false"), z.literal("1"), z.literal("0")])
   .transform((value) => value === true || value === "true" || value === "1");
+
+/** Preserves legacy feature flags whose presence, rather than spelling, enables them. */
+export const environmentPresenceSchema = z
+  .union([z.string(), z.boolean()])
+  .optional()
+  .transform((value) => value === true || (typeof value === "string" && value.length > 0));
+
+/** Preserves legacy switches that deliberately opt in only for the literal `1`. */
+export const environmentExactOneSchema = z
+  .union([z.string(), z.boolean()])
+  .optional()
+  .transform((value) => value === true || value === "1");
+
+/** Preserves opt-out controls where only the literal `1` disables a default-on behaviour. */
+export const environmentNotExactOneSchema = z
+  .union([z.string(), z.boolean()])
+  .optional()
+  .transform((value) => value !== "1");
+
+/** Preserves legacy values that opt in with `1`, `true`, or `yes`. */
+export const environmentLegacyTruthySchema = z
+  .union([z.string(), z.boolean()])
+  .optional()
+  .transform(
+    (value) => value === true || (typeof value === "string" && /^(1|true|yes)$/i.test(value)),
+  );
 
 export const portSchema = z.coerce.number().int().min(1).max(65_535);
 
@@ -26,7 +46,7 @@ export type RuntimeConfigIssue = {
 };
 
 export class InvalidRuntimeConfigError extends Error {
-  readonly name = "InvalidRuntimeConfigError";
+  override readonly name = "InvalidRuntimeConfigError";
   readonly issues: RuntimeConfigIssue[];
 
   constructor(
@@ -37,9 +57,7 @@ export class InvalidRuntimeConfigError extends Error {
       path: issue.path.join("."),
       code: issue.code,
     }));
-    const locations = issues
-      .map((issue) => `${issue.path || "<root>"} (${issue.code})`)
-      .join(", ");
+    const locations = issues.map((issue) => `${issue.path || "<root>"} (${issue.code})`).join(", ");
     super(`Invalid ${runtime} configuration: ${locations}.`);
     this.issues = issues;
   }
@@ -113,11 +131,8 @@ export class RuntimeConfig<Value extends Record<string, unknown>> {
   ): RuntimeConfig<Record<string, unknown>> {
     const definition = options.definition;
     const schema =
-      ("schema" in options ? options.schema : undefined) ??
-      compileRuntimeConfig(definition ?? {});
-    const input = definition
-      ? resolveDefinition(definition, options.source)
-      : options.source;
+      ("schema" in options ? options.schema : undefined) ?? compileRuntimeConfig(definition ?? {});
+    const input = definition ? resolveDefinition(definition, options.source) : options.source;
     const result = schema.safeParse(input);
 
     if (!result.success) {
@@ -248,10 +263,7 @@ function configValue<const T extends boolean | number | string>(
   value: T,
   options?: { env?: string },
 ): ConfigLeaf<WidenPrimitive<T>>;
-function configValue<T>(
-  value: z.ZodType<T> | T,
-  options?: { env?: string },
-): ConfigLeaf<T> {
+function configValue<T>(value: z.ZodType<T> | T, options?: { env?: string }): ConfigLeaf<T> {
   const schema = isSchema(value) ? value : primitiveSchema(value as never);
   return {
     _configLeaf: true,
@@ -269,14 +281,8 @@ type WidenPrimitive<Value> = Value extends string
       : Value;
 
 function configUrl(options?: { env?: string; optional?: false }): ConfigLeaf<string>;
-function configUrl(options: {
-  env?: string;
-  optional: true;
-}): ConfigLeaf<string | undefined>;
-function configUrl(options?: {
-  env?: string;
-  optional?: boolean;
-}): ConfigLeaf<string | undefined> {
+function configUrl(options: { env?: string; optional: true }): ConfigLeaf<string | undefined>;
+function configUrl(options?: { env?: string; optional?: boolean }): ConfigLeaf<string | undefined> {
   if (options?.optional) {
     return {
       _configLeaf: true,
@@ -293,10 +299,7 @@ function configUrl(options?: {
 }
 
 function configSecret(options?: { env?: string; optional?: false }): ConfigLeaf<string>;
-function configSecret(options: {
-  env?: string;
-  optional: true;
-}): ConfigLeaf<string | undefined>;
+function configSecret(options: { env?: string; optional: true }): ConfigLeaf<string | undefined>;
 function configSecret(options?: {
   env?: string;
   optional?: boolean;
@@ -316,10 +319,7 @@ function configSecret(options?: {
   };
 }
 
-function configInteger(
-  defaultValue?: number,
-  options?: { env?: string },
-): ConfigLeaf<number> {
+function configInteger(defaultValue?: number, options?: { env?: string }): ConfigLeaf<number> {
   const base = z.coerce.number().int();
   const schema = defaultValue === undefined ? base : base.default(defaultValue);
   return { _configLeaf: true, schema, env: options?.env };

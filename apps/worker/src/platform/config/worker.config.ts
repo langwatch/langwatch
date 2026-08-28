@@ -11,6 +11,8 @@ const producerOnlyEventingSchema = environmentBooleanSchema
   .refine((enabled) => !enabled, "Eventing consumers are not enabled in Wave 1.");
 
 export const workerConfigDefinition = RuntimeConfig.define({
+  /** A standalone worker owns background consumer behaviour once installed. */
+  processRole: Config.value(z.literal("worker").default("worker"), { env: "WORKER_PROCESS_ROLE" }),
   environment: Config.value(z.string().min(1).default("local"), { env: "ENVIRONMENT" }),
   nodeEnvironment: Config.value(
     z.enum(["development", "test", "production"]).default("development"),

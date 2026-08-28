@@ -186,6 +186,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       chalk:
         specifier: ^6.0.0
         version: 6.0.0
@@ -241,6 +244,9 @@ importers:
       '@langwatch/agent-web':
         specifier: workspace:*
         version: link:../../packages/features/agent/web
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../packages/design-system
