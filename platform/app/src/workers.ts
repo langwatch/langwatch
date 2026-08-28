@@ -56,7 +56,6 @@ void (async () => {
       const runtime = WorkerRuntime.create({
         ...ports,
         resources,
-        ownsResources: false,
       });
 
       return {

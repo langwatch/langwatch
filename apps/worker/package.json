@@ -35,8 +35,8 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/topic-server": "workspace:*",
-    "@langwatch/trace-server": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/trace-server": "workspace:*",
     "zod": "^4.3.6"
   },
   "devDependencies": {

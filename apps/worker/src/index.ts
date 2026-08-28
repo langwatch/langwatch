@@ -27,8 +27,22 @@ export {
 } from "./platform/lifecycle/worker-runtime.port";
 export { WorkerRuntime } from "./platform/lifecycle/worker.runtime";
 export {
+  WORKER_SHUTDOWN_SIGNALS,
+  WorkerSignalHandlers,
+  type WorkerShutdownSignal,
+  type WorkerSignalSource,
+} from "./platform/lifecycle/worker.signals";
+export {
   WORKER_LIVENESS_PATH,
   createWorkerLivenessPolicy,
   isWorkerHeartbeatLive,
   type WorkerLivenessPolicy,
 } from "./platform/liveness/worker.liveness";
+export {
+  bootWorker,
+  WorkerProcess,
+  type WorkerApplicationPort,
+  type WorkerBootOptions,
+  type WorkerProcessComposition,
+  type WorkerProcessFactoryContext,
+} from "./worker.process";

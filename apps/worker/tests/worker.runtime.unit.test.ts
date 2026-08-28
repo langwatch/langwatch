@@ -127,7 +127,7 @@ describe("WorkerRuntime", () => {
     expect(phases).toEqual(["transport", "lifecycle"]);
   });
 
-  it("stops the transport, closes the lifecycle, then closes owned resources", async () => {
+  it("stops the transport and lifecycle before its borrowed resource scope", async () => {
     const phases: string[] = [];
     const lifecycle = new TestWorkerLifecycle();
     const transport = new TestWorkerTransport();
@@ -148,6 +148,8 @@ describe("WorkerRuntime", () => {
     await runtime.start();
     await runtime.close();
 
+    expect(phases).toEqual(["transport", "lifecycle"]);
+    await resources.close();
     expect(phases).toEqual(["transport", "lifecycle", "resource"]);
   });
 
@@ -165,6 +167,8 @@ describe("WorkerRuntime", () => {
     await expect(runtime.close()).rejects.toBe(transportError);
 
     expect(lifecycle.close).toHaveBeenCalledOnce();
+    expect(closeResource).not.toHaveBeenCalled();
+    await resources.close();
     expect(closeResource).toHaveBeenCalledOnce();
   });
 
@@ -182,6 +186,8 @@ describe("WorkerRuntime", () => {
     await expect(runtime.close()).rejects.toBe(lifecycleError);
 
     expect(transport.handle.shutdown).toHaveBeenCalledOnce();
+    expect(closeResource).not.toHaveBeenCalled();
+    await resources.close();
     expect(closeResource).toHaveBeenCalledOnce();
   });
 
@@ -194,7 +200,6 @@ describe("WorkerRuntime", () => {
       lifecycle: new TestWorkerLifecycle(),
       transport: new TestWorkerTransport(),
       resources,
-      ownsResources: false,
     });
 
     await runtime.close();

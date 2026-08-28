@@ -11,7 +11,7 @@ class TestQueue implements EventSourcedQueueProcessor<Record<string, unknown>> {
 }
 
 describe("WorkerEventingRuntime", () => {
-  it("requires explicit consumer activation and closes its shared queue", async () => {
+  it("stays producer-only and closes its shared queue", async () => {
     const queue = new TestQueue();
     const runtime = WorkerEventingRuntime.create({
       eventStore: EventStoreMemory.createForTesting(),
@@ -19,7 +19,6 @@ describe("WorkerEventingRuntime", () => {
       processStore: new InMemoryProcessStore(),
       executionTarget: "worker",
       warnWhenProjectionsRunInline: false,
-      consumersEnabled: true,
     });
 
     await runtime.start();

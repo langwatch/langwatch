@@ -9,16 +9,16 @@ export type WorkerRuntimeOptions = {
   lifecycle: WorkerLifecyclePort;
   transport: WorkerTransportPort;
   resources?: ResourceScope;
-  ownsResources?: boolean;
 };
 
 export class WorkerRuntime {
   static create(options: WorkerRuntimeOptions): WorkerRuntime {
+    const resources = options.resources ?? new ResourceScope();
     return new WorkerRuntime(
       options.lifecycle,
       options.transport,
-      options.resources ?? new ResourceScope(),
-      options.ownsResources ?? true,
+      resources,
+      options.resources === undefined,
     );
   }
 

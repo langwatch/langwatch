@@ -18,10 +18,10 @@ export interface WorkerEventingDependencies {
   /** Production-only diagnostic for missing shared projection queues. */
   warnWhenProjectionsRunInline: boolean;
   /**
-   * A consumer may run only when this process registers every job type on the
-   * shared Eventing queue. The Topic slice alone is not that registry.
+   * Kept as an explicit false-only assertion until the complete shared queue
+   * registry moves into a dedicated consumer-capable composition.
    */
-  consumersEnabled: boolean;
+  consumersEnabled?: false;
   retentionPolicyResolver?: RetentionPolicyResolver;
 }
 
@@ -44,7 +44,7 @@ export class WorkerEventingRuntime {
       enabled: true,
       eventStore: dependencies.eventStore,
       queueFactory: dependencies.queueFactory,
-      consumersEnabled: dependencies.consumersEnabled,
+      consumersEnabled: false,
       executionTarget: dependencies.executionTarget,
       processStore: dependencies.processStore,
       retentionPolicyResolver: dependencies.retentionPolicyResolver,

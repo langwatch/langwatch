@@ -7,6 +7,7 @@ import {
   type EnterpriseWorkerCompositionOptions,
 } from "@langwatch/enterprise-worker";
 import type { ProcessObservability } from "@langwatch/observability/node";
+import { ResourceScope } from "@langwatch/runtime-composition";
 import {
   TopicServerInstaller,
   type TopicServerInstallerDependencies,
@@ -48,6 +49,7 @@ export type WorkerProductionCompositionOptions = {
   topic: WorkerTopicCompositionOptions;
   enterprise?: EnterpriseWorkerCompositionOptions;
   observability?: ProcessObservability;
+  resources?: ResourceScope;
 };
 
 /**
@@ -101,6 +103,7 @@ export class WorkerProductionComposition {
       trace,
       enterprise,
       observability: options.observability,
+      resources: options.resources,
     });
   }
 
@@ -117,12 +120,14 @@ export class WorkerProductionComposition {
     trace?: TraceWorkerFeatureInstaller;
     enterprise?: EnterpriseWorkerComposition | EnterpriseWorkerCompositionOptions;
     observability?: ProcessObservability;
+    resources?: ResourceScope;
   }): WorkerProductionComposition {
-    const lifecycle = WorkerProductionLifecycle.create({
-      lifecycle: options.lifecycle,
-      observability: options.observability,
+    const lifecycle = WorkerProductionLifecycle.create(options.lifecycle);
+    const runtime = WorkerRuntime.create({
+      lifecycle,
+      transport: options.transport,
+      resources: options.resources,
     });
-    const runtime = WorkerRuntime.create({ lifecycle, transport: options.transport });
     const application = WorkerApplication.create({
       runtime,
       eventing: options.eventing,
@@ -163,32 +168,15 @@ export class WorkerProductionComposition {
 }
 
 class WorkerProductionLifecycle extends WorkerLifecyclePort {
-  static create(options: {
-    lifecycle: WorkerLifecyclePort;
-    observability?: ProcessObservability;
-  }): WorkerProductionLifecycle {
-    return new WorkerProductionLifecycle(options.lifecycle, options.observability);
+  static create(lifecycle: WorkerLifecyclePort): WorkerProductionLifecycle {
+    return new WorkerProductionLifecycle(lifecycle);
   }
 
-  private constructor(
-    private readonly lifecycle: WorkerLifecyclePort,
-    private readonly observability: ProcessObservability | undefined,
-  ) {
+  private constructor(private readonly lifecycle: WorkerLifecyclePort) {
     super();
   }
 
   async close(): Promise<void> {
-    let firstError: unknown;
-    try {
-      await this.lifecycle.close();
-    } catch (error) {
-      firstError = error;
-    }
-    try {
-      await this.observability?.shutdown();
-    } catch (error) {
-      firstError ??= error;
-    }
-    if (firstError) throw firstError;
+    await this.lifecycle.close();
   }
 }

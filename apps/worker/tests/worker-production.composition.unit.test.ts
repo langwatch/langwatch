@@ -1,9 +1,14 @@
-import { InMemoryProcessStore, type EventSourcedQueueProcessor } from "@langwatch/eventing";
+import {
+  InMemoryProcessStore,
+  type EventSourcedQueueProcessor,
+  type EventSourcing,
+} from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { TraceProcessingInstallerPort } from "@langwatch/trace-server";
+import { ResourceScope } from "@langwatch/runtime-composition";
 import { TraceTopicAssignmentPort, type AssignTopicCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 import { WorkerProductionComposition } from "../src/app/worker-production.composition";
+import { resolveWorkerConfig } from "../src/platform/config/worker.config";
 import {
   TopicWorkerFeatureInstaller,
   type TopicWorkerCapability,
@@ -45,16 +50,29 @@ class TopicCapability implements TopicWorkerCapability {
   };
 }
 
+class EventingTopicCapability implements TopicWorkerCapability {
+  readonly install = vi.fn();
+  readonly startBootSeeds = vi.fn();
+  readonly commandDispatch: TopicWorkerCapability["commandDispatch"];
+
+  constructor(readonly commandSend = vi.fn(async () => undefined)) {
+    this.commandDispatch = {
+      recordTopics: async () => undefined,
+      requestClustering: commandSend,
+    };
+  }
+}
+
 class TraceAssignments extends TraceTopicAssignmentPort {
   readonly assignTopic = vi.fn(async (_input: AssignTopicCommandData) => undefined);
 }
 
-class TraceInstaller extends TraceProcessingInstallerPort {
-  readonly install = vi.fn(() => ({ traceAssignments: this.traceAssignments }));
+class TraceInstaller {
+  readonly install = vi.fn((_eventSourcing: EventSourcing) => ({
+    traceAssignments: this.traceAssignments,
+  }));
 
-  constructor(private readonly traceAssignments: TraceTopicAssignmentPort) {
-    super();
-  }
+  constructor(private readonly traceAssignments: TraceTopicAssignmentPort) {}
 }
 
 class Projects {
@@ -107,7 +125,7 @@ describe("WorkerProductionComposition", () => {
     const transport = new Transport();
     const lifecycle = new Lifecycle();
     const composition = WorkerProductionComposition.createFromPorts({
-      config: { environment: "test", nodeEnvironment: "test" },
+      config: resolveWorkerConfig({ NODE_ENV: "test" }),
       eventing,
       lifecycle,
       transport,
@@ -180,7 +198,7 @@ describe("WorkerProductionComposition", () => {
       traceAssignments: trace.traceAssignments,
     });
     const composition = WorkerProductionComposition.createFromPorts({
-      config: { environment: "test", nodeEnvironment: "test" },
+      config: resolveWorkerConfig({ NODE_ENV: "test" }),
       eventing,
       lifecycle: new Lifecycle(),
       transport: new Transport(),
@@ -198,5 +216,77 @@ describe("WorkerProductionComposition", () => {
     expect(traceInstaller.install.mock.invocationCallOrder[0]).toBeLessThan(
       capability.install.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
     );
+  });
+
+  it("routes manual Topic dispatch through the Eventing command sender", async () => {
+    const queue = new Queue();
+    const eventing = WorkerEventingRuntime.create({
+      eventStore: EventStoreMemory.createForTesting(),
+      queueFactory: () => queue,
+      processStore: new InMemoryProcessStore(),
+      executionTarget: "worker",
+      warnWhenProjectionsRunInline: false,
+      consumersEnabled: false,
+    });
+    const capability = new EventingTopicCapability();
+    const topic = TopicWorkerFeatureInstaller.create({
+      installer: capability,
+      eventing,
+      traceAssignments: { assignTopic: async () => undefined },
+    });
+    const composition = WorkerProductionComposition.createFromPorts({
+      config: resolveWorkerConfig({ NODE_ENV: "test" }),
+      eventing,
+      lifecycle: new Lifecycle(),
+      transport: new Transport(),
+      topic,
+    });
+
+    await composition.application.start();
+    await composition.topic.requestManualRun("project-1", 456);
+
+    expect(capability.commandSend).toHaveBeenCalledWith({
+      tenantId: "project-1",
+      occurredAt: 456,
+      trigger: "manual",
+    });
+
+    await composition.application.close();
+  });
+
+  it("does not close a parent resource scope from the production composition", async () => {
+    const queue = new Queue();
+    const eventing = WorkerEventingRuntime.create({
+      eventStore: EventStoreMemory.createForTesting(),
+      queueFactory: () => queue,
+      processStore: new InMemoryProcessStore(),
+      executionTarget: "worker",
+      warnWhenProjectionsRunInline: false,
+      consumersEnabled: false,
+    });
+    const resources = new ResourceScope();
+    const closeResource = vi.fn();
+    resources.own("parent", closeResource);
+    const capability = new TopicCapability();
+    const topic = TopicWorkerFeatureInstaller.create({
+      installer: capability,
+      eventing,
+      traceAssignments: { assignTopic: async () => undefined },
+    });
+    const composition = WorkerProductionComposition.createFromPorts({
+      config: resolveWorkerConfig({ NODE_ENV: "test" }),
+      eventing,
+      lifecycle: new Lifecycle(),
+      transport: new Transport(),
+      topic,
+      resources,
+    });
+
+    await composition.application.start();
+    await composition.application.close();
+
+    expect(closeResource).not.toHaveBeenCalled();
+    await resources.close();
+    expect(closeResource).toHaveBeenCalledOnce();
   });
 });
