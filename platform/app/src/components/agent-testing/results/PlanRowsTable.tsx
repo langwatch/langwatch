@@ -10,7 +10,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Badge, Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
 import {
   Archive,
   Crosshair,
@@ -27,6 +27,7 @@ import { useNow } from "~/hooks/useNow";
 import type { ResultGroup } from "~/server/app-layer/simulations/result-atoms/atom.types";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { FG_MUTED } from "../shared/design";
+import { FromCodeBadge } from "../shared/FromCodeBadge";
 import { PassRateText } from "../shared/PassRateText";
 import { TrendSparkline } from "../shared/TrendSparkline";
 import {
@@ -99,13 +100,7 @@ export type PlanRowModel = {
 };
 
 function PlanBadge({ kind }: { kind: RunPlan["kind"] }) {
-  if (kind === "external") {
-    return (
-      <Badge size="xs" variant="subtle" colorPalette="gray">
-        from code
-      </Badge>
-    );
-  }
+  if (kind === "external") return <FromCodeBadge />;
   return null;
 }
 
@@ -291,7 +286,12 @@ export function PlanRowsTable({
 
             <ScopeCell plan={plan} />
 
-            <Text fontSize="11.5px" color={FG_MUTED} truncate>
+            <Text
+              fontSize="11.5px"
+              color={FG_MUTED}
+              truncate
+              data-testid="plan-targets"
+            >
               {targetsLabel(
                 (group?.targetKeys ?? []).map((key) => resolveTargetName(key)),
               )}

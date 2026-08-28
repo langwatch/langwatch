@@ -261,11 +261,12 @@ Feature: The Results tab
     And choosing it narrows the list by its key
 
   @integration
-  Scenario: A run from code reads From code for its target and its scope
+  Scenario: A run from code reads default for its target and From code for its scope
     Given a set that runs from code
     When its row and its runs are read
     Then the scope reads "From code"
-    And the target reads "From code"
+    And the target reads "default"
+    And the Target grouping row for it reads "default" with the from code mark
 
   @integration
   Scenario: Choosing a run inside an opened row lands on its plan at that run

@@ -151,6 +151,14 @@ export function suiteScopeKind(suite: RunPlanSuite): RunPlanScopeKind {
  */
 export const CODE_RUN_LABEL = "From code";
 
+/**
+ * How the target of a run from code is named. The code pointed the run at its
+ * own agent, so the platform holds no target for it, and the run reads under
+ * the default target the same way a run without a set reads under the
+ * default set. Surfaces that list it mark it with the from-code badge.
+ */
+export const CODE_TARGET_NAME = "default";
+
 export function toExternalPlanSlug(scenarioSetId: string): string {
   return `${EXTERNAL_SET_PREFIX}${scenarioSetId}`;
 }

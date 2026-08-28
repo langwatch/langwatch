@@ -16,6 +16,7 @@ import { useNow } from "~/hooks/useNow";
 import type { ResultGroup } from "~/server/app-layer/simulations/result-atoms/atom.types";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { FG_MUTED, GROUP_HEADER_BG, ROW_HOVER_BG } from "../shared/design";
+import { FromCodeBadge } from "../shared/FromCodeBadge";
 import { PassRateText } from "../shared/PassRateText";
 import { passRateColor } from "../shared/pass-rate-color";
 import { TrendSparkline } from "../shared/TrendSparkline";
@@ -28,6 +29,7 @@ import {
   ResultsTableTruncationLine,
 } from "./ResultsTableChrome";
 import type { ResultRow } from "./result-atoms";
+import { isCodeTargetKey } from "./result-atoms";
 
 const GROUP_COLUMNS =
   "20px minmax(0,1fr) minmax(120px,190px) 70px 78px minmax(100px,110px)";
@@ -156,6 +158,7 @@ function GroupSummaryRow({
   // A target group is keyed by a reference id, and the read leaves naming it
   // to the client, which holds the names of the agents and the prompts.
   const title = isScenario ? group.title : resolveTargetName(group.key);
+  const isCodeTarget = !isScenario && isCodeTargetKey(group.key);
   return (
     <ResultsTableRow
       columns={GROUP_COLUMNS}
@@ -175,6 +178,7 @@ function GroupSummaryRow({
         <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
           {title}
         </Text>
+        {isCodeTarget ? <FromCodeBadge /> : null}
       </HStack>
 
       <Text fontSize="11.5px" color={FG_MUTED} truncate>

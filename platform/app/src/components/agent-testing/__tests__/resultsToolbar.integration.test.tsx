@@ -660,8 +660,8 @@ describe("the toolbar of the Results tab", () => {
       ]);
     });
 
-    /** @scenario "A run from code reads From code for its target and its scope" */
-    it("reads From code as the scope and the target of a set that runs from code", async () => {
+    /** @scenario "A run from code reads default for its target and From code for its scope" */
+    it("reads From code as the scope and default as the target of a set that runs from code", async () => {
       const user = userEvent.setup();
       overviewState.byGroupBy.plan = {
         totals: makeTotals(),
@@ -693,12 +693,18 @@ describe("the toolbar of the Results tab", () => {
       expect(within(row).getByTestId("plan-scope")).toHaveTextContent(
         "From code",
       );
+      expect(within(row).getByTestId("plan-targets")).toHaveTextContent(
+        "default",
+      );
       expect(row).not.toHaveTextContent(/unknown/i);
       expect(row).not.toHaveTextContent(/whatever/i);
 
       await user.click(screen.getByRole("radio", { name: "Target" }));
       const target = await screen.findByTestId("results-group-row-unknown");
-      expect(target).toHaveTextContent("From code");
+      expect(target).toHaveTextContent("default");
+      expect(within(target).getByTestId("from-code-badge")).toHaveTextContent(
+        "from code",
+      );
       expect(target).not.toHaveTextContent(/unknown/i);
     });
 

@@ -31,7 +31,12 @@ import type {
   ResultsGroupBy,
 } from "~/server/app-layer/simulations/result-atoms/atom.types";
 import { UNKNOWN_TARGET_KEY } from "~/server/app-layer/simulations/result-atoms/atom.types";
-import { CODE_RUN_LABEL, type RunPlan, toExternalPlanSlug } from "./run-plans";
+import {
+  CODE_RUN_LABEL,
+  CODE_TARGET_NAME,
+  type RunPlan,
+  toExternalPlanSlug,
+} from "./run-plans";
 
 /** What the filter row asks of the list. */
 export type ResultFilters = {
@@ -183,9 +188,14 @@ export function targetNameOf({
   targetNames: Map<string, string>;
 }): string {
   // A run with no platform target was pointed at its agent by the code that
-  // pushed it, so it reads the way the scope of such a set reads.
-  if (targetKey === UNKNOWN_TARGET_KEY) return CODE_RUN_LABEL;
+  // pushed it, so it reads under the default target.
+  if (isCodeTargetKey(targetKey)) return CODE_TARGET_NAME;
   return targetNames.get(targetKey) ?? targetKey;
+}
+
+/** True for the key a run with no platform target is grouped under. */
+export function isCodeTargetKey(targetKey: string): boolean {
+  return targetKey === UNKNOWN_TARGET_KEY;
 }
 
 /** How a row names its targets: "dev-agent vs prod-agent". */
