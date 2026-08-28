@@ -73,17 +73,15 @@ export async function createLegacyAppRuntime({
   composeApp,
   features = appFeatures,
   resources,
-  ownsResources,
 }: {
   composeApp: () => App;
   features?: readonly FeatureDefinition<Record<string, never>>[];
   resources?: ResourceScope;
-  ownsResources?: boolean;
 }): Promise<AppRuntime> {
   return ApiRuntime.create({
     application: LegacyAppApplication.create(composeApp),
     lifecycle: LegacyAppFeatureLifecycle.create(features),
     resources,
-    ownsResources,
+    ownsResources: resources === undefined,
   });
 }
