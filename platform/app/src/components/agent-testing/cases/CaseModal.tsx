@@ -21,6 +21,7 @@ import {
   CaseModalFooter,
   CaseModalHeader,
 } from "./CaseModalParts";
+import { CASE_EDITOR_DRAWER_SIZE } from "./drawerKeys";
 import type { TestSuiteEntry } from "./test-cases";
 import type { CaseEditorState } from "./useCaseEditor";
 
@@ -48,7 +49,7 @@ export function CaseModal({
       open={open}
       onOpenChange={({ open: nextOpen }) => !nextOpen && onClose()}
       placement="end"
-      size="md"
+      size={CASE_EDITOR_DRAWER_SIZE}
     >
       <Drawer.Content bg="bg.panel" data-testid="case-modal">
         <CaseModalHeader

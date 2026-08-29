@@ -175,6 +175,14 @@ Feature: The scenarios table
 
   # --- The scenario editor ---
 
+  @unit
+  Scenario: The scenario editor opens wider than a standard drawer
+    Given the widths a drawer of the product can ask for by name
+    When the scenario editor names the width it opens at
+    Then that width is a step of the drawer recipe and not a width of its own
+    And the step is wider than the standard medium drawer by about a fifth
+    And it stays narrower than the large drawer, so four fields do not read as half a page
+
   @integration
   Scenario: New scenario opens the scenario dialog straight away
     Given the Agent Testing page is open
