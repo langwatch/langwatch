@@ -39,8 +39,18 @@ import type {
   AnomalyKind,
   DashboardData,
   GroupInfo,
+  AggregateProcessManager,
+  DeadLetterCount,
+  DeadOutboxMessageView,
   OpsService,
   OpsSnapshotService,
+  OutboxAttemptView,
+  ProcessAuditEntryView,
+  ProcessFleetSummary,
+  ProcessInstanceDetail,
+  ProcessInstanceRow,
+  ProcessOutboxMessageView,
+  ProcessWakeRow,
   ReplayHistoryEntry,
   ReplayStatus,
 } from "@langwatch/ops-contract";
@@ -55,9 +65,15 @@ export type OpsProcessRef = {
 
 /**
  * The event-sourcing explorers and the replay runner, each narrowed to what
- * this feature calls. Structural rather than imported: they are the process's
- * own composition over its event store, and the concrete return types reach
- * the client through the context type rather than through these shapes.
+ * this feature calls.
+ *
+ * Structural rather than imported, because they are the process's own
+ * composition over its event store — but typed with the contract's
+ * vocabulary, not `unknown`. They were `Promise<unknown>` under a comment
+ * claiming the concrete types reached the client "through the context type
+ * rather than through these shapes", and nothing did: a tRPC procedure
+ * publishes what its handler returns, so `unknown` here is `{}` in the
+ * browser, and every field the operator pages read was unchecked.
  */
 export type OpsEventExplorer = {
   discoverAggregates(input: {
@@ -88,47 +104,64 @@ export type OpsProcessExplorer = {
     aggregateType: string;
     projectId: string;
     aggregateId: string;
-  }): Promise<unknown>;
+  }): Promise<AggregateProcessManager[]>;
   requeueDeadMessages(input: {
     processName: string;
     projectId: string;
     processKey: string;
     messageKeyPrefix?: string;
     requestedBy: string;
-  }): Promise<unknown>;
-  getFleetSummary(): Promise<unknown>;
-  getDeadLetters(input: { processName?: string; page: number; pageSize: number }): Promise<unknown>;
-  getDeadLetterCounts(): Promise<unknown>;
+  }): Promise<{ requeued: number }>;
+  getFleetSummary(): Promise<ProcessFleetSummary[]>;
+  getDeadLetters(input: { processName?: string; page: number; pageSize: number }): Promise<{
+    messages: DeadOutboxMessageView[];
+    total: number;
+    byProcess: DeadLetterCount[];
+  }>;
+  getDeadLetterCounts(): Promise<DeadLetterCount[]>;
   getInstances(input: {
     processName?: string;
     page: number;
     pageSize: number;
     search?: string;
-  }): Promise<unknown>;
-  getUpcomingWakes(input: { limit: number }): Promise<unknown>;
-  getInstanceDetail(input: { ref: OpsProcessRef }): Promise<unknown>;
-  getOutbox(input: { ref: OpsProcessRef; page: number; pageSize: number }): Promise<unknown>;
-  listRecentActions(input: { limit: number }): Promise<unknown>;
-  wakeNow(input: { ref: OpsProcessRef; actorUserId: string }): Promise<unknown>;
-  redriveDeadInstance(input: { ref: OpsProcessRef; actorUserId: string }): Promise<unknown>;
+  }): Promise<{ instances: ProcessInstanceRow[]; total: number }>;
+  getUpcomingWakes(input: { limit: number }): Promise<ProcessWakeRow[]>;
+  getInstanceDetail(input: { ref: OpsProcessRef }): Promise<ProcessInstanceDetail | null>;
+  getOutbox(input: {
+    ref: OpsProcessRef;
+    page: number;
+    pageSize: number;
+  }): Promise<{ messages: ProcessOutboxMessageView[]; total: number }>;
+  listRecentActions(input: { limit: number }): Promise<ProcessAuditEntryView[]>;
+  wakeNow(input: { ref: OpsProcessRef; actorUserId: string }): Promise<{ woke: boolean }>;
+  redriveDeadInstance(input: {
+    ref: OpsProcessRef;
+    actorUserId: string;
+  }): Promise<{ requeued: number }>;
   redriveDeadMessage(input: {
     ref: OpsProcessRef;
     messageId: string;
     actorUserId: string;
-  }): Promise<unknown>;
+  }): Promise<{ redriven: boolean }>;
   discardDeadMessage(input: {
     ref: OpsProcessRef;
     messageId: string;
     actorUserId: string;
-  }): Promise<unknown>;
-  redriveDeadLetters(input: { processName?: string; actorUserId: string }): Promise<unknown>;
-  discardDeadLetters(input: { processName?: string; actorUserId: string }): Promise<unknown>;
-  getOutboxAttempts(input: { outboxId: string; projectId: string }): Promise<unknown>;
+  }): Promise<{ discarded: boolean }>;
+  redriveDeadLetters(input: {
+    processName?: string;
+    actorUserId: string;
+  }): Promise<{ redriven: number }>;
+  discardDeadLetters(input: {
+    processName?: string;
+    actorUserId: string;
+  }): Promise<{ discarded: number }>;
+  getOutboxAttempts(input: { outboxId: string; projectId: string }): Promise<OutboxAttemptView[]>;
   releaseLapsedLease(input: {
     ref: OpsProcessRef;
     messageId: string;
     actorUserId: string;
-  }): Promise<unknown>;
+  }): Promise<{ released: boolean }>;
 };
 
 /**

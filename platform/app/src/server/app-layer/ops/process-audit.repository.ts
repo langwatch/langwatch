@@ -1,3 +1,5 @@
+import type { ProcessAuditEntryView } from "@langwatch/ops-contract";
+
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 
 export type ProcessControlAction =
@@ -11,15 +13,6 @@ export type ProcessControlAction =
   | "process_redrive_dead_letters"
   | "process_discard_dead_letters"
   | "process_release_lapsed_lease";
-
-export interface ProcessAuditEntryView {
-  id: string;
-  createdAt: number;
-  action: string;
-  targetId: string;
-  actorUserId: string | null;
-  metadata: unknown;
-}
 
 export interface ProcessAuditSink {
   append(entry: {

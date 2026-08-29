@@ -1,8 +1,8 @@
 import { Box, Button, Center, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/ops-web";
 import { PinnedAwareJsonView } from "~/features/traces-v2/components/TraceDrawer/JsonHighlight";
-import type { ProcessInstanceDetail } from "~/server/app-layer/ops/manager-explorer.service";
-import type { ProcessOutboxMessageView } from "~/server/app-layer/ops/repositories/process-ops.repository";
+import type { ProcessInstanceDetail } from "@langwatch/ops-contract";
+import type { ProcessOutboxMessageView } from "@langwatch/ops-contract";
 import type { GrafanaDeepLinkConfig } from "~/utils/grafanaLinks";
 import { describeNextWake } from "@langwatch/ops-web";
 import { OutboxMessageCard } from "./OutboxMessageCard";
@@ -20,13 +20,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function InstanceStatusRow({
-  detail,
-  now,
-}: {
-  detail: ProcessInstanceDetail;
-  now: number;
-}) {
+function InstanceStatusRow({ detail, now }: { detail: ProcessInstanceDetail; now: number }) {
   const wakeOverdue = detail.nextWakeAt !== null && detail.nextWakeAt < now;
   return (
     <HStack gap={4} flexWrap="wrap">
@@ -193,8 +187,8 @@ export function ProcessInstanceContent({
   if (!detail) {
     return (
       <Text textStyle="sm" color="fg.muted" data-testid="process-instance-missing">
-        This process instance no longer exists — retention reaped it, or it was never
-        started for this key.
+        This process instance no longer exists — retention reaped it, or it was never started for
+        this key.
       </Text>
     );
   }
@@ -207,17 +201,8 @@ export function ProcessInstanceContent({
         <Text textStyle="xs" color="fg.muted">
           State
         </Text>
-        <Box
-          bg="bg.subtle"
-          borderRadius="sm"
-          padding={2}
-          maxHeight="280px"
-          overflow="auto"
-        >
-          <PinnedAwareJsonView
-            content={JSON.stringify(detail.state)}
-            pinnedKeys={NO_PINNED_KEYS}
-          />
+        <Box bg="bg.subtle" borderRadius="sm" padding={2} maxHeight="280px" overflow="auto">
+          <PinnedAwareJsonView content={JSON.stringify(detail.state)} pinnedKeys={NO_PINNED_KEYS} />
         </Box>
       </VStack>
 

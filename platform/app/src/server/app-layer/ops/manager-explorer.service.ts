@@ -1,17 +1,24 @@
 import type { ProcessRef, ProcessStore } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ProcessFleetSummary } from "@langwatch/ops-contract";
+import type {
+  AggregateProcessManager,
+  AggregateProcessManagerInstance,
+  AggregateProcessManagerOutboxMessage,
+  ProcessFleetSummary,
+  ProcessInstanceDetail,
+} from "@langwatch/ops-contract";
 import { getProcessManagerMetadata } from "~/server/event-sourcing/registration/pipelineRegistry";
-import type { ProcessAuditEntryView, ProcessAuditSink } from "./process-audit.repository";
+import type { ProcessAuditEntryView } from "@langwatch/ops-contract";
+import type { ProcessAuditSink } from "./process-audit.repository";
 import type {
   DeadLetterCount,
   DeadOutboxMessageView,
   OutboxAttemptView,
   ProcessInstanceRow,
-  ProcessOpsRepository,
   ProcessOutboxMessageView,
   ProcessWakeRow,
-} from "./repositories/process-ops.repository";
+} from "@langwatch/ops-contract";
+import type { ProcessOpsRepository } from "./repositories/process-ops.repository";
 
 /**
  * One global knob each, per the visibility plan: a wake this far past due
@@ -22,56 +29,6 @@ import type {
  */
 export const OVERDUE_WAKE_MS = 60 * 1000;
 export const OVERDUE_PENDING_MS = 5 * 60 * 1000;
-
-export interface ProcessInstanceDetail {
-  ref: ProcessRef;
-  tenantId: string;
-  state: unknown;
-  revision: number;
-  nextWakeAt: number | null;
-  updatedAt: number;
-}
-
-/** The aggregate's current position in one manager's machine. */
-export interface AggregateProcessManagerInstance {
-  /**
-   * The persisted state JSON. Deliberately identities-and-flags only — the
-   * content boundary (`toPayload`) keeps customer payload out of it — so it is
-   * safe to render directly.
-   */
-  state: unknown;
-  /** Optimistic-concurrency counter; 1 after the first commit. */
-  revision: number;
-  /** Epoch ms of the next due wake-up, or null when none is scheduled. */
-  nextWakeAt: number | null;
-  updatedAt: number;
-}
-
-/** One cross-aggregate command this instance emitted, via the transactional outbox. */
-export interface AggregateProcessManagerOutboxMessage {
-  messageKey: string;
-  intentType: string;
-  status: "pending" | "dispatched" | "dead" | "discarded";
-  attempts: number;
-  nextAttemptAt: number;
-  createdAt: number;
-  /** The event that produced this intent; null for a wake-driven commit. */
-  sourceEventId: string | null;
-}
-
-/** One process-manager state machine as it stands for a single aggregate. */
-export interface AggregateProcessManager {
-  processName: string;
-  pipelineName: string;
-  /** Event types that drive the machine's transitions. */
-  eventTypes: readonly string[];
-  /** Intent types the machine can emit — the commands it sends to other aggregates. */
-  intentTypes: string[];
-  hasWake: boolean;
-  /** The aggregate's current position, or null if the machine never started for it. */
-  instance: AggregateProcessManagerInstance | null;
-  outbox: AggregateProcessManagerOutboxMessage[];
-}
 
 /**
  * Reads the process-manager state machines for a single aggregate: the machine
@@ -165,9 +122,7 @@ export class ManagerExplorerService {
     return this.fleet.findUpcomingWakes(params);
   }
 
-  async getInstanceDetail(params: {
-    ref: ProcessRef;
-  }): Promise<ProcessInstanceDetail | null> {
+  async getInstanceDetail(params: { ref: ProcessRef }): Promise<ProcessInstanceDetail | null> {
     const instance = await this.store.findByRef({ ref: params.ref });
     if (!instance) return null;
     return {
@@ -197,11 +152,7 @@ export class ManagerExplorerService {
    * the most urgent thing this substrate can tell an operator, so it gets a
    * read that does not require knowing where to look.
    */
-  async getDeadLetters(params: {
-    processName?: string;
-    page: number;
-    pageSize: number;
-  }): Promise<{
+  async getDeadLetters(params: { processName?: string; page: number; pageSize: number }): Promise<{
     messages: DeadOutboxMessageView[];
     total: number;
     byProcess: DeadLetterCount[];
@@ -223,10 +174,7 @@ export class ManagerExplorerService {
    * receives `now` as data and clamps, so the worst case is a wake that
    * decides to do nothing.
    */
-  async wakeNow(params: {
-    ref: ProcessRef;
-    actorUserId: string;
-  }): Promise<{ woke: boolean }> {
+  async wakeNow(params: { ref: ProcessRef; actorUserId: string }): Promise<{ woke: boolean }> {
     const result = await this.fleet.wakeInstanceNow({
       ref: params.ref,
       now: Date.now(),
@@ -473,10 +421,7 @@ export class ManagerExplorerService {
       now: Date.now(),
     });
     // Intentionally retain these opaque operational IDs for the audit trail.
-    logger.info(
-      { ...rest, requestedBy, requeued },
-      "ops requeue of dead outbox messages",
-    );
+    logger.info({ ...rest, requestedBy, requeued }, "ops requeue of dead outbox messages");
     return { requeued };
   }
 }

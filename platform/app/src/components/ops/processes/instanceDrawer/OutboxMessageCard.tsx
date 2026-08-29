@@ -2,7 +2,7 @@ import { Badge, Box, Button, Card, HStack, Spacer, Text } from "@chakra-ui/react
 import { useState } from "react";
 import { formatTimeAgo } from "@langwatch/ops-web";
 import { PinnedAwareJsonView } from "~/features/traces-v2/components/TraceDrawer/JsonHighlight";
-import type { ProcessOutboxMessageView } from "~/server/app-layer/ops/repositories/process-ops.repository";
+import type { ProcessOutboxMessageView } from "@langwatch/ops-contract";
 import { type GrafanaDeepLinkConfig, grafanaTraceUrl } from "~/utils/grafanaLinks";
 
 const NO_PINNED_KEYS: ReadonlySet<string> = new Set();
@@ -174,11 +174,8 @@ export function OutboxMessageCard({
 }) {
   const [showJson, setShowJson] = useState(false);
   const leaseLapsed =
-    message.status === "pending" &&
-    message.leasedUntil !== null &&
-    message.leasedUntil < now;
-  const traceHref =
-    message.traceId && grafana ? grafanaTraceUrl(message.traceId, grafana) : null;
+    message.status === "pending" && message.leasedUntil !== null && message.leasedUntil < now;
+  const traceHref = message.traceId && grafana ? grafanaTraceUrl(message.traceId, grafana) : null;
 
   return (
     <Card.Root variant="outline">
@@ -201,13 +198,7 @@ export function OutboxMessageCard({
           actionPending={actionPending}
         />
         {showJson && (
-          <Box
-            bg="bg.subtle"
-            borderRadius="sm"
-            padding={2}
-            maxHeight="240px"
-            overflow="auto"
-          >
+          <Box bg="bg.subtle" borderRadius="sm" padding={2} maxHeight="240px" overflow="auto">
             <PinnedAwareJsonView
               content={JSON.stringify(message.payload)}
               pinnedKeys={NO_PINNED_KEYS}

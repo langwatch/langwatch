@@ -15,7 +15,7 @@ import { middleEllipsis } from "@langwatch/ops-web";
 import { formatTimeAgo } from "@langwatch/ops-web";
 import { Drawer } from "~/components/ui/drawer";
 import { useDrawer } from "~/hooks/useDrawer";
-import type { ProcessInstanceRow } from "~/server/app-layer/ops/repositories/process-ops.repository";
+import type { ProcessInstanceRow } from "@langwatch/ops-contract";
 import { api } from "~/utils/api";
 import { describeNextWake } from "@langwatch/ops-web";
 
@@ -162,16 +162,12 @@ function InstancesBody({
     return (
       <Box padding={4}>
         <Text textStyle="xs" color="fg.muted">
-          {searching
-            ? "No instances match the search."
-            : "No instances yet for this process."}
+          {searching ? "No instances match the search." : "No instances yet for this process."}
         </Text>
       </Box>
     );
   }
-  return (
-    <InstancesTable rows={rows} now={now} showProcess={showProcess} onOpen={onOpen} />
-  );
+  return <InstancesTable rows={rows} now={now} showProcess={showProcess} onOpen={onOpen} />;
 }
 
 interface Props {

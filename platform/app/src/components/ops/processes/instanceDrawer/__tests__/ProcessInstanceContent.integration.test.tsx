@@ -7,8 +7,8 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { ProcessInstanceDetail } from "~/server/app-layer/ops/manager-explorer.service";
-import type { ProcessOutboxMessageView } from "~/server/app-layer/ops/repositories/process-ops.repository";
+import type { ProcessInstanceDetail } from "@langwatch/ops-contract";
+import type { ProcessOutboxMessageView } from "@langwatch/ops-contract";
 import { OutboxMessageCard } from "../OutboxMessageCard";
 import { ProcessInstanceContent } from "../ProcessInstanceContent";
 
@@ -27,9 +27,7 @@ const DETAIL: ProcessInstanceDetail = {
   updatedAt: NOW - 30_000,
 };
 
-function makeMessage(
-  overrides: Partial<ProcessOutboxMessageView> = {},
-): ProcessOutboxMessageView {
+function makeMessage(overrides: Partial<ProcessOutboxMessageView> = {}): ProcessOutboxMessageView {
   return {
     id: "msg-1",
     messageKey: "dispatch:turn_9:1",

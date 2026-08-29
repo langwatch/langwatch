@@ -1,4 +1,14 @@
 import type { ProcessRef } from "@langwatch/eventing";
+// One definition of what the operator sees, shared with the port the
+// transport calls — see `@langwatch/ops-contract`'s ops-process module.
+import type {
+  DeadLetterCount,
+  DeadOutboxMessageView,
+  OutboxAttemptView,
+  ProcessInstanceRow,
+  ProcessOutboxMessageView,
+  ProcessWakeRow,
+} from "@langwatch/ops-contract";
 
 /**
  * Fleet-level trouble counts for one process name — the row the operator
@@ -16,88 +26,6 @@ export interface ProcessNameCounts {
   /** Pending messages whose lease expired — dispatcher died OR still delivering. */
   lapsedLeases: number;
   deadMessages: number;
-}
-
-export interface ProcessInstanceRow {
-  processName: string;
-  projectId: string;
-  processKey: string;
-  tenantId: string;
-  revision: number;
-  nextWakeAt: number | null;
-  updatedAt: number;
-  pendingMessages: number;
-  deadMessages: number;
-}
-
-/** One upcoming instance wake, for the dashboard's timed-work table. */
-export interface ProcessWakeRow {
-  processName: string;
-  projectId: string;
-  processKey: string;
-  nextWakeAt: number;
-}
-
-export interface ProcessOutboxMessageView {
-  id: string;
-  messageKey: string;
-  intentType: string;
-  status: "pending" | "dispatched" | "dead" | "discarded";
-  attempts: number;
-  nextAttemptAt: number;
-  leasedUntil: number | null;
-  createdAt: number;
-  sourceEventId: string | null;
-  /** Parsed from the message's stored W3C carrier; null when absent/unparsable. */
-  traceId: string | null;
-  payload: unknown;
-}
-
-/**
- * A retired message, with the identity needed to act on it.
- *
- * `findOutboxMessages` answers for one instance, which means an operator can
- * only reach a dead message by already knowing which process key it belongs
- * to — and the fleet table only ever showed them a count. This view is the
- * fleet-wide read: it carries the full ref so a row can be redriven straight
- * from the list, and the trace id so the operator can reach the failure
- * itself. WHY it died is in the attempt history (`findAttempts`); `traceId`
- * remains the deeper join to the producing trace.
- */
-export interface DeadOutboxMessageView extends ProcessOutboxMessageView {
-  processName: string;
-  projectId: string;
-  processKey: string;
-  /** Last write to the row, which for a dead row is when it was retired. */
-  updatedAt: number;
-}
-
-/** One process's share of the dead total, for the fleet-level summary. */
-export interface DeadLetterCount {
-  processName: string;
-  count: number;
-  /** Oldest retirement in this group, so the operator can age the incident. */
-  oldestUpdatedAt: number;
-}
-
-/**
- * One FAILED delivery attempt of an outbox message, oldest first — why a
- * dead letter died, on the page (specs/ops/dead-letter-recovery.feature).
- */
-export interface OutboxAttemptView {
-  /**
-   * Row identity, not the attempt number. A redrive resets `attempts` to 0,
-   * so a message that failed, was redriven, and failed again holds two
-   * entries numbered 1 — the number is not unique over a message's life.
-   */
-  id: string;
-  attempt: number;
-  occurredAt: number;
-  /** "dead" marks the failure that killed the message. */
-  outcome: "retry_scheduled" | "dead";
-  errorType: string;
-  errorMessage: string;
-  retryAfterMs: number | null;
 }
 
 export interface ProcessOpsRepository {
@@ -193,10 +121,7 @@ export interface ProcessOpsRepository {
   discardAllDeadMessages(params: { processName?: string; now: number }): Promise<number>;
 
   /** The message's failed attempts, oldest first. */
-  findAttempts(params: {
-    outboxId: string;
-    projectId: string;
-  }): Promise<OutboxAttemptView[]>;
+  findAttempts(params: { outboxId: string; projectId: string }): Promise<OutboxAttemptView[]>;
 
   /**
    * Clear a LAPSED lease so the dispatcher can pick the message up now

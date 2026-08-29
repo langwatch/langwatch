@@ -5,11 +5,10 @@ import type {
   DeadOutboxMessageView,
   OutboxAttemptView,
   ProcessInstanceRow,
-  ProcessNameCounts,
-  ProcessOpsRepository,
   ProcessOutboxMessageView,
   ProcessWakeRow,
-} from "./process-ops.repository";
+} from "@langwatch/ops-contract";
+import type { ProcessNameCounts, ProcessOpsRepository } from "./process-ops.repository";
 
 /** `00-<32 hex trace id>-<16 hex span id>-<flags>` per W3C traceparent. */
 const TRACEPARENT_RE = /^[0-9a-f]{2}-([0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}$/;
@@ -506,10 +505,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     return { messageKey: message.messageKey };
   }
 
-  async redriveAllDeadMessages(params: {
-    processName?: string;
-    now: number;
-  }): Promise<number> {
+  async redriveAllDeadMessages(params: { processName?: string; now: number }): Promise<number> {
     const now = new Date(params.now);
     const nameFilter = params.processName
       ? Prisma.sql`AND "processName" = ${params.processName}`
@@ -545,10 +541,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     `);
   }
 
-  async discardAllDeadMessages(params: {
-    processName?: string;
-    now: number;
-  }): Promise<number> {
+  async discardAllDeadMessages(params: { processName?: string; now: number }): Promise<number> {
     const now = new Date(params.now);
     const nameFilter = params.processName
       ? Prisma.sql`AND "processName" = ${params.processName}`
