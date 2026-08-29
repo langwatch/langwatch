@@ -718,16 +718,15 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      in services/nlpgo); a code-block ceiling at or above it races the stream
      shutting down.
 
-     With `langwatch_nlp.enabled` false the engine is external, so the chart can
-     only tell the CLIENTS about a ceiling it has no way to impose — hence the
-     second check: in that mode the value must stay at the engine's own default. */}}
+     With `langwatch_nlp.enabled` false the engine is external and the chart
+     cannot impose the ceiling, only report it to the clients. The value is
+     passed through as given: the operator sets the real ceiling on the external
+     service and matches it here, and the chart has no way to check that pairing,
+     so it does not pretend to. */}}
 {{- define "langwatch.codeBlockTimeoutSeconds" -}}
 {{- $seconds := int (.Values.langwatch_nlp.codeBlockTimeoutSeconds | default 600) -}}
 {{- if ge $seconds 720 -}}
 {{- fail "langwatch_nlp.codeBlockTimeoutSeconds must stay below the engine's stream idle timeout (720s) — a code-block ceiling at or above it races the stream shutting down" -}}
-{{- end -}}
-{{- if and (not .Values.langwatch_nlp.enabled) (ne $seconds 600) -}}
-{{- fail "langwatch_nlp.codeBlockTimeoutSeconds is changed while langwatch_nlp.enabled is false. The chart cannot apply it to an NLP service it does not deploy, but it still hands it to the app and the workers, whose fetch deadline is derived from it — so they would abort turns the external engine is still working on. Set the ceiling on the external service and leave this at 600, the engine's own default." -}}
 {{- end -}}
 {{- $seconds -}}
 {{- end -}}

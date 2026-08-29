@@ -92,8 +92,21 @@ test_ceiling_is_checked_with_the_service_disabled() {
   # cleanly and shipped the number to the app and the workers anyway.
   expect_render_fails "external, above idle timeout" \
     "--set langwatch_nlp.enabled=false --set langwatch_nlp.codeBlockTimeoutSeconds=900"
-  expect_render_fails "external, shortened" \
-    "--set langwatch_nlp.enabled=false --set langwatch_nlp.codeBlockTimeoutSeconds=60"
+
+  # A shortened ceiling is a legal external-engine config: the operator sets the
+  # real ceiling on their own service and matches it here. The chart cannot see
+  # that value, so it passes this through instead of guessing.
+  local values
+  if ! render "--set langwatch_nlp.enabled=false --set langwatch_nlp.codeBlockTimeoutSeconds=60"; then
+    fail "external, shortened" "render failed, expected a shortened external ceiling to be allowed: $render_out"
+    return
+  fi
+  values=$(emitted_ceilings)
+  if [ "$values" != "60" ]; then
+    fail "external, shortened" "expected every caller to get 60, got: $(echo "$values" | tr '\n' ' ')"
+    return
+  fi
+  echo "ok   [external, shortened] a matched external ceiling is passed through"
 }
 
 # @scenario "An external NLP service still leaves the clients installable"
