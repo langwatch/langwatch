@@ -180,8 +180,6 @@ import { decryptSlackBotToken } from "~/runtime/app/features/automation-adapters
 import { RecentItemsService } from "~/server/home/recent-items.service";
 import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
 import { wrapAiCall } from "~/server/modelProviders/aiCallFailedError";
-import { resolveCallerProjectScope } from "~/server/organizations/resolveCallerProjectScope";
-import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { rateLimit } from "~/server/rateLimit";
 import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
 import { getClientIp } from "~/utils/getClientIp";
@@ -341,9 +339,9 @@ const codingAgentViewerVisibility = async (
 const codingAgentsRouter = createCodingAgentTrpcRouter({
   ...appTrpcMount,
   ports: {
-    tryResolveOrganizationForProject: resolveOrganizationId,
-    resolveCallerProjectScope: ({ userId, organizationId }) =>
-      resolveCallerProjectScope({ userId, organizationId }),
+    // The organization lookup and the caller's project scope moved onto
+    // `CodingAgentApp`, which the transport reaches at `ctx.app.codingAgentApp`.
+    // Only the viewer's visibility is still the process's to supply.
     readViewerVisibility: codingAgentViewerVisibility,
   },
 });

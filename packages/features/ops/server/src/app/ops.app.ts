@@ -41,6 +41,8 @@ import type {
   GroupInfo,
   OpsService,
   OpsSnapshotService,
+  ReplayHistoryEntry,
+  ReplayStatus,
 } from "@langwatch/ops-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 
@@ -129,9 +131,17 @@ export type OpsProcessExplorer = {
   }): Promise<unknown>;
 };
 
+/**
+ * The projection replay runner, as the operator surface calls it.
+ *
+ * Typed with the contract's own vocabulary rather than `unknown`. It was the
+ * latter, and `unknown` is what the browser receives as `{}` — every field the
+ * replay drawer, the history table and the status banner read came back
+ * unchecked.
+ */
 export type OpsReplayRunner = {
-  getHistory(): Promise<unknown>;
-  findHistoryEntry(input: { runId: string }): Promise<unknown>;
+  getHistory(): Promise<ReplayHistoryEntry[]>;
+  findHistoryEntry(input: { runId: string }): Promise<ReplayHistoryEntry | null>;
   startReplay(input: {
     projectionNames: string[];
     since: string;
@@ -140,9 +150,9 @@ export type OpsReplayRunner = {
     fullRebuild?: boolean;
     description: string;
     userName: string;
-  }): Promise<unknown>;
-  getStatus(): Promise<unknown>;
-  cancelReplay(): Promise<unknown>;
+  }): Promise<{ runId: string }>;
+  getStatus(): Promise<ReplayStatus>;
+  cancelReplay(): Promise<{ cancelled: boolean }>;
 };
 
 /**
@@ -232,11 +242,10 @@ export class OpsConfirmationRequiredError extends HandledError {
   declare readonly code: "ops_confirmation_required";
 
   constructor() {
-    super(
-      "ops_confirmation_required",
-      "This action needs to be confirmed before it can run",
-      { httpStatus: 400, fault: "customer" },
-    );
+    super("ops_confirmation_required", "This action needs to be confirmed before it can run", {
+      httpStatus: 400,
+      fault: "customer",
+    });
     this.name = "OpsConfirmationRequiredError";
   }
 }

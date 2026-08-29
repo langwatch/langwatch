@@ -1,55 +1,8 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
-export interface ReplayStatus {
-  state: "idle" | "running" | "completed" | "failed" | "cancelled";
-  runId: string | null;
-  startedAt: string | null;
-  completedAt: string | null;
-  projectionNames: string[];
-  since: string;
-  tenantIds: string[];
-  currentProjection: string | null;
-  currentPhase: string | null;
-  aggregatesProcessed: number;
-  aggregatesTotal: number;
-  eventsProcessed: number;
-  error: string | null;
-  description: string | null;
-  userName: string | null;
-}
-
-export interface ReplayHistoryEntry {
-  runId: string;
-  projectionNames: string[];
-  since: string;
-  tenantIds: string[];
-  description: string;
-  startedAt: string;
-  completedAt: string | null;
-  state: "completed" | "failed" | "cancelled";
-  userName: string;
-  aggregatesProcessed: number;
-  eventsProcessed: number;
-  error?: string | null;
-}
-
-export const IDLE_STATUS: ReplayStatus = {
-  state: "idle",
-  runId: null,
-  startedAt: null,
-  completedAt: null,
-  projectionNames: [],
-  since: "",
-  tenantIds: [],
-  currentProjection: null,
-  currentPhase: null,
-  aggregatesProcessed: 0,
-  aggregatesTotal: 0,
-  eventsProcessed: 0,
-  error: null,
-  description: null,
-  userName: null,
-};
+// The vocabulary is the Ops contract's: one definition of what a replay is,
+// shared by the repository here and by the port the operator transport calls.
+import { IDLE_STATUS, type ReplayHistoryEntry, type ReplayStatus } from "@langwatch/ops-contract";
 
 export interface ReplayRepository {
   getStatus(): Promise<ReplayStatus>;

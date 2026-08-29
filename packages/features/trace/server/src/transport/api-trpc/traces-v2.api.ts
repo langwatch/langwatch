@@ -105,7 +105,19 @@ const logger = createLogger("langwatch:api:traces-v2");
  */
 export type TracesV2TrpcContext = Readonly<{
   app: Readonly<{ traces: TraceApp }>;
-  session: Readonly<{ user: Readonly<{ id: string }> }>;
+  /**
+   * Who the write is attributed to.
+   *
+   * `actor()`, not the session: the process's session is nullable, so a
+   * context demanding a non-null one could not be satisfied by the root the
+   * app hands in — and because this context reaches `AppRouter`, that made
+   * every `api.*` result in the browser infer as `{}`. It is also what
+   * `TraceApp` asks for. Its own note: "the caller arrives as an argument
+   * rather than being read off a session, which is what lets one operation
+   * serve a browser session, an API key and a background job without knowing
+   * which it is serving."
+   */
+  actor(): Readonly<{ id: string }>;
 }>;
 
 type TracesV2TrpcProcedures<
@@ -977,7 +989,7 @@ export class TracesV2TrpcApi {
             traceId: input.traceId,
             newName: parsed.data.newName,
           },
-          ctx.session.user,
+          ctx.actor(),
         );
 
         return { traceId: input.traceId, newName: parsed.data.newName };

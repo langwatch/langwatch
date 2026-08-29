@@ -143,8 +143,7 @@ export function alignDevAuthUrlsToPort(processEnv) {
 export function createEnvConfig(source) {
   alignDevAuthUrlsToPort(source);
   /** @param {import('zod').ZodTypeAny} schema */
-  const optionalIfBuildTime = (schema) =>
-    source.BUILD_TIME ? schema.optional() : schema;
+  const optionalIfBuildTime = (schema) => (source.BUILD_TIME ? schema.optional() : schema);
 
   const environment = createEnv({
     // clientPrefix required by env-core to distinguish client/server vars
@@ -284,11 +283,7 @@ export function createEnvConfig(source) {
       LANGEVALS_STAGING_THRESHOLD_BYTES: z.coerce.number().int().positive().optional(),
       LANGEVALS_STAGING_TTL_SECONDS: z.coerce.number().int().positive().default(600),
       EVAL_MAX_PAYLOAD_BYTES: z.coerce.number().int().positive().default(16_000_000),
-      TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: z.coerce
-        .number()
-        .int()
-        .positive()
-        .default(180_000_000),
+      TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: z.coerce.number().int().positive().default(180_000_000),
       // ADR-027: instance-level license, bootstraps + recovers SSO on
       // self-hosted deployments without requiring an in-DB org license.
       LANGWATCH_LICENSE_KEY: z.string().optional(),
@@ -299,10 +294,7 @@ export function createEnvConfig(source) {
       // live login and logs how it compares against the legacy outcome
       // WITHOUT changing anything, `enforce` is the flip, and `off` leaves the
       // legacy path byte-for-byte untouched. Rollback is this value.
-      IDENTITY_ROUTER_V2: z
-        .enum(["off", "shadow", "enforce"])
-        .optional()
-        .default("off"),
+      IDENTITY_ROUTER_V2: z.enum(["off", "shadow", "enforce"]).optional().default("off"),
       // D06: whether two-step verification exists at all. Reached SIGNED
       // OUT — a challenge stands between a password and a session — so it is
       // an env flag rather than a feature flag, which is read per project
@@ -327,10 +319,7 @@ export function createEnvConfig(source) {
       // `SsoConnection` projection lookup alongside so disagreements are
       // logged with both answers. `enforce` is the flip, and only at `enforce`
       // do the string writes stop. Rollback is this value.
-      SSOCONN_ROUTING: z
-        .enum(["off", "shadow", "enforce"])
-        .optional()
-        .default("off"),
+      SSOCONN_ROUTING: z.enum(["off", "shadow", "enforce"]).optional().default("off"),
       // D08: whether a SCIM push writes membership through the grants
       // service. Two-valued, because there is no useful middle: `off` keeps
       // the previous write path — the hand-written OrganizationUser row with
@@ -363,11 +352,7 @@ export function createEnvConfig(source) {
       // `PlanInfo.maxTriggerPersistDispatchesPerDay`.
       TRIGGER_PERSIST_DAILY_CAP_FREE: z.coerce.number().int().positive().default(100),
       TRIGGER_PERSIST_DAILY_CAP_PAID: z.coerce.number().int().positive().default(1000),
-      TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE: z.coerce
-        .number()
-        .int()
-        .positive()
-        .default(10000),
+      TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE: z.coerce.number().int().positive().default(10000),
       DEMO_PROJECT_ID: z.string().optional(),
       DEMO_PROJECT_USER_ID: z.string().optional(),
       DEMO_PROJECT_SLUG: z.string().optional(),
@@ -387,7 +372,12 @@ export function createEnvConfig(source) {
       SMTP_SECURE: z.string().optional(),
       RESEND_API_KEY: z.string().optional(),
       S3_KEY_SALT: z.string().optional(),
-      IS_SAAS: z.boolean().optional(),
+      // Not optional: the runtime mapping below derives it from two string
+      // comparisons, which always yield a boolean. Declaring it optional made
+      // every server-side reader carry a `| undefined` the value can never
+      // have, and one of them — the Enterprise tRPC composition, which takes a
+      // required `saasBilling: boolean` — could not be satisfied at all.
+      IS_SAAS: z.boolean(),
       // Instance-wide bearer credential for the self-hosted organization
       // provisioning API (/api/organizations). Absent (the default) the
       // family answers 404; it is also absent-by-construction on SaaS, where
@@ -620,22 +610,18 @@ export function createEnvConfig(source) {
       API_TOKEN_JWT_SECRET: source.API_TOKEN_JWT_SECRET,
       REDIS_URL: source.REDIS_URL,
       REDIS_CLUSTER_ENDPOINTS: source.REDIS_CLUSTER_ENDPOINTS,
-      SKIP_REDIS:
-        source.SKIP_REDIS === "1" || source.SKIP_REDIS?.toLowerCase() === "true",
+      SKIP_REDIS: source.SKIP_REDIS === "1" || source.SKIP_REDIS?.toLowerCase() === "true",
       REDIS_DB_INDEX: source.REDIS_DB_INDEX,
       GLOBAL_QUEUE_CONCURRENCY: source.GLOBAL_QUEUE_CONCURRENCY,
       GROUP_QUEUE_ZSTD_WRITES_ENABLED: source.GROUP_QUEUE_ZSTD_WRITES_ENABLED,
       GROUP_QUEUE_MSGPACK_WRITES_ENABLED: source.GROUP_QUEUE_MSGPACK_WRITES_ENABLED,
       LANGWATCH_FOLD_CACHE_TTL_SECONDS: source.LANGWATCH_FOLD_CACHE_TTL_SECONDS,
       GOOGLE_APPLICATION_CREDENTIALS: source.GOOGLE_APPLICATION_CREDENTIALS,
-      LANGWATCH_DISABLE_GOOGLE_DLP:
-        source.LANGWATCH_DISABLE_GOOGLE_DLP?.toLowerCase() === "true",
+      LANGWATCH_DISABLE_GOOGLE_DLP: source.LANGWATCH_DISABLE_GOOGLE_DLP?.toLowerCase() === "true",
       LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER:
         source.LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER?.toLowerCase() === "true",
-      LANGWATCH_EVAL_INPUTS_INLINE_MAX_BYTES:
-        source.LANGWATCH_EVAL_INPUTS_INLINE_MAX_BYTES,
-      LANGWATCH_EVAL_INPUTS_HARD_CEILING_BYTES:
-        source.LANGWATCH_EVAL_INPUTS_HARD_CEILING_BYTES,
+      LANGWATCH_EVAL_INPUTS_INLINE_MAX_BYTES: source.LANGWATCH_EVAL_INPUTS_INLINE_MAX_BYTES,
+      LANGWATCH_EVAL_INPUTS_HARD_CEILING_BYTES: source.LANGWATCH_EVAL_INPUTS_HARD_CEILING_BYTES,
       AZURE_OPENAI_ENDPOINT: source.AZURE_OPENAI_ENDPOINT,
       AZURE_OPENAI_KEY: source.AZURE_OPENAI_KEY,
       OPENAI_API_KEY: source.OPENAI_API_KEY,
@@ -679,10 +665,8 @@ export function createEnvConfig(source) {
       IS_SAAS: source.IS_SAAS === "1" || source.IS_SAAS?.toLowerCase() === "true",
       // Blank means unset, so a templated .env line with no value cannot take
       // the whole deployment down over an optional credential.
-      LANGWATCH_INSTANCE_ADMIN_API_KEY:
-        source.LANGWATCH_INSTANCE_ADMIN_API_KEY || undefined,
-      RUM_ENABLED:
-        source.RUM_ENABLED === "1" || source.RUM_ENABLED?.toLowerCase() === "true",
+      LANGWATCH_INSTANCE_ADMIN_API_KEY: source.LANGWATCH_INSTANCE_ADMIN_API_KEY || undefined,
+      RUM_ENABLED: source.RUM_ENABLED === "1" || source.RUM_ENABLED?.toLowerCase() === "true",
       RUM_SAMPLE_RATIO: source.RUM_SAMPLE_RATIO,
       BLOCK_LOCAL_HTTP_CALLS:
         source.BLOCK_LOCAL_HTTP_CALLS === "1" ||
@@ -692,8 +676,7 @@ export function createEnvConfig(source) {
       DISABLE_TOKENIZATION:
         source.DISABLE_TOKENIZATION === "1" ||
         source.DISABLE_TOKENIZATION?.toLowerCase() === "true",
-      LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD:
-        source.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD,
+      LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD: source.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD,
       LANGWATCH_DISPATCH_TENANT_CAP: source.LANGWATCH_DISPATCH_TENANT_CAP,
       LANGWATCH_DISPATCH_GLOBAL_BUDGET: source.LANGWATCH_DISPATCH_GLOBAL_BUDGET,
       USE_S3_STORAGE:
@@ -729,8 +712,7 @@ export function createEnvConfig(source) {
       POSTHOG_KEY: source.POSTHOG_KEY,
       POSTHOG_HOST: source.POSTHOG_HOST,
       DISABLE_USAGE_STATS:
-        source.DISABLE_USAGE_STATS === "1" ||
-        source.DISABLE_USAGE_STATS?.toLowerCase() === "true",
+        source.DISABLE_USAGE_STATS === "1" || source.DISABLE_USAGE_STATS?.toLowerCase() === "true",
       LANGWATCH_NLP_LAMBDA_CONFIG: source.LANGWATCH_NLP_LAMBDA_CONFIG,
       GITHUB_CLIENT_ID: source.GITHUB_CLIENT_ID,
       GITHUB_CLIENT_SECRET: source.GITHUB_CLIENT_SECRET,
@@ -785,11 +767,7 @@ export function createEnvConfig(source) {
   // if we touch any of these keys from the browser bundle. Read from
   // source directly and skip the guard entirely when we're being
   // imported into a client bundle (typeof window !== "undefined").
-  if (
-    typeof window === "undefined" &&
-    !source.SKIP_ENV_VALIDATION &&
-    !source.BUILD_TIME
-  ) {
+  if (typeof window === "undefined" && !source.SKIP_ENV_VALIDATION && !source.BUILD_TIME) {
     if (
       (source.IS_SAAS === "1" || source.IS_SAAS?.toLowerCase() === "true") &&
       !(

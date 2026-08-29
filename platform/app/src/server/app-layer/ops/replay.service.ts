@@ -5,11 +5,8 @@ import { createLogger } from "@langwatch/observability";
 import { randomUUID } from "crypto";
 import { env } from "~/env.mjs";
 import { createReplayRuntime } from "~/runtime/app/replay-runtime.adapter";
-import type {
-  ReplayHistoryEntry,
-  ReplayRepository,
-  ReplayStatus,
-} from "./repositories/replay.repository";
+import type { ReplayHistoryEntry, ReplayStatus } from "@langwatch/ops-contract";
+import type { ReplayRepository } from "./repositories/replay.repository";
 
 const logger = createLogger("langwatch:ops:replay-service");
 
@@ -379,10 +376,7 @@ export class ReplayService {
     }
   }
 
-  private async updateProgress(params: {
-    runId: string;
-    progress: ReplayProgress;
-  }): Promise<void> {
+  private async updateProgress(params: { runId: string; progress: ReplayProgress }): Promise<void> {
     const lockHolder = await this.repo.getLockHolder();
     if (lockHolder !== params.runId) return;
 

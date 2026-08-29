@@ -16,8 +16,11 @@ export function fireInviteAcceptedNurturingCalls({
   organizationName,
 }: {
   userId: string;
-  email: string | null | undefined;
-  name: string | null | undefined;
+  email: string;
+  // Optional, not `| undefined`: the caller's port declares it optional and a
+  // required key cannot be satisfied by one that may be absent. The body
+  // already treats an absent name the same as an empty one.
+  name?: string | null;
   organizationId: string;
   organizationName: string;
 }): void {

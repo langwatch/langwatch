@@ -31,7 +31,7 @@
  *
  * Spec: specs/identity/sso-onboarding-tiers.feature.
  */
-import { AdminSurfaceHiddenError, type OpsService } from "@langwatch/ops-contract";
+import { AdminSurfaceHiddenError, type AdminIdentity } from "@langwatch/ops-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
@@ -114,7 +114,18 @@ type StaffIdentity = Readonly<{ id: string; email?: string | null }>;
  * debugging a customer account is still the operator here.
  */
 export type SsoConnectionTrpcContext = Readonly<{
-  app: Readonly<{ ops: OpsService }>;
+  /**
+   * The staff check, and only that.
+   *
+   * It named the whole `OpsService` and calls one method on it. The process's
+   * `app.ops` is an `OpsApp`, which answers `isAdmin` and not the other
+   * forty-eight, so the context could not be satisfied — and because this
+   * context is intersected into `EnterpriseTrpcContext`, the failure was not
+   * local: it made the app's tRPC root unassignable to the enterprise
+   * composition, which collapsed `AppRouter` and with it the inferred result
+   * type of every `api.*` call in the browser.
+   */
+  app: Readonly<{ ops: Readonly<{ isAdmin(identity: AdminIdentity): boolean }> }>;
   actor(): Readonly<{ id: string }>;
   session: Readonly<{
     user: StaffIdentity & Readonly<{ impersonator?: StaffIdentity | null }>;

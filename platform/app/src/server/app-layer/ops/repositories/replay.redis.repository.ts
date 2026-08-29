@@ -1,11 +1,7 @@
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import {
-  IDLE_STATUS,
-  type ReplayHistoryEntry,
-  type ReplayRepository,
-  type ReplayStatus,
-} from "./replay.repository";
+import { IDLE_STATUS, type ReplayHistoryEntry, type ReplayStatus } from "@langwatch/ops-contract";
+import { type ReplayRepository } from "./replay.repository";
 
 const REPLAY_LOCK_KEY = "ops:replay:lock";
 const REPLAY_STATUS_KEY = "ops:replay:status";

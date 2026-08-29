@@ -2,12 +2,8 @@ import type { ReplayProgress, RetentionPolicyResolver } from "@langwatch/eventin
 import { describe, expect, it, vi } from "vitest";
 import { createReplayRuntime } from "~/runtime/app/replay-runtime.adapter";
 import { LOCK_REFRESH_INTERVAL_MS, ReplayService } from "../replay.service";
-import {
-  IDLE_STATUS,
-  type ReplayHistoryEntry,
-  type ReplayRepository,
-  type ReplayStatus,
-} from "../repositories/replay.repository";
+import { IDLE_STATUS, type ReplayHistoryEntry, type ReplayStatus } from "@langwatch/ops-contract";
+import { type ReplayRepository } from "../repositories/replay.repository";
 
 vi.mock("~/env.mjs", () => ({
   env: { REDIS_URL: "redis://unit-test" },

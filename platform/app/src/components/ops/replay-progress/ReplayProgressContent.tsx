@@ -25,10 +25,7 @@ import {
 import { Link } from "~/components/ui/link";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { useReplayStatus } from "~/hooks/useReplayStatus";
-import type {
-  ReplayHistoryEntry,
-  ReplayStatus,
-} from "~/server/app-layer/ops/repositories/replay.repository";
+import type { ReplayHistoryEntry, ReplayStatus } from "@langwatch/ops-contract";
 import { api } from "~/utils/api";
 
 const MESH_PULSE_CSS = `
@@ -40,10 +37,7 @@ const MESH_PULSE_CSS = `
 
 export function ReplayProgressContent({ runId }: { runId: string }) {
   const statusQuery = useReplayStatus();
-  const historyQuery = api.ops.getReplayRun.useQuery(
-    { runId },
-    { refetchInterval: false },
-  );
+  const historyQuery = api.ops.getReplayRun.useQuery({ runId }, { refetchInterval: false });
   const cancelMutation = api.ops.cancelReplay.useMutation({
     onSuccess: () => {
       void statusQuery.refetch();
@@ -161,19 +155,14 @@ function LiveRunView({
     () => parseActiveProjections(status.currentProjection),
     [status.currentProjection],
   );
-  const activeProjections = useMemo(
-    () => new Set(activeProjectionNames),
-    [activeProjectionNames],
-  );
+  const activeProjections = useMemo(() => new Set(activeProjectionNames), [activeProjectionNames]);
 
   return (
     <VStack align="stretch" gap={4}>
       {/* Phase timeline */}
       <PhaseTimeline
         currentPhase={status.currentPhase}
-        completedState={
-          !isRunning ? (status.state as "completed" | "failed" | "cancelled") : null
-        }
+        completedState={!isRunning ? (status.state as "completed" | "failed" | "cancelled") : null}
       />
 
       {/* Stat bar */}
@@ -187,9 +176,7 @@ function LiveRunView({
         </Stat.Root>
         <Stat.Root>
           <Stat.Label>Events</Stat.Label>
-          <Stat.ValueText textStyle="lg">
-            {status.eventsProcessed.toLocaleString()}
-          </Stat.ValueText>
+          <Stat.ValueText textStyle="lg">{status.eventsProcessed.toLocaleString()}</Stat.ValueText>
         </Stat.Root>
         <Stat.Root>
           <Stat.Label>Rate</Stat.Label>
@@ -200,9 +187,7 @@ function LiveRunView({
         <Stat.Root>
           <Stat.Label>Elapsed</Stat.Label>
           <Stat.ValueText textStyle="lg">
-            {status.startedAt
-              ? formatDuration(status.startedAt, status.completedAt)
-              : "\u2014"}
+            {status.startedAt ? formatDuration(status.startedAt, status.completedAt) : "\u2014"}
           </Stat.ValueText>
         </Stat.Root>
       </SimpleGrid>
@@ -280,9 +265,7 @@ function LiveRunView({
                   key={name}
                   size="sm"
                   variant={isRunning && activeProjections.has(name) ? "solid" : "subtle"}
-                  colorPalette={
-                    isRunning && activeProjections.has(name) ? "orange" : "gray"
-                  }
+                  colorPalette={isRunning && activeProjections.has(name) ? "orange" : "gray"}
                 >
                   {name}
                 </Badge>
@@ -369,12 +352,7 @@ function HistoricalRunView({
                 <Text textStyle="xs" fontWeight="medium" color="red.500" marginBottom={1}>
                   Error
                 </Text>
-                <Text
-                  textStyle="xs"
-                  color="red.500"
-                  whiteSpace="pre-wrap"
-                  wordBreak="break-word"
-                >
+                <Text textStyle="xs" color="red.500" whiteSpace="pre-wrap" wordBreak="break-word">
                   {entry.error}
                 </Text>
               </Box>

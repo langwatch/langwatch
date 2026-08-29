@@ -2,7 +2,7 @@ import { Badge, Card, HStack, Status, Table, Text } from "@chakra-ui/react";
 import { ArrowRight } from "lucide-react";
 import { formatDuration } from "@langwatch/ops-web";
 import { replayStateColor } from "@langwatch/ops-web";
-import type { ReplayHistoryEntry } from "~/server/app-layer/ops/repositories/replay.repository";
+import type { ReplayHistoryEntry } from "@langwatch/ops-contract";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 
@@ -74,19 +74,13 @@ export function ReplayHistoryTable() {
                       </Text>
                     </Table.Cell>
                     <Table.Cell textAlign="end">
-                      <Text textStyle="xs">
-                        {formatDuration(run.startedAt, run.completedAt)}
-                      </Text>
+                      <Text textStyle="xs">{formatDuration(run.startedAt, run.completedAt)}</Text>
                     </Table.Cell>
                     <Table.Cell textAlign="end">
-                      <Text textStyle="xs">
-                        {(run.aggregatesProcessed ?? 0).toLocaleString()}
-                      </Text>
+                      <Text textStyle="xs">{(run.aggregatesProcessed ?? 0).toLocaleString()}</Text>
                     </Table.Cell>
                     <Table.Cell textAlign="end">
-                      <Text textStyle="xs">
-                        {(run.eventsProcessed ?? 0).toLocaleString()}
-                      </Text>
+                      <Text textStyle="xs">{(run.eventsProcessed ?? 0).toLocaleString()}</Text>
                     </Table.Cell>
                     <Table.Cell>
                       <Text textStyle="xs" color="fg.muted" whiteSpace="nowrap">
