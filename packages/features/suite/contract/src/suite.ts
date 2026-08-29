@@ -79,10 +79,31 @@ export const suiteSchema = z
   .strict();
 export type Suite = z.infer<typeof suiteSchema>;
 
-export const suiteRunParametersSchema = z.record(
-  z.string().min(1),
-  z.union([z.string(), z.number(), z.boolean()]),
-);
+/**
+ * The named values a run carries.
+ *
+ * The name is bounded in a refinement rather than as `z.string().min(1)` on
+ * the key. A key schema's refusal is reported as zod's `invalid_key`, wrapping
+ * the real issue a level down, so `flatten()` — which is what the boundary
+ * sends a caller — reduces it to "Invalid key in record": it names neither the
+ * offending parameter nor what was wrong with it, and "record" is our storage
+ * rather than the caller's vocabulary.
+ */
+export const suiteRunParametersSchema = z
+  .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+  .superRefine((parameters, ctx) => {
+    for (const name of Object.keys(parameters)) {
+      if (name.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.too_small,
+          origin: "string",
+          minimum: 1,
+          inclusive: true,
+          message: "A run parameter must have a name",
+        });
+      }
+    }
+  });
 export type SuiteRunParameters = z.infer<typeof suiteRunParametersSchema>;
 
 export const suiteRunInputSchema = z

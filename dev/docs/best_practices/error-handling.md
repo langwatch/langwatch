@@ -351,6 +351,48 @@ toast explains a different problem reads as two things fighting for attention.
 Don't write a call site that assumes "returned `false`" means "touched
 nothing".
 
+## Don't constrain a `z.record` key schema — refine the keys instead
+
+`ValidationError.fromZodError` sends the caller `zodError.flatten()`. Under
+zod 4 a key schema's refusal is reported as an `invalid_key` issue with the
+real one nested inside it, and `flatten()` only reads the outer message. So
+
+```ts
+z.record(z.string().max(256), valueSchema)   // ✗
+```
+
+reaches the customer as `fieldErrors: { parameters: ["Invalid key in record"] }`
+— which names neither the offending key nor what was wrong with it, and says
+"record", which is our storage rather than their vocabulary. It also breaks
+tests that assert the issue `code`, because the `too_big` they expect is one
+level down.
+
+Put the constraint in a refinement, where the issue is yours to shape:
+
+```ts
+z.record(z.string(), valueSchema).superRefine((values, ctx) => {   // ✓
+  for (const name of Object.keys(values)) {
+    if (name.length > MAX) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.too_big,
+        origin: "string",
+        maximum: MAX,
+        inclusive: true,
+        path: [name],
+        message: `A parameter name may be at most ${MAX} characters`,
+      });
+    }
+  }
+});
+```
+
+The `path` carries the offending key, the `maximum` is readable without
+parsing prose, and the message is the one the customer sees.
+
+This applies wherever a caller can choose the keys. A record whose keys are
+machine-generated — array indices in a serialised wire format, say — is not
+member input, and constraining its key schema is fine.
+
 ## Non-tRPC transports
 
 Not every transport carries the identical shape yet. Know which one you are on:

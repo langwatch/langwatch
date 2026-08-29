@@ -74,16 +74,36 @@ const parameterValueSchema = z.union([
  * prose.
  */
 const parametersSchema = z
-  .record(z.string().max(MAX_PARAMETER_NAME_LENGTH), parameterValueSchema)
+  .record(z.string(), parameterValueSchema)
   .superRefine((parameters, ctx) => {
-    const count = Object.keys(parameters).length;
-    if (count > MAX_PARAMETERS) {
+    const names = Object.keys(parameters);
+    if (names.length > MAX_PARAMETERS) {
       ctx.addIssue({
         code: z.ZodIssueCode.too_big,
         origin: "object",
         maximum: MAX_PARAMETERS,
         inclusive: true,
       });
+    }
+    // Checked here rather than as `z.string().max(…)` on the key, which is
+    // where it used to live. A key schema's refusal is reported as zod's
+    // `invalid_key`, wrapping the real `too_big` one level down — so
+    // `flatten()`, which is what the boundary sends a caller, produced the
+    // field error "Invalid key in record": it names neither the parameter nor
+    // the ceiling, and "record" is our storage, not the member's vocabulary.
+    // An issue raised here carries the offending name in its own path and the
+    // limit in its own field, the same way the count above does.
+    for (const name of names) {
+      if (name.length > MAX_PARAMETER_NAME_LENGTH) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.too_big,
+          origin: "string",
+          maximum: MAX_PARAMETER_NAME_LENGTH,
+          inclusive: true,
+          path: [name],
+          message: `A parameter name may be at most ${MAX_PARAMETER_NAME_LENGTH} characters`,
+        });
+      }
     }
   })
   .default({});
