@@ -24,10 +24,10 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import type {
   CodeScenario,
-  CodeTarget,
   ResultAtom,
   ResultGroup,
   ResultTotals,
+  RunTarget,
   SeriesBucket,
 } from "~/server/app-layer/simulations/result-atoms/atom.types";
 import { api } from "~/utils/api";
@@ -365,7 +365,7 @@ function useResultFilterOptions({
   /** The scenarios that ran from code inside the window, which the project holds no row for. */
   codeScenarios: CodeScenario[] | undefined;
   /** The targets a run from code named inside the window, for the same reason. */
-  codeTargets: CodeTarget[] | undefined;
+  codeTargets: RunTarget[] | undefined;
   targetNames: Map<string, string>;
 }) {
   const scenarioOptions = useMemo(
@@ -427,7 +427,7 @@ function useTargetNames({
   atoms,
 }: {
   targetNames: Map<string, string>;
-  codeTargets: CodeTarget[] | undefined;
+  codeTargets: RunTarget[] | undefined;
   groups: ResultGroup[];
   atoms: ResultAtom[] | undefined;
 }): Map<string, string> {
@@ -485,7 +485,7 @@ export function useResultGroups({
   );
 
   // Read over the window alone, for the same reason.
-  const { data: codeTargets } = api.scenarios.getCodeTargets.useQuery(
+  const { data: codeTargets } = api.scenarios.getRunTargets.useQuery(
     { projectId, startDate: scope.startDate, endDate: scope.endDate },
     { enabled: !!project },
   );

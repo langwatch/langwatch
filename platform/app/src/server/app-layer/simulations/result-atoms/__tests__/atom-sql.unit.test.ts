@@ -15,7 +15,9 @@ import {
   PASSED_STATUS_VALUES,
   SCENARIO_KEY_EXPR,
   TARGET_KEY_EXPR,
+  TARGET_PARAMETERS_EXPR,
   TARGET_REF_EXPR,
+  TARGET_STAMP_KEY_EXPR,
   trendKeyExpr,
 } from "../atom-sql";
 
@@ -210,6 +212,32 @@ describe("the grain of a grouping", () => {
 });
 
 describe("the key a target folds under", () => {
+  describe("when a run carries the key the platform stamped", () => {
+    /**
+     * The stamp is what tells one agent's parameter variants apart, so it is
+     * read before the bare reference id. A run recorded before the stamp
+     * existed carries none and falls through to the reference id, which is
+     * the key it always had.
+     */
+    /** @scenario "A target with parameter overrides is its own target" */
+    /** @scenario "An old run with no target key keeps its reference id as key" */
+    it("reads the stamped key first, then the reference id", () => {
+      const stampAt = TARGET_KEY_EXPR.indexOf(TARGET_STAMP_KEY_EXPR);
+      const refAt = TARGET_KEY_EXPR.indexOf(TARGET_REF_EXPR);
+
+      expect(stampAt).toBeGreaterThanOrEqual(0);
+      expect(refAt).toBeGreaterThan(stampAt);
+      expect(TARGET_STAMP_KEY_EXPR).toContain("'targetKey'");
+      expect(TARGET_STAMP_KEY_EXPR).toContain("'langwatch'");
+    });
+
+    it("reads the target's overrides raw, under the reserved namespace", () => {
+      expect(TARGET_PARAMETERS_EXPR).toContain("JSONExtractRaw(");
+      expect(TARGET_PARAMETERS_EXPR).toContain("'targetParameters'");
+      expect(TARGET_PARAMETERS_EXPR).toContain("'langwatch'");
+    });
+  });
+
   describe("when a run carries both a platform target and reported agents", () => {
     /**
      * The platform runs its own scenarios through the same SDK, so a platform

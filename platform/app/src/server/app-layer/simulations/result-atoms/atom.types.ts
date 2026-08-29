@@ -1,3 +1,4 @@
+import type { RunParameterValues } from "~/server/scenarios/parameters";
 import type { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 
 /** The target key a run carries when it names no platform target. */
@@ -69,10 +70,19 @@ export interface ResultAtom {
   /** The name the run carries, or null when it carries none. */
   scenarioName: string | null;
   /**
-   * The bare `targetReferenceId`, `code:` and the slug of the agent name a run
-   * from code reported, or {@link UNKNOWN_TARGET_KEY}.
+   * The key the platform stamped (the reference id, or the reference id and a
+   * hash of the target's parameter overrides), the bare `targetReferenceId`
+   * of a run recorded before that stamp, `code:` and the slug of the agent
+   * name a run from code reported, or {@link UNKNOWN_TARGET_KEY}.
    */
   targetKey: string;
+  /**
+   * The parameter overrides of the run's target alone, or null when the
+   * target carried none. What tells `prod-agent · model=gpt-5-mini` from
+   * `prod-agent`; the client names the agent through its own target map and
+   * appends these.
+   */
+  targetParameters: RunParameterValues | null;
   /**
    * The agent name the code that pushed the run reported, or null when it
    * reported none. A run started on the platform is named by its reference id
@@ -119,10 +129,27 @@ export interface CodeScenario {
   name: string;
 }
 
-/** One target a run from code named, as the target filter lists it. */
-export interface CodeTarget {
+/**
+ * One target the window's runs name that the stored agent and prompt lists
+ * cannot: a target a run from code named, or a stored target run with
+ * parameter overrides. What the target filter lists beside the stored lists.
+ */
+export interface RunTarget {
   /** The key its runs fold under, and what the target filter takes. */
   key: string;
+  /**
+   * The stored agent or prompt the target points at, for a platform target
+   * run with overrides. Null for a target a run from code named, which has
+   * no row to point at. The client names the target through this id.
+   */
+  referenceId: string | null;
+  /** The parameter overrides of the target, or null when it carried none. */
+  parameters: RunParameterValues | null;
+  /**
+   * The agent name the run reported, for a target named from code. A
+   * platform target reports none and reads as its key here; the client
+   * names it from `referenceId` and `parameters`.
+   */
   name: string;
 }
 
@@ -138,6 +165,12 @@ export interface ResultGroup {
   lastRunAt: number | null;
   /** Target keys used by the listed runs, sorted. Named by the client. */
   targetKeys: string[];
+  /**
+   * The parameter overrides of the group's target, for a target grouping
+   * whose target carried any; null otherwise. What lets the client read the
+   * row as `prod-agent · model=gpt-5-mini`.
+   */
+  targetParameters: RunParameterValues | null;
   /** Oldest first, at most 14 points, most recent kept when there are more. */
   trend: TrendPoint[];
   cost: AtomCost;

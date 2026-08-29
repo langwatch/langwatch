@@ -65,6 +65,25 @@ export const LANGWATCH_METADATA =
 export const TARGET_REF_EXPR = `JSONExtractString(${LANGWATCH_METADATA}, 'targetReferenceId')`;
 
 /**
+ * The target key the platform stamped on the run: the reference id alone, or
+ * the reference id and a hash of the target's parameter overrides. Empty on
+ * a run recorded before targets carried parameters, and on every run pushed
+ * from code.
+ *
+ * @see server/suites/target-key.ts
+ */
+export const TARGET_STAMP_KEY_EXPR = `JSONExtractString(${LANGWATCH_METADATA}, 'targetKey')`;
+
+/**
+ * The parameter overrides of the run's target alone, as the raw JSON object
+ * they were stamped as, or '' when the target carried none.
+ *
+ * Raw rather than a map read: the values are strings, numbers and booleans,
+ * and re-typing them in SQL would lose which they were.
+ */
+export const TARGET_PARAMETERS_EXPR = `JSONExtractRaw(${LANGWATCH_METADATA}, 'targetParameters')`;
+
+/**
  * The names the code that pushed the run reported for its agents, joined.
  *
  * The SDK lists every participant of the run on `metadata.agents`, each with a
@@ -89,13 +108,17 @@ export const CODE_TARGET_SLUG_EXPR = nameSlug(CODE_TARGET_NAME_EXPR);
 /**
  * The key a target folds under.
  *
- * A run started on the platform names a stored agent or prompt, and that
- * reference id is the key. A run pushed from code names its own agent instead,
- * so its key is built from that name: `code:acme-support-agent`. Two runs of
- * one agent therefore read as one target. A run that names neither keeps the
- * `unknown` key, which the page reads as the default target.
+ * A run started on the platform carries the key the platform stamped, which
+ * tells one agent's parameter variants apart. A run recorded before that
+ * stamp existed names only its stored agent or prompt, and that reference id
+ * is the key, so every key that existed before is unchanged. A run pushed
+ * from code names its own agent instead, so its key is built from that name:
+ * `code:acme-support-agent`. Two runs of one agent therefore read as one
+ * target. A run that names none of these keeps the `unknown` key, which the
+ * page reads as the default target.
  */
 export const TARGET_KEY_EXPR = `multiIf(
+  ${TARGET_STAMP_KEY_EXPR} != '', ${TARGET_STAMP_KEY_EXPR},
   ${TARGET_REF_EXPR} != '', ${TARGET_REF_EXPR},
   ${CODE_TARGET_SLUG_EXPR} != '', concat('code:', ${CODE_TARGET_SLUG_EXPR}),
   '${UNKNOWN_TARGET_KEY}')`;

@@ -34,6 +34,7 @@ import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simu
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 import type { RunParameterValues } from "~/server/scenarios/parameters";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
+import { targetKeyOf } from "~/server/suites/target-key";
 import { NullSuiteRunReadRepository } from "../../../suites/repositories/suite-run.repository";
 import {
   SuiteRunService,
@@ -143,6 +144,24 @@ async function runBatch(params: {
     },
   });
 
+  const targets = params.targets ?? [DEFAULT_TARGET];
+  // The values each target resolves: the run's values merged with that
+  // target's own overrides, the target winning, the way the suite service
+  // hands them over.
+  const parametersByTargetKey = params.parametersByScenarioId
+    ? new Map(
+        targets.map((target) => [
+          targetKeyOf(target),
+          new Map(
+            [...params.parametersByScenarioId!].map(([scenarioId, values]) => [
+              scenarioId,
+              { ...values, ...target.runParameters },
+            ]),
+          ),
+        ]),
+      )
+    : undefined;
+
   await service.startRun({
     suiteId: params.suiteId,
     projectId: tenantId,
@@ -151,16 +170,14 @@ async function runBatch(params: {
       params.scenarioIds.map((id) => [id, `Scenario ${id}`]),
     ),
     scenarioVersionMap: new Map(params.scenarioIds.map((id) => [id, 1])),
-    activeTargets: params.targets ?? [DEFAULT_TARGET],
+    activeTargets: targets,
     repeatCount: params.repeatCount ?? 1,
     skippedArchived: { scenarios: [], targets: [] },
     idempotencyKey: `idem-${nanoid()}`,
     simulatorModel: params.simulatorModel ?? null,
     judgeModel: params.judgeModel ?? null,
     ...(params.note !== undefined ? { note: params.note } : {}),
-    ...(params.parametersByScenarioId
-      ? { parametersByScenarioId: params.parametersByScenarioId }
-      : {}),
+    ...(parametersByTargetKey ? { parametersByTargetKey } : {}),
   });
 
   for (const command of queued) {
@@ -489,6 +506,51 @@ describe("Feature: the previous configurations of a scope", () => {
       expect(
         entries[0]!.configuration.targets.map((target) => target.referenceId),
       ).toEqual(["dev-agent", "prod-agent"]);
+    });
+  });
+
+  describe("given a plan run against one agent plain and with overrides", () => {
+    /** @scenario "A configuration restores the parameters of each target" */
+    it("reads one configuration naming both, the variant carrying its overrides", async () => {
+      const suiteId = `suite-${nanoid()}`;
+      const scenarioId = `scenario-${nanoid()}`;
+      const targets: SuiteRunTarget[] = [
+        { type: "http", referenceId: "prod-agent" },
+        {
+          type: "http",
+          referenceId: "prod-agent",
+          runParameters: { model: "gpt-5-mini" },
+        },
+      ];
+
+      await runBatch({
+        suiteId,
+        scenarioIds: [scenarioId],
+        targets,
+        parametersByScenarioId: new Map([
+          [scenarioId, { region: "eu-central", model: "gpt-5" }],
+        ]),
+        runAt: NOW - HOUR_MS,
+      });
+
+      const entries = await readConfigurations([
+        plan({ id: suiteId, targets }),
+      ]);
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0]!.configuration.targets).toEqual([
+        { type: "http", referenceId: "prod-agent" },
+        {
+          type: "http",
+          referenceId: "prod-agent",
+          runParameters: { model: "gpt-5-mini" },
+        },
+      ]);
+      // The run-level values, without the override the variant carried.
+      expect(entries[0]!.runParameters).toEqual({
+        region: "eu-central",
+        model: "gpt-5",
+      });
     });
   });
 

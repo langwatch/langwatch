@@ -18,25 +18,32 @@ import {
   sortTargets,
 } from "~/components/agent-testing/run/run-configuration";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
+import { targetKeyOf } from "~/server/suites/target-key";
 import type { SuiteTarget } from "~/server/suites/types";
 import type { RawRunConfigurationRow } from "../run-configurations.clickhouse.repository";
 import { __testing } from "../run-configurations.service";
 
-const { toEntry, parseRunParameters, toTarget, collapse } = __testing;
+const { toEntry, toTarget, collapse } = __testing;
 
 const LAST_RUN_MS = 1_800_000_000_000;
+
+/** A plan row with no target of its own to contribute. */
+const NO_PLAN_TARGETS = { byKey: new Map(), byReference: new Map() };
 
 /** A folded row, with the fields a test does not care about filled in. */
 function row(
   overrides: Partial<RawRunConfigurationRow>,
 ): RawRunConfigurationRow {
+  const targetPairs = overrides.TargetPairs ?? ["http:agent-1"];
   return {
     SetId: getSuiteSetId("suite-1"),
-    TargetPairs: ["http:agent-1"],
+    TargetPairs: targetPairs,
+    TargetParameters: targetPairs.map(() => ""),
     RepeatCount: "1",
     SimulatorModel: "",
     JudgeModel: "",
     Parameters: "",
+    FirstTargetParameters: "",
     // The flag saying a note was taken, never the note. Off by default.
     UsesNote: "0",
     LastRunAtMs: String(LAST_RUN_MS),
@@ -48,17 +55,10 @@ describe("Feature: reading a configuration back off the runs", () => {
   describe("given a plan row holding the configuration of its last run", () => {
     /** @scenario "A configuration read off the runs keys the same as the plan row it came from" */
     it("keys the same as the client helper the dialog keys with", () => {
+      const overrides = { region: "eu-central", seats: 12 };
       const targets: SuiteTarget[] = [
-        {
-          type: "http",
-          referenceId: "prod-agent",
-          runParameters: { region: "eu-central", seats: 12 },
-        },
-        {
-          type: "http",
-          referenceId: "dev-agent",
-          runParameters: { region: "eu-central", seats: 12 },
-        },
+        { type: "http", referenceId: "prod-agent", runParameters: overrides },
+        { type: "http", referenceId: "dev-agent" },
       ];
       const plan = {
         id: "suite-1",
@@ -68,9 +68,10 @@ describe("Feature: reading a configuration back off the runs", () => {
         scenarioIds: ["scenario-b", "scenario-a"],
         targets,
       };
+      const runParameters = { model: "gpt-5" };
 
       // The dialog's own recipe, over the plan row, the way the read it
-      // replaces built it: the sorted-first target carries the overrides.
+      // replaces built it.
       const fromPlanRow = configurationKeyOf({
         configuration: {
           scope: { mode: "scenarios", scenarioIds: plan.scenarioIds },
@@ -79,23 +80,64 @@ describe("Feature: reading a configuration back off the runs", () => {
           simulatorModel: "openai/gpt-5-mini",
           judgeModel: null,
         },
-        runParameters: sortTargets(targets)[0]!.runParameters ?? {},
+        runParameters,
       });
 
       // The same configuration, as the runs recorded it. The targets arrive in
       // the order the database folded them, which is not the order the key
-      // takes them in.
+      // takes them in, and the run-level values were read off the plain
+      // target's run.
       const entry = toEntry({
         row: row({
-          TargetPairs: ["http:prod-agent", "http:dev-agent"],
+          TargetPairs: [`http:${targetKeyOf(targets[0]!)}`, "http:dev-agent"],
+          TargetParameters: [
+            JSON.stringify({ seats: 12, region: "eu-central" }),
+            "",
+          ],
           RepeatCount: "2",
           SimulatorModel: "openai/gpt-5-mini",
-          Parameters: JSON.stringify({ seats: 12, region: "eu-central" }),
+          Parameters: JSON.stringify(runParameters),
         }),
         plan,
       });
 
       expect(entry.key).toBe(fromPlanRow);
+      expect(entry.configuration.targets).toHaveLength(2);
+      expect(entry.configuration.targets).toEqual(
+        expect.arrayContaining(targets),
+      );
+      expect(entry.runParameters).toEqual(runParameters);
+    });
+  });
+
+  describe("given a row whose run-level values were read off a target with overrides", () => {
+    /** @scenario "A configuration restores the parameters of each target" */
+    it("takes the target's overrides back out of the run-level values", () => {
+      const target: SuiteTarget = {
+        type: "http",
+        referenceId: "prod-agent",
+        runParameters: { model: "gpt-5-mini" },
+      };
+
+      const entry = toEntry({
+        row: row({
+          TargetPairs: [`http:${targetKeyOf(target)}`],
+          TargetParameters: [JSON.stringify(target.runParameters)],
+          Parameters: JSON.stringify({ model: "gpt-5-mini", region: "eu" }),
+          FirstTargetParameters: JSON.stringify(target.runParameters),
+        }),
+        plan: {
+          id: "suite-1",
+          name: "Refunds",
+          kind: "run_plan",
+          scope: { mode: "all" },
+          scenarioIds: [],
+          targets: [],
+        },
+      });
+
+      expect(entry.configuration.targets).toEqual([target]);
+      expect(entry.runParameters).toEqual({ region: "eu" });
     });
   });
 
@@ -130,7 +172,8 @@ describe("Feature: reading a configuration back off the runs", () => {
     it("still reopens the target the run named", () => {
       const target = toTarget({
         pair: "workflow:removed-agent",
-        planTargetsByReference: new Map(),
+        parameters: "",
+        planTargets: NO_PLAN_TARGETS,
       });
 
       expect(target).toEqual({
@@ -139,36 +182,64 @@ describe("Feature: reading a configuration back off the runs", () => {
       });
     });
 
+    it("reopens a variant with the overrides the run recorded", () => {
+      const key = targetKeyOf({
+        referenceId: "removed-agent",
+        runParameters: { model: "gpt-5-mini" },
+      });
+
+      const target = toTarget({
+        pair: `http:${key}`,
+        parameters: JSON.stringify({ model: "gpt-5-mini" }),
+        planTargets: NO_PLAN_TARGETS,
+      });
+
+      expect(target).toEqual({
+        type: "http",
+        referenceId: "removed-agent",
+        runParameters: { model: "gpt-5-mini" },
+      });
+    });
+
+    it("takes the overrides from the run, not from the plan row", () => {
+      const stored: SuiteTarget = {
+        type: "http",
+        referenceId: "prod-agent",
+        runParameters: { model: "gpt-5-mini" },
+        runSecretParameterNames: ["api_token"],
+      };
+
+      const target = toTarget({
+        pair: "http:prod-agent",
+        parameters: "",
+        planTargets: {
+          byKey: new Map([[targetKeyOf(stored), stored]]),
+          byReference: new Map([["prod-agent", stored]]),
+        },
+      });
+
+      expect(target).toEqual({
+        type: "http",
+        referenceId: "prod-agent",
+        runSecretParameterNames: ["api_token"],
+      });
+    });
+
     it("drops a pair whose type is not one a run can name", () => {
       expect(
         toTarget({
           pair: "carrier-pigeon:x",
-          planTargetsByReference: new Map(),
+          parameters: "",
+          planTargets: NO_PLAN_TARGETS,
         }),
       ).toBeNull();
       expect(
-        toTarget({ pair: "http:", planTargetsByReference: new Map() }),
+        toTarget({
+          pair: "http:",
+          parameters: "",
+          planTargets: NO_PLAN_TARGETS,
+        }),
       ).toBeNull();
-    });
-  });
-
-  describe("given the raw parameters a run stored", () => {
-    it("reads back strings, numbers and booleans", () => {
-      expect(
-        parseRunParameters(
-          JSON.stringify({ region: "eu-central", seats: 12, trial: false }),
-        ),
-      ).toEqual({ region: "eu-central", seats: 12, trial: false });
-    });
-
-    it("reads a run that resolved none as no parameters", () => {
-      expect(parseRunParameters("")).toEqual({});
-    });
-
-    it("drops a value the current shape cannot carry", () => {
-      expect(
-        parseRunParameters(JSON.stringify({ region: "eu", extra: { a: 1 } })),
-      ).toEqual({ region: "eu" });
     });
   });
 

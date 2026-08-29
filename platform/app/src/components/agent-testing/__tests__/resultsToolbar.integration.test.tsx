@@ -105,7 +105,7 @@ vi.mock("~/utils/api", () => ({
       getCodeScenarios: {
         useQuery: () => ({ data: codeScenarioState.scenarios }),
       },
-      getCodeTargets: {
+      getRunTargets: {
         useQuery: () => ({ data: codeTargetState.targets }),
       },
       getResultsOverview: {

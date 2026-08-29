@@ -4,6 +4,10 @@ import {
   isOnPlatformSet,
   ON_PLATFORM_DISPLAY_NAME,
 } from "~/server/scenarios/internal-set-id";
+import {
+  parseRunParametersJson,
+  type RunParameterValues,
+} from "~/server/scenarios/parameters";
 import { mapStatus } from "~/server/simulations/simulation-run.mappers";
 import { extractSuiteId, getSuiteSetId } from "~/server/suites/suite-set-id";
 import type {
@@ -11,12 +15,12 @@ import type {
   AtomCostSource,
   AtomOutcome,
   CodeScenario,
-  CodeTarget,
   ResultAtom,
   ResultGroup,
   ResultsFilter,
   ResultsGroupBy,
   ResultsOverview,
+  RunTarget,
   SeriesBucket,
   TrendPoint,
 } from "./atom.types";
@@ -126,11 +130,12 @@ export class ResultAtomsService {
   }
 
   /**
-   * The targets a run from code named inside the window, for the target
-   * filter. Read over the window alone, for the same reason the scenarios
-   * that ran from code are.
+   * The targets the window names that the stored lists cannot, for the
+   * target filter: those named by a run from code, and the parameter
+   * variants of stored targets. Read over the window alone, for the same
+   * reason the scenarios that ran from code are.
    */
-  async getCodeTargets({
+  async getRunTargets({
     projectId,
     startDate,
     endDate,
@@ -138,14 +143,16 @@ export class ResultAtomsService {
     projectId: string;
     startDate: number;
     endDate?: number;
-  }): Promise<CodeTarget[]> {
-    const rows = await this.repository.findCodeTargets({
+  }): Promise<RunTarget[]> {
+    const rows = await this.repository.findRunTargets({
       projectId,
       startDate,
       endDate,
     });
     return rows.map((row) => ({
       key: row.TargetKey,
+      referenceId: row.ReferenceId === "" ? null : row.ReferenceId,
+      parameters: targetParametersOf(row.TargetParameters),
       name: row.Name !== "" ? row.Name : row.TargetKey,
     }));
   }
@@ -344,6 +351,17 @@ const runKey = (setId: string, batchRunId: string): string =>
   `${setId}\0${batchRunId}`;
 
 /**
+ * The overrides a row carries, or null when it carries none. '' is what a
+ * target with no overrides, and every run recorded before targets carried
+ * any, reads as.
+ */
+function targetParametersOf(raw: string): RunParameterValues | null {
+  if (raw === "") return null;
+  const parsed = parseRunParametersJson(raw);
+  return Object.keys(parsed).length > 0 ? parsed : null;
+}
+
+/**
  * How a set id reads when no suite owns it.
  *
  * A code-pushed set keeps the name the SDK gave it, which is what the person
@@ -382,6 +400,7 @@ function toAtom({
     scenarioKey: row.ScenarioKey,
     scenarioName: row.ScenarioName === "" ? null : row.ScenarioName,
     targetKey: row.TargetKey,
+    targetParameters: targetParametersOf(row.TargetParameters),
     targetName: row.TargetName === "" ? null : row.TargetName,
     status: mapStatus(row.Status),
     outcome: row.Outcome as AtomOutcome,
@@ -414,6 +433,11 @@ function toGroup({
     scenarioCount: Number(row.ScenarioCount),
     lastRunAt: row.LastRunAt === "0" ? null : Number(row.LastRunAt),
     targetKeys: row.TargetKeys,
+    // Only a target group names one target. Any other grouping folds runs of
+    // several targets, and the overrides of one of them would name the group
+    // after a target it does not stand for.
+    targetParameters:
+      groupBy === "target" ? targetParametersOf(row.TargetParameters) : null,
     trend,
     cost: toCost({
       totalUsd: Number(row.CostTotal),
@@ -594,6 +618,7 @@ function withQuietPlans({
       scenarioCount: 0,
       lastRunAt: null,
       targetKeys: [],
+      targetParameters: null,
       trend: [],
       cost: { totalUsd: 0, knownAtoms: 0, unknownAtoms: 0 },
     });
