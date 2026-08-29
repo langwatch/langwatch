@@ -13,12 +13,12 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { describeRoute } from "hono-openapi";
 
+import { requires } from "@langwatch/api";
 import {
   type AppRestProjectVariables,
   type AppRestSecurity,
-  requires,
   type SecuredApp,
-} from "../../app-rest";
+} from "@langwatch/api/rest";
 
 const logger = createLogger("langwatch:api:copilotkit");
 

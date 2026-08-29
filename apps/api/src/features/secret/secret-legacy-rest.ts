@@ -15,15 +15,15 @@ import type { SecretApp } from "@langwatch/secret-server";
 import type { Context, MiddlewareHandler } from "hono";
 import { describeRoute, resolver } from "hono-openapi";
 
+import { requires } from "@langwatch/api";
 import {
   type AppRestProjectVariables,
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
-  requires,
-  validator,
   type SecuredApp,
-} from "../../app-rest";
+  validator,
+} from "@langwatch/api/rest";
 
 const logger = createLogger("langwatch:api:secrets");
 const LEGACY_SECRET_API_NOTICE =

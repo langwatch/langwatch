@@ -41,16 +41,16 @@ import {
   spendSummaryStatusFilter,
   USD_DISPLAY_STRING_FORMAT,
 } from "@langwatch/gateway-server";
+import { requires } from "@langwatch/api";
 import {
   type ApiErrorBody,
   type AppRestOrganizationVariables,
   type AppRestSecurity,
   BadRequestError,
   canonicalBaseResponses,
-  requires,
   type SecuredApp,
   validator as zValidator,
-} from "../../app-rest";
+} from "@langwatch/api/rest";
 import type { GatewaySpendRestPorts } from "./gateway-spend-rest.ports";
 import {
   END_USER_SPEND_DESCRIPTION,

@@ -3,15 +3,15 @@ import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import { describeRoute, resolver } from "hono-openapi";
 
+import { requires } from "@langwatch/api";
 import {
   type AppRestProjectVariables,
   type AppRestSecurity,
   baseResponses,
-  requires,
   resolvePersonalCaller,
   type SecuredApp,
   validator as zValidator,
-} from "../../app-rest";
+} from "@langwatch/api/rest";
 import {
   meProjectResponseSchema,
   meUsageQuerySchema,

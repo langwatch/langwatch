@@ -81,6 +81,11 @@ export const UNPUBLISHED = [
     why: "control-plane calls from the gateway and langy workers, authenticated by an internal shared secret",
   },
   {
+    match: "/api/admin",
+    category: "internal",
+    why: "LangWatch staff back-office, including impersonation; publishing it would advertise a surface no customer may call",
+  },
+  {
     match: "/api/ops",
     category: "internal",
     why: "operator debugging (ClickHouse EXPLAIN), reachable only with ops credentials",
@@ -186,6 +191,11 @@ export const UNPUBLISHED = [
     why: "the stop button next to execute, session authenticated for the same reason",
   },
 
+  {
+    match: "POST /api/export/traces/download",
+    category: "internal",
+    why: "the dashboard's download button, authenticated by a browser session rather than an API key. An API-key holder cannot reach it; /api/traces/search is the programmatic equivalent",
+  },
   {
     match: "POST /api/export/scenario-runs/download",
     category: "internal",

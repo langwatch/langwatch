@@ -63,11 +63,42 @@ const LANGWATCH_ROOT = resolve(__dirname, "..");
 
 export const SPEC_PATH = join(LANGWATCH_ROOT, "src/app/api/openapiLangWatch.json");
 
-/** Trees that hold Hono route registrations. */
+const REPO_ROOT = resolve(LANGWATCH_ROOT, "../..");
+
+/**
+ * Trees that hold Hono route registrations.
+ *
+ * The last four are not decoration. Most REST families now live in
+ * `packages/features/<f>/server/src/transport/api-rest`, their mount in
+ * `apps/api`, and the framework's own compatibility routes in `packages/api`
+ * — and a gate that reads only `platform/app` saw 146 of the 383 routes this
+ * repository registers. Everything it could not see was, by construction,
+ * neither published nor excused nor reported: four UNPUBLISHED entries went
+ * stale not because their routes had gone but because the gate had stopped
+ * looking where they live.
+ */
 export const HANDLER_ROOTS = [
   join(LANGWATCH_ROOT, "src/app/api"),
   join(LANGWATCH_ROOT, "src/server/routes"),
   join(LANGWATCH_ROOT, "ee"),
+  join(REPO_ROOT, "packages/features"),
+  join(REPO_ROOT, "packages/enterprise"),
+  join(REPO_ROOT, "apps/api/src"),
+] as const;
+
+/**
+ * Trees read for `YYYY-MM-DD` constants and nothing else.
+ *
+ * `packages/api` is the framework, not a family: it registers no product
+ * route, but it exports `MANAGEMENT_API_VERSION`, which four families spell by
+ * reference. Scanning it for routes as well would read the `basePath:
+ * "/api/roles"` and `.get("/:id", handler)` in `rest-api-service.ts`'s usage
+ * examples as two live registrations — a text scan cannot tell a doc comment
+ * from code.
+ */
+const VERSION_CONSTANT_ROOTS = [
+  join(LANGWATCH_ROOT, "src/server/api"),
+  join(REPO_ROOT, "packages/api/src"),
 ] as const;
 
 interface OpenApiDocument {
@@ -161,9 +192,7 @@ export function collectRegisteredRoutes(roots: readonly string[]): RegisteredRou
   // Version constants live outside the handler roots by design —
   // `MANAGEMENT_API_VERSION` sits in `src/server/api/management/version.ts` —
   // so the scan for them casts a wider net than the route walk itself.
-  const constants = dateConstantsOf(
-    discoverTypeScriptFiles([...roots, join(LANGWATCH_ROOT, "src/server/api")]),
-  );
+  const constants = dateConstantsOf(discoverTypeScriptFiles([...roots, ...VERSION_CONSTANT_ROOTS]));
   return files.flatMap((file) =>
     routesRegisteredIn({
       file,
@@ -186,9 +215,13 @@ function routesRegisteredIn({
   const basePaths = basePathsFor({ file, source });
   if (basePaths.length === 0) return [];
 
+  // Relative to the app for its own files, and to the repository for a family
+  // that lives in a package — an absolute path in the report is noise.
   const relative = file.startsWith(`${LANGWATCH_ROOT}/`)
     ? file.slice(LANGWATCH_ROOT.length + 1)
-    : file;
+    : file.startsWith(`${REPO_ROOT}/`)
+      ? file.slice(REPO_ROOT.length + 1)
+      : file;
   const framework = importsApiFramework(source);
 
   const registrations = collectRouteRegistrations(source);
