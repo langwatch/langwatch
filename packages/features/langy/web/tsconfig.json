@@ -14,5 +14,5 @@
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/langy-web.tsbuildinfo",
     "types": ["vitest/globals"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx"]
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

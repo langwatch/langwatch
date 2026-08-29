@@ -2,7 +2,7 @@ import { configDefaults } from "vitest/config";
 
 export default {
   test: {
-    exclude: [...configDefaults.exclude, "tests/**/*.integration.test.ts"],
+    exclude: [...configDefaults.exclude, "src/**/*.integration.test.ts"],
   },
   resolve: {
     alias: {

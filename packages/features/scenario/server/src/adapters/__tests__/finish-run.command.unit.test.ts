@@ -1,0 +1,260 @@
+import { createTenantId, type Command } from "@langwatch/eventing";
+import { describe, expect, it, vi } from "vitest";
+import { decodeScenarioError, ScenarioInfraErrorCode } from "@langwatch/scenario-contract";
+import type { FinishRunCommandData } from "@langwatch/scenario-contract";
+import {
+  SIMULATION_EVENT_VERSIONS,
+  SIMULATION_RUN_COMMAND_TYPES,
+  SIMULATION_RUN_EVENT_TYPES,
+} from "@langwatch/scenario-contract";
+import type {
+  SimulationMessageSnapshotEvent,
+  SimulationProcessingEvent,
+  SimulationTextMessageEndEvent,
+} from "@langwatch/scenario-contract";
+import type { SimulationEventResults as SimulationResults } from "@langwatch/scenario-contract";
+import type { FinishRunDeps } from "../finish-run.adapter";
+import { FinishRunCommand } from "../finish-run.adapter";
+
+function makeDeps(overrides: Partial<FinishRunDeps> = {}) {
+  const loadPriorEvents = vi.fn().mockResolvedValue([]);
+  return {
+    loadPriorEvents,
+    ...overrides,
+  } as FinishRunDeps & { loadPriorEvents: typeof loadPriorEvents };
+}
+
+function makeCommand(overrides: Partial<FinishRunCommandData> = {}): Command<FinishRunCommandData> {
+  return {
+    tenantId: createTenantId("tenant-1"),
+    aggregateId: "run-1",
+    type: SIMULATION_RUN_COMMAND_TYPES.FINISH,
+    data: {
+      tenantId: "tenant-1",
+      scenarioRunId: "run-1",
+      occurredAt: Date.now(),
+      ...overrides,
+    },
+  };
+}
+
+function queuedEvent(): SimulationProcessingEvent {
+  return {
+    id: "event-queued",
+    type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
+    version: SIMULATION_EVENT_VERSIONS.QUEUED,
+    aggregateType: "simulation_run",
+    aggregateId: "run-1",
+    tenantId: createTenantId("tenant-1"),
+    occurredAt: 1,
+    createdAt: 1,
+    data: {
+      scenarioRunId: "run-1",
+      scenarioId: "scenario-1",
+      batchRunId: "batch-1",
+      scenarioSetId: "set-1",
+    },
+  };
+}
+
+function messageSnapshotEvent(traceIds: string[]): SimulationMessageSnapshotEvent {
+  return {
+    id: `event-snapshot-${traceIds.join("-")}`,
+    type: SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT,
+    version: SIMULATION_EVENT_VERSIONS.MESSAGE_SNAPSHOT,
+    aggregateType: "simulation_run",
+    aggregateId: "run-1",
+    tenantId: createTenantId("tenant-1"),
+    occurredAt: 1,
+    createdAt: 1,
+    data: { scenarioRunId: "run-1", messages: [], traceIds },
+  };
+}
+
+function textMessageEndEvent(traceId: string): SimulationTextMessageEndEvent {
+  return {
+    id: `event-text-end-${traceId}`,
+    type: SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_END,
+    version: SIMULATION_EVENT_VERSIONS.TEXT_MESSAGE_END,
+    aggregateType: "simulation_run",
+    aggregateId: "run-1",
+    tenantId: createTenantId("tenant-1"),
+    occurredAt: 1,
+    createdAt: 1,
+    data: {
+      scenarioRunId: "run-1",
+      messageId: `message-${traceId}`,
+      role: "assistant",
+      content: "complete",
+      traceId,
+    },
+  };
+}
+
+describe("FinishRunCommand", () => {
+  describe("when the caller supplies all ECST fields", () => {
+    it("emits them without reading prior events", async () => {
+      const deps = makeDeps();
+      const handler = new FinishRunCommand(deps);
+
+      const events = await handler.handle(
+        makeCommand({
+          scenarioId: "scenario-1",
+          batchRunId: "batch-1",
+          scenarioSetId: "set-1",
+          traceIds: ["trace-1"],
+          status: "SUCCESS",
+        }),
+      );
+
+      expect(deps.loadPriorEvents).not.toHaveBeenCalled();
+      expect(events).toHaveLength(1);
+      const event = events[0]!;
+      expect(event.type).toBe(SIMULATION_RUN_EVENT_TYPES.FINISHED);
+      expect(event.version).toBe(SIMULATION_EVENT_VERSIONS.FINISHED);
+      expect(event.idempotencyKey).toBe("tenant-1:run-1:finishRun");
+      expect(event.data).toMatchObject({
+        scenarioRunId: "run-1",
+        scenarioId: "scenario-1",
+        batchRunId: "batch-1",
+        scenarioSetId: "set-1",
+        traceIds: ["trace-1"],
+        status: "SUCCESS",
+      });
+    });
+  });
+
+  describe("when ECST fields are missing", () => {
+    it("backfills identity from RunQueued and traceIds from prior events", async () => {
+      const priorEvents: SimulationProcessingEvent[] = [
+        queuedEvent(),
+        messageSnapshotEvent(["trace-1", "trace-2"]),
+        textMessageEndEvent("trace-2"),
+        textMessageEndEvent("trace-3"),
+        messageSnapshotEvent(["trace-1"]),
+      ];
+      const deps = makeDeps({
+        loadPriorEvents: vi.fn().mockResolvedValue(priorEvents),
+      });
+      const handler = new FinishRunCommand(deps);
+
+      const events = await handler.handle(makeCommand());
+
+      expect(deps.loadPriorEvents).toHaveBeenCalledWith({
+        tenantId: "tenant-1",
+        scenarioRunId: "run-1",
+      });
+      // deduped, first-seen order
+      expect(events[0]!.data).toMatchObject({
+        scenarioId: "scenario-1",
+        batchRunId: "batch-1",
+        scenarioSetId: "set-1",
+        traceIds: ["trace-1", "trace-2", "trace-3"],
+      });
+    });
+
+    it("only fills gaps — caller-supplied fields win", async () => {
+      const deps = makeDeps({
+        loadPriorEvents: vi.fn().mockResolvedValue([queuedEvent()]),
+      });
+      const handler = new FinishRunCommand(deps);
+
+      const events = await handler.handle(
+        makeCommand({
+          scenarioId: "caller-scenario",
+          traceIds: ["caller-trace"],
+        }),
+      );
+
+      expect(events[0]!.data).toMatchObject({
+        scenarioId: "caller-scenario",
+        batchRunId: "batch-1",
+        scenarioSetId: "set-1",
+        traceIds: ["caller-trace"],
+      });
+    });
+
+    it("emits without identity when no RunQueued event exists", async () => {
+      const deps = makeDeps({ loadPriorEvents: vi.fn().mockResolvedValue([]) });
+      const handler = new FinishRunCommand(deps);
+
+      const events = await handler.handle(makeCommand());
+
+      expect(events).toHaveLength(1);
+      expect(events[0]!.data).toEqual({
+        scenarioRunId: "run-1",
+        traceIds: [],
+      });
+    });
+  });
+
+  describe("when constructed without deps (legacy zero-arg registration)", () => {
+    it("emits exactly what the caller supplied", async () => {
+      const handler = new FinishRunCommand();
+
+      const events = await handler.handle(makeCommand());
+
+      expect(events).toHaveLength(1);
+      expect(events[0]!.data).toEqual({ scenarioRunId: "run-1" });
+    });
+  });
+
+  describe("when an infrastructure caller supplies a bare error", () => {
+    /** @scenario "The stall reason is recorded on the terminal event" */
+    it("synthesizes failure results so the reason lands on the event", async () => {
+      const handler = new FinishRunCommand(makeDeps());
+
+      const events = await handler.handle(makeCommand({ status: "ERROR", error: "stalled" }));
+
+      const results = (events[0]!.data as { results?: SimulationResults }).results;
+      expect(results).toBeDefined();
+      expect(results!.verdict).toBe("failure");
+      expect(decodeScenarioError(results!.error)?.code).toBe(ScenarioInfraErrorCode.Infra);
+    });
+
+    it("keeps the cancelled shape for a CANCELLED status", async () => {
+      const handler = new FinishRunCommand(makeDeps());
+
+      const events = await handler.handle(
+        makeCommand({ status: "CANCELLED", error: "Cancelled by user" }),
+      );
+
+      const results = (events[0]!.data as { results?: SimulationResults }).results;
+      expect(results).toBeDefined();
+      expect(results!.verdict).toBe("inconclusive");
+      expect(results!.error).toBe("Cancelled by user");
+    });
+
+    it("prefers caller-supplied results over the bare error", async () => {
+      const handler = new FinishRunCommand(makeDeps());
+      const supplied = {
+        verdict: "failure" as const,
+        reasoning: "judge said no",
+        metCriteria: [],
+        unmetCriteria: [],
+        error: "judge failure",
+      };
+
+      const events = await handler.handle(
+        makeCommand({
+          status: "ERROR",
+          error: "stalled",
+          results: supplied,
+        }),
+      );
+
+      expect((events[0]!.data as { results?: SimulationResults }).results).toEqual(supplied);
+    });
+  });
+
+  describe("when the caller uses the static routing helpers", () => {
+    it("keeps the routing/idempotency contract of the old pure command", () => {
+      const payload = makeCommand().data;
+      expect(FinishRunCommand.getAggregateId(payload)).toBe("run-1");
+      expect(FinishRunCommand.getSpanAttributes(payload)).toEqual({
+        "payload.scenarioRun.id": "run-1",
+      });
+      expect(FinishRunCommand.makeJobId(payload)).toBe("tenant-1:run-1:finish-run");
+    });
+  });
+});

@@ -14,5 +14,5 @@
       "@langwatch/enterprise-governance-contract": ["../contract/src/index.ts"]
     }
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts"]
 }

@@ -2,7 +2,7 @@ import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    exclude: [...configDefaults.exclude, "tests/batch-results/**/*.browser.test.tsx"],
-    setupFiles: ["./tests/setup.ts"],
+    exclude: [...configDefaults.exclude, "src/**/__tests__/**/*.browser.test.tsx"],
+    setupFiles: ["./src/__tests__/setup.ts"],
   },
 });

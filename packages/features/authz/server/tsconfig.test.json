@@ -5,6 +5,6 @@
     "types": ["node"],
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/authz-server-tests.tsbuildinfo"
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "include": ["src/**/*.ts"],
   "exclude": []
 }

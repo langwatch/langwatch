@@ -17,5 +17,5 @@
       "@langwatch/enterprise-licensing-contract": ["../contract/src/index.ts"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx"]
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

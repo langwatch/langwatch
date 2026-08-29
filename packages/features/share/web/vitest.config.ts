@@ -4,6 +4,6 @@ export default defineConfig({
   test: {
     watch: false,
     testTimeout: 10000,
-    include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
   },
 });
