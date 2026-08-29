@@ -195,7 +195,7 @@ export class EvaluatorApp {
   // ── Writes ────────────────────────────────────────────────────────────────
 
   /** Creates an evaluator, refusing a code evaluator that carries no program. */
-  create(input: EvaluatorCreateInput): Promise<Evaluator> {
+  async create(input: EvaluatorCreateInput): Promise<Evaluator> {
     if (input.type === "code") assertCodeEvaluatorConfig(input.id, input.config);
     return this.dependencies.evaluators.create(input);
   }
@@ -237,7 +237,7 @@ export class EvaluatorApp {
   }
 
   /** Updates an evaluator, refusing a code evaluator that carries no program. */
-  update(input: EvaluatorUpdateInput): Promise<Evaluator> {
+  async update(input: EvaluatorUpdateInput): Promise<Evaluator> {
     if (input.data.type === "code" && input.data.config !== undefined) {
       assertCodeEvaluatorConfig(input.id, input.data.config);
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { EvaluatorService } from "@langwatch/evaluator-contract";
+import { EvaluatorNotFoundError, EvaluatorService } from "@langwatch/evaluator-contract";
 import {
   MonitorEvaluatorRequiredError,
   MonitorNotFoundError,
@@ -245,5 +245,32 @@ describe("MonitorService", () => {
       enabled: false,
       experimentId: null,
     });
+  });
+
+  // Ported from the REST family's Postgres integration test, which proved this
+  // by posting an unknown evaluator id and reading back a 404. The rule is the
+  // service's: a monitor may only name an evaluator its own project has.
+  /** @scenario Creating a monitor with an unknown evaluator is rejected */
+  it("refuses a create naming an evaluator the project does not have", async () => {
+    const repository = new FakeRepository();
+    repository.value = null;
+    const evaluators = new FakeEvaluatorService();
+    evaluators.getById.mockRejectedValue(new EvaluatorNotFoundError("evaluator_missing"));
+    const service = MonitorService.create({ repository, evaluators, generateId });
+
+    await expect(
+      service.create({
+        projectId: "project_1",
+        name: "Monitor",
+        checkType: "hallucination",
+        preconditions: {},
+        parameters: {},
+        mappings: {},
+        sample: 1,
+        executionMode: "ON_MESSAGE",
+        evaluatorId: "evaluator_missing",
+      }),
+    ).rejects.toMatchObject({ code: "evaluator_not_found" });
+    expect(repository.value).toBeNull();
   });
 });
