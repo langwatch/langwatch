@@ -472,8 +472,11 @@ export class LangWatchQLService {
     const execution = await executor.execute({
       sql,
       // The resolved record, not the caller's: it is the one carrying the
-      // window this surface injected.
-      ...(validation.boundParameters ? { parameters: validation.boundParameters } : {}),
+      // window this surface injected AND the step this run was bucketed at.
+      // `validation.boundParameters` is the wrong half — it predates the
+      // granularity merge, so passing it drops `period_granularity_seconds`
+      // from every statement that declares one.
+      ...(Object.keys(executionParameters).length > 0 ? { parameters: executionParameters } : {}),
       tenantCapability: lwqlTenantCapability({
         secret: project.lwqlKey,
       }),
