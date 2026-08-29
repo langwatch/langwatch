@@ -12,7 +12,11 @@
  * The prompt service arrives as a provider rather than an instance, so the
  * OpenAPI generator can build this app with none.
  */
-import { createPromptsRestApp, type PromptRestService } from "@langwatch/prompt-server";
+import {
+  createPromptsRestApp,
+  type PromptAppVariables,
+  type PromptRestService,
+} from "@langwatch/prompt-server";
 import type { Hono } from "hono";
 
 import { organizationMiddleware } from "~/app/api/middleware/organization";
@@ -23,7 +27,9 @@ import { prisma } from "~/server/db";
 import { uniqueConstraintTargets } from "~/server/utils/prismaErrors";
 
 /** `/api/prompts`, bound to one process's prompt service. */
-export function buildPromptsRestApp(prompts: () => PromptRestService): Hono {
+export function buildPromptsRestApp(
+  prompts: () => PromptRestService,
+): Hono<{ Variables: PromptAppVariables }> {
   return createPromptsRestApp({
     security: appRestSecurity,
     prompts,
