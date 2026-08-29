@@ -76,7 +76,6 @@ import {
   INSTANCE_LICENSE_NO_PERMISSION,
 } from "@langwatch/enterprise-api";
 import { createLogger } from "@langwatch/observability";
-import { TRPCError } from "@trpc/server";
 import { evaluatorsSchema } from "@langwatch/evaluator-contract";
 import { z } from "zod";
 import {
@@ -91,33 +90,8 @@ import { restoreWithheldEdits } from "~/server/traces/edit-overlay/restoreWithhe
 import { getAllForProjectInput, tracesFilterInput } from "./routers/traces.schemas";
 import type { TRPCContext } from "./trpc.context";
 import { getUserProtectionsForProject } from "./utils";
-import type { GuardrailAttachment } from "@langwatch/gateway-contract";
-import { GatewayUsageService } from "@langwatch/gateway-server";
-// Prisma persistence, so it cannot come through the package root:
-// `private-runtime-export` forbids a feature server index exporting from
-// `repositories/`. The package's `./composition/*` subpaths are the sanctioned
-// way for a composition root to reach one.
-import { resolveProviderLabels } from "@langwatch/gateway-server/composition/gateway-provider-labels";
 import { assertWebhookEndpointsEntitled } from "~/runtime/app/features/webhooks";
-import type { Session } from "~/server/auth";
-import { resolveApplicableBudgetsForDraftKey } from "~/server/gateway/applicableBudgets.service";
-import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
-import { GatewayGuardrailService } from "~/server/gateway/guardrail.service";
-import {
-  assertActorCanManageAllScopes,
-  assertActorCanOperateOnAnyScope,
-  assertGuardrailAttachmentsAllowed,
-  assertScopesBelongToOrg,
-  assertTraceProjectBelongsToOrg,
-  isVisibleToMembership,
-  loadMembershipSet,
-  requireExistingVk,
-  requireVisibleVk,
-  resolveVkProjectId,
-} from "~/server/gateway/virtualKey.authz";
-import { loadTraceDestinationFacts, toVirtualKeyCamelDto } from "@langwatch/gateway-server";
 import { virtualKeyBudgetInputSchema } from "~/server/gateway/virtualKey.service";
-import { loadDirectBudgetsForKeys } from "~/server/gateway/virtualKeyDirectBudget.service";
 import { env } from "~/env.mjs";
 import { auditLog } from "~/runtime/app/features/audit-log";
 import { authProviderIsMounted, platformSSOAllowed } from "~/runtime/app/features/sso";
@@ -811,153 +785,26 @@ const enterpriseRouters = EnterpriseTrpcComposition.create({
   },
 });
 
-/** Refuses an organization id that names no organization, as this surface always has. */
-const assertOrganizationExists = async (organizationId: string): Promise<void> => {
-  const organization = await prisma.organization.findUnique({ where: { id: organizationId } });
-  if (!organization) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "organization not found" });
-  }
-};
-
-/** The caller as the virtual-key authorization vocabulary names them. */
-const virtualKeyActor = (principal: unknown) =>
-  ({ kind: "session", session: principal as Session }) as const;
-
-const listVisibleVirtualKeys = async ({
-  organizationId,
-  userId,
-  virtualKeys,
-}: {
-  organizationId: string;
-  userId: string;
-  virtualKeys: {
-    getAll(organizationId: string): Promise<Awaited<ReturnType<typeof requireExistingVk>>[]>;
-  };
-}) => {
-  const membership = await loadMembershipSet(prisma, organizationId, userId);
-  return (await virtualKeys.getAll(organizationId)).filter((vk) =>
-    isVisibleToMembership(membership, vk.scopes),
-  );
-};
-
 /**
- * The one seam left between the gateway transports and this application: every
- * entry fronts a module under `server/gateway/**` or a persistence read the
- * routers used to make inline. It shrinks to nothing when those move.
+ * All that is left of the seam between the gateway transports and this
+ * application.
+ *
+ * Everything else this bag carried — the visibility rules, the per-scope
+ * checks, the DTO projections, the budget resolvers, the usage reads — now
+ * lives on `GatewayApp`, which the routers reach at `ctx.app.gateway` and the
+ * process composes once in `app-layer/presets.ts`. That composition is also
+ * what the public REST family is given, so the two doors cannot enforce
+ * different rules.
+ *
+ * The budget parser cannot follow it there. A tRPC procedure's input parser is
+ * fixed when the router is BUILT and the application is a per-request value,
+ * so this one member stays an argument.
  */
 const gatewayTrpcPorts = {
-  budgets: {
-    assertOrganizationExists,
-    resolveProviderLabels: (budgets) => resolveProviderLabels({ prisma, budgets: [...budgets] }),
-    listGroupTargets: async (organizationId) => {
-      const groups = await prisma.group.findMany({
-        where: { organizationId },
-        select: { id: true, name: true, _count: { select: { members: true } } },
-        orderBy: { name: "asc" },
-      });
-      return groups.map((group) => ({
-        id: group.id,
-        name: group.name,
-        memberCount: group._count.members,
-      }));
-    },
-  },
-  cacheRules: {
-    assertOrganizationExists,
-    cacheRules: () => GatewayCacheRuleService.create(prisma),
-  },
-  guardrails: {
-    guardrails: ({ evaluators, monitors }) =>
-      GatewayGuardrailService.create(prisma, evaluators, monitors),
-  },
-  spendEvents: {
-    resolveVirtualKeyNames: ({ organizationId, virtualKeyIds }) =>
-      prisma.virtualKey.findMany({
-        where: { id: { in: [...virtualKeyIds] }, organizationId },
-        select: { id: true, name: true },
-      }),
-  },
-  usage: {
-    listVisibleVirtualKeys,
-    isVirtualKeyVisible: async ({ organizationId, userId, virtualKey }) =>
-      isVisibleToMembership(
-        await loadMembershipSet(prisma, organizationId, userId),
-        virtualKey.scopes,
-      ),
-    createUsageService: ({ chRepo, spendRepo }) =>
-      GatewayUsageService.create({ prisma, chRepo, spendRepo }),
-  },
-  virtualKeys: {
-    listVisibleVirtualKeys,
-    requireVisibleVirtualKey: async ({ organizationId, id, userId, virtualKeys }) =>
-      requireVisibleVk(virtualKeys, await loadMembershipSet(prisma, organizationId, userId), {
-        id,
-        organizationId,
-      }),
-    requireExistingVirtualKey: ({ organizationId, id, virtualKeys }) =>
-      requireExistingVk(virtualKeys, id, organizationId),
-    assertCanManageAllScopes: ({ principal, scopes }) =>
-      assertActorCanManageAllScopes({ prisma, actor: virtualKeyActor(principal) }, [...scopes]),
-    assertCanOperateOnAnyScope: ({ principal, scopes, permission }) =>
-      assertActorCanOperateOnAnyScope(
-        { prisma, actor: virtualKeyActor(principal) },
-        [...scopes],
-        permission,
-      ),
-    assertScopesBelongToOrganization: ({ organizationId, scopes }) =>
-      assertScopesBelongToOrg(prisma, organizationId, [...scopes]),
-    assertTraceProjectBelongsToOrganization: ({ organizationId, traceProjectId }) =>
-      assertTraceProjectBelongsToOrg(prisma, organizationId, traceProjectId),
-    assertGuardrailAttachmentsAllowed: ({ principal, projectId, attachments }) =>
-      assertGuardrailAttachmentsAllowed(
-        { prisma, actor: virtualKeyActor(principal) },
-        projectId,
-        attachments as GuardrailAttachment[] | undefined,
-      ),
-    resolveVirtualKeyProjectId: ({ organizationId, virtualKeyId, scopes, traceProjectId }) =>
-      resolveVkProjectId(prisma, organizationId, {
-        vkId: virtualKeyId,
-        inputScopes: scopes ? [...scopes] : undefined,
-        traceProjectId,
-      }),
-    isOrganizationMember: async ({ organizationId, userId }) =>
-      (await prisma.organizationUser.findFirst({
-        where: { organizationId, userId },
-        select: { userId: true },
-      })) !== null,
-    toVirtualKeyDtos: async ({ virtualKeys, projects }) => {
-      // One read of the destinations for the whole page: a listing must not
-      // cost a query per key to say where each one's traffic goes.
-      const facts = await loadTraceDestinationFacts({ projects, virtualKeys: [...virtualKeys] });
-      return virtualKeys.map((virtualKey) => toVirtualKeyCamelDto({ virtualKey, facts }));
-    },
-    resolveApplicableBudgets: ({ target, projects, budgetDecisions, budgets }) =>
-      resolveApplicableBudgetsForDraftKey(
-        prisma,
-        projects,
-        { ...target, scopes: [...target.scopes] },
-        budgetDecisions,
-        budgets,
-      ),
-    loadDirectBudgetsForKeys: ({ organizationId, virtualKeyIds, now, chRepo }) =>
-      loadDirectBudgetsForKeys({
-        prisma,
-        organizationId,
-        virtualKeyIds: [...virtualKeyIds],
-        chRepo,
-        now,
-      }),
-    spendByVirtualKey: ({ organizationId, virtualKeyIds, window, chRepo, spendRepo }) =>
-      GatewayUsageService.create({ prisma, chRepo, spendRepo }).spendByVirtualKey({
-        organizationId,
-        virtualKeyIds: [...virtualKeyIds],
-        window,
-      }),
-    schemas: { virtualKeyBudgetInput: virtualKeyBudgetInputSchema },
-  },
-  // `satisfies`, not an annotation: an annotation would collapse each port's
-  // concrete return type to the loose constraint and the routers would lose
-  // their output typing.
+  virtualKeys: { virtualKeyBudgetInput: virtualKeyBudgetInputSchema },
+  // `satisfies`, not an annotation: an annotation would collapse the parser's
+  // concrete type to the loose constraint and the router would lose the shape
+  // its create and update inputs publish.
 } satisfies GatewayTrpcPorts;
 
 const gatewayRouters = createGatewayTrpcRouters({ ...appTrpcMount, ports: gatewayTrpcPorts });

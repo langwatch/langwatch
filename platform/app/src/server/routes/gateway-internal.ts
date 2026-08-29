@@ -407,7 +407,7 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
     return c.json(rejectionBody(parseRejection), parseRejection.status);
   }
 
-  const service = c.app.gateway.virtualKeys;
+  const service = c.app.gatewayStores.virtualKeys;
   const vk = await service.getBySecretInternal(presented);
   if (!vk) {
     logAuthDecision(c, "virtual_key_not_found", 401);
@@ -566,8 +566,8 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
   const materialiser = new GatewayConfigMaterialiser(
     prisma,
     c.app.projects.projectService,
-    c.var.langwatchApp.gateway.budgets ?? null,
-    c.var.langwatchApp.gateway.budgetDecisions,
+    c.var.langwatchApp.gatewayStores.budgets ?? null,
+    c.var.langwatchApp.gatewayStores.budgetDecisions,
   );
 
   const ifNoneMatch = c.req.header("If-None-Match");
@@ -638,7 +638,7 @@ secured.access(gatewayPolicy()).get("/changes", async (c) => {
     1,
     Math.min(25, Number.parseInt(c.req.query("timeout_s") ?? "10", 10) || 10),
   );
-  const repo = c.var.langwatchApp.gateway.changes;
+  const repo = c.var.langwatchApp.gatewayStores.changes;
   const deadline = Date.now() + timeoutSeconds * 1000;
 
   while (Date.now() < deadline) {
@@ -832,7 +832,7 @@ secured.access(gatewayPolicy()).get("/budget-bucket-spend", async (c) => {
       404,
     );
   }
-  const budgetRepository = getApp().gateway.budgets;
+  const budgetRepository = getApp().gatewayStores.budgets;
   if (!budgetRepository) {
     // Without the ledger there is no bucket figure; report zero spend so
     // enforcement stays permissive rather than inventing a number.

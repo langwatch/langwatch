@@ -214,7 +214,25 @@ export class App {
   readonly codingAgents: AppDependencies["codingAgents"] & AppCommands["codingAgents"];
   /** The Coding Agent feature's application; `codingAgents` above is the raw capability. */
   readonly codingAgentApp: CodingAgentApp;
-  readonly gateway: AppDependencies["gateway"];
+  /** The AI Gateway feature's application; `gatewayStores` below is raw. */
+  readonly gateway: AppDependencies["gatewayApp"];
+  /**
+   * The gateway's raw stores and services, beside the application.
+   *
+   * Three kinds of caller need them, and none of them is doing gateway domain
+   * work. The gateway-internal routes resolve a presented secret
+   * (`getBySecretInternal`) and long-poll the change log — the data plane's
+   * own wire, not a screen's read; the cost-event ingestion path debits
+   * budgets and appends changes from a collector, not from a person; and the
+   * billing-reconciliation REST family reads the webhook endpoint, event and
+   * delivery stores the push path writes.
+   *
+   * `GatewayApp` deliberately publishes none of that: `virtualKeys` on it is
+   * the read/write surface a door calls, not the whole `VirtualKeyService`,
+   * and the webhook trio and change log belong to no gateway door at all.
+   * Same reason `traceIngestion` and `traceExport` sit beside `TraceApp`.
+   */
+  readonly gatewayStores: AppDependencies["gateway"];
   /** The Webhook feature's application, over the process's endpoint store. */
   readonly webhooks: WebhookApp;
   readonly filters: AppDependencies["filters"];
@@ -466,7 +484,8 @@ export class App {
       share: deps.share,
       projects: deps.projects,
     });
-    this.gateway = deps.gateway;
+    this.gateway = deps.gatewayApp;
+    this.gatewayStores = deps.gateway;
     this.webhooks = WebhookApp.create({
       endpoints: deps.gateway.webhookEndpoints,
       health: deps.gateway.webhookHealth,

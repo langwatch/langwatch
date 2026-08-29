@@ -94,13 +94,13 @@ export async function seedBudgetOverviewFixture(): Promise<void> {
   ({ redisConnection } = await startTestContainers());
 
   // The tRPC user.budgetOverview procedure, the CLI REST endpoint and
-  // gatewayBudgets.get all read getApp().gateway.budgets, so stand up a test
+  // gatewayBudgets.get all read getApp().gatewayStores.budgets, so stand up a test
   // App whose budget repo points at the same test ClickHouse the debits below
   // are seeded into. Without it those surfaces read an empty ledger and
   // disagree with the direct-service reads.
   await resetApp();
   const app = createTestApp({ redis: redisConnection });
-  app.gateway.budgets = chRepo();
+  app.gatewayStores.budgets = chRepo();
   globalForApp.__langwatch_app = app;
 
   await prisma.organization.create({

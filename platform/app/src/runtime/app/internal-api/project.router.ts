@@ -165,7 +165,7 @@ export const projectRouter = ProjectTrpcApi.create(
       try {
         await provisionLangyVirtualKey({
           prisma: ctx.prisma,
-          virtualKeys: ctx.app.gateway.virtualKeys,
+          virtualKeys: ctx.app.gatewayStores.virtualKeys,
           projectId,
           organizationId,
           actorUserId,

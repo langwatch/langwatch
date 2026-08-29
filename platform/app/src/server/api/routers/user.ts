@@ -218,7 +218,7 @@ const accountRouter = createUserTrpcRouter({
       ctx.app.governance.tryResolveDefaultRoutingPolicyForUser(input),
     listPersonalVirtualKeys: (ctx: TRPCContext, input) =>
       ctx.app.governance.personalVirtualKeyList(input),
-    checkBudget: (ctx: TRPCContext, input) => ctx.app.gateway.budgetDecisions.check(input),
+    checkBudget: (ctx: TRPCContext, input) => ctx.app.gatewayStores.budgetDecisions.check(input),
   },
 });
 

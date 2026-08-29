@@ -170,7 +170,7 @@ export function installClickHouseTestApp({
   const governanceOcsfEvents = new AppGovernanceOcsfEventsAdapter(required);
   const personalUsage = new AppPersonalUsageReadAdapter(required);
   const baseApp = createTestApp();
-  const governanceVirtualKeys = baseApp.gateway.virtualKeys;
+  const governanceVirtualKeys = baseApp.gatewayStores.virtualKeys;
   const governanceOptions = {
     organizations: baseApp.organizations,
     projects: baseApp.projects,
@@ -186,7 +186,7 @@ export function installClickHouseTestApp({
       featureFlags: baseApp.featureFlags,
       personalVirtualKeys: governanceVirtualKeys,
       personalUsage,
-      budgetDecisions: baseApp.gateway.budgetDecisions,
+      budgetDecisions: baseApp.gatewayStores.budgetDecisions,
     }),
     providers: {
       list: () =>
@@ -253,7 +253,7 @@ export function installClickHouseTestApp({
     },
     redis: redis ?? null,
     gateway: {
-      ...baseApp.gateway,
+      ...baseApp.gatewayStores,
       budgets: GatewayBudgetLedgerAdapter.create(requiredGateway),
       virtualKeySpend: GatewayVirtualKeySpendAdapter.create(requiredGateway),
       spendEvents: GatewaySpendEventsService.create(

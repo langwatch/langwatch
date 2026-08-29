@@ -245,17 +245,47 @@ import {
 import { FilterService } from "~/server/filters/filter.service";
 import { PrismaDataPrivacyAdapter } from "@langwatch/data-privacy-server";
 import {
+  GatewayApp,
   GatewayBudgetLedgerAdapter,
   GatewaySpendEventsClickHouseAdapter,
   GatewaySpendEventsService,
+  GatewayUsageService,
   GatewayVirtualKeySpendAdapter,
+  loadTraceDestinationFacts,
   PrismaGatewayAdapter,
+  toVirtualKeyCamelDto,
+  toVirtualKeySnakeDto,
 } from "@langwatch/gateway-server";
 import { createGatewayAuditPort } from "@langwatch/gateway-server/composition/gateway-audit";
 import { createGatewayChangeEventsPort } from "@langwatch/gateway-server/composition/gateway-change-events";
+import { resolveProviderLabels } from "@langwatch/gateway-server/composition/gateway-provider-labels";
+import {
+  type ApplicableBudget,
+  resolveApplicableBudgetsForDraftKey,
+} from "~/server/gateway/applicableBudgets.service";
 import { createBudgetChangeEventDedupeService } from "~/server/gateway/budgetChangeEventDedupe.service";
+import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
+import { GatewayGuardrailService } from "~/server/gateway/guardrail.service";
 import { createProcessVirtualKeyCrypto } from "~/runtime/app/features/gateway-virtual-key-crypto.composition";
-import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import {
+  assertActorCanManageAllScopes,
+  assertActorCanOperateOnAnyScope,
+  assertGuardrailAttachmentsAllowed,
+  assertScopesBelongToOrg,
+  assertTraceProjectBelongsToOrg,
+  isVisibleToMembership,
+  loadMembershipSet,
+  type MembershipSet,
+  requireExistingVk,
+  requireVisibleVk,
+  resolveVkProjectId,
+  type VirtualKeyActor,
+} from "~/server/gateway/virtualKey.authz";
+import { VirtualKeyService, virtualKeyBudgetInputSchema } from "~/server/gateway/virtualKey.service";
+import {
+  loadDirectBudgetsForKeys,
+  type VirtualKeyDirectBudget,
+} from "~/server/gateway/virtualKeyDirectBudget.service";
 import { getEdgeSpoolFailOpenCounter, getLangyTurnsCounter } from "~/server/metrics";
 import {
   getLangyGithubPrUsage,
@@ -356,6 +386,11 @@ import {
   type ProcessRole,
   roleRunsWorkers,
 } from "./config";
+import type { ProjectIdentity } from "@langwatch/project-contract";
+import { TRPCError } from "@trpc/server";
+import type { PrismaClient } from "~/generated/prisma/client";
+import type { Session } from "~/server/auth";
+import { withIdempotency } from "~/server/api/idempotency";
 import type { AppDependencies, DataRetentionDependencies } from "./dependencies";
 import { ManagedProvidersAppAdapter } from "./enterprise/managed-providers.adapter";
 import { PrismaEvaluationCostRecorder } from "./evaluations/evaluation-cost.recorder";
@@ -663,6 +698,298 @@ class AppGatewayClickHouseResolver {
   resolve = async (tenantId: string): Promise<AppGatewayClickHouseClient> => {
     return AppGatewayClickHouseClient.create(await this.resolveClient(tenantId));
   };
+}
+
+/**
+ * Whether a value carries what a browser {@link Session} requires.
+ *
+ * Both required members are checked — `expires` and `user.id` — so the
+ * narrowing asserts nothing the runtime has not seen. The optional members are
+ * left alone, which is what optional means. A value that fails becomes a null
+ * session, and every gateway check refuses a null session.
+ */
+function isBrowserSession(value: unknown): value is Session {
+  if (typeof value !== "object" || value === null) return false;
+  if (!("expires" in value) || typeof value.expires !== "string") return false;
+  if (!("user" in value)) return false;
+  const user = value.user;
+  return typeof user === "object" && user !== null && "id" in user && typeof user.id === "string";
+}
+
+/**
+ * The caller as the virtual-key authorization vocabulary names them, whichever
+ * door they arrived through.
+ *
+ * `GatewayActor` is `unknown` on purpose: the feature hands a caller straight
+ * into these checks and never reads one, because what an identity IS belongs
+ * to this process's authentication. So exactly two shapes reach here — the
+ * browser session a tRPC context carries, and the credential actor
+ * `actorForCredential` builds a few lines below for a REST request — and one
+ * implementation has to accept both, where the process used to supply two.
+ *
+ * They are told apart by the member only one of them has: every
+ * {@link VirtualKeyActor} carries `kind`, and `Session` has no such field.
+ * The credential branches are rebuilt member by member rather than waved
+ * through, so nothing reaches the role-binding resolver that was not read off
+ * the value first.
+ *
+ * Every unrecognised shape answers `{ kind: "session", session: null }`, which
+ * `assertActorCanManageAllScopes` and its siblings refuse outright. This
+ * cannot widen an authorization: what it fails to recognise, it denies.
+ */
+function gatewayVirtualKeyActor(actor: unknown): VirtualKeyActor {
+  if (typeof actor !== "object" || actor === null) {
+    return { kind: "session", session: null };
+  }
+  if (!("kind" in actor)) {
+    return { kind: "session", session: isBrowserSession(actor) ? actor : null };
+  }
+  if (
+    actor.kind === "apiKey" &&
+    "apiKeyId" in actor &&
+    typeof actor.apiKeyId === "string" &&
+    "organizationId" in actor &&
+    typeof actor.organizationId === "string" &&
+    "userId" in actor &&
+    (typeof actor.userId === "string" || actor.userId === null)
+  ) {
+    return {
+      kind: "apiKey",
+      apiKeyId: actor.apiKeyId,
+      userId: actor.userId,
+      organizationId: actor.organizationId,
+    };
+  }
+  if (
+    actor.kind === "legacyProjectKey" &&
+    "projectId" in actor &&
+    typeof actor.projectId === "string"
+  ) {
+    return { kind: "legacyProjectKey", projectId: actor.projectId };
+  }
+  return { kind: "session", session: null };
+}
+
+/**
+ * A project credential stands in for someone working in its project, so it
+ * sees organization-scoped keys, its own team's keys and its own project's —
+ * and not a sibling team's. The same rule the tRPC list applies to a member.
+ */
+function membershipForProjectCredential(project: ProjectIdentity): MembershipSet {
+  return {
+    isOrgMember: true,
+    isOrgAdmin: false,
+    teamIds: new Set([project.teamId]),
+    projectIds: new Set([project.id]),
+  };
+}
+
+/**
+ * The Gateway feature's application, composed once per process.
+ *
+ * Everything passed in is either a capability built over persistence the
+ * feature package cannot reach, or a decision made against role bindings and
+ * memberships it cannot see. This replaces the two bags the process used to
+ * build — `gatewayTrpcPorts` in `server/api/root.ts` and
+ * `gatewayPlatformRestPorts` in `server/api-router.ts` — which described the
+ * same process to the same feature and disagreed about it: `budgets` meant the
+ * decision service on one side and the ClickHouse spend source on the other,
+ * and three members shared a name with different signatures. One composition
+ * is what stops the public REST door and the browser's tRPC door enforcing
+ * different rules.
+ */
+function composeGatewayApp(input: {
+  prisma: PrismaClient;
+  projects: AppDependencies["projects"];
+  evaluators: AppDependencies["evaluators"];
+  monitors: AppDependencies["monitors"];
+  stores: AppDependencies["gateway"];
+}): AppDependencies["gatewayApp"] {
+  const { prisma, projects, evaluators, monitors, stores } = input;
+  const virtualKeys = stores.virtualKeys;
+  const usage = GatewayUsageService.create({
+    prisma,
+    chRepo: stores.budgets,
+    spendRepo: stores.virtualKeySpend,
+  });
+
+  // Explicit type arguments, not inferred: they are the two shapes the wire
+  // contract of every router built over this application carries, and an
+  // inference that fell back to `unknown` would take them off it silently.
+  return GatewayApp.create<ApplicableBudget[], VirtualKeyDirectBudget>({
+    virtualKeys,
+    budgetDecisions: stores.budgetDecisions,
+    budgetSpend: stores.budgets,
+    virtualKeySpend: stores.virtualKeySpend,
+    spendEvents: stores.spendEvents,
+    projects,
+    guardrails: GatewayGuardrailService.create(prisma, evaluators, monitors),
+    cacheRules: GatewayCacheRuleService.create(prisma),
+    usage,
+    idempotency: (receipt) => withIdempotency({ prisma, ...receipt }),
+    // A deployment without the ClickHouse spend source answers
+    // `spend_source_unavailable` rather than a $0.00 that cannot be told apart
+    // from a key that genuinely spent nothing.
+    spendSourceAvailable: stores.virtualKeySpend !== undefined,
+    schemas: { virtualKeyBudgetInput: virtualKeyBudgetInputSchema },
+
+    organizationIdForProject: async (projectId) => {
+      const found = await prisma.project.findUnique({
+        where: { id: projectId },
+        include: { team: true },
+      });
+      if (!found) throw new Error(`project ${projectId} missing team`);
+      return found.team.organizationId;
+    },
+    assertOrganizationExists: async (organizationId) => {
+      const organization = await prisma.organization.findUnique({
+        where: { id: organizationId },
+      });
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "organization not found" });
+      }
+    },
+    resolveProviderLabels: (budgets) => resolveProviderLabels({ prisma, budgets: [...budgets] }),
+    listGroupTargets: async (organizationId) => {
+      const groups = await prisma.group.findMany({
+        where: { organizationId },
+        select: { id: true, name: true, _count: { select: { members: true } } },
+        orderBy: { name: "asc" },
+      });
+      return groups.map((group) => ({
+        id: group.id,
+        name: group.name,
+        memberCount: group._count.members,
+      }));
+    },
+    groupMemberCounts: async (budgets) => {
+      const groupIds = Array.from(
+        new Set(budgets.filter((b) => b.scopeType === "GROUP").map((b) => b.scopeId)),
+      );
+      if (groupIds.length === 0) return new Map();
+      const groups = await prisma.group.findMany({
+        where: { id: { in: groupIds } },
+        select: { id: true, _count: { select: { members: true } } },
+      });
+      return new Map(groups.map((group) => [group.id, group._count.members]));
+    },
+    // VirtualKey is organization-scoped, so the lookup is fenced by the owning
+    // organization and never by the raw ids off the spend rows alone.
+    resolveVirtualKeyNames: ({ organizationId, virtualKeyIds }) =>
+      prisma.virtualKey.findMany({
+        where: { id: { in: [...virtualKeyIds] }, organizationId },
+        select: { id: true, name: true },
+      }),
+    isOrganizationMember: async ({ organizationId, userId }) =>
+      (await prisma.organizationUser.findFirst({
+        where: { organizationId, userId },
+        select: { userId: true },
+      })) !== null,
+    // A scoped API key acts as its owning user; a legacy project key carries
+    // none, so it acts as a stable machine principal for its project, which
+    // keeps an audit row traceable back to the credential that wrote it.
+    actorForCredential: ({ projectId, resolvedToken }) =>
+      resolvedToken?.type === "apiKey"
+        ? {
+            actor: {
+              kind: "apiKey",
+              apiKeyId: resolvedToken.apiKeyId,
+              userId: resolvedToken.userId,
+              organizationId: resolvedToken.organizationId,
+            } satisfies VirtualKeyActor,
+            actorUserId: resolvedToken.userId ?? `svc_${projectId}`,
+          }
+        : {
+            actor: { kind: "legacyProjectKey", projectId } satisfies VirtualKeyActor,
+            actorUserId: `svc_${projectId}`,
+          },
+
+    listVisibleVirtualKeys: async ({ organizationId, userId }) => {
+      const membership = await loadMembershipSet(prisma, organizationId, userId);
+      return (await virtualKeys.getAll(organizationId)).filter((virtualKey) =>
+        isVisibleToMembership(membership, virtualKey.scopes),
+      );
+    },
+    isVirtualKeyVisible: async ({ organizationId, userId, virtualKey }) =>
+      isVisibleToMembership(
+        await loadMembershipSet(prisma, organizationId, userId),
+        virtualKey.scopes,
+      ),
+    requireVisibleVirtualKeyForUser: async ({ organizationId, id, userId }) =>
+      requireVisibleVk(virtualKeys, await loadMembershipSet(prisma, organizationId, userId), {
+        id,
+        organizationId,
+      }),
+    visibleToProjectCredential: ({ project, virtualKeys: page }) => {
+      const membership = membershipForProjectCredential(project);
+      return page.filter((virtualKey) => isVisibleToMembership(membership, virtualKey.scopes));
+    },
+    requireVisibleVirtualKeyForProjectCredential: ({ project, id, organizationId }) =>
+      requireVisibleVk(virtualKeys, membershipForProjectCredential(project), {
+        id,
+        organizationId,
+      }),
+    requireExistingVirtualKey: ({ organizationId, id }) =>
+      requireExistingVk(virtualKeys, id, organizationId),
+
+    assertCanManageAllScopes: ({ actor, scopes }) =>
+      assertActorCanManageAllScopes({ prisma, actor: gatewayVirtualKeyActor(actor) }, [...scopes]),
+    assertCanOperateOnAnyScope: ({ actor, scopes, permission }) =>
+      assertActorCanOperateOnAnyScope(
+        { prisma, actor: gatewayVirtualKeyActor(actor) },
+        [...scopes],
+        permission,
+      ),
+    assertScopesBelongToOrganization: ({ organizationId, scopes }) =>
+      assertScopesBelongToOrg(prisma, organizationId, [...scopes]),
+    assertTraceProjectBelongsToOrganization: ({ organizationId, traceProjectId }) =>
+      assertTraceProjectBelongsToOrg(prisma, organizationId, traceProjectId),
+    assertGuardrailAttachmentsAllowed: ({ actor, projectId, attachments }) =>
+      assertGuardrailAttachmentsAllowed(
+        { prisma, actor: gatewayVirtualKeyActor(actor) },
+        projectId,
+        attachments ? [...attachments] : undefined,
+      ),
+    resolveVirtualKeyProjectId: ({ organizationId, virtualKeyId, scopes, traceProjectId }) =>
+      resolveVkProjectId(prisma, organizationId, {
+        vkId: virtualKeyId,
+        inputScopes: scopes ? [...scopes] : undefined,
+        traceProjectId,
+      }),
+
+    // One read of the destinations for a whole page, in both casings: a
+    // listing must not cost a query per key to say where its traffic goes.
+    toVirtualKeyCamelDtos: async ({ virtualKeys: page }) => {
+      const facts = await loadTraceDestinationFacts({ projects, virtualKeys: [...page] });
+      return page.map((virtualKey) => toVirtualKeyCamelDto({ virtualKey, facts }));
+    },
+    toVirtualKeySnakeDtos: async ({ virtualKeys: page }) => {
+      const facts = await loadTraceDestinationFacts({ projects, virtualKeys: [...page] });
+      return page.map((virtualKey) => toVirtualKeySnakeDto({ virtualKey, facts }));
+    },
+    resolveApplicableBudgets: ({ target }) =>
+      resolveApplicableBudgetsForDraftKey(
+        prisma,
+        projects,
+        { ...target, scopes: [...target.scopes] },
+        stores.budgetDecisions,
+        stores.budgets,
+      ),
+    loadDirectBudgetsForKeys: ({ organizationId, virtualKeyIds, now }) =>
+      loadDirectBudgetsForKeys({
+        prisma,
+        organizationId,
+        virtualKeyIds: [...virtualKeyIds],
+        chRepo: stores.budgets,
+        now,
+      }),
+    spendByVirtualKey: ({ organizationId, virtualKeyIds, window }) =>
+      usage.spendByVirtualKey({
+        organizationId,
+        virtualKeyIds: [...virtualKeyIds],
+        window,
+      }),
+  });
 }
 
 export function initializeWebApp(): App {
@@ -2445,6 +2772,22 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     snapshots,
   });
 
+  // Hoisted out of the App literal because two members are built from it: the
+  // raw seam the ingestion, data-plane and reconciliation paths read, and the
+  // gateway application every one of the feature's seven doors is given.
+  const gatewayStores: AppDependencies["gateway"] = {
+    virtualKeys: governanceVirtualKeys,
+    budgetDecisions: gatewayBudgetDecisions,
+    budgets: gatewayBudgetRepository,
+    changes: gatewayChanges,
+    virtualKeySpend: gatewayVirtualKeySpend,
+    spendEvents: gatewaySpend ? GatewaySpendEventsService.create(gatewaySpend.port) : undefined,
+    webhookEvents,
+    webhookEndpoints: webhookEndpointService,
+    webhookHealth,
+    webhookDelivery,
+  };
+
   const app = initializeApp({
     config,
     nlpLambda,
@@ -2472,18 +2815,14 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     simulations,
     simulationExports,
     topics,
-    gateway: {
-      virtualKeys: governanceVirtualKeys,
-      budgetDecisions: gatewayBudgetDecisions,
-      budgets: gatewayBudgetRepository,
-      changes: gatewayChanges,
-      virtualKeySpend: gatewayVirtualKeySpend,
-      spendEvents: gatewaySpend ? GatewaySpendEventsService.create(gatewaySpend.port) : undefined,
-      webhookEvents,
-      webhookEndpoints: webhookEndpointService,
-      webhookHealth,
-      webhookDelivery,
-    },
+    gateway: gatewayStores,
+    gatewayApp: composeGatewayApp({
+      prisma,
+      projects,
+      evaluators,
+      monitors,
+      stores: gatewayStores,
+    }),
     filters: {
       options: new FilterService(
         clickhouseEnabled ? new FilterOptionsClickHouseRepository(resolveClickHouseClient) : null,
@@ -3057,6 +3396,28 @@ export function createTestApp(
       simulations: testSimulations,
     }),
   });
+  // Same two-member shape as the process preset: the raw seam and the
+  // application composed over it.
+  //
+  // An override is read HERE rather than left to the `...overrides` spread at
+  // the end, because the application is composed from these stores. A test
+  // that swaps in ClickHouse-backed repositories (`clickhouseTestApp`) would
+  // otherwise get them on `app.gatewayStores` and an application still holding
+  // the empty defaults, so its REST and tRPC doors would report no spend
+  // source while the direct reads saw one.
+  const testGatewayStores: AppDependencies["gateway"] = overrides?.gateway ?? {
+    virtualKeys: testGovernanceVirtualKeys,
+    budgetDecisions: testGatewayBudgetDecisions,
+    budgets: undefined,
+    changes: testGatewayChanges,
+    virtualKeySpend: undefined,
+    spendEvents: undefined,
+    webhookEvents: undefined,
+    webhookEndpoints: testWebhookEndpoints,
+    webhookHealth: testWebhookHealth,
+    webhookDelivery: undefined,
+  };
+
   const shutdownResources = new AppShutdownResources();
   shutdownResources.register("subscriber", "trace-privacy", () => testTracePrivacy.close());
   shutdownResources.register("subscriber", "mailer", () => testMailer.close());
@@ -3219,18 +3580,14 @@ export function createTestApp(
     simulations: testSimulations,
     simulationExports: ScenarioRunExportService.create(testSimulations),
     topics: testTopics,
-    gateway: {
-      virtualKeys: testGovernanceVirtualKeys,
-      budgetDecisions: testGatewayBudgetDecisions,
-      budgets: undefined,
-      changes: testGatewayChanges,
-      virtualKeySpend: undefined,
-      spendEvents: undefined,
-      webhookEvents: undefined,
-      webhookEndpoints: testWebhookEndpoints,
-      webhookHealth: testWebhookHealth,
-      webhookDelivery: undefined,
-    },
+    gateway: testGatewayStores,
+    gatewayApp: composeGatewayApp({
+      prisma: testPrisma,
+      projects: testProjects,
+      evaluators: testEvaluators,
+      monitors: testMonitors,
+      stores: testGatewayStores,
+    }),
     filters: { options: new FilterService(null) },
     clickhouse: {
       enabled: false,

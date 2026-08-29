@@ -16,7 +16,7 @@ const VK_SECRETS = process.env.VK_SECRETS?.split(",") ?? [];
 
 async function probe(secret: string) {
   const app = initializeDefaultApp({ processRole: "web" });
-  const vk = await app.gateway.virtualKeys.getBySecretInternal(secret);
+  const vk = await app.gatewayStores.virtualKeys.getBySecretInternal(secret);
   if (!vk) {
     console.log(`✗ ${secret.slice(0, 18)}… → unknown VK`);
     return;

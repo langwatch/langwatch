@@ -57,7 +57,7 @@ vi.mock("~/server/app-layer/app", async () => {
       planProvider: {
         getActivePlan: async () => ({ webhookEndpointsEnabled: true }),
       },
-      gateway: {
+      gatewayStores: {
         budgets: new GatewayBudgetClickHouseRepository(async () => chClient),
         virtualKeySpend: GatewayVirtualKeySpendAdapter.create(async () => chClient),
         spendEvents: GatewaySpendEventsService.create(

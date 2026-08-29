@@ -130,7 +130,7 @@ async function purgePrevious(target: SeedTarget) {
 }
 
 async function createKeys(target: SeedTarget): Promise<Map<string, string>> {
-  const service = initializeDefaultApp({ processRole: "web" }).gateway.virtualKeys;
+  const service = initializeDefaultApp({ processRole: "web" }).gatewayStores.virtualKeys;
   const base = {
     organizationId: target.organizationId,
     actorUserId: target.userId,

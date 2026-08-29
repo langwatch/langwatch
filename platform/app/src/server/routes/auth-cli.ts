@@ -1278,7 +1278,7 @@ secured.access(CLI_POLICY).get("/budget/status", async (c: CliContext) => {
   const personalVk = vks[0];
   if (!personalVk) return c.json({ ok: true }, 200);
 
-  const decision = await c.var.langwatchApp.gateway.budgetDecisions.check({
+  const decision = await c.var.langwatchApp.gatewayStores.budgetDecisions.check({
     organizationId: tokenRecord.organization_id,
     teamId: workspace.team.id,
     projectId: workspace.project.id,

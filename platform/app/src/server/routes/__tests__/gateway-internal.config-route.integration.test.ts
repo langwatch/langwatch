@@ -38,7 +38,7 @@ vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
   tryGetApp: () => null,
   getApp: () => ({
-    gateway: {
+    gatewayStores: {
       budgets: new GatewayBudgetClickHouseRepository(async (projectId) => {
         const client = await getClickHouseClientForTenant(projectId);
         if (!client) throw new Error("ClickHouse is not configured");

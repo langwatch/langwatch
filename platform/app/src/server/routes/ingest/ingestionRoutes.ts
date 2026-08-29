@@ -656,10 +656,10 @@ secured.access(ingestAuth).post("/otel/:sourceId/v1/logs", async (c: IngestConte
         costEventCount = events.length;
 
         const budgetCHRepo =
-          events.length > 0 ? c.var.langwatchApp.gateway.budgets : undefined;
+          events.length > 0 ? c.var.langwatchApp.gatewayStores.budgets : undefined;
         if (events.length > 0 && budgetCHRepo) {
-          const budgetDecisions = c.var.langwatchApp.gateway.budgetDecisions;
-          const changeEvents = c.var.langwatchApp.gateway.changes;
+          const budgetDecisions = c.var.langwatchApp.gatewayStores.budgetDecisions;
+          const changeEvents = c.var.langwatchApp.gatewayStores.changes;
 
           for (const event of events) {
             try {

@@ -32,12 +32,15 @@ import type { DashboardService } from "@langwatch/dashboard-contract";
 import type { LangWatchQLService } from "~/server/analytics/lwql";
 import type { AppCommands } from "~/server/event-sourcing/registration/pipelineRegistry";
 import type { FilterService } from "~/server/filters/filter.service";
+import type { GatewayApp } from "@langwatch/gateway-server";
 import type { GatewayBudgetSpendPort } from "@langwatch/gateway-server";
 import type { GatewayChangeEventsPort } from "@langwatch/gateway-server";
 import type { GatewayService } from "@langwatch/gateway-server";
 import type { GatewayVirtualKeySpendPort } from "@langwatch/gateway-server";
 import type { GatewaySpendEventsService } from "@langwatch/gateway-server";
+import type { ApplicableBudget } from "~/server/gateway/applicableBudgets.service";
 import type { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import type { VirtualKeyDirectBudget } from "~/server/gateway/virtualKeyDirectBudget.service";
 import type { StoredObjectOwnerResolver } from "@langwatch/stored-object-contract";
 import type { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
 import type { AppUserAvatarReadCompatibilityAdapter } from "~/runtime/app/features/user-avatar-read.compatibility.adapter";
@@ -218,6 +221,21 @@ export interface AppDependencies {
     /** The process-owned delivery/outbox capability for replay and intent execution. */
     webhookDelivery: WebhookDeliveryService | undefined;
   };
+  /**
+   * The Gateway feature's application — what all seven of its doors are given.
+   *
+   * A port rather than something the App builds for itself. Its checks reach
+   * `server/gateway/virtualKey.authz`, which imports
+   * `server/app-layer/permissions/imperative`, which value-imports `getApp`
+   * from `app-layer/app.ts`: composing it there would put a cycle back through
+   * that module into every backend process's graph. Same reason
+   * {@link AppDependencies.codingAgentScope} is a port.
+   *
+   * The two type arguments are the shapes this process owns and the feature
+   * package cannot name. They are pinned here rather than left `unknown` so a
+   * tRPC router built over the application keeps them on its wire contract.
+   */
+  gatewayApp: GatewayApp<ApplicableBudget[], VirtualKeyDirectBudget>;
   /** The values a filter can offer, read from the trace store. */
   filters: {
     options: FilterService;

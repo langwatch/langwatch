@@ -47,7 +47,7 @@ export async function getCodexVercelAIModel({
 
   const virtualKey = await provisionLangyVirtualKey({
     prisma,
-    virtualKeys: getApp().gateway.virtualKeys,
+    virtualKeys: getApp().gatewayStores.virtualKeys,
     projectId,
     organizationId,
   });

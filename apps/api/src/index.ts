@@ -143,14 +143,11 @@ export {
   MAX_VALUE_BYTES,
   MIN_TTL_SECONDS,
 } from "./features/agent-cache/agent-cache-rest";
-export {
-  createGatewayPlatformRestApp,
-  type GatewayPlatformRestPorts,
-  type GatewayRestActor,
-  type GatewayRestVirtualKeyBudgetInput,
-  type GatewayRestVirtualKeyReads,
-  type GatewayRestVirtualKeyWrites,
-} from "@langwatch/gateway-server";
+// The five port and actor types this used to re-export beside the family are
+// gone: `GatewayApp` subsumed them. A process composes that application and
+// hands it in — `createGatewayPlatformRestApp({ security, gateway })` — and
+// reaches the class through `@langwatch/gateway-server`, where it is declared.
+export { createGatewayPlatformRestApp } from "@langwatch/gateway-server";
 export { createGatewaySpendRestApp } from "./features/gateway/gateway-spend-rest";
 export type { GatewaySpendRestPorts } from "./features/gateway/gateway-spend-rest.ports";
 export { createGovernanceRestApp } from "@langwatch/enterprise-api";

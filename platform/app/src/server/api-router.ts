@@ -7,20 +7,12 @@ import { app as scimApp } from "~/server/enterprise/scim/routes";
 import { app as webhooksApp } from "~/server/enterprise/scim/webhooks";
 import { Hono, type MiddlewareHandler } from "hono";
 import { appRestSecurity } from "~/server/api/security";
-import type { GuardrailAttachment } from "@langwatch/gateway-contract";
 import {
   applicableEndUserCaps,
   FixedGatewaySettlementPolicy,
-  GatewayUsageService,
-  loadTraceDestinationFacts,
   settlementGraceMs,
-  toVirtualKeySnakeDto,
 } from "@langwatch/gateway-server";
-import type {
-  GatewayPlatformRestPorts,
-  GatewayRestActor,
-  GatewaySpendRestPorts,
-} from "@langwatch/platform-api";
+import type { GatewaySpendRestPorts } from "@langwatch/platform-api";
 import { createExportTracesRestApp } from "@langwatch/platform-api";
 import {
   createAppRestFeatures,
@@ -88,18 +80,15 @@ import { canonicalErrorFor } from "~/app/api/shared/canonical-error";
 import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 import { platformUrl } from "~/app/api/shared/platform-url";
 import { scenarioRunPlatformUrl } from "../app/api/simulation-runs/scenario-run-platform-url";
-import type { ProjectIdentity } from "@langwatch/project-contract";
 import { auditLog } from "~/runtime/app/features/audit-log";
 import {
   assertWebhookEndpointsEntitled,
   WebhookEndpointsNotEntitledError,
 } from "~/runtime/app/features/webhooks";
 import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
-import { withIdempotency } from "~/server/api/idempotency";
 import { managementAuditPort } from "~/server/api/management/audit";
 import { instanceAdminApiKey } from "~/server/api/management/instance-admin-key";
 import { appRestRbacVocabulary } from "~/server/api/management/rbac-vocabulary";
-import type { Permission } from "~/server/api/rbac";
 import { getUserProtectionsForProject } from "~/server/api/utils";
 import { predefinedEventsSchemas, predefinedEventTypes } from "@langwatch/trace-contract";
 import {
@@ -114,20 +103,6 @@ import { prisma } from "~/server/db";
 import { ExportFailedError, ExportUnauthenticatedError } from "~/server/export/errors";
 import { exportRequestSchema } from "~/server/export/types";
 import { resolveSpendScope } from "~/server/gateway/spendScope";
-import {
-  assertActorCanManageAllScopes,
-  assertActorCanOperateOnAnyScope,
-  assertGuardrailAttachmentsAllowed,
-  assertScopesBelongToOrg,
-  assertTraceProjectBelongsToOrg,
-  isVisibleToMembership,
-  type MembershipSet,
-  requireExistingVk,
-  requireVisibleVk,
-  resolveVkProjectId,
-  type VirtualKeyActor,
-} from "~/server/gateway/virtualKey.authz";
-import { virtualKeyBudgetInputSchema } from "~/server/gateway/virtualKey.service";
 import { rateLimit } from "~/server/rateLimit";
 import { bodyLimit } from "./routes/_lib/body-limit";
 import { extractInlineMediaFromEvent } from "./stored-objects/content-extractor";
@@ -137,145 +112,14 @@ import type { NextRequest } from "~/types/next-stubs";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { zodErrorMessage } from "~/utils/zodErrorMessage";
 
-/**
- * A project credential stands in for someone working in its project, so it
- * sees organization-scoped keys, its own team's keys and its own project's —
- * and not a sibling team's. The same rule the tRPC list uses.
- */
-function membershipForProjectCredential(project: ProjectIdentity): MembershipSet {
-  return {
-    isOrgMember: true,
-    isOrgAdmin: false,
-    teamIds: new Set([project.teamId]),
-    projectIds: new Set([project.id]),
-  };
-}
-
-/**
- * The process's receipt ledger, as the gateway REST port takes it. A named
- * generic rather than an arrow so the port's own type parameter survives.
- */
-function runIdempotently<T>(input: {
-  operation: string;
-  scopeId: string;
-  key: string | null;
-  validatedBody: unknown;
-  handler: () => Promise<{ status: number; body: T }>;
-}) {
-  return withIdempotency({ prisma, ...input });
-}
-
-/**
- * The one seam between the public gateway REST surface and this application.
- * Every entry fronts the SAME module the gateway's tRPC routers reach through
- * `gatewayTrpcPorts`, so the two doors cannot enforce different rules.
- */
-function gatewayPlatformRestPorts(app: App): GatewayPlatformRestPorts {
-  const asActor = (actor: GatewayRestActor) => actor as VirtualKeyActor;
-  return {
-    virtualKeys: app.gateway.virtualKeys,
-    budgets: app.gateway.budgetDecisions,
-    spendSourceAvailable: app.gateway.virtualKeySpend !== undefined,
-    organizationIdForProject: async (projectId) => {
-      const found = await prisma.project.findUnique({
-        where: { id: projectId },
-        include: { team: true },
-      });
-      if (!found) throw new Error(`project ${projectId} missing team`);
-      return found.team.organizationId;
-    },
-    // A scoped API key acts as its owning user; a legacy project key carries
-    // none, so it acts as a stable machine principal for its project, which
-    // keeps an audit row traceable back to the credential that wrote it.
-    actorForCredential: ({ projectId, resolvedToken }) =>
-      resolvedToken?.type === "apiKey"
-        ? {
-            actor: {
-              kind: "apiKey",
-              apiKeyId: resolvedToken.apiKeyId,
-              userId: resolvedToken.userId,
-              organizationId: resolvedToken.organizationId,
-            },
-            actorUserId: resolvedToken.userId ?? `svc_${projectId}`,
-          }
-        : {
-            actor: { kind: "legacyProjectKey", projectId },
-            actorUserId: `svc_${projectId}`,
-          },
-    visibleToProjectCredential: ({ project, virtualKeys }) => {
-      const membership = membershipForProjectCredential(project);
-      return virtualKeys.filter((vk) => isVisibleToMembership(membership, vk.scopes));
-    },
-    requireVisibleVirtualKey: ({ project, id, organizationId }) =>
-      requireVisibleVk(app.gateway.virtualKeys, membershipForProjectCredential(project), {
-        id,
-        organizationId,
-      }),
-    requireExistingVirtualKey: ({ id, organizationId }) =>
-      requireExistingVk(app.gateway.virtualKeys, id, organizationId),
-    assertCanManageAllScopes: ({ actor, scopes }) =>
-      assertActorCanManageAllScopes({ prisma, actor: asActor(actor) }, [...scopes]),
-    assertCanOperateOnAnyScope: ({ actor, scopes, permission }) =>
-      assertActorCanOperateOnAnyScope(
-        { prisma, actor: asActor(actor) },
-        [...scopes],
-        permission as Permission,
-      ),
-    assertScopesBelongToOrganization: ({ organizationId, scopes }) =>
-      assertScopesBelongToOrg(prisma, organizationId, [...scopes]),
-    assertTraceProjectBelongsToOrganization: ({ organizationId, traceProjectId }) =>
-      assertTraceProjectBelongsToOrg(prisma, organizationId, traceProjectId),
-    assertGuardrailAttachmentsAllowed: ({ actor, projectId, attachments }) =>
-      assertGuardrailAttachmentsAllowed(
-        { prisma, actor: asActor(actor) },
-        projectId,
-        attachments as GuardrailAttachment[] | undefined,
-      ),
-    resolveVirtualKeyProjectId: ({ organizationId, virtualKeyId, scopes, traceProjectId }) =>
-      resolveVkProjectId(prisma, organizationId, {
-        vkId: virtualKeyId,
-        inputScopes: scopes ? [...scopes] : undefined,
-        traceProjectId,
-      }),
-    // One read of the destinations for the whole page: a listing must not cost
-    // a query per key to say where each one's traffic goes.
-    toVirtualKeyDtos: async ({ virtualKeys }) => {
-      const facts = await loadTraceDestinationFacts({
-        projects: app.projects.projectService,
-        virtualKeys: [...virtualKeys],
-      });
-      return virtualKeys.map((virtualKey) => toVirtualKeySnakeDto({ virtualKey, facts }));
-    },
-    groupMemberCounts: async (budgets) => {
-      const groupIds = Array.from(
-        new Set(budgets.filter((b) => b.scopeType === "GROUP").map((b) => b.scopeId)),
-      );
-      if (groupIds.length === 0) return new Map();
-      const groups = await prisma.group.findMany({
-        where: { id: { in: groupIds } },
-        select: { id: true, _count: { select: { members: true } } },
-      });
-      return new Map(groups.map((g) => [g.id, g._count.members]));
-    },
-    spendByVirtualKey: ({ organizationId, virtualKeyIds, window }) =>
-      GatewayUsageService.create({
-        prisma,
-        chRepo: undefined,
-        spendRepo: app.gateway.virtualKeySpend,
-      }).spendByVirtualKey({ organizationId, virtualKeyIds: [...virtualKeyIds], window }),
-    idempotency: runIdempotently,
-    schemas: { virtualKeyBudgetInput: virtualKeyBudgetInputSchema },
-  };
-}
-
 /** The ledger, the replay path and the scope resolver the spend reads use. */
 function gatewaySpendRestPorts(app: App): GatewaySpendRestPorts {
   return {
-    spendEvents: app.gateway.spendEvents,
-    budgetSpend: app.gateway.budgets,
-    webhookEndpoints: app.gateway.webhookEndpoints,
-    webhookEvents: app.gateway.webhookEvents,
-    webhookDelivery: app.gateway.webhookDelivery,
+    spendEvents: app.gatewayStores.spendEvents,
+    budgetSpend: app.gatewayStores.budgets,
+    webhookEndpoints: app.gatewayStores.webhookEndpoints,
+    webhookEvents: app.gatewayStores.webhookEvents,
+    webhookDelivery: app.gatewayStores.webhookDelivery,
     settlementPolicy: FixedGatewaySettlementPolicy.create(
       settlementGraceMs(process.env.LW_SPEND_SETTLEMENT_GRACE_MS),
     ),
@@ -414,7 +258,10 @@ export function createApiRouter(app: App) {
       datasets: () => app.dataset,
       evaluators: () => app.evaluatorApp,
       experiments: () => app.experiments,
-      gatewayPlatform: () => gatewayPlatformRestPorts(app),
+      // The same application the gateway's six tRPC routers are given, not a
+      // second description of this process, which is what stops the public
+      // REST door and the browser's door enforcing different rules.
+      gatewayPlatform: () => app.gateway,
       gatewaySpend: () => gatewaySpendRestPorts(app),
       governance: () => app.governanceApp,
       modelProviders: () => app.modelProviders.providerService,

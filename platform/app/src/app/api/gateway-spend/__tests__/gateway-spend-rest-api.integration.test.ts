@@ -64,7 +64,7 @@ vi.mock("~/server/app-layer/app", async () => {
           webhookEndpointsEnabled: planHasWebhookEndpoints,
         }),
       },
-      gateway: {
+      gatewayStores: {
         budgets: GatewayBudgetLedgerAdapter.create(resolveTestClickHouseClient),
         virtualKeySpend: undefined,
         spendEvents: GatewaySpendEventsService.create(
@@ -113,11 +113,11 @@ import { resolveSpendScope } from "~/server/gateway/spendScope";
 function gatewaySpendRestPorts(): GatewaySpendRestPorts {
   const current = getApp();
   return {
-    spendEvents: current.gateway.spendEvents,
-    budgetSpend: current.gateway.budgets,
-    webhookEndpoints: current.gateway.webhookEndpoints,
-    webhookEvents: current.gateway.webhookEvents,
-    webhookDelivery: current.gateway.webhookDelivery,
+    spendEvents: current.gatewayStores.spendEvents,
+    budgetSpend: current.gatewayStores.budgets,
+    webhookEndpoints: current.gatewayStores.webhookEndpoints,
+    webhookEvents: current.gatewayStores.webhookEvents,
+    webhookDelivery: current.gatewayStores.webhookDelivery,
     settlementPolicy: FixedGatewaySettlementPolicy.create(
       settlementGraceMs(process.env.LW_SPEND_SETTLEMENT_GRACE_MS),
     ),

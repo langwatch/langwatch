@@ -17,7 +17,7 @@ async function main() {
   }
 
   const app = initializeDefaultApp({ processRole: "web" });
-  const service = app.gateway.virtualKeys;
+  const service = app.gatewayStores.virtualKeys;
   const vk = await service.getBySecretInternal(presented);
   console.log("vk:", vk ? `${vk.id} (${vk.name})` : "null");
   if (!vk) return;
