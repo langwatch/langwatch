@@ -87,23 +87,33 @@ exported from a component that never groups, are the same tell.
 
 ## Test files that still cannot load
 
-Repaired so far: the three Langy suites, `caseFiling`, `canonical-error`, and
-`savedWorkbenchChart.integration` — six of the twenty found. What each of the
-rest names, and why it is not a repoint:
+Twelve of the twenty are resolved: the three Langy suites, `caseFiling`,
+`canonical-error`, `savedWorkbenchChart.integration`, `virtualKeySpend` with
+its `budgetOverviewFixture`, `secrets.service-boundary`, and two retired to
+successors that cover them better (`getEvaluatorModelSettingFields`,
+`modelDefaults.service.userKey`).
+
+Three findings came out of the ones that were **not** repoints, which is the
+argument for working through the rest rather than sweeping them:
+
+- `dashboardBelongsToProject` looked exactly like an orphan and was not.
+- `modelDefaults.service.userKey` named a deleted guard — and the handled
+  error it pinned had stopped being thrown anywhere, leaving a registered code
+  with customer copy that no path could reach.
+- `secrets.service-boundary` loaded fine once repointed but asserted a stale
+  calling convention, which is the same lesson the workbench's three gave:
+  a suite that cannot load also stops being maintained.
+
+What each of the rest names, and why it is not a repoint:
 
 | suite | names | why |
 | --- | --- | --- |
 | `modelProvider.routingHandle.integration` | `ModelProviderService` | The concrete service is internal to `@langwatch/model-provider-server` on purpose — the package's public surface is `PostgresModelProviderAdapter`, which constructs it. Either drive the test through the adapter, or move the test into the package. |
 | `seedOnboardingDefaults.merge.integration` | `ModelProviderService`, `ModelDefaultsRepository` | Same, plus `ModelDefaultsRepository` exists nowhere in the repo. |
-| `modelDefaults.service.userKey.unit` | `assertCanWriteScope` | Exists nowhere. The only `assertCanWriteScope` left is data-retention's, an unrelated port method. |
-| `secrets.service-boundary.unit` | `../secrets` | The router moved out of `server/api/routers`. |
 | `grant-provenance.unit` | `../repositories/authz-grants.ledger.repository`, `./ledger-write-fork.harness` | Neither exists; `server/app-layer/authz/repositories/` is gone. |
-| `getEvaluatorModelSettingFields.unit` | `../getEvaluator` | Deleted by 4b9a5d3eb5, which consolidated evaluator execution. |
 | `runBoardSnapshot.integration` | `../experiment-run.service` | Moved under `@langwatch/experiment-*`. |
 | `governance-ingestion-key-resolution.integration` | `~/server/api-key/token-resolver` | Deleted; no successor by that name. |
-| `savedWorkbenchChart.integration` (was) | — | Fixed. |
 | `langyProcessPipeline.prisma.integration` | `./helpers/langyEventFixtures` | The fixture went with #6051, and so did every module it imported — `process-manager/` now holds nothing but this one `__tests__`. Worth porting rather than dropping: it is the only place the exactly-once commit and the outbox dispatch are asserted against a real Postgres. The package's three process tests (`langyConversationProcess`, `pipelineShape`, `langy-process-trace-continuity`) are all unit, and none of them makes that claim. |
-| `virtualKeySpend.integration`, `budgetOverviewFixture` | each other | The fixture is itself in the broken set. |
 | `e2e/langy/fake-tab-*` (3) | `~/features/langy/uiActions/*` | The whole `uiActions` directory moved into the Langy package. |
 
 The split that matters: a suite naming a symbol that still exists somewhere is
