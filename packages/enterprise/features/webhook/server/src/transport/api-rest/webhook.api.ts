@@ -781,7 +781,13 @@ export function createWebhookRestApp(options: {
             // Null on a transport with no status of its own: a queue accepted
             // the message or it did not, and there is no code to report.
             response_status: result.status,
-            response_body: (delivered ? result.body : (result.error ?? "")).slice(0, 500),
+            // `body` is `unknown` on the dispatch result — a queue transport
+            // answers with whatever its client returned — so it is rendered
+            // rather than sliced directly, which would throw on a non-string.
+            response_body: String(delivered ? (result.body ?? "") : (result.error ?? "")).slice(
+              0,
+              500,
+            ),
           },
         });
       } catch (error) {
@@ -950,14 +956,16 @@ export function createWebhookRestApp(options: {
       // The service maps emitted types to row statuses and serves an empty
       // page for unknown types, so consumers can probe forward-compatibly
       // without an error.
-      const page = await webhooks().requireEvents().getEmittedEvents({
-        organizationId: organization.id,
-        fromMs: query.from,
-        toMs: query.to,
-        cursor: query.cursor ?? null,
-        limit: query.limit,
-        types: query.type !== undefined ? [query.type] : undefined,
-      });
+      const page = await webhooks()
+        .requireEvents()
+        .getEmittedEvents({
+          organizationId: organization.id,
+          fromMs: query.from,
+          toMs: query.to,
+          cursor: query.cursor ?? null,
+          limit: query.limit,
+          types: query.type !== undefined ? [query.type] : undefined,
+        });
       return c.json({ data: page.events, next_cursor: page.nextCursor });
     },
   );
@@ -980,10 +988,12 @@ export function createWebhookRestApp(options: {
     }),
     async (c) => {
       const organization = c.get("organization");
-      const event = await webhooks().requireEvents().tryGetEmittedEventById({
-        organizationId: organization.id,
-        id: c.req.param("id"),
-      });
+      const event = await webhooks()
+        .requireEvents()
+        .tryGetEmittedEventById({
+          organizationId: organization.id,
+          id: c.req.param("id"),
+        });
       if (!event) throw new WebhookEventNotFoundError();
       return c.json({ data: event });
     },

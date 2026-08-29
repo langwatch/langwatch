@@ -97,7 +97,11 @@ export class LicenseEnforcementTrpcApi {
      * `actor()` is the process's refusal for a request carrying no caller, and
      * it throws before the fallback below can be reached.
      */
-    const callerOf = (ctx: TContext): LimitActor => {
+    // The CONSTRAINT rather than the type parameter: a resolver is handed a
+    // `Simplify<TContext>`, which satisfies the constraint and is not
+    // assignable to `TContext`. This reads the session and the actor, both of
+    // which the constraint declares.
+    const callerOf = (ctx: LicenseEnforcementTrpcContext): LimitActor => {
       const actor = ctx.actor();
       return ctx.session?.user ?? actor;
     };

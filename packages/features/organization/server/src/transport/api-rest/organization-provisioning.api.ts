@@ -128,7 +128,11 @@ export function verifyInstanceAdminKey(options: {
     if (!isAuthorized(authorization, configured)) {
       throw new InstanceAdminRefusedError("invalid_credentials");
     }
-    await next();
+    // Returned rather than awaited so every path of a `Promise<Response | void>`
+    // returns one; `noImplicitReturns` reads the fall-through as a missing
+    // answer, and a middleware that short-circuits on some paths and not
+    // others is exactly where that matters.
+    return next();
   };
 }
 

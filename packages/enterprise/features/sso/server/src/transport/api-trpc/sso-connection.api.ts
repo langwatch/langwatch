@@ -194,12 +194,20 @@ export class SsoConnectionTrpcApi {
     const { protected: procedure, staffPolicy, staffPolicyForOrganization } = procedures;
 
     /** The operator, or a 404 that says nothing about why. */
-    const requireOperator = (ctx: TContext): OperatorActor => {
+    // The CONSTRAINT, not the type parameter: tRPC hands a resolver a
+    // `Simplify<TContext>`, which satisfies the constraint but is not
+    // assignable to `TContext` itself. Neither helper reads anything past the
+    // constraint.
+    const requireOperator = (ctx: SsoConnectionTrpcContext): OperatorActor => {
       // `actor()` is the process's refusal for a request carrying no caller;
       // it throws before the fallback below can be reached.
       const caller = ctx.actor();
       const user = ctx.session?.user;
-      const staff = user?.impersonator ?? user ?? caller;
+      // Annotated, because the actor fallback carries no address and the
+      // staff list is checked on one: a request with no session resolves to
+      // an identity that cannot be an operator, which is the refusal this
+      // surface wants and not an accident of inference.
+      const staff: StaffIdentity = user?.impersonator ?? user ?? caller;
       if (!ctx.app.ops.isAdmin(staff)) throw new AdminSurfaceHiddenError();
       return { userId: staff.id };
     };
@@ -215,7 +223,7 @@ export class SsoConnectionTrpcApi {
       action,
       args,
     }: {
-      ctx: TContext;
+      ctx: SsoConnectionTrpcContext;
       action: string;
       args: Record<string, unknown>;
     }): Promise<OperatorActor> => {

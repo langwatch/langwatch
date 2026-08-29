@@ -971,13 +971,21 @@ export class UserTrpcApi {
         const sortedScopes = decision.scopes
           .map((scope) => ({ ...scope, pctUsed: percentUsed(scope.spentUsd, scope.limitUsd) }))
           .sort((a, b) => b.pctUsed - a.pctUsed);
-        const topScope = decision.blockedBy[0] ?? sortedScopes[0];
+        // `blockedBy` carries the same scopes without the derived percentage,
+        // so it is mapped the same way rather than tested for the field: a
+        // `"pctUsed" in topScope` guard over the union typed the value
+        // `unknown`, and the comparison below silently never fired for a
+        // blocking scope.
+        const blocking = decision.blockedBy[0];
+        const topScope = blocking
+          ? { ...blocking, pctUsed: percentUsed(blocking.spentUsd, blocking.limitUsd) }
+          : sortedScopes[0];
         if (!topScope) return { status: "ok" as const };
 
         const baseStatus =
           decision.decision === "hard_block"
             ? ("exceeded" as const)
-            : decision.decision === "soft_warn" || ("pctUsed" in topScope && topScope.pctUsed >= 80)
+            : decision.decision === "soft_warn" || topScope.pctUsed >= 80
               ? ("warning" as const)
               : ("ok" as const);
 

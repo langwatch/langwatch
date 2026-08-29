@@ -61,7 +61,7 @@ function resolveOrganization(organizations: () => OrganizationService): Middlewa
       );
     }
 
-    await next();
+    return next();
   };
 }
 

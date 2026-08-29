@@ -151,7 +151,7 @@ export class SubscriptionTrpcApi {
      * refusal for a request carrying no caller and throws before the fallback
      * can be reached.
      */
-    const callerOf = (ctx: TContext): { email?: string | null } => {
+    const callerOf = (ctx: SubscriptionTrpcContext): { email?: string | null } => {
       ctx.actor();
       return ctx.session?.user ?? {};
     };
