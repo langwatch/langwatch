@@ -106,6 +106,48 @@ console.log(result.batchRunId);
 
 `langwatch.runPlans.run({ ... })` takes the same body as `POST /api/v1/run-plans/run`.
 
+## Compare two agents, or one agent on two models
+
+A run goes against every target you name, so naming two targets runs each scenario twice and files both under one batch. That is how you compare a candidate against what is in production.
+
+A target may also carry the parameter values it alone runs with. Name the same agent twice with different values and you compare that agent on two models in the same run.
+
+```bash
+langwatch test-suite run "Checkout regression" \
+  --target 'http:agent_abc123?model=gpt-5' \
+  --target 'http:agent_abc123?model=gpt-5-mini' \
+  --wait
+```
+
+The suffix after the question mark is a query string. Both halves are percent-decoded, so a value that holds `?` or `&` must be written as `%3F` or `%26`. A value is read as the type it looks like: `true` and `false` become booleans, a plain number becomes a number, everything else stays text.
+
+On the REST API the same values go in `runParameters` on the target:
+
+```bash
+curl -X POST "https://app.langwatch.ai/api/v1/test-suites/suite_abc123/run" \
+  -H "X-Auth-Token: ${LANGWATCH_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targets": [
+      {
+        "type": "http",
+        "referenceId": "agent_abc123",
+        "runParameters": { "model": "gpt-5" }
+      },
+      {
+        "type": "http",
+        "referenceId": "agent_abc123",
+        "runParameters": { "model": "gpt-5-mini" }
+      }
+    ],
+    "note": "gpt-5 against gpt-5-mini"
+  }'
+```
+
+`runParameters` are merged over the run-level `parameters`, and the target wins. Use `parameters` for what every target shares, such as a fixture id or a tenant, and `runParameters` for what tells the targets apart.
+
+The results page shows one column per target, each with its own pass rate, duration and cost, so you read the two side by side rather than as one fused number.
+
 ## Poll the batch
 
 `GET /api/simulation-runs/batches/{batchRunId}` answers with the counts of one batch:

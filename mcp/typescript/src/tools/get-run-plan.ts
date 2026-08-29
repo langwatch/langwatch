@@ -33,7 +33,14 @@ export async function handleGetRunPlan(params: {
 
   lines.push("\n## Targets");
   for (const target of plan.targets) {
-    lines.push(`- ${target.type}:${target.referenceId}`);
+    // The parameters are part of the target's identity, so a plan that
+    // compares one agent on two models reads as two lines that differ.
+    const overrides = Object.entries(target.runParameters ?? {})
+      .map(([name, value]) => `${name}=${String(value)}`)
+      .join(", ");
+    lines.push(
+      `- ${target.type}:${target.referenceId}${overrides ? ` (${overrides})` : ""}`,
+    );
   }
 
   if (plan.scenarioIds.length > 0) {

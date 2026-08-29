@@ -8,6 +8,11 @@ Feature: Run Plan CLI Commands
   name creates the plan. A configuration is a scope, one or more targets, a
   repeat count, a simulator model and a judge model.
 
+  A target is what to run against plus the parameter values that target alone
+  runs with, written as a query string after its reference id. The same agent
+  named twice with different values is two targets, which is how one agent is
+  compared on two models.
+
   Background:
     Given I have a valid LANGWATCH_API_KEY configured
 
@@ -46,6 +51,14 @@ Feature: Run Plan CLI Commands
   Scenario: Run against more than one target
     When I run "langwatch run-plan run --all --target http:agent_abc --target prompt:prompt_xyz"
     Then the run is scheduled against both targets
+
+  @unit
+  Scenario: A target carries its own parameters after a question mark
+    When I run "langwatch run-plan run --all --target 'http:agent_abc?model=gpt-5' --target 'http:agent_abc?model=gpt-5-mini'"
+    Then the run is scheduled against two targets that name the same agent
+    And each target carries the model value written after its question mark
+    And the values are percent-decoded and read as the type they look like
+    And a value given here wins over the same name given with --param
 
   @unit
   Scenario: Run under a name that names an existing plan
@@ -107,6 +120,24 @@ Feature: Run Plan CLI Commands
   Scenario: Run with a malformed target
     When I run "langwatch run-plan run --all --target agent_abc"
     Then I see an error that a target reads as type:referenceId
+    And no run is scheduled
+
+  @unit
+  Scenario: Run with a target whose question mark carries nothing
+    When I run "langwatch run-plan run --all --target 'http:agent_abc?'"
+    Then I see an error that the question mark carries no parameters
+    And no run is scheduled
+
+  @unit
+  Scenario: Run with a target parameter that is not a pair
+    When I run "langwatch run-plan run --all --target 'http:agent_abc?model'"
+    Then I see an error that each target parameter reads as key=value
+    And no run is scheduled
+
+  @unit
+  Scenario: Run with a target holding a second question mark
+    When I run "langwatch run-plan run --all --target 'http:agent_abc?ask=what?'"
+    Then I see an error that a question mark must be percent-encoded as %3F
     And no run is scheduled
 
   @unit

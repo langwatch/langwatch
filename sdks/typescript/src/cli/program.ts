@@ -89,7 +89,7 @@ const SCOPE_SCENARIO_FLAG_HELP =
  * eating argv until the next flag.
  */
 const TARGET_FLAG_HELP =
-  "What to run against, written <type>:<referenceId>, for example http:agent_abc123. The types are prompt, http, code and workflow. Repeat the flag for more than one.";
+  "What to run against, written <type>:<referenceId>, for example http:agent_abc123. The types are prompt, http, code and workflow. Repeat the flag for more than one. Add a query string to give that target its own parameter values, for example http:agent_abc123?model=gpt-5, and repeat the flag with the same agent and a different value to compare the two. A target value wins over the same name given with --param. The halves are percent-decoded, so a reference id or a value that holds ? or & must encode it as %3F or %26.";
 
 const RUN_NAME_FLAG_HELP =
   "The run plan to file this run under. A name already in use takes this configuration and the run joins that plan's history; a new name creates the plan. Left out, the platform derives one from what the run covers and what it runs against.";

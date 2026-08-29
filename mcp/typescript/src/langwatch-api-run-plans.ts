@@ -4,6 +4,7 @@ import type {
   runParametersSchema,
   runPlanScopeSchema,
   runPlanTargetSchema,
+  RunPlanTargetWire,
 } from "./schemas/run-plan.js";
 
 /**
@@ -25,7 +26,7 @@ import type {
 /** What a run plan covers. Mirrors `suiteScopeSchema` on the platform. */
 export type RunPlanScope = z.infer<typeof runPlanScopeSchema>;
 
-/** One thing a plan runs its scenarios against. */
+/** One thing a plan runs its scenarios against, as a tool caller writes it. */
 export type RunPlanTarget = z.infer<typeof runPlanTargetSchema>;
 
 /** The values a run supplies for the parameters its scenarios declare. */
@@ -37,7 +38,7 @@ export interface RunPlan {
   slug: string;
   scope: RunPlanScope | null;
   scenarioIds: string[];
-  targets: RunPlanTarget[];
+  targets: RunPlanTargetWire[];
   repeatCount: number;
   simulatorModel: string | null;
   judgeModel: string | null;
@@ -51,7 +52,7 @@ export interface RunPlan {
 /** The configuration a run either writes onto a plan or creates it with. */
 export interface RunPlanConfig {
   scope: RunPlanScope;
-  targets: RunPlanTarget[];
+  targets: RunPlanTargetWire[];
   repeatCount?: number;
   simulatorModel?: string | null;
   judgeModel?: string | null;
@@ -70,7 +71,7 @@ export interface RunPlanRunResult {
   items: Array<{
     scenarioRunId: string;
     scenarioId: string;
-    target: RunPlanTarget;
+    target: RunPlanTargetWire;
     name: string | null;
   }>;
   runPlanId: string;

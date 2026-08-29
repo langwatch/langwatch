@@ -2,8 +2,8 @@ import { makeRequest } from "./langwatch-api.js";
 import type {
   RunParameters,
   RunPlanRunResult,
-  RunPlanTarget,
 } from "./langwatch-api-run-plans.js";
+import type { RunPlanTargetWire } from "./schemas/run-plan.js";
 
 /**
  * Client for `/api/v1/test-suites`.
@@ -88,7 +88,7 @@ export async function archiveTestSuite(
 export async function runTestSuite(
   id: string,
   data: {
-    targets: RunPlanTarget[];
+    targets: RunPlanTargetWire[];
     name?: string;
     repeatCount?: number;
     simulatorModel?: string | null;

@@ -301,6 +301,42 @@ describe("handleRunTestSuite()", () => {
       });
     });
   });
+
+  describe("when two targets name the same agent with different parameters", () => {
+    /** @scenario "Agent runs a test suite against one agent on two models" */
+    it("sends both targets, each carrying its own runParameters", async () => {
+      await handleRunTestSuite({
+        id: "suite_abc123",
+        targets: [
+          {
+            type: "http",
+            referenceId: "agent_abc",
+            parameters: { model: "gpt-5" },
+          },
+          {
+            type: "http",
+            referenceId: "agent_abc",
+            parameters: { model: "gpt-5-mini" },
+          },
+        ],
+      });
+
+      expect(mockRunTestSuite).toHaveBeenLastCalledWith("suite_abc123", {
+        targets: [
+          {
+            type: "http",
+            referenceId: "agent_abc",
+            runParameters: { model: "gpt-5" },
+          },
+          {
+            type: "http",
+            referenceId: "agent_abc",
+            runParameters: { model: "gpt-5-mini" },
+          },
+        ],
+      });
+    });
+  });
 });
 
 describe("handleCreateScenario() with a testSuiteId", () => {

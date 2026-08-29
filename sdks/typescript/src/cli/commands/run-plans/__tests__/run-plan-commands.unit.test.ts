@@ -294,6 +294,59 @@ describe("runRunPlanCommand()", () => {
     });
   });
 
+  describe("when a target carries its own parameters", () => {
+    /** @scenario "A target carries its own parameters after a question mark" */
+    it("sends the same agent twice, each with its own values", async () => {
+      await runRunPlanCommand({
+        all: true,
+        target: ["http:agent_abc?model=gpt-5", "http:agent_abc?model=gpt-5-mini"],
+      });
+
+      expect(runSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            targets: [
+              {
+                type: "http",
+                referenceId: "agent_abc",
+                runParameters: { model: "gpt-5" },
+              },
+              {
+                type: "http",
+                referenceId: "agent_abc",
+                runParameters: { model: "gpt-5-mini" },
+              },
+            ],
+          }),
+        }),
+      );
+    });
+
+    /** @scenario "A target carries its own parameters after a question mark" */
+    it("keeps the run-level values, which the target values override", async () => {
+      await runRunPlanCommand({
+        all: true,
+        target: ["http:agent_abc?model=gpt-5"],
+        param: ["model=gpt-5-mini", "account_tier=gold"],
+      });
+
+      expect(runSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          parameters: { model: "gpt-5-mini", account_tier: "gold" },
+          config: expect.objectContaining({
+            targets: [
+              {
+                type: "http",
+                referenceId: "agent_abc",
+                runParameters: { model: "gpt-5" },
+              },
+            ],
+          }),
+        }),
+      );
+    });
+  });
+
   describe("when a name is given", () => {
     /** @scenario "Run under a name that names an existing plan" */
     it("sends the name, which is the plan's identity", async () => {
