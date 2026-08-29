@@ -89,6 +89,109 @@ rest.get("/secrets", "2026-08-07", (e) => e
 
 tRPC keeps its own spelling (`.input()` then a declared authz middleware then `.query`/`.mutation`) because its type-state machinery is built on tRPC 11's builder and cannot be replaced without forking it. **What converges is the declaration order and the handler body, not the punctuation**: input, then output, then policy, then a handler that calls `c.app` and returns a value.
 
+## The declaration rules, and where they live
+
+Today `RestReady` demands **all five** of input, output, permission, rate limit
+and resource limit before `.handle()` is callable. That is why every endpoint
+carries an input schema even when it takes nothing. The rules below relax two
+of those and tighten one.
+
+### 1–3. The handler's shape follows the schemas
+
+```ts
+type HandlerFor<TApp, TAuth, TInput, TOutput> =
+  TInput extends z.ZodObject
+    ? (c: Context<TApp, TAuth>, input: z.output<TInput>) => Returns<TOutput>
+    : (c: Context<TApp, TAuth>) => Returns<TOutput>;
+
+type Returns<TOutput> =
+  TOutput extends z.ZodType
+    ? z.input<TOutput> | Promise<z.input<TOutput>>
+    : void | Promise<void>;
+```
+
+- No `.withInput()` → the handler has **no second parameter**. Declaring one is
+  a compile error, so it cannot read input that was never validated.
+- No `.withOutput()` → the handler returns `void`. Returning a value is a
+  compile error, and the endpoint answers 204 / `undefined`.
+- Returning a value therefore *requires* `.withOutput()`, which is the same
+  rule stated from the other side.
+
+A `GET` that takes nothing stops needing a dummy schema, and a `DELETE` that
+answers nothing stops needing a dummy output.
+
+### 4. Permission stays mandatory
+
+`.withPermission(p)` or `.withoutPermission(reason)`. Already enforced by
+`RestReady`; unchanged, and extended to tRPC.
+
+### 5. A scope id in the input must be bound to the permission
+
+**This is the one I would write differently from how it was proposed, because
+the gap it closes is bigger than a missing opt-out.**
+
+The two transports do not authorize the same way:
+
+| | What the permission is checked against |
+| --- | --- |
+| tRPC | `scopeLineageGuard(declaration)` runs **after** `.input()` and reads the scope id **from validated input** |
+| REST | `permissionEnforcer: (permission) => MiddlewareHandler` — the **credential's** scope. The input is never consulted. |
+
+So a REST endpoint whose input carries `projectId` is authorized against the
+project the credential resolved to, while its handler reads `input.projectId`.
+When those differ, the caller reads another tenant's data with a permission
+they genuinely hold. It is not a missing declaration; it is a missing *binding*.
+
+A third opt-out (`withConfirmedNoPermission`) would not close it. Whatever the
+wording, the two variants mean "no authorization needed" and reviewers will not
+reliably tell them apart — and the endpoints at risk here are ones that DO
+declare a permission.
+
+So the rule is a binding, not an opt-out:
+
+```ts
+.withPermission("project:view", { scope: "projectId" })  // checked against the input field
+.withPermission("project:view")                          // credential scope; legal only if
+                                                         // the input declares no scope id
+.withoutPermission(reason)                               // the one opt-out, unchanged
+```
+
+Enforced by type-state over the input schema's own keys:
+
+```ts
+type ScopeIdKey = "projectId" | "teamId" | "organizationId" | "userId";
+type ScopeIdsIn<TInput> =
+  TInput extends z.ZodObject ? Extract<keyof TInput["shape"], ScopeIdKey> : never;
+```
+
+If `ScopeIdsIn<TInput>` is not `never`, `.handle()` requires the bound form, and
+`scope` must name one of those keys — a typo is a compile error rather than a
+silently unchecked id. Ordering falls out of it: the check reads validated
+input, so the policy is applied after the parser, which is what tRPC's builder
+already does deliberately.
+
+### Where this logic lives
+
+One implementation, in `@langwatch/api`, transport-agnostic:
+
+```
+shared (packages/api/src/declaration/)
+  the declaration record   input, output, permission + scope binding, limits, docs
+  the type-state           Ready<…>, ScopeIdsIn<…>, HandlerFor<…>, Returns<…>
+  the scope-lineage check  given a declaration and validated input, decide
+        │
+        ├── rest/    maps a declaration onto a Hono route  (thin)
+        └── trpc/    maps a declaration onto a procedure   (thin)
+```
+
+The type-state and the lineage check are the parts a bug would be dangerous in,
+so neither transport gets a copy. What stays per-transport is only the mapping:
+where input comes from (path/query/body vs a single argument), and how a value
+becomes a response (status + body vs a return).
+
+This is also what makes rule 5 fixable at all. Written once, REST inherits the
+binding tRPC already has instead of growing a second, differently-wrong copy.
+
 ## What I am not proposing
 
 - **Not** replacing tRPC's builder with REST's. `.input()`'s parameter type is a two-branch conditional (`TInputOut extends UnsetMarker ? $Parser : TypeError<…>`) which no generic wrapper can satisfy — the documented dead end at `trpc-permission-builder.ts:365`. Converging the punctuation means forking tRPC's builder. Not worth it.

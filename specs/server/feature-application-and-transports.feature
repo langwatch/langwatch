@@ -85,6 +85,52 @@ Feature: The feature application and its transports
     And it returns a value rather than composing a response
 
   @unimplemented @unit
+  Scenario: A handler is given input only when input was declared
+    Given an endpoint that declares no input schema
+    Then its handler is given no input to read
+    And an endpoint that declares one gives its handler the validated input
+
+  @unimplemented @unit
+  Scenario: A handler may answer only when output was declared
+    Given an endpoint that declares no output schema
+    Then its handler answers with nothing
+    And returning a value from it does not compile
+
+  @unimplemented @unit
+  Scenario: Answering requires an output schema
+    Given an endpoint whose handler returns a value
+    When no output schema is declared
+    Then the endpoint does not compile
+
+  # ─── Authorization is bound to what the request names ───────────────────
+
+  @unimplemented @unit
+  Scenario: An endpoint naming a scope must bind its permission to it
+    Given an endpoint whose input names a project, team, organization or user
+    When it declares a permission without saying which input names the scope
+    Then the endpoint does not compile
+
+  @unimplemented @unit
+  Scenario: The bound scope must be one the input actually declares
+    Given an endpoint that binds its permission to an input field
+    When that field is not in the input schema
+    Then the endpoint does not compile
+
+  @unimplemented @integration
+  Scenario: A caller may not reach a scope their credential does not cover
+    Given a caller holding a permission in their own project
+    And a request naming a different project in its input
+    When the request reaches either transport
+    Then it is refused
+    And the refusal does not disclose whether the named project exists
+
+  @unimplemented @unit
+  Scenario: Authorization is decided after the input is validated
+    Given an endpoint whose permission is bound to an input field
+    Then the scope is read from the validated input
+    And never from the unvalidated request
+
+  @unimplemented @unit
   Scenario: The transport owns the response
     Given a handler that returns a value
     Then the framework renders it for that transport
