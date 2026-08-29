@@ -3184,6 +3184,13 @@ export function createTestApp(
   // below are built from.
   const testDataset = AppDatasetRuntime.create({
     database: testPrisma,
+    // Not optional in practice: `AppDatasetRuntime.create` builds its own
+    // storage resolver whenever one is not supplied, and that resolver
+    // refuses to exist without a process-owned AWS configuration. Omitting it
+    // threw "Dataset S3 clients require a process-owned AWS configuration"
+    // out of `createTestApp` itself — so a suite calling it at module scope
+    // could not even load, whatever it was actually testing.
+    aws: testAws,
   }).build();
   const testWorkflowNlpRuntime = AppWorkflowNlpRuntimePort.create(nlpLambda);
   const testWorkflows = AppWorkflowRuntime.create({
