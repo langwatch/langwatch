@@ -20,8 +20,8 @@ const PROD = { id: "agent_prod", name: "prod-agent", type: "http" as const };
 
 describe("initialCompareRows", () => {
   describe("when the project offers another agent", () => {
-    /** @scenario "The second row defaults to the next agent" */
-    it("opens on the chosen agent with its line, then the next agent with none", () => {
+    /** @scenario "The second row defaults to the next agent with the same parameter line" */
+    it("opens on the chosen agent with its line, then the next agent with the same line", () => {
       expect(
         initialCompareRows({
           target: { type: "http", id: "agent_dev" },
@@ -33,7 +33,10 @@ describe("initialCompareRows", () => {
           target: { type: "http", id: "agent_dev" },
           parameterLine: "locale=de",
         },
-        { target: { type: "http", id: "agent_prod" }, parameterLine: "" },
+        {
+          target: { type: "http", id: "agent_prod" },
+          parameterLine: "locale=de",
+        },
       ]);
     });
 
@@ -50,16 +53,22 @@ describe("initialCompareRows", () => {
 
   describe("when the project offers one agent only", () => {
     /** @scenario "The second row defaults to the same agent when there is no other" */
-    it("opens the second row on the same agent with an empty line", () => {
+    it("opens the second row on the same agent with the same line", () => {
       expect(
         initialCompareRows({
           target: { type: "http", id: "agent_dev" },
-          parameterLine: "",
+          parameterLine: "locale=de",
           agents: [DEV],
         }),
       ).toEqual([
-        { target: { type: "http", id: "agent_dev" }, parameterLine: "" },
-        { target: { type: "http", id: "agent_dev" }, parameterLine: "" },
+        {
+          target: { type: "http", id: "agent_dev" },
+          parameterLine: "locale=de",
+        },
+        {
+          target: { type: "http", id: "agent_dev" },
+          parameterLine: "locale=de",
+        },
       ]);
     });
   });
@@ -82,17 +91,17 @@ describe("initialCompareRows", () => {
 
 describe("addCompareRow", () => {
   describe("when the section holds two rows", () => {
-    /** @scenario "A row is added with the first agent and an empty line, up to four" */
-    it("adds the agent of the first row with an empty line", () => {
+    /** @scenario "A row is added as a copy of the last row, up to four" */
+    it("adds a copy of the last row, agent and line", () => {
       const rows = addCompareRow([
         { target: { type: "http", id: "agent_dev" }, parameterLine: "a=1" },
-        { target: { type: "http", id: "agent_prod" }, parameterLine: "" },
+        { target: { type: "http", id: "agent_prod" }, parameterLine: "b=2" },
       ]);
 
       expect(rows).toHaveLength(3);
       expect(rows[2]).toEqual({
-        target: { type: "http", id: "agent_dev" },
-        parameterLine: "",
+        target: { type: "http", id: "agent_prod" },
+        parameterLine: "b=2",
       });
     });
   });

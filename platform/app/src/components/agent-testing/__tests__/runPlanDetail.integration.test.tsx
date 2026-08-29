@@ -1770,6 +1770,10 @@ describe("<RunPlanDetail/> on a comparison run", () => {
       within(targets).getAllByTestId(/^run-settings-target-/),
     ).toHaveLength(1);
     expect(targets).toHaveTextContent("dev-agent");
+    expect(targets).not.toHaveTextContent("locale");
+    expect(screen.getByTestId("run-settings-parameters")).toHaveTextContent(
+      "locale = de",
+    );
   });
 
   /** @scenario "An older run with no target key reads as one column" */
@@ -1844,8 +1848,8 @@ describe("<RunPlanDetail/> on a comparison run", () => {
     ).toBe(rgbOf(TARGET_COLORS[0]));
   });
 
-  /** @scenario "The run settings name every target" */
-  it("names every target with its parameters on a Targets row, and keeps them off the Parameters row", async () => {
+  /** @scenario "The run settings of a comparison read one layer of parameters" */
+  it("reads every parameter each target received on its Targets line, and no Parameters row", async () => {
     const user = userEvent.setup();
     setRuns([
       runAgainst({
@@ -1873,14 +1877,17 @@ describe("<RunPlanDetail/> on a comparison run", () => {
       `run-settings-target-${DEV_MINI}`,
     ]);
     expect(lines[0]).toHaveTextContent("dev-agent");
+    expect(within(lines[0]!).getByText("locale = de")).toBeInTheDocument();
     expect(lines[0]).not.toHaveTextContent("model");
     expect(lines[1]).toHaveTextContent("dev-agent");
+    expect(within(lines[1]!).getByText("locale = de")).toBeInTheDocument();
     const chip = within(lines[1]!).getByText("model = gpt-5-mini");
     expect(chip.tagName).toBe("CODE");
 
-    const parameters = screen.getByTestId("run-settings-parameters");
-    expect(parameters).toHaveTextContent("locale = de");
-    expect(parameters).not.toHaveTextContent("model");
+    // One layer of parameters: the target lines carry them all.
+    expect(
+      screen.queryByTestId("run-settings-parameters"),
+    ).not.toBeInTheDocument();
 
     // The same two targets read as two columns.
     expect(

@@ -470,16 +470,23 @@ describe("resolving a run plan by name", () => {
         criteria: ["The agent helps"],
         labels: [],
         testSuiteId: refunds.id,
-        parameters: [{ name: "model", defaultValue: "gpt-5" }],
+        parameters: [
+          { name: "model", defaultValue: "gpt-5" },
+          { name: "locale", defaultValue: "en" },
+        ],
       });
       const agent = await createHttpAgent();
       const targets: SuiteTarget[] = [
         {
           type: "http",
           referenceId: agent.id,
-          runParameters: { model: "gpt-5-mini" },
+          runParameters: { locale: "de", model: "gpt-5-mini" },
         },
-        { type: "http", referenceId: agent.id },
+        {
+          type: "http",
+          referenceId: agent.id,
+          runParameters: { locale: "de" },
+        },
       ];
       const scope: SuiteScope = {
         mode: "test_suites",
@@ -494,8 +501,8 @@ describe("resolving a run plan by name", () => {
         idempotencyKey: `run-${nanoid(6)}`,
       });
 
-      // The plain target sorts first, and only the variant carries its
-      // parameters in the label.
+      // The target with fewer parameters sorts first, and only the value
+      // that differs is in the label: the locale both share stays out.
       const expected = `Refunds ${agent.name} vs ${agent.name} · model=gpt-5-mini`;
       expect(result.created).toBe(true);
       expect(result.planName).toBe(expected);

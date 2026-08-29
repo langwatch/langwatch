@@ -66,7 +66,7 @@ import {
   SuiteRepository,
   type UpdateSuiteInput,
 } from "./suite.repository";
-import { repeatedReferenceIds, targetKeyOf, targetLabelOf } from "./target-key";
+import { targetKeyOf, targetLabels } from "./target-key";
 import {
   isSuiteAgentTargetType,
   parseSuiteTargets,
@@ -1403,18 +1403,15 @@ export class SuiteService {
     ]);
     // Stored order, so the name reads the columns in the order the results
     // show them. A target the project no longer names reads as its id, and an
-    // agent that appears more than once reads with its parameters.
-    const sorted = sortSuiteTargets(params.targets);
-    const repeated = repeatedReferenceIds(sorted);
+    // agent that appears more than once reads with the parameters that tell
+    // its targets apart.
     return derivePlanName({
       scopeLabel,
-      targetLabels: sorted.map((target) =>
-        targetLabelOf({
-          name: targetNames[target.referenceId] ?? target.referenceId,
-          runParameters: target.runParameters,
-          duplicated: repeated.has(target.referenceId),
-        }),
-      ),
+      targetLabels: targetLabels({
+        targets: sortSuiteTargets(params.targets),
+        nameOf: (target) =>
+          targetNames[target.referenceId] ?? target.referenceId,
+      }),
     });
   }
 

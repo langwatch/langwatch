@@ -2118,8 +2118,8 @@ describe("the comparison", () => {
   });
 
   /** @scenario "The first row is the agent that was chosen with its parameter line" */
-  /** @scenario "The second row defaults to the next agent" */
-  it("opens on the chosen agent with its line, and the next agent with none", async () => {
+  /** @scenario "The second row defaults to the next agent with the same parameter line" */
+  it("opens on the chosen agent with its line, and the next agent with the same line", async () => {
     const user = userEvent.setup();
     await openWithParameters(user);
 
@@ -2135,7 +2135,7 @@ describe("the comparison", () => {
       "agent_2",
     );
     expect(screen.getByTestId("run-dialog-compare-parameters-1")).toHaveValue(
-      "",
+      "locale=en",
     );
     // The list offers the same agents as the picker, tunnel mark included.
     expect(
@@ -2147,12 +2147,10 @@ describe("the comparison", () => {
   });
 
   /** @scenario "The second row defaults to the same agent when there is no other" */
-  it("opens the second row on the same agent when the project has one agent", async () => {
+  it("opens the second row on the same agent with the same line when the project has one agent", async () => {
     const user = userEvent.setup();
     mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT] });
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    await openWithParameters(user);
 
     await user.click(screen.getByTestId("customize-chip-compare"));
 
@@ -2160,23 +2158,24 @@ describe("the comparison", () => {
       "agent_1",
     );
     expect(screen.getByTestId("run-dialog-compare-parameters-1")).toHaveValue(
-      "",
+      "locale=en",
     );
   });
 
-  /** @scenario "A row is added with the first agent and an empty line, up to four" */
-  it("adds rows with the first agent and an empty line, and stops at four", async () => {
+  /** @scenario "A row is added as a copy of the last row, up to four" */
+  it("adds a copy of the last row, and stops at four", async () => {
     const user = userEvent.setup();
     await openWithParameters(user);
     await user.click(screen.getByTestId("customize-chip-compare"));
+    await writeRowParameters(user, 1, "locale=de");
 
     await user.click(screen.getByTestId("run-dialog-compare-add"));
 
     expect(screen.getByTestId("run-dialog-compare-agent-2")).toHaveValue(
-      "agent_1",
+      "agent_2",
     );
     expect(screen.getByTestId("run-dialog-compare-parameters-2")).toHaveValue(
-      "",
+      "locale=de",
     );
 
     await user.click(screen.getByTestId("run-dialog-compare-add"));
@@ -2317,12 +2316,10 @@ describe("the comparison", () => {
   it("sends each target with its own parameters and no run-level ones", async () => {
     const user = userEvent.setup();
     mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT] });
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    await openWithParameters(user);
     await user.click(screen.getByTestId("customize-chip-compare"));
-    await writeRowParameters(user, 0, "model=gpt-5");
-    await writeRowParameters(user, 1, "model=gpt-5-mini");
+    await writeRowParameters(user, 0, "locale=en, model=gpt-5");
+    await writeRowParameters(user, 1, "locale=en, model=gpt-5-mini");
 
     await user.click(screen.getByTestId("run-dialog-run"));
 
@@ -2332,15 +2329,17 @@ describe("the comparison", () => {
       {
         type: "http",
         referenceId: "agent_1",
-        runParameters: { model: "gpt-5" },
+        runParameters: { locale: "en", model: "gpt-5" },
       },
       {
         type: "http",
         referenceId: "agent_1",
-        runParameters: { model: "gpt-5-mini" },
+        runParameters: { locale: "en", model: "gpt-5-mini" },
       },
     ]);
+    // One layer of parameters: the rows carry them all, the run carries none.
     expect(input.parameters).toBeUndefined();
+    // The name reads the value that differs and leaves the shared one out.
     expect(input.name).toBe(
       "Refunds prod-agent · model=gpt-5 vs prod-agent · model=gpt-5-mini",
     );

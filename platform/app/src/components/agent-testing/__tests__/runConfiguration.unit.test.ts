@@ -311,8 +311,8 @@ describe("sortedTargetLabels", () => {
   });
 
   describe("when the same agent appears twice with different parameters", () => {
-    /** @scenario "The same agent twice is named with its parameters" */
-    it("names each with its parameters", () => {
+    /** @scenario "The same agent twice is named with the parameters that differ" */
+    it("names each with the parameters that differ, and leaves a shared value out", () => {
       expect(
         deriveRunName({
           scopeLabel: "Refunds",
@@ -321,12 +321,12 @@ describe("sortedTargetLabels", () => {
               {
                 type: "http",
                 referenceId: "agent_dev",
-                runParameters: { model: "gpt-5" },
+                runParameters: { locale: "de", model: "gpt-5" },
               },
               {
                 type: "http",
                 referenceId: "agent_dev",
-                runParameters: { model: "gpt-5-mini" },
+                runParameters: { locale: "de", model: "gpt-5-mini" },
               },
             ],
             targetLabels: TARGET_LABELS,
@@ -334,6 +334,28 @@ describe("sortedTargetLabels", () => {
           }),
         }),
       ).toBe("Refunds dev-agent · model=gpt-5 vs dev-agent · model=gpt-5-mini");
+    });
+
+    /** @scenario "A repeated agent that carries none of the differing parameters keeps its bare name" */
+    it("keeps the bare name for the target that carries none of the differing parameters", () => {
+      expect(
+        sortedTargetLabels({
+          targets: [
+            {
+              type: "http",
+              referenceId: "agent_dev",
+              runParameters: { locale: "de" },
+            },
+            {
+              type: "http",
+              referenceId: "agent_dev",
+              runParameters: { locale: "de", plan: "pro" },
+            },
+          ],
+          targetLabels: TARGET_LABELS,
+          fallbackLabel: byReferenceId,
+        }),
+      ).toEqual(["dev-agent", "dev-agent · plan=pro"]);
     });
 
     it("sorts the keys inside a label", () => {

@@ -35,10 +35,11 @@ function targetOfAgent(agent: RunDialogAgent): NonNullable<TargetValue> {
 /**
  * The rows the section opens on.
  *
- * Row one is the agent that was chosen, with the parameter line the
- * Parameters section held. Row two is the next agent in picker order that is
+ * Both rows start with the parameter line the Parameters section held, so a
+ * comparison has one layer of parameters: the one on its rows. Row one is the
+ * agent that was chosen. Row two is the next agent in picker order that is
  * not row one's agent; when the project has no other agent, it is the same
- * agent with an empty line, which is the "one connection, two models" case.
+ * agent, which is the "one connection, two models" case.
  */
 export function initialCompareRows({
   target,
@@ -57,15 +58,18 @@ export function initialCompareRows({
   const second = other ? targetOfAgent(other) : first;
   return [
     { target: first, parameterLine },
-    { target: second, parameterLine: "" },
+    { target: second, parameterLine },
   ];
 }
 
-/** One more row: the agent of row one, with an empty line. */
+/**
+ * One more row: a copy of the last one, agent and line, so the new row only
+ * needs the one value that is to differ.
+ */
 export function addCompareRow(rows: readonly CompareRow[]): CompareRow[] {
-  const first = rows[0];
-  if (!first || rows.length >= MAX_COMPARE_ROWS) return [...rows];
-  return [...rows, { target: first.target, parameterLine: "" }];
+  const last = rows[rows.length - 1];
+  if (!last || rows.length >= MAX_COMPARE_ROWS) return [...rows];
+  return [...rows, { target: last.target, parameterLine: last.parameterLine }];
 }
 
 /** What a row sends as its own overrides, or nothing for an empty line. */

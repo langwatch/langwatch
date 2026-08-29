@@ -20,9 +20,11 @@
  * neither stays a short block.
  *
  * The targets row names every target the run went against, on a run against
- * one target as much as on a comparison, with the parameters each target
- * alone carried. The parameters row then reads the run-level values only, so
- * no override reads twice.
+ * one target as much as on a comparison. A comparison has one layer of
+ * parameters: each target line carries every value that target received, and
+ * there is no parameters row. A run against one target reads the target's
+ * own overrides on its line and the run-level values on the parameters row,
+ * so no value reads twice.
  *
  * The run note is not here. It reads in the header line and does not move.
  *
@@ -35,7 +37,7 @@ import type { ReactNode } from "react";
 import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
 import { FG_MUTED } from "../shared/design";
 import { TargetDot } from "../shared/TargetDot";
-import type { RunSettings } from "./run-settings";
+import type { RunSettingParameter, RunSettings } from "./run-settings";
 import type { BatchTarget } from "./useBatchTargets";
 
 /**
@@ -139,11 +141,24 @@ function ParameterChip({ name, value }: { name: string; value: string }) {
   );
 }
 
+/** The overrides a target alone carried, as the block prints them. */
+function overridesOf(target: BatchTarget): RunSettingParameter[] {
+  return Object.entries(target.parameters ?? {})
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, value]) => ({ name, value: String(value) }));
+}
+
 /**
  * The targets the run went against, one line each: the dot the target reads
- * in everywhere on the page, its name, and the parameters it alone carried.
+ * in everywhere on the page, its name, and its parameters as chips.
  */
-function TargetsRow({ targets }: { targets: BatchTarget[] }) {
+function TargetsRow({
+  targets,
+  parametersOf,
+}: {
+  targets: BatchTarget[];
+  parametersOf: (target: BatchTarget) => RunSettingParameter[];
+}) {
   return (
     <SettingRow label="Targets" testId="run-settings-targets">
       <VStack align="stretch" gap={1} paddingY="1px">
@@ -157,11 +172,13 @@ function TargetsRow({ targets }: { targets: BatchTarget[] }) {
           >
             <TargetDot color={target.color} />
             <Text fontSize="12px">{target.name}</Text>
-            {Object.entries(target.parameters ?? {})
-              .sort(([left], [right]) => left.localeCompare(right))
-              .map(([name, value]) => (
-                <ParameterChip key={name} name={name} value={String(value)} />
-              ))}
+            {parametersOf(target).map((parameter) => (
+              <ParameterChip
+                key={parameter.name}
+                name={parameter.name}
+                value={parameter.value}
+              />
+            ))}
           </HStack>
         ))}
       </VStack>
@@ -189,6 +206,14 @@ export function RunSettingsBlock({
   const startedRow = [startedLabel, startedByLabel]
     .filter((part): part is string => !!part)
     .join(" · ");
+  // A comparison reads every value on the target lines and nothing under
+  // them; a run against one target reads its overrides on the line and the
+  // run-level values on their own row.
+  const isComparison = targets.length > 1;
+  const parametersOf = (target: BatchTarget) =>
+    isComparison
+      ? (settings.parametersByTarget.get(target.key) ?? [])
+      : overridesOf(target);
 
   return (
     <VStack
@@ -208,9 +233,11 @@ export function RunSettingsBlock({
         </SettingRow>
       ) : null}
 
-      {targets.length > 0 ? <TargetsRow targets={targets} /> : null}
+      {targets.length > 0 ? (
+        <TargetsRow targets={targets} parametersOf={parametersOf} />
+      ) : null}
 
-      {settings.parameters.length > 0 ? (
+      {!isComparison && settings.parameters.length > 0 ? (
         <SettingRow label="Parameters" testId="run-settings-parameters">
           <HStack gap={2} flexWrap="wrap">
             {settings.parameters.map((parameter) => (

@@ -116,4 +116,42 @@ describe("the targets the run settings read", () => {
       expect(settings?.parameters).toEqual([{ name: "locale", value: "de" }]);
     });
   });
+
+  describe("when the run went against the same agent on two sets of parameters", () => {
+    /** @scenario "Each target of a run reads every parameter it received" */
+    it("reads the full set each target received, keyed by target key", () => {
+      const plain = run({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        targetKey: "agent_1",
+      });
+      plain.metadata = {
+        ...plain.metadata,
+        parameters: { locale: "de" },
+      } as never;
+      const variant = {
+        ...run({
+          targetReferenceId: "agent_1",
+          targetType: "http",
+          targetKey: "agent_1#0123abcd",
+          targetParameters: { model: "gpt-5-mini" },
+        }),
+        scenarioRunId: "run_b",
+      };
+      variant.metadata = {
+        ...variant.metadata,
+        parameters: { model: "gpt-5-mini", locale: "de" },
+      } as never;
+
+      const settings = readRunSettings([plain, variant]);
+
+      expect(settings?.parametersByTarget.get("agent_1")).toEqual([
+        { name: "locale", value: "de" },
+      ]);
+      expect(settings?.parametersByTarget.get("agent_1#0123abcd")).toEqual([
+        { name: "locale", value: "de" },
+        { name: "model", value: "gpt-5-mini" },
+      ]);
+    });
+  });
 });

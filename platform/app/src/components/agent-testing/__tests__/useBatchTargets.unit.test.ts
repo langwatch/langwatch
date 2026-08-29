@@ -112,6 +112,33 @@ describe("batchTargetsOf()", () => {
     });
   });
 
+  describe("when the targets of one agent share a value", () => {
+    /** @scenario "The targets of a repeated agent read the parameters that differ" */
+    it("labels each with the parameters that differ and leaves the shared one out", () => {
+      const targets = batchTargetsOf({
+        scenarioRuns: [
+          runAgainst({
+            scenarioRunId: "r1",
+            referenceId: "agent_dev",
+            parameters: { locale: "de", model: "a" },
+          }),
+          runAgainst({
+            scenarioRunId: "r2",
+            referenceId: "agent_dev",
+            parameters: { locale: "de", model: "b" },
+          }),
+        ],
+        targetNameMap: NAMES,
+      });
+
+      expect(targets.map((target) => target.label)).toEqual([
+        "dev-agent · model=a",
+        "dev-agent · model=b",
+      ]);
+      expect(targets[0]?.parameters).toEqual({ locale: "de", model: "a" });
+    });
+  });
+
   describe("when the runs were recorded before targets carried a key", () => {
     /** @scenario "An older run with no target key reads as one column" */
     it("reads one target under its reference id", () => {

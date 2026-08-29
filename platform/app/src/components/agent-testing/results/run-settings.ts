@@ -38,6 +38,12 @@ export type RunSettingParameter = {
 export type RunSettings = {
   /** Sorted by name, so two runs of one plan read in the same order. */
   parameters: RunSettingParameter[];
+  /**
+   * Every parameter each target received, keyed by target key and sorted by
+   * name. A comparison reads these beside each target, in place of the
+   * Parameters row.
+   */
+  parametersByTarget: Map<string, RunSettingParameter[]>;
   /** How many times each scenario and target pair ran. One when it ran once. */
   repeatCount: number;
   /** Null only on a run recorded before the models were stamped. */
@@ -68,26 +74,51 @@ function readParameters(
   scenarioRuns: ScenarioRunData[],
 ): RunSettingParameter[] {
   for (const run of scenarioRuns) {
-    const raw = run.metadata?.parameters;
-    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) continue;
     const overridden = new Set(
       Object.keys(run.metadata?.langwatch?.targetParameters ?? {}),
     );
-
-    const parameters = Object.entries(raw)
-      .filter(([name]) => !overridden.has(name))
-      .filter(
-        ([, value]) =>
-          typeof value === "string" ||
-          typeof value === "number" ||
-          typeof value === "boolean",
-      )
-      .map(([name, value]) => ({ name, value: String(value) }))
-      .sort((left, right) => left.name.localeCompare(right.name));
-
+    const parameters = parametersOfRun(run).filter(
+      (parameter) => !overridden.has(parameter.name),
+    );
     if (parameters.length > 0) return parameters;
   }
   return [];
+}
+
+/** The parameters of one run as the block prints them, sorted by name. */
+function parametersOfRun(run: ScenarioRunData): RunSettingParameter[] {
+  const raw = run.metadata?.parameters;
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return [];
+  return Object.entries(raw)
+    .filter(
+      ([, value]) =>
+        typeof value === "string" ||
+        typeof value === "number" ||
+        typeof value === "boolean",
+    )
+    .map(([name, value]) => ({ name, value: String(value) }))
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+/**
+ * The full set of values each target received: the first run of the target
+ * that carries any.
+ *
+ * This is the merged set, the run-level values with the target's own on top,
+ * which is what the agent was called with. On a comparison, it is the one
+ * layer of parameters the settings read.
+ */
+function readParametersByTarget(
+  scenarioRuns: ScenarioRunData[],
+): Map<string, RunSettingParameter[]> {
+  const byTarget = new Map<string, RunSettingParameter[]>();
+  for (const run of scenarioRuns) {
+    const key = targetKeyOfRun(run);
+    if (!key || byTarget.has(key)) continue;
+    const parameters = parametersOfRun(run);
+    if (parameters.length > 0) byTarget.set(key, parameters);
+  }
+  return byTarget;
 }
 
 /**
@@ -192,6 +223,7 @@ export function readRunSettings(
   if (scenarioRuns.length === 0) return null;
   return {
     parameters: readParameters(scenarioRuns),
+    parametersByTarget: readParametersByTarget(scenarioRuns),
     repeatCount: readRepeatCount(scenarioRuns),
     simulatorModel: readModel(scenarioRuns, "simulatorModel"),
     judgeModel: readModel(scenarioRuns, "judgeModel"),

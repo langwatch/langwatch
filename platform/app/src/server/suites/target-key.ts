@@ -80,11 +80,16 @@ export function splitTargetKey(key: string): {
   return { referenceId: key.slice(0, at), hash };
 }
 
-/** The overrides as `k=v, k=v`, keys sorted. Empty when there are none. */
+/**
+ * The overrides as `k=v, k=v`, keys sorted. Empty when there are none.
+ *
+ * With `names`, only the pairs of those names are read.
+ */
 export function targetParametersLabel(
   runParameters: RunParameterValues | undefined,
+  names?: ReadonlySet<string>,
 ): string {
-  return parameterPairs(runParameters).join(", ");
+  return parameterPairs(runParameters, names).join(", ");
 }
 
 /**
@@ -107,50 +112,104 @@ export function targetSortKey({
   return `${type}:${referenceId}|${parameterPairs(runParameters).join(",")}`;
 }
 
-/** The overrides as `k=v` pairs, sorted by name. */
+/** The overrides as `k=v` pairs, sorted by name, kept to `names` when given. */
 function parameterPairs(
   runParameters: RunParameterValues | undefined,
+  names?: ReadonlySet<string>,
 ): string[] {
   if (!hasParameterOverrides(runParameters)) return [];
-  return sortedEntries(runParameters).map(
-    ([name, value]) => `${name}=${value}`,
+  return sortedEntries(runParameters)
+    .filter(([name]) => names === undefined || names.has(name))
+    .map(([name, value]) => `${name}=${value}`);
+}
+
+/** A target as the label rules read it: its agent and its overrides. */
+type LabelledTarget = {
+  referenceId: string;
+  runParameters?: RunParameterValues;
+};
+
+/**
+ * The parameter names that tell the targets of one agent apart.
+ *
+ * For each agent that appears more than once, the names whose value is not
+ * the same on every one of its targets. A name one target carries and another
+ * does not counts as a difference. An agent that appears once has no such
+ * name, and neither has a name every target of the agent shares.
+ */
+export function differingParameterNames(
+  targets: readonly LabelledTarget[],
+): Map<string, Set<string>> {
+  const setsByAgent = new Map<string, RunParameterValues[]>();
+  for (const target of targets) {
+    const sets = setsByAgent.get(target.referenceId) ?? [];
+    sets.push(target.runParameters ?? {});
+    setsByAgent.set(target.referenceId, sets);
+  }
+  return new Map(
+    [...setsByAgent].map(([referenceId, sets]) => [
+      referenceId,
+      namesThatDiffer(sets),
+    ]),
   );
+}
+
+/** The names whose value is not the same on every one of the sets. */
+function namesThatDiffer(sets: readonly RunParameterValues[]): Set<string> {
+  const names = new Set<string>();
+  if (sets.length < 2) return names;
+  for (const name of new Set(sets.flatMap((set) => Object.keys(set)))) {
+    const values = new Set(sets.map((set) => JSON.stringify(set[name])));
+    if (values.size > 1) names.add(name);
+  }
+  return names;
 }
 
 /**
  * What a target is called.
  *
- * Its name, or `name · k=v` when the same agent appears more than once in the
- * run and this target carries overrides to tell it apart by. A repeated agent
- * with no overrides keeps its bare name: the other one carries the
- * parameters.
+ * Its name, or `name · k=v` over the names in `differingNames` the target
+ * carries: the parameters that tell it from the other targets of the same
+ * agent, and none of the ones they share. A target that carries none of them
+ * keeps its bare name.
  */
 export function targetLabelOf({
   name,
   runParameters,
-  duplicated,
+  differingNames,
 }: {
   name: string;
   runParameters?: RunParameterValues;
-  duplicated: boolean;
+  differingNames: ReadonlySet<string>;
 }): string {
-  const parameters = targetParametersLabel(runParameters);
-  return duplicated && parameters !== ""
-    ? `${name}${TARGET_LABEL_SEPARATOR}${parameters}`
-    : name;
+  const parameters = targetParametersLabel(runParameters, differingNames);
+  return parameters === ""
+    ? name
+    : `${name}${TARGET_LABEL_SEPARATOR}${parameters}`;
 }
 
-/** The reference ids that appear more than once in a list of targets. */
-export function repeatedReferenceIds(
-  targets: readonly { referenceId: string }[],
-): Set<string> {
-  const seen = new Set<string>();
-  const repeated = new Set<string>();
-  for (const target of targets) {
-    if (seen.has(target.referenceId)) repeated.add(target.referenceId);
-    seen.add(target.referenceId);
-  }
-  return repeated;
+/**
+ * The labels of a list of targets, in the order given.
+ *
+ * The one rule the run dialog, the plan name and the run detail share: an
+ * agent that appears once reads as its name, and an agent that appears more
+ * than once reads with the parameters that differ between its targets.
+ */
+export function targetLabels<T extends LabelledTarget>({
+  targets,
+  nameOf,
+}: {
+  targets: readonly T[];
+  nameOf: (target: T) => string;
+}): string[] {
+  const differing = differingParameterNames(targets);
+  return targets.map((target) =>
+    targetLabelOf({
+      name: nameOf(target),
+      runParameters: target.runParameters,
+      differingNames: differing.get(target.referenceId) ?? new Set(),
+    }),
+  );
 }
 
 function sortedEntries(

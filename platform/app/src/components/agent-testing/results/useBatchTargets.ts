@@ -26,11 +26,7 @@ import {
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import type { RunParameterValues } from "~/server/scenarios/parameters";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
-import {
-  repeatedReferenceIds,
-  targetLabelOf,
-  targetSortKey,
-} from "~/server/suites/target-key";
+import { targetLabels, targetSortKey } from "~/server/suites/target-key";
 import { targetColor } from "../shared/target-colors";
 
 /** One target of a run, as the run detail reads it. */
@@ -43,7 +39,10 @@ export type BatchTarget = {
   parameters: RunParameterValues | null;
   /** The name of the agent or the prompt, or the reference id when unknown. */
   name: string;
-  /** The name, with the parameters when the same agent appears more than once. */
+  /**
+   * The name, with the parameters that differ from the other targets of the
+   * same agent when the agent appears more than once.
+   */
   label: string;
   color: string;
 };
@@ -139,23 +138,24 @@ export function batchTargetsOf({
     ),
   );
 
-  const repeated = repeatedReferenceIds(sorted);
-
-  return sorted.map((target, index) => {
-    const name = targetNameMap.get(target.referenceId) ?? target.referenceId;
-    return {
-      key: target.key,
+  const nameOf = (target: { referenceId: string }) =>
+    targetNameMap.get(target.referenceId) ?? target.referenceId;
+  const labels = targetLabels({
+    targets: sorted.map((target) => ({
       referenceId: target.referenceId,
-      parameters: target.parameters,
-      name,
-      label: targetLabelOf({
-        name,
-        runParameters: target.parameters ?? undefined,
-        duplicated: repeated.has(target.referenceId),
-      }),
-      color: targetColor(index),
-    };
+      runParameters: target.parameters ?? undefined,
+    })),
+    nameOf,
   });
+
+  return sorted.map((target, index) => ({
+    key: target.key,
+    referenceId: target.referenceId,
+    parameters: target.parameters,
+    name: nameOf(target),
+    label: labels[index] ?? nameOf(target),
+    color: targetColor(index),
+  }));
 }
 
 /** The targets of the runs given, named from the project's agents and prompts. */

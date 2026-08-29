@@ -15,6 +15,11 @@ Feature: Comparison mode
     "name=value, name=value" grammar, and an x. The colour of a row is its
     position, and the same colour marks that target on the run detail.
 
+    A comparison has one layer of parameters: the line of each row. Every row
+    starts with the line the Parameters section held, and a new row copies the
+    last one, so a person changes the one value that is to differ. The run
+    carries no run-level parameters besides the secrets.
+
     Secret parameters stay run-level and shared across the targets, so a scope
     that declares one shows a single "Secret parameters" block under the rows.
 
@@ -36,22 +41,22 @@ Feature: Comparison mode
     Then the first row holds "dev-agent" and "locale=de"
 
   @integration
-  Scenario: The second row defaults to the next agent
-    Given a project with "dev-agent" and "prod-agent", and "dev-agent" chosen
+  Scenario: The second row defaults to the next agent with the same parameter line
+    Given a project with "dev-agent" and "prod-agent", and "dev-agent" chosen with the parameter line "locale=de"
     When "Compare agents" is chosen
-    Then the second row holds "prod-agent" with an empty parameter line
+    Then the second row holds "prod-agent" with the parameter line "locale=de"
 
   @integration
   Scenario: The second row defaults to the same agent when there is no other
-    Given a project with one agent, "dev-agent"
+    Given a project with one agent, "dev-agent", chosen with the parameter line "locale=de"
     When "Compare agents" is chosen
-    Then the second row holds "dev-agent" with an empty parameter line
+    Then the second row holds "dev-agent" with the parameter line "locale=de"
 
   @integration
-  Scenario: A row is added with the first agent and an empty line, up to four
-    Given the run dialog in compare mode with two rows
+  Scenario: A row is added as a copy of the last row, up to four
+    Given the run dialog in compare mode where the last row holds "prod-agent" and "locale=de"
     When "Add a target to compare" is chosen
-    Then a third row holds the agent of the first row with an empty parameter line
+    Then a third row holds "prod-agent" with the parameter line "locale=de"
     And the control is gone once there are four rows
 
   @integration
@@ -109,9 +114,15 @@ Feature: Comparison mode
     Then the run name reads "<scope> dev-agent vs prod-agent"
 
   @unit
-  Scenario: The same agent twice is named with its parameters
-    Given a comparison of "dev-agent" on "model=gpt-5" and "dev-agent" on "model=gpt-5-mini"
+  Scenario: The same agent twice is named with the parameters that differ
+    Given a comparison of "dev-agent" on "locale=de, model=gpt-5" and "dev-agent" on "locale=de, model=gpt-5-mini"
     Then the run name reads "<scope> dev-agent · model=gpt-5 vs dev-agent · model=gpt-5-mini"
+    And a value both targets share is not in the name
+
+  @unit
+  Scenario: A repeated agent that carries none of the differing parameters keeps its bare name
+    Given a comparison of "dev-agent" on "locale=de" and "dev-agent" on "locale=de, plan=pro"
+    Then the targets read "dev-agent" and "dev-agent · plan=pro"
 
   @unit
   Scenario: Targets are sorted by agent and then by parameters
@@ -191,19 +202,22 @@ Feature: Comparison mode
     And the entry carries no "passed" count
 
   @integration
-  Scenario: The run settings name every target
-    Given a run against "dev-agent" and "dev-agent" on "model=gpt-5-mini"
+  Scenario: The run settings of a comparison read one layer of parameters
+    Given a run against "dev-agent" and "dev-agent" on "model=gpt-5-mini", both over "locale=de"
     When the run settings are shown
-    Then a "Targets" row reads one line per target, with its dot, its name and its parameters as chips
-    And the "Parameters" row reads no parameter of a target
+    Then a "Targets" row reads one line per target, with its dot, its name and every parameter it received as chips
+    And the line of "dev-agent" reads "locale = de"
+    And the line of "dev-agent" on "model=gpt-5-mini" reads "locale = de" and "model = gpt-5-mini"
+    And there is no "Parameters" row
 
   @integration
   Scenario: A single-target run reads as before
-    Given a run against one target
+    Given a run against one target over "locale=de"
     When the run is opened
     Then the table reads one row per scenario with its verdict, its time and its cost
     And the header line carries the summary of the run
     And the run settings name the target on a "Targets" row
+    And the "Parameters" row reads "locale = de"
 
   @integration
   Scenario: An older run with no target key reads as one column
@@ -220,6 +234,12 @@ Feature: Comparison mode
   Scenario: The Parameters row reads the run-level parameters alone
     Given a run whose target carries "model=gpt-5-mini" over the run-level "locale=de"
     Then the parameters of the run settings read "locale=de" alone
+
+  @unit
+  Scenario: Each target of a run reads every parameter it received
+    Given a run against "dev-agent" over "locale=de" and "dev-agent" on "model=gpt-5-mini" over "locale=de"
+    Then the parameters of "dev-agent" read "locale=de"
+    And the parameters of "dev-agent" on "model=gpt-5-mini" read "locale=de" and "model=gpt-5-mini"
 
   @unit
   Scenario: Runs are grouped by their target key
@@ -244,6 +264,11 @@ Feature: Comparison mode
     Given runs against "dev-agent" on "model=gpt-5-mini" and "prod-agent"
     Then the targets read "dev-agent" and "prod-agent"
     And each keeps its parameters
+
+  @unit
+  Scenario: The targets of a repeated agent read the parameters that differ
+    Given runs against "dev-agent" on "locale=de, model=a" and "dev-agent" on "locale=de, model=b"
+    Then the targets read "dev-agent · model=a" and "dev-agent · model=b"
 
   # --- The results list ---
 

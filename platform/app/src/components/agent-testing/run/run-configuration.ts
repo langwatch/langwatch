@@ -14,7 +14,10 @@
 import type { RunParameterValues } from "~/server/scenarios/parameters";
 import { configurationKey, scopeKey } from "~/server/suites/plan-config";
 import type { SuiteScope } from "~/server/suites/scope";
-import { targetLabelOf, targetSortKey } from "~/server/suites/target-key";
+import {
+  targetLabels as labelTargets,
+  targetSortKey,
+} from "~/server/suites/target-key";
 import type { SuiteTarget } from "~/server/suites/types";
 
 /**
@@ -102,8 +105,9 @@ export function sortTargets(targets: readonly SuiteTarget[]): SuiteTarget[] {
  * What the targets are called, in sorted order.
  *
  * A target is named after its agent. The same agent appearing more than once
- * is named with its overrides, so "dev-agent · model=gpt-5 vs dev-agent ·
- * model=gpt-5-mini" tells the two apart.
+ * is named with the parameters that differ between its targets, so "dev-agent
+ * · model=gpt-5 vs dev-agent · model=gpt-5-mini" tells the two apart and a
+ * value both share stays out of the name.
  */
 export function sortedTargetLabels({
   targets,
@@ -115,16 +119,11 @@ export function sortedTargetLabels({
   /** What a target the project no longer offers reads as. */
   fallbackLabel: (target: SuiteTarget) => string;
 }): string[] {
-  const sorted = sortTargets(targets);
-  return sorted.map((target) =>
-    targetLabelOf({
-      name: targetLabels.get(target.referenceId) ?? fallbackLabel(target),
-      runParameters: target.runParameters,
-      duplicated:
-        sorted.filter((other) => other.referenceId === target.referenceId)
-          .length > 1,
-    }),
-  );
+  return labelTargets({
+    targets: sortTargets(targets),
+    nameOf: (target) =>
+      targetLabels.get(target.referenceId) ?? fallbackLabel(target),
+  });
 }
 
 /** The scenarios a rule names inside itself, which only a hand-picked one does. */

@@ -229,13 +229,14 @@ Feature: A run plan is identified by its name
     Then the label reads "model=gpt-5-mini, seats=12"
 
   @unit
-  Scenario: A target is labelled with its parameters only when its agent is repeated
-    Given a target named "prod-agent" with the override "model=gpt-5-mini"
+  Scenario: A target is labelled with the parameters that tell it from the other targets of its agent
+    Given a target named "prod-agent" with the overrides "locale=de, model=gpt-5-mini"
     When it is the only target of that agent
     Then its label reads "prod-agent"
-    When the same agent appears more than once in the run
+    When the same agent appears again with the overrides "locale=de, model=gpt-5"
     Then its label reads "prod-agent · model=gpt-5-mini"
-    And a repeated agent with no overrides still reads "prod-agent"
+    And the value both targets share is not in the label
+    And a repeated agent that carries none of the differing parameters still reads "prod-agent"
 
   @unit
   Scenario: The same agent twice with different parameters is two targets
@@ -255,8 +256,9 @@ Feature: A run plan is identified by its name
   @integration
   Scenario: A run named by the server labels a repeated agent with its parameters
     Given a project holding the test suite "Refunds" and the agent "prod-agent"
-    When a run of "Refunds" is started with no name against "prod-agent" and against "prod-agent" with the override "model=gpt-5-mini"
+    When a run of "Refunds" is started with no name against "prod-agent" with "locale=de" and against "prod-agent" with "locale=de, model=gpt-5-mini"
     Then a run plan named "Refunds prod-agent vs prod-agent · model=gpt-5-mini" is created
+    And the value both targets share is not in the name
     And the labels follow the stored order of the targets
     And a second run with no name joins that same plan
 

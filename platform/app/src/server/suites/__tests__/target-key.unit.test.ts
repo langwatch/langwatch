@@ -7,10 +7,11 @@ import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   canonicalParameters,
-  repeatedReferenceIds,
+  differingParameterNames,
   splitTargetKey,
   targetKeyOf,
   targetLabelOf,
+  targetLabels,
   targetParametersLabel,
   targetSortKey,
 } from "../target-key";
@@ -188,48 +189,107 @@ describe("targetSortKey", () => {
 });
 
 describe("targetLabelOf", () => {
-  describe("when the agent appears once in the run", () => {
-    /** @scenario "A target is labelled with its parameters only when its agent is repeated" */
+  describe("when no parameter tells the target apart", () => {
+    /** @scenario "A target is labelled with the parameters that tell it from the other targets of its agent" */
     it("reads the name alone", () => {
       expect(
         targetLabelOf({
           name: "prod-agent",
-          runParameters: { model: "gpt-5-mini" },
-          duplicated: false,
+          runParameters: { locale: "de", model: "gpt-5-mini" },
+          differingNames: new Set(),
         }),
       ).toBe("prod-agent");
     });
   });
 
-  describe("when the agent appears more than once in the run", () => {
-    /** @scenario "A target is labelled with its parameters only when its agent is repeated" */
-    it("reads the name and the parameters", () => {
+  describe("when some parameters tell the target apart", () => {
+    /** @scenario "A target is labelled with the parameters that tell it from the other targets of its agent" */
+    it("reads the name and those parameters only, sorted by name", () => {
       expect(
         targetLabelOf({
           name: "prod-agent",
-          runParameters: { model: "gpt-5-mini" },
-          duplicated: true,
+          runParameters: { seats: 12, locale: "de", model: "gpt-5-mini" },
+          differingNames: new Set(["model", "seats"]),
         }),
-      ).toBe("prod-agent · model=gpt-5-mini");
+      ).toBe("prod-agent · model=gpt-5-mini, seats=12");
     });
 
-    /** @scenario "A target is labelled with its parameters only when its agent is repeated" */
-    it("keeps the bare name for the one that carries no overrides", () => {
-      expect(targetLabelOf({ name: "prod-agent", duplicated: true })).toBe(
-        "prod-agent",
-      );
+    /** @scenario "A target is labelled with the parameters that tell it from the other targets of its agent" */
+    it("keeps the bare name for a target that carries none of them", () => {
+      expect(
+        targetLabelOf({
+          name: "prod-agent",
+          runParameters: { locale: "de" },
+          differingNames: new Set(["model"]),
+        }),
+      ).toBe("prod-agent");
     });
   });
 });
 
-describe("repeatedReferenceIds", () => {
-  it("names the reference ids that appear more than once", () => {
-    const repeated = repeatedReferenceIds([
-      { referenceId: "a" },
-      { referenceId: "b" },
-      { referenceId: "a" },
-    ]);
+describe("differingParameterNames", () => {
+  describe("when an agent appears once", () => {
+    /** @scenario "A target is labelled with the parameters that tell it from the other targets of its agent" */
+    it("names nothing for it", () => {
+      const differing = differingParameterNames([
+        { referenceId: "a", runParameters: { model: "gpt-5-mini" } },
+        { referenceId: "b" },
+      ]);
 
-    expect([...repeated]).toEqual(["a"]);
+      expect([...(differing.get("a") ?? [])]).toEqual([]);
+      expect([...(differing.get("b") ?? [])]).toEqual([]);
+    });
+  });
+
+  describe("when an agent appears more than once", () => {
+    /** @scenario "A target is labelled with the parameters that tell it from the other targets of its agent" */
+    it("names the parameters whose values are not the same on every target of it", () => {
+      const differing = differingParameterNames([
+        { referenceId: "a", runParameters: { locale: "de", model: "gpt-5" } },
+        {
+          referenceId: "a",
+          runParameters: { locale: "de", model: "gpt-5-mini" },
+        },
+        { referenceId: "b", runParameters: { locale: "de" } },
+      ]);
+
+      expect([...(differing.get("a") ?? [])]).toEqual(["model"]);
+      expect([...(differing.get("b") ?? [])]).toEqual([]);
+    });
+
+    /** @scenario "A target is labelled with the parameters that tell it from the other targets of its agent" */
+    it("counts a parameter one target carries and another does not", () => {
+      const differing = differingParameterNames([
+        { referenceId: "a", runParameters: { locale: "de" } },
+        { referenceId: "a", runParameters: { locale: "de", plan: "pro" } },
+      ]);
+
+      expect([...(differing.get("a") ?? [])]).toEqual(["plan"]);
+    });
+
+    it("tells a number from the string of that number", () => {
+      const differing = differingParameterNames([
+        { referenceId: "a", runParameters: { seats: 12 } },
+        { referenceId: "a", runParameters: { seats: "12" } },
+      ]);
+
+      expect([...(differing.get("a") ?? [])]).toEqual(["seats"]);
+    });
+  });
+});
+
+describe("targetLabels", () => {
+  /** @scenario "A target is labelled with the parameters that tell it from the other targets of its agent" */
+  it("labels every target in the order given, by the one rule", () => {
+    expect(
+      targetLabels({
+        targets: [
+          { referenceId: "a", runParameters: { locale: "de" } },
+          { referenceId: "a", runParameters: { locale: "de", plan: "pro" } },
+          { referenceId: "b", runParameters: { locale: "de" } },
+        ],
+        nameOf: (target) => `agent-${target.referenceId}`,
+      }),
+    ).toEqual(["agent-a", "agent-a · plan=pro", "agent-b"]);
   });
 });
