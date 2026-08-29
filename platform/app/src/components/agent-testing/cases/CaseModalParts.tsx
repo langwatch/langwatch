@@ -29,6 +29,7 @@ import { DIALOG_FIELD_STYLE, FieldLabel } from "../shared/DialogFields";
 import { FG_MUTED } from "../shared/design";
 import { RemoveBlockButton } from "../shared/RemoveBlockButton";
 import { SmallButton } from "../shared/SmallButton";
+import { CaseRecentRunsButton } from "./CaseRecentRunsButton";
 import { CaseVersionHistoryPopover } from "./CaseVersionHistoryPopover";
 import type { TestSuiteEntry } from "./test-cases";
 import type { CaseDraft, CaseEditorState } from "./useCaseEditor";
@@ -58,7 +59,10 @@ const CRITERIA_HEIGHT = { min: "92px", max: "276px" } as const;
 const PARAMETERS_HELP =
   "Parameters reach your agent as arguments of the function you annotated. Use them to run the same scenario as a free or a pro customer, in another locale, or on another model.";
 
-/** The heading: what the dialog is for, and the way back to the versions. */
+/**
+ * The heading: what the dialog is for, the way into a recent run of this
+ * scenario, and the way back to its versions.
+ */
 export function CaseModalHeader({
   isEditing,
   scenarioId,
@@ -86,12 +90,17 @@ export function CaseModalHeader({
       <Text fontSize="12px" color={FG_MUTED} marginTop={0.5}>
         {CASE_MODAL_SUBTITLE}
       </Text>
-      {isEditing && scenarioId && version !== null && (
-        <CaseVersionHistoryPopover
-          scenarioId={scenarioId}
-          version={version}
-          initialOpen={openHistoryOnOpen}
-        />
+      {isEditing && scenarioId && (
+        <HStack position="absolute" top={2.5} right={11} gap={1.5}>
+          <CaseRecentRunsButton scenarioId={scenarioId} />
+          {version !== null && (
+            <CaseVersionHistoryPopover
+              scenarioId={scenarioId}
+              version={version}
+              initialOpen={openHistoryOnOpen}
+            />
+          )}
+        </HStack>
       )}
       <Drawer.CloseTrigger />
     </Drawer.Header>

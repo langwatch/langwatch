@@ -19,6 +19,7 @@ import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentTestingCaseEditor } from "../cases/AgentTestingCaseEditor";
 import { AgentTestingCaseEditorDrawer } from "../cases/AgentTestingCaseEditorDrawer";
+import { NO_RUN_YET_HINT } from "../cases/CaseRecentRunsButton";
 
 const mockCreate = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
@@ -26,6 +27,7 @@ const mockGetById = vi.hoisted(() => vi.fn());
 const mockTestSuitesGetAll = vi.hoisted(() => vi.fn());
 const mockListVersions = vi.hoisted(() => vi.fn());
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
+const mockLastResults = vi.hoisted(() => vi.fn());
 
 const emptyQuery = vi.hoisted(() => () => ({
   data: undefined,
@@ -68,7 +70,14 @@ vi.mock("~/utils/api", () => ({
       },
       getAll: { useQuery: emptyQuery },
       getById: { useQuery: mockGetById },
-      getLastResultSummaries: { useQuery: emptyQuery },
+      getLastResultSummaries: { useQuery: mockLastResults },
+      // The recent runs of the scenario are read only once the list is opened.
+      getSuiteRunData: {
+        useQuery: () => ({
+          data: { runs: [], scenarioSetIds: {} },
+          isLoading: false,
+        }),
+      },
       listVersions: { useQuery: mockListVersions },
       getVersion: { useQuery: emptyQuery },
       restoreVersion: {
@@ -193,6 +202,7 @@ describe("the scenario dialog", () => {
       isLoading: false,
       refetch: vi.fn(),
     });
+    mockLastResults.mockReturnValue({ data: [], isLoading: false });
   });
 
   afterEach(cleanup);
@@ -358,6 +368,68 @@ describe("the scenario dialog", () => {
       expect(
         screen.getByTestId("customize-chip-case-turns"),
       ).toBeInTheDocument();
+    });
+
+    /** @scenario "The editor turns the recent runs off on a scenario that never ran" */
+    it("turns the recent runs off, and says why, on a scenario that never ran", async () => {
+      const user = userEvent.setup();
+      mockGetById.mockReturnValue({
+        data: storedCase(),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      mockLastResults.mockReturnValue({ data: [], isLoading: false });
+      openDrawerAs({ scenarioId: "case_1" });
+      render(
+        <>
+          <AgentTestingCaseEditor />
+          <AgentTestingCaseEditorDrawer />
+        </>,
+        { wrapper: Wrapper },
+      );
+
+      const trigger = await screen.findByTestId("recent-runs-trigger");
+      expect(trigger).toBeDisabled();
+
+      // A disabled button dispatches no pointer event, so the reason is
+      // carried by the span around it.
+      await user.hover(trigger.parentElement!);
+      expect(await screen.findByText(NO_RUN_YET_HINT)).toBeInTheDocument();
+    });
+
+    /** @scenario "The editor offers a recent run of the scenario it is open on" */
+    it("offers the recent runs of that scenario beside its version", async () => {
+      const user = userEvent.setup();
+      mockGetById.mockReturnValue({
+        data: storedCase(),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      mockLastResults.mockReturnValue({
+        data: [{ scenarioId: "case_1", batchRunId: "batch_1" }],
+        isLoading: false,
+      });
+      openDrawerAs({ scenarioId: "case_1" });
+      render(
+        <>
+          <AgentTestingCaseEditor />
+          <AgentTestingCaseEditorDrawer />
+        </>,
+        { wrapper: Wrapper },
+      );
+
+      const trigger = await screen.findByTestId("recent-runs-trigger");
+      expect(trigger).not.toBeDisabled();
+      // It sits beside the version, which is the other thing the header says
+      // about the scenario being edited.
+      expect(
+        trigger.parentElement?.parentElement?.querySelector(
+          "[data-testid='case-modal-history']",
+        ),
+      ).not.toBeNull();
+
+      await user.click(trigger);
+      expect(await screen.findByTestId("recent-runs-list")).toBeInTheDocument();
     });
 
     /** @scenario "Editing a scenario names its version and opens the history" */

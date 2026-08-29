@@ -40,9 +40,6 @@ export function CaseVersionHistoryPopover({
     >
       <Popover.Trigger asChild>
         <Button
-          position="absolute"
-          top={3}
-          right={11}
           size="xs"
           variant="ghost"
           fontSize="12px"
