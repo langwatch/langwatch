@@ -97,6 +97,12 @@ Feature: Test Suite CLI Commands
     Then the name is resolved to its ID and the run is scheduled
 
   @unit
+  Scenario: Run a test suite against one agent on two models
+    When I run "langwatch test-suite run Refunds --target 'http:agent_abc?model=gpt-5' --target 'http:agent_abc?model=gpt-5-mini'"
+    Then the run is scheduled against two targets that name the same agent
+    And each target carries the model value written after its question mark
+
+  @unit
   Scenario: Run a test suite with no target
     When I run "langwatch test-suite run <suite-id>"
     Then I see an error that at least one --target is needed

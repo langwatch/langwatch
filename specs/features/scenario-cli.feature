@@ -130,6 +130,12 @@ Feature: Scenario CLI Commands
     Then the run is scheduled against both targets
 
   @unit
+  Scenario: Run a scenario against one agent on two models
+    When I run "langwatch scenario run <scenario-id> --target 'http:agent_abc?model=gpt-5' --target 'http:agent_abc?model=gpt-5-mini'"
+    Then the run is scheduled against two targets that name the same agent
+    And each target carries the model value written after its question mark
+
+  @unit
   Scenario: Run a scenario under a plan name
     Given my project has a run plan named "Login checks"
     When I run "langwatch scenario run <scenario-id> --target http:agent_abc --name 'Login checks'"
