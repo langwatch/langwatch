@@ -41,7 +41,12 @@ export function isOrgScopedPermission(permission: Permission): boolean {
     // (rbac.ts ADMIN defaults); resolving them against team roles denies
     // org admins client-side while the server correctly allows them.
     permission.startsWith("webhookEndpoints:") ||
-    permission.startsWith("gatewaySpend:")
+    permission.startsWith("gatewaySpend:") ||
+    // The cost screen is org-exclusive on the server (rbac.ts
+    // ORG_EXCLUSIVE_RESOURCES). Omitting it here sent the check down the
+    // team-role path, where no bag carries it, so the screen refused every
+    // org admin while the router allowed them.
+    permission.startsWith("governanceCost:")
   );
 }
 
