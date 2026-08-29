@@ -20,5 +20,5 @@ export {
   type NamedApiKeyBinding,
   type UpdateApiKeyRequest,
 } from "./app/api-key.app";
-export { createApiKeysRestApp } from "./api/app-rest/api-key.api";
-export { ApiKeyTrpcApi, type ApiKeyTrpcContext } from "./api/app-trpc/api-key.api";
+export { createApiKeysRestApp } from "./transport/api-rest/api-key.api";
+export { ApiKeyTrpcApi, type ApiKeyTrpcContext } from "./transport/api-trpc/api-key.api";

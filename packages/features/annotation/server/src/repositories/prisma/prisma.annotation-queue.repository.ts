@@ -9,7 +9,7 @@
  * return shape is the one the reviewer's pages have always been served.
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { AnnotationQueueStore } from "../../api/app-trpc/annotation.trpc-schemas";
+import type { AnnotationQueueStore } from "../../transport/api-trpc/annotation.trpc-schemas";
 
 /**
  * Every queue item the caller's organization can see: one whose queue belongs

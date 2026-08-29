@@ -16,7 +16,7 @@
 import { NotFoundError } from "@langwatch/handled-error";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { Project } from "~/generated/prisma/client";
+import type { ProjectIdentity } from "@langwatch/project-contract";
 
 import { lwqlEnabled } from "~/server/analytics/lwql/access";
 import { LangWatchQLNotEnabledError } from "~/server/analytics/lwql/errors";
@@ -37,9 +37,9 @@ export function callerProject({
   project,
   requestedProjectId,
 }: {
-  project: Project;
+  project: ProjectIdentity;
   requestedProjectId: string | undefined;
-}): Project {
+}): ProjectIdentity {
   if (requestedProjectId !== project.id) {
     throw new NotFoundError("project_not_found", "Project", requestedProjectId ?? "");
   }
@@ -55,7 +55,7 @@ export function callerProject({
  */
 export async function requireLangWatchQLEnabled(input: {
   featureFlags: FeatureFlagService;
-  project: Project;
+  project: ProjectIdentity;
   projects: ProjectService;
 }): Promise<void> {
   // Asked through `lwqlEnabled` rather than evaluated here: it is the
@@ -92,10 +92,10 @@ export async function lwqlProject({
   requestedProjectId,
 }: {
   featureFlags: FeatureFlagService;
-  project: Project;
+  project: ProjectIdentity;
   projects: ProjectService;
   requestedProjectId: string | undefined;
-}): Promise<Project> {
+}): Promise<ProjectIdentity> {
   const resolved = callerProject({ project, requestedProjectId });
   await requireLangWatchQLEnabled({ featureFlags, project: resolved, projects });
   return resolved;

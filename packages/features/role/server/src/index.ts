@@ -1,18 +1,18 @@
 export { RoleApp, type RoleAppDependencies, type RoleCaller } from "./app/role.app";
-export { createRolesRestApp } from "./api/app-rest/role.api";
+export { createRolesRestApp } from "./transport/api-rest/role.api";
 export {
   RoleBindingTrpcApi,
   roleBindingTrpcInputSchemas,
   type RoleBindingTrpcContext,
   type RoleBindingTrpcProcedures,
-} from "./api/app-trpc/role-binding.api";
+} from "./transport/api-trpc/role-binding.api";
 export {
   RoleTrpcApi,
   roleTrpcInputSchemas,
   type DeclaredProcedure,
   type RoleTrpcContext,
   type RoleTrpcProcedures,
-} from "./api/app-trpc/role.api";
+} from "./transport/api-trpc/role.api";
 export {
   PostgresRoleAdapter,
   type PostgresRoleAdapterOptions,

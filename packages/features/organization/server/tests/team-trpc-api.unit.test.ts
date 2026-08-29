@@ -20,7 +20,7 @@ import {
   OrganizationApp,
   type OrganizationAppDependencies,
 } from "../src/app/organization.app";
-import { TeamTrpcApi } from "../src/api/app-trpc/team.api";
+import { TeamTrpcApi } from "../src/transport/api-trpc/team.api";
 
 type TestContext = {
   app: { organizations: OrganizationApp };

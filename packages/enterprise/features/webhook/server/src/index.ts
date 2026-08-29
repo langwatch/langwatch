@@ -119,7 +119,7 @@ export {
 export {
   WebhookEndpointTrpcApi,
   type WebhookEndpointTrpcContext,
-} from "./api/app-trpc/webhook-endpoint.api";
+} from "./transport/api-trpc/webhook-endpoint.api";
 
 /**
  * The organization-key REST family this feature owns, `/api/webhooks/v1`. The
@@ -127,4 +127,4 @@ export {
  * application and its own canonical error mapping; every path, body, header,
  * status code and enum spelling is the feature's published contract.
  */
-export { createWebhookRestApp } from "./api/app-rest/webhook.api";
+export { createWebhookRestApp } from "./transport/api-rest/webhook.api";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { withoutHiddenResourceAttrs } from "../src/api/app-trpc/trace-view-gates.api";
+import { withoutHiddenResourceAttrs } from "../src/transport/api-trpc/trace-view-gates.api";
 
 describe("withoutHiddenResourceAttrs", () => {
   describe("given resource attributes carrying the internal non-billable marker", () => {

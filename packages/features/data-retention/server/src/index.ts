@@ -6,4 +6,4 @@ export {
   type DataRetentionTrpcContext,
   type DataRetentionTrpcPolicy,
   type RetentionScopeTarget,
-} from "./api/app-trpc/data-retention.api";
+} from "./transport/api-trpc/data-retention.api";

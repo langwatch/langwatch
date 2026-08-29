@@ -41,18 +41,18 @@ export {
   type ModelProviderCaller,
   type SpanReader,
 } from "./app/model-provider.app";
-export { createModelProvidersRestApp } from "./api/app-rest/model-provider.api";
-export { createModelDefaultsRestApp } from "./api/app-rest/model-defaults.api";
+export { createModelProvidersRestApp } from "./transport/api-rest/model-provider.api";
+export { createModelDefaultsRestApp } from "./transport/api-rest/model-defaults.api";
 export {
   ModelProviderTrpcApi,
   type ModelProviderTrpcContext,
-} from "./api/app-trpc/model-provider.api";
+} from "./transport/api-trpc/model-provider.api";
 export {
   LlmModelCostTrpcApi,
   type LlmModelCostTrpcContext,
-} from "./api/app-trpc/llm-model-cost.api";
+} from "./transport/api-trpc/llm-model-cost.api";
 export {
   TranslateTrpcApi,
   type TranslateTrpcContext,
   type TranslateTrpcPorts,
-} from "./api/app-trpc/translate.api";
+} from "./transport/api-trpc/translate.api";

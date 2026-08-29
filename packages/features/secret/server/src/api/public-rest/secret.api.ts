@@ -29,7 +29,7 @@ export class SecretPublicRestApi {
         endpoint
           .withInput(secretPublicRest.list.input)
           .withOutput(secretPublicRest.list.output)
-          .withPermission(secretPublicRest.list.permission)
+          .withPermission(secretPublicRest.list.permission, { scope: "projectId" })
           .withDocs({
             operationId: `listSecrets${operationIdSuffix}`,
             summary: "List project secrets",
@@ -45,7 +45,7 @@ export class SecretPublicRestApi {
         endpoint
           .withInput(secretPublicRest.get.input)
           .withOutput(secretPublicRest.get.output)
-          .withPermission(secretPublicRest.get.permission)
+          .withPermission(secretPublicRest.get.permission, { scope: "projectId" })
           .withDocs({
             operationId: `getSecret${operationIdSuffix}`,
             summary: "Get project-secret metadata",
@@ -61,7 +61,7 @@ export class SecretPublicRestApi {
         endpoint
           .withInput(secretPublicRest.create.input)
           .withOutput(secretPublicRest.create.output)
-          .withPermission(secretPublicRest.create.permission)
+          .withPermission(secretPublicRest.create.permission, { scope: "projectId" })
           .withStatus(201)
           .withDocs({
             operationId: `createSecret${operationIdSuffix}`,
@@ -77,7 +77,7 @@ export class SecretPublicRestApi {
         endpoint
           .withInput(secretPublicRest.update.input)
           .withOutput(secretPublicRest.update.output)
-          .withPermission(secretPublicRest.update.permission)
+          .withPermission(secretPublicRest.update.permission, { scope: "projectId" })
           .withDocs({
             operationId: `updateSecret${operationIdSuffix}`,
             summary: "Replace a project secret value",
@@ -91,7 +91,7 @@ export class SecretPublicRestApi {
         endpoint
           .withInput(secretPublicRest.delete.input)
           .withOutput(secretPublicRest.delete.output)
-          .withPermission(secretPublicRest.delete.permission)
+          .withPermission(secretPublicRest.delete.permission, { scope: "projectId" })
           .withDocs({
             operationId: `deleteSecret${operationIdSuffix}`,
             summary: "Delete a project secret",

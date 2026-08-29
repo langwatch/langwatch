@@ -66,7 +66,7 @@ export class ColumnTypeChangeNotSupportedError extends HandledError {
  *
  * A discriminant rather than a second class on purpose: the REST layer
  * dispatches dataset domain errors by `error.name`
- * (`src/api/app-rest/dataset.error-handler.ts`), so a distinct class would
+ * (`src/transport/api-rest/dataset.error-handler.ts`), so a distinct class would
  * silently drop out of the 409 mapping at every route that never learned about
  * it. One class, one name, one HTTP status; the tRPC boundary reads `reason`.
  */

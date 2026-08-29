@@ -9,7 +9,7 @@ import {
   type DataRetentionTrpcAuthz,
   type DataRetentionTrpcContext,
   type DataRetentionTrpcPolicy,
-} from "../src/api/app-trpc/data-retention.api";
+} from "../src/transport/api-trpc/data-retention.api";
 
 const getResolvedForProject = vi.fn();
 const triggerRetroactiveUpdate = vi.fn();

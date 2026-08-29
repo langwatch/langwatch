@@ -18,8 +18,7 @@ export {
   type FilesDualAuthVariables,
   type FilesProjectPermissionCheck,
   type FilesRateLimiter,
-} from "./api/app-rest/stored-object.api";
-export { StoredObjectsInternalApi } from "./api/internal/stored-object.api";
+} from "./transport/api-rest/stored-object.api";
 export { StoredObjectOwnerLookupRuntime } from "./adapters/stored-object-owner-lookup.runtime";
 export {
   StoredObjectDestinationPolicy,
@@ -78,4 +77,4 @@ export { PostgresStoredObjectAdapter } from "./adapters/postgres.stored-object.a
 export {
   StoredObjectTrpcApi,
   type StoredObjectTrpcContext,
-} from "./api/app-trpc/stored-object.api";
+} from "./transport/api-trpc/stored-object.api";

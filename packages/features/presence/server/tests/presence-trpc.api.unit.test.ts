@@ -10,7 +10,7 @@ import {
 import type { ProjectService } from "@langwatch/project-contract";
 import { TrpcRootDefinition } from "@langwatch/api/trpc";
 import { describe, expect, it, vi } from "vitest";
-import { PresenceTrpcApi, type PresenceTrpcContext } from "../src/api/app-trpc/presence.api";
+import { PresenceTrpcApi, type PresenceTrpcContext } from "../src/transport/api-trpc/presence.api";
 import { PresenceBroadcastPort, PresenceEmitterPort } from "../src/ports/presence.port";
 import { PresenceRepository } from "../src/repositories/presence.repository";
 import { PresenceService as ComposedPresenceService } from "../src/services/presence.service";

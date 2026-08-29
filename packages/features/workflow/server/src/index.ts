@@ -24,7 +24,7 @@ export {
   WorkflowOptimizationTrpcApi,
   type WorkflowOptimizationTrpcContext,
   type WorkflowOptimizationTrpcPorts,
-} from "./api/app-trpc/workflow-optimization.api";
+} from "./transport/api-trpc/workflow-optimization.api";
 export {
   WorkflowTrpcApi,
   type WorkflowCascadeArchiveResult,
@@ -37,4 +37,4 @@ export {
   type WorkflowTrpcContext,
   type WorkflowTrpcPorts,
   type WorkflowVersionRow,
-} from "./api/app-trpc/workflow.api";
+} from "./transport/api-trpc/workflow.api";

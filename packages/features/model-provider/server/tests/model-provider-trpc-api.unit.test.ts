@@ -16,7 +16,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { ModelProviderApp } from "../src/app/model-provider.app";
-import { ModelProviderTrpcApi } from "../src/api/app-trpc/model-provider.api";
+import { ModelProviderTrpcApi } from "../src/transport/api-trpc/model-provider.api";
 
 type TestContext = {
   app: { modelProviders: ModelProviderApp };

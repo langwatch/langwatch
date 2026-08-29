@@ -18,7 +18,7 @@ import { z } from "zod";
 import {
   OrganizationTrpcApi,
   type OrganizationTrpcPorts,
-} from "../src/api/app-trpc/organization.api";
+} from "../src/transport/api-trpc/organization.api";
 import {
   OrganizationApp,
   type OrganizationAppDependencies,

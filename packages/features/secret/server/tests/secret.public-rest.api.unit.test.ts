@@ -46,6 +46,15 @@ function buildApi() {
     name: "secret",
     app: () => runtimeApp,
     actor: () => ({ id: "user-1" }),
+    // The credential this family is exercised with. Without it the scope
+    // binding on every endpoint fails closed and answers 403 — which is the
+    // check working: an endpoint whose input names a project cannot be
+    // authorized against a credential that resolved to none.
+    auth: async (context, next) => {
+      context.set("project", { id: "project-1" });
+      await next();
+    },
+    openapiSecurity: [{ bearerAuth: [] }],
     logger: false,
     maxInputBytes: 16 * 1024,
     permissionEnforcer: () => async (_context, next) => next(),

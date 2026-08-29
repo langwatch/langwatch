@@ -56,4 +56,4 @@ export {
   type EvaluationTrpcPorts,
   type EvaluationRunOutcome,
   type EvaluatorUnavailability,
-} from "./api/app-trpc/evaluation.api";
+} from "./transport/api-trpc/evaluation.api";

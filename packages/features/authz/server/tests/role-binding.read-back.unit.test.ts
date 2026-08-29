@@ -5,7 +5,7 @@
  */
 import { RoleBindingScopeType, TeamUserRole } from "@langwatch/prisma-client/generated";
 import { describe, expect, it } from "vitest";
-import { optimisticBindingWire } from "../src/api/app-rest/role-binding.read-back";
+import { optimisticBindingWire } from "../src/transport/api-rest/role-binding.read-back";
 
 const AT = new Date("2026-08-18T09:00:00.000Z");
 

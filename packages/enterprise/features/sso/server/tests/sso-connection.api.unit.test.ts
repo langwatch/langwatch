@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   SsoConnectionTrpcApi,
   type SsoConnectionTrpcContext,
-} from "../src/api/app-trpc/sso-connection.api";
+} from "../src/transport/api-trpc/sso-connection.api";
 
 const backoffice = {
   list: vi.fn(),

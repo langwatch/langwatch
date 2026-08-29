@@ -17,15 +17,15 @@ export {
   ProjectStoredObjectsPort,
   type ProjectDatabase,
 } from "./ports/project.port";
-export { createProjectRestApp } from "./api/app-rest/project.api";
+export { createProjectRestApp } from "./transport/api-rest/project.api";
 export {
   ProjectTrpcApi,
   type ProjectFieldProtections,
   type ProjectTrpcContext,
-} from "./api/app-trpc/project.api";
+} from "./transport/api-trpc/project.api";
 export {
   HomeTrpcApi,
   type HomeTrpcContext,
   type HomeTrpcPorts,
   type RecentItem,
-} from "./api/app-trpc/home.api";
+} from "./transport/api-trpc/home.api";

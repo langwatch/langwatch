@@ -17,7 +17,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import { SecretApp } from "../src/app/secret.app";
 
-import { SecretTrpcApi, type SecretTrpcPolicy } from "../src/api/app-trpc/secret.api";
+import { SecretTrpcApi, type SecretTrpcPolicy } from "../src/transport/api-trpc/secret.api";
 
 /** The `.use()` surface the injected policy applies its middleware through. */
 type ChainableProcedure = { use(middleware: unknown): ChainableProcedure };

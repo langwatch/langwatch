@@ -1,5 +1,5 @@
 import type { Prisma, PrismaClient, SavedView } from "@langwatch/prisma-client/generated";
-import type { SavedViewsPort } from "../api/app-trpc/saved-view.api";
+import type { SavedViewsPort } from "../transport/api-trpc/saved-view.api";
 import { SavedViewRepository } from "../repositories/prisma/prisma.saved-view.repository";
 import { SavedViewService } from "../services/saved-view.service";
 

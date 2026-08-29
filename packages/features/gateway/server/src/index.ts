@@ -97,24 +97,24 @@ export {
 export {
   GatewayBudgetTrpcApi,
   type GatewayBudgetTrpcContext,
-} from "./api/app-trpc/gateway-budget.api";
+} from "./transport/api-trpc/gateway-budget.api";
 export {
   GatewayCacheRuleTrpcApi,
   type GatewayCacheRuleTrpcContext,
-} from "./api/app-trpc/gateway-cache-rule.api";
+} from "./transport/api-trpc/gateway-cache-rule.api";
 export {
   GatewayGuardrailTrpcApi,
   type GatewayGuardrailTrpcContext,
-} from "./api/app-trpc/gateway-guardrail.api";
+} from "./transport/api-trpc/gateway-guardrail.api";
 export {
   GatewaySpendEventTrpcApi,
   type GatewaySpendEventTrpcContext,
-} from "./api/app-trpc/gateway-spend-event.api";
+} from "./transport/api-trpc/gateway-spend-event.api";
 export {
   GatewayUsageTrpcApi,
   type GatewayUsageTrpcContext,
-} from "./api/app-trpc/gateway-usage.api";
-export { VirtualKeyTrpcApi, type VirtualKeyTrpcContext } from "./api/app-trpc/virtual-key.api";
+} from "./transport/api-trpc/gateway-usage.api";
+export { VirtualKeyTrpcApi, type VirtualKeyTrpcContext } from "./transport/api-trpc/virtual-key.api";
 
 /**
  * The public REST family this feature owns. The process supplies the bound REST
@@ -122,5 +122,5 @@ export { VirtualKeyTrpcApi, type VirtualKeyTrpcContext } from "./api/app-trpc/vi
  * declarations are the feature's, so the REST and tRPC doors cannot drift
  * apart.
  */
-export { createGatewayPlatformRestApp } from "./api/app-rest/gateway-platform.api";
-export { type VirtualKeyTrpcSchemas } from "./api/app-trpc/virtual-key.api";
+export { createGatewayPlatformRestApp } from "./transport/api-rest/gateway-platform.api";
+export { type VirtualKeyTrpcSchemas } from "./transport/api-trpc/virtual-key.api";

@@ -21,7 +21,7 @@ import { WebhookEndpointAdapter } from "../src/adapters/webhook-endpoint.webhook
 import { WebhookIdPort } from "../src/ports/webhook-id.port";
 import { WebhookSecretPort } from "../src/ports/webhook-secret.port";
 import { WebhookApp } from "../src/app/webhook.app";
-import { WebhookEndpointTrpcApi } from "../src/api/app-trpc/webhook-endpoint.api";
+import { WebhookEndpointTrpcApi } from "../src/transport/api-trpc/webhook-endpoint.api";
 
 const ORG_ID = "org_1";
 

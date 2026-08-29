@@ -134,13 +134,13 @@ export {
   AutomationTrpcApi,
   type AutomationTrpcContext,
   type AutomationTrpcPorts,
-} from "./api/app-trpc/automation.api";
+} from "./transport/api-trpc/automation.api";
 export {
   EmailSuppressionTrpcApi,
   type EmailSuppressionTrpcContext,
   type EmailSuppressionTrpcPorts,
-} from "./api/app-trpc/email-suppression.api";
-export { buildRetryAfterMessage } from "./api/app-trpc/retry-after-message";
+} from "./transport/api-trpc/email-suppression.api";
+export { buildRetryAfterMessage } from "./transport/api-trpc/retry-after-message";
 
 /**
  * The feature's application: the one object all three of its doors call, and
@@ -172,4 +172,4 @@ export {
  * platform-URL builder; the base path, access declarations, schemas and
  * delegation are the feature's.
  */
-export { createTriggerRestApp } from "./api/app-rest/automation.api";
+export { createTriggerRestApp } from "./transport/api-rest/automation.api";

@@ -18,7 +18,7 @@ export {
   type OpsScope,
   type OpsTrpcContext,
   type OpsTrpcPorts,
-} from "./api/app-trpc/ops.api";
+} from "./transport/api-trpc/ops.api";
 export {
   PostgresOpsAdapter,
   type PostgresOpsAdapterOptions,

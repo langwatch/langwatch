@@ -14,7 +14,7 @@ import {
   gatePullRequestSessionTitles,
   gateSessionListCost,
   gateSessionListTitles,
-} from "../src/api/app-trpc/coding-agent.gates";
+} from "../src/transport/api-trpc/coding-agent.gates";
 
 function sessionListRow(over: Record<string, unknown> = {}) {
   return {

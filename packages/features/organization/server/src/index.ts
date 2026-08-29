@@ -18,23 +18,23 @@ export {
   type OrganizationCaller,
   type OrganizationWithMembersAndTheirTeams,
 } from "./app/organization.app";
-export { TeamTrpcApi, type TeamTrpcContext } from "./api/app-trpc/team.api";
+export { TeamTrpcApi, type TeamTrpcContext } from "./transport/api-trpc/team.api";
 export {
   GroupTrpcApi,
   type GroupTrpcContext,
   type GroupTrpcPorts,
-} from "./api/app-trpc/group.api";
+} from "./transport/api-trpc/group.api";
 export {
   JoinRequestTrpcApi,
   type JoinRequestTrpcContext,
   type JoinRequestTrpcPorts,
-} from "./api/app-trpc/join-request.api";
+} from "./transport/api-trpc/join-request.api";
 export {
   OrganizationTrpcApi,
   type OrganizationTrpcContext,
   type OrganizationTrpcPorts,
-} from "./api/app-trpc/organization.api";
+} from "./transport/api-trpc/organization.api";
 export {
   PersonalWorkspaceFeaturesTrpcApi,
   type PersonalWorkspaceFeaturesTrpcContext,
-} from "./api/app-trpc/personal-workspace-features.api";
+} from "./transport/api-trpc/personal-workspace-features.api";

@@ -1363,7 +1363,7 @@ const serviceDependenciesRule = {
 function isFeatureApi(classification) {
   return (
     classification.role === "server" &&
-    /^src\/api\/[^/]+\/.+\.api\.ts$/.test(classification.relative ?? "")
+    /^src\/transport\/[^/]+\/.+\.api\.ts$/.test(classification.relative ?? "")
   );
 }
 

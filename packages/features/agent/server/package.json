@@ -17,13 +17,9 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./internal-api": {
-      "types": "./src/api/internal/agent.api.ts",
-      "default": "./src/api/internal/agent.api.ts"
-    },
     "./legacy-rest": {
-      "types": "./src/api/legacy-rest/agent.api.ts",
-      "default": "./src/api/legacy-rest/agent.api.ts"
+      "types": "./src/transport/api-rest/agent-legacy-facade.api.ts",
+      "default": "./src/transport/api-rest/agent-legacy-facade.api.ts"
     },
     "./testing": {
       "types": "./src/testing.ts",

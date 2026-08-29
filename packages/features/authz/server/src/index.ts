@@ -29,5 +29,5 @@ export {
   type AuthzCaller,
   type EffectivePermissions,
 } from "./app/authz.app";
-export { createRoleBindingsRestApp } from "./api/app-rest/role-binding.api";
-export { AuthzTrpcApi, type AuthzTrpcContext } from "./api/app-trpc/authz.api";
+export { createRoleBindingsRestApp } from "./transport/api-rest/role-binding.api";
+export { AuthzTrpcApi, type AuthzTrpcContext } from "./transport/api-trpc/authz.api";

@@ -9,5 +9,5 @@ export {
   type MonitorPatch,
   type MonitorReplicationPorts,
 } from "./app/monitor.app";
-export { MonitorTrpcApi, type MonitorTrpcContext } from "./api/app-trpc/monitor.api";
-export { createMonitorRestApp } from "./api/app-rest/monitor.api";
+export { MonitorTrpcApi, type MonitorTrpcContext } from "./transport/api-trpc/monitor.api";
+export { createMonitorRestApp } from "./transport/api-rest/monitor.api";

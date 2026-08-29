@@ -25,10 +25,6 @@
       "types": "./src/api/public/stored-object.api.ts",
       "default": "./src/api/public/stored-object.api.ts"
     },
-    "./internal-api": {
-      "types": "./src/api/internal/stored-object.api.ts",
-      "default": "./src/api/internal/stored-object.api.ts"
-    },
     "./testing": {
       "types": "./src/testing.ts",
       "default": "./src/testing.ts"

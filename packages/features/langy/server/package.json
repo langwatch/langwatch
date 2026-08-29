@@ -53,10 +53,6 @@
       "types": "./src/api/public/langy.api.ts",
       "default": "./src/api/public/langy.api.ts"
     },
-    "./internal-api": {
-      "types": "./src/api/internal/langy.api.ts",
-      "default": "./src/api/internal/langy.api.ts"
-    },
     "./testing": {
       "types": "./src/testing.ts",
       "default": "./src/testing.ts"

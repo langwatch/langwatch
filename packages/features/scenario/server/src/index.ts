@@ -68,14 +68,14 @@ export {
   type ScenarioBroadcast,
   type ScenarioCaller,
 } from "./app/scenario.app";
-export { ScenarioTrpcApi } from "./api/app-trpc/scenario.api";
-export { filterRunsByTimestamp } from "./api/app-trpc/scenario-events.api";
+export { ScenarioTrpcApi } from "./transport/api-trpc/scenario.api";
+export { filterRunsByTimestamp } from "./transport/api-trpc/scenario-events.api";
 export {
   simulationTargetSchema,
   type SimulationTarget,
-} from "./api/app-trpc/simulation-runner.api";
+} from "./transport/api-trpc/simulation-runner.api";
 export type {
   ScenarioTrpcContext,
   ScenarioTrpcPorts,
   ScenarioTrpcProcedures,
-} from "./api/app-trpc/scenario.trpc-context";
+} from "./transport/api-trpc/scenario.trpc-context";

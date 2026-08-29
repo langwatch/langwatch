@@ -14,7 +14,7 @@ import type { ProjectService } from "@langwatch/project-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SpendEventRow } from "../src/repositories/clickhouse/clickhouse.gateway-spend-events.repository";
-import { GatewaySpendEventTrpcApi } from "../src/api/app-trpc/gateway-spend-event.api";
+import { GatewaySpendEventTrpcApi } from "../src/transport/api-trpc/gateway-spend-event.api";
 import { GatewayApp, type GatewayAppDependencies } from "../src/app/gateway.app";
 import type { GatewaySpendEventsService } from "../src/services/gateway-spend-events.service";
 

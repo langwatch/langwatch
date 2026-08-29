@@ -5,12 +5,12 @@ export {
   DashboardIdGenerator,
   SavedWorkbenchChartPolicy,
 } from "./ports/dashboard.port";
-export { DashboardTrpcApi, type DashboardTrpcContext } from "./api/app-trpc/dashboard.api";
+export { DashboardTrpcApi, type DashboardTrpcContext } from "./transport/api-trpc/dashboard.api";
 export {
   GraphTrpcApi,
   type GraphTrpcContext,
   type GraphTrpcPorts,
-} from "./api/app-trpc/graph.api";
+} from "./transport/api-trpc/graph.api";
 export {
   SavedViewNotThereError,
   SavedViewReorderUnknownIdsError,
@@ -19,12 +19,12 @@ export {
   type SavedViewTrpcPorts,
   type SavedViewsPort,
   type SavedViewPeriod,
-} from "./api/app-trpc/saved-view.api";
+} from "./transport/api-trpc/saved-view.api";
 export {
   SavedWorkbenchChartTrpcApi,
   type SavedWorkbenchChartTrpcContext,
   type SavedWorkbenchChartTrpcPorts,
-} from "./api/app-trpc/saved-workbench-chart.api";
+} from "./transport/api-trpc/saved-workbench-chart.api";
 
 /**
  * The feature's application: the one object every door calls, and the refusals
@@ -46,5 +46,5 @@ export {
  * builder; the base paths, access declarations, schemas and delegation are the
  * feature's.
  */
-export { createGraphsRestApp } from "./api/app-rest/graph.api";
-export { createDashboardsRestApp } from "./api/app-rest/dashboard.api";
+export { createGraphsRestApp } from "./transport/api-rest/graph.api";
+export { createDashboardsRestApp } from "./transport/api-rest/dashboard.api";

@@ -18,20 +18,20 @@ export {
   EvaluatorTrpcApi,
   type EvaluatorTrpcContext,
   type EvaluatorTrpcPorts,
-} from "./api/app-trpc/evaluator.api";
+} from "./transport/api-trpc/evaluator.api";
 export {
   EvaluatorReplicationApi,
   type EvaluatorCopyCommand,
   type EvaluatorReplicationPorts,
-} from "./api/app-trpc/evaluator-replication.api";
+} from "./transport/api-trpc/evaluator-replication.api";
 export {
   createEvaluatorsRestApp,
   type EvaluatorAppVariables,
   type EvaluatorOrganizationVariables,
-} from "./api/app-rest/evaluator.api";
+} from "./transport/api-rest/evaluator.api";
 export {
   apiResponseEvaluatorSchema,
   type ApiResponseEvaluator,
   createEvaluatorInputSchema,
   updateEvaluatorInputSchema,
-} from "./api/app-rest/evaluator.schemas";
+} from "./transport/api-rest/evaluator.schemas";

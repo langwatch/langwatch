@@ -12,11 +12,11 @@ export {
   AnalyticsTrpcApi,
   type AnalyticsTrpcContext,
   type AnalyticsTrpcPorts,
-} from "./api/app-trpc/analytics.api";
+} from "./transport/api-trpc/analytics.api";
 export {
   LangWatchQLTrpcApi,
   type LangWatchQLTrpcContext,
   type LangWatchQLTrpcPorts,
   type LangWatchQLAvailability,
   type LangWatchQLUnavailableReason,
-} from "./api/app-trpc/langwatch-ql.api";
+} from "./transport/api-trpc/langwatch-ql.api";

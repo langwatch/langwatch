@@ -45,8 +45,8 @@ export {
   type CodingAgentTrpcPorts,
   type CodingAgentTrpcRequest,
   type CodingAgentViewerVisibility,
-} from "./api/app-trpc/coding-agent.api";
+} from "./transport/api-trpc/coding-agent.api";
 export {
   createCodingAgentRestApp,
   type CodingAgentRestAuditPort,
-} from "./api/app-rest/coding-agent.api";
+} from "./transport/api-rest/coding-agent.api";

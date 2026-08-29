@@ -23,7 +23,7 @@ import {
   EvaluationTrpcApi,
   type EvaluationRunOutcome,
   type EvaluationTrpcPorts,
-} from "../src/api/app-trpc/evaluation.api";
+} from "../src/transport/api-trpc/evaluation.api";
 
 const PROJECT_ID = "proj-byok-1";
 const USER_ID = "user-test";

@@ -291,18 +291,18 @@ export {
   type TracesV2SessionGroupsReader,
   type TracesV2SpanReader,
 } from "./app/trace.app";
-export { SpansTrpcApi, type SpansTrpcContext, type SpansTrpcPorts } from "./api/app-trpc/spans.api";
+export { SpansTrpcApi, type SpansTrpcContext, type SpansTrpcPorts } from "./transport/api-trpc/spans.api";
 export {
   TraceEditOverlayTrpcApi,
   type TraceEditOverlayTrpcContext,
   type TraceEditOverlayTrpcPorts,
   type TraceEditOverlayVisibilityWindow,
-} from "./api/app-trpc/trace-edit-overlay.api";
+} from "./transport/api-trpc/trace-edit-overlay.api";
 export {
   TracesTrpcApi,
   type TracesTrpcContext,
   type TracesTrpcPorts,
-} from "./api/app-trpc/traces.api";
+} from "./transport/api-trpc/traces.api";
 export {
   canReadCapturedContent,
   type CategoryVisibility,
@@ -334,19 +334,19 @@ export {
   type TraceSpanDisplayPort,
   type TraceSpanProtectionPort,
   type V2Protections,
-} from "./api/app-trpc/trace-read-mappers.api";
+} from "./transport/api-trpc/trace-read-mappers.api";
 export {
   TracesV2TrpcApi,
   type TracesV2CodingAgentEnrichmentPort,
   type TracesV2ReadPorts,
   type TracesV2TrpcContext,
   type TracesV2TrpcPorts,
-} from "./api/app-trpc/traces-v2.api";
+} from "./transport/api-trpc/traces-v2.api";
 export {
   SharedTraceTrpcApi,
   type SharedTraceTrpcContext,
   type SharedTraceTrpcPorts,
-} from "./api/app-trpc/shared-trace.api";
+} from "./transport/api-trpc/shared-trace.api";
 export {
   gateEvaluations,
   gateHeaderCost,
@@ -357,4 +357,4 @@ export {
   HIDDEN_RESOURCE_ATTRS,
   withoutHiddenResourceAttrs,
   type SessionTitleRedactionFlag,
-} from "./api/app-trpc/trace-view-gates.api";
+} from "./transport/api-trpc/trace-view-gates.api";

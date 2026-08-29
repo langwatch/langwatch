@@ -11,11 +11,11 @@ export {
   IdentityTrpcApi,
   type IdentityTrpcContext,
   type IdentityTrpcPorts,
-} from "./api/app-trpc/identity.api";
+} from "./transport/api-trpc/identity.api";
 export {
   UserTrpcApi,
   type Auth0PasswordChangeOutcome,
   type UnlinkAccountOutcome,
   type UserTrpcContext,
   type UserTrpcPorts,
-} from "./api/app-trpc/user.api";
+} from "./transport/api-trpc/user.api";

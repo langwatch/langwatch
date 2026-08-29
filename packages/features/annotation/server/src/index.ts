@@ -18,11 +18,11 @@ export {
   type AnnotationQueueStore,
   type AnnotationTrpcContext,
   type AnnotationTrpcPorts,
-} from "./api/app-trpc/annotation.api";
+} from "./transport/api-trpc/annotation.api";
 export {
   AnnotationScoreTrpcApi,
   type AnnotationScoreTrpcContext,
-} from "./api/app-trpc/annotation-score.api";
+} from "./transport/api-trpc/annotation-score.api";
 export { PostgresAnnotationQueueAdapter } from "./adapters/postgres.annotation-queue.adapter";
 export {
   AnnotationAnnotatorReferenceInvalidError,

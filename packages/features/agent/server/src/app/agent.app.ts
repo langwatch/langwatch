@@ -38,8 +38,8 @@ export class AgentApp {
    * hands the generator to its input schema, which is built once at module
    * load, while the REST family mints inside the request — and neither moment
    * should be a second copy of what an agent id looks like. It was two copies
-   * before this: `agent_${nanoid()}` in `api/app-trpc/agent.api.ts` and again
-   * in `api/app-rest/agent-legacy.api.ts`.
+   * before this: `agent_${nanoid()}` in `transport/api-trpc/agent.api.ts` and again
+   * in `transport/api-rest/agent-legacy.api.ts`.
    */
   static nextAgentId(): string {
     return `agent_${nanoid()}`;

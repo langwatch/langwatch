@@ -68,7 +68,10 @@ const SERVER_PATTERNS = [
   new RegExp(`^processes/${NAME}\\.process\\.ts$`),
   new RegExp(`^intents/${NAME}\\.intent\\.ts$`),
   new RegExp(`^adapters/${NAME}(?:\\.${NAME})?\\.adapter\\.ts$`),
-  new RegExp(`^api/${NAME}/${NAME}\\.api\\.ts$`),
+  // A transport lives under `transport/<surface>/`, where the surface names
+  // the door: `api-rest`, `api-trpc`. The old `api/app-<kind>/` said "app"
+  // twice and put the noun before the adjective.
+  new RegExp(`^transport/${NAME}/${NAME}\\.api\\.ts$`),
   new RegExp(`^migrations/${NAME}-import\\.${NAME}\\.migration\\.ts$`),
 ] as const;
 
@@ -225,7 +228,7 @@ function lintServer(pkg: ClassifiedPackage): ArchitectureViolation[] {
       violation(
         file,
         `Server source path ${JSON.stringify(path)} is not part of strict layout version 0.`,
-        "Use services, repositories, stores, projections, subscribers, processes, intents, ports, adapters, api/<surface>, or migrations with the canonical filename grammar.",
+        "Use services, repositories, stores, projections, subscribers, processes, intents, ports, adapters, transport/<surface>, or migrations with the canonical filename grammar.",
       ),
     );
   }

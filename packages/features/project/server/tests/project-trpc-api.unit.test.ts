@@ -32,7 +32,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { ProjectApp, type TopicClusteringCommands } from "../src/app/project.app";
-import { ProjectTrpcApi } from "../src/api/app-trpc/project.api";
+import { ProjectTrpcApi } from "../src/transport/api-trpc/project.api";
 
 type TestContext = {
   app: { projects: ProjectApp };

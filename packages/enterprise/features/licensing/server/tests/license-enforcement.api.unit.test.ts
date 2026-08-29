@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   LicenseEnforcementTrpcApi,
   type LicenseEnforcementTrpcContext,
-} from "../src/api/app-trpc/license-enforcement.api";
+} from "../src/transport/api-trpc/license-enforcement.api";
 import { LicensingApp } from "../src/app/licensing.app";
 
 const checkLimit = vi.fn();

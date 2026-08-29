@@ -33,8 +33,8 @@ export {
   type RecordSuiteRunItemStartedCommandData,
   type StartSuiteRunCommandData,
 } from "@langwatch/suite-contract";
-export { SuiteTrpcApi } from "./api/app-trpc/suite.api";
-export type { SuiteTrpcContext, SuiteTrpcProcedures } from "./api/app-trpc/suite.trpc-context";
+export { SuiteTrpcApi } from "./transport/api-trpc/suite.api";
+export type { SuiteTrpcContext, SuiteTrpcProcedures } from "./transport/api-trpc/suite.trpc-context";
 
 /**
  * The feature's application: the one object both of its doors call, and the
@@ -54,4 +54,4 @@ export {
  * platform-URL builder; the base path, access declarations, schemas and
  * delegation are the feature's.
  */
-export { createSuiteRestApp } from "./api/app-rest/suite.api";
+export { createSuiteRestApp } from "./transport/api-rest/suite.api";

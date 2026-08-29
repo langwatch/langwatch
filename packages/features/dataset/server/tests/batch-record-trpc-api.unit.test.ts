@@ -16,7 +16,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { DatasetService } from "@langwatch/dataset-contract";
 
-import { BatchRecordTrpcApi } from "../src/api/app-trpc/batch-record.api";
+import { BatchRecordTrpcApi } from "../src/transport/api-trpc/batch-record.api";
 import { DatasetApp } from "../src/app/dataset.app";
 
 type TestContext = { app: { dataset: DatasetApp } };

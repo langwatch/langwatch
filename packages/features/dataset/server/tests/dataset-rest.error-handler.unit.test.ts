@@ -1,7 +1,7 @@
 import { DatasetNotReadyError } from "@langwatch/dataset-contract";
 import type { Context, ErrorHandler } from "hono";
 import { describe, expect, it } from "vitest";
-import { createDatasetErrorHandler } from "../src/api/app-rest/dataset.error-handler";
+import { createDatasetErrorHandler } from "../src/transport/api-rest/dataset.error-handler";
 
 /** The process boundary this family layers over; unreached by these cases. */
 const unreachedBoundary: ErrorHandler = () => {

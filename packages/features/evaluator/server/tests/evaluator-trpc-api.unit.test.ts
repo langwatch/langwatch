@@ -16,7 +16,7 @@ import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { EvaluatorApp } from "../src/app/evaluator.app";
-import { EvaluatorTrpcApi, type EvaluatorTrpcPorts } from "../src/api/app-trpc/evaluator.api";
+import { EvaluatorTrpcApi, type EvaluatorTrpcPorts } from "../src/transport/api-trpc/evaluator.api";
 
 type TestContext = {
   app: { evaluatorApp: EvaluatorApp };

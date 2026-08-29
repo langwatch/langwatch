@@ -13,7 +13,7 @@
  * in rather than imported.
  */
 import type { TraceLegacyReadPort } from "../src/ports/trace-legacy-read.port";
-import { TracesTrpcApi } from "../src/api/app-trpc/traces.api";
+import { TracesTrpcApi } from "../src/transport/api-trpc/traces.api";
 import { TraceApp, type TraceAppDependencies } from "../src/app/trace.app";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";

@@ -6,7 +6,7 @@
  */
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
-import { SpansTrpcApi } from "../src/api/app-trpc/spans.api";
+import { SpansTrpcApi } from "../src/transport/api-trpc/spans.api";
 import { TraceApp, type TraceAppDependencies } from "../src/app/trace.app";
 import type { TraceLegacyReadPort } from "../src/ports/trace-legacy-read.port";
 

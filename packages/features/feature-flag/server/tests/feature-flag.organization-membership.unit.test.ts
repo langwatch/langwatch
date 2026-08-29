@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   FeatureFlagTrpcApi,
   type FeatureFlagTrpcContext,
-} from "../src/api/app-trpc/feature-flag.api";
+} from "../src/transport/api-trpc/feature-flag.api";
 import { MemoryFeatureFlagService } from "../src/testing";
 
 const USER_ID = "user_1";

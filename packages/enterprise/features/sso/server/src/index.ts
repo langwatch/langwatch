@@ -2,7 +2,7 @@ export {
   SsoConnectionTrpcApi,
   type SsoConnectionTrpcContext,
   type SsoConnectionTrpcPorts,
-} from "./api/app-trpc/sso-connection.api";
+} from "./transport/api-trpc/sso-connection.api";
 export {
   LicensingSsoAdapter,
   type LicensingSsoAdapterOptions,

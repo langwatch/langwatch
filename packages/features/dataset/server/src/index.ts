@@ -8,22 +8,22 @@ export {
   DatasetTrpcApi,
   type DatasetTrpcContext,
   type DatasetTrpcPorts,
-} from "./api/app-trpc/dataset.api";
+} from "./transport/api-trpc/dataset.api";
 export {
   DatasetRecordTrpcApi,
   type DatasetRecordTrpcContext,
-} from "./api/app-trpc/dataset-record.api";
+} from "./transport/api-trpc/dataset-record.api";
 export {
   BatchRecordTrpcApi,
   type BatchRecordTrpcContext,
   type BatchRecordTrpcPorts,
-} from "./api/app-trpc/batch-record.api";
+} from "./transport/api-trpc/batch-record.api";
 export {
   createDatasetRestApp,
   type DatasetDirectUploadAuthorization,
   type DatasetDirectUploadAuthorizer,
-} from "./api/app-rest/dataset.api";
-export { createDatasetErrorHandler } from "./api/app-rest/dataset.error-handler";
+} from "./transport/api-rest/dataset.api";
+export { createDatasetErrorHandler } from "./transport/api-rest/dataset.error-handler";
 export {
   PostgresDatasetAdapter,
   type PostgresDatasetAdapterOptions,

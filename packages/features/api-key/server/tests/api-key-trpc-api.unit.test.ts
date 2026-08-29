@@ -33,7 +33,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { ApiKeyApp } from "../src/app/api-key.app";
-import { ApiKeyTrpcApi } from "../src/api/app-trpc/api-key.api";
+import { ApiKeyTrpcApi } from "../src/transport/api-trpc/api-key.api";
 
 const USER_ID = "user_1";
 const ORG_ID = "org_1";

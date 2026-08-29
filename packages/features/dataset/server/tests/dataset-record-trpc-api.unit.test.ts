@@ -24,7 +24,7 @@ import {
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { DatasetRecordTrpcApi } from "../src/api/app-trpc/dataset-record.api";
+import { DatasetRecordTrpcApi } from "../src/transport/api-trpc/dataset-record.api";
 import { DatasetApp } from "../src/app/dataset.app";
 
 type TestContext = { app: { dataset: DatasetApp } };

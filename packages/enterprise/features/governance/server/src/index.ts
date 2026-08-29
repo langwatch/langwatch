@@ -123,11 +123,11 @@ export { TraceAlertTriggerMatchSubscriber } from "./subscribers/trace-alert-trig
 export {
   PersonalVirtualKeyTrpcApi,
   type PersonalVirtualKeyTrpcContext,
-} from "./api/app-trpc/personal-virtual-key.api";
+} from "./transport/api-trpc/personal-virtual-key.api";
 export {
   RoutingPolicyTrpcApi,
   type RoutingPolicyTrpcContext,
-} from "./api/app-trpc/routing-policy.api";
+} from "./transport/api-trpc/routing-policy.api";
 
 /**
  * The public REST family this feature owns. The process supplies the bound
@@ -135,4 +135,4 @@ export {
  * services; the base path, access declarations, schemas and delegation are
  * the feature's.
  */
-export { createGovernanceRestApp } from "./api/app-rest/governance.api";
+export { createGovernanceRestApp } from "./transport/api-rest/governance.api";

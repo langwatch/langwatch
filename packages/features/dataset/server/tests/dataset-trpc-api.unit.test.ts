@@ -22,7 +22,7 @@ import { DatasetConflictError as DiscriminatedDatasetConflictError } from "../sr
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { DatasetTrpcApi } from "../src/api/app-trpc/dataset.api";
+import { DatasetTrpcApi } from "../src/transport/api-trpc/dataset.api";
 import { DatasetApp } from "../src/app/dataset.app";
 
 type TestContext = { app: { dataset: DatasetApp } };

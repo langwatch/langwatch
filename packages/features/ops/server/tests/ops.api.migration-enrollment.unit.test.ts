@@ -15,7 +15,7 @@ import {
   OpsTrpcApi,
   type OpsTrpcContext,
   type OpsTrpcPorts,
-} from "../src/api/app-trpc/ops.api";
+} from "../src/transport/api-trpc/ops.api";
 import { OpsApp, type OpsCapability } from "../src/app/ops.app";
 
 const service = {

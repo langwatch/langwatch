@@ -4,7 +4,7 @@ export {
 } from "./adapters/prisma.agent.adapter";
 export { AgentApp, type AgentAppDependencies } from "./app/agent.app";
 export { AgentService } from "./services/agent.service";
-export { AgentTrpcApi, type AgentTrpcContext } from "./api/app-trpc/agent.api";
+export { AgentTrpcApi, type AgentTrpcContext } from "./transport/api-trpc/agent.api";
 export type { AgentsAuditLogPort, AgentsDatabase, AgentsWorkflowPort } from "./ports/agent.port";
 export {
   HttpProxyTrpcApi,
@@ -12,7 +12,7 @@ export {
   type HttpProxyTrpcContext,
   type HttpProxyTrpcPorts,
   type HttpProxyTrpcRequest,
-} from "./api/app-trpc/http-proxy.api";
+} from "./transport/api-trpc/http-proxy.api";
 export {
   buildAgentTestTrace,
   buildTraceparentHeader,
@@ -21,7 +21,7 @@ export {
   sanitizeHeadersForTrace,
   type AgentTestTrace,
   type TraceTestContext,
-} from "./api/app-trpc/agent-test-tracing";
+} from "./transport/api-trpc/agent-test-tracing";
 
 /**
  * The deprecated `/api/agents` REST family this feature owns. The process
@@ -31,4 +31,4 @@ export {
 export {
   type AgentPlatformUrlBuilder,
   createAgentLegacyRestApp,
-} from "./api/app-rest/agent-legacy.api";
+} from "./transport/api-rest/agent-legacy.api";

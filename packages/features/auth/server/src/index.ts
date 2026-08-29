@@ -7,5 +7,5 @@ export {
   type AuthSession,
   type InviteLanding,
 } from "./app/auth.app";
-export { FrontDoorTrpcApi, type FrontDoorTrpcContext } from "./api/app-trpc/front-door.api";
-export { PublicEnvTrpcApi, type PublicEnvTrpcContext } from "./api/app-trpc/public-env.api";
+export { FrontDoorTrpcApi, type FrontDoorTrpcContext } from "./transport/api-trpc/front-door.api";
+export { PublicEnvTrpcApi, type PublicEnvTrpcContext } from "./transport/api-trpc/public-env.api";

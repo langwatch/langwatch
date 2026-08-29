@@ -6,11 +6,11 @@ export {
   type MintLicenseInput,
   type SsoGateStatus,
 } from "./app/licensing.app";
-export { LicenseTrpcApi, type LicenseTrpcContext } from "./api/app-trpc/license.api";
+export { LicenseTrpcApi, type LicenseTrpcContext } from "./transport/api-trpc/license.api";
 export {
   LicenseEnforcementTrpcApi,
   type LicenseEnforcementTrpcContext,
-} from "./api/app-trpc/license-enforcement.api";
+} from "./transport/api-trpc/license-enforcement.api";
 export {
   LicensingEntitlementSource,
   type LicensingEntitlementSourceMode,
