@@ -59,7 +59,7 @@ describe("saveOrCommitWorkflowVersion", () => {
   const getCtx = () => ({
     prisma,
     session: { user: { id: userId } } as Session,
-    app: { workflows: getApp().workflows },
+    app: { workflows: getApp().workflows, modelProviders: getApp().modelProviders },
   });
 
   describe("when a signature node has localPromptConfig", () => {

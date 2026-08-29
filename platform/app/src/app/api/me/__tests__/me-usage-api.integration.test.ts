@@ -309,7 +309,7 @@ describe("Feature: Personal usage REST API", () => {
       },
     });
     callerUserToken = (
-      await getApp().apiKeys.create({
+      await getApp().apiKeys.apiKeyService.create({
         name: `me-usage-caller-${nanoid(6)}`,
         userId,
         createdByUserId: userId,

@@ -20,7 +20,7 @@ wireDefaultTestApp();
 
 const { hono: app } = createModelDefaultsRestApp({
   security: appRestSecurity,
-  modelProviders: () => getApp().modelProviders,
+  modelProviders: () => getApp().modelProviders.providerService,
 });
 
 describe("Feature: Model Defaults REST API", () => {

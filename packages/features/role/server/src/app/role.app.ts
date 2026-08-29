@@ -113,6 +113,19 @@ export class RoleApp {
     return this.dependencies.roles.removeFromUser({ ...input, actor: this.actorFor(by) });
   }
 
+  /**
+   * The organization a team assignment lands in.
+   *
+   * Read here rather than off the team, because an assignment is refused for a
+   * team nobody can name — the service raises `TeamNotFoundError`, which the
+   * door renders as a 404 — and the plan that governs custom roles is read per
+   * organization. A door that resolved the organization some other way would
+   * be answering the plan question about a team it had not established exists.
+   */
+  getAssignmentOrganization(input: Readonly<{ teamId: string }>): Promise<string> {
+    return this.dependencies.roles.getAssignmentOrganization(input);
+  }
+
   // ── role bindings ──────────────────────────────────────────────────────────
 
   /**

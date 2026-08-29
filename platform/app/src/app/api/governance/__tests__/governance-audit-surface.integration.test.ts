@@ -60,8 +60,7 @@ describe("Audit uniformity: identical payload shape across all governance surfac
 
   const { hono: governanceApp } = createGovernanceRestApp({
     security: appRestSecurity,
-    governance: () => app.governance,
-    projects: () => app.projects,
+    app: () => app.governanceApp,
   });
 
   const orgIds: string[] = [];
@@ -131,7 +130,7 @@ describe("Audit uniformity: identical payload shape across all governance surfac
       },
     });
 
-    const apiKeyResult = await app.apiKeys.create({
+    const apiKeyResult = await app.apiKeys.apiKeyService.create({
       name: `uniform-pat-${ns}`,
       userId: testUser.id,
       organizationId: testOrg.id,

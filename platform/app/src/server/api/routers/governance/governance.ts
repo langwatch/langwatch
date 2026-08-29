@@ -319,7 +319,7 @@ export const governanceRouter = createTRPCRouter({
       });
       if (!membership) return null;
 
-      const workspace = await ctx.app.organizations.tryFindPersonalWorkspace({
+      const workspace = await ctx.app.users.tryFindPersonalWorkspace({
         userId: user.id,
         organizationId: input.organizationId,
       });

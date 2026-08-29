@@ -135,7 +135,7 @@ secured.access(langyInternalPolicy()).post("/turn/:turnId/result", async (c) => 
   // this rejects a forged triple and a benign cross-tenant mix-up alike.
   // 404 (not 4xx-with-detail) so a probe never confirms a cross-tenant id;
   // the manager treats 4xx as terminal, so it will not retry-loop.
-  const turnExists = await appFromContext(c).langy.turnExists({
+  const turnExists = await appFromContext(c).langy.langyService.turnExists({
     projectId: body.projectId,
     conversationId: body.conversationId,
     turnId,
@@ -152,7 +152,7 @@ secured.access(langyInternalPolicy()).post("/turn/:turnId/result", async (c) => 
     return c.json({ error: "turn not found" }, 404);
   }
 
-  await appFromContext(c).langy.ingestAgentTurnResult({
+  await appFromContext(c).langy.langyService.ingestAgentTurnResult({
     projectId: body.projectId,
     conversationId: body.conversationId,
     turnId,
@@ -201,7 +201,7 @@ secured.access(langyInternalPolicy()).post("/credentials/revoke", async (c) => {
     throw ValidationError.fromZodError(parsed.error);
   }
 
-  const outcome = await appFromContext(c).langy.revokeWorkerSessionKey({
+  const outcome = await appFromContext(c).langy.langyService.revokeWorkerSessionKey({
     apiKeyId: parsed.data.apiKeyId,
     projectId: parsed.data.projectId,
   });

@@ -885,7 +885,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: CliContext) => {
         scope: CliKeyScopeSummary;
       };
       try {
-        minted = await c.var.langwatchApp.apiKeys.mintCliLoginKey({
+        minted = await c.var.langwatchApp.apiKeys.apiKeyService.mintCliLoginKey({
           userId: user.id,
           organizationId: organization.id,
           deviceLabel,
@@ -2605,7 +2605,7 @@ secured.access(cliApproveAuth).post("/approve", async (c: CliContext) => {
     // registry and the approving user's own ceiling. A violation throws a
     // HandledError (cli_key_selection_invalid / api_key_scope_violation /
     // personal_workspace_not_managed_here) and nothing is stamped.
-    keySelection = await c.var.langwatchApp.apiKeys.validateCliSelection({
+    keySelection = await c.var.langwatchApp.apiKeys.apiKeyService.validateCliSelection({
       userId: session.user.id,
       organizationId: organization_id,
       selection: {
@@ -2637,7 +2637,7 @@ secured.access(cliApproveAuth).post("/approve", async (c: CliContext) => {
     }
     try {
       keySelection =
-        (await c.var.langwatchApp.apiKeys.tryResolveDefaultCliSelection({
+        (await c.var.langwatchApp.apiKeys.apiKeyService.tryResolveDefaultCliSelection({
           userId: session.user.id,
           organizationId: organization_id,
         })) ?? undefined;
@@ -2727,7 +2727,10 @@ secured.access(CLI_POLICY).post("/logout", async (c: CliContext) => {
   }
   await ops.exec();
 
-  await revokeCliKeysFromTokenRecords(c.var.langwatchApp.apiKeys, [refreshRaw, accessRaw]);
+  await revokeCliKeysFromTokenRecords(c.var.langwatchApp.apiKeys.apiKeyService, [
+    refreshRaw,
+    accessRaw,
+  ]);
 
   return c.json({ ok: true });
 });

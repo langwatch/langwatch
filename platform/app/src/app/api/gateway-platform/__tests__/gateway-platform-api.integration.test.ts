@@ -475,7 +475,7 @@ async function seedUserWithRole(args: {
       scopeId: args.bindingScope.id,
     },
   });
-  const created = await getApp().apiKeys.create({
+  const created = await getApp().apiKeys.apiKeyService.create({
     name: `gwrest-${args.userId}`,
     userId: args.userId,
     createdByUserId: args.userId,

@@ -1,9 +1,14 @@
 import type { MiddlewareHandler } from "hono";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { App } from "~/server/app-layer/app";
 import { appFromContext } from "~/app/api/middleware/app-context";
 
+/**
+ * The Project feature's application, not its service: `App.projects` holds
+ * `ProjectApp`, and a variable still typed `ProjectService` would tell a
+ * future consumer it can call reads the application does not answer.
+ */
 export type ProjectServiceMiddlewareVariables = {
-  projectService: ProjectService;
+  projectService: App["projects"];
 };
 
 export const projectServiceMiddleware: MiddlewareHandler = async (c, next) => {

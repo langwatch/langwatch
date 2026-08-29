@@ -212,7 +212,7 @@ const authenticateRequest = async (c: Context, permission: Permission) => {
     return { error: "Missing credentials", status: 401 as const };
   }
 
-  const apiKeys = appFromContext(c).apiKeys;
+  const apiKeys = appFromContext(c).apiKeys.apiKeyService;
   const resolved = await apiKeys.tryResolveToken({
     token: credentials.token,
     projectId: credentials.projectId,
@@ -358,9 +358,9 @@ secured.access(sessionAuth).post(
           datasetColumns,
           loadedPrompts,
           loadedAgents,
-          modelProviders: c.app.modelProviders,
+          modelProviders: c.app.modelProviders.providerService,
           nlpLambda: c.app.nlpLambda,
-          workflows: c.app.workflows,
+          workflows: c.app.workflows.workflowService,
           loadedEvaluators,
           loadedWorkflows,
           defaultConcurrency: c.app.config.evaluationExecution.defaultConcurrency,
@@ -649,7 +649,7 @@ secured.access(apiKeyAuthRun).post(
     const runInputs = inputsParse.data;
 
     const prepared = await prepareSavedStateExecution({
-      experiments: c.app.experiments,
+      experiments: c.app.experiments.experimentService,
       evaluators: c.app.evaluators,
       projectId: project.id,
       slug,
@@ -706,9 +706,9 @@ secured.access(apiKeyAuthRun).post(
             datasetColumns,
             loadedPrompts: loadedPrompts as Map<string, VersionedPrompt>,
             loadedAgents: loadedAgents as Map<string, TypedAgent>,
-            modelProviders: c.app.modelProviders,
+            modelProviders: c.app.modelProviders.providerService,
             nlpLambda: c.app.nlpLambda,
-            workflows: c.app.workflows,
+            workflows: c.app.workflows.workflowService,
             loadedEvaluators,
             loadedWorkflows,
             defaultConcurrency: c.app.config.evaluationExecution.defaultConcurrency,
@@ -757,9 +757,9 @@ secured.access(apiKeyAuthRun).post(
       datasetColumns,
       loadedPrompts: loadedPrompts as Map<string, VersionedPrompt>,
       loadedAgents: loadedAgents as Map<string, TypedAgent>,
-      modelProviders: c.app.modelProviders,
+      modelProviders: c.app.modelProviders.providerService,
       nlpLambda: c.app.nlpLambda,
-      workflows: c.app.workflows,
+      workflows: c.app.workflows.workflowService,
       loadedEvaluators,
       loadedWorkflows,
       defaultConcurrency: c.app.config.evaluationExecution.defaultConcurrency,
@@ -770,7 +770,7 @@ secured.access(apiKeyAuthRun).post(
       ...(runsSavedDataset(runInputs)
         ? {
             persistResults: {
-              experiments: c.app.experiments,
+              experiments: c.app.experiments.experimentService,
               actor: workbenchActorFrom({ resolved }),
             },
           }
@@ -1234,14 +1234,16 @@ secured.access(apiKeyAuthExperimentsUpdate).put(
 
     const body = c.req.valid("json");
 
-    const saved = await c.app.experiments.saveWorkbenchState({
-      projectId: project.id,
-      slug,
-      state: body.state,
-      ...(body.expectedVersion !== undefined ? { expectedVersion: body.expectedVersion } : {}),
-      ...(body.commitMessage ? { commitMessage: body.commitMessage } : {}),
-      actor: workbenchActorFrom({ resolved }),
-    });
+    const saved = await c.app.experiments.saveWorkbenchState(
+      {
+        projectId: project.id,
+        slug,
+        state: body.state,
+        ...(body.expectedVersion !== undefined ? { expectedVersion: body.expectedVersion } : {}),
+        ...(body.commitMessage ? { commitMessage: body.commitMessage } : {}),
+      },
+      { kind: "credential", resolved },
+    );
 
     markUsed();
     return c.json({ version: saved.version });
@@ -1400,12 +1402,14 @@ secured.access(apiKeyAuthExperimentsUpdate).post(
       });
     }
 
-    const restored = await experiments.restoreWorkbenchVersion({
-      projectId: project.id,
-      id: workbench.experimentId,
-      version: parsedVersion,
-      actor: workbenchActorFrom({ resolved }),
-    });
+    const restored = await experiments.restoreWorkbenchVersion(
+      {
+        projectId: project.id,
+        id: workbench.experimentId,
+        version: parsedVersion,
+      },
+      { kind: "credential", resolved },
+    );
 
     logger.info(
       { projectId: project.id, slug, version: parsedVersion },

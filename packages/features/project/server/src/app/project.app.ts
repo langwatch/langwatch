@@ -99,6 +99,21 @@ export class ProjectApp {
   }
 
   /**
+   * The service itself, for the process functions that still take it whole.
+   *
+   * None of them is a project door: the LangWatchQL rollout gate resolves the
+   * project's organization before reading a flag, the gateway's trace-destination
+   * read lists the projects a page of virtual keys points at, and the personal
+   * usage roll-up resolves the organization's hidden governance project. Each
+   * takes a `ProjectService` as a parameter, so a narrowed shape will not do.
+   * Until they move, this getter is the seam that remains — the same one
+   * `ModelProviderApp.providerService` keeps.
+   */
+  get projectService(): ProjectService {
+    return this.dependencies.projects;
+  }
+
+  /**
    * Provisions a project, attributed to the caller who asked for it.
    *
    * The attribution is here rather than in each door because "who created

@@ -325,7 +325,7 @@ describe("Langy session key (caller-scoped)", () => {
         });
 
         const app = getApp();
-        const resolved = await app.apiKeys.tryResolveToken({
+        const resolved = await app.apiKeys.apiKeyService.tryResolveToken({
           token,
           projectId,
         });
@@ -358,7 +358,7 @@ describe("Langy session key (caller-scoped)", () => {
         });
 
         const app = getApp();
-        const resolved = await app.apiKeys.tryResolveToken({
+        const resolved = await app.apiKeys.apiKeyService.tryResolveToken({
           token,
           projectId,
         });

@@ -40,7 +40,7 @@ export const enforceWorkbenchEnabled: PermissionMiddleware<{
     !(await lwqlEnabled({
       featureFlags: app.featureFlags,
       projectId: input.projectId,
-      projects: app.projects,
+      projects: app.projects.projectService,
     }))
   ) {
     // A typed handled error, not a bare FORBIDDEN: `handledErrorMiddleware`

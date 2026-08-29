@@ -20,8 +20,8 @@ wireDefaultTestApp();
 
 const { hono: app } = createProjectRestApp({
   security: appRestSecurity,
-  projects: () => getApp().projects,
-  apiKeys: () => getApp().apiKeys,
+  projects: () => getApp().projects.projectService,
+  apiKeys: () => getApp().apiKeys.apiKeyService,
 });
 
 describe("Feature: Projects REST API", () => {
@@ -483,7 +483,7 @@ describe("Feature: Projects REST API", () => {
 
     const mintKey = async (permissions: string[], scopeId: string) =>
       (
-        await getApp().apiKeys.create({
+        await getApp().apiKeys.apiKeyService.create({
           name: `scoped-${nanoid(6)}`,
           userId,
           createdByUserId: userId,

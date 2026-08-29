@@ -52,7 +52,7 @@ const roleOrganizationPermission = ({
     }) => {
       const app = ctx.app;
       if (!app?.roles) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const role = await app.roles.get({ roleId: input.roleId });
+      const role = await app.roles.getRole({ roleId: input.roleId });
       if (!(await probeOrganizationPermission(ctx, role.organizationId, permission))) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }

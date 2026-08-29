@@ -83,7 +83,7 @@ async function handleImpersonate(c: AdminContext, method: "POST" | "DELETE") {
   if (!rawBetterAuth) throw new AdminSessionExpiredError();
 
   if (method === "DELETE") {
-    await ops.stopImpersonation({ sessionId: rawBetterAuth.session.id });
+    await ops.operations.stopImpersonation({ sessionId: rawBetterAuth.session.id });
     return c.json({ message: "Impersonation ended" });
   }
 
@@ -102,7 +102,7 @@ async function handleImpersonate(c: AdminContext, method: "POST" | "DELETE") {
     });
   }
 
-  await ops.startImpersonation({
+  await ops.operations.startImpersonation({
     sessionId: rawBetterAuth.session.id,
     impersonatorUserId: user.id,
     userIdToImpersonate,
@@ -147,7 +147,7 @@ secured.access(adminAuth).post("/admin/:resource", async (c: AdminContext) => {
     });
   }
 
-  const result = await ops.adminOperation({
+  const result = await ops.operations.adminOperation({
     ...parsed.data,
     actorId: user.id,
     req: auditRequestFrom(c.req.raw),

@@ -112,6 +112,19 @@ export class UserApp {
   private constructor(private readonly dependencies: UserAppDependencies) {}
 
   /**
+   * The service itself, for the sign-up ceremony.
+   *
+   * `signUpVerification` composes the confirmation flow per request over the
+   * process's mailer and user directory, and takes the directory whole; it
+   * lives in the application's identity runtime beside better-auth's own
+   * composition, which is the other caller. Until it moves, this getter is the
+   * seam that remains — the same one `EvaluatorApp.evaluatorService` keeps.
+   */
+  get userService(): UserService {
+    return this.dependencies.users;
+  }
+
+  /**
    * The user whose data a personal-workspace read answers for.
    *
    * Both doors ask this and neither may decide it. It lived in the REST

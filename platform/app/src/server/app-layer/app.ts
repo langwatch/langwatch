@@ -147,6 +147,23 @@ export class App {
   readonly presence: AppDependencies["presence"];
   readonly secrets: SecretApp;
   readonly traces: TraceApp;
+  /**
+   * The span, log and metric ingestion services, raw.
+   *
+   * NOT on `TraceApp`, and deliberately: that application answers reads a
+   * person asked for, and ingestion answers a collector. They share a store
+   * and nothing else — no permission, no actor, no protections. Folding them
+   * in would give every trace door a method that writes the firehose.
+   *
+   * Named apart rather than reached through `traces` because this is the
+   * highest-traffic path in the product and it should be obvious at the call
+   * site which of the two a caller is on.
+   */
+  readonly traceIngestion: Readonly<{
+    collection: AppDependencies["traces"]["collection"];
+    logCollection: AppDependencies["traces"]["logCollection"];
+    metricCollection: AppDependencies["traces"]["metricCollection"];
+  }>;
   readonly evaluations: AppDependencies["evaluations"] & AppCommands["evaluations"];
   /** The ADR-034 analytics read API, and the restricted SQL surface beside it. */
   readonly analytics: AnalyticsApp;
@@ -196,6 +213,18 @@ export class App {
   readonly suites: SuiteApp;
   readonly automation: AutomationApp;
   readonly organizations: OrganizationApp;
+  /**
+   * The organization service in full, raw.
+   *
+   * `OrganizationApp` narrows it on purpose — its own comment calls
+   * `OrganizationService` "the widest surface in the platform", and an
+   * organization screen has no business reaching the parts that answer
+   * ingestion or billing claims. That narrowing is right, and it means the
+   * CLI's personal-workspace lifecycle, which genuinely needs the whole
+   * thing, cannot go through the application. It gets it here instead of the
+   * application quietly widening back out.
+   */
+  readonly organizationService: AppDependencies["organizations"];
   readonly projects: ProjectApp;
   readonly users: UserApp;
   readonly roles: RoleApp;
@@ -316,6 +345,7 @@ export class App {
       projects: deps.projects,
       featureFlags: deps.featureFlags,
     });
+    this.organizationService = deps.organizations;
     this.organizations = OrganizationApp.create({
       organizations: deps.organizations,
       projects: deps.projects,
@@ -382,6 +412,11 @@ export class App {
       github: deps.github,
       scope: deps.codingAgentScope,
     });
+    this.traceIngestion = {
+      collection: deps.traces.collection,
+      logCollection: deps.traces.logCollection,
+      metricCollection: deps.traces.metricCollection,
+    };
     this.traces = TraceApp.create({
       traces,
       topics: deps.topics,

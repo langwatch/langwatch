@@ -155,7 +155,7 @@ async function authenticateRequest(
     return { error: message, status: 401, body: { message } };
   }
 
-  const apiKeys = appFromContext(c).apiKeys;
+  const apiKeys = appFromContext(c).apiKeys.apiKeyService;
   const resolved = await apiKeys.tryResolveToken({
     token: credentials.token,
     projectId: credentials.projectId,
@@ -686,9 +686,9 @@ secured.access(legacyEvaluationAuth).post(
         data,
         evaluatorType: checkType as EvaluatorTypes,
         settings: (settings as Record<string, unknown>) ?? {},
-        modelProviders: c.app.modelProviders,
+        modelProviders: c.app.modelProviders.providerService,
         managedProviders: c.app.managedProviders,
-        workflows: c.app.workflows,
+        workflows: c.app.workflows.workflowService,
         evaluators: c.app.evaluators,
       });
     } catch (error) {
@@ -1194,7 +1194,10 @@ async function handleEvaluatorCall(c: Context, evaluatorSlug: string, as_guardra
       ...(!workflowEvaluatorDef
         ? getEvaluatorDefaultSettings(
             evaluatorDefinition,
-            await resolveEvaluatorSettingsDefaults(project.id, c.app.modelProviders),
+            await resolveEvaluatorSettingsDefaults(
+              project.id,
+              c.app.modelProviders.providerService,
+            ),
             {
               defaultModel: DEFAULT_MODEL,
               embeddingsModel: DEFAULT_EMBEDDINGS_MODEL,
@@ -1326,9 +1329,9 @@ async function handleEvaluatorCall(c: Context, evaluatorSlug: string, as_guardra
       evaluatorType: checkType as EvaluatorTypes,
       data,
       settings,
-      modelProviders: c.app.modelProviders,
+      modelProviders: c.app.modelProviders.providerService,
       managedProviders: c.app.managedProviders,
-      workflows: c.app.workflows,
+      workflows: c.app.workflows.workflowService,
       evaluators: c.app.evaluators,
     });
 
@@ -1487,7 +1490,7 @@ const processBatchEvaluation = async (
   const { experiment_id, experiment_slug } = param;
 
   const experiment = await findOrCreateExperiment({
-    experiments: app.experiments,
+    experiments: app.experiments.experimentService,
     project,
     experiment_id,
     experiment_slug,
@@ -1528,7 +1531,7 @@ const dispatchToClickHouse = async (
   const targets = mapLegacyExperimentTargets(batchEvaluation.targets ?? []);
 
   try {
-    await app.experiments.startExperimentRun({
+    await app.experiments.experimentService.startExperimentRun({
       tenantId: project.id,
       runId,
       experimentId,
@@ -1546,7 +1549,7 @@ const dispatchToClickHouse = async (
 
   const resultPromises = [
     ...batchEvaluation.dataset.map((entry) =>
-      app.experiments
+      app.experiments.experimentService
         .recordTargetResult({
           tenantId: project.id,
           runId,
@@ -1575,7 +1578,7 @@ const dispatchToClickHouse = async (
         }),
     ),
     ...batchEvaluation.evaluations.map((evaluation) =>
-      app.experiments
+      app.experiments.experimentService
         .recordEvaluatorResult({
           tenantId: project.id,
           runId,
@@ -1611,7 +1614,7 @@ const dispatchToClickHouse = async (
 
   if (batchEvaluation.timestamps.finished_at || batchEvaluation.timestamps.stopped_at) {
     try {
-      await app.experiments.completeExperimentRun({
+      await app.experiments.experimentService.completeExperimentRun({
         tenantId: project.id,
         runId,
         experimentId,

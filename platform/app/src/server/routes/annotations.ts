@@ -74,7 +74,7 @@ async function authenticateRequest(c: Context, permission: Permission) {
     return { error: message, status: 401 as const, body: { message } };
   }
 
-  const apiKeys = c.app.apiKeys;
+  const apiKeys = c.app.apiKeys.apiKeyService;
   const resolved = await apiKeys.tryResolveToken({
     token: credentials.token,
     projectId: credentials.projectId,
@@ -361,7 +361,10 @@ secured.access(annotationsCreateAuth).post("/annotations/trace/:id", async (c) =
       return c.json({ status: "error", message: "Invalid request body." }, 400);
     }
 
-    const addAnnotation = await annotations.create({
+    // Unattributed on purpose: this family authenticates with a project key,
+    // so there is no reviewer to credit. `email` below is the only identity an
+    // external annotator gives us.
+    const addAnnotation = await annotations.createUnattributed({
       id: nanoid(),
       comment: parsed.data.comment,
       projectId: project.id,

@@ -221,7 +221,7 @@ describe("project.regenerateApiKey integration", () => {
 
       // Sanity: the original base key authenticates to this project via the
       // real legacy-key resolution path before rotation.
-      const resolvedBefore = await app.apiKeys.tryResolveToken({
+      const resolvedBefore = await app.apiKeys.apiKeyService.tryResolveToken({
         token: originalApiKey,
       });
       expect(resolvedBefore?.type).toBe("legacyProjectKey");
@@ -232,13 +232,13 @@ describe("project.regenerateApiKey integration", () => {
       });
 
       // The previous raw key no longer resolves to anything.
-      const resolvedOld = await app.apiKeys.tryResolveToken({
+      const resolvedOld = await app.apiKeys.apiKeyService.tryResolveToken({
         token: originalApiKey,
       });
       expect(resolvedOld).toBeNull();
 
       // The new key resolves, scoped to the same project.
-      const resolvedNew = await app.apiKeys.tryResolveToken({ token: newApiKey });
+      const resolvedNew = await app.apiKeys.apiKeyService.tryResolveToken({ token: newApiKey });
       expect(resolvedNew?.type).toBe("legacyProjectKey");
       expect(resolvedNew?.project.id).toBe(projectId);
     });

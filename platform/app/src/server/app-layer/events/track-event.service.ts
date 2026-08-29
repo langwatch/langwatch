@@ -66,7 +66,7 @@ export async function recordTrackedEventSpan(params: {
     }
   }
 
-  await getApp().traces.collection.ingestNormalizedSpan({
+  await getApp().traceIngestion.collection.ingestNormalizedSpan({
     tenantId: project.id,
     span: {
       traceId: body.trace_id,

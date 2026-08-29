@@ -299,6 +299,41 @@ export class DashboardApp {
     );
   }
 
+  /**
+   * Puts one saved chart on a dashboard, at a grid position when the caller
+   * names one.
+   *
+   * Placement is a property of the chart rather than of the dashboard's own
+   * card list: a saved chart carries its dashboard id and grid box, so this is
+   * a write on the chart and belongs beside the rest of its lifecycle.
+   */
+  placeSavedWorkbenchChart(input: {
+    projectId: string;
+    chartId: string;
+    dashboardId: string;
+    gridColumn?: number;
+    gridRow?: number;
+    colSpan?: number;
+    rowSpan?: number;
+  }): Promise<SavedWorkbenchChart> {
+    return this.named(input.projectId, () =>
+      this.dependencies.dashboard.placeSavedWorkbenchChart(input),
+    );
+  }
+
+  /**
+   * Takes one saved chart off whatever dashboard it is on, clearing its grid
+   * box with it. The chart itself is untouched.
+   */
+  unplaceSavedWorkbenchChart(input: {
+    projectId: string;
+    chartId: string;
+  }): Promise<SavedWorkbenchChart> {
+    return this.named(input.projectId, () =>
+      this.dependencies.dashboard.unplaceSavedWorkbenchChart(input),
+    );
+  }
+
   /** Runs one saved chart, for the period the surface asks for. */
   runSavedWorkbenchChart(input: {
     projectId: string;

@@ -28,8 +28,7 @@ import { platformUrl } from "~/app/api/shared/platform-url";
 /** The family as the API router mounts it. */
 const app = createEvaluatorsRestApp({
   security: appRestSecurity,
-  evaluators: () => getApp().evaluators,
-  modelProviders: () => getApp().modelProviders,
+  app: () => getApp().evaluatorApp,
   platformUrl,
   organizationMiddleware,
 }).hono;

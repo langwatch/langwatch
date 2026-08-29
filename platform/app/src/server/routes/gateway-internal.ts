@@ -438,7 +438,7 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
   // project to fall back to; the gateway then skips span export rather than
   // failing the auth handshake.
   const traceProject = vk.traceProjectId
-    ? await c.app.projects.tryGetTraceDestination(vk.traceProjectId)
+    ? await c.app.projects.projectService.tryGetTraceDestination(vk.traceProjectId)
     : null;
 
   // notAfter ends the token at the key's expiration date when that arrives
@@ -493,7 +493,7 @@ secured.access(gatewayPolicy()).post("/codex/refresh", async (c) => {
       400,
     );
   }
-  const result = await c.app.modelProviders.refreshCodexForGateway({
+  const result = await c.app.modelProviders.providerService.refreshCodexForGateway({
     providerRowId: parsed.data.provider_row_id,
   });
   if (result.status === "not_connected") {
@@ -565,7 +565,7 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
 
   const materialiser = new GatewayConfigMaterialiser(
     prisma,
-    c.app.projects,
+    c.app.projects.projectService,
     c.var.langwatchApp.gateway.budgets ?? null,
     c.var.langwatchApp.gateway.budgetDecisions,
   );
@@ -721,14 +721,17 @@ secured.access(gatewayPolicy()).post("/guardrail/check", async (c) => {
       400,
     );
   }
-  const verdict = await GatewayGuardrailEvaluationService.create(prisma, c.app.monitors, (input) =>
-    runEvaluation({
-      ...input,
-      modelProviders: c.app.modelProviders,
-      managedProviders: c.app.managedProviders,
-      workflows: c.app.workflows,
-      evaluators: c.app.evaluators,
-    }),
+  const verdict = await GatewayGuardrailEvaluationService.create(
+    prisma,
+    c.app.monitors.monitorService,
+    (input) =>
+      runEvaluation({
+        ...input,
+        modelProviders: c.app.modelProviders.providerService,
+        managedProviders: c.app.managedProviders,
+        workflows: c.app.workflows.workflowService,
+        evaluators: c.app.evaluators,
+      }),
   ).check({
     projectId: parsed.data.project_id,
     guardrailIds: parsed.data.guardrail_ids,

@@ -175,7 +175,7 @@ describe("Feature: the agent cache", () => {
     ).token;
 
     sandboxToken = await mintAgentSandboxApiKey({
-      apiKeys: getApp().apiKeys,
+      apiKeys: getApp().apiKeys.apiKeyService,
       projectId,
       organizationId: testOrganization.id,
     });

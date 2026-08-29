@@ -297,7 +297,7 @@ describe("Model Providers API", () => {
           customKeys: { OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER },
         });
 
-        const providers = await getApp().modelProviders.getExecutionProviders({
+        const providers = await getApp().modelProviders.providerService.getExecutionProviders({
           projectId: testProjectId,
         });
         const saved = providers.openai;

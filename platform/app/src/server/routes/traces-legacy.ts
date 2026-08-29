@@ -66,7 +66,7 @@ async function authenticateRequest(c: Context, permission: Permission) {
     return { error: message, status: 401 as const, body: { message } };
   }
 
-  const apiKeys = c.app.apiKeys;
+  const apiKeys = c.app.apiKeys.apiKeyService;
   const resolved = await apiKeys.tryResolveToken({
     token: credentials.token,
     projectId: credentials.projectId,
@@ -119,19 +119,22 @@ secured.access(tracesViewAuth).get("/trace/:id", async (c) => {
     const protections = await getProtectionsForProject(prisma, {
       projectId: project.id,
     });
-    const traceService = c.app.traces.read;
-    const trace = await traceService.getById(project.id, traceId, protections, {
-      full: true,
+    // `readTrace` resolves offloaded values in full (#4991) — the same
+    // `{ full: true }` this handler used to pass for itself.
+    const trace = await c.app.traces.readTrace({
+      projectId: project.id,
+      traceId,
+      protections,
     });
     if (!trace) {
       return c.json({ message: "Trace not found." }, 404);
     }
 
-    const evaluationsMap = await traceService.getEvaluationsMultiple(
-      project.id,
-      [traceId],
+    const evaluationsMap = await c.app.traces.readEvaluations({
+      projectId: project.id,
+      traceIds: [traceId],
       protections,
-    );
+    });
     const evaluations = evaluationsMap[traceId] ?? [];
 
     markUsed();
@@ -262,9 +265,8 @@ secured.access(tracesViewAuth).post("/trace/search", async (c) => {
   const protections = await getProtectionsForProject(prisma, {
     projectId: project.id,
   });
-  const traceService = c.app.traces.read;
-  const results = await traceService.getAllTracesForProject(
-    {
+  const results = await c.app.traces.listTraces({
+    query: {
       ...params,
       projectId: project.id,
       startDate:
@@ -276,11 +278,11 @@ secured.access(tracesViewAuth).post("/trace/search", async (c) => {
       pageSize,
     },
     protections,
-    {
+    options: {
       downloadMode: true,
       scrollId: params.scrollId ?? undefined,
     },
-  );
+  });
 
   const rawTraces = results.groups.flat() as Trace[];
   const enrichedTraces = enrichTracesWithEvaluations({
@@ -332,14 +334,13 @@ secured.access(tracesViewAuth).get("/thread/:id", async (c) => {
   const protections = await getProtectionsForProject(prisma, {
     projectId: project.id,
   });
-  // Thread-detail read consumes conversation content — resolve full IO (#4991).
-  const traceService = c.app.traces.read;
-  const traces = await traceService.getTracesByThreadId(
-    project.id,
+  // Thread-detail read consumes conversation content — `readThreadTraces`
+  // resolves full IO (#4991), which is what this handler asked for itself.
+  const traces = await c.app.traces.readThreadTraces({
+    projectId: project.id,
     threadId,
     protections,
-    { full: true },
-  );
+  });
 
   markUsed();
   return c.json({ traces });

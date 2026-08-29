@@ -345,7 +345,7 @@ async function rateLimitGuard(c: IngestContext): Promise<Response | null> {
 //      The governance fold projection + OCSF read projection downstream
 //      filter on these.
 //   3. Hand off to the existing trace pipeline via
-//      getApp().traces.collection.handleOtlpTraceRequest with the Gov
+//      getApp().traceIngestion.collection.handleOtlpTraceRequest with the Gov
 //      Project as the tenant. The receiver does NOT write CH directly.
 //
 // Spec contracts:
@@ -401,7 +401,7 @@ secured.access(ingestAuth).post("/otel/:sourceId", async (c: IngestContext) => {
         // governance entity created it (per master directive); receiver
         // pulls it back here for trace-pipeline tenancy. Helper is
         // idempotent so a race-created Project resolves cleanly.
-        const govProject = await c.var.langwatchApp.projects.ensureInternal({
+        const govProject = await c.var.langwatchApp.projects.projectService.ensureInternal({
           organizationId: source.organizationId,
           kind: "internal_governance",
         });
@@ -417,7 +417,7 @@ secured.access(ingestAuth).post("/otel/:sourceId", async (c: IngestContext) => {
           >[0],
           null,
         );
-        const result = await c.var.langwatchApp.traces.collection.handleOtlpTraceRequest(
+        const result = await c.var.langwatchApp.traceIngestion.collection.handleOtlpTraceRequest(
           govProject.id,
           parsed.request,
           DEFAULT_PII_REDACTION_LEVEL,
@@ -469,7 +469,7 @@ secured.access(ingestAuth).post("/otel/:sourceId", async (c: IngestContext) => {
 // streaming, s3_custom callback mode, custom in-house agents). Maps
 // the JSON envelope to ONE OTLP log_record (NOT a synthetic span — flat
 // events have no logical duration / parent-child tree) and hands off to
-// the EXISTING log pipeline via getApp().traces.logCollection.
+// the EXISTING log pipeline via getApp().traceIngestion.logCollection.
 // handleOtlpLogRequest. Same store, same trace viewer drill-down,
 // origin metadata distinguishes from application logs.
 //
@@ -517,12 +517,12 @@ secured.access(ingestAuth).post("/webhook/:sourceId", async (c: IngestContext) =
     envelopeId = `envelope-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
     if (bodyBytes > 0) {
-      const govProject = await c.var.langwatchApp.projects.ensureInternal({
+      const govProject = await c.var.langwatchApp.projects.projectService.ensureInternal({
         organizationId: source.organizationId,
         kind: "internal_governance",
       });
       const logRequest = buildWebhookLogRequest(raw, source);
-      await c.var.langwatchApp.traces.logCollection.handleOtlpLogRequest({
+      await c.var.langwatchApp.traceIngestion.logCollection.handleOtlpLogRequest({
         tenantId: govProject.id,
         organizationId: source.organizationId,
         logRequest,
@@ -616,7 +616,7 @@ secured.access(ingestAuth).post("/otel/:sourceId/v1/logs", async (c: IngestConte
       // off the log attributes, mirroring the trace path and the
       // webhook receiver.
       if (logRecordCount > 0) {
-        const govProject = await c.var.langwatchApp.projects.ensureInternal({
+        const govProject = await c.var.langwatchApp.projects.projectService.ensureInternal({
           organizationId: source.organizationId,
           kind: "internal_governance",
         });
@@ -626,7 +626,7 @@ secured.access(ingestAuth).post("/otel/:sourceId/v1/logs", async (c: IngestConte
           null,
         );
         try {
-          await c.var.langwatchApp.traces.logCollection.handleOtlpLogRequest({
+          await c.var.langwatchApp.traceIngestion.logCollection.handleOtlpLogRequest({
             tenantId: govProject.id,
             organizationId: source.organizationId,
             logRequest: parsed.request,
@@ -904,7 +904,7 @@ secured
           // deliberately not recorded: the collector re-sends this same
           // request, so counting it now double-counts it.
           try {
-            const govProject = await c.var.langwatchApp.projects.ensureInternal({
+            const govProject = await c.var.langwatchApp.projects.projectService.ensureInternal({
               organizationId: source.organizationId,
               kind: "internal_governance",
             });
@@ -916,7 +916,7 @@ secured
               null,
             );
             const result =
-              await c.var.langwatchApp.traces.metricCollection.handleOtlpMetricRequest({
+              await c.var.langwatchApp.traceIngestion.metricCollection.handleOtlpMetricRequest({
                 tenantId: govProject.id,
                 organizationId: source.organizationId,
                 metricRequest: parsed.request,

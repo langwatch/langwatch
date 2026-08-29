@@ -72,7 +72,7 @@ export const evaluationsRouter = createEvaluationTrpcRouter({
      * and the package reports every Azure variable as missing.
      */
     tryResolveAzureSafetyEnv: (ctx: TRPCContext, { projectId }) =>
-      getAzureSafetyEnvFromProject(ctx.app.modelProviders, projectId),
+      getAzureSafetyEnvFromProject(ctx.app.modelProviders.providerService, projectId),
 
     evaluatorUnavailability,
     missingEnvironmentVariables: (envVars) => envVars.filter((envVar) => !process.env[envVar]),
@@ -90,9 +90,9 @@ export const evaluationsRouter = createEvaluationTrpcRouter({
         mappings: input.mappings,
         protections,
         evaluations: ctx.app.evaluations,
-        modelProviders: ctx.app.modelProviders,
+        modelProviders: ctx.app.modelProviders.providerService,
         managedProviders: ctx.app.managedProviders,
-        workflows: ctx.app.workflows,
+        workflows: ctx.app.workflows.workflowService,
         evaluators: ctx.app.evaluators,
         traceCanonicalisation: ctx.app.traces.canonicalisation,
       });
@@ -106,7 +106,7 @@ export const evaluationsRouter = createEvaluationTrpcRouter({
       await studioBackendPostEvent({
         projectId,
         nlpLambda: ctx.app.nlpLambda,
-        modelProviders: ctx.app.modelProviders,
+        modelProviders: ctx.app.modelProviders.providerService,
         message: { type: "is_alive", payload: {} },
         onEvent: () => {
           // Response received - lambda is warm

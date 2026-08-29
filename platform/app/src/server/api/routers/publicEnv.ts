@@ -13,7 +13,6 @@
  */
 import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
 import { createPublicEnvTrpcProcedure, declaredCheckFrom } from "@langwatch/platform-api/app-trpc";
-import { resolveAuthProvider } from "~/runtime/app/features/sso";
 import {
   checkDeclaredPermission,
   checkDeclaredPermissionAny,
@@ -29,6 +28,7 @@ import {
   tracerMiddleware,
 } from "../trpc.runtime-policy";
 import { scopeLineageGuard } from "../trpc.scope-lineage-middleware";
+import { authApp } from "./frontDoor";
 
 /** This process's concrete policy chain, in the order the mount applies it. */
 const middlewares: AppTrpcPolicyMiddlewares = {
@@ -49,10 +49,8 @@ const middlewares: AppTrpcPolicyMiddlewares = {
 export const publicEnvRouter = createPublicEnvTrpcProcedure({
   publicProcedure: appTrpcRoot.procedure,
   middlewares,
-  ports: {
-    // ADR-027: the single source of truth for the sign-in mode. Never read
-    // `env.NEXTAUTH_PROVIDER` directly here — a deployment whose licence gate
-    // denies SSO must still be told to render the email form.
-    resolveAuthProvider,
-  },
+  // The same auth application the front door takes, composed once beside it:
+  // both surfaces are the signed-out door, and the sign-in mode it answers
+  // with is the one ADR-027 source of truth for the whole deployment.
+  ports: authApp,
 });

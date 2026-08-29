@@ -486,8 +486,8 @@ async function enrichLlmSpanWithAncestorPrompt({
   currentParams: Record<string, unknown> | null;
 }): Promise<Record<string, unknown> | null> {
   const app = getApp();
-  const allSpans = await app.traces.spans.getSpansByTraceId({
-    tenantId,
+  const allSpans = await app.traces.readSpans({
+    projectId: tenantId,
     traceId,
     ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
   });

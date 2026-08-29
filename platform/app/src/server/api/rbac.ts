@@ -2175,7 +2175,13 @@ export function resolveOpsScope({
   userEmail: string | null | undefined;
   /** Email of the real admin behind an impersonation session, if any. */
   impersonatorEmail?: string | null;
-  ops: OpsService;
+  /**
+   * The allow-list read only. Narrowed rather than taking the service or the
+   * application, because both answer it and this resolver is reached from
+   * both: the tRPC middleware hands over `ctx.app.ops` (an `OpsApp`) while the
+   * SSE endpoint still holds the service.
+   */
+  ops: Pick<OpsService, "isAdmin">;
 }): OpsScope {
   if (ops.isAdmin({ email: userEmail }) || ops.isAdmin({ email: impersonatorEmail })) {
     return { kind: "platform" };

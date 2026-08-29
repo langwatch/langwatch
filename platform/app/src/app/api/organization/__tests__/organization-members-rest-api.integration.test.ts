@@ -455,7 +455,7 @@ describe("Feature: Organization members and invites REST API", () => {
       // and the acting credential is a service key: it acts as nobody, so the
       // self guard cannot be what refuses here, only the storage guard can.
       lastAdminOrg = await seedManagementOrg({ prisma, ns: `lastadmin-${ns}` });
-      const serviceKey = await getApp().apiKeys.create({
+      const serviceKey = await getApp().apiKeys.apiKeyService.create({
         name: `mgmt-service-key-lastadmin-${ns}`,
         userId: null,
         createdByUserId: lastAdminOrg.adminUserId,

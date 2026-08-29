@@ -73,7 +73,7 @@ describe("Feature: Groups REST API through the composed router", () => {
       },
     });
 
-    const created = await getApp().apiKeys.create({
+    const created = await getApp().apiKeys.apiKeyService.create({
       name: `groups-mount-key-${nanoid(6)}`,
       userId,
       createdByUserId: userId,

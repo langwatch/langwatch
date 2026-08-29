@@ -93,7 +93,7 @@ describe("Feature: Group endpoints behind the Enterprise gate", () => {
       },
     });
 
-    const created = await getApp().apiKeys.create({
+    const created = await getApp().apiKeys.apiKeyService.create({
       name: `groups-gate-key-${nanoid(6)}`,
       userId,
       createdByUserId: userId,

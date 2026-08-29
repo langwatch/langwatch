@@ -37,7 +37,7 @@ import { managementAuditPort } from "~/server/api/management/audit";
 const app = createScimTokensRestApp({
   security: appRestSecurity,
   enterpriseGate: requireEnterprisePlanRest("SCIM"),
-  scim: () => getApp().scim,
+  app: () => getApp().scimApp,
   audit: managementAuditPort,
 });
 

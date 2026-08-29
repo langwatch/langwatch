@@ -67,7 +67,7 @@ describe("Secret modern REST authentication", () => {
       },
     });
 
-    const permitted = await app.apiKeys.create({
+    const permitted = await app.apiKeys.apiKeyService.create({
       name: `secret-rest-permitted-${namespace}`,
       organizationId: organization.id,
       permissionMode: "all",
@@ -81,7 +81,7 @@ describe("Secret modern REST authentication", () => {
     });
     permittedToken = permitted.token;
 
-    const denied = await app.apiKeys.create({
+    const denied = await app.apiKeys.apiKeyService.create({
       name: `secret-rest-denied-${namespace}`,
       organizationId: organization.id,
       permissionMode: "restricted",
@@ -142,7 +142,7 @@ describe("Secret modern REST authentication", () => {
 
   it("sanitizes infrastructure failures in authentication and service dispatch", async () => {
     const authenticationFailure = vi
-      .spyOn(getApp().apiKeys, "tryResolveToken")
+      .spyOn(getApp().apiKeys.apiKeyService, "tryResolveToken")
       .mockRejectedValueOnce(new Error("database password must-not-leak"));
     const authenticationResponse = await request(`/api/v1/secret?projectId=${project.id}`);
     authenticationFailure.mockRestore();

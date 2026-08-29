@@ -103,6 +103,19 @@ export class MonitorApp {
 
   private constructor(private readonly dependencies: MonitorAppDependencies) {}
 
+  /**
+   * The service itself, for the process function that still takes it whole.
+   *
+   * The gateway's guardrail check (`server/gateway/guardrailEvaluation.service.ts`)
+   * is not a monitor door: it resolves a virtual key's guardrails against the
+   * monitors backing them while a request is in flight on the data plane, and
+   * declares a `MonitorService` parameter. Until it moves, this getter is the
+   * seam that remains — the same one `WorkflowApp.workflowService` keeps.
+   */
+  get monitorService(): MonitorService {
+    return this.dependencies.monitors;
+  }
+
   /** Every monitor configured on the project, with its evaluator. */
   list(input: Readonly<{ projectId: string }>): Promise<MonitorWithEvaluator[]> {
     return this.dependencies.monitors.getAllForProject(input);

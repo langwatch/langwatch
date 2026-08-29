@@ -23,6 +23,7 @@ import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { getLangWatchTracer } from "langwatch";
+import type { ProjectIdentity } from "@langwatch/project-contract";
 import { createServiceApp } from "~/server/api/security";
 import { handlerManagedAuth } from "@langwatch/platform-api/app-rest";
 import {
@@ -122,7 +123,7 @@ async function authenticate(c: RouteContext, logger: ReturnType<typeof createLog
 
   let resolved;
   try {
-    resolved = await c.app.apiKeys.tryResolveToken({
+    resolved = await c.app.apiKeys.apiKeyService.tryResolveToken({
       token: credentials.token,
       projectId: credentials.projectId,
     });
@@ -243,7 +244,7 @@ async function enforcePlanLimit({
   logger,
 }: {
   app: App;
-  project: { id: string; teamId: string; team: { organizationId: string } };
+  project: Pick<ProjectIdentity, "id" | "teamId" | "organizationId">;
   customerTraceIds: string[];
   logger: ReturnType<typeof createLogger>;
 }): Promise<void> {
@@ -267,11 +268,11 @@ async function enforcePlanLimit({
 
   try {
     const activePlan = await app.planProvider.getActivePlan({
-      organizationId: project.team.organizationId,
+      organizationId: project.organizationId,
     });
     app.usageLimits
       .notifyPlanLimitReached({
-        organizationId: project.team.organizationId,
+        organizationId: project.organizationId,
         planName: activePlan.name ?? "free",
         usageUnit: limitResult.usageUnit,
         current: limitResult.count,
@@ -592,7 +593,7 @@ secured
 
         // Body successfully parsed — mark the API key as used
         if (resolved.type === "apiKey") {
-          c.app.apiKeys.markUsed({ id: resolved.apiKeyId });
+          c.app.apiKeys.apiKeyService.markUsed({ id: resolved.apiKeyId });
         }
 
         await applyReceiverProvenanceToTraces({
@@ -601,7 +602,7 @@ secured
           policy: c.app.governance,
         });
 
-        const collectionResult = await c.app.traces.collection.handleOtlpTraceRequest(
+        const collectionResult = await c.app.traceIngestion.collection.handleOtlpTraceRequest(
           project.id,
           traceRequest,
           DEFAULT_PII_REDACTION_LEVEL,
@@ -676,7 +677,7 @@ secured
 
         // Body successfully parsed — mark the API key as used
         if (resolved.type === "apiKey") {
-          c.app.apiKeys.markUsed({ id: resolved.apiKeyId });
+          c.app.apiKeys.apiKeyService.markUsed({ id: resolved.apiKeyId });
         }
 
         await applyReceiverProvenanceToLogs({
@@ -685,9 +686,9 @@ secured
           policy: c.app.governance,
         });
 
-        const result = await c.app.traces.logCollection.handleOtlpLogRequest({
+        const result = await c.app.traceIngestion.logCollection.handleOtlpLogRequest({
           tenantId: project.id,
-          organizationId: project.team.organizationId,
+          organizationId: project.organizationId,
           logRequest,
           piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
         });
@@ -777,12 +778,12 @@ secured
 
         // Body successfully parsed — mark the API key as used
         if (resolved.type === "apiKey") {
-          c.app.apiKeys.markUsed({ id: resolved.apiKeyId });
+          c.app.apiKeys.apiKeyService.markUsed({ id: resolved.apiKeyId });
         }
 
-        const result = await c.app.traces.metricCollection.handleOtlpMetricRequest({
+        const result = await c.app.traceIngestion.metricCollection.handleOtlpMetricRequest({
           tenantId: project.id,
-          organizationId: project.team.organizationId,
+          organizationId: project.organizationId,
           metricRequest: metricsRequest,
           piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
         });

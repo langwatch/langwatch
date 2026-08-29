@@ -387,8 +387,8 @@ const httpProxyRouter = createHttpProxyTrpcRouter({
       await studioBackendPostEvent({
         projectId,
         nlpLambda: ctx.app.nlpLambda,
-        modelProviders: ctx.app.modelProviders,
-        message: await ctx.app.workflows.enrichStudioEvent({ event, projectId }),
+        modelProviders: ctx.app.modelProviders.providerService,
+        message: await ctx.app.workflows.prepareStudioEvent({ event, projectId }),
         onEvent,
       });
     },
@@ -396,7 +396,7 @@ const httpProxyRouter = createHttpProxyTrpcRouter({
     // are this process's, so the write is split at exactly that seam.
     recordAgentTestTrace: async (request, { projectId, trace }) => {
       const ctx = request as TRPCContext;
-      await ctx.app.traces.recordSpan({
+      await ctx.app.commands.traces.recordSpan({
         tenantId: projectId,
         span: CollectorSpanUtils.convertSpanToOtlp(trace.span),
         resource: CollectorSpanUtils.buildResource({

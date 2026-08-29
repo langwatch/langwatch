@@ -254,7 +254,7 @@ const dashboardRouter = createTRPCRouter({
       await assertOrganizationMember({ ctx, userId, organizationId: input.organizationId });
 
       // Find the user's personal project. If none yet, return empty-state.
-      const workspace = await ctx.app.organizations.tryFindPersonalWorkspace({
+      const workspace = await ctx.app.users.tryFindPersonalWorkspace({
         userId,
         organizationId: input.organizationId,
       });
@@ -284,7 +284,7 @@ const dashboardRouter = createTRPCRouter({
       // under the organization's hidden Governance Project tenant. Resolve it
       // read-only so the PRINCIPAL-ledger union is scoped to this
       // organization's tenant.
-      const governanceProject = await ctx.app.projects.tryFindInternal({
+      const governanceProject = await ctx.app.projects.projectService.tryFindInternal({
         organizationId: input.organizationId,
         kind: "internal_governance",
       });

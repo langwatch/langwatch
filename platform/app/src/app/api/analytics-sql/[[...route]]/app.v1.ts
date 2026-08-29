@@ -183,7 +183,7 @@ function registerQuery(secured: ReturnType<typeof createProjectApp>): void {
       const project = await lwqlProject({
         featureFlags: c.app.featureFlags,
         project: c.get("project"),
-        projects: c.app.projects,
+        projects: c.app.projects.projectService,
         requestedProjectId: c.req.param("projectId"),
       });
       const { sql, parameters, timeWindow, granularitySeconds } =
@@ -231,7 +231,7 @@ function registerSchema(secured: ReturnType<typeof createProjectApp>): void {
       const project = await lwqlProject({
         featureFlags: c.app.featureFlags,
         project: c.get("project"),
-        projects: c.app.projects,
+        projects: c.app.projects.projectService,
         requestedProjectId: c.req.param("projectId"),
       });
 

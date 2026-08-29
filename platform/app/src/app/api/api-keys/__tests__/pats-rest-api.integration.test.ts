@@ -19,7 +19,7 @@ import { managementAuditPort } from "~/server/api/management/audit";
 
 const { hono: app } = createApiKeysRestApp({
   security: appRestSecurity,
-  apiKeys: () => getApp().apiKeys,
+  apiKeys: () => getApp().apiKeys.apiKeyService,
   permissions: () => getApp().permissions,
   audit: managementAuditPort,
 });

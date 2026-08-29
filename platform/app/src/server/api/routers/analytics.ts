@@ -98,7 +98,7 @@ const isWorkbenchEnabled = (ctx: TRPCContext, input: { projectId: string }) =>
   lwqlEnabled({
     featureFlags: ctx.app.featureFlags,
     projectId: input.projectId,
-    projects: ctx.app.projects,
+    projects: ctx.app.projects.projectService,
   });
 
 /** Exported for the transport's own tests; mounted below as `analytics.lwql`. */

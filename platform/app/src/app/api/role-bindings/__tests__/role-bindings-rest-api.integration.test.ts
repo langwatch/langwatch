@@ -147,7 +147,7 @@ describe("Feature: Role bindings REST API", () => {
     // A service key whose initial reach is a team the tested project does
     // not belong to, so any project access it gains comes from the binding
     // under test.
-    const serviceKey = await getApp().apiKeys.create({
+    const serviceKey = await getApp().apiKeys.apiKeyService.create({
       name: `rb-service-key-${nanoid(6)}`,
       userId: null,
       createdByUserId: seeded.adminUserId,

@@ -72,8 +72,10 @@ export async function loadQueueItemTraces(
   const protections = await getUserProtectionsForProject(ctx, { projectId });
   // Annotators label trace content — resolve full IO (#4991) so they see the
   // whole value, not the 64 KB preview.
-  return ctx.app.traces.read.getTracesWithSpans(projectId, [...traceIds], protections, void 0, {
-    full: true,
+  return ctx.app.traces.readTracesWithSpans({
+    projectId,
+    traceIds: [...traceIds],
+    protections,
   });
 }
 
@@ -138,9 +140,14 @@ export const annotationRouter = createAnnotationTrpcRouter({
 
     loadTraces: (ctx: TRPCContext, input) => loadQueueItemTraces(ctx, input),
 
-    recordAnnotationOnTrace: (ctx: TRPCContext, input) => ctx.app.traces.addAnnotation(input),
+    // The trace-side write is an eventing command rather than an application
+    // operation: carrying a comment onto the trace is ingestion into the trace
+    // pipeline, not a rule the trace application owns.
+    recordAnnotationOnTrace: (ctx: TRPCContext, input) =>
+      ctx.app.commands.traces.addAnnotation(input),
 
-    removeAnnotationFromTrace: (ctx: TRPCContext, input) => ctx.app.traces.removeAnnotation(input),
+    removeAnnotationFromTrace: (ctx: TRPCContext, input) =>
+      ctx.app.commands.traces.removeAnnotation(input),
 
     queueTracesForAnnotation: (ctx: TRPCContext, input) =>
       createOrUpdateQueueItems({
@@ -148,7 +155,7 @@ export const annotationRouter = createAnnotationTrpcRouter({
         projectId: input.projectId,
         annotators: [...input.annotators],
         userId: input.userId,
-        annotations: ctx.app.annotations,
+        annotations: ctx.app.annotations.annotationService,
         // Which ids address a trace this project holds is trace storage's
         // answer, so it is resolved here rather than inside the queueing.
         findExistingTraceIds: (candidates) =>

@@ -10,6 +10,7 @@
  * meets at the door.
  */
 import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
+import { AuthApp } from "@langwatch/auth-server";
 import { createFrontDoorTrpcRouter, declaredCheckFrom } from "@langwatch/platform-api/app-trpc";
 import type { TRPCContext } from "~/server/api/trpc.context";
 import {
@@ -22,6 +23,7 @@ import { signInRouter, signUpVerification } from "~/server/app-layer/identity/ru
 import { InviteExpiredError, InviteNotFoundError } from "~/server/invites/errors";
 import { buildMembersSettingsUrl } from "~/server/invites/invite-link";
 import { InviteService, resolveInviteDisplayStatus } from "~/server/invites/invite.service";
+import { resolveAuthProvider } from "~/runtime/app/features/sso";
 import { rateLimit } from "~/server/rateLimit";
 import { getClientIp } from "~/utils/getClientIp";
 import { appTrpcRoot } from "../trpc.root";
@@ -52,61 +54,77 @@ const middlewares: AppTrpcPolicyMiddlewares = {
 };
 
 /** The sign-up ceremony, composed per request over this process's app. */
-const signUp = (ctx: TRPCContext) => signUpVerification(ctx.app.mailer, ctx.app.users);
+const signUp = (ctx: TRPCContext) =>
+  signUpVerification(ctx.app.mailer, ctx.app.users.userService);
+
+/**
+ * The auth feature's application, composed once over this process.
+ *
+ * Both signed-out doors take it — the front door here and `publicEnv` beside
+ * it, which is why it is built in one place and exported rather than composed
+ * twice. Every capability it holds is the process's, and each takes the
+ * request rather than being captured from one, so a single instance serves
+ * every caller.
+ */
+export const authApp = AuthApp.create({
+  clientIp: (ctx: TRPCContext) => getClientIp(ctx.req) ?? "unknown",
+  rateLimit,
+  route: (input) => signInRouter().route(input),
+  addressIsRegistered: (ctx: TRPCContext, input) => signUp(ctx).addressIsRegistered(input),
+  requestSignUpVerification: (ctx: TRPCContext, input) => signUp(ctx).requestVerification(input),
+  completeSignUpVerification: (ctx: TRPCContext, input) => signUp(ctx).completeVerification(input),
+
+  /**
+   * A revoked invitation reads exactly like a missing one, the same way
+   * `organization.acceptInvite` answers it: the journey ends quietly,
+   * revealing nothing about the organization or the inviter. Expired is
+   * different — it is recoverable (the inviter resends in one click), so it
+   * gets its own named refusal.
+   */
+  readInviteLanding: async (ctx: TRPCContext, { inviteCode }) => {
+    const invite = await ctx.prisma.organizationInvite.findUnique({
+      where: { inviteCode },
+      select: {
+        status: true,
+        expiration: true,
+        organization: { select: { name: true } },
+        requestedByUser: { select: { name: true } },
+      },
+    });
+
+    if (!invite || invite.status === "REVOKED") {
+      throw new InviteNotFoundError("Invitation not found");
+    }
+
+    const status = resolveInviteDisplayStatus(invite);
+    if (status === "EXPIRED") {
+      throw new InviteExpiredError();
+    }
+
+    return {
+      organizationName: invite.organization.name,
+      inviterName: invite.requestedByUser?.name ?? null,
+      alreadyAccepted: status === "ACCEPTED",
+    };
+  },
+
+  requestFreshInvite: async (ctx: TRPCContext, { inviteCode }) => {
+    await InviteService.create(ctx.prisma, { mailer: ctx.app.mailer }).requestFreshInvite({
+      inviteCode,
+      membersSettingsUrl: buildMembersSettingsUrl(),
+    });
+  },
+
+  // ADR-027: the single source of truth for the sign-in mode. Never read
+  // `env.NEXTAUTH_PROVIDER` directly here — a deployment whose licence gate
+  // denies SSO must still be told to render the email form.
+  resolveAuthProvider,
+});
 
 export const frontDoorRouter = createFrontDoorTrpcRouter({
   root: appTrpcRoot,
   protectedProcedure: authProtectedProcedure,
   publicProcedure: appTrpcRoot.procedure,
   middlewares,
-  ports: {
-    clientIp: (ctx: TRPCContext) => getClientIp(ctx.req) ?? "unknown",
-    rateLimit,
-    route: (input) => signInRouter().route(input),
-    addressIsRegistered: (ctx: TRPCContext, input) => signUp(ctx).addressIsRegistered(input),
-    requestSignUpVerification: (ctx: TRPCContext, input) => signUp(ctx).requestVerification(input),
-    completeSignUpVerification: (ctx: TRPCContext, input) =>
-      signUp(ctx).completeVerification(input),
-
-    /**
-     * A revoked invitation reads exactly like a missing one, the same way
-     * `organization.acceptInvite` answers it: the journey ends quietly,
-     * revealing nothing about the organization or the inviter. Expired is
-     * different — it is recoverable (the inviter resends in one click), so it
-     * gets its own named refusal.
-     */
-    readInviteLanding: async (ctx: TRPCContext, { inviteCode }) => {
-      const invite = await ctx.prisma.organizationInvite.findUnique({
-        where: { inviteCode },
-        select: {
-          status: true,
-          expiration: true,
-          organization: { select: { name: true } },
-          requestedByUser: { select: { name: true } },
-        },
-      });
-
-      if (!invite || invite.status === "REVOKED") {
-        throw new InviteNotFoundError("Invitation not found");
-      }
-
-      const status = resolveInviteDisplayStatus(invite);
-      if (status === "EXPIRED") {
-        throw new InviteExpiredError();
-      }
-
-      return {
-        organizationName: invite.organization.name,
-        inviterName: invite.requestedByUser?.name ?? null,
-        alreadyAccepted: status === "ACCEPTED",
-      };
-    },
-
-    requestFreshInvite: async (ctx: TRPCContext, { inviteCode }) => {
-      await InviteService.create(ctx.prisma, { mailer: ctx.app.mailer }).requestFreshInvite({
-        inviteCode,
-        membersSettingsUrl: buildMembersSettingsUrl(),
-      });
-    },
-  },
+  ports: authApp,
 });

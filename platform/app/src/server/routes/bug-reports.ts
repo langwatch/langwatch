@@ -87,7 +87,7 @@ secured
         callerKey: callerKey(c),
         apiToken: credentials?.token,
         projectIdHint: credentials?.projectId,
-        apiKeys: c.var.langwatchApp.apiKeys,
+        apiKeys: c.var.langwatchApp.apiKeys.apiKeyService,
       });
       return c.json({ id }, 201);
     } catch (error) {

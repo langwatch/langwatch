@@ -27,6 +27,7 @@ import type {
   CopyWorkflowCommand,
   CreateWorkflowCommand,
   PublishWorkflowCommand,
+  StudioClientEvent,
   Workflow,
   WorkflowService,
   WorkflowVersion,
@@ -68,6 +69,23 @@ export class WorkflowApp {
     includeVersion?: boolean;
   }): Promise<WorkflowWithVersion> {
     return this.dependencies.workflows.getById(input);
+  }
+
+  /**
+   * One studio event, resolved against the project it will run in: its
+   * environment, its LiteLLM parameters and the datasets it names.
+   *
+   * Every studio execution goes through this — the studio's own HTTP route,
+   * the prompt playground's CopilotKit adapter and the experiment
+   * orchestrator — and each of them holds this application rather than the
+   * service. Resolving a run's credentials and data is the workflow feature's
+   * own decision, not something a transport should assemble for itself.
+   */
+  prepareStudioEvent(input: {
+    event: StudioClientEvent;
+    projectId: string;
+  }): Promise<StudioClientEvent> {
+    return this.dependencies.workflows.prepareStudioEvent(input);
   }
 
   /**
@@ -125,6 +143,20 @@ export class WorkflowApp {
   /** Archives one workflow, or restores it when `unarchive` is set. */
   archive(input: ArchiveWorkflowCommand): Promise<Workflow> {
     return this.dependencies.workflows.archive(input);
+  }
+
+  /**
+   * The service itself, for the process functions that still take it directly.
+   *
+   * Two of them do, and neither is a workflow door: the trace evaluation runner
+   * (`server/evaluations/runEvaluation.ts`) takes a `WorkflowService` as one of
+   * six collaborators, and the studio's save-or-commit helper writes a version
+   * with the author it resolved from the request. Both live beside the
+   * transports in the application being retired; until they move, this getter is
+   * the seam that remains — the same one `EvaluatorApp.evaluatorService` keeps.
+   */
+  get workflowService(): WorkflowService {
+    return this.dependencies.workflows;
   }
 
   // -- the evaluator a published workflow is wrapped in -----------------------

@@ -114,7 +114,10 @@ export async function authorizeDirectUpload(
   }
 
   const app = appFromContext(c);
-  const resolved = await app.apiKeys.tryResolveToken({
+  // The credential resolution and the last-used stamp are authentication
+  // plumbing rather than a domain operation, so they ask the API-key service
+  // itself — the seam `ApiKeyApp` keeps for exactly this.
+  const resolved = await app.apiKeys.apiKeyService.tryResolveToken({
     token: credentials.token,
     projectId: credentials.projectId ?? projectId,
   });
@@ -140,7 +143,7 @@ export async function authorizeDirectUpload(
   // bump of `lastUsedAt` on a successful API-key auth (no-op for legacy keys,
   // which carry no `apiKeyId`). Matches the experiments-v3 `markUsed` pattern.
   if (resolved.type === "apiKey") {
-    app.apiKeys.markUsed({ id: resolved.apiKeyId });
+    app.apiKeys.apiKeyService.markUsed({ id: resolved.apiKeyId });
   }
 
   return {

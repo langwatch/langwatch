@@ -41,6 +41,13 @@ vi.mock("~/server/app-layer/app", async () => {
       traces: {
         recordSpan: (...args: unknown[]) => mockScheduleTrace(...args),
       },
+      // The tRPC port dispatches the eventing command; `traces.recordSpan`
+      // above is what the metadata service still reaches for.
+      commands: {
+        traces: {
+          recordSpan: (...args: unknown[]) => mockScheduleTrace(...args),
+        },
+      },
     }),
   };
 });
@@ -52,6 +59,13 @@ vi.mock("../../../app-layer/app", async () => {
       permissions: appPermissionsService(dbForPermissions),
       traces: {
         recordSpan: (...args: unknown[]) => mockScheduleTrace(...args),
+      },
+      // The tRPC port dispatches the eventing command; `traces.recordSpan`
+      // above is what the metadata service still reaches for.
+      commands: {
+        traces: {
+          recordSpan: (...args: unknown[]) => mockScheduleTrace(...args),
+        },
       },
     }),
   };

@@ -28,17 +28,17 @@ wireDefaultTestApp();
 // mounts, so the test exercises the real ports rather than a stand-in.
 const { hono: app } = createWorkflowsRestApp({
   security: appRestSecurity,
-  workflows: () => getApp().workflows,
+  workflows: () => getApp().workflows.workflowService,
   ports: {
     platformUrl,
     requireApiKeyPermission: (permission) => requireApiKeyPermission({ permission }),
     triggerEvaluation: (input) =>
       WorkflowEvaluationService.create(
         prisma,
-        getApp().experiments,
-        getApp().modelProviders,
+        getApp().experiments.experimentService,
+        getApp().modelProviders.providerService,
         getApp().nlpLambda,
-        getApp().workflows,
+        getApp().workflows.workflowService,
         getApp().config.evaluationExecution.defaultConcurrency,
       ).triggerEvaluationForRest(input),
   },

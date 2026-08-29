@@ -81,7 +81,7 @@ async function authorizeUiRequest(c: Context) {
   const credentials = extractCredentials((name) => c.req.header(name));
   if (!credentials) throw new LangyApiCredentialMissingError();
 
-  const resolved = await c.app.apiKeys.tryResolveToken({
+  const resolved = await c.app.apiKeys.apiKeyService.tryResolveToken({
     token: credentials.token,
     projectId: credentials.projectId,
   });
@@ -128,17 +128,17 @@ function createService({
   return new LangyUiActionService({
     redis,
     conversations: {
-      findByIdVisible: (args) => app.langy.tryFindByIdVisible(args),
+      findByIdVisible: (args) => app.langy.tryFindVisible(args),
     },
     buffer: LangyTokenBuffer.create({ redis: app.redis }),
     backendRunner: ({ kind, definition, payload, experimentSlug }) =>
       executeBackendAction({
-        experiments: app.experiments,
+        experiments: app.experiments.experimentService,
         runServices: {
           evaluators: app.evaluators,
-          modelProviders: app.modelProviders,
+          modelProviders: app.modelProviders.providerService,
           nlpLambda: app.nlpLambda,
-          workflows: app.workflows,
+          workflows: app.workflows.workflowService,
         },
         context: {
           ...context,

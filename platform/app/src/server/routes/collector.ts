@@ -94,7 +94,7 @@ secured
       }
 
       const app = c.app;
-      const apiKeys = app.apiKeys;
+      const apiKeys = app.apiKeys.apiKeyService;
       const resolved = await apiKeys.tryResolveToken({
         token: credentials.token,
         projectId: credentials.projectId,
@@ -151,10 +151,10 @@ secured
       if (limitResult.exceeded) {
         try {
           const activePlan = await app.planProvider.getActivePlan({
-            organizationId: project.team.organizationId,
+            organizationId: project.organizationId,
           });
           await app.usageLimits.notifyPlanLimitReached({
-            organizationId: project.team.organizationId,
+            organizationId: project.organizationId,
             planName: activePlan.name ?? "free",
             usageUnit: limitResult.usageUnit,
             current: limitResult.count,
@@ -577,7 +577,7 @@ secured
             // REST collector shares the (tenant, trace, span) dedup gate + ADR-022
             // spool hook with the OTLP path — a retry storm here must not bypass
             // dedup. occurredAt is stamped inside ingestNormalizedSpan.
-            app.traces.collection.ingestNormalizedSpan({
+            app.traceIngestion.collection.ingestNormalizedSpan({
               tenantId: project.id,
               span: CollectorSpanUtils.convertSpanToOtlp(span),
               resource,

@@ -14,9 +14,10 @@
  * them directly, and both take this application's request context.
  */
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
-import type { DatasetService } from "@langwatch/dataset-contract";
+import type { DatasetApp } from "@langwatch/dataset-server";
 import { pMapLimited } from "@langwatch/eventing";
 import { featureByKey, type ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApp } from "@langwatch/model-provider-server";
 import { createLogger } from "@langwatch/observability";
 import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
 import {
@@ -29,9 +30,9 @@ import {
   parseStudioWorkflow,
   studioWorkflowSchema,
   type StudioWorkflow,
-  type WorkflowService,
   type WorkflowVersion,
 } from "@langwatch/workflow-contract";
+import type { WorkflowApp } from "@langwatch/workflow-server";
 import type { JsonValue } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
 import { generateText } from "ai";
@@ -187,7 +188,7 @@ export const workflowRouter = createWorkflowTrpcRouter({
     prepareDsl: (ctx, input) =>
       prepareWorkflowDsl({
         projectId: input.projectId,
-        modelProviders: appContext(ctx).app.modelProviders,
+        modelProviders: appContext(ctx).app.modelProviders.providerService,
         dsl: input.dsl,
       }),
 
@@ -399,7 +400,7 @@ export const workflowRouter = createWorkflowTrpcRouter({
           model: await getVercelAIModel({
             projectId: input.projectId,
             featureKey: "workflows.commit_message",
-            modelProviders: appContext(ctx).app.modelProviders,
+            modelProviders: appContext(ctx).app.modelProviders.providerService,
             managedProviders: appContext(ctx).app.managedProviders,
           }),
           providerOptions: {
@@ -538,7 +539,7 @@ export const copyWorkflowWithDatasets = async ({
   copyDatasets,
   copiedFromWorkflowId,
 }: {
-  ctx: { prisma: PrismaClient; session: Session; app: { dataset: DatasetService } };
+  ctx: { prisma: PrismaClient; session: Session; app: { dataset: DatasetApp } };
   workflow: {
     id: string;
     name: string;
@@ -647,7 +648,7 @@ export const copyWorkflowWithDatasets = async ({
 type WorkflowSaveContext = {
   prisma: PrismaClient;
   session: Session;
-  app: { workflows: WorkflowService; modelProviders: ModelProviderService };
+  app: { workflows: WorkflowApp; modelProviders: ModelProviderApp };
 };
 
 export const saveOrCommitWorkflowVersion = async ({
@@ -669,10 +670,10 @@ export const saveOrCommitWorkflowVersion = async ({
 }): Promise<WorkflowVersion> => {
   const dslWithMergedConfigs = await prepareWorkflowDsl({
     projectId: input.projectId,
-    modelProviders: ctx.app.modelProviders,
+    modelProviders: ctx.app.modelProviders.providerService,
     dsl: input.dsl,
   });
-  const updatedVersion = await ctx.app.workflows.saveVersion({
+  const updatedVersion = await ctx.app.workflows.workflowService.saveVersion({
     projectId: input.projectId,
     workflowId: input.workflowId,
     dsl: JSON.parse(JSON.stringify(dslWithMergedConfigs)),

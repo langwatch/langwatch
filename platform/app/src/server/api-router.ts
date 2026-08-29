@@ -94,7 +94,6 @@ import {
   assertWebhookEndpointsEntitled,
   WebhookEndpointsNotEntitledError,
 } from "~/runtime/app/features/webhooks";
-import { LegacyAgentsRestFeature } from "~/runtime/app/legacy-rest/agents";
 import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
 import { withIdempotency } from "~/server/api/idempotency";
 import { managementAuditPort } from "~/server/api/management/audit";
@@ -129,13 +128,10 @@ import {
   type VirtualKeyActor,
 } from "~/server/gateway/virtualKey.authz";
 import { virtualKeyBudgetInputSchema } from "~/server/gateway/virtualKey.service";
-import { resolveCallerProjectScope } from "~/server/organizations/resolveCallerProjectScope";
-import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { rateLimit } from "~/server/rateLimit";
 import { bodyLimit } from "./routes/_lib/body-limit";
 import { extractInlineMediaFromEvent } from "./stored-objects/content-extractor";
 import { monitorMappingsSchema } from "~/server/tracer/tracesMapping";
-import { webhookDestinationFor } from "~/server/webhooks/destinations";
 import { WorkflowEvaluationService } from "~/server/workflows/workflowEvaluation.service";
 import type { NextRequest } from "~/types/next-stubs";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -245,7 +241,7 @@ function gatewayPlatformRestPorts(app: App): GatewayPlatformRestPorts {
     // a query per key to say where each one's traffic goes.
     toVirtualKeyDtos: async ({ virtualKeys }) => {
       const facts = await loadTraceDestinationFacts({
-        projects: app.projects,
+        projects: app.projects.projectService,
         virtualKeys: [...virtualKeys],
       });
       return virtualKeys.map((virtualKey) => toVirtualKeySnakeDto({ virtualKey, facts }));
@@ -405,49 +401,39 @@ export function createApiRouter(app: App) {
     security: appRestSecurity,
     services: {
       agentCache: () => agentCacheStore,
-      agents: () => LegacyAgentsRestFeature.create({ prisma, session: null }),
-      apiKeys: () => app.apiKeys,
+      agents: () => app.agents,
+      apiKeys: () => app.apiKeys.apiKeyService,
       authzGrants: () => app.authzGrants,
       automation: () => app.automation,
       broadcast: () => app.broadcast,
-      codingAgents: () => ({
-        codingAgents: app.codingAgents,
-        githubWebBase: () => app.github.getWebBase(),
-        resolveOrganizationId,
-        resolveCallerProjectScope,
-        auditLog,
-      }),
+      codingAgents: () => app.codingAgentApp,
+      // REST audits a read that names people; tRPC does not, which is why this
+      // is a port of the family rather than something the application does.
+      codingAgentAudit: () => ({ auditLog }),
       dashboard: () => app.dashboard,
       datasets: () => app.dataset,
-      evaluators: () => app.evaluators,
+      evaluators: () => app.evaluatorApp,
       experiments: () => app.experiments,
       gatewayPlatform: () => gatewayPlatformRestPorts(app),
       gatewaySpend: () => gatewaySpendRestPorts(app),
-      governance: () => app.governance,
-      modelProviders: () => app.modelProviders,
+      governance: () => app.governanceApp,
+      modelProviders: () => app.modelProviders.providerService,
       monitors: () => app.monitors,
       organizations: () => app.organizations,
       permissions: () => app.permissions,
-      projects: () => app.projects,
+      projects: () => app.projects.projectService,
       roles: () => app.roles,
       scenarios: () => app.scenarios,
       scenarioTabs: () => app.scenarioTabs,
-      scim: () => app.scim,
+      scim: () => app.scimApp,
       secrets: () => app.secrets,
       simulations: () => app.simulations,
-      storedObjects: () => app.storedObjects,
+      storedObjects: () => app.storedObjectApp,
       storedObjectOwners: () => app.storedObjectOwners,
       suites: () => app.suites,
       userAvatarObjects: () => app.userAvatarObjects,
-      webhooks: () => ({
-        endpoints: app.gateway.webhookEndpoints,
-        health: app.gateway.webhookHealth,
-        events: app.gateway.webhookEvents,
-        assertEndpointsEntitled: assertWebhookEndpointsEntitled,
-        dispatch: ({ destination, ...input }) => webhookDestinationFor(destination).send(input),
-        runIdempotent: (input) => withIdempotency({ prisma, ...input }),
-      }),
-      workflows: () => app.workflows,
+      webhooks: () => app.webhooks,
+      workflows: () => app.workflows.workflowService,
     },
     ports: {
       agentPlatformUrl,
@@ -458,8 +444,8 @@ export function createApiRouter(app: App) {
         new PromptStudioAdapter({
           projectId,
           nlpLambda: app.nlpLambda,
-          modelProviders: app.modelProviders,
-          workflows: app.workflows,
+          modelProviders: app.modelProviders.providerService,
+          workflows: app.workflows.workflowService,
         }),
       dualAuth,
       enterpriseGate: requireEnterprisePlanRest,
@@ -499,10 +485,10 @@ export function createApiRouter(app: App) {
       triggerWorkflowEvaluation: (input) =>
         WorkflowEvaluationService.create(
           prisma,
-          app.experiments,
-          app.modelProviders,
+          app.experiments.experimentService,
+          app.modelProviders.providerService,
           app.nlpLambda,
-          app.workflows,
+          app.workflows.workflowService,
           app.config.evaluationExecution.defaultConcurrency,
         ).triggerEvaluationForRest(input),
     },

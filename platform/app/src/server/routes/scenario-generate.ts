@@ -135,7 +135,7 @@ secured
       const model = await getVercelAIModel({
         projectId,
         featureKey: "scenarios.generator",
-        modelProviders: c.app.modelProviders,
+        modelProviders: c.app.modelProviders.providerService,
         managedProviders: c.app.managedProviders,
       });
 

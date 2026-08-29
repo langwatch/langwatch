@@ -195,6 +195,11 @@ type OrganizationsAppService = Readonly<{
     currentUserId: string;
   }): Promise<OrganizationMemberWithUser | null>;
   getAllMembers(organizationId: string): Promise<User[]>;
+  getUserOrgRoleByTeamId(input: {
+    userId: string;
+    teamId: string;
+  }): Promise<OrganizationUserRole | null>;
+  getPrimaryIntent(organizationId: string): Promise<OrganizationIntent | null>;
   ensurePersonalWorkspace(input: {
     userId: string;
     organizationId: string;
@@ -377,6 +382,30 @@ export class OrganizationApp {
   /** Every member of one organization, for the member pickers. */
   getAllMembers(input: { organizationId: string }): Promise<User[]> {
     return this.dependencies.organizations.getAllMembers(input.organizationId);
+  }
+
+  /**
+   * The role a user holds in the organization that owns one team.
+   *
+   * Read by the process's project-protections resolver: someone with no team
+   * binding at all may still reach a project through an organization-wide
+   * role, and that is the read which says so. Keyed on the TEAM rather than
+   * the organization because a project names its team, not its tenant.
+   */
+  getUserOrgRoleByTeamId(input: {
+    userId: string;
+    teamId: string;
+  }): Promise<OrganizationUserRole | null> {
+    return this.dependencies.organizations.getUserOrgRoleByTeamId(input);
+  }
+
+  /**
+   * The organization's declared primary intent (ADR-038), or null where it was
+   * never set. The governance setup screen reads it to decide which checklist
+   * the organization is being walked through.
+   */
+  getPrimaryIntent(organizationId: string): Promise<OrganizationIntent | null> {
+    return this.dependencies.organizations.getPrimaryIntent(organizationId);
   }
 
   /** Makes the caller's personal workspace in this organization exist. */

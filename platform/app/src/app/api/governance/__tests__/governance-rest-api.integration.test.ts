@@ -70,8 +70,7 @@ describe("Feature: Governance REST API", () => {
 
   const { hono: app } = createGovernanceRestApp({
     security: appRestSecurity,
-    governance: () => testApp.governance,
-    projects: () => testApp.projects,
+    app: () => testApp.governanceApp,
   });
 
   const request = (path: string, init?: RequestInit) =>
@@ -133,7 +132,7 @@ describe("Feature: Governance REST API", () => {
       },
     });
 
-    const apiKeyResult = await testApp.apiKeys.create({
+    const apiKeyResult = await testApp.apiKeys.apiKeyService.create({
       name: `gov-pat-${suffix}`,
       userId: testUser.id,
       organizationId: testOrganization.id,

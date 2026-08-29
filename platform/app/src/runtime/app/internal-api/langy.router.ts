@@ -83,7 +83,7 @@ function createUiActionService(): LangyUiActionService {
   return new LangyUiActionService({
     redis,
     conversations: {
-      findByIdVisible: (args) => app.langy.tryFindByIdVisible(args),
+      findByIdVisible: (args) => app.langy.tryFindVisible(args),
     },
     buffer: LangyTokenBuffer.create({ redis: app.redis }),
   });

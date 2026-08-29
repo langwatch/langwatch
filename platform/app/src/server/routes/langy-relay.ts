@@ -63,7 +63,7 @@ secured.access(relayPolicy()).post("/relay/frames", async (c) => {
   const body = c.req.raw.body;
   if (!body) return c.json({ error: "missing body" }, 400);
 
-  const relay = c.app.langy.openRelayConnection();
+  const relay = c.app.langy.langyService.openRelayConnection();
 
   const tally: RelayTally = {
     applied: 0,

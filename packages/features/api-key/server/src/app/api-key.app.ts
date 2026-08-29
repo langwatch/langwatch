@@ -87,6 +87,28 @@ export class ApiKeyApp {
   private constructor(private readonly dependencies: ApiKeyAppDependencies) {}
 
   /**
+   * The service itself, for the one thing this application deliberately is not
+   * about: turning a credential on the wire into a caller.
+   *
+   * Everything below is the MANAGEMENT surface — a signed-in member listing,
+   * minting and retiring keys in an organization they belong to. Resolving an
+   * inbound token (`tryResolveToken`, `markUsed`) is the opposite direction:
+   * it runs before anyone is authenticated, so there is no `by` to prove
+   * membership for, and it is what the Hono auth middleware and every
+   * key-authenticated REST family call on the way in. The CLI device-login
+   * lifecycle (`mintCliLoginKey`, `validateCliSelection`,
+   * `tryResolveDefaultCliSelection`, `revokeCliLoginKeysForDevice`) sits on the
+   * same seam: those run against a device grant, not a session.
+   *
+   * Modelling either as an operation here would mean this application
+   * answering "who is calling?" for its own callers, so the getter is the seam
+   * that remains — the same one `ModelProviderApp.providerService` keeps.
+   */
+  get apiKeyService(): ApiKeyService {
+    return this.dependencies.apiKeys;
+  }
+
+  /**
    * The caller's own bindings in one organization, each with its scope named.
    *
    * Bindings on archived projects are dropped: the drawers mirror this list to

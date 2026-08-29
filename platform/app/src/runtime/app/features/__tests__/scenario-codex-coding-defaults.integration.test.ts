@@ -98,7 +98,7 @@ describe.skipIf(!hasCredentialsSecret)(
         enabled: true,
         customKeys: { OPENAI_API_KEY: `sk-openai-${ns}` },
         scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
-      });
+      }, { id: userId });
 
       // A real, enabled Codex provider so that if this test regresses, the
       // failure it reproduces is the REPORTED one (the litellm-params
@@ -121,22 +121,26 @@ describe.skipIf(!hasCredentialsSecret)(
           CODEX_TOKENS_SAVED_AT: new Date().toISOString(),
         },
         scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
-      });
+      }, { id: userId });
 
       // Exactly the pair codexApplyCodingDefaults writes for FAST, plus a
       // DEFAULT role default so the simulator/judge resolve.
-      await app.modelProviders.setDefault({
-        scope: { scopeType: "PROJECT", scopeId: projectId },
-        key: "DEFAULT",
-        model: "openai/gpt-5-mini",
-        authorId: userId,
-      });
-      await app.modelProviders.setDefault({
-        scope: { scopeType: "PROJECT", scopeId: projectId },
-        key: "FAST",
-        model: CODEX_DEFAULT_MODEL,
-        authorId: userId,
-      });
+      await app.modelProviders.setDefault(
+        {
+          scope: { scopeType: "PROJECT", scopeId: projectId },
+          key: "DEFAULT",
+          model: "openai/gpt-5-mini",
+        },
+        { id: userId },
+      );
+      await app.modelProviders.setDefault(
+        {
+          scope: { scopeType: "PROJECT", scopeId: projectId },
+          key: "FAST",
+          model: CODEX_DEFAULT_MODEL,
+        },
+        { id: userId },
+      );
 
       const scenario = await prisma.scenario.create({
         data: {

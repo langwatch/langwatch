@@ -54,8 +54,6 @@ describe("Feature: Suites REST API", () => {
   const { hono: app } = createSuiteRestApp({
     security: appRestSecurity,
     suites: () => testApp.suites,
-    scenarios: () => testApp.scenarios,
-    projects: () => testApp.projects,
     platformUrl,
   });
 

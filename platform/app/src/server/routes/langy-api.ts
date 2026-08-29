@@ -110,7 +110,7 @@ async function authorizeTurn(c: Context) {
   const credentials = extractCredentials((name) => c.req.header(name));
   if (!credentials) throw new LangyApiCredentialMissingError();
 
-  const apiKeys = appFromContext(c).apiKeys;
+  const apiKeys = appFromContext(c).apiKeys.apiKeyService;
   const resolved = await apiKeys.tryResolveToken({
     token: credentials.token,
     projectId: credentials.projectId,
@@ -230,7 +230,7 @@ async function startTurn({ c, conversationId }: { c: Context; conversationId: st
 
   const body = await parseTurnBody(c, conversationId);
 
-  const result = await appFromContext(c).langy.startConversationTurn({
+  const result = await appFromContext(c).langy.langyService.startConversationTurn({
     projectId: auth.projectId,
     idempotencyKey: body.idempotencyKey,
     session: auth.session,
@@ -253,7 +253,7 @@ async function startTurn({ c, conversationId }: { c: Context; conversationId: st
     // Client disconnect and the wait deadline are one signal: an abandoned
     // hold stops consuming fold reads (and its blocking Redis read) at once.
     const settlement = await awaitLangyTurnSettlement({
-      langy: appFromContext(c).langy,
+      langy: appFromContext(c).langy.langyService,
       redis: appFromContext(c).redis ?? null,
       projectId: auth.projectId,
       conversationId: result.conversationId,

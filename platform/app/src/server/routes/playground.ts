@@ -58,7 +58,10 @@ secured
     // legacy `{provider}/{model}`. For mp-id values we look up the MP by
     // id; for legacy values we resolve to the single accessible MP for
     // that provider (today always narrowest-wins) exactly as before.
-    const modelProviders = await getProjectModelProviders(c.app.modelProviders, projectId);
+    const modelProviders = await getProjectModelProviders(
+      c.app.modelProviders.providerService,
+      projectId,
+    );
     const providerKey = model.split("/")[0] ?? "";
     const modelProvider = providerKey.startsWith("mp_")
       ? Object.values(modelProviders).find((provider) => provider.id === providerKey)
@@ -82,7 +85,7 @@ secured
       return c.json(previousError, { status: 401 });
     }
 
-    const litellmParams = await c.app.modelProviders.prepareExecution({
+    const litellmParams = await c.app.modelProviders.providerService.prepareExecution({
       model,
       projectId,
     });

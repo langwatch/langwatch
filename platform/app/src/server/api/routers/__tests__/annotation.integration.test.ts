@@ -61,6 +61,14 @@ vi.mock("~/server/app-layer/app", async () => {
         },
         allInstances: async () => [],
       },
+      // The annotation transport dispatches the trace-side write as an eventing
+      // command, so the fake carries it where the port now reaches for it.
+      commands: {
+        traces: {
+          addAnnotation: mockAddAnnotation,
+          removeAnnotation: mockRemoveAnnotation,
+        },
+      },
       traces: {
         addAnnotation: mockAddAnnotation,
         removeAnnotation: mockRemoveAnnotation,
@@ -75,11 +83,7 @@ vi.mock("~/server/app-layer/app", async () => {
           getByTraceId: async () => ({ redactedByVisibilityWindow: false }),
         },
       },
-      annotations: PostgresAnnotationAdapter.create({
-        database: prisma,
-        projects: createAnnotationTestProjects(),
-        organizations: createAnnotationTestOrganizations(),
-      }).build(),
+      annotations: annotationAppFake(),
       users: createAnnotationTestUsers(),
       organizations: {
         // The shared test user belongs to the org through the legacy TeamUser
@@ -90,6 +94,20 @@ vi.mock("~/server/app-layer/app", async () => {
     }),
   };
 });
+
+/**
+ * `app.annotations` is an `AnnotationApp` in the real composition. This suite
+ * fakes the service it wraps and carries it under `annotationService` as well,
+ * because the queueing port takes the service rather than the application.
+ */
+function annotationAppFake() {
+  const service = PostgresAnnotationAdapter.create({
+    database: prisma,
+    projects: createAnnotationTestProjects(),
+    organizations: createAnnotationTestOrganizations(),
+  }).build();
+  return Object.assign(service, { annotationService: service });
+}
 
 /**
  * Every trace this suite writes to. The project is shared with other suites,

@@ -478,7 +478,7 @@ secured.access(experimentsManageAuth).post(
 
     for (const param of params) {
       try {
-        await processDSPyStep(c.app.experiments, project, param);
+        await processDSPyStep(c.app.experiments.experimentService, project, param);
       } catch (error) {
         if (error instanceof z.ZodError) {
           logger.error(
@@ -659,7 +659,7 @@ secured.access(experimentsManageAuth).post(
     let experiment;
     try {
       experiment = await findOrCreateExperiment({
-        experiments: c.app.experiments,
+        experiments: c.app.experiments.experimentService,
         project,
         // The body accepts either identifier and this handler used to forward
         // only the slug, so an id-only request passed validation and then hit
@@ -1418,7 +1418,7 @@ async function handleWorkflowRun(
   // and hard-coding 500 was masking those as raw 500s regardless of type.
   let result: unknown;
   try {
-    result = await c.app.workflows.run({
+    result = await c.app.workflows.workflowService.run({
       workflowId,
       projectId: project.id,
       inputs: body,

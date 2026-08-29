@@ -190,7 +190,7 @@ beforeAll(async () => {
     },
   });
   callerToken = (
-    await getApp().apiKeys.create({
+    await getApp().apiKeys.apiKeyService.create({
       name: `pr-usage-caller-${ns}`,
       userId: callerUserId,
       createdByUserId: callerUserId,

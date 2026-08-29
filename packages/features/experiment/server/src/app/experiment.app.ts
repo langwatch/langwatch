@@ -42,9 +42,11 @@ import type {
   ExperimentRunAggregate,
   ExperimentRunListInput,
   ExperimentRunLookup,
+  ExperimentRunSlugPageInput,
   ExperimentRunWithItems,
   ExperimentService,
   ExperimentSlugLookup,
+  ExperimentType,
   GetWorkbenchStateInput,
   ListWorkbenchVersionsInput,
   RestoreWorkbenchVersionInput,
@@ -119,6 +121,21 @@ export class ExperimentApp {
 
   private constructor(private readonly dependencies: ExperimentAppDependencies) {}
 
+  /**
+   * The service itself, for the process functions that still take it whole.
+   *
+   * None of them is an experiment door: the workbench run orchestrator
+   * persists its cells through it, the DSPy and batch-evaluation uploads
+   * find-or-create an experiment before writing run events into it, and the
+   * saved-state execution helper resolves the experiment the run is built
+   * from. Each declares a `ExperimentService` parameter, so a narrowed shape
+   * will not do. Until they move, this getter is the seam that remains — the
+   * same one `WorkflowApp.workflowService` keeps.
+   */
+  get experimentService(): ExperimentService {
+    return this.dependencies.experiments;
+  }
+
   // ── Experiments ────────────────────────────────────────────────
 
   /** Every active experiment in the project. */
@@ -144,6 +161,50 @@ export class ExperimentApp {
   /** One experiment by slug. */
   getBySlug(input: ExperimentSlugLookup): Promise<Experiment> {
     return this.dependencies.experiments.getBySlug(input);
+  }
+
+  /**
+   * One experiment by slug, or null when the project has none by that name.
+   *
+   * Absence is a real answer beside {@link getBySlug} rather than instead of
+   * it: a caller that names the slug itself — a batch-evaluation upload, a
+   * poller — decides for itself what a miss means, while a caller reading a
+   * slug out of its own URL wants the raise.
+   */
+  tryGetBySlug(input: ExperimentSlugLookup): Promise<Experiment | null> {
+    return this.dependencies.experiments.tryGetBySlug(input);
+  }
+
+  /**
+   * One experiment by slug, only when it is of the kind the caller expects.
+   *
+   * The type is part of the question, not a check afterwards: two experiments
+   * in a project may share a slug across kinds, and a workbench route that
+   * read the slug alone would happily open a batch-evaluation record it cannot
+   * render.
+   */
+  tryGetBySlugAndType(
+    input: ExperimentSlugLookup & Readonly<{ type: ExperimentType }>,
+  ): Promise<Experiment | null> {
+    return this.dependencies.experiments.tryGetBySlugAndType(input);
+  }
+
+  /** One experiment's id and slug, for a caller that holds only the slug. */
+  tryGetIdBySlug(
+    input: ExperimentSlugLookup,
+  ): Promise<{ id: string; slug: string } | null> {
+    return this.dependencies.experiments.tryGetIdBySlug(input);
+  }
+
+  /**
+   * Whether the experiment is still live — present and not archived.
+   *
+   * A run's cached status outlives its experiment's archival, so every read
+   * that answers from that cache asks this first; otherwise archive visibility
+   * silently depends on how old the run is.
+   */
+  isActive(input: ExperimentLookup): Promise<boolean> {
+    return this.dependencies.experiments.isActive(input);
   }
 
   /** One experiment by whichever identifier the caller holds. */
@@ -205,6 +266,21 @@ export class ExperimentApp {
   /** One run of one experiment. A missing run reads as null. */
   tryGetRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null> {
     return this.dependencies.experiments.tryGetRun(input);
+  }
+
+  /**
+   * One page of an experiment's runs, addressed by slug.
+   *
+   * The experiment comes back with the page because resolving the slug is
+   * half the read: a caller paging by slug needs the id it resolved to in
+   * order to say which experiment the 404 was about.
+   */
+  getRunsPageBySlug(input: ExperimentRunSlugPageInput): Promise<{
+    experiment: { id: string; slug: string };
+    runs: ExperimentRun[];
+    totalHits: number;
+  }> {
+    return this.dependencies.experiments.getRunsPageBySlug(input);
   }
 
   /**

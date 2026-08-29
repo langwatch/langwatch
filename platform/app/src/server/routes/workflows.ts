@@ -67,7 +67,7 @@ secured
       const model = await getVercelAIModel({
         projectId,
         featureKey: "studio.autocomplete",
-        modelProviders: c.app.modelProviders,
+        modelProviders: c.app.modelProviders.providerService,
         managedProviders: c.app.managedProviders,
       });
 
@@ -157,7 +157,7 @@ secured
 
       let message: StudioClientEvent;
       try {
-        message = await c.app.workflows.prepareStudioEvent({
+        message = await c.app.workflows.workflowService.prepareStudioEvent({
           event: eventWithoutEnvs,
           projectId,
         });
@@ -223,7 +223,7 @@ secured
           void studioBackendPostEvent({
             projectId,
             nlpLambda: c.app.nlpLambda,
-            modelProviders: c.app.modelProviders,
+            modelProviders: c.app.modelProviders.providerService,
             message,
             onEvent: (serverEvent: StudioServerEvent) => {
               void stream.writeSSE({

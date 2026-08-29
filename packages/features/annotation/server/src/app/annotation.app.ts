@@ -111,6 +111,19 @@ export class AnnotationApp {
 
   private constructor(private readonly dependencies: AnnotationAppDependencies) {}
 
+  /**
+   * The service itself, for `createOrUpdateQueueItems`.
+   *
+   * That queueing function is this package's own, but it is not reachable from
+   * here: it takes the trace-storage read that decides which of the requested
+   * ids actually address a trace, which is another feature's persistence and
+   * therefore the process's to supply. So the process calls it, and this getter
+   * is what it hands over — the same seam `EvaluatorApp.evaluatorService` keeps.
+   */
+  get annotationService(): AnnotationService {
+    return this.dependencies.annotations;
+  }
+
   // -- comments --------------------------------------------------------------
 
   /** The comments matching a query, in the order the query asked for. */
@@ -156,6 +169,21 @@ export class AnnotationApp {
     by: AnnotationCaller,
   ): Promise<Annotation> {
     return this.dependencies.annotations.create({ ...input, userId: by.id });
+  }
+
+  /**
+   * Saves one comment left through the public API, where the annotator is a
+   * project credential rather than a member of the workspace.
+   *
+   * The reviewer is null on purpose and not by omission: there is no user to
+   * attribute it to, and stamping the key's owner would credit whoever minted
+   * the key with words they never wrote. What identity there is travels in
+   * `email` on the input, which is the only thing an external annotator hands
+   * us. Named apart from {@link create} so a door cannot reach the
+   * unattributed write by forgetting an argument.
+   */
+  createUnattributed(input: Omit<CreateAnnotationInput, "userId">): Promise<Annotation> {
+    return this.dependencies.annotations.create({ ...input, userId: null });
   }
 
   /** Replaces what a comment says. Never what it is about — that is a new comment. */

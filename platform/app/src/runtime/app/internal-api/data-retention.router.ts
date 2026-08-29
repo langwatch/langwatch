@@ -92,7 +92,10 @@ const dataRetentionPolicy = {
       ctx.app.planProvider,
     ),
   assertCanDisableRetention: (ctx: TRPCContext) =>
-    assertCanDisableRetention({ prisma: ctx.prisma, session: ctx.session }, ctx.app.ops),
+    assertCanDisableRetention(
+      { prisma: ctx.prisma, session: ctx.session },
+      ctx.app.ops.operations,
+    ),
   assertPlanForScope: (ctx: TRPCContext, scope: RetentionScope) =>
     assertRetentionPlanForScope(
       { prisma: ctx.prisma, session: ctx.session },

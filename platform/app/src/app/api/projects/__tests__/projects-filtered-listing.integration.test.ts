@@ -25,8 +25,8 @@ import { appRestSecurity } from "~/server/api/security";
 
 const { hono: app } = createProjectRestApp({
   security: appRestSecurity,
-  projects: () => getApp().projects,
-  apiKeys: () => getApp().apiKeys,
+  projects: () => getApp().projects.projectService,
+  apiKeys: () => getApp().apiKeys.apiKeyService,
 });
 
 describe("Feature: GET /api/projects honours the credential's reach", () => {
@@ -63,7 +63,7 @@ describe("Feature: GET /api/projects honours the credential's reach", () => {
     permissions?: string[];
   }) =>
     (
-      await getApp().apiKeys.create({
+      await getApp().apiKeys.apiKeyService.create({
         name: `reach-${nanoid(6)}`,
         userId: args.userId,
         createdByUserId: args.userId,

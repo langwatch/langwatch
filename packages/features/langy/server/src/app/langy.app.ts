@@ -130,6 +130,23 @@ export class LangyApp {
 
   private constructor(private readonly dependencies: LangyAppDependencies) {}
 
+  /**
+   * The service itself, for the paths that are not a Langy door.
+   *
+   * Everything below serves a person looking at a conversation. These do not:
+   * the worker posts its turn result back over `/api/internal/langy`
+   * (`turnExists`, `ingestAgentTurnResult`, `revokeWorkerSessionKey`), the
+   * frame relay opens a long-lived ndjson connection (`openRelayConnection`),
+   * and the wait path on the public HTTP turn API takes a `LangyService` as a
+   * parameter. Each runs against a worker session key rather than a person, so
+   * modelling them here would put the agent's own callbacks in the same surface
+   * as the panel's reads. Until they move, this getter is the seam that
+   * remains — the same one `WorkflowApp.workflowService` keeps.
+   */
+  get langyService(): LangyService {
+    return this.dependencies.langy;
+  }
+
   // -- conversation reads ----------------------------------------------------
 
   /** One page of the caller's slim conversation spine. */
