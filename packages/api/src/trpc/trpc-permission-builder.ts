@@ -362,7 +362,15 @@ export function createPermissionProcedureBuilder<TCheckContext, TDeclaredContext
 
     const builder = {
       input(input: Parser) {
-        return permissionProcedureBuilder(procedure.input(input));
+        // tRPC types `.input()` as a conditional on the input already
+        // accumulated, and this builder forwards for a procedure whose input
+        // is a type parameter — the conditional never resolves, so it lands
+        // on the framework's `TypeError<…>` branch. The cast is on the
+        // FORWARDING seam only: the parser reaching tRPC is the caller's own,
+        // and the builder returned re-derives its types from the result.
+        return permissionProcedureBuilder(
+          procedure.input(input as Parameters<typeof procedure.input>[0]),
+        );
       },
       use(middleware: DeclaredAuthzMiddleware<TrpcCheckMiddleware<TCheckContext, TInputOut>>) {
         return withPermissionCheck(middleware);

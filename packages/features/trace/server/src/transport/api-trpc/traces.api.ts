@@ -428,8 +428,14 @@ export class TracesTrpcApi {
         });
       }),
 
+      // One `.input()` over an intersection rather than two chained calls.
+      // tRPC's second `.input()` merges through a conditional on the input it
+      // already has, and the process supplies these schemas as type
+      // parameters — an unresolved parameter never takes the merging branch,
+      // so the chain resolved to the framework's `TypeError<…>`. The parsed
+      // shape and the published input are the same either way.
       getSampleTracesDataset: policy("traces:view")(
-        procedure.input(ports.filterInputSchema).input(sampleExtrasSchema),
+        procedure.input(z.intersection(ports.filterInputSchema, sampleExtrasSchema)),
       ).query(async ({ ctx, input }) => {
         const protections = await ports.getViewerProtections(ctx, {
           projectId: input.projectId,
@@ -458,7 +464,7 @@ export class TracesTrpcApi {
       }),
 
       getSampleTraces: policy("traces:view")(
-        procedure.input(ports.filterInputSchema).input(sampleTracesExtrasSchema),
+        procedure.input(z.intersection(ports.filterInputSchema, sampleTracesExtrasSchema)),
       ).query(async ({ ctx, input }) => {
         const protections = await ports.getViewerProtections(ctx, {
           projectId: input.projectId,
@@ -508,7 +514,7 @@ export class TracesTrpcApi {
       }),
 
       getAllForDownload: policy("traces:view")(
-        procedure.input(ports.listInputSchema).input(downloadExtrasSchema),
+        procedure.input(z.intersection(ports.listInputSchema, downloadExtrasSchema)),
       ).mutation(async ({ ctx, input }) => {
         const protections = await ports.getViewerProtections(ctx, {
           projectId: input.projectId,

@@ -18,10 +18,7 @@
  * Spec: packages/features/analytics/specs/analytics-timeseries.feature.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type {
-  AnalyticsReadInput,
-  AnalyticsTimeseriesInput,
-} from "@langwatch/analytics-contract";
+import type { AnalyticsReadInput, AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
 import {
   TRPCError,
   type AnyTRPCRootTypes,
@@ -131,8 +128,12 @@ export class AnalyticsTrpcApi {
         async ({ ctx, input }) => ctx.app.analytics.getTimeseries(input),
       ),
 
+      // One `.input()` over an intersection, not two chained calls: tRPC's
+      // second `.input()` merges through a conditional on the input already
+      // accumulated, and the process supplies `sharedFiltersSchema` as a type
+      // parameter — an unresolved parameter never takes the merging branch.
       dataForFilter: policy("analytics:view")(
-        procedure.input(ports.sharedFiltersSchema).input(filterSelectionSchema),
+        procedure.input(z.intersection(ports.sharedFiltersSchema, filterSelectionSchema)),
       ).query(async ({ ctx, input }) => {
         const { field, key, subkey } = input;
 

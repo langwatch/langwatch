@@ -27,6 +27,7 @@
  */
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import type { ProjectService } from "@langwatch/project-contract";
+import { jsonValueSchema } from "@langwatch/scenario-contract";
 import type {
   ScenarioFolder,
   ScenarioFolderCreateInput,
@@ -190,7 +191,12 @@ export class SuiteApp {
       projectId: input.projectId,
       ...(input.name === undefined ? {} : { name: input.name }),
       ...(input.description === undefined ? {} : { description: input.description }),
-      ...(input.targets === undefined ? {} : { targets: input.targets }),
+      // A folder stores its targets as opaque JSON, and a suite target carries
+      // an `unknown` `runParameters`. Parsed rather than cast, because that is
+      // the claim the scenario contract makes about what it is storing.
+      ...(input.targets === undefined
+        ? {}
+        : { targets: jsonValueSchema.array().parse(input.targets) }),
       ...(input.repeatCount === undefined ? {} : { repeatCount: input.repeatCount }),
       ...(input.labels === undefined ? {} : { labels: input.labels }),
       ...(input.simulatorModel === undefined ? {} : { simulatorModel: input.simulatorModel }),
