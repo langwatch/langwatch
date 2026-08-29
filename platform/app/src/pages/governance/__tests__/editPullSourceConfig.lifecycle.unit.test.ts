@@ -12,8 +12,14 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { syncIngestionPullSource } from "../../../services/pullers/ingestionPullLifecycle";
-import { recommendedPullSchedule } from "../../logic/pullCadence";
+import {
+  IngestionPullLifecycleRepository,
+  IngestionPullLifecycleService,
+  IngestionPullTenantPort,
+  type IngestionPullLifecycleCommandPort,
+  type IngestionPullLifecycleSource,
+} from "@langwatch/enterprise-governance-server";
+import { recommendedPullSchedule } from "@langwatch/enterprise-governance-web";
 import { buildEditSubmission, seedPullSchedule } from "../inventory.enterprise";
 
 // `resolvePullConfig` toasts the offending field when a pull config will not
@@ -23,12 +29,35 @@ vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-// The lifecycle looks up the hidden governance project to address the process
-// manager. Which project it lands on is not what these tests are about.
-vi.mock("../../../services/governanceProject.service", () => ({
-  ensureHiddenGovernanceProject: vi.fn().mockResolvedValue({ id: "proj_gov" }),
-  PROJECT_KIND: { INTERNAL_GOVERNANCE: "internal_governance" },
-}));
+/**
+ * The lifecycle resolves the hidden governance project to address the process
+ * manager. Which project it lands on is not what these tests are about, so the
+ * tenant port answers one and the reconciliation repository is never reached —
+ * `sync` reads neither.
+ */
+class FixedTenant extends IngestionPullTenantPort {
+  async resolveTenantId(): Promise<string> {
+    return "proj_gov";
+  }
+}
+
+class UnreachedRepository extends IngestionPullLifecycleRepository {
+  async listForReconciliation(): Promise<IngestionPullLifecycleSource[]> {
+    throw new Error("sync() does not reconcile");
+  }
+}
+
+/** The service under test, with the command port these suites assert on. */
+function lifecycleFor(commands: {
+  configure: ReturnType<typeof vi.fn>;
+  disable: ReturnType<typeof vi.fn>;
+}) {
+  return IngestionPullLifecycleService.create({
+    repository: new UnreachedRepository(),
+    tenant: new FixedTenant(),
+    commands: commands as unknown as IngestionPullLifecycleCommandPort,
+  });
+}
 
 /**
  * Reaches across into the poller lifecycle on purpose. The cadence bug was
@@ -46,7 +75,7 @@ describe("given a saved edit that reaches the pull lifecycle", () => {
       updatedAt: new Date("2026-01-01T00:00:00Z"),
       pollerCursor: null,
       pullSchedule: submission.pullSchedule ?? null,
-    } as unknown as Parameters<typeof syncIngestionPullSource>[0]["source"];
+    } as unknown as IngestionPullLifecycleSource;
   }
 
   async function syncAfterEdit(pullSchedule: string) {
@@ -77,11 +106,7 @@ describe("given a saved edit that reaches the pull lifecycle", () => {
     });
     const commands = { configure: vi.fn(), disable: vi.fn() };
 
-    await syncIngestionPullSource({
-      prisma: {} as never,
-      source: sourceRowFrom(submission ?? {}),
-      commands,
-    });
+    await lifecycleFor(commands).sync(sourceRowFrom(submission ?? {}));
 
     return { submission, commands };
   }
@@ -100,9 +125,7 @@ describe("given a saved edit that reaches the pull lifecycle", () => {
           cron: recommendedPullSchedule("anthropic_admin"),
         }),
       );
-      expect(submission?.pullSchedule).toBe(
-        recommendedPullSchedule("anthropic_admin"),
-      );
+      expect(submission?.pullSchedule).toBe(recommendedPullSchedule("anthropic_admin"));
     });
   });
 
@@ -150,7 +173,7 @@ describe("given a row whose column and parser copy disagree", () => {
       updatedAt: new Date("2026-01-01T00:00:00Z"),
       pollerCursor: null,
       pullSchedule: submission.pullSchedule ?? null,
-    } as unknown as Parameters<typeof syncIngestionPullSource>[0]["source"];
+    } as unknown as IngestionPullLifecycleSource;
   }
 
   async function renameAndSync(seededCadence: string) {
@@ -176,11 +199,7 @@ describe("given a row whose column and parser copy disagree", () => {
     });
     const commands = { configure: vi.fn(), disable: vi.fn() };
 
-    await syncIngestionPullSource({
-      prisma: {} as never,
-      source: rowFrom(submission ?? {}),
-      commands,
-    });
+    await lifecycleFor(commands).sync(rowFrom(submission ?? {}));
 
     return { submission, commands };
   }
@@ -206,9 +225,7 @@ describe("given a row whose column and parser copy disagree", () => {
         seedPullSchedule({ pullSchedule: RUNNING, storedParserConfig: STORED }),
       );
 
-      expect(
-        (submission?.parserConfig as Record<string, unknown>).schedule,
-      ).toBe(RUNNING);
+      expect((submission?.parserConfig as Record<string, unknown>).schedule).toBe(RUNNING);
     });
   });
 
@@ -274,23 +291,17 @@ describe("given a source an admin has deliberately disabled", () => {
       expect(submission).not.toHaveProperty("status");
 
       const commands = { configure: vi.fn(), disable: vi.fn() };
-      await syncIngestionPullSource({
-        prisma: {} as never,
-        source: {
-          id: "src_1",
-          organizationId: "org_1",
-          status: "disabled",
-          archivedAt: null,
-          updatedAt: new Date("2026-01-01T00:00:00Z"),
-          pollerCursor: null,
-          pullSchedule: submission?.pullSchedule ?? null,
-        } as unknown as Parameters<typeof syncIngestionPullSource>[0]["source"],
-        commands,
-      });
+      await lifecycleFor(commands).sync({
+        id: "src_1",
+        organizationId: "org_1",
+        status: "disabled",
+        archivedAt: null,
+        updatedAt: new Date("2026-01-01T00:00:00Z"),
+        pollerCursor: null,
+        pullSchedule: submission?.pullSchedule ?? null,
+      } as unknown as IngestionPullLifecycleSource);
 
-      expect(commands.disable).toHaveBeenCalledWith(
-        expect.objectContaining({ sourceId: "src_1" }),
-      );
+      expect(commands.disable).toHaveBeenCalledWith(expect.objectContaining({ sourceId: "src_1" }));
       expect(commands.configure).not.toHaveBeenCalled();
     });
   });
