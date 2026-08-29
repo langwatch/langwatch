@@ -8,12 +8,18 @@
 import { describe, expect, it } from "vitest";
 import {
   addCompareRow,
+  compareRowColorIndexes,
   compareRowParameters,
   hasDuplicateCompareRows,
   initialCompareRows,
   MAX_COMPARE_ROWS,
 } from "../run/compare-rows";
 import { TARGET_COLORS, targetColor } from "../shared/target-colors";
+
+/** A scope that declares no parameter, so every typed value is an override. */
+const NO_DEFAULTS = new Map<string, string>();
+/** A scope where "locale" defaults to "en". */
+const DEFAULTS = new Map<string, string>([["locale", "en"]]);
 
 const DEV = { id: "agent_dev", name: "dev-agent", type: "http" as const };
 const PROD = { id: "agent_prod", name: "prod-agent", type: "http" as const };
@@ -123,16 +129,37 @@ describe("hasDuplicateCompareRows", () => {
     /** @scenario "Two rows with the same agent and the same parameters are refused" */
     it("finds them, whatever the order the pairs were written in", () => {
       expect(
-        hasDuplicateCompareRows([
-          {
-            target: { type: "http", id: "agent_dev" },
-            parameterLine: "a=1, b=2",
-          },
-          {
-            target: { type: "http", id: "agent_dev" },
-            parameterLine: "b=2, a=1",
-          },
-        ]),
+        hasDuplicateCompareRows({
+          rows: [
+            {
+              target: { type: "http", id: "agent_dev" },
+              parameterLine: "a=1, b=2",
+            },
+            {
+              target: { type: "http", id: "agent_dev" },
+              parameterLine: "b=2, a=1",
+            },
+          ],
+          defaults: NO_DEFAULTS,
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("when two rows differ only by a typed default", () => {
+    /** @scenario "Two rows that differ only by a typed default are one target" */
+    it("finds them one target", () => {
+      expect(
+        hasDuplicateCompareRows({
+          rows: [
+            { target: { type: "http", id: "agent_dev" }, parameterLine: "" },
+            {
+              target: { type: "http", id: "agent_dev" },
+              parameterLine: "locale=en",
+            },
+          ],
+          defaults: DEFAULTS,
+        }),
       ).toBe(true);
     });
   });
@@ -140,16 +167,19 @@ describe("hasDuplicateCompareRows", () => {
   describe("when the same agent runs with different values", () => {
     it("finds none", () => {
       expect(
-        hasDuplicateCompareRows([
-          {
-            target: { type: "http", id: "agent_dev" },
-            parameterLine: "model=a",
-          },
-          {
-            target: { type: "http", id: "agent_dev" },
-            parameterLine: "model=b",
-          },
-        ]),
+        hasDuplicateCompareRows({
+          rows: [
+            {
+              target: { type: "http", id: "agent_dev" },
+              parameterLine: "model=a",
+            },
+            {
+              target: { type: "http", id: "agent_dev" },
+              parameterLine: "model=b",
+            },
+          ],
+          defaults: NO_DEFAULTS,
+        }),
       ).toBe(false);
     });
   });
@@ -160,8 +190,8 @@ describe("compareRowParameters", () => {
     it("sends nothing", () => {
       expect(
         compareRowParameters({
-          target: { type: "http", id: "agent_dev" },
-          parameterLine: "",
+          row: { target: { type: "http", id: "agent_dev" }, parameterLine: "" },
+          defaults: NO_DEFAULTS,
         }),
       ).toBeUndefined();
     });
@@ -171,10 +201,89 @@ describe("compareRowParameters", () => {
     it("sends them parsed", () => {
       expect(
         compareRowParameters({
-          target: { type: "http", id: "agent_dev" },
-          parameterLine: "model=gpt-5-mini, temperature=0.2",
+          row: {
+            target: { type: "http", id: "agent_dev" },
+            parameterLine: "model=gpt-5-mini, temperature=0.2",
+          },
+          defaults: NO_DEFAULTS,
         }),
       ).toEqual({ model: "gpt-5-mini", temperature: 0.2 });
+    });
+  });
+
+  describe("when a value is typed equal to its declared default", () => {
+    /** @scenario "A typed default is not an override" */
+    it("leaves it out, and sends nothing when nothing else is typed", () => {
+      expect(
+        compareRowParameters({
+          row: {
+            target: { type: "http", id: "agent_dev" },
+            parameterLine: "locale=en, model=gpt-5",
+          },
+          defaults: DEFAULTS,
+        }),
+      ).toEqual({ model: "gpt-5" });
+      expect(
+        compareRowParameters({
+          row: {
+            target: { type: "http", id: "agent_dev" },
+            parameterLine: "locale=en",
+          },
+          defaults: DEFAULTS,
+        }),
+      ).toBeUndefined();
+    });
+  });
+});
+
+describe("compareRowColorIndexes", () => {
+  describe("when the rows were added out of sorted order", () => {
+    /** @scenario "A row takes the colour of its place in the sorted target list" */
+    it("gives each row the position its target sorts under", () => {
+      expect(
+        compareRowColorIndexes({
+          rows: [
+            { target: { type: "http", id: "agent_prod" }, parameterLine: "" },
+            { target: { type: "http", id: "agent_dev" }, parameterLine: "" },
+          ],
+          defaults: NO_DEFAULTS,
+        }),
+      ).toEqual([1, 0]);
+    });
+  });
+
+  describe("when the same agent sits in two rows on different parameters", () => {
+    /** @scenario "A row takes the colour of its place in the sorted target list" */
+    it("orders the two rows by their parameters", () => {
+      expect(
+        compareRowColorIndexes({
+          rows: [
+            {
+              target: { type: "http", id: "agent_dev" },
+              parameterLine: "model=b",
+            },
+            {
+              target: { type: "http", id: "agent_dev" },
+              parameterLine: "model=a",
+            },
+          ],
+          defaults: NO_DEFAULTS,
+        }),
+      ).toEqual([1, 0]);
+    });
+  });
+
+  describe("when the rows were added in sorted order", () => {
+    it("leaves every row on its own position", () => {
+      expect(
+        compareRowColorIndexes({
+          rows: [
+            { target: { type: "http", id: "agent_dev" }, parameterLine: "" },
+            { target: { type: "http", id: "agent_prod" }, parameterLine: "" },
+          ],
+          defaults: NO_DEFAULTS,
+        }),
+      ).toEqual([0, 1]);
     });
   });
 });

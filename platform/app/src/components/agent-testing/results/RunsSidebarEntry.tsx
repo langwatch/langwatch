@@ -11,7 +11,14 @@
  * @see specs/suites/run-notes.feature
  */
 
-import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  HStack,
+  Spinner,
+  Text,
+  VisuallyHidden,
+  VStack,
+} from "@chakra-ui/react";
 import { FG_MUTED } from "../shared/design";
 import { PassRateText } from "../shared/PassRateText";
 import { passRateColor } from "../shared/pass-rate-color";
@@ -20,6 +27,8 @@ import { passRateColor } from "../shared/pass-rate-color";
 export type SidebarTargetRate = {
   key: string;
   color: string;
+  /** What the target is called, which is what a screen reader reads. */
+  label: string;
   passRate: number | null;
 };
 
@@ -51,6 +60,9 @@ export type RunsSidebarEntryProps = {
  * The dot before each rate is the colour of the target, which is what tells
  * the two rates apart; the rate itself reads in its own pass-rate colour, the
  * same scale as everywhere else on the surface.
+ *
+ * Colour alone would leave a rate unnamed for a reader who cannot see it, so
+ * each rate carries the name of its target as accessible text.
  */
 function ComparisonResult({
   targetRates,
@@ -75,6 +87,7 @@ function ComparisonResult({
             backgroundColor={target.color}
             data-testid={`${testId}-target-dot-${target.key}`}
           />
+          <VisuallyHidden>{`${target.label}: `}</VisuallyHidden>
           <PassRateText passRate={target.passRate} fontSize="10.5px" />
         </HStack>
       ))}

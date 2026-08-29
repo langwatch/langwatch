@@ -17,6 +17,7 @@ import {
   hasDuplicateCompareRows,
   initialCompareRows,
   MAX_COMPARE_ROWS,
+  type ParameterDefaults,
 } from "./compare-rows";
 import { lineFromRows, rowsFromLine } from "./parameter-rows";
 import type { RunDialogAgent } from "./RunTargetPicker";
@@ -97,10 +98,13 @@ export function useCompareRows({
   fields,
   planFields,
   agents,
+  defaults,
 }: {
   fields: RunDialogFields;
   planFields: RunPlanFields;
   agents: readonly RunDialogAgent[];
+  /** The declared defaults, which a typed value equal to does not override. */
+  defaults: ParameterDefaults;
 }) {
   const { compareRows, setCompareRows } = planFields;
   const { setTarget } = fields;
@@ -152,6 +156,9 @@ export function useCompareRows({
     addCompareRow: addRow,
     removeCompareRow,
     canAddCompareRow: compareRows.length < MAX_COMPARE_ROWS,
-    hasDuplicateCompareRows: hasDuplicateCompareRows(compareRows),
+    hasDuplicateCompareRows: hasDuplicateCompareRows({
+      rows: compareRows,
+      defaults,
+    }),
   };
 }

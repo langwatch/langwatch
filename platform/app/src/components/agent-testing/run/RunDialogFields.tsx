@@ -83,6 +83,11 @@ function AddedBlocks({
 /**
  * The targets of a comparison, and under them the secrets the scope declares:
  * a secret is run-level, so one block serves every target.
+ *
+ * The block stands even while it holds nothing. A comparison replaces the
+ * parameter section, so its "Add secret parameter" control is the only way
+ * into an ad hoc secret, and hiding the block on an empty one would make a
+ * person leave the comparison to type a secret.
  */
 function ComparisonBlocks({
   form,
@@ -91,9 +96,6 @@ function ComparisonBlocks({
   form: RunDialogForm;
   isBusy: boolean;
 }) {
-  const hasSecretBlock =
-    form.secretDefinitions.length > 0 || form.parameterRows.length > 0;
-
   return (
     <>
       <CompareAgentsSection
@@ -105,28 +107,23 @@ function ComparisonBlocks({
         onRemoveRow={form.removeCompareRow}
         onRemove={form.removeComparison}
         hasDuplicates={form.hasDuplicateCompareRows}
+        defaults={form.parameterDefaults}
         isBusy={isBusy}
       />
-      {hasSecretBlock && (
-        <VStack
-          align="stretch"
-          gap={0}
-          data-testid="run-dialog-compare-secrets"
-        >
-          <FieldLabel>Secret parameters</FieldLabel>
-          <ParameterRowsEditor
-            rows={form.parameterRows}
-            onChangeRow={form.updateParameterRow}
-            onAddRow={form.addSecretParameterRow}
-            onRemoveRow={form.removeParameterRow}
-            declaredSecrets={form.secretDefinitions}
-            secretValues={form.secretValues}
-            onChangeSecretValue={form.setSecretValue}
-            disabled={isBusy}
-            secretOnly
-          />
-        </VStack>
-      )}
+      <VStack align="stretch" gap={0} data-testid="run-dialog-compare-secrets">
+        <FieldLabel>Secret parameters</FieldLabel>
+        <ParameterRowsEditor
+          rows={form.parameterRows}
+          onChangeRow={form.updateParameterRow}
+          onAddRow={form.addSecretParameterRow}
+          onRemoveRow={form.removeParameterRow}
+          declaredSecrets={form.secretDefinitions}
+          secretValues={form.secretValues}
+          onChangeSecretValue={form.setSecretValue}
+          disabled={isBusy}
+          secretOnly
+        />
+      </VStack>
     </>
   );
 }

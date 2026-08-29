@@ -192,7 +192,7 @@ describe("SuiteRunService", () => {
       });
     });
 
-    describe("the version stamp on queued runs", () => {
+    describe("when a run is started with a version read for each scenario", () => {
       /** @scenario "The version stamped is the version read when the batch was queued" */
       it("stamps each queued run with its own scenario's version from the queue-time read", async () => {
         await service.startRun({
@@ -258,7 +258,7 @@ describe("SuiteRunService", () => {
       });
     });
 
-    describe("the target stamp on queued runs", () => {
+    describe("when a run is started with a target that carries parameters", () => {
       const plain = { type: "http", referenceId: "prod-agent" } as const;
       const variant = {
         type: "http",

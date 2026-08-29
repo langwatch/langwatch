@@ -35,7 +35,13 @@ export type ComparisonChartsBlockProps = {
   totalBatchCount: number | null;
 };
 
-/** One bar per target on one number of the run on screen. */
+/**
+ * One bar per target on one number of the run on screen.
+ *
+ * The label under a bar is the short one, so two targets of one agent read
+ * as what tells them apart rather than as the same truncated name twice.
+ * The full label reads on hover.
+ */
 function targetGroups({
   targets,
   summaries,
@@ -52,7 +58,8 @@ function targetGroups({
       : { value: null, text: "-" };
     return {
       key: target.key,
-      label: target.label,
+      label: target.shortLabel,
+      title: target.label,
       bars: [{ key: target.key, color: target.color, value, text }],
     };
   });

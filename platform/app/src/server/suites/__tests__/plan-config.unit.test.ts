@@ -162,6 +162,26 @@ describe("duplicateSuiteTargets", () => {
       ).toEqual([]);
     });
   });
+
+  describe("when one override holds the separators the readable key writes", () => {
+    /** @scenario "A value holding a comma and an equals sign does not fake a second target" */
+    it("keeps two targets whose pairs read alike apart", () => {
+      expect(
+        duplicateSuiteTargets([
+          {
+            type: "http",
+            referenceId: "prod-agent",
+            runParameters: { a: "b,c=d" },
+          },
+          {
+            type: "http",
+            referenceId: "prod-agent",
+            runParameters: { a: "b", c: "d" },
+          },
+        ]),
+      ).toEqual([]);
+    });
+  });
 });
 
 describe("configurationKey", () => {
@@ -193,6 +213,44 @@ describe("configurationKey", () => {
       });
 
       expect(variant).not.toBe(plain);
+    });
+  });
+
+  describe("when one target's override holds a comma and an equals sign", () => {
+    /** @scenario "A value holding a comma and an equals sign does not fake a second target" */
+    it("keys it apart from the target whose pairs read alike", () => {
+      const config = {
+        scope: { mode: "all" } as const,
+        repeatCount: 1,
+        simulatorModel: null,
+        judgeModel: null,
+      };
+      const oneValue = configurationKey({
+        config: {
+          ...config,
+          targets: [
+            {
+              type: "http",
+              referenceId: "prod-agent",
+              runParameters: { a: "b,c=d" },
+            },
+          ],
+        },
+      });
+      const twoValues = configurationKey({
+        config: {
+          ...config,
+          targets: [
+            {
+              type: "http",
+              referenceId: "prod-agent",
+              runParameters: { a: "b", c: "d" },
+            },
+          ],
+        },
+      });
+
+      expect(oneValue).not.toBe(twoValues);
     });
   });
 });

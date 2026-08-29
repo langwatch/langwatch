@@ -85,19 +85,20 @@ export async function archiveTestSuite(
  * creates or joins the run plan named "<suite name> <target name>" when no
  * name is sent.
  */
-export async function runTestSuite(
-  id: string,
-  data: {
-    targets: RunPlanTargetWire[];
-    name?: string;
-    repeatCount?: number;
-    simulatorModel?: string | null;
-    judgeModel?: string | null;
-    parameters?: RunParameters;
-    note?: string;
-    idempotencyKey?: string;
-  },
-): Promise<RunPlanRunResult> {
+export async function runTestSuite({
+  id,
+  ...data
+}: {
+  id: string;
+  targets: RunPlanTargetWire[];
+  name?: string;
+  repeatCount?: number;
+  simulatorModel?: string | null;
+  judgeModel?: string | null;
+  parameters?: RunParameters;
+  note?: string;
+  idempotencyKey?: string;
+}): Promise<RunPlanRunResult> {
   return makeRequest(
     "POST",
     `/api/v1/test-suites/${encodeURIComponent(id)}/run`,

@@ -2278,6 +2278,48 @@ describe("the comparison", () => {
     expect(screen.getByTestId("run-dialog-run")).toBeEnabled();
   });
 
+  /** @scenario "Two rows that differ only by a typed default are one target" */
+  it("refuses a row that only spells the declared default out beside an empty one", async () => {
+    const user = userEvent.setup();
+    mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT] });
+    await openWithParameters(user);
+    await user.click(screen.getByTestId("customize-chip-compare"));
+    // Row one keeps the declared "locale=en"; row two is emptied.
+    await writeRowParameters(user, 1, "");
+
+    expect(screen.getByTestId("run-dialog-compare-error")).toHaveTextContent(
+      DUPLICATE_TARGETS_MESSAGE,
+    );
+    expect(screen.getByTestId("run-dialog-run")).toBeDisabled();
+
+    await writeRowParameters(user, 1, "locale=de");
+    expect(
+      screen.queryByTestId("run-dialog-compare-error"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("run-dialog-run")).toBeEnabled();
+  });
+
+  /** @scenario "A typed default is not an override" */
+  it("sends no override for a value typed equal to its declared default", async () => {
+    const user = userEvent.setup();
+    await openWithParameters(user);
+    await user.click(screen.getByTestId("customize-chip-compare"));
+    await writeRowParameters(user, 1, "locale=de");
+
+    await user.click(screen.getByTestId("run-dialog-run"));
+
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+    const input = mockSuitesRunPlan.mock.calls[0]![0];
+    expect(input.config.targets).toEqual([
+      { type: "http", referenceId: "agent_1" },
+      {
+        type: "http",
+        referenceId: "agent_2",
+        runParameters: { locale: "de" },
+      },
+    ]);
+  });
+
   /** @scenario "The secret parameters of the scope are one shared block" */
   it("shows one shared secret block under the rows and waits for its value", async () => {
     const user = userEvent.setup();
@@ -2312,14 +2354,32 @@ describe("the comparison", () => {
     expect(input.config.targets[0].runParameters).toBeUndefined();
   });
 
+  /** @scenario "A comparison always offers a way to add a shared secret" */
+  it("offers the add secret control while the block holds nothing", async () => {
+    const user = userEvent.setup();
+    mockScenariosGetAll.mockReturnValue(casesDeclaring([]));
+    renderDialog(
+      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
+    );
+
+    await user.click(screen.getByTestId("customize-chip-compare"));
+
+    const secrets = screen.getByTestId("run-dialog-compare-secrets");
+    expect(
+      within(secrets).getByRole("button", { name: "Add a secret parameter" }),
+    ).toBeInTheDocument();
+  });
+
   /** @scenario "Each target carries its own parameters" */
   it("sends each target with its own parameters and no run-level ones", async () => {
     const user = userEvent.setup();
     mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT] });
     await openWithParameters(user);
     await user.click(screen.getByTestId("customize-chip-compare"));
-    await writeRowParameters(user, 0, "locale=en, model=gpt-5");
-    await writeRowParameters(user, 1, "locale=en, model=gpt-5-mini");
+    // "locale=de" is not the declared default, so it stays an override on
+    // both rows; the name still reads only the value that differs.
+    await writeRowParameters(user, 0, "locale=de, model=gpt-5");
+    await writeRowParameters(user, 1, "locale=de, model=gpt-5-mini");
 
     await user.click(screen.getByTestId("run-dialog-run"));
 
@@ -2329,12 +2389,12 @@ describe("the comparison", () => {
       {
         type: "http",
         referenceId: "agent_1",
-        runParameters: { locale: "en", model: "gpt-5" },
+        runParameters: { locale: "de", model: "gpt-5" },
       },
       {
         type: "http",
         referenceId: "agent_1",
-        runParameters: { locale: "en", model: "gpt-5-mini" },
+        runParameters: { locale: "de", model: "gpt-5-mini" },
       },
     ]);
     // One layer of parameters: the rows carry them all, the run carries none.

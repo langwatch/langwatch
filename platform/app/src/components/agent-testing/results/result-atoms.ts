@@ -221,7 +221,9 @@ export function targetNameOf({
     targetNames.get(targetKey) ??
     targetNames.get(referenceId) ??
     (isCodeTargetKey({ targetKey }) ? CODE_TARGET_NAME : referenceId);
-  const parameters = targetParametersLabel(targetParameters?.get(targetKey));
+  const parameters = targetParametersLabel({
+    runParameters: targetParameters?.get(targetKey),
+  });
   return parameters === ""
     ? name
     : `${name}${TARGET_LABEL_SEPARATOR}${parameters}`;

@@ -245,6 +245,12 @@ Feature: A run plan is identified by its name
     Then both are kept
     And they are sorted by type, reference id and parameters, read as "type:referenceId|k=v,k2=v2", so the order is the same on every run and the same one the run dialog shows
 
+  @unit
+  Scenario: A value holding a comma and an equals sign does not fake a second target
+    Given a target with the override "a" holding "b,c=d" and a target with the overrides "a=b" and "c=d"
+    When the targets are compared
+    Then they are two targets and neither is refused as a duplicate
+
   @integration
   Scenario: Two identical targets are refused
     Given a project with one scenario and the agent "prod-agent"
@@ -252,6 +258,20 @@ Feature: A run plan is identified by its name
     Then the run is refused with a validation error naming the targets field
     And no run plan of that name exists
     And nothing is scheduled
+
+  @integration
+  Scenario: A typed default is not an override
+    Given a project with one scenario that declares "model" with the default "gpt-5" and the agent "prod-agent"
+    When a run is started with no name against "prod-agent" with "locale=de, model=gpt-5" and against "prod-agent" with "locale=de, model=gpt-5-mini"
+    Then the plan stores the first target with "locale=de" alone
+    And the plan is named "Refunds prod-agent vs prod-agent · model=gpt-5-mini"
+
+  @integration
+  Scenario: Two targets that differ only by a typed default are refused
+    Given a project with one scenario that declares "model" with the default "gpt-5" and the agent "prod-agent"
+    When a run is started against "prod-agent" with no overrides and against "prod-agent" with "model=gpt-5"
+    Then the run is refused with a validation error naming the targets field
+    And no run plan of that name exists
 
   @integration
   Scenario: A run named by the server labels a repeated agent with its parameters

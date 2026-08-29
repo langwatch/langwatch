@@ -17,7 +17,7 @@
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { RunParameterValues } from "~/server/scenarios/parameters";
 import { type SuiteScope, suiteScopeSchema } from "./scope";
-import { targetSortKey } from "./target-key";
+import { targetIdentityKey, targetSortKey } from "./target-key";
 import type { SuiteTarget } from "./types";
 
 /** Everything a run plan holds beside its name. */
@@ -49,13 +49,17 @@ export function sortSuiteTargets(targets: SuiteTarget[]): SuiteTarget[] {
  * Two targets of one agent with the same overrides would run the same thing
  * twice under one column, so a config holding any is refused. The same agent
  * with different overrides is two targets, and is fine.
+ *
+ * Two targets are the same one when `targetIdentityKey` says so, which reads
+ * the overrides as JSON. The readable sort key cannot answer this: a value
+ * that holds a comma and an `=` writes the pairs another target writes.
  */
 export function duplicateSuiteTargets(targets: SuiteTarget[]): SuiteTarget[] {
   const seen = new Set<string>();
   const reported = new Set<string>();
   const duplicates: SuiteTarget[] = [];
   for (const target of targets) {
-    const key = targetSortKey(target);
+    const key = targetIdentityKey(target);
     if (seen.has(key) && !reported.has(key)) {
       duplicates.push(target);
       reported.add(key);
@@ -109,7 +113,7 @@ export function configurationKey(params: {
   const { config } = params;
   return [
     scopeKey({ scope: config.scope, scenarioIds: params.scenarioIds }),
-    sortSuiteTargets(config.targets).map(targetSortKey).join("+"),
+    sortSuiteTargets(config.targets).map(targetIdentityKey).join("+"),
     `x${config.repeatCount}`,
     config.simulatorModel ?? "",
     config.judgeModel ?? "",

@@ -47,6 +47,7 @@ export function RunsSidebarBatchEntry({
     ? targets.map((target) => ({
         key: target.key,
         color: target.color,
+        label: target.label,
         passRate: summaryOfTarget({ scenarioRuns: batch.scenarioRuns, target })
           .passRate,
       }))

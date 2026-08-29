@@ -470,7 +470,7 @@
                 "run-plan archive"
               ],
               "hints": {
-                "run-plan run": "langwatch run-plan run --all --target http:agent_abc123 --name \"nightly regression\" --wait; compare one agent on two models with --target 'http:agent_abc123?model=gpt-5' --target 'http:agent_abc123?model=gpt-5-mini'",
+                "run-plan run": "langwatch run-plan run --all --target 'http:agent_abc123?model=gpt-5' --target 'http:agent_abc123?model=gpt-5-mini' --name \"nightly regression\" --wait",
                 "run-plan list": "langwatch run-plan list -o json",
                 "run-plan get": "langwatch run-plan get <id> -o json",
                 "run-plan archive": "langwatch run-plan archive <id>"

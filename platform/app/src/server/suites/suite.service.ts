@@ -66,7 +66,12 @@ import {
   SuiteRepository,
   type UpdateSuiteInput,
 } from "./suite.repository";
-import { targetKeyOf, targetLabels } from "./target-key";
+import {
+  declaredDefaults,
+  targetKeyOf,
+  targetLabels,
+  withCanonicalOverrides,
+} from "./target-key";
 import {
   isSuiteAgentTargetType,
   parseSuiteTargets,
@@ -112,7 +117,10 @@ type ResolvedRunReferences = {
 type PreparedRun = {
   /** The scenarios the run covers, archived ones included. */
   scenarioIds: string[];
-  /** The targets the run reaches, in stored order. */
+  /**
+   * The targets the run reaches, in stored order, each with its overrides
+   * canonical: a value equal to the declared default is no override.
+   */
   targets: SuiteTarget[];
   references: ResolvedRunReferences;
   parametersByTargetKey: ParametersByTargetKey;
@@ -934,12 +942,35 @@ export class SuiteService {
     }
 
     const scenarioIds = await params.readScenarioIds();
-    const references = await this.resolveReferences({
+    const resolved = await this.resolveReferences({
       scenarioIds,
       projectId: params.projectId,
       organizationId: params.organizationId,
       targets: params.targets,
     });
+
+    // The identity of a target is its overrides, and a value equal to the
+    // declared default is no override. Only the scenarios say what the
+    // defaults are, so the canonical set is known here and not before: it is
+    // what the key, the sort, the name and the stamp all read.
+    const defaults = declaredDefaults(
+      resolved.scenarioConfigs.flatMap((scenario) =>
+        parseScenarioParameterDefinitions(scenario.parameters),
+      ),
+    );
+    const targets = sortSuiteTargets(
+      withCanonicalOverrides({ targets: params.targets, defaults }),
+    );
+    // Two targets that differ only by a typed default are one target.
+    if (duplicateSuiteTargets(targets).length > 0) {
+      refuseTargets(TARGET_DUPLICATE_REFUSAL);
+    }
+    const references = {
+      ...resolved,
+      activeTargets: sortSuiteTargets(
+        withCanonicalOverrides({ targets: resolved.activeTargets, defaults }),
+      ),
+    };
 
     const { parametersByTargetKey, secretParametersByScenarioId } =
       await resolveParametersPerTarget({
@@ -950,7 +981,7 @@ export class SuiteService {
 
     return {
       scenarioIds,
-      targets: params.targets,
+      targets,
       references,
       parametersByTargetKey,
       secretParametersByScenarioId,
@@ -1203,7 +1234,9 @@ export class SuiteService {
         span.setAttribute("suite.scenario_count", prepared.scenarioIds.length);
 
         // Derived only once the run holds up, so a refused run reads no names
-        // it will not use.
+        // it will not use. The prepared targets carry the canonical
+        // overrides, so the name and the stored config read the same target
+        // the run was stamped with.
         const name =
           requestedName ??
           (await this.defaultPlanName({
@@ -1211,7 +1244,7 @@ export class SuiteService {
             organizationId: params.organizationId,
             scope,
             scenarioIds: params.config.scenarioIds ?? [],
-            targets,
+            targets: prepared.targets,
           }));
 
         const { suite, created } = await this.resolvePlanByName({
@@ -1219,7 +1252,7 @@ export class SuiteService {
           name,
           config: params.config,
           scope,
-          targets,
+          targets: prepared.targets,
           scenarioIds: prepared.scenarioIds,
         });
         span.setAttribute("suite.id", suite.id);

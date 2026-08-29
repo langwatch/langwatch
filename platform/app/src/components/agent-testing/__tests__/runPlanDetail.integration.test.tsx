@@ -20,7 +20,7 @@ import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { targetKeyOf } from "~/server/suites/target-key";
 import { api } from "~/utils/api";
-import { NOT_IN_RUN_LABEL } from "../results/ComparisonResultsTable";
+import { NOT_IN_RUN_LABEL } from "../results/ComparisonResultsRow";
 import { RunPlanDetail } from "../results/RunPlanDetail";
 import { RUN_AGAIN_LABEL } from "../results/RunPlanDetailHeader";
 import { PROJECT_DEFAULT_MODEL } from "../results/RunSettingsBlock";
@@ -1741,6 +1741,49 @@ describe("<RunPlanDetail/> on a comparison run", () => {
     expect(within(groups[0]!).getAllByTestId("mini-bar")).toHaveLength(2);
     expect(overRuns).toHaveTextContent("Run #1");
     expect(overRuns).toHaveTextContent("Run #2");
+  });
+
+  /** @scenario "The charts of a comparison run put the targets next to each other" */
+  it("reads a short label under each bar and the full label on hover", () => {
+    setRuns([
+      runAgainst({
+        scenarioRunId: "r1",
+        scenarioId: "scen_1",
+        name: "Angry refund request",
+        referenceId: DEV,
+      }),
+      runAgainst({
+        scenarioRunId: "r2",
+        scenarioId: "scen_1",
+        name: "Angry refund request",
+        referenceId: DEV,
+        parameters: { model: "gpt-5-mini" },
+      }),
+    ]);
+    renderDetail();
+
+    const passRate = screen.getByTestId("comparison-chart-pass-rate");
+    // The same agent twice: the differing parameters alone tell the bars
+    // apart, and the one with none reads "default".
+    expect(within(passRate).getByTitle("dev-agent")).toHaveTextContent(
+      "default",
+    );
+    expect(
+      within(passRate).getByTitle("dev-agent · model=gpt-5-mini"),
+    ).toHaveTextContent("model=gpt-5-mini");
+    expect(passRate).not.toHaveTextContent("dev-agent");
+
+    // Two different agents read their names.
+    setRuns(comparisonBatch());
+    cleanup();
+    renderDetail();
+    const byName = screen.getByTestId("comparison-chart-pass-rate");
+    expect(within(byName).getByTitle("dev-agent")).toHaveTextContent(
+      "dev-agent",
+    );
+    expect(within(byName).getByTitle("prod-agent")).toHaveTextContent(
+      "prod-agent",
+    );
   });
 
   /** @scenario "A single-target run carries no comparison charts" */

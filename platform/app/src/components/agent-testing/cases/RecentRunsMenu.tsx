@@ -207,6 +207,9 @@ export function RecentRunsMenu(props: RecentRunsMenuProps) {
  *
  * The runs are read only once the submenu is opened, so a menu that nobody
  * opens this far downloads nothing.
+ *
+ * The list carries its own test id: a row submenu can be open while the button
+ * above the table is mounted, and one id on both would match twice.
  */
 export function RecentRunsSubmenu({
   period,
@@ -224,7 +227,7 @@ export function RecentRunsSubmenu({
           {OPEN_RECENT_RUNS_LABEL}
         </MenuActionLabel>
       </Menu.TriggerItem>
-      <Menu.Content minWidth="240px" data-testid="recent-runs-list">
+      <Menu.Content minWidth="240px" data-testid="recent-runs-submenu-list">
         <RecentRunsList
           period={period}
           scenarioIds={scenarioIds}

@@ -61,6 +61,12 @@ Feature: Run Plan CLI Commands
     And a value given here wins over the same name given with --param
 
   @unit
+  Scenario: A reference id that holds a question mark is percent-decoded
+    When I run "langwatch run-plan run --all --target 'http:agent%3Fabc?model=gpt-5'"
+    Then the run is scheduled against the agent named "agent?abc"
+    And the target carries the model value
+
+  @unit
   Scenario: Run under a name that names an existing plan
     Given my project has a run plan named "Nightly regression"
     When I run "langwatch run-plan run --all --target http:agent_abc --name 'Nightly regression'"

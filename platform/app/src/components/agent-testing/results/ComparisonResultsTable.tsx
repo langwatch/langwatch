@@ -8,52 +8,35 @@
  * the summary of that target's runs alone, so the two pills sit side by side
  * where the single run reads one pill in its header line.
  *
- * A cell stacks one line per run of its scenario and target, so a run that
- * repeated reads three verdicts rather than one. Each line opens the same run
- * drawer a row of the single-target table opens, which is where rerun and
- * the editor live, so the rows carry no menu of their own. A scenario the
- * run never went against with a target says so in that cell.
- *
- * The matrix scrolls sideways inside its own card once the columns do not
- * fit, so the page itself never does.
+ * The rows and the cells live in `ComparisonResultsRow`; this file owns the
+ * grid: which scenarios are rows, which targets are columns, and how wide
+ * either is. The matrix scrolls sideways inside its own card once the columns
+ * do not fit, so the page itself never does.
  *
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import { Box, Button, chakra, HStack, Spinner, Text } from "@chakra-ui/react";
-import { Square } from "lucide-react";
+import { Box, Text } from "@chakra-ui/react";
 import { RunMetricsSummary } from "~/components/suites/RunMetricsSummary";
-import { isCancellableStatus } from "~/components/suites/useCancelScenarioRun";
-import { isTerminalStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
-import { FG_MUTED, ROW_HOVER_BG, TABLE_HEADER_BG } from "../shared/design";
-import { LastResultLabel } from "../shared/LastResultLabel";
-import { ResultMetricsInline } from "../shared/ResultMetricsInline";
+import { FG_MUTED, TABLE_HEADER_BG } from "../shared/design";
 import { TargetLegend } from "../shared/TargetDot";
 import {
-  type BatchTarget,
-  runsOfTarget,
-  summaryOfTarget,
-} from "./useBatchTargets";
-
-/** What a cell reads when the run never went against that target. */
-export const NOT_IN_RUN_LABEL = "not in run";
+  MatrixRow,
+  type RunLineHandlers,
+  type ScenarioLine,
+} from "./ComparisonResultsRow";
+import { type BatchTarget, summaryOfTarget } from "./useBatchTargets";
 
 const SCENARIO_COLUMN_WIDTH = 200;
 const TARGET_COLUMN_WIDTH = 220;
 
-export type ComparisonResultsTableProps = {
+export type ComparisonResultsTableProps = RunLineHandlers & {
   scenarioRuns: ScenarioRunData[];
   targets: BatchTarget[];
-  onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
-  /** Absent when the person may not stop runs, or when the set is not ours. */
-  onCancelRun?: (scenarioRun: ScenarioRunData) => void;
-  cancellingJobId?: string | null;
 };
 
-/** One scenario of the run, in the order the runs first name it. */
-type ScenarioLine = { scenarioId: string; name: string };
-
+/** The scenarios of the run, in the order the runs first name them. */
 function scenariosOf(scenarioRuns: ScenarioRunData[]): ScenarioLine[] {
   const seen = new Map<string, ScenarioLine>();
   for (const run of scenarioRuns) {
@@ -64,105 +47,6 @@ function scenariosOf(scenarioRuns: ScenarioRunData[]): ScenarioLine[] {
     });
   }
   return [...seen.values()];
-}
-
-/** The runs of one scenario against one target, in a stable order. */
-function cellRuns({
-  scenarioRuns,
-  scenarioId,
-  target,
-}: {
-  scenarioRuns: ScenarioRunData[];
-  scenarioId: string;
-  target: BatchTarget;
-}): ScenarioRunData[] {
-  return runsOfTarget({ scenarioRuns, target })
-    .filter((run) => run.scenarioId === scenarioId)
-    .sort((left, right) =>
-      left.scenarioRunId.localeCompare(right.scenarioRunId),
-    );
-}
-
-/** The Stop control, on a run that is still going. */
-function StopRunButton({
-  isCancelling,
-  onCancel,
-}: {
-  isCancelling: boolean;
-  onCancel: () => void;
-}) {
-  return (
-    <Button
-      size="xs"
-      variant="outline"
-      height="22px"
-      fontSize="11px"
-      paddingX={2}
-      gap={1}
-      aria-label="Stop"
-      disabled={isCancelling}
-      onClick={(event) => {
-        event.stopPropagation();
-        onCancel();
-      }}
-      data-testid="cancel-run-button"
-    >
-      {isCancelling ? <Spinner size="xs" /> : <Square size={10} />}
-      Stop
-    </Button>
-  );
-}
-
-/** One run inside a cell: its verdict, and its time and cost once settled. */
-function RunLine({
-  scenarioRun,
-  onScenarioRunClick,
-  onCancelRun,
-  cancellingJobId,
-}: Pick<
-  ComparisonResultsTableProps,
-  "onScenarioRunClick" | "onCancelRun" | "cancellingJobId"
-> & { scenarioRun: ScenarioRunData }) {
-  const canCancel = !!onCancelRun && isCancellableStatus(scenarioRun.status);
-  const isSettled = isTerminalStatus(scenarioRun.status);
-
-  return (
-    <HStack gap={2} align="flex-start" width="full">
-      <chakra.button
-        type="button"
-        flex={1}
-        minWidth={0}
-        textAlign="left"
-        cursor="pointer"
-        borderRadius="md"
-        paddingX={1.5}
-        paddingY={1}
-        marginX={-1.5}
-        _hover={{ background: ROW_HOVER_BG }}
-        onClick={() => onScenarioRunClick(scenarioRun)}
-        data-testid={`comparison-run-${scenarioRun.scenarioRunId}`}
-      >
-        <LastResultLabel
-          status={scenarioRun.status}
-          results={scenarioRun.results ?? undefined}
-        />
-        {isSettled ? (
-          <ResultMetricsInline
-            durationInMs={
-              scenarioRun.durationInMs > 0 ? scenarioRun.durationInMs : null
-            }
-            totalCost={scenarioRun.totalCost ?? null}
-          />
-        ) : null}
-      </chakra.button>
-      {canCancel ? (
-        <StopRunButton
-          isCancelling={cancellingJobId === scenarioRun.scenarioRunId}
-          onCancel={() => onCancelRun?.(scenarioRun)}
-        />
-      ) : null}
-    </HStack>
-  );
 }
 
 /** The header of one target column: its mark, its name and its own summary. */
@@ -233,77 +117,6 @@ function MatrixHeader({
           scenarioRuns={scenarioRuns}
         />
       ))}
-    </Box>
-  );
-}
-
-/** One scenario across every target. */
-function MatrixRow({
-  scenario,
-  columns,
-  targets,
-  scenarioRuns,
-  ...handlers
-}: Pick<
-  ComparisonResultsTableProps,
-  | "targets"
-  | "scenarioRuns"
-  | "onScenarioRunClick"
-  | "onCancelRun"
-  | "cancellingJobId"
-> & { scenario: ScenarioLine; columns: string }) {
-  return (
-    <Box
-      display="grid"
-      gridTemplateColumns={columns}
-      columnGap={3}
-      alignItems="start"
-      paddingX={4}
-      paddingY="10px"
-      data-testid={`comparison-row-${scenario.scenarioId}`}
-    >
-      <Text
-        fontSize="12.5px"
-        fontWeight="medium"
-        color="fg"
-        paddingTop="5px"
-        truncate
-      >
-        {scenario.name}
-      </Text>
-
-      {targets.map((target) => {
-        const runs = cellRuns({
-          scenarioRuns,
-          scenarioId: scenario.scenarioId,
-          target,
-        });
-        return (
-          <Box
-            key={target.key}
-            display="flex"
-            flexDirection="column"
-            alignItems="stretch"
-            gap={1}
-            minWidth={0}
-            data-testid={`comparison-cell-${scenario.scenarioId}-${target.key}`}
-          >
-            {runs.length === 0 ? (
-              <Text fontSize="11.5px" color={FG_MUTED} paddingTop="5px">
-                {NOT_IN_RUN_LABEL}
-              </Text>
-            ) : (
-              runs.map((scenarioRun) => (
-                <RunLine
-                  key={scenarioRun.scenarioRunId}
-                  scenarioRun={scenarioRun}
-                  {...handlers}
-                />
-              ))
-            )}
-          </Box>
-        );
-      })}
     </Box>
   );
 }

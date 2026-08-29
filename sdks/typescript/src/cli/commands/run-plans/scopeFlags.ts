@@ -234,10 +234,19 @@ export function parseTargets(
 
     const questionIndex = rest.indexOf("?");
     if (questionIndex === -1) {
-      return { type: type as RunPlanTarget["type"], referenceId: rest };
+      return {
+        type: type as RunPlanTarget["type"],
+        referenceId: decodeQueryPart({ part: rest, target: value }),
+      };
     }
 
-    const referenceId = rest.slice(0, questionIndex);
+    // Decoded, because the refusal below tells a reader to write a question
+    // mark in a reference id as %3F. Handing that back undecoded would send
+    // the platform a reference id nothing resolves.
+    const referenceId = decodeQueryPart({
+      part: rest.slice(0, questionIndex),
+      target: value,
+    });
     const query = rest.slice(questionIndex + 1);
     if (query.includes("?")) {
       rejectTarget(

@@ -19,10 +19,15 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
+import { declaredDefaults } from "~/server/suites/target-key";
 import { api } from "~/utils/api";
 import type { CustomizeChip } from "../shared/CustomizeChips";
 import { applyConfigurationTo } from "./apply-configuration";
-import { type CompareRow, compareRowParameters } from "./compare-rows";
+import {
+  type CompareRow,
+  compareRowParameters,
+  type ParameterDefaults,
+} from "./compare-rows";
 import type { PromptEntry } from "./PromptPicker";
 import {
   formatParameterLine,
@@ -260,6 +265,18 @@ function useRunDialogChoices(subject: RunDialogSubject | null) {
 }
 
 /**
+ * The declared default of every plain parameter the run can carry.
+ *
+ * A value typed equal to its default is no override: the dialog keys, sorts
+ * and names a target the way the server does, without it.
+ */
+function useParameterDefaults(
+  definitions: readonly ScenarioParameterDefinition[],
+): ParameterDefaults {
+  return useMemo(() => declaredDefaults(definitions), [definitions]);
+}
+
+/**
  * The overrides the run can carry, and the fields that collect them.
  *
  * In a comparison the plain values ride on the rows of the targets, so the
@@ -343,8 +360,11 @@ function useRunDialogParameters({
       ((showParameterRows || isCompare) &&
         missingSecretRowNames(parameterRows).length > 0));
 
+  const parameterDefaults = useParameterDefaults(parameterDefinitions);
+
   return {
     parameterDefinitions,
+    parameterDefaults,
     secretDefinitions,
     parameterRows,
     showParameterRows,
@@ -650,17 +670,23 @@ function caseCountOf(
 /**
  * The targets the run goes against: the rows of a comparison, each with its
  * own overrides, or the one agent.
+ *
+ * A row's overrides are canonical: a value typed equal to the declared
+ * default is left out, so what the dialog sends, sorts and names is the
+ * target the server keys.
  */
 function runTargetsOf({
   target,
   compareRows,
+  defaults,
 }: {
   target: TargetValue;
   compareRows: readonly CompareRow[];
+  defaults: ParameterDefaults;
 }): RunTarget[] {
   if (compareRows.length > 0) {
     return compareRows.map((row) => {
-      const runParameters = compareRowParameters(row);
+      const runParameters = compareRowParameters({ row, defaults });
       return { ...row.target, ...(runParameters ? { runParameters } : {}) };
     });
   }
@@ -777,11 +803,13 @@ export function useRunDialogForm(subject: RunDialogSubject | null) {
     fields,
     planFields,
     agents: choices.scenarioAgents,
+    defaults: parameters.parameterDefaults,
   });
 
   const runTargets = runTargetsOf({
     target: fields.target,
     compareRows: planFields.compareRows,
+    defaults: parameters.parameterDefaults,
   });
   const naming = useRunDialogNaming({
     subject,

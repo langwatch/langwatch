@@ -77,6 +77,12 @@ Feature: Comparison mode
     Then "dev-agent" is the agent to be tested
     And the "Parameters" section holds "locale=de"
 
+  @unit
+  Scenario: A row takes the colour of its place in the sorted target list
+    Given rows for "prod-agent" and then for "dev-agent"
+    Then the dot of "dev-agent" reads the first colour and "prod-agent" the second
+    And each row keeps the colour its column reads on the run detail
+
   @integration
   Scenario: Two rows with the same agent and the same parameters are refused
     Given the run dialog in compare mode with "dev-agent" twice, both with "model=gpt-5-mini"
@@ -90,6 +96,12 @@ Feature: Comparison mode
     Then one "Secret parameters" block with that row sits under the rows
     And the run waits for its value
 
+  @integration
+  Scenario: A comparison always offers a way to add a shared secret
+    Given a scope that declares no parameter at all
+    When "Compare agents" is chosen
+    Then the "Secret parameters" block still offers "Add secret parameter"
+
   # --- What the run carries ---
 
   @integration
@@ -98,6 +110,21 @@ Feature: Comparison mode
     When Run is chosen
     Then the run carries two targets, each with its own parameters
     And the run carries no run-level parameters
+
+  @integration
+  Scenario: A typed default is not an override
+    Given a scope that declares "locale" with the default "en"
+    When a row is typed "locale=en, model=gpt-5"
+    Then the target's overrides are "model=gpt-5" alone
+    And a row typed "locale=en" carries no override at all
+    And the run and the results read the target the way the server keys it
+
+  @integration
+  Scenario: Two rows that differ only by a typed default are one target
+    Given a scope that declares "locale" with the default "en"
+    And the run dialog in compare mode with "dev-agent" on an empty line and "dev-agent" on "locale=en"
+    Then it reads "Two targets are the same agent with the same parameters."
+    And Run is off
 
   @integration
   Scenario: A stored comparison comes back with every target and its parameters
@@ -180,6 +207,8 @@ Feature: Comparison mode
     When the run is opened
     Then four charts read between the run settings and the table: "Pass rate", "Total cost", "Average reply latency" and "Pass rate over runs"
     And each chart draws one bar per target, in the colour of the target
+    And under a bar the label reads the parameters that differ when the agent repeats, "default" for the target with none, or the agent name when the names differ
+    And the full label of the target reads on hover
     And "Pass rate over runs" draws one group per run of the plan, oldest first
 
   @integration
@@ -236,10 +265,17 @@ Feature: Comparison mode
     Then the parameters of the run settings read "locale=de" alone
 
   @unit
+  Scenario: A value one target overrides is still read from a target that did not
+    Given a run where one target overrides "plan" and another target does not
+    Then the parameters of the run settings read the "plan" the second target carried
+    And the order the runs arrive in does not change what is read
+
+  @unit
   Scenario: Each target of a run reads every parameter it received
     Given a run against "dev-agent" over "locale=de" and "dev-agent" on "model=gpt-5-mini" over "locale=de"
     Then the parameters of "dev-agent" read "locale=de"
     And the parameters of "dev-agent" on "model=gpt-5-mini" read "locale=de" and "model=gpt-5-mini"
+    And a name one scenario of the target declares and another does not still reads on its line
 
   @unit
   Scenario: Runs are grouped by their target key

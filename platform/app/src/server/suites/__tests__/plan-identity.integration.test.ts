@@ -457,6 +457,7 @@ describe("resolving a run plan by name", () => {
     });
 
     /** @scenario "A run named by the server labels a repeated agent with its parameters" */
+    /** @scenario "A typed default is not an override" */
     it("labels a repeated agent with its parameters when the run sends no name", async () => {
       const refunds = await suiteService.createTestSuite({
         projectId,
@@ -476,6 +477,8 @@ describe("resolving a run plan by name", () => {
         ],
       });
       const agent = await createHttpAgent();
+      // The first target spells the declared default of "model" out, which
+      // is no override: it is stored, keyed and named as "locale=de" alone.
       const targets: SuiteTarget[] = [
         {
           type: "http",
@@ -485,7 +488,7 @@ describe("resolving a run plan by name", () => {
         {
           type: "http",
           referenceId: agent.id,
-          runParameters: { locale: "de" },
+          runParameters: { locale: "de", model: "gpt-5" },
         },
       ];
       const scope: SuiteScope = {
@@ -507,6 +510,19 @@ describe("resolving a run plan by name", () => {
       expect(result.created).toBe(true);
       expect(result.planName).toBe(expected);
       expect(result.jobCount).toBe(2);
+      const stored = (await plansNamed(expected))[0]!;
+      expect(stored.targets).toEqual([
+        {
+          type: "http",
+          referenceId: agent.id,
+          runParameters: { locale: "de" },
+        },
+        {
+          type: "http",
+          referenceId: agent.id,
+          runParameters: { locale: "de", model: "gpt-5-mini" },
+        },
+      ]);
 
       const again = await suiteService.runPlan({
         projectId,
@@ -708,6 +724,38 @@ describe("resolving a run plan by name", () => {
       // Nothing was written at all, so the row was never even touched.
       expect(after.updatedAt).toEqual(before.updatedAt);
       expect(startSuiteRun).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "Two targets that differ only by a typed default are refused" */
+    it("creates no plan when two targets differ only by a typed default", async () => {
+      await scenarioService.create({
+        projectId,
+        name: "One",
+        situation: "A customer asks for help",
+        criteria: ["The agent helps"],
+        labels: [],
+        parameters: [{ name: "model", defaultValue: "gpt-5" }],
+      });
+      const agent = await createHttpAgent();
+
+      await expect(
+        runUnderName({
+          name: "Typed default",
+          scope: { mode: "all" },
+          targets: [
+            { type: "http", referenceId: agent.id },
+            {
+              type: "http",
+              referenceId: agent.id,
+              runParameters: { model: "gpt-5" },
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({
+        code: "validation_error",
+        meta: { fieldErrors: { targets: [expect.any(String)] } },
+      });
+      expect(await plansNamed("Typed default")).toHaveLength(0);
     });
 
     /** @scenario "Two identical targets are refused" */

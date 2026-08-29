@@ -51,6 +51,13 @@ describe("parseTargets()", () => {
         { type: "prompt", referenceId: "prompt:xyz" },
       ]);
     });
+
+    /** @scenario "A reference id that holds a question mark is percent-decoded" */
+    it("percent-decodes the reference id", () => {
+      expect(parseTargets(["http:agent%3Fabc"])).toEqual([
+        { type: "http", referenceId: "agent?abc" },
+      ]);
+    });
   });
 
   describe("when a target carries a query string", () => {
@@ -107,6 +114,17 @@ describe("parseTargets()", () => {
           type: "http",
           referenceId: "agent_abc",
           runParameters: { seats: 12, beta: true, account: "007" },
+        },
+      ]);
+    });
+
+    /** @scenario "A reference id that holds a question mark is percent-decoded" */
+    it("percent-decodes the reference id beside the parameters", () => {
+      expect(parseTargets(["http:agent%3Fabc?model=gpt-5"])).toEqual([
+        {
+          type: "http",
+          referenceId: "agent?abc",
+          runParameters: { model: "gpt-5" },
         },
       ]);
     });

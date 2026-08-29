@@ -15,7 +15,10 @@
  * @see specs/suites/run-plan-identity-by-name.feature
  */
 
-import type { RunParameterValues } from "../scenarios/parameters";
+import type {
+  RunParameterValues,
+  ScenarioParameterValue,
+} from "../scenarios/parameters";
 
 /** How many hex characters of the hash a key keeps. */
 export const TARGET_KEY_HASH_LENGTH = 8;
@@ -33,6 +36,75 @@ export function hasParameterOverrides(
   runParameters: RunParameterValues | undefined,
 ): runParameters is RunParameterValues {
   return runParameters !== undefined && Object.keys(runParameters).length > 0;
+}
+
+/** What a declared parameter says about its default, as the rule reads it. */
+type DeclaredParameter = {
+  name: string;
+  defaultValue?: ScenarioParameterValue;
+  secret?: boolean;
+};
+
+/**
+ * The default of every plain parameter the scenarios of a run declare.
+ *
+ * First declaration wins, the way the run dialog unions the definitions, so
+ * two scenarios that default one name differently read one default. A secret
+ * has no default and is never in the map.
+ */
+export function declaredDefaults(
+  definitions: readonly DeclaredParameter[],
+): Map<string, ScenarioParameterValue> {
+  const defaults = new Map<string, ScenarioParameterValue>();
+  for (const definition of definitions) {
+    if (definition.secret === true || definition.defaultValue === undefined)
+      continue;
+    if (!defaults.has(definition.name))
+      defaults.set(definition.name, definition.defaultValue);
+  }
+  return defaults;
+}
+
+/**
+ * The overrides of a target: the values it was given with every entry taken
+ * out whose value is the declared default of that parameter.
+ *
+ * A value typed equal to the default changes nothing the agent receives, so
+ * it is no override: a row with an empty line and a row that spells the
+ * default out are one target. Nothing when no entry is left.
+ */
+export function canonicalOverrides({
+  runParameters,
+  defaults,
+}: {
+  runParameters?: RunParameterValues;
+  defaults: ReadonlyMap<string, ScenarioParameterValue>;
+}): RunParameterValues | undefined {
+  if (!hasParameterOverrides(runParameters)) return undefined;
+  const kept = Object.entries(runParameters).filter(
+    ([name, value]) => defaults.get(name) !== value,
+  );
+  return kept.length > 0 ? Object.fromEntries(kept) : undefined;
+}
+
+/** The targets with their overrides canonical, the key absent when empty. */
+export function withCanonicalOverrides<
+  T extends { runParameters?: RunParameterValues },
+>({
+  targets,
+  defaults,
+}: {
+  targets: readonly T[];
+  defaults: ReadonlyMap<string, ScenarioParameterValue>;
+}): T[] {
+  return targets.map((target) => {
+    const { runParameters: _given, ...rest } = target;
+    const runParameters = canonicalOverrides({
+      runParameters: target.runParameters,
+      defaults,
+    });
+    return (runParameters ? { ...rest, runParameters } : rest) as T;
+  });
 }
 
 /** The overrides as one comparable string: JSON, keys sorted by code point. */
@@ -85,11 +157,14 @@ export function splitTargetKey(key: string): {
  *
  * With `names`, only the pairs of those names are read.
  */
-export function targetParametersLabel(
-  runParameters: RunParameterValues | undefined,
-  names?: ReadonlySet<string>,
-): string {
-  return parameterPairs(runParameters, names).join(", ");
+export function targetParametersLabel({
+  runParameters,
+  names,
+}: {
+  runParameters: RunParameterValues | undefined;
+  names?: ReadonlySet<string>;
+}): string {
+  return parameterPairs({ runParameters, names }).join(", ");
 }
 
 /**
@@ -109,14 +184,45 @@ export function targetSortKey({
   referenceId: string;
   runParameters?: RunParameterValues;
 }): string {
-  return `${type}:${referenceId}|${parameterPairs(runParameters).join(",")}`;
+  return `${type}:${referenceId}|${parameterPairs({ runParameters }).join(",")}`;
+}
+
+/**
+ * The string that tells two targets apart.
+ *
+ * {@link targetSortKey} writes the overrides as `k=v,k2=v2`, which a value
+ * holding a comma and an `=` can forge: `{ a: "b,c=d" }` and
+ * `{ a: "b", c: "d" }` write the same pairs, and the two targets would then
+ * read as one. Identity reads the canonical JSON instead, where every value is
+ * quoted and no value can be read as another pair. The readable key stays for
+ * ordering alone.
+ */
+export function targetIdentityKey({
+  type,
+  referenceId,
+  runParameters,
+}: {
+  type: string;
+  referenceId: string;
+  runParameters?: RunParameterValues;
+}): string {
+  return JSON.stringify([
+    type,
+    referenceId,
+    hasParameterOverrides(runParameters)
+      ? canonicalParameters(runParameters)
+      : "",
+  ]);
 }
 
 /** The overrides as `k=v` pairs, sorted by name, kept to `names` when given. */
-function parameterPairs(
-  runParameters: RunParameterValues | undefined,
-  names?: ReadonlySet<string>,
-): string[] {
+function parameterPairs({
+  runParameters,
+  names,
+}: {
+  runParameters: RunParameterValues | undefined;
+  names?: ReadonlySet<string>;
+}): string[] {
   if (!hasParameterOverrides(runParameters)) return [];
   return sortedEntries(runParameters)
     .filter(([name]) => names === undefined || names.has(name))
@@ -182,7 +288,10 @@ export function targetLabelOf({
   runParameters?: RunParameterValues;
   differingNames: ReadonlySet<string>;
 }): string {
-  const parameters = targetParametersLabel(runParameters, differingNames);
+  const parameters = targetParametersLabel({
+    runParameters,
+    names: differingNames,
+  });
   return parameters === ""
     ? name
     : `${name}${TARGET_LABEL_SEPARATOR}${parameters}`;

@@ -28,7 +28,7 @@ Feature: MCP Run Plan Tools
 
   Scenario: Agent compares one agent on two models in one run
     When the agent calls platform_run_plan with two targets that name the same agent and different parameters
-    Then the request carries both targets, each with its own parameters
+    Then the run covers both target variants, each on its own parameters
     And the parameters of a target override the parameters of the run
 
   Scenario: Agent reads the batch a run started

@@ -20,9 +20,9 @@ export async function handleRunTestSuite(params: {
   note?: string;
   idempotencyKey?: string;
 }): Promise<string> {
-  const { id, targets, ...data } = params;
-  const result = await apiRunTestSuite(id, {
-    ...data,
+  const { targets, ...rest } = params;
+  const result = await apiRunTestSuite({
+    ...rest,
     targets: toWireTargets(targets),
   });
 

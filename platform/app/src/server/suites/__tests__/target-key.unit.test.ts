@@ -6,14 +6,18 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
+  canonicalOverrides,
   canonicalParameters,
+  declaredDefaults,
   differingParameterNames,
   splitTargetKey,
+  targetIdentityKey,
   targetKeyOf,
   targetLabelOf,
   targetLabels,
   targetParametersLabel,
   targetSortKey,
+  withCanonicalOverrides,
 } from "../target-key";
 
 /** The first eight hex characters of node's own SHA-1, the reference answer. */
@@ -136,17 +140,68 @@ describe("splitTargetKey", () => {
   });
 });
 
+describe("targetIdentityKey", () => {
+  describe("when one override holds the separators the sort key writes", () => {
+    /** @scenario "A value holding a comma and an equals sign does not fake a second target" */
+    it("keys two targets whose readable pairs read alike apart", () => {
+      const oneValue = {
+        type: "http",
+        referenceId: "prod-agent",
+        runParameters: { a: "b,c=d" },
+      };
+      const twoValues = {
+        type: "http",
+        referenceId: "prod-agent",
+        runParameters: { a: "b", c: "d" },
+      };
+
+      expect(targetSortKey(oneValue)).toBe(targetSortKey(twoValues));
+      expect(targetIdentityKey(oneValue)).not.toBe(
+        targetIdentityKey(twoValues),
+      );
+    });
+  });
+
+  describe("when the same overrides are written in another order", () => {
+    it("reads one key", () => {
+      expect(
+        targetIdentityKey({
+          type: "http",
+          referenceId: "prod-agent",
+          runParameters: { model: "gpt-5-mini", locale: "de" },
+        }),
+      ).toBe(
+        targetIdentityKey({
+          type: "http",
+          referenceId: "prod-agent",
+          runParameters: { locale: "de", model: "gpt-5-mini" },
+        }),
+      );
+    });
+  });
+
+  describe("when two targets of one reference id are of different types", () => {
+    it("keys them apart", () => {
+      expect(targetIdentityKey({ type: "http", referenceId: "abc" })).not.toBe(
+        targetIdentityKey({ type: "prompt", referenceId: "abc" }),
+      );
+    });
+  });
+});
+
 describe("targetParametersLabel", () => {
   /** @scenario "A target's parameters read as a sorted list of pairs" */
   it("lists the pairs sorted by name", () => {
-    expect(targetParametersLabel({ seats: 12, model: "gpt-5-mini" })).toBe(
-      "model=gpt-5-mini, seats=12",
-    );
+    expect(
+      targetParametersLabel({
+        runParameters: { seats: 12, model: "gpt-5-mini" },
+      }),
+    ).toBe("model=gpt-5-mini, seats=12");
   });
 
   it("reads empty when there are none", () => {
-    expect(targetParametersLabel(undefined)).toBe("");
-    expect(targetParametersLabel({})).toBe("");
+    expect(targetParametersLabel({ runParameters: undefined })).toBe("");
+    expect(targetParametersLabel({ runParameters: {} })).toBe("");
   });
 });
 
@@ -291,5 +346,75 @@ describe("targetLabels", () => {
         nameOf: (target) => `agent-${target.referenceId}`,
       }),
     ).toEqual(["agent-a", "agent-a · plan=pro", "agent-b"]);
+  });
+});
+
+describe("declaredDefaults", () => {
+  /** @scenario "A typed default is not an override" */
+  it("reads the first default of each plain parameter and no secret", () => {
+    const defaults = declaredDefaults([
+      { name: "model", defaultValue: "gpt-5" },
+      { name: "model", defaultValue: "gpt-5-mini" },
+      { name: "locale" },
+      { name: "locale", defaultValue: "en" },
+      { name: "api_token", secret: true },
+    ]);
+
+    expect([...defaults]).toEqual([
+      ["model", "gpt-5"],
+      ["locale", "en"],
+    ]);
+  });
+});
+
+describe("canonicalOverrides", () => {
+  const defaults = new Map<string, string | number | boolean>([
+    ["locale", "en"],
+    ["seats", 12],
+  ]);
+
+  /** @scenario "A typed default is not an override" */
+  it("keeps the values that differ from the declared default", () => {
+    expect(
+      canonicalOverrides({
+        runParameters: { locale: "en", model: "gpt-5", seats: 12 },
+        defaults,
+      }),
+    ).toEqual({ model: "gpt-5" });
+  });
+
+  /** @scenario "A typed default is not an override" */
+  it("reads nothing when every value is its default", () => {
+    expect(
+      canonicalOverrides({ runParameters: { locale: "en" }, defaults }),
+    ).toBeUndefined();
+    expect(canonicalOverrides({ runParameters: {}, defaults })).toBeUndefined();
+    expect(canonicalOverrides({ defaults })).toBeUndefined();
+  });
+
+  it("tells the string of a number from the number", () => {
+    expect(
+      canonicalOverrides({ runParameters: { seats: "12" }, defaults }),
+    ).toEqual({ seats: "12" });
+  });
+});
+
+describe("withCanonicalOverrides", () => {
+  /** @scenario "Two rows that differ only by a typed default are one target" */
+  it("gives two targets that differ only by a typed default one key", () => {
+    const [plain, typed] = withCanonicalOverrides({
+      targets: [
+        { type: "http", referenceId: "agent_1" },
+        {
+          type: "http",
+          referenceId: "agent_1",
+          runParameters: { locale: "en" },
+        },
+      ],
+      defaults: new Map([["locale", "en"]]),
+    });
+
+    expect(typed).toEqual({ type: "http", referenceId: "agent_1" });
+    expect(targetKeyOf(typed!)).toBe(targetKeyOf(plain!));
   });
 });

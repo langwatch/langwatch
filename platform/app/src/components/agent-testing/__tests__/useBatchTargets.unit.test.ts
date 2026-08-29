@@ -135,7 +135,35 @@ describe("batchTargetsOf()", () => {
         "dev-agent · model=a",
         "dev-agent · model=b",
       ]);
+      expect(targets.map((target) => target.shortLabel)).toEqual([
+        "model=a",
+        "model=b",
+      ]);
       expect(targets[0]?.parameters).toEqual({ locale: "de", model: "a" });
+    });
+  });
+
+  describe("when a repeated agent has one target with no differing parameter", () => {
+    /** @scenario "The charts of a comparison run put the targets next to each other" */
+    it("reads that target as default under a bar, and a lone agent as its name", () => {
+      const targets = batchTargetsOf({
+        scenarioRuns: [
+          runAgainst({ scenarioRunId: "r1", referenceId: "agent_dev" }),
+          runAgainst({
+            scenarioRunId: "r2",
+            referenceId: "agent_dev",
+            parameters: { model: "gpt-5-mini" },
+          }),
+          runAgainst({ scenarioRunId: "r3", referenceId: "agent_prod" }),
+        ],
+        targetNameMap: NAMES,
+      });
+
+      expect(targets.map((target) => target.shortLabel)).toEqual([
+        "default",
+        "model=gpt-5-mini",
+        "prod-agent",
+      ]);
     });
   });
 

@@ -58,7 +58,7 @@ Feature: MCP Test Suite Tools
   Scenario: Agent runs a test suite against one agent on two models
     Given a test suite exists with id "suite_abc123"
     When the agent calls platform_run_test_suite with two targets that name the same agent and different parameters
-    Then the request carries both targets, each with its own parameters
+    Then the run covers both target variants, each on its own parameters
 
   Scenario: Agent files a new scenario in a test suite
     When the agent calls platform_create_scenario with a testSuiteId

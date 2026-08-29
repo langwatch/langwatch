@@ -11,8 +11,10 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { computeRelativeWindow } from "~/components/PeriodSelector";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { SuiteNameDialog } from "../cases/SuiteNameDialog";
 import { SuiteRail } from "../cases/SuiteRail";
 import {
@@ -21,8 +23,14 @@ import {
 } from "../cases/test-cases";
 import type { SuiteLastRun } from "../cases/useTestCasesData";
 
+const routerPush = vi.fn();
+
 vi.mock("~/utils/compat/next-router", () => ({
-  useRouter: () => ({ query: {}, push: vi.fn(), isReady: true }),
+  useRouter: () => ({
+    query: { project: "test-project" },
+    push: routerPush,
+    isReady: true,
+  }),
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -37,19 +45,20 @@ vi.mock("~/utils/formatTimeAgo", () => ({
 }));
 
 // The recent runs of a suite hang off its row menu, so opening that submenu
-// reads the runs. What the list holds is covered against real runs in
-// casesTable; the rail only has to offer the way in.
+// reads the runs of the whole project and narrows them to the suite.
+const suiteRunDataQuery = vi.fn();
+const suitesGetAllQuery = vi.fn();
+
 vi.mock("~/utils/api", () => ({
   api: {
     scenarios: {
       getSuiteRunData: {
-        useQuery: () => ({
-          data: { runs: [], scenarioSetIds: {} },
-          isLoading: false,
-        }),
+        useQuery: (...args: unknown[]) => suiteRunDataQuery(...args),
       },
     },
-    suites: { getAll: { useQuery: () => ({ data: [], isLoading: false }) } },
+    suites: {
+      getAll: { useQuery: (...args: unknown[]) => suitesGetAllQuery(...args) },
+    },
   },
 }));
 
@@ -130,8 +139,65 @@ function railEntries(): string[] {
     .filter((id): id is string => !!id?.startsWith("suite-rail-item-"));
 }
 
+/**
+ * Two batches of the project: one that covered a scenario of Refunds, and one
+ * that covered a scenario of another suite. Narrowing to the open suite is the
+ * work the submenu does, so a fixture holding only its own runs would prove
+ * nothing.
+ */
+const TWO_HOURS_AGO = Date.now() - 2 * 60 * 60 * 1000 - 60_000;
+
+const REFUNDS_SET = "__internal__suite_1__suite";
+const OTHER_SET = "__internal__suite_2__suite";
+
+function makeProjectRun(
+  overrides: Partial<ScenarioRunData> = {},
+): ScenarioRunData {
+  return {
+    scenarioId: "case_1",
+    batchRunId: "batch_refunds",
+    scenarioRunId: "run_refunds",
+    name: "Double charge",
+    description: null,
+    metadata: null,
+    status: ScenarioRunStatus.SUCCESS,
+    results: null,
+    messages: [],
+    timestamp: TWO_HOURS_AGO,
+    durationInMs: 6300,
+    totalCost: 0.0042,
+    ...overrides,
+  } as ScenarioRunData;
+}
+
+/** Hands the two reads their answer: the runs, and the set each batch is of. */
+function setProjectRuns(runs: ScenarioRunData[]) {
+  suiteRunDataQuery.mockReturnValue({
+    data: {
+      runs,
+      scenarioSetIds: {
+        batch_refunds: REFUNDS_SET,
+        batch_elsewhere: OTHER_SET,
+      },
+    },
+    isLoading: false,
+  });
+}
+
 describe("the test suites rail", () => {
   afterEach(cleanup);
+
+  beforeEach(() => {
+    routerPush.mockClear();
+    setProjectRuns([]);
+    suitesGetAllQuery.mockReturnValue({
+      data: [
+        { id: "suite_1", name: "Refunds", slug: "refunds" },
+        { id: "suite_2", name: "Checkout", slug: "checkout" },
+      ],
+      isLoading: false,
+    });
+  });
 
   // --- What is listed ---
 
@@ -298,18 +364,39 @@ describe("the test suites rail", () => {
   });
 
   /** @scenario "Open recent runs holds the runs that covered the suite" */
-  it("hangs the recent runs of that suite off the row menu", async () => {
+  it("lists the runs that covered the suite and opens one under its plan", async () => {
+    setProjectRuns([
+      makeProjectRun(),
+      makeProjectRun({
+        batchRunId: "batch_elsewhere",
+        scenarioRunId: "run_elsewhere",
+        scenarioId: "case_elsewhere",
+      }),
+    ]);
     renderRail();
     const user = await openSuiteMenu("Refunds");
 
-    // The submenu is the way in; what it lists is the same list the button
-    // above the table lists, which casesTable covers against real runs.
-    const trigger = await screen.findByRole("menuitem", {
-      name: /Open recent runs/,
-    });
-    await user.click(trigger);
+    await user.click(
+      await screen.findByRole("menuitem", { name: /Open recent runs/ }),
+    );
 
-    expect(await screen.findByTestId("recent-runs-list")).toBeInTheDocument();
+    const list = await screen.findByTestId("recent-runs-submenu-list");
+    const rows = within(list).getAllByTestId(/^recent-run-/);
+    expect(rows.map((row) => row.getAttribute("data-testid"))).toEqual([
+      "recent-run-batch_refunds",
+    ]);
+    expect(rows[0]).toHaveTextContent("Refunds");
+
+    await user.click(rows[0]!);
+
+    // The row opens the run under the plan that holds it, on the Results tab.
+    expect(routerPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: "/[project]/agent-testing/[[...path]]",
+      }),
+      expect.stringContaining("/results/refunds/batch_refunds"),
+      { shallow: true },
+    );
   });
 
   /** @scenario "Every action of the rail row menu carries its icon" */

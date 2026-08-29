@@ -59,7 +59,7 @@ export type RunSettings = {
 };
 
 /**
- * The run-level parameter values of a batch: the first run that carries any.
+ * The run-level parameter values of a batch.
  *
  * A person who sets a parameter in the run dialog sets it for every scenario,
  * so a run of the batch that carries values carries the ones they chose.
@@ -69,20 +69,29 @@ export type RunSettings = {
  * values with the target's own overrides on top. The overrides are taken back
  * out: they belong to the target, and the Targets row reads them beside the
  * target they belong to.
+ *
+ * Every run is read, not the first one that carries anything, and a name is
+ * answered by the first run that did NOT override it. One target overriding
+ * `plan` would otherwise drop the run-level `plan` from the block for the
+ * whole batch, and which run came first would decide what the block prints.
  */
 function readParameters(
   scenarioRuns: ScenarioRunData[],
 ): RunSettingParameter[] {
+  const valueByName = new Map<string, string>();
   for (const run of scenarioRuns) {
     const overridden = new Set(
       Object.keys(run.metadata?.langwatch?.targetParameters ?? {}),
     );
-    const parameters = parametersOfRun(run).filter(
-      (parameter) => !overridden.has(parameter.name),
-    );
-    if (parameters.length > 0) return parameters;
+    for (const parameter of parametersOfRun(run)) {
+      if (overridden.has(parameter.name)) continue;
+      if (valueByName.has(parameter.name)) continue;
+      valueByName.set(parameter.name, parameter.value);
+    }
   }
-  return [];
+  return [...valueByName]
+    .map(([name, value]) => ({ name, value }))
+    .sort((left, right) => left.name.localeCompare(right.name));
 }
 
 /** The parameters of one run as the block prints them, sorted by name. */
@@ -101,24 +110,41 @@ function parametersOfRun(run: ScenarioRunData): RunSettingParameter[] {
 }
 
 /**
- * The full set of values each target received: the first run of the target
- * that carries any.
+ * The full set of values each target received, over every run of it.
  *
  * This is the merged set, the run-level values with the target's own on top,
  * which is what the agent was called with. On a comparison, it is the one
  * layer of parameters the settings read.
+ *
+ * Every scenario declares its own parameters, so one run of the target can
+ * carry a name another does not. The names are taken together, the first
+ * value seen for a name kept, so the line reads everything the target was
+ * called with somewhere in the run.
  */
 function readParametersByTarget(
   scenarioRuns: ScenarioRunData[],
 ): Map<string, RunSettingParameter[]> {
-  const byTarget = new Map<string, RunSettingParameter[]>();
+  const byTarget = new Map<string, Map<string, string>>();
   for (const run of scenarioRuns) {
     const key = targetKeyOfRun(run);
-    if (!key || byTarget.has(key)) continue;
-    const parameters = parametersOfRun(run);
-    if (parameters.length > 0) byTarget.set(key, parameters);
+    if (!key) continue;
+    const values = byTarget.get(key) ?? new Map<string, string>();
+    for (const parameter of parametersOfRun(run)) {
+      if (!values.has(parameter.name))
+        values.set(parameter.name, parameter.value);
+    }
+    byTarget.set(key, values);
   }
-  return byTarget;
+  return new Map(
+    [...byTarget]
+      .filter(([, values]) => values.size > 0)
+      .map(([key, values]) => [
+        key,
+        [...values]
+          .map(([name, value]) => ({ name, value }))
+          .sort((left, right) => left.name.localeCompare(right.name)),
+      ]),
+  );
 }
 
 /**

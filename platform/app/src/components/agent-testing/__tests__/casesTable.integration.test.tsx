@@ -963,7 +963,7 @@ describe("the scenarios table", () => {
         await screen.findByRole("menuitem", { name: /Open recent runs/ }),
       );
 
-      const list = await screen.findByTestId("recent-runs-list");
+      const list = await screen.findByTestId("recent-runs-submenu-list");
       const rows = within(list).getAllByTestId(/^recent-run-/);
       expect(rows).toHaveLength(3);
 
@@ -998,7 +998,7 @@ describe("the scenarios table", () => {
       await user.click(
         screen.getByRole("menuitem", { name: /Open recent runs/ }),
       );
-      await screen.findByTestId("recent-runs-list");
+      await screen.findByTestId("recent-runs-submenu-list");
 
       expect(suiteRunDataQuery.mock.calls.some(isEnabledRead)).toBe(true);
     });

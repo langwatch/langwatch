@@ -27,6 +27,8 @@ export type MiniBarGroup = {
   key: string;
   /** What reads under the group. */
   label: string;
+  /** The long form of the label, read on hover. The label when not given. */
+  title?: string;
   bars: MiniBar[];
 };
 
@@ -88,6 +90,64 @@ function BarColumn({ bar, scale }: { bar: MiniBar; scale: number }) {
   );
 }
 
+/** The bars themselves: one column per bar, the groups side by side. */
+function BarArea({
+  groups,
+  scale,
+  testId,
+}: {
+  groups: MiniBarGroup[];
+  scale: number;
+  testId?: string;
+}) {
+  return (
+    <HStack
+      gap={3}
+      height={`${BAR_AREA_HEIGHT}px`}
+      alignItems="flex-end"
+      marginTop={2}
+    >
+      {groups.map((group) => (
+        <HStack
+          key={group.key}
+          flex={1}
+          minWidth={0}
+          gap={1}
+          alignItems="flex-end"
+          justify="center"
+          data-testid={testId ? `${testId}-group-${group.key}` : undefined}
+        >
+          {group.bars.map((bar) => (
+            <BarColumn key={bar.key} bar={bar} scale={scale} />
+          ))}
+        </HStack>
+      ))}
+    </HStack>
+  );
+}
+
+/** The line under the bars: what each group stands for, one label per group. */
+function GroupLabels({ groups }: { groups: MiniBarGroup[] }) {
+  return (
+    <HStack gap={3} marginTop={1}>
+      {groups.map((group) => (
+        <Text
+          key={group.key}
+          flex={1}
+          minWidth={0}
+          fontSize="10px"
+          color={FG_MUTED}
+          textAlign="center"
+          truncate
+          title={group.title ?? group.label}
+        >
+          {group.label}
+        </Text>
+      ))}
+    </HStack>
+  );
+}
+
 export function MiniBarCard({
   title,
   groups,
@@ -117,46 +177,8 @@ export function MiniBarCard({
       <Text fontSize="11px" fontWeight="semibold" color={FG_MUTED}>
         {title}
       </Text>
-
-      <HStack
-        gap={3}
-        height={`${BAR_AREA_HEIGHT}px`}
-        alignItems="flex-end"
-        marginTop={2}
-      >
-        {groups.map((group) => (
-          <HStack
-            key={group.key}
-            flex={1}
-            minWidth={0}
-            gap={1}
-            alignItems="flex-end"
-            justify="center"
-            data-testid={testId ? `${testId}-group-${group.key}` : undefined}
-          >
-            {group.bars.map((bar) => (
-              <BarColumn key={bar.key} bar={bar} scale={fullScale} />
-            ))}
-          </HStack>
-        ))}
-      </HStack>
-
-      <HStack gap={3} marginTop={1}>
-        {groups.map((group) => (
-          <Text
-            key={group.key}
-            flex={1}
-            minWidth={0}
-            fontSize="10px"
-            color={FG_MUTED}
-            textAlign="center"
-            truncate
-            title={group.label}
-          >
-            {group.label}
-          </Text>
-        ))}
-      </HStack>
+      <BarArea groups={groups} scale={fullScale} testId={testId} />
+      <GroupLabels groups={groups} />
     </VStack>
   );
 }

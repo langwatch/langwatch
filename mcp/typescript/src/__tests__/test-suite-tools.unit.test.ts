@@ -296,7 +296,8 @@ describe("handleRunTestSuite()", () => {
     });
 
     it("sends the suite id apart from the run body", () => {
-      expect(mockRunTestSuite).toHaveBeenCalledWith("suite_abc123", {
+      expect(mockRunTestSuite).toHaveBeenCalledWith({
+        id: "suite_abc123",
         targets: [{ type: "http", referenceId: "agent_abc" }],
       });
     });
@@ -321,7 +322,8 @@ describe("handleRunTestSuite()", () => {
         ],
       });
 
-      expect(mockRunTestSuite).toHaveBeenLastCalledWith("suite_abc123", {
+      expect(mockRunTestSuite).toHaveBeenLastCalledWith({
+        id: "suite_abc123",
         targets: [
           {
             type: "http",

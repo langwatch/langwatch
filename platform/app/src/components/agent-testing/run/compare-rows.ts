@@ -9,8 +9,15 @@
  */
 
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
-import type { RunParameterValues } from "~/server/scenarios/parameters";
-import { targetSortKey } from "~/server/suites/target-key";
+import type {
+  RunParameterValues,
+  ScenarioParameterValue,
+} from "~/server/scenarios/parameters";
+import {
+  canonicalOverrides,
+  targetIdentityKey,
+  targetSortKey,
+} from "~/server/suites/target-key";
 import { toLineRunParameters } from "./parameter-line";
 import type { RunDialogAgent } from "./RunTargetPicker";
 
@@ -72,27 +79,96 @@ export function addCompareRow(rows: readonly CompareRow[]): CompareRow[] {
   return [...rows, { target: last.target, parameterLine: last.parameterLine }];
 }
 
-/** What a row sends as its own overrides, or nothing for an empty line. */
-export function compareRowParameters(
-  row: CompareRow,
-): RunParameterValues | undefined {
-  return toLineRunParameters({ line: row.parameterLine, secretValues: {} });
-}
+/** The declared default of each parameter the run's scenarios name. */
+export type ParameterDefaults = ReadonlyMap<string, ScenarioParameterValue>;
 
 /**
- * The identity of a row: its agent and its overrides, with the pairs sorted so
- * "a=1, b=2" and "b=2, a=1" are one target.
+ * What a row sends as its own overrides, or nothing for an empty line.
+ *
+ * A value typed equal to the declared default is no override and is left
+ * out, the way the server reads it, so the dialog's duplicate check, its sort
+ * order and its derived name match the server's.
  */
-export function compareRowKey(row: CompareRow): string {
-  return targetSortKey({
-    type: row.target.type,
-    referenceId: row.target.id,
-    runParameters: compareRowParameters(row),
+export function compareRowParameters({
+  row,
+  defaults,
+}: {
+  row: CompareRow;
+  defaults: ParameterDefaults;
+}): RunParameterValues | undefined {
+  return canonicalOverrides({
+    runParameters: toLineRunParameters({
+      line: row.parameterLine,
+      secretValues: {},
+    }),
+    defaults,
   });
 }
 
-/** Whether two rows name the same agent with the same overrides. */
-export function hasDuplicateCompareRows(rows: readonly CompareRow[]): boolean {
-  const keys = rows.map(compareRowKey);
+/**
+ * The identity of a row: its agent and its overrides, read as JSON so
+ * "a=1, b=2" and "b=2, a=1" are one target and a value holding a comma is
+ * never read as a second pair.
+ */
+export function compareRowKey({
+  row,
+  defaults,
+}: {
+  row: CompareRow;
+  defaults: ParameterDefaults;
+}): string {
+  return targetIdentityKey({
+    type: row.target.type,
+    referenceId: row.target.id,
+    runParameters: compareRowParameters({ row, defaults }),
+  });
+}
+
+/**
+ * The colour position of every row, by row index.
+ *
+ * The run detail colours a target by its place in the sorted target list, so a
+ * row must take the colour of its place in that same order. Colouring by row
+ * position instead would give one target two colours, the dot in the dialog
+ * and the column of the results, whenever the rows were not added in sorted
+ * order.
+ */
+export function compareRowColorIndexes({
+  rows,
+  defaults,
+}: {
+  rows: readonly CompareRow[];
+  defaults: ParameterDefaults;
+}): number[] {
+  const sorted = rows
+    .map((row, index) => ({
+      index,
+      sortKey: targetSortKey({
+        type: row.target.type,
+        referenceId: row.target.id,
+        runParameters: compareRowParameters({ row, defaults }),
+      }),
+    }))
+    .sort((left, right) => left.sortKey.localeCompare(right.sortKey));
+
+  const colorIndexes = rows.map(() => 0);
+  sorted.forEach((entry, position) => {
+    colorIndexes[entry.index] = position;
+  });
+  return colorIndexes;
+}
+
+/**
+ * Whether two rows name the same agent with the same overrides. Two rows
+ * that differ only by a typed default are one target.
+ */
+export function hasDuplicateCompareRows({
+  rows,
+  defaults,
+}: {
+  rows: readonly CompareRow[];
+  defaults: ParameterDefaults;
+}): boolean {
+  const keys = rows.map((row) => compareRowKey({ row, defaults }));
   return new Set(keys).size !== keys.length;
 }

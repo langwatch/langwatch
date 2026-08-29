@@ -484,6 +484,37 @@ describe("SuiteService", () => {
           expect(scenarioRepo.findManyIncludingArchived).not.toHaveBeenCalled();
           expect(suiteRunService.startRun).not.toHaveBeenCalled();
         });
+
+        /** @scenario "Two targets that differ only by a typed default are refused" */
+        it("rejects two targets that differ only by a typed default", async () => {
+          const { service, suiteRunService } = createService({
+            scenarioRepository: declaring([
+              { name: "account_tier", defaultValue: "gold" },
+            ]),
+          });
+
+          await expect(
+            service.run({
+              suite: makeSuite({
+                scenarioIds: ["scen_1"],
+                targets: [
+                  { type: "http", referenceId: "agent_1" },
+                  {
+                    type: "http",
+                    referenceId: "agent_1",
+                    runParameters: { account_tier: "gold" },
+                  },
+                ] as SuiteTarget[],
+              }),
+              ...RUN_DEFAULTS,
+            }),
+          ).rejects.toMatchObject({
+            code: "validation_error",
+            meta: { fieldErrors: { targets: [expect.any(String)] } },
+          });
+
+          expect(suiteRunService.startRun).not.toHaveBeenCalled();
+        });
       });
 
       describe("when a supplied name is declared by no scenario in the run", () => {
