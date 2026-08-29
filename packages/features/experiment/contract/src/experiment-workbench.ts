@@ -320,86 +320,98 @@ export type HttpConfig = z.infer<typeof httpConfigSchema>;
  * Note: Evaluators are NOT tied to targets. All evaluators in the store
  * apply to ALL targets. Only the mappings differ per target (and per dataset).
  */
-export const targetConfigSchema = z
-  .object({
-    id: z.string(),
-    type: z.enum(["prompt", "agent", "evaluator", "workflow"]),
-    icon: z.string().optional(),
-    promptId: z.string().optional(),
-    promptVersionId: z.string().optional(),
-    /**
-     * The version number currently loaded for this target.
-     * Used for:
-     * - Displaying version badge in UI
-     * - Comparing with latest DB version to detect outdated status
-     * - When undefined + no localPromptConfig, target "follows latest" automatically
-     * - When set + has localPromptConfig, target is "pinned" to this version
-     */
-    promptVersionNumber: z.number().optional(),
-    localPromptConfig: localPromptConfigSchema.optional(),
-    dbAgentId: z.string().optional(),
-    /**
-     * The specific agent type (code, signature, workflow, http).
-     * Used by DSL adapter to determine which node type to generate.
-     * Only set for agent targets (type === "agent").
-     */
-    agentType: agentTypeEnum.optional(),
-    /**
-     * HTTP configuration for HTTP agent targets.
-     * Stored on the target so DSL adapter can generate HTTP nodes synchronously.
-     * Only set when agentType === "http".
-     */
-    httpConfig: httpConfigSchema.optional(),
-    /**
-     * Database evaluator ID for evaluator targets.
-     * Used to load evaluator settings from the database at execution time.
-     * Only set when type === "evaluator".
-     */
-    targetEvaluatorId: z.string().optional(),
-    /**
-     * Local evaluator config for unsaved changes.
-     * Stores name and settings modifications until the user clicks "Save".
-     * When present, the target header shows an orange dot indicator.
-     * Only set when type === "evaluator".
-     */
-    localEvaluatorConfig: localEvaluatorConfigSchema.optional(),
-    /**
-     * @deprecated Read-only legacy shape for column-style pairwise targets
-     * (#5100). `toComparisonConfig` folds it into `comparison` on load.
-     * Never written.
-     */
-    pairwise: pairwiseEvaluatorConfigSchema.optional(),
-    /**
-     * Comparison config for column-style comparison targets. Set only when
-     * type === "evaluator" AND the underlying evaluator is the comparison
-     * judge. Gives the column path a single source of truth for which other
-     * targets to compare; per-row input mappings are derived from
-     * variants/goldenField at save time and run time. Also drives the
-     * target-column Swords icon and the "reuse existing comparison" flow.
-     */
-    comparison: comparisonEvaluatorConfigSchema.optional(),
-    /**
-     * Studio workflow target: the committed studio workflow evaluated as a whole
-     * per dataset row (distinct from an "agent" target with agentType "workflow",
-     * which is a saved agent built as a single code node). Only set when
-     * type === "workflow".
-     */
-    workflowId: z.string().optional(),
-    workflowVersionId: z.string().optional(),
-    inputs: z.array(fieldSchema).optional(),
-    outputs: z.array(fieldSchema).optional(),
-    // Per-dataset mappings: datasetId -> inputFieldName -> FieldMapping
-    mappings: z.record(z.string(), z.record(z.string(), fieldMappingSchema)),
-  })
-  .superRefine((value, ctx) => {
-    if (value.type === "workflow" && !value.workflowId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["workflowId"],
-        message: "workflowId is required when type is workflow",
-      });
-    }
-  });
+/**
+ * The target's shape, without the cross-field rule below.
+ *
+ * Named because callers need to `.extend()` it, and an extended schema has to
+ * start from an object. Under zod 3 they reached it with
+ * `targetConfigSchema.innerType()`, because `.superRefine()` wrapped the
+ * object in a `ZodEffects`. Zod 4 refines in place — the method is gone, and
+ * the call was a TypeError thrown at module load, which took the whole
+ * experiments-v3 action surface with it. Exporting the base is what makes the
+ * extension possible without a wrapper to unwrap.
+ */
+export const targetConfigObjectSchema = z.object({
+  id: z.string(),
+  type: z.enum(["prompt", "agent", "evaluator", "workflow"]),
+  icon: z.string().optional(),
+  promptId: z.string().optional(),
+  promptVersionId: z.string().optional(),
+  /**
+   * The version number currently loaded for this target.
+   * Used for:
+   * - Displaying version badge in UI
+   * - Comparing with latest DB version to detect outdated status
+   * - When undefined + no localPromptConfig, target "follows latest" automatically
+   * - When set + has localPromptConfig, target is "pinned" to this version
+   */
+  promptVersionNumber: z.number().optional(),
+  localPromptConfig: localPromptConfigSchema.optional(),
+  dbAgentId: z.string().optional(),
+  /**
+   * The specific agent type (code, signature, workflow, http).
+   * Used by DSL adapter to determine which node type to generate.
+   * Only set for agent targets (type === "agent").
+   */
+  agentType: agentTypeEnum.optional(),
+  /**
+   * HTTP configuration for HTTP agent targets.
+   * Stored on the target so DSL adapter can generate HTTP nodes synchronously.
+   * Only set when agentType === "http".
+   */
+  httpConfig: httpConfigSchema.optional(),
+  /**
+   * Database evaluator ID for evaluator targets.
+   * Used to load evaluator settings from the database at execution time.
+   * Only set when type === "evaluator".
+   */
+  targetEvaluatorId: z.string().optional(),
+  /**
+   * Local evaluator config for unsaved changes.
+   * Stores name and settings modifications until the user clicks "Save".
+   * When present, the target header shows an orange dot indicator.
+   * Only set when type === "evaluator".
+   */
+  localEvaluatorConfig: localEvaluatorConfigSchema.optional(),
+  /**
+   * @deprecated Read-only legacy shape for column-style pairwise targets
+   * (#5100). `toComparisonConfig` folds it into `comparison` on load.
+   * Never written.
+   */
+  pairwise: pairwiseEvaluatorConfigSchema.optional(),
+  /**
+   * Comparison config for column-style comparison targets. Set only when
+   * type === "evaluator" AND the underlying evaluator is the comparison
+   * judge. Gives the column path a single source of truth for which other
+   * targets to compare; per-row input mappings are derived from
+   * variants/goldenField at save time and run time. Also drives the
+   * target-column Swords icon and the "reuse existing comparison" flow.
+   */
+  comparison: comparisonEvaluatorConfigSchema.optional(),
+  /**
+   * Studio workflow target: the committed studio workflow evaluated as a whole
+   * per dataset row (distinct from an "agent" target with agentType "workflow",
+   * which is a saved agent built as a single code node). Only set when
+   * type === "workflow".
+   */
+  workflowId: z.string().optional(),
+  workflowVersionId: z.string().optional(),
+  inputs: z.array(fieldSchema).optional(),
+  outputs: z.array(fieldSchema).optional(),
+  // Per-dataset mappings: datasetId -> inputFieldName -> FieldMapping
+  mappings: z.record(z.string(), z.record(z.string(), fieldMappingSchema)),
+});
+
+/** The target as it is validated on the way into stored state. */
+export const targetConfigSchema = targetConfigObjectSchema.superRefine((value, ctx) => {
+  if (value.type === "workflow" && !value.workflowId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["workflowId"],
+      message: "workflowId is required when type is workflow",
+    });
+  }
+});
 export type TargetType = "prompt" | "agent" | "evaluator" | "workflow";
 export type TargetConfig = Omit<z.infer<typeof targetConfigSchema>, "inputs" | "outputs"> & {
   inputs: Field[];

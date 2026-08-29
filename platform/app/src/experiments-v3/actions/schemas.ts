@@ -10,7 +10,7 @@ import {
   fieldMappingSchema,
   isComparisonEvaluatorType,
   localPromptConfigSchema,
-  targetConfigSchema,
+  targetConfigObjectSchema,
 } from "../types";
 
 /**
@@ -32,29 +32,18 @@ import {
 // ============================================================================
 
 /**
- * The target object without the `type === "workflow" requires workflowId`
- * refinement, so it can be extended. The refinement stays on
- * `targetConfigSchema`, which is what validates the state written back.
+ * Extends the target object rather than `targetConfigSchema`: the refinement
+ * stays on the latter, which is what validates the state written back.
  */
-const targetObjectSchema = targetConfigSchema.innerType();
-
-export const addTargetPayloadSchema = targetObjectSchema
+export const addTargetPayloadSchema = targetConfigObjectSchema
   .extend({
     id: z
       .string()
       .min(1)
       .optional()
-      .describe(
-        "Id for the new column. Generated as target-<nanoid> when omitted.",
-      ),
-    inputs: z
-      .array(fieldSchema)
-      .default([])
-      .describe("Fields the column reads from the dataset."),
-    outputs: z
-      .array(fieldSchema)
-      .default([])
-      .describe("Fields the column produces for each row."),
+      .describe("Id for the new column. Generated as target-<nanoid> when omitted."),
+    inputs: z.array(fieldSchema).default([]).describe("Fields the column reads from the dataset."),
+    outputs: z.array(fieldSchema).default([]).describe("Fields the column produces for each row."),
     mappings: z
       .record(z.string(), z.record(z.string(), fieldMappingSchema))
       .default({})
@@ -106,18 +95,14 @@ export const duplicateTargetPayloadSchema = z
       "Use it to start a candidate from a column already on the board, then change one thing about the copy. " +
       "The copy shares the original's name, so both columns read as the same name with a (1) and a (2) suffix.",
   );
-export type DuplicateTargetPayload = z.infer<
-  typeof duplicateTargetPayloadSchema
->;
+export type DuplicateTargetPayload = z.infer<typeof duplicateTargetPayloadSchema>;
 
 export const duplicateTargetResultSchema = z.object({
   targetId: z.string().describe("Id of the new copy."),
   name: z
     .string()
     .optional()
-    .describe(
-      "The name held in state after the copy, when the column can hold one.",
-    ),
+    .describe("The name held in state after the copy, when the column can hold one."),
 });
 
 export const removeTargetPayloadSchema = z
@@ -144,15 +129,11 @@ export const setTargetPromptPayloadSchema = z
     inputs: z
       .array(fieldSchema)
       .optional()
-      .describe(
-        "Fields the column reads. Defaults to the fields the prompt config declares.",
-      ),
+      .describe("Fields the column reads. Defaults to the fields the prompt config declares."),
     outputs: z
       .array(fieldSchema)
       .optional()
-      .describe(
-        "Fields the column produces. Defaults to the fields the prompt config declares.",
-      ),
+      .describe("Fields the column produces. Defaults to the fields the prompt config declares."),
   })
   .describe(
     "Replace a column's prompt with a draft that is not saved to the prompt library. " +
@@ -186,9 +167,7 @@ export const updateTargetModelPayloadSchema = z
       "Use it to compare the same prompt on two models. " +
       "The column needs a prompt already: a column with none is refused.",
   );
-export type UpdateTargetModelPayload = z.infer<
-  typeof updateTargetModelPayloadSchema
->;
+export type UpdateTargetModelPayload = z.infer<typeof updateTargetModelPayloadSchema>;
 
 export const updateTargetModelResultSchema = z.object({
   targetId: z.string().describe("Id of the column that was changed."),
@@ -201,9 +180,7 @@ export const updateTargetModelResultSchema = z.object({
 
 export const setMappingPayloadSchema = z
   .object({
-    targetId: z
-      .string()
-      .describe("Id of the column whose input is being wired."),
+    targetId: z.string().describe("Id of the column whose input is being wired."),
     datasetId: z
       .string()
       .describe(
@@ -211,9 +188,7 @@ export const setMappingPayloadSchema = z
       ),
     inputField: z
       .string()
-      .describe(
-        "Name of the column's own input field, as the prompt declares it.",
-      ),
+      .describe("Name of the column's own input field, as the prompt declares it."),
     mapping: fieldMappingSchema.describe(
       "Where the value comes from: a dataset column, or a fixed value used for every row.",
     ),
@@ -236,9 +211,7 @@ export const setEvaluatorMappingPayloadSchema = z
       ),
     inputField: z
       .string()
-      .describe(
-        "Name of the evaluator's own input field, for example expected_output.",
-      ),
+      .describe("Name of the evaluator's own input field, for example expected_output."),
     mapping: fieldMappingSchema.describe(
       "Where the value comes from: a dataset column, the column's own output, or a fixed value.",
     ),
@@ -248,9 +221,7 @@ export const setEvaluatorMappingPayloadSchema = z
       "Use it after adding an evaluator whose fields the workbench could not infer. " +
       "An evaluator that resolves no input reports the row as an error instead of scoring empty against empty.",
   );
-export type SetEvaluatorMappingPayload = z.infer<
-  typeof setEvaluatorMappingPayloadSchema
->;
+export type SetEvaluatorMappingPayload = z.infer<typeof setEvaluatorMappingPayloadSchema>;
 
 // ============================================================================
 // Evaluators
@@ -272,8 +243,7 @@ const isKnownEvaluatorType = (evaluatorType: string): boolean =>
   Object.hasOwn(AVAILABLE_EVALUATORS, evaluatorType) ||
   evaluatorType === WORKFLOW_EVALUATOR_TYPE ||
   DB_EVALUATOR_TYPE_PREFIXES.some(
-    (prefix) =>
-      evaluatorType.startsWith(prefix) && evaluatorType.length > prefix.length,
+    (prefix) => evaluatorType.startsWith(prefix) && evaluatorType.length > prefix.length,
   );
 
 export const addEvaluatorPayloadSchema = evaluatorConfigSchema
@@ -288,9 +258,7 @@ export const addEvaluatorPayloadSchema = evaluatorConfigSchema
       .string()
       .min(1)
       .optional()
-      .describe(
-        "Id for the new evaluator. Generated as evaluator_<nanoid> when omitted.",
-      ),
+      .describe("Id for the new evaluator. Generated as evaluator_<nanoid> when omitted."),
     name: z
       .string()
       .trim()
@@ -305,10 +273,7 @@ export const addEvaluatorPayloadSchema = evaluatorConfigSchema
         "Fields the evaluator reads. Defaults to the fields its type declares in the catalog.",
       ),
     mappings: z
-      .record(
-        z.string(),
-        z.record(z.string(), z.record(z.string(), fieldMappingSchema)),
-      )
+      .record(z.string(), z.record(z.string(), z.record(z.string(), fieldMappingSchema)))
       .default({})
       .describe(
         "Where each field reads from, per dataset and per column: mappings[datasetId][targetId][inputField]. Given mappings win, and every gap is inferred from the dataset and the column output names.",
@@ -333,10 +298,7 @@ export const addEvaluatorPayloadSchema = evaluatorConfigSchema
       });
     }
 
-    if (
-      payload.comparison &&
-      !isComparisonEvaluatorType(payload.evaluatorType)
-    ) {
+    if (payload.comparison && !isComparisonEvaluatorType(payload.evaluatorType)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["comparison"],
@@ -351,10 +313,7 @@ export const addEvaluatorPayloadSchema = evaluatorConfigSchema
       `Set \`comparison\` and the evaluator becomes a column of its own that judges the columns it names against each other. Only the Comparison judge (${COMPARISON_EVALUATOR_TYPE}) may do that, and any other type given a comparison config is refused. ` +
       "Run `langwatch evaluator types` to list the types this workbench accepts.",
   );
-export type AddEvaluatorPayload = Omit<
-  z.input<typeof addEvaluatorPayloadSchema>,
-  "inputs"
-> & {
+export type AddEvaluatorPayload = Omit<z.input<typeof addEvaluatorPayloadSchema>, "inputs"> & {
   inputs?: Field[];
 };
 
@@ -386,10 +345,7 @@ export const addColumnPayloadSchema = z
     column: datasetColumnSchema
       .extend({
         id: z.string().optional().describe("Defaults to the column name."),
-        type: z
-          .string()
-          .default("string")
-          .describe('Column type, for example "string" or "json".'),
+        type: z.string().default("string").describe('Column type, for example "string" or "json".'),
       })
       .describe("The column to add."),
   })
@@ -464,9 +420,7 @@ export const runPayloadSchema = z
     rowIndices: z
       .array(z.number().int().min(0))
       .optional()
-      .describe(
-        "Rows to run, counted from 0. Omitted means every row of the active dataset.",
-      ),
+      .describe("Rows to run, counted from 0. Omitted means every row of the active dataset."),
   })
   .describe(
     "Run the evaluation and answer at once with the id of the run, without waiting for it to finish. " +
