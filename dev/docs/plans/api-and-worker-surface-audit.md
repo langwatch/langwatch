@@ -92,7 +92,7 @@ by restoring the aliases.
 namespaces those four families gained, plus `/api/agent-cache/*`,
 `/api/experiments/{slug}/*` and `/api/scenarios/{id}/versions*`.
 
-### Three defects found, and fixed
+### Defects found, and fixed
 
 1. **No task ran, on any task.** `platform/app/src/env.mjs` held the installed
    configuration in a module-scoped binding. tsx compiles the application's
@@ -135,17 +135,74 @@ with hono-openapi 0.4's `request` key, which 1.x ignores in favour of deriving
 `requestBody` from the validator — and these two routes used `hiddenValidator`,
 which strips exactly that metadata.
 
+### Fourteen more, found by making the app typecheck
+
+`apps/api` typechecked with 90 errors; ten were its own and the rest were in
+the feature packages it pulls in. Working through them turned up defects rather
+than noise, because a transport that cannot compile is a door nobody has run:
+
+- **`license.*` and `licenseEnforcement.*` raised a TypeError on every call.**
+  Both transports read their capabilities through `ctx.app.licensing`, eight
+  call sites between them, and nothing in `platform/app` composed a
+  `LicensingApp` or put one on the App. The composition still passed the ports
+  the transports used to take — TypeScript objected at four call sites, and the
+  values were then ignored at runtime, so the argument that was still there
+  described a wiring that no longer existed.
+- **`prisma.annotation-queue.repository.ts` could not load at all**, importing
+  `AnnotationQueueStore` from a file that does not exist.
+- **`GatewaySpendProcessingEvent`** was named by the spend pipeline, its
+  settlement process manager and its fold projection, and declared by none of
+  them — because `gateway-spend-events.adapter.ts` hand-wrote its own envelope
+  instead of extending the framework's `EventSchema`, and the copy disagreed in
+  three ways: no `createdAt`, `occurredAt` as a `Date` rather than epoch
+  milliseconds, and plain strings where the framework brands `tenantId`,
+  `aggregateType` and `type`.
+- **A graph alert or a scheduled report could be created with an action it
+  cannot perform.** Both deliver notifications and have nowhere to put a row;
+  their builders' input types say so and the door passed `input.action` through
+  from the full enum, so a graph alert asking to add to a dataset was stored
+  and then never delivered. It is refused now, with its own error code and
+  customer copy.
+- **`budgetStatus` never fired its 80% warning for a blocking scope**: the
+  guard was `"pctUsed" in topScope && topScope.pctUsed >= 80` over a union
+  where only one member carries the field, which types the value `unknown`.
+- **The webhook test-fire sliced an `unknown` body**, which throws on a queue
+  transport that answers with anything but a string.
+- Four chained `procedure.input(a).input(b)` calls — three trace reads and one
+  analytics read — had not compiled since their first schema became a port.
+  tRPC types the second call as a conditional on the input already
+  accumulated, and a conditional over an unresolved type parameter never takes
+  the merging branch.
+- Three helpers annotated `ctx` with the router's type parameter rather than
+  the constraint. tRPC hands a resolver a `Simplify<TContext>`; eleven call
+  sites in the SSO back office alone.
+- Two middlewares returned on some paths and fell off the end on others.
+- `@langwatch/gateway-contract` was imported by
+  `composition/api/src/governance/gateway-debit.adapter.ts` and was not a
+  dependency of that package.
+
+And a regression of this branch's own test colocation: six fixtures stayed in
+`tests/` when their tests moved into `__tests__`, and two of the three tests
+reading them broke. `automation-template.service.unit.test.ts` failed to load
+entirely, taking twenty tests with it.
+
 ### What is left for this app
 
 - 44 REST apps and 18 internal-api tRPC routers to extract.
 - Make the standalone process serve the composed surface, or accept that
   `platform/app` remains the composition root until it is deleted.
 - Resolve ADR 002's status against the shipped removal.
-- `packages/features/stored-object/server/src/api/public/stored-object.api.ts`
-  is written against a `GroupRegistrar.register` that the builder no longer has
-  (12 type errors, 1 red test). It is a v0 foundation: nothing installs it and
-  it is not on `main`'s spec. Either port it to `registerRoute`/`RestService`
-  or delete it.
+- **One decision, not a repair.**
+  `packages/features/stored-object/server/src/api/public/stored-object.api.ts`
+  is the only remaining source of typecheck errors reachable from this app
+  (12 of them, plus 1 red test). It is written against
+  `GroupRegistrar.register(name, version, …)`, which ADR 001's withdrawal
+  removed — "no service ever registered a dotted operation, so every catalogue
+  answered empty" — and this v0 family is the counter-example that was
+  overlooked, because nothing installs it. It is not on `main`'s spec, and the
+  feature already has a live REST family (`/api/files`) and a live tRPC
+  transport. Port it onto `registerRoute`, which means choosing REST paths for
+  its four operations, or delete it.
 
 ## `apps/worker`
 
@@ -195,12 +252,13 @@ written; false one commit later, when `f9fd8aeab5` added 157 lines to
 ## Verification
 
 ```text
-apps/api      22 test files, 95 tests, green; own sources typecheck clean
-apps/worker   19 test files, 107 tests, green; own sources typecheck clean
+apps/api      20 test files, 83 tests, green
+apps/worker   19 test files, 107 tests, green
+both apps     zero typecheck errors, in src AND in tests
+apps/api's dependency graph   90 errors -> 12, all twelve in the one file above
 route gate    274/381 documented, 0 unexplained, 0 stale
 ```
 
-`apps/api`'s typecheck still reports 71 errors and `apps/worker`'s 5, all of
-them inside feature packages they depend on rather than in either app: the zod
-dual-major boundary in four tRPC transports, `stored-object`'s dead public RPC
-family, and a Hono context variance in `stored-object`'s REST family.
+`apps/api` ran 95 tests before its own `tests/` mirror was dissolved; twelve of
+them tested `@langwatch/api` and moved there, which is why that package now
+runs 302 rather than 290.
