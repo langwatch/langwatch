@@ -270,6 +270,20 @@ Feature: The scenarios table
     And removing the block takes the fields away and offers the chip again
 
   @integration
+  Scenario: A block a chip opens reads under the criteria, not at the foot of the body
+    Given the scenario dialog is open
+    When "Define min and max turns" is chosen
+    Then the block reads straight under the criteria
+    And the "Customize scenario" chip row is the last thing in the body
+    And a short scenario leaves no gap between the criteria and the block
+
+  @integration
+  Scenario: Two open blocks read in the order their chips sit in
+    Given the scenario dialog is open
+    When "Add parameters" and "Override models" are both chosen
+    Then the parameters read above the model overrides, the way the chips are ordered
+
+  @integration
   Scenario: Editing a scenario opens the blocks it already uses
     Given a stored scenario with parameters and a judge model of its own
     When its editor is opened

@@ -262,11 +262,21 @@ export function CaseModalFields({
       )}
       <TitleAndSuiteRow draft={draft} setDraft={setDraft} suites={suites} />
       <SituationAndCriteria draft={draft} setDraft={setDraft} />
-      {/* The chip row sits pinned to the bottom of the scroll area, so the
-          gap between the last question and the footer belongs to it, not to
+      {/* A block a chip opened reads where the reader was looking when they
+          opened it: straight under the criteria, in the order the chips sit
+          in. Pinned to the foot with the chip row, it left a hole under a
+          short scenario and read as part of the chips rather than as part of
+          the scenario. */}
+      <CustomizeBlocks editor={editor} />
+      {/* The chip row alone is pinned to the bottom of the scroll area, so the
+          gap between the last block and the footer belongs to it, not to
           empty space. */}
       <Box marginTop="auto">
-        <CustomizeSection editor={editor} />
+        <CustomizeChips
+          title="Customize scenario"
+          chips={editor.customize.chips}
+          testId="customize-case-chips"
+        />
       </Box>
     </VStack>
   );
@@ -424,14 +434,27 @@ function ModelsBlock({
 }
 
 /**
- * What the scenario can carry beyond the four questions: the parameters, the turn
- * limits and the model overrides, each behind a chip until it is asked for.
+ * What the scenario can carry beyond the four questions: the parameters, the
+ * turn limits and the model overrides, each behind a chip until it is asked
+ * for.
+ *
+ * The blocks read in the order their chips sit in, and they read as part of the
+ * scenario rather than as part of the chip row: a scenario with one block open
+ * runs criteria, block, chips, top to bottom.
  */
-function CustomizeSection({ editor }: { editor: CaseEditorState }) {
+function CustomizeBlocks({ editor }: { editor: CaseEditorState }) {
   const { draft, setDraft, customize } = editor;
 
+  if (
+    !customize.showParameters &&
+    !customize.showTurns &&
+    !customize.showModels
+  ) {
+    return null;
+  }
+
   return (
-    <VStack align="stretch" gap={4}>
+    <VStack align="stretch" gap={4} data-testid="case-customize-blocks">
       {customize.showParameters && (
         <ParametersBlock
           draft={draft}
@@ -453,11 +476,6 @@ function CustomizeSection({ editor }: { editor: CaseEditorState }) {
           onRemove={customize.removeModels}
         />
       )}
-      <CustomizeChips
-        title="Customize scenario"
-        chips={customize.chips}
-        testId="customize-case-chips"
-      />
     </VStack>
   );
 }

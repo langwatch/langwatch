@@ -232,6 +232,54 @@ describe("the scenario dialog", () => {
       expect(dialog.textContent).not.toMatch(/with AI|Langy/i);
     });
 
+    /** @scenario "A block a chip opens reads under the criteria, not at the foot of the body" */
+    it("reads a block under the criteria and leaves only the chips at the foot", async () => {
+      const user = userEvent.setup();
+      openNew();
+      await screen.findByTestId("case-modal");
+
+      await user.click(screen.getByTestId("customize-chip-case-turns"));
+
+      const criteria = screen.getByLabelText("Criteria");
+      const block = await screen.findByTestId("case-turns-block");
+      const chips = screen.getByTestId("customize-case-chips");
+
+      // The block belongs to the scenario, so it reads where the reader was
+      // looking, and the chip row is what stays at the foot of the body.
+      expect(
+        criteria.compareDocumentPosition(block) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        block.compareDocumentPosition(chips) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+
+      // Only the chip row is held at the foot. While the block shared that
+      // wrapper it was pushed down with the chips, which left the hole under a
+      // short scenario.
+      const pinnedToTheFoot = chips.parentElement;
+      expect(pinnedToTheFoot).not.toBeNull();
+      expect(pinnedToTheFoot!.contains(block)).toBe(false);
+    });
+
+    /** @scenario "Two open blocks read in the order their chips sit in" */
+    it("orders two open blocks the way their chips are ordered", async () => {
+      const user = userEvent.setup();
+      openNew();
+      await screen.findByTestId("case-modal");
+
+      await user.click(screen.getByTestId("customize-chip-case-parameters"));
+      await user.click(screen.getByTestId("customize-chip-case-models"));
+
+      const parameters = await screen.findByTestId("case-parameters-block");
+      const models = await screen.findByTestId("case-models-block");
+
+      expect(
+        parameters.compareDocumentPosition(models) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
     /** @scenario "The situation and the criteria grow with what is written in them" */
     it("lets the situation and the criteria grow, and caps them at three times their height", async () => {
       openNew();
