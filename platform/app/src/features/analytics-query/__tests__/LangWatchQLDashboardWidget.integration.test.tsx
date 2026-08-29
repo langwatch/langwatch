@@ -33,7 +33,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
+import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 
 const { mutateMock, chartQueryMock } = vi.hoisted(() => ({
   mutateMock: vi.fn(),
@@ -71,11 +71,9 @@ vi.mock("~/utils/api", () => ({
 // that echoes the row count, so "the widget drew this answer" is observable
 // without mounting Vega.
 vi.mock("../components/LazyLangWatchQLWidgetChart", () => ({
-  LazyLangWatchQLWidgetChart: ({
-    rows,
-  }: {
-    rows: readonly Record<string, unknown>[];
-  }) => <div data-testid="widget-chart">{JSON.stringify(rows)}</div>,
+  LazyLangWatchQLWidgetChart: ({ rows }: { rows: readonly Record<string, unknown>[] }) => (
+    <div data-testid="widget-chart">{JSON.stringify(rows)}</div>
+  ),
 }));
 
 import { LangWatchQLDashboardWidget } from "../components/LangWatchQLDashboardWidget";
@@ -107,9 +105,7 @@ function answer({
 const mount = (element: ReactElement) =>
   render(<ChakraProvider value={defaultSystem}>{element}</ChakraProvider>);
 
-function mountWidget(
-  props: { granularitySeconds?: LangWatchQLGranularityStep } = {},
-) {
+function mountWidget(props: { granularitySeconds?: LangWatchQLGranularityStep } = {}) {
   return mount(
     <LangWatchQLDashboardWidget
       chartId="chart_1"
@@ -179,9 +175,7 @@ describe("the LangWatchQL dashboard widget", () => {
       );
 
       await screen.findByTestId("widget-chart");
-      expect(
-        screen.queryByTestId("lwql-widget-coarsened-notice"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("lwql-widget-coarsened-notice")).not.toBeInTheDocument();
     });
   });
 

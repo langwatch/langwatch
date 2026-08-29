@@ -49,10 +49,7 @@ export type {
   LangWatchQLGranularityResolution,
   LangWatchQLTimeWindowResolution,
 } from "./resolveTimeWindow";
-export {
-  resolveLangWatchQLGranularity,
-  resolveLangWatchQLTimeWindow,
-} from "./resolveTimeWindow";
+export { resolveLangWatchQLGranularity, resolveLangWatchQLTimeWindow } from "./resolveTimeWindow";
 export type {
   LangWatchQLSchema,
   LangWatchQLSchemaColumn,
@@ -60,7 +57,7 @@ export type {
 } from "./schema";
 export { describeLangWatchQLSchema, lwqlExampleSql } from "./schema";
 export { MAX_LWQL_LENGTH } from "./sqlText";
-export type { LangWatchQLTimeWindow } from "./timeWindow";
+export type { LangWatchQLTimeWindow } from "@langwatch/analytics-contract";
 export {
   formatLangWatchQLDateTimeParameter,
   isLangWatchQLDateTimeParameterType,
@@ -68,4 +65,4 @@ export {
   LWQL_PERIOD_END_PARAMETER,
   LWQL_PERIOD_START_PARAMETER,
   LWQL_TIME_WINDOW_PARAMETERS,
-} from "./timeWindow";
+} from "@langwatch/analytics-contract";

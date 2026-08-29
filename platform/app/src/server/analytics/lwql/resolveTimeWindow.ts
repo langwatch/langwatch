@@ -48,7 +48,7 @@ import {
   LWQL_PERIOD_END_PARAMETER,
   LWQL_PERIOD_GRANULARITY_PARAMETER,
   LWQL_PERIOD_START_PARAMETER,
-} from "./timeWindow";
+} from "@langwatch/analytics-contract";
 import type { LangWatchQLParameter } from "./validation/validate";
 
 /** What a statement's reserved names mean for the request about to be made. */
@@ -79,10 +79,7 @@ export interface LangWatchQLTimeWindowResolution {
   readonly awaitingTimeWindow: readonly string[];
 }
 
-function valueFor(
-  name: LangWatchQLTimeWindowParameter,
-  timeWindow: LangWatchQLTimeWindow,
-): string {
+function valueFor(name: LangWatchQLTimeWindowParameter, timeWindow: LangWatchQLTimeWindow): string {
   return formatLangWatchQLDateTimeParameter(
     name === LWQL_PERIOD_START_PARAMETER ? timeWindow.start : timeWindow.end,
   );
@@ -123,9 +120,7 @@ export function resolveLangWatchQLTimeWindow({
   /** The period the surface is showing, when it has one. */
   readonly timeWindow?: LangWatchQLTimeWindow;
 }): LangWatchQLTimeWindowResolution {
-  const reserved = declared.filter((parameter) =>
-    isLangWatchQLTimeWindowParameter(parameter.name),
-  );
+  const reserved = declared.filter((parameter) => isLangWatchQLTimeWindowParameter(parameter.name));
 
   const mistyped = reserved
     .filter((parameter) => !isLangWatchQLDateTimeParameterType(parameter.type))
@@ -359,9 +354,7 @@ function resolveAgainstBudget({
     // coarsening would put a notice on a card whose answer never changed.
     // Reachable the moment a day-scale step joins the offered list, where the
     // fallback to the coarsest fitting step can land below the request.
-    ...(effective > granularitySeconds
-      ? { coarsenedFromSeconds: granularitySeconds }
-      : {}),
+    ...(effective > granularitySeconds ? { coarsenedFromSeconds: granularitySeconds } : {}),
   };
 }
 
@@ -403,8 +396,7 @@ export function assertLangWatchQLGranularityDeclaration(
       !absent.includes(name) &&
       !declared.some(
         (parameter) =>
-          parameter.name === name &&
-          isLangWatchQLDateTimeParameterType(parameter.type),
+          parameter.name === name && isLangWatchQLDateTimeParameterType(parameter.type),
       ),
   );
   if (absent.length > 0 || mistyped.length > 0) {

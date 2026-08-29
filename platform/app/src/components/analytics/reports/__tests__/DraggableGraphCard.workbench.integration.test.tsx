@@ -27,7 +27,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
+import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
@@ -53,24 +53,21 @@ vi.mock("~/components/analytics/CustomGraph", () => ({
   CustomGraph: () => <div data-testid="builder-graph" />,
 }));
 
-vi.mock(
-  "~/features/analytics-query/components/LangWatchQLDashboardWidget",
-  () => ({
-    LangWatchQLDashboardWidget: ({
-      chartId,
-      granularitySeconds,
-    }: {
-      chartId: string;
-      granularitySeconds?: number;
-    }) => (
-      <div
-        data-testid="workbench-widget"
-        data-chart-id={chartId}
-        data-granularity={granularitySeconds ?? "unset"}
-      />
-    ),
-  }),
-);
+vi.mock("~/features/analytics-query/components/LangWatchQLDashboardWidget", () => ({
+  LangWatchQLDashboardWidget: ({
+    chartId,
+    granularitySeconds,
+  }: {
+    chartId: string;
+    granularitySeconds?: number;
+  }) => (
+    <div
+      data-testid="workbench-widget"
+      data-chart-id={chartId}
+      data-granularity={granularitySeconds ?? "unset"}
+    />
+  ),
+}));
 
 import { WORKBENCH_SQL_CHART_KIND } from "~/server/analytics/chartKinds";
 
@@ -136,9 +133,7 @@ describe("a dashboard grid card", () => {
     it("offers the alert bell", () => {
       renderCard({ kind: "builder" });
 
-      expect(
-        screen.getByRole("button", { name: /Add alert/ }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Add alert/ })).toBeInTheDocument();
     });
 
     it("draws the builder renderer for a row carrying no kind at all", () => {
@@ -163,9 +158,7 @@ describe("a dashboard grid card", () => {
     it("offers no alert bell", () => {
       renderCard({ kind: WORKBENCH_SQL_CHART_KIND });
 
-      expect(
-        screen.queryByRole("button", { name: /Add alert/ }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Add alert/ })).not.toBeInTheDocument();
     });
 
     it("passes the stored step through to the widget", () => {
@@ -174,10 +167,7 @@ describe("a dashboard grid card", () => {
         granularitySeconds: 3600,
       });
 
-      expect(screen.getByTestId("workbench-widget")).toHaveAttribute(
-        "data-granularity",
-        "3600",
-      );
+      expect(screen.getByTestId("workbench-widget")).toHaveAttribute("data-granularity", "3600");
     });
 
     it("passes no step when the row carries none, leaving the widget its default", () => {
@@ -188,10 +178,7 @@ describe("a dashboard grid card", () => {
         granularitySeconds: null,
       });
 
-      expect(screen.getByTestId("workbench-widget")).toHaveAttribute(
-        "data-granularity",
-        "unset",
-      );
+      expect(screen.getByTestId("workbench-widget")).toHaveAttribute("data-granularity", "unset");
     });
   });
 });

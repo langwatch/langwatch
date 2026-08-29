@@ -24,7 +24,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
+import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import { api } from "~/utils/api";
 
 export interface UseLangWatchQLWidgetRunInput {
@@ -76,9 +76,7 @@ export function useLangWatchQLWidgetRun({
     // never replaced by an older one that resolved late.
     const settle = (outcome: Settled) => {
       setSettled((current) =>
-        current !== null && current.sequence > outcome.sequence
-          ? current
-          : outcome,
+        current !== null && current.sequence > outcome.sequence ? current : outcome,
       );
     };
 
@@ -98,20 +96,10 @@ export function useLangWatchQLWidgetRun({
         onError: (error) => settle({ sequence, error }),
       },
     );
-  }, [
-    isChartLoaded,
-    requestKey,
-    mutate,
-    chartId,
-    projectId,
-    start,
-    end,
-    granularitySeconds,
-  ]);
+  }, [isChartLoaded, requestKey, mutate, chartId, projectId, start, end, granularitySeconds]);
 
   return {
-    result:
-      settled !== null && "result" in settled ? settled.result : undefined,
+    result: settled !== null && "result" in settled ? settled.result : undefined,
     error: settled !== null && "error" in settled ? settled.error : undefined,
   };
 }

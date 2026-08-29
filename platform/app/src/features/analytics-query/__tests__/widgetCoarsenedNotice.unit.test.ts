@@ -17,7 +17,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { LWQL_GRANULARITY_MAX_BUCKETS } from "~/server/analytics/lwql/timeWindow";
+import { LWQL_GRANULARITY_MAX_BUCKETS } from "@langwatch/analytics-contract";
 
 import { widgetCoarsenedNotice } from "../logic/widgetCoarsenedNotice";
 

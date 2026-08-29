@@ -32,8 +32,8 @@ import {
   resolveLangWatchQLTimeWindow,
 } from "./resolveTimeWindow";
 import { describeLangWatchQLSchema } from "./schema";
-import type { LangWatchQLTimeWindow } from "./timeWindow";
-import { LWQL_PERIOD_GRANULARITY_PARAMETER } from "./timeWindow";
+import type { LangWatchQLTimeWindow } from "@langwatch/analytics-contract";
+import { LWQL_PERIOD_GRANULARITY_PARAMETER } from "@langwatch/analytics-contract";
 import { lwqlValidationError } from "./validation/errors";
 import { type AcceptedLangWatchQL, validateLangWatchQL } from "./validation/validate";
 

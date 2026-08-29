@@ -15,9 +15,10 @@
  * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
-import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
-
-export type LangWatchQLGranularityStep = 1 | 60 | 3600;
+import type {
+  LangWatchQLGranularityStep,
+  LangWatchQLQueryResult,
+} from "@langwatch/analytics-contract";
 
 /**
  * A bound parameter's value. Scalars only, matching what the API accepts — a

@@ -17,7 +17,7 @@
  */
 import { z } from "zod";
 
-import { LWQL_GRANULARITY_STEPS } from "./timeWindow";
+import { LWQL_GRANULARITY_STEPS } from "@langwatch/analytics-contract";
 
 /**
  * The widest and narrowest UTC years a bound may land on.

@@ -18,14 +18,13 @@
 import {
   describeLangWatchQLGranularityStep,
   LWQL_GRANULARITY_MAX_BUCKETS,
-} from "~/server/analytics/lwql/timeWindow";
+} from "@langwatch/analytics-contract";
 
 /**
  * How one datapoint step is named inside this notice: the adjective form,
  * because every mention here modifies "buckets".
  */
-const step = (seconds: number): string =>
-  describeLangWatchQLGranularityStep(seconds, "adjective");
+const step = (seconds: number): string => describeLangWatchQLGranularityStep(seconds, "adjective");
 
 /** The notice a widget shows when its period forced a coarser step. */
 export function widgetCoarsenedNotice({

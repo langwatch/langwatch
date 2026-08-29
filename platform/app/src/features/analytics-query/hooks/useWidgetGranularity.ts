@@ -25,17 +25,15 @@
  */
 
 import { useCallback, useMemo } from "react";
-import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
+import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 
-import { LWQL_GRANULARITY_STEPS } from "~/server/analytics/lwql/timeWindow";
+import { LWQL_GRANULARITY_STEPS } from "@langwatch/analytics-contract";
 import { useRouter } from "~/utils/compat/next-router";
 
 /** The query parameter the whole picker state is encoded into. */
 export const WIDGET_GRANULARITY_QUERY_PARAMETER = "widgetGranularity";
 
-const isOfferedStep = (
-  seconds: number,
-): seconds is LangWatchQLGranularityStep =>
+const isOfferedStep = (seconds: number): seconds is LangWatchQLGranularityStep =>
   (LWQL_GRANULARITY_STEPS as readonly number[]).includes(seconds);
 
 /**
@@ -75,14 +73,9 @@ export function encodeWidgetGranularity(
 
 export interface WidgetGranularityState {
   /** The step each card was picked to run at, by graph id. */
-  readonly granularityByGraphId: Readonly<
-    Record<string, LangWatchQLGranularityStep>
-  >;
+  readonly granularityByGraphId: Readonly<Record<string, LangWatchQLGranularityStep>>;
   /** Records a member's pick for one card, into the URL. */
-  readonly setGranularity: (
-    graphId: string,
-    granularitySeconds: number,
-  ) => void;
+  readonly setGranularity: (graphId: string, granularitySeconds: number) => void;
 }
 
 export function useWidgetGranularity(): WidgetGranularityState {
@@ -90,10 +83,7 @@ export function useWidgetGranularity(): WidgetGranularityState {
   const encoded = router.query[WIDGET_GRANULARITY_QUERY_PARAMETER];
   const encodedValue = typeof encoded === "string" ? encoded : undefined;
 
-  const granularityByGraphId = useMemo(
-    () => parseWidgetGranularity(encodedValue),
-    [encodedValue],
-  );
+  const granularityByGraphId = useMemo(() => parseWidgetGranularity(encodedValue), [encodedValue]);
 
   const setGranularity = useCallback(
     (graphId: string, granularitySeconds: number) => {
@@ -107,8 +97,7 @@ export function useWidgetGranularity(): WidgetGranularityState {
         [graphId]: granularitySeconds,
       });
 
-      const { [WIDGET_GRANULARITY_QUERY_PARAMETER]: _replaced, ...rest } =
-        router.query;
+      const { [WIDGET_GRANULARITY_QUERY_PARAMETER]: _replaced, ...rest } = router.query;
 
       // Same route, query only: the picks are read from the URL on render, so
       // the dashboard re-renders without remounting and only the card whose

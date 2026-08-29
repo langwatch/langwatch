@@ -17,11 +17,8 @@ import {
   LangWatchQLGranularityTooFineError,
   LangWatchQLReservedGranularityTypeError,
 } from "../errors";
-import {
-  LWQL_GRANULARITY_MAX_BUCKETS,
-  resolveLangWatchQLGranularity,
-} from "../resolveTimeWindow";
-import { LWQL_GRANULARITY_STEPS } from "../timeWindow";
+import { LWQL_GRANULARITY_MAX_BUCKETS, resolveLangWatchQLGranularity } from "../resolveTimeWindow";
+import { LWQL_GRANULARITY_STEPS } from "@langwatch/analytics-contract";
 import type { LangWatchQLParameter } from "../validation/validate";
 
 const GRANULARITY: LangWatchQLParameter[] = [
@@ -66,10 +63,7 @@ function metaOf(run: () => unknown): Record<string, unknown> {
   try {
     run();
   } catch (error) {
-    return ((error as { meta?: Record<string, unknown> }).meta ?? {}) as Record<
-      string,
-      unknown
-    >;
+    return ((error as { meta?: Record<string, unknown> }).meta ?? {}) as Record<string, unknown>;
   }
   return {};
 }
@@ -130,31 +124,25 @@ describe("resolveLangWatchQLGranularity", () => {
 
   describe("given the parameter declared with the wrong type", () => {
     /** @scenario "The granularity parameter declared as anything but UInt32 is refused" */
-    it.each([
-      ["Int32"],
-      ["UInt16"],
-      ["Float64"],
-      ["UInt32('UTC')"],
-      ["String"],
-    ])("refuses %s at run as well as save", (type) => {
-      expect(() =>
-        resolveLangWatchQLGranularity({
-          declared: [...PERIOD, { name: "period_granularity_seconds", type }],
-          timeWindow: WINDOW,
-          granularitySeconds: 60,
-        }),
-      ).toThrow(LangWatchQLReservedGranularityTypeError);
-    });
+    it.each([["Int32"], ["UInt16"], ["Float64"], ["UInt32('UTC')"], ["String"]])(
+      "refuses %s at run as well as save",
+      (type) => {
+        expect(() =>
+          resolveLangWatchQLGranularity({
+            declared: [...PERIOD, { name: "period_granularity_seconds", type }],
+            timeWindow: WINDOW,
+            granularitySeconds: 60,
+          }),
+        ).toThrow(LangWatchQLReservedGranularityTypeError);
+      },
+    );
 
     it("reports the wrong declared type, not the bad step, when both are wrong", () => {
       // Wrong type AND zero: the declaration is what the author must fix
       // first, so its copy is the answer either way.
       const run = () =>
         resolveLangWatchQLGranularity({
-          declared: [
-            ...PERIOD,
-            { name: "period_granularity_seconds", type: "Int64" },
-          ],
+          declared: [...PERIOD, { name: "period_granularity_seconds", type: "Int64" }],
           parameters: {},
           timeWindow: WINDOW,
           granularitySeconds: 0,
@@ -175,9 +163,7 @@ describe("resolveLangWatchQLGranularity", () => {
 
     /** @scenario "A caller that supplies period_granularity_seconds itself is refused" */
     it("is refused by this resolver even when called on its own", () => {
-      expect(codeOf(suppliesGranularity)).toBe(
-        "lwql_reserved_parameter_supplied",
-      );
+      expect(codeOf(suppliesGranularity)).toBe("lwql_reserved_parameter_supplied");
     });
 
     it("names the granularity parameter rather than the window pair", () => {
@@ -363,9 +349,7 @@ describe("resolveLangWatchQLGranularity", () => {
           });
 
           if (resolution.coarsenedFromSeconds !== undefined) {
-            expect(resolution.granularitySeconds).toBeGreaterThan(
-              resolution.coarsenedFromSeconds,
-            );
+            expect(resolution.granularitySeconds).toBeGreaterThan(resolution.coarsenedFromSeconds);
           }
         }
       }
@@ -407,8 +391,7 @@ describe("resolveLangWatchQLGranularity", () => {
         start: new Date("2026-02-20T00:00:00.000Z"),
         end: new Date("2036-02-20T00:00:00.000Z"),
       };
-      const coarsest =
-        LWQL_GRANULARITY_STEPS[LWQL_GRANULARITY_STEPS.length - 1];
+      const coarsest = LWQL_GRANULARITY_STEPS[LWQL_GRANULARITY_STEPS.length - 1];
 
       const run = () =>
         resolveLangWatchQLGranularity({
@@ -432,9 +415,7 @@ describe("resolveLangWatchQLGranularity", () => {
       // Integer-exact by construction -- the float-division route (% !== 0)
       // was itself a test bug, not a property of the contract.
       const start = new Date("2026-02-20T00:00:00.000Z");
-      const end = new Date(
-        start.getTime() + LWQL_GRANULARITY_MAX_BUCKETS * 1000,
-      );
+      const end = new Date(start.getTime() + LWQL_GRANULARITY_MAX_BUCKETS * 1000);
       const resolution = resolveLangWatchQLGranularity({
         declared: [...PERIOD, ...GRANULARITY],
         timeWindow: { start, end },
@@ -447,9 +428,7 @@ describe("resolveLangWatchQLGranularity", () => {
 
     it("refuses one bucket past the ceiling", () => {
       const start = new Date("2026-02-20T00:00:00.000Z");
-      const end = new Date(
-        start.getTime() + (LWQL_GRANULARITY_MAX_BUCKETS + 1) * 1000,
-      );
+      const end = new Date(start.getTime() + (LWQL_GRANULARITY_MAX_BUCKETS + 1) * 1000);
       expect(() =>
         resolveLangWatchQLGranularity({
           declared: [...PERIOD, ...GRANULARITY],

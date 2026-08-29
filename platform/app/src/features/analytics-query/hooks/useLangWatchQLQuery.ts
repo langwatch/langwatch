@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
-import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
+import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import { api } from "~/utils/api";
 
 import { createLangWatchQLExecute } from "../logic/lwqlExecute";
@@ -32,15 +32,11 @@ export interface UseLangWatchQLQuery {
   /** What the primary action reads right now. */
   actionLabel: LangWatchQLActionLabel;
   setSql: (sql: string) => void;
-  setParameters: (
-    parameters: Readonly<Record<string, LangWatchQLParameterValue>>,
-  ) => void;
+  setParameters: (parameters: Readonly<Record<string, LangWatchQLParameterValue>>) => void;
   /** Sets the period the next submission reports over, or clears it. */
   setTimeWindow: (timeWindow: LangWatchQLTimeWindowValues | undefined) => void;
   /** Sets the step the next submission buckets at, or clears it. */
-  setGranularity: (
-    granularitySeconds: LangWatchQLGranularityStep | undefined,
-  ) => void;
+  setGranularity: (granularitySeconds: LangWatchQLGranularityStep | undefined) => void;
   /** Submits the current draft. Ignored while a request is in flight. */
   runQuery: () => void;
   /** Re-sends the submitted snapshot, never the draft. */
@@ -49,11 +45,7 @@ export interface UseLangWatchQLQuery {
   cancelQuery: () => void;
 }
 
-export function useLangWatchQLQuery({
-  projectId,
-}: {
-  projectId: string;
-}): UseLangWatchQLQuery {
+export function useLangWatchQLQuery({ projectId }: { projectId: string }): UseLangWatchQLQuery {
   const utils = api.useUtils();
 
   // Read through refs so the controller survives every re-render: rebuilding it
@@ -91,8 +83,7 @@ export function useLangWatchQLQuery({
     [controller],
   );
   const setTimeWindow = useCallback(
-    (timeWindow: LangWatchQLTimeWindowValues | undefined) =>
-      controller.setTimeWindow(timeWindow),
+    (timeWindow: LangWatchQLTimeWindowValues | undefined) => controller.setTimeWindow(timeWindow),
     [controller],
   );
   const setGranularity = useCallback(

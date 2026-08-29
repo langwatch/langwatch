@@ -17,7 +17,7 @@ import { resolveLangWatchQLTimeWindow } from "../resolveTimeWindow";
 import {
   formatLangWatchQLDateTimeParameter,
   isLangWatchQLDateTimeParameterType,
-} from "../timeWindow";
+} from "@langwatch/analytics-contract";
 import type { LangWatchQLParameter } from "../validation/validate";
 
 const PERIOD: LangWatchQLParameter[] = [
@@ -44,10 +44,7 @@ function metaOf(run: () => unknown): Record<string, unknown> {
   try {
     run();
   } catch (error) {
-    return ((error as { meta?: Record<string, unknown> }).meta ?? {}) as Record<
-      string,
-      unknown
-    >;
+    return ((error as { meta?: Record<string, unknown> }).meta ?? {}) as Record<string, unknown>;
   }
   return {};
 }
@@ -68,9 +65,9 @@ describe("given an instant to hand the database", () => {
   describe("when it is formatted as a bound parameter", () => {
     /** @scenario "The injected window is a UTC ClickHouse date-time, not an ISO-8601 instant" */
     it("spells it as a space-separated UTC date-time with no zone designator", () => {
-      expect(
-        formatLangWatchQLDateTimeParameter(new Date("2026-02-20T12:34:56.000Z")),
-      ).toBe("2026-02-20 12:34:56");
+      expect(formatLangWatchQLDateTimeParameter(new Date("2026-02-20T12:34:56.000Z"))).toBe(
+        "2026-02-20 12:34:56",
+      );
     });
 
     /** @scenario "The injected window is a UTC ClickHouse date-time, not an ISO-8601 instant" */
@@ -81,9 +78,7 @@ describe("given an instant to hand the database", () => {
       const acrossMidnight = new Date("2026-02-21T01:30:00.000Z");
       expect(new Date(acrossMidnight).getDate(), NON_UTC_ZONE).toBe(20);
 
-      expect(formatLangWatchQLDateTimeParameter(acrossMidnight)).toBe(
-        "2026-02-21 01:30:00",
-      );
+      expect(formatLangWatchQLDateTimeParameter(acrossMidnight)).toBe("2026-02-21 01:30:00");
       // The same instant written the way `toISOString` would: the `T` and the
       // `Z` are exactly what the DateTime binding does not read.
       expect(formatLangWatchQLDateTimeParameter(acrossMidnight)).not.toContain("T");
@@ -92,9 +87,9 @@ describe("given an instant to hand the database", () => {
 
     /** @scenario "The injected window is a UTC ClickHouse date-time, not an ISO-8601 instant" */
     it("truncates below the second and pads every field to its width", () => {
-      expect(
-        formatLangWatchQLDateTimeParameter(new Date("2026-02-03T04:05:06.789Z")),
-      ).toBe("2026-02-03 04:05:06");
+      expect(formatLangWatchQLDateTimeParameter(new Date("2026-02-03T04:05:06.789Z"))).toBe(
+        "2026-02-03 04:05:06",
+      );
     });
 
     it("refuses an invalid date rather than spelling it as text", () => {
@@ -107,12 +102,7 @@ describe("given a declared parameter type", () => {
   describe("when it is measured against what may carry an instant", () => {
     /** @scenario "A reserved period parameter declared as anything but a date-time is refused" */
     it("accepts the date-time spellings and nothing else", () => {
-      for (const type of [
-        "DateTime",
-        "DateTime('UTC')",
-        "DateTime64(3)",
-        "DateTime64(3, 'UTC')",
-      ]) {
+      for (const type of ["DateTime", "DateTime('UTC')", "DateTime64(3)", "DateTime64(3, 'UTC')"]) {
         expect(isLangWatchQLDateTimeParameterType(type), type).toBe(true);
       }
       for (const type of ["String", "UInt64", "Date", "Date32", "Nullable(DateTime)"]) {

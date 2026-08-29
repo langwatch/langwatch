@@ -86,13 +86,10 @@ export const LWQL_SURFACE_PARAMETERS = [
   LWQL_PERIOD_GRANULARITY_PARAMETER,
 ] as const;
 
-export type LangWatchQLSurfaceParameter =
-  (typeof LWQL_SURFACE_PARAMETERS)[number];
+export type LangWatchQLSurfaceParameter = (typeof LWQL_SURFACE_PARAMETERS)[number];
 
 /** Whether a parameter name belongs to the surface rather than the caller. */
-export function isLangWatchQLSurfaceParameter(
-  name: string,
-): name is LangWatchQLSurfaceParameter {
+export function isLangWatchQLSurfaceParameter(name: string): name is LangWatchQLSurfaceParameter {
   return (LWQL_SURFACE_PARAMETERS as readonly string[]).includes(name);
 }
 
@@ -129,8 +126,7 @@ export function isLangWatchQLGranularityParameterType(type: string): boolean {
 export const LWQL_GRANULARITY_STEPS = [1, 60, 3600] as const;
 
 /** One of the offered steps — the only values any door accepts. */
-export type LangWatchQLGranularityStep =
-  (typeof LWQL_GRANULARITY_STEPS)[number];
+export type LangWatchQLGranularityStep = (typeof LWQL_GRANULARITY_STEPS)[number];
 
 /**
  * The unit each offered step is named by, keyed off the steps themselves so a
@@ -163,9 +159,9 @@ export function describeLangWatchQLGranularityStep(
   form: "noun" | "adjective" = "noun",
 ): string {
   const separator = form === "adjective" ? "-" : " ";
-  const unit = (
-    LWQL_GRANULARITY_STEP_UNITS as Readonly<Record<number, string | undefined>>
-  )[seconds];
+  const unit = (LWQL_GRANULARITY_STEP_UNITS as Readonly<Record<number, string | undefined>>)[
+    seconds
+  ];
 
   return unit === undefined
     ? `${seconds}${separator}second${form === "noun" ? "s" : ""}`

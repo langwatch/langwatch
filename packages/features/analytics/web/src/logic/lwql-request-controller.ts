@@ -17,11 +17,11 @@
 
 import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 
+import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import {
   initialLangWatchQLRequestState,
   type LangWatchQLAnswer,
   type LangWatchQLParameterValue,
-  type LangWatchQLGranularityStep,
   type LangWatchQLRequestAction,
   type LangWatchQLRequestState,
   type LangWatchQLSnapshot,
