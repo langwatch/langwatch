@@ -348,6 +348,14 @@ Feature: The scenarios table
     Then the address names the Results tab, the plan the run belongs to and that run
     And the page is not reloaded, so a live run keeps streaming
 
+  @unit
+  Scenario: Every way into a recent run carries the same list icon
+    Given the button above the table and the recent runs of a row menu
+    When the icon of each is read
+    Then both read the list icon the shared list names
+    And no way into a run carries the history icon
+    And the history icon is left to the version history, which is what it means
+
   @integration
   Scenario: A suite whose scenarios have no run in the period offers no recent runs button
     Given a test suite whose scenarios have no run in the period

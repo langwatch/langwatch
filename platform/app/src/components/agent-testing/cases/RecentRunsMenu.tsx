@@ -13,8 +13,8 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import { Box, HStack, Text } from "@chakra-ui/react";
-import { ChevronDown, History } from "lucide-react";
+import { Box, HStack, Icon, Text } from "@chakra-ui/react";
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import type { Period } from "~/components/PeriodSelector";
 import { Menu } from "~/components/ui/menu";
@@ -23,6 +23,7 @@ import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { FG_MUTED } from "../shared/design";
 import { formatPassRate, passRateColor } from "../shared/pass-rate-color";
 import { SmallButton } from "../shared/SmallButton";
+import { MENU_ACTION_ICONS } from "./MenuActionLabel";
 import { useOpenPlanRun } from "./useOpenPlanRun";
 import { type RecentRun, useSuiteRecentRuns } from "./useSuiteRecentRuns";
 
@@ -141,7 +142,7 @@ export function RecentRunsMenu(props: RecentRunsMenuProps) {
     >
       <Menu.Trigger asChild>
         <SmallButton data-testid="recent-runs-trigger">
-          <History size={13} />
+          <Icon as={MENU_ACTION_ICONS.openLastRun} boxSize="13px" />
           {OPEN_RECENT_RUN_LABEL}
           <ChevronDown size={13} />
         </SmallButton>

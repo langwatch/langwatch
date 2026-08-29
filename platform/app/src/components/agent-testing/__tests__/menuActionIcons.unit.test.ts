@@ -26,4 +26,16 @@ describe("given the actions the suites rail and the scenario rows share", () => 
       expect(sourceOf(file)).toContain("MenuActionLabel");
     }
   });
+
+  /** @scenario "Every way into a recent run carries the same list icon" */
+  it("gives the button above the table the same list icon, and leaves history to the versions", () => {
+    const button = sourceOf("RecentRunsMenu.tsx");
+
+    // The button reads the icon from the shared list rather than naming one of
+    // its own, so a way into a run cannot drift from the row menus.
+    expect(button).toContain("MENU_ACTION_ICONS.openLastRun");
+    // The history icon means the version history of a scenario. A way into a
+    // run that carried it read as a way into the versions.
+    expect(button).not.toContain("History");
+  });
 });
