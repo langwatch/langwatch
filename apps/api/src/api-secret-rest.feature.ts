@@ -1,6 +1,6 @@
 import { createRestService, RestVersionSelector } from "@langwatch/api/rest";
 import type { SecretService } from "@langwatch/secret-contract";
-import { SecretPublicRestApi } from "@langwatch/secret-server";
+import { SecretApp, SecretPublicRestApi } from "@langwatch/secret-server";
 import { Hono } from "hono";
 import { ApiRestSecurityPolicy, type ApiRestSecurityPort } from "./api-rest.security";
 
@@ -9,12 +9,12 @@ const restVersionSelector = RestVersionSelector.create({
   latestVersion: "v1",
 });
 
-type ApiSecretRestApplication = Readonly<{ secrets: SecretService }>;
+
 
 /** Installs all deployed Secret REST base paths over one composed service instance. */
 export class ApiSecretRestFeature {
   static create(options: { secrets: SecretService; security: ApiRestSecurityPort }): Hono {
-    const application = { secrets: options.secrets };
+    const application = SecretApp.create({ secrets: options.secrets });
     const security = ApiRestSecurityPolicy.create(options.security);
 
     return new Hono()
@@ -59,13 +59,13 @@ export class ApiSecretRestFeature {
 }
 
 function buildSecretRestApi(options: {
-  application: ApiSecretRestApplication;
+  application: SecretApp;
   basePath: string;
   operationIdSuffix?: string;
   pathVersion?: "v1";
   security: ApiRestSecurityPolicy;
 }): Hono {
-  const rest = createRestService<ApiSecretRestApplication>({
+  const rest = createRestService<SecretApp>({
     name: "secret",
     basePath: options.basePath,
     staticVersioning: {

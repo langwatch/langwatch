@@ -15,6 +15,7 @@
 import type { SecretService } from "@langwatch/secret-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
+import { SecretApp } from "../src/app/secret.app";
 
 import { SecretTrpcApi, type SecretTrpcPolicy } from "../src/api/app-trpc/secret.api";
 
@@ -22,7 +23,7 @@ import { SecretTrpcApi, type SecretTrpcPolicy } from "../src/api/app-trpc/secret
 type ChainableProcedure = { use(middleware: unknown): ChainableProcedure };
 
 type TestContext = {
-  app: { secrets: SecretService };
+  app: { secrets: SecretApp };
   actor(): { id: string };
   authorize(permission: string, target: { projectId: string }): Promise<void>;
   session: { user: { id: string } } | null;
@@ -84,7 +85,7 @@ function harness({ withPolicy = true } = {}) {
     authorize,
     secrets,
     caller: router.createCaller({
-      app: { secrets },
+      app: { secrets: SecretApp.create({ secrets }) },
       actor: () => ({ id: "user-1" }),
       authorize,
       session: { user: { id: "user-1" } },

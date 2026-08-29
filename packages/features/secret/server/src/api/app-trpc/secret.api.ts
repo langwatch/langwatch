@@ -22,15 +22,22 @@ import {
   secretIdSchema,
   secretProjectIdSchema,
   secretValueSchema,
-  type SecretService,
 } from "@langwatch/secret-contract";
 import { z } from "zod";
+import type { SecretApp } from "#app/secret.app";
 
-type SecretApplication = Readonly<{ secrets: SecretService }>;
-
-/** The host supplies authentication; authorization arrives as `policy`. */
+/**
+ * The host supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the host's application this feature reaches, not the
+ * feature's application itself, because a tRPC root is shared by every feature
+ * mounted on it and so carries all of them. The REST door, whose service is
+ * built per family, holds {@link SecretApp} directly. Both reach the same
+ * object; only the path to it differs, and closing that gap means a middleware
+ * that narrows the context per router.
+ */
 export type SecretTrpcContext = Readonly<{
-  app: SecretApplication;
+  app: Readonly<{ secrets: SecretApp }>;
   actor(): Readonly<{ id: string }>;
   /**
    * The project-scoped authorization a host performs when it injects no
@@ -126,19 +133,13 @@ export class SecretTrpcApi {
       ),
       create: policy("secrets:manage")(
         procedure.input(createSecretInputSchema.omit({ actorId: true })),
-      ).mutation(async ({ ctx, input }) => {
-        const actor = ctx.actor();
-        return ctx.app.secrets.create({ ...input, actorId: actor.id });
-      }),
+      ).mutation(async ({ ctx, input }) => ctx.app.secrets.create(input, ctx.actor())),
       update: policy("secrets:manage")(procedure.input(legacyUpdateInputSchema)).mutation(
         async ({ ctx, input }) => {
-          const actor = ctx.actor();
-          await ctx.app.secrets.update({
-            projectId: input.projectId,
-            id: input.secretId,
-            value: input.value,
-            actorId: actor.id,
-          });
+          await ctx.app.secrets.update(
+            { projectId: input.projectId, id: input.secretId, value: input.value },
+            ctx.actor(),
+          );
           return { success: true };
         },
       ),

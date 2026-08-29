@@ -135,12 +135,28 @@ The two transports do not authorize the same way:
 | | What the permission is checked against |
 | --- | --- |
 | tRPC | `scopeLineageGuard(declaration)` runs **after** `.input()` and reads the scope id **from validated input** |
-| REST | `permissionEnforcer: (permission) => MiddlewareHandler` — the **credential's** scope. The input is never consulted. |
+| REST | `permissionEnforcer: (permission) => MiddlewareHandler` — the **credential's** scope only |
 
-So a REST endpoint whose input carries `projectId` is authorized against the
-project the credential resolved to, while its handler reads `input.projectId`.
-When those differ, the caller reads another tenant's data with a permission
-they genuinely hold. It is not a missing declaration; it is a missing *binding*.
+REST does have a comparison, and it is worth being exact about it because the
+first draft of this document was not. `assertAuthorizedProjectInput`
+(`packages/api/src/rest/pipeline.ts:713`) compares `input.projectId` to the
+project on the context and throws `ProjectInputMismatchError` when they differ.
+Three facts about it:
+
+- It opens with `if (!required) return`, where `required` is
+  `serviceConfig.projectIdInput === true` — **opt-in, per service, off by
+  default**. Two files set it, across five services.
+- It knows only `projectId`. `teamId`, `organizationId` and `userId` are not
+  compared by anything.
+- It is a service-wide flag, not a per-endpoint declaration, so it cannot say
+  *which* field an endpoint's permission is about.
+
+So the mechanism exists and is correct where it is switched on; what is missing
+is that it is not the default, is not general, and is not declared where the
+endpoint declares everything else. An endpoint whose input carries `projectId`
+on a service that did not opt in is authorized against the credential's project
+while its handler reads `input.projectId`. It is not a missing check; it is an
+**unbound, opt-out-by-default** one.
 
 A third opt-out (`withConfirmedNoPermission`) would not close it. Whatever the
 wording, the two variants mean "no authorization needed" and reviewers will not

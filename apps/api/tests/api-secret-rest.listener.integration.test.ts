@@ -26,7 +26,15 @@ class TestSecretService extends SecretService {
 
 class TestRestSecurity extends ApiRestSecurityPort {
   readonly authenticate = vi.fn(async () => ({
-    projectId: "project-1",
+    project: {
+      id: "project-1",
+      name: "Project One",
+      slug: "project-one",
+      teamId: "team-1",
+      organizationId: "org-1",
+      isPersonal: false,
+      ownerUserId: null,
+    },
     actor: { id: "user-1" },
   }));
   readonly authorize = vi.fn(async () => undefined);
@@ -134,7 +142,7 @@ describe("standalone Secret REST listener", () => {
     expect(response.status).toBe(201);
     expect(api.security.authenticate).toHaveBeenCalledOnce();
     expect(api.security.authorize).toHaveBeenCalledWith({
-      request: { projectId: "project-1", actor: { id: "user-1" } },
+      request: { project: expect.objectContaining({ id: "project-1" }), actor: { id: "user-1" } },
       permission: "secrets:manage",
     });
     expect(api.secrets.create).toHaveBeenCalledWith({
@@ -145,7 +153,7 @@ describe("standalone Secret REST listener", () => {
     });
     expect(api.security.complete).toHaveBeenCalledOnce();
     expect(api.security.complete).toHaveBeenCalledWith({
-      request: { projectId: "project-1", actor: { id: "user-1" } },
+      request: { project: expect.objectContaining({ id: "project-1" }), actor: { id: "user-1" } },
       method: "POST",
       path: "/api/v1/secret",
       status: 201,

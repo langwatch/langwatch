@@ -1,10 +1,10 @@
 import type { RestService } from "@langwatch/api/rest";
-import { secretPublicRest, toSecretPublic, type SecretService } from "@langwatch/secret-contract";
+import { secretPublicRest, toSecretPublic } from "@langwatch/secret-contract";
+import type { SecretApp } from "#app/secret.app";
 
 export const SECRET_PUBLIC_API_VERSION = "2026-08-24" as const;
 
-type SecretApplication = Readonly<{ secrets: SecretService }>;
-type SecretPublicRestService<TApplication extends SecretApplication> = RestService<
+type SecretPublicRestService<TApplication extends SecretApp> = RestService<
   TApplication,
   false,
   true,
@@ -19,7 +19,7 @@ export class SecretPublicRestApi {
     return new SecretPublicRestApi();
   }
 
-  install<TApplication extends SecretApplication>(
+  install<TApplication extends SecretApp>(
     api: SecretPublicRestService<TApplication>,
     options: SecretPublicRestApiOptions = {},
   ): SecretPublicRestService<TApplication> {
@@ -38,7 +38,7 @@ export class SecretPublicRestApi {
             tags: ["Secrets"],
           })
           .handle(async (context, input) =>
-            (await context.app.secrets.list({ projectId: input.projectId })).map(toSecretPublic),
+            (await context.app.list({ projectId: input.projectId })).map(toSecretPublic),
           ),
       )
       .get("/:id", SECRET_PUBLIC_API_VERSION, (endpoint) =>
@@ -53,7 +53,7 @@ export class SecretPublicRestApi {
           })
           .handle(async (context, input) =>
             toSecretPublic(
-              await context.app.secrets.get({ projectId: input.projectId, id: input.id }),
+              await context.app.get({ projectId: input.projectId, id: input.id }),
             ),
           ),
       )
@@ -70,9 +70,7 @@ export class SecretPublicRestApi {
             tags: ["Secrets"],
           })
           .handle(async (context, input) =>
-            toSecretPublic(
-              await context.app.secrets.create({ ...input, actorId: context.actor().id }),
-            ),
+            toSecretPublic(await context.app.create(input, context.actor())),
           ),
       )
       .put("/:id", SECRET_PUBLIC_API_VERSION, (endpoint) =>
@@ -86,9 +84,7 @@ export class SecretPublicRestApi {
             tags: ["Secrets"],
           })
           .handle(async (context, input) =>
-            toSecretPublic(
-              await context.app.secrets.update({ ...input, actorId: context.actor().id }),
-            ),
+            toSecretPublic(await context.app.update(input, context.actor())),
           ),
       )
       .delete("/:id", SECRET_PUBLIC_API_VERSION, (endpoint) =>
@@ -102,7 +98,7 @@ export class SecretPublicRestApi {
             tags: ["Secrets"],
           })
           .handle(async (context, input) => {
-            await context.app.secrets.delete({ projectId: input.projectId, id: input.id });
+            await context.app.delete({ projectId: input.projectId, id: input.id });
             return { id: input.id, deleted: true };
           }),
       );

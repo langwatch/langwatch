@@ -5,7 +5,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { runWithContext } from "@langwatch/observability/context";
 import type { SecretService } from "@langwatch/secret-contract";
-import { SecretTrpcApi, type SecretTrpcContext } from "@langwatch/secret-server";
+import { SecretApp, SecretTrpcApi, type SecretTrpcContext } from "@langwatch/secret-server";
 import { TRPCError, type TRPCDefaultErrorShape } from "@trpc/server";
 import { TrpcRootDefinition } from "@langwatch/api/trpc";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
@@ -16,7 +16,7 @@ import type { TopicApiFeature } from "./features/topic/topic-api.feature";
 import type { ApiRequestFailureCapturePort } from "./api-process.lifecycle";
 
 export type ApiActor = Readonly<{ id: string }>;
-export type ApiServices = Readonly<{ agents: AgentService; secrets: SecretService }>;
+export type ApiServices = Readonly<{ agents: AgentService; secrets: SecretApp }>;
 
 /** The HTTP host authenticates a request then supplies these policy operations. */
 export type ApiRequestContext = Readonly<{
@@ -179,7 +179,7 @@ export class ApiApplication {
   }): ApiApplication {
     options.topic?.install();
     return new ApiApplication(
-      { agents: options.agents, secrets: options.secrets },
+      { agents: options.agents, secrets: SecretApp.create({ secrets: options.secrets }) },
       options.http,
       options.rest,
       options.topic,
@@ -194,7 +194,7 @@ export class ApiApplication {
   private constructor(
     private readonly services: Readonly<{
       agents: AgentService | undefined;
-      secrets: SecretService;
+      secrets: SecretApp;
     }>,
     private readonly http: ApiHttpOptions | undefined,
     rest: Hono | undefined,
