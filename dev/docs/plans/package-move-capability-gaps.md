@@ -76,3 +76,32 @@ not by size — the giveaway in both open cases above is a constant or a state
 field that travelled while the control that drove it did not. `setGranularity`
 with no caller outside its own unit tests, and `PICKER_UNFILED_GROUP_NAME`
 exported from a component that never groups, are the same tell.
+
+## Test files that still cannot load
+
+Repaired so far: the three Langy suites, `caseFiling`, `canonical-error`, and
+`savedWorkbenchChart.integration` — six of the twenty found. What each of the
+rest names, and why it is not a repoint:
+
+| suite | names | why |
+| --- | --- | --- |
+| `modelProvider.routingHandle.integration` | `ModelProviderService` | The concrete service is internal to `@langwatch/model-provider-server` on purpose — the package's public surface is `PostgresModelProviderAdapter`, which constructs it. Either drive the test through the adapter, or move the test into the package. |
+| `seedOnboardingDefaults.merge.integration` | `ModelProviderService`, `ModelDefaultsRepository` | Same, plus `ModelDefaultsRepository` exists nowhere in the repo. |
+| `modelDefaults.service.userKey.unit` | `assertCanWriteScope` | Exists nowhere. The only `assertCanWriteScope` left is data-retention's, an unrelated port method. |
+| `secrets.service-boundary.unit` | `../secrets` | The router moved out of `server/api/routers`. |
+| `grant-provenance.unit` | `../repositories/authz-grants.ledger.repository`, `./ledger-write-fork.harness` | Neither exists; `server/app-layer/authz/repositories/` is gone. |
+| `getEvaluatorModelSettingFields.unit` | `../getEvaluator` | Deleted by 4b9a5d3eb5, which consolidated evaluator execution. |
+| `runBoardSnapshot.integration` | `../experiment-run.service` | Moved under `@langwatch/experiment-*`. |
+| `governance-ingestion-key-resolution.integration` | `~/server/api-key/token-resolver` | Deleted; no successor by that name. |
+| `savedWorkbenchChart.integration` (was) | — | Fixed. |
+| `langyProcessPipeline.prisma.integration` | `./helpers/langyEventFixtures` | A fixture the colocation move left behind. |
+| `virtualKeySpend.integration`, `budgetOverviewFixture` | each other | The fixture is itself in the broken set. |
+| `e2e/langy/fake-tab-*` (3) | `~/features/langy/uiActions/*` | The whole `uiActions` directory moved into the Langy package. |
+
+The split that matters: a suite naming a symbol that still exists somewhere is
+a repoint, and those are done. A suite naming a symbol that exists **nowhere**
+is one of two things — coverage whose subject was absorbed into a successor
+under a new name, or coverage that was silently dropped. Telling those apart is
+per-suite work and is what the remainder needs. Do not delete them as orphans
+without answering that question: `dashboardBelongsToProject` looked exactly
+like an orphan and was not.
