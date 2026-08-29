@@ -464,6 +464,61 @@ describe("strict feature source layout", () => {
     expect(policies()).not.toContain("feature-source-layout");
   });
 
+  /**
+   * A test is named for the behaviour it pins, never for an artifact, so the
+   * source grammar has nothing useful to say about it. What the layout does
+   * insist on is WHERE it sits — in a `__tests__` directory beside its
+   * subject, rather than in a mirror tree at the package root that only stays
+   * accurate while someone maintains it by hand.
+   */
+  it("accepts tests and their helpers anywhere under a __tests__ directory", () => {
+    featurePackage({ feature: "agent", role: "server", layoutVersion: 0 });
+    write(
+      "packages/features/agent/server/src/services/agent.service.ts",
+      "export class AgentService {}",
+    );
+    write(
+      "packages/features/agent/server/src/services/__tests__/agent.service.unit.test.ts",
+      "export const covered = true;",
+    );
+    // A name the production grammar would reject on every count: no artifact
+    // suffix, four dotted parts, and a level that is not one of the three.
+    write(
+      "packages/features/agent/server/src/services/__tests__/agent.retries.redelivery.test.ts",
+      "export const covered = true;",
+    );
+    // Helpers and fixtures travel with the tests that use them, at any depth.
+    write(
+      "packages/features/agent/server/src/services/__tests__/support/testAgentService.ts",
+      "export const stub = true;",
+    );
+    write(
+      "packages/features/agent/server/src/__tests__/fixtures/agent.fixtures.ts",
+      "export const fixture = true;",
+    );
+
+    expect(policies()).not.toContain("feature-source-layout");
+    expect(policies()).not.toContain("feature-source-filename");
+  });
+
+  /**
+   * The exemption is for the DIRECTORY, not for the word. A test parked beside
+   * production source is still a source path, and the grammar still applies.
+   */
+  it("still rejects a test file that is not inside a __tests__ directory", () => {
+    featurePackage({ feature: "agent", role: "server", layoutVersion: 0 });
+    write(
+      "packages/features/agent/server/src/services/agent.service.ts",
+      "export class AgentService {}",
+    );
+    write(
+      "packages/features/agent/server/src/services/agent.service.unit.test.ts",
+      "export const covered = true;",
+    );
+
+    expect(policies()).toContain("feature-source-layout");
+  });
+
   /** @scenario Unknown or missing layout versions fail */
   it("rejects a missing or unknown layout version", () => {
     featurePackage({ feature: "agent", role: "contract" });

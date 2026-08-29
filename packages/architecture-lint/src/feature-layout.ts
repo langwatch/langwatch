@@ -28,6 +28,22 @@ const CANONICAL_ARTIFACTS = new Set([
   "subscriber",
 ]);
 const TEST_LEVELS = new Set(["unit", "integration", "e2e"]);
+/**
+ * A test lives in a `__tests__` directory beside the code it covers.
+ *
+ * The layout grammar below describes PRODUCTION source: what a service is
+ * called, where a repository may live, which directory a transport goes in. A
+ * test answers none of those questions — it is named for the behaviour it
+ * pins, not for an artifact — so holding it to the same grammar would only ever
+ * produce noise. What matters about a test's path is the one thing this
+ * pattern checks: that it sits beside its subject rather than in a directory
+ * of its own at the package root, where the connection between a test and the
+ * code it covers survives only as long as someone maintains the mirror by hand.
+ *
+ * Anything under `__tests__` is exempt, helpers and fixtures included, at any
+ * depth.
+ */
+const TEST_DIRECTORY = /(?:^|\/)__tests__\//;
 const SERVER_QUALIFIED_ARTIFACTS = new Set(["adapter", "mapper", "repository", "store"]);
 const SERVER_ARCHITECTURAL_QUALIFIERS = new Set([
   "clickhouse",
@@ -138,6 +154,7 @@ function lintSourceFilenames(pkg: ClassifiedPackage): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   const files = walkFiles(`${pkg.root}/src`, (path) => /\.[cm]?[jt]sx?$/.test(path));
   for (const file of files) {
+    if (TEST_DIRECTORY.test(workspacePath(`${pkg.root}/src`, file))) continue;
     const name = file.slice(file.lastIndexOf("/") + 1);
     const valid =
       pkg.kind === "server" ? isStrictServerFilename(name) : isLowerKebabFilename(name);
@@ -153,6 +170,7 @@ function lintContract(pkg: ClassifiedPackage): ArchitectureViolation[] {
 
   for (const file of files) {
     const path = workspacePath(`${pkg.root}/src`, file);
+    if (TEST_DIRECTORY.test(path)) continue;
     const name = path.slice(path.lastIndexOf("/") + 1);
     if (name === "index.ts") continue;
 
@@ -210,6 +228,7 @@ function lintServer(pkg: ClassifiedPackage): ArchitectureViolation[] {
 
   for (const file of files) {
     const path = workspacePath(`${pkg.root}/src`, file);
+    if (TEST_DIRECTORY.test(path)) continue;
     if (/^services\/.+-process\.service\.ts$/.test(path)) {
       violations.push(
         violation(

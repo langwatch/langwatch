@@ -25,7 +25,8 @@
     "rename-feature-sources": "tsx src/rename-feature-sources.cli.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run",
+    "colocate-tests": "tsx src/colocate-tests.cli.ts"
   },
   "dependencies": {
     "typescript": "6.0.3",
