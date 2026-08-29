@@ -229,6 +229,41 @@ order — **is referenced by nothing but its own tests**. That is the headline
 for this app: every pipeline processes messages, and none of them does so
 through the composition that was built for them.
 
+It could not, yet. `WorkerEventingRuntime` hard-codes `consumersEnabled: false`
+in three places and types the field as `?: false`, and the worker's config
+schema **refuses** `WORKER_EVENTING_CONSUMERS_ENABLED=true` outright:
+
+```ts
+const producerOnlyEventingSchema = environmentBooleanSchema
+  .default(false)
+  .refine((enabled) => !enabled, "Eventing consumers are not enabled in Wave 1.");
+```
+
+So the extracted worker is a producer-only graph by construction, fail-closed
+at boot rather than merely unwired. "All pipelines processing messages" is true
+of the legacy graph and structurally false of this one.
+
+### The two graphs now agree on what exists
+
+`platform/app/src/server/event-sourcing/__tests__/worker-pipeline-parity.unit.test.ts`
+is new, and it is the precondition the switchover needs: a pipeline only the
+legacy side registers stops being consumed the day the worker composition goes
+live, and one only the worker registers is registered twice while both graphs
+run. Both are silent.
+
+It found a difference on its first run. The legacy registry makes 22
+`eventSourcing.register(...)` calls and the worker declares 24 features, and
+the apparent gap — `governance-ingestion` — was not a gap: Governance's two
+ingestion pipelines register inside `AppGovernanceEventingAdapter.register()`,
+a third shape that the obvious reading of the registry does not show, alongside
+Trace's and Topic's installers. With all three pinned by name, **the two graphs
+declare exactly the same twenty-four features.**
+
+What is still unproven is the other half: the legacy registry supplies each
+pipeline its stores, adapters and ports, and `WorkerProductionComposition`
+requires a host to supply the same. Declaration parity is now a fact;
+composition parity is the work.
+
 ### What was fixed
 
 `src/features/catalogue.json` declares 24 features, and its test pins that list
