@@ -23,6 +23,7 @@
  * billing store.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { UsageStats } from "@langwatch/entitlement-contract";
 import {
   TRPCError,
   type AnyTRPCRootTypes,
@@ -67,8 +68,11 @@ type LimitsTrpcProcedures<
  *
  * Both answers are the deployment's own wire shapes — the usage panel's and
  * the notification row's — forwarded through this transport untouched, so
- * `create` is generic over the concrete ports and the router's inferred
- * output is the real shape rather than the constraint's.
+ * The reading is typed, not generic. It was `Promise<unknown>` under a note
+ * saying `create`'s port generic carried the real shape to the client, and it
+ * did not: tRPC resolves a handler returning `TPorts["getUsageStats"]` to
+ * `unknown`, which the browser reads back as `{}`. The usage bar, the usage
+ * settings page and the dashboard body were all reading fields off nothing.
  */
 export type LimitsTrpcPorts = Readonly<{
   /**
@@ -79,7 +83,7 @@ export type LimitsTrpcPorts = Readonly<{
   getUsageStats(
     ctx: LimitsTrpcContext,
     input: Readonly<{ organizationId: string; user: LimitsTrpcUser }>,
-  ): Promise<unknown>;
+  ): Promise<UsageStats>;
   /**
    * Sends the approaching-limit email if this reading crosses the threshold
    * and nothing has been sent in the current window. Answers the notification

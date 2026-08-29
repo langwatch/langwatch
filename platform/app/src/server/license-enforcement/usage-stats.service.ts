@@ -1,6 +1,13 @@
 import type { PrismaClient } from "~/generated/prisma/client";
 import { UNLIMITED_MESSAGES } from "@langwatch/enterprise-billing-contract";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
+// The reading's vocabulary is the entitlement contract's: one definition,
+// shared with the port the limits transport publishes it through.
+import type {
+  MessageLimitInfo,
+  MessageLimitStatus,
+  UsageStats,
+} from "@langwatch/entitlement-contract";
 import { formatNumber, formatPercent } from "../../utils/formatNumber";
 import { getApp } from "../app-layer/app";
 import type { PlanProvider } from "../app-layer/subscription/plan-provider";
@@ -15,26 +22,11 @@ import type { MinimalUser } from "./license-enforcement.service";
 /** Threshold at which to show a warning (80% of limit) */
 export const MESSAGE_LIMIT_WARNING_THRESHOLD = 0.8;
 
-/** Alert levels for message usage */
-export type MessageLimitStatus = "ok" | "warning" | "exceeded";
-
-/** Pre-formatted message limit info for frontend display */
-export interface MessageLimitInfo {
-  status: MessageLimitStatus;
-  current: number;
-  max: number;
-  currentFormatted: string;
-  maxFormatted: string;
-  percentageFormatted: string;
-  message: string;
-}
-
 /**
  * Calculates the message limit status based on current usage and max allowed.
  */
 export function getMessageLimitStatus(current: number, max: number): MessageLimitStatus {
-  if (max === 0 || max === Number.MAX_SAFE_INTEGER || max >= UNLIMITED_MESSAGES)
-    return "ok";
+  if (max === 0 || max === Number.MAX_SAFE_INTEGER || max >= UNLIMITED_MESSAGES) return "ok";
   if (current >= max) return "exceeded";
   if (current >= max * MESSAGE_LIMIT_WARNING_THRESHOLD) return "warning";
   return "ok";
@@ -73,9 +65,7 @@ export function buildMessageLimitInfo(current: number, max: number): MessageLimi
  * Follows Interface Segregation Principle - only what we need.
  */
 export interface ITraceUsageService {
-  getCurrentMonthCount(params: {
-    organizationId: string;
-  }): Promise<UsageCount | "unlimited">;
+  getCurrentMonthCount(params: { organizationId: string }): Promise<UsageCount | "unlimited">;
   /**
    * Real current-month usage count for display, computed even for unlimited
    * (seat-based / metered) plans where getCurrentMonthCount returns "unlimited".
@@ -97,16 +87,6 @@ export interface IUsageUnitResolver {
 /**
  * Usage statistics result for an organization.
  */
-export interface UsageStats {
-  currentMonthMessagesCount: number | null;
-  currentMonthCost: number;
-  activePlan: PlanInfo;
-  maxMonthlyUsageLimit: number;
-  membersCount: number;
-  membersLiteCount: number;
-  messageLimitInfo: MessageLimitInfo;
-  usageUnit: UsageUnit;
-}
 
 /**
  * Service for retrieving organization usage statistics.
@@ -133,12 +113,7 @@ export class UsageStatsService {
    */
   static create(prisma: PrismaClient): UsageStatsService {
     const repository = new LicenseEnforcementRepository(prisma);
-    return new UsageStatsService(
-      repository,
-      getApp().usage,
-      getApp().planProvider,
-      getApp().usage,
-    );
+    return new UsageStatsService(repository, getApp().usage, getApp().planProvider, getApp().usage);
   }
 
   /**
