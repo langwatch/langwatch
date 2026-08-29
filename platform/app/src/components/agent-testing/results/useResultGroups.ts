@@ -30,6 +30,7 @@ import type {
   RunTarget,
   SeriesBucket,
 } from "~/server/app-layer/simulations/result-atoms/atom.types";
+import type { RunParameterValues } from "~/server/scenarios/parameters";
 import { api } from "~/utils/api";
 import type { PlanRowModel } from "./PlanRowsTable";
 import type { ResultsFilterOption } from "./ResultsFilterMenu";
@@ -42,6 +43,7 @@ import {
   type ResultRow,
   type ScenarioFacts,
   targetNameOf,
+  targetParametersOf,
   toResultRows,
 } from "./result-atoms";
 import type { RunPlan } from "./run-plans";
@@ -258,11 +260,13 @@ function useNamedRows({
   plans,
   scenarios,
   targetNames,
+  targetParameters,
 }: {
   atoms: ResultAtom[] | undefined;
   plans: RunPlan[];
   scenarios: ScenarioSource[] | undefined;
   targetNames: Map<string, string>;
+  targetParameters: Map<string, RunParameterValues>;
 }): ResultRow[] {
   const scenarioFacts = useMemo(
     () => toScenarioFacts(scenarios ?? []),
@@ -281,8 +285,9 @@ function useNamedRows({
         plans: planBySlug,
         scenarioFacts,
         targetNames,
+        targetParameters,
       }),
-    [atoms, planBySlug, scenarioFacts, targetNames],
+    [atoms, planBySlug, scenarioFacts, targetNames, targetParameters],
   );
 }
 
@@ -360,13 +365,18 @@ function useResultFilterOptions({
   codeScenarios,
   codeTargets,
   targetNames,
+  targetParameters,
 }: {
   scenarios: ScenarioSource[] | undefined;
   /** The scenarios that ran from code inside the window, which the project holds no row for. */
   codeScenarios: CodeScenario[] | undefined;
-  /** The targets a run from code named inside the window, for the same reason. */
+  /**
+   * The targets the window's runs name that the stored lists cannot: the
+   * targets a run from code named, and the parameter variants of stored ones.
+   */
   codeTargets: RunTarget[] | undefined;
   targetNames: Map<string, string>;
+  targetParameters: Map<string, RunParameterValues>;
 }) {
   const scenarioOptions = useMemo(
     () =>
@@ -393,8 +403,10 @@ function useResultFilterOptions({
       .map((label) => ({ value: label, label }) satisfies ResultsFilterOption);
   }, [scenarios]);
 
-  // The project's agents and prompts, and beside them the agents a run from
-  // code named, which the project holds no row for.
+  // The project's agents and prompts, and beside them the targets the window
+  // names that the project holds no row for: the agents a run from code
+  // named, and the stored agents run with parameter overrides, which read
+  // under the agent's name and their parameters.
   const targetOptions = useMemo(
     () =>
       [
@@ -404,13 +416,49 @@ function useResultFilterOptions({
         })),
         ...(codeTargets ?? []).map((target) => ({
           value: target.key,
-          label: target.name,
+          label: target.referenceId
+            ? targetNameOf({
+                targetKey: target.key,
+                targetNames,
+                targetParameters,
+              })
+            : target.name,
         })),
       ].sort((a, b) => a.label.localeCompare(b.label)),
-    [targetNames, codeTargets],
+    [targetNames, codeTargets, targetParameters],
   );
 
   return { scenarioOptions, labelOptions, targetOptions };
+}
+
+/**
+ * The parameter overrides of every target the page knows, keyed by target
+ * key, so a target with overrides reads them after its name.
+ */
+function useTargetParameters({
+  codeTargets,
+  groups,
+  atoms,
+}: {
+  codeTargets: RunTarget[] | undefined;
+  groups: ResultGroup[];
+  atoms: ResultAtom[] | undefined;
+}): Map<string, RunParameterValues> {
+  return useMemo(
+    () =>
+      targetParametersOf([
+        ...(codeTargets ?? []).map((target) => ({
+          targetKey: target.key,
+          targetParameters: target.parameters,
+        })),
+        ...groups.map((group) => ({
+          targetKey: group.key,
+          targetParameters: group.targetParameters,
+        })),
+        ...(atoms ?? []),
+      ]),
+    [codeTargets, groups, atoms],
+  );
 }
 
 /**
@@ -447,6 +495,36 @@ function useTargetNames({
     for (const [key, name] of targetNames) carried.set(key, name);
     return carried;
   }, [targetNames, codeTargets, groups, atoms]);
+}
+
+/**
+ * Everything the page needs to name a target key: the names, the parameter
+ * overrides, and the one function every row and cell names a key through.
+ */
+function useTargetNaming({
+  platformTargetNames,
+  codeTargets,
+  groups,
+  atoms,
+}: {
+  platformTargetNames: Map<string, string>;
+  codeTargets: RunTarget[] | undefined;
+  groups: ResultGroup[];
+  atoms: ResultAtom[] | undefined;
+}) {
+  const targetParameters = useTargetParameters({ codeTargets, groups, atoms });
+  const targetNames = useTargetNames({
+    targetNames: platformTargetNames,
+    codeTargets,
+    groups,
+    atoms,
+  });
+  const resolveTargetName = useMemo(
+    () => (targetKey: string) =>
+      targetNameOf({ targetKey, targetNames, targetParameters }),
+    [targetNames, targetParameters],
+  );
+  return { targetNames, targetParameters, resolveTargetName };
 }
 
 export function useResultGroups({
@@ -491,34 +569,31 @@ export function useResultGroups({
   );
 
   const platformTargetNames = useTargetNameMap();
+  const groups = overview.data?.groups ?? EMPTY_GROUPS;
+
+  const { targetNames, targetParameters, resolveTargetName } = useTargetNaming({
+    platformTargetNames,
+    codeTargets,
+    // Only a target grouping row names a target. Any other grouping keys
+    // its rows by something else, so its titles are not target names.
+    groups: grouping === "target" ? groups : EMPTY_GROUPS,
+    atoms: atomPage.data?.atoms,
+  });
+
   const options = useResultFilterOptions({
     scenarios,
     codeScenarios,
     codeTargets,
     targetNames: platformTargetNames,
+    targetParameters,
   });
-
-  const groups = overview.data?.groups ?? EMPTY_GROUPS;
-
-  const targetNames = useTargetNames({
-    targetNames: platformTargetNames,
-    codeTargets,
-    // Only a target grouping row names a target. Any other grouping keys its
-    // rows by something else, so its titles are not target names.
-    groups: grouping === "target" ? groups : EMPTY_GROUPS,
-    atoms: atomPage.data?.atoms,
-  });
-
-  const resolveTargetName = useMemo(
-    () => (targetKey: string) => targetNameOf({ targetKey, targetNames }),
-    [targetNames],
-  );
 
   const rows = useNamedRows({
     atoms: atomPage.data?.atoms,
     plans,
     scenarios,
     targetNames,
+    targetParameters,
   });
 
   const rowsByGroupKey = useMemo(

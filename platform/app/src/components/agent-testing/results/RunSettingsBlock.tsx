@@ -19,16 +19,24 @@
  * simulator model read only when the run carries them, so a run that recorded
  * neither stays a short block.
  *
+ * The targets row names every target the run went against, on a run against
+ * one target as much as on a comparison, with the parameters each target
+ * alone carried. The parameters row then reads the run-level values only, so
+ * no override reads twice.
+ *
  * The run note is not here. It reads in the header line and does not move.
  *
  * @see specs/features/agent-testing/results-tabs.feature
+ * @see specs/features/agent-testing/comparison-mode.feature
  */
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
 import { FG_MUTED } from "../shared/design";
+import { TargetDot } from "../shared/TargetDot";
 import type { RunSettings } from "./run-settings";
+import type { BatchTarget } from "./useBatchTargets";
 
 /**
  * What a model row says when the run recorded no model at all.
@@ -114,12 +122,62 @@ function ModelRow({
   );
 }
 
+/** One parameter as a chip: a literal, so it reads in a monospace font. */
+function ParameterChip({ name, value }: { name: string; value: string }) {
+  return (
+    <Text
+      as="code"
+      fontFamily="mono"
+      fontSize="11.5px"
+      background="bg.muted"
+      borderRadius="sm"
+      paddingX={1.5}
+      paddingY={0.5}
+    >
+      {`${name} = ${value}`}
+    </Text>
+  );
+}
+
+/**
+ * The targets the run went against, one line each: the dot the target reads
+ * in everywhere on the page, its name, and the parameters it alone carried.
+ */
+function TargetsRow({ targets }: { targets: BatchTarget[] }) {
+  return (
+    <SettingRow label="Targets" testId="run-settings-targets">
+      <VStack align="stretch" gap={1} paddingY="1px">
+        {targets.map((target) => (
+          <HStack
+            key={target.key}
+            gap={2}
+            flexWrap="wrap"
+            minHeight={ROW_HEIGHT}
+            data-testid={`run-settings-target-${target.key}`}
+          >
+            <TargetDot color={target.color} />
+            <Text fontSize="12px">{target.name}</Text>
+            {Object.entries(target.parameters ?? {})
+              .sort(([left], [right]) => left.localeCompare(right))
+              .map(([name, value]) => (
+                <ParameterChip key={name} name={name} value={String(value)} />
+              ))}
+          </HStack>
+        ))}
+      </VStack>
+    </SettingRow>
+  );
+}
+
 export function RunSettingsBlock({
   settings,
+  targets,
   startedLabel,
   startedByLabel,
 }: {
   settings: RunSettings;
+  /** The targets of the run, in order and in colour. */
+  targets: BatchTarget[];
   /** The date and the age of the run, or nothing when neither is known. */
   startedLabel: string | null;
   /**
@@ -150,22 +208,17 @@ export function RunSettingsBlock({
         </SettingRow>
       ) : null}
 
+      {targets.length > 0 ? <TargetsRow targets={targets} /> : null}
+
       {settings.parameters.length > 0 ? (
         <SettingRow label="Parameters" testId="run-settings-parameters">
           <HStack gap={2} flexWrap="wrap">
             {settings.parameters.map((parameter) => (
-              <Text
+              <ParameterChip
                 key={parameter.name}
-                as="code"
-                fontFamily="mono"
-                fontSize="11.5px"
-                background="bg.muted"
-                borderRadius="sm"
-                paddingX={1.5}
-                paddingY={0.5}
-              >
-                {`${parameter.name} = ${parameter.value}`}
-              </Text>
+                name={parameter.name}
+                value={parameter.value}
+              />
             ))}
           </HStack>
         </SettingRow>

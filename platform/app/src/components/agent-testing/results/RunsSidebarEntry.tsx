@@ -3,9 +3,11 @@
  * with it, how long ago it started and how it went.
  *
  * A run that is still going reads its progress instead of a pass rate it does
- * not have yet.
+ * not have yet. A run against more than one target reads one rate per target
+ * once it settled, so the rail already says which did better.
  *
  * @see specs/features/agent-testing/results-tabs.feature
+ * @see specs/features/agent-testing/comparison-mode.feature
  * @see specs/suites/run-notes.feature
  */
 
@@ -14,12 +16,24 @@ import { FG_MUTED } from "../shared/design";
 import { PassRateText } from "../shared/PassRateText";
 import { passRateColor } from "../shared/pass-rate-color";
 
+/** How one target of a comparison did, and the colour it reads in. */
+export type SidebarTargetRate = {
+  key: string;
+  color: string;
+  passRate: number | null;
+};
+
 export type RunsSidebarEntryProps = {
   title: string;
   note: string | null;
   timeAgo: string;
   passRate: number | null;
   passedCount: number | null;
+  /**
+   * One rate per target, on a run against more than one. Such a run reads
+   * the rates side by side and no rate of the whole.
+   */
+  targetRates?: SidebarTargetRate[];
   isSelected: boolean;
   isPending?: boolean;
   /** True while the run still has cases to judge. */
@@ -30,6 +44,46 @@ export type RunsSidebarEntryProps = {
   onClick?: () => void;
   testId: string;
 };
+
+/**
+ * How a comparison went: one rate per target, "62% vs 81% · 2 targets".
+ *
+ * The dot before each rate is the colour of the target, which is what tells
+ * the two rates apart; the rate itself reads in its own pass-rate colour, the
+ * same scale as everywhere else on the surface.
+ */
+function ComparisonResult({
+  targetRates,
+  testId,
+}: {
+  targetRates: SidebarTargetRate[];
+  testId: string;
+}) {
+  return (
+    <HStack gap={1} flexWrap="wrap" data-testid={`${testId}-result`}>
+      {targetRates.map((target, index) => (
+        <HStack key={target.key} gap={1}>
+          {index > 0 ? (
+            <Text fontSize="10.5px" color={FG_MUTED}>
+              vs
+            </Text>
+          ) : null}
+          <Box
+            boxSize="6px"
+            borderRadius="full"
+            flexShrink={0}
+            backgroundColor={target.color}
+            data-testid={`${testId}-target-dot-${target.key}`}
+          />
+          <PassRateText passRate={target.passRate} fontSize="10.5px" />
+        </HStack>
+      ))}
+      <Text fontSize="10.5px" color={FG_MUTED}>
+        · {targetRates.length} targets
+      </Text>
+    </HStack>
+  );
+}
 
 /** One line, with the whole note on hover, so a long note never grows the entry. */
 function EntryNote({
@@ -61,6 +115,7 @@ function EntryNote({
 function EntryResult({
   passRate,
   passedCount,
+  targetRates,
   isRunning,
   judgedCount,
   totalCount,
@@ -69,6 +124,7 @@ function EntryResult({
   RunsSidebarEntryProps,
   | "passRate"
   | "passedCount"
+  | "targetRates"
   | "isRunning"
   | "judgedCount"
   | "totalCount"
@@ -80,6 +136,10 @@ function EntryResult({
         {judgedCount ?? 0}/{totalCount} judged
       </Text>
     );
+  }
+
+  if (targetRates && targetRates.length > 1) {
+    return <ComparisonResult targetRates={targetRates} testId={testId} />;
   }
 
   if (passRate === null && passedCount === null) return null;
@@ -134,6 +194,7 @@ export function RunsSidebarEntry({
   timeAgo,
   passRate,
   passedCount,
+  targetRates,
   isSelected,
   isPending,
   isRunning,
@@ -171,6 +232,7 @@ export function RunsSidebarEntry({
       <EntryResult
         passRate={passRate}
         passedCount={passedCount}
+        targetRates={targetRates}
         isRunning={isRunning}
         judgedCount={judgedCount}
         totalCount={totalCount}

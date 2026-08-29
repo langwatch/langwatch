@@ -25,6 +25,7 @@
  * @see specs/scenarios/run-configuration-on-runs.feature
  */
 
+import { targetKeyOfRun } from "~/components/suites/run-history-transforms";
 import type { RunActor } from "~/server/scenarios/run-actor";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
@@ -52,11 +53,16 @@ export type RunSettings = {
 };
 
 /**
- * The parameter values of a batch: the first run that carries any.
+ * The run-level parameter values of a batch: the first run that carries any.
  *
  * A person who sets a parameter in the run dialog sets it for every scenario,
  * so a run of the batch that carries values carries the ones they chose.
  * Values only differ between scenarios for defaults nobody set.
+ *
+ * A run carries the values its target resolved, which are the run-level
+ * values with the target's own overrides on top. The overrides are taken back
+ * out: they belong to the target, and the Targets row reads them beside the
+ * target they belong to.
  */
 function readParameters(
   scenarioRuns: ScenarioRunData[],
@@ -64,8 +70,12 @@ function readParameters(
   for (const run of scenarioRuns) {
     const raw = run.metadata?.parameters;
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) continue;
+    const overridden = new Set(
+      Object.keys(run.metadata?.langwatch?.targetParameters ?? {}),
+    );
 
     const parameters = Object.entries(raw)
+      .filter(([name]) => !overridden.has(name))
       .filter(
         ([, value]) =>
           typeof value === "string" ||
@@ -86,12 +96,15 @@ function readParameters(
  * The largest group answers for the batch: a scenario that was cancelled
  * before its later iterations started would otherwise pull the count under
  * what the run was started with.
+ *
+ * A target is its key, so the same agent on two sets of parameters is two
+ * targets and a scenario that ran once against each is not a repeat.
  */
 function readRepeatCount(scenarioRuns: ScenarioRunData[]): number {
   const counts = new Map<string, number>();
   for (const run of scenarioRuns) {
-    const targetId = run.metadata?.langwatch?.targetReferenceId ?? "";
-    const key = `${run.scenarioId}::${targetId}`;
+    const targetKey = targetKeyOfRun(run) ?? "";
+    const key = `${run.scenarioId}::${targetKey}`;
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   return Math.max(1, ...counts.values());

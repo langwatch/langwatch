@@ -31,6 +31,12 @@ import type {
   ResultsGroupBy,
 } from "~/server/app-layer/simulations/result-atoms/atom.types";
 import { UNKNOWN_TARGET_KEY } from "~/server/app-layer/simulations/result-atoms/atom.types";
+import type { RunParameterValues } from "~/server/scenarios/parameters";
+import {
+  splitTargetKey,
+  TARGET_LABEL_SEPARATOR,
+  targetParametersLabel,
+} from "~/server/suites/target-key";
 import {
   CODE_TARGET_NAME,
   type RunPlan,
@@ -127,6 +133,7 @@ export function toResultRows({
   plans,
   scenarioFacts,
   targetNames,
+  targetParameters,
 }: {
   atoms: ResultAtom[];
   /** The project's run plans, keyed by slug. */
@@ -135,6 +142,8 @@ export function toResultRows({
   scenarioFacts: Map<string, ScenarioFacts>;
   /** Agent and prompt names, keyed by target reference id. */
   targetNames: Map<string, string>;
+  /** The parameter overrides the page knows, keyed by target key. */
+  targetParameters?: Map<string, RunParameterValues>;
 }): ResultRow[] {
   return atoms.map((atom) => {
     const facts = scenarioFacts.get(atom.scenarioId);
@@ -152,7 +161,11 @@ export function toResultRows({
       scenarioName: facts?.name ?? atom.scenarioName ?? atom.scenarioId,
       labels: facts?.labels ?? [],
       targetKey: atom.targetKey,
-      targetName: targetNameOf({ targetKey: atom.targetKey, targetNames }),
+      targetName: targetNameOf({
+        targetKey: atom.targetKey,
+        targetNames,
+        targetParameters,
+      }),
       outcome: atom.outcome,
     };
   });
@@ -185,18 +198,52 @@ function planOfAtom({
  * pushed from code names its own agent instead, and that name arrives with
  * the runs, so it reaches the map the same way. A run from code that named no
  * agent reads under the default target.
+ *
+ * A target with parameter overrides is keyed by its reference id and a hash
+ * of the overrides. It is named from the reference id, and the overrides
+ * read after the name, "prod-agent · model=gpt-5-mini", so the same agent on
+ * two sets of parameters reads as two targets wherever it is listed.
+ *
+ * @see specs/features/agent-testing/comparison-mode.feature
  */
 export function targetNameOf({
   targetKey,
   targetNames,
+  targetParameters,
 }: {
   targetKey: string;
   targetNames: Map<string, string>;
+  /** The parameter overrides the page knows, keyed by target key. */
+  targetParameters?: Map<string, RunParameterValues>;
 }): string {
-  const known = targetNames.get(targetKey);
-  if (known) return known;
-  if (isCodeTargetKey({ targetKey })) return CODE_TARGET_NAME;
-  return targetKey;
+  const { referenceId } = splitTargetKey(targetKey);
+  const name =
+    targetNames.get(targetKey) ??
+    targetNames.get(referenceId) ??
+    (isCodeTargetKey({ targetKey }) ? CODE_TARGET_NAME : referenceId);
+  const parameters = targetParametersLabel(targetParameters?.get(targetKey));
+  return parameters === ""
+    ? name
+    : `${name}${TARGET_LABEL_SEPARATOR}${parameters}`;
+}
+
+/**
+ * The parameter overrides the page knows, keyed by target key.
+ *
+ * Fed from everything the page already holds: the targets the window lists,
+ * the group rows of a target grouping and the atoms of the drill-down. A key
+ * with no overrides is left out, so the map only ever adds to a name.
+ */
+export function targetParametersOf(
+  known: { targetKey: string; targetParameters: RunParameterValues | null }[],
+): Map<string, RunParameterValues> {
+  const parameters = new Map<string, RunParameterValues>();
+  for (const { targetKey, targetParameters } of known) {
+    if (!targetParameters || Object.keys(targetParameters).length === 0)
+      continue;
+    parameters.set(targetKey, targetParameters);
+  }
+  return parameters;
 }
 
 /**

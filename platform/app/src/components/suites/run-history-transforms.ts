@@ -220,6 +220,52 @@ function getTargetReferenceId(run: ScenarioRunData): string | undefined {
 }
 
 /**
+ * The key the run's target folds under: the stamped target key, which tells
+ * an agent on one set of parameters from the same agent on another, or the
+ * bare reference id of a run recorded before targets carried a key.
+ *
+ * @see specs/features/agent-testing/comparison-mode.feature
+ */
+export function targetKeyOfRun(run: ScenarioRunData): string | undefined {
+  return run.metadata?.langwatch?.targetKey ?? getTargetReferenceId(run);
+}
+
+/**
+ * Groups a flat list of scenario runs by their target key.
+ *
+ * One group per key, in the order the keys first appear. The label is the key
+ * itself: naming a target belongs to the client, which holds the names of the
+ * agents and the prompts. Runs without a target fold under "Unknown".
+ *
+ * @see specs/features/agent-testing/comparison-mode.feature
+ */
+export function groupRunsByTargetKey({
+  runs,
+}: {
+  runs: ScenarioRunData[];
+}): RunGroup[] {
+  const targetMap = new Map<string, ScenarioRunData[]>();
+
+  for (const run of runs) {
+    const key = targetKeyOfRun(run) ?? UNKNOWN_GROUP_KEY;
+    const existing = targetMap.get(key);
+    if (existing) {
+      existing.push(run);
+    } else {
+      targetMap.set(key, [run]);
+    }
+  }
+
+  return [...targetMap].map(([key, scenarioRuns]) => ({
+    groupKey: key,
+    groupLabel: key === UNKNOWN_GROUP_KEY ? "Unknown" : key,
+    groupType: "target",
+    timestamp: maxTimestamp(scenarioRuns),
+    scenarioRuns,
+  }));
+}
+
+/**
  * Groups a flat list of scenario runs by their target (metadata.langwatch.targetReferenceId).
  *
  * Returns groups sorted by timestamp descending (most recent first).
@@ -408,6 +454,9 @@ export function getScenarioDisplayNames({
  * Returns a Map from scenarioRunId to iteration number (1-based).
  * Only includes entries for runs where there are multiple iterations
  * (i.e., the same scenario+target pair appears more than once).
+ *
+ * The target is its key, so the same agent on two sets of parameters counts
+ * as two targets and neither borrows the other's iterations.
  */
 export function computeIterationMap({
   scenarioRuns,
@@ -417,8 +466,8 @@ export function computeIterationMap({
   const keyCounters = new Map<string, string[]>();
 
   for (const run of scenarioRuns) {
-    const targetId = getTargetReferenceId(run) ?? "";
-    const key = `${run.scenarioId}::${targetId}`;
+    const targetKey = targetKeyOfRun(run) ?? "";
+    const key = `${run.scenarioId}::${targetKey}`;
     const ids = keyCounters.get(key);
     if (ids) {
       ids.push(run.scenarioRunId);

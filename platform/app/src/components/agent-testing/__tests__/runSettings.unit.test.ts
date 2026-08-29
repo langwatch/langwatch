@@ -71,3 +71,49 @@ describe("the models the run settings read", () => {
     });
   });
 });
+
+describe("the targets the run settings read", () => {
+  describe("when the same agent ran on two sets of parameters", () => {
+    /** @scenario "The repeat count counts the runs of each scenario and target key" */
+    it("counts one run per scenario and target key, not per agent", () => {
+      const settings = readRunSettings([
+        run({
+          targetReferenceId: "agent_1",
+          targetType: "http",
+          targetKey: "agent_1",
+        }),
+        {
+          ...run({
+            targetReferenceId: "agent_1",
+            targetType: "http",
+            targetKey: "agent_1#0123abcd",
+            targetParameters: { model: "gpt-5-mini" },
+          }),
+          scenarioRunId: "run_b",
+        },
+      ]);
+
+      expect(settings?.repeatCount).toBe(1);
+    });
+  });
+
+  describe("when a target carries overrides over the run-level values", () => {
+    /** @scenario "The Parameters row reads the run-level parameters alone" */
+    it("reads the run-level parameters and leaves the target's own out", () => {
+      const withParameters = run({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        targetKey: "agent_1#0123abcd",
+        targetParameters: { model: "gpt-5-mini" },
+      });
+      withParameters.metadata = {
+        ...withParameters.metadata,
+        parameters: { locale: "de", model: "gpt-5-mini" },
+      } as never;
+
+      const settings = readRunSettings([withParameters]);
+
+      expect(settings?.parameters).toEqual([{ name: "locale", value: "de" }]);
+    });
+  });
+});

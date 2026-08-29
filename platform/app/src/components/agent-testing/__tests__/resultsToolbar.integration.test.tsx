@@ -51,7 +51,12 @@ const codeScenarioState = vi.hoisted(() => ({
   scenarios: [] as { key: string; name: string }[],
 }));
 const codeTargetState = vi.hoisted(() => ({
-  targets: [] as { key: string; name: string }[],
+  targets: [] as {
+    key: string;
+    name: string;
+    referenceId?: string | null;
+    parameters?: Record<string, string> | null;
+  }[],
 }));
 const overviewState = vi.hoisted(() => ({
   byGroupBy: {} as Record<string, unknown>,
@@ -958,6 +963,84 @@ describe("the toolbar of the Results tab", () => {
       expect(
         within(table).getByTestId("results-flat-row-exec_2"),
       ).toHaveTextContent("prod-agent");
+    });
+  });
+
+  describe("when a target ran with parameter overrides", () => {
+    const VARIANT_KEY = "agent_prod#0123abcd";
+    const variant = {
+      key: VARIANT_KEY,
+      referenceId: "agent_prod",
+      parameters: { model: "gpt-5-mini" },
+      name: VARIANT_KEY,
+    };
+
+    /** @scenario "A target group row names its parameters" */
+    it("reads the bare agent and its variant as two target rows", async () => {
+      const user = userEvent.setup();
+      overviewState.byGroupBy.target = {
+        totals: makeTotals(),
+        groups: [
+          makeGroup({
+            key: "agent_prod",
+            title: "prod-agent",
+            targetParameters: null,
+          }),
+          makeGroup({
+            key: VARIANT_KEY,
+            title: "prod-agent",
+            targetParameters: { model: "gpt-5-mini" },
+          }),
+        ],
+      };
+
+      renderList();
+
+      await user.click(screen.getByRole("radio", { name: "Target" }));
+
+      const bare = await screen.findByTestId("results-group-row-agent_prod");
+      const withModel = screen.getByTestId(`results-group-row-${VARIANT_KEY}`);
+      expect(bare).toHaveTextContent("prod-agent");
+      expect(bare).not.toHaveTextContent("model=");
+      expect(withModel).toHaveTextContent("prod-agent · model=gpt-5-mini");
+    });
+
+    /** @scenario "The Targets cell of a plan names each variant" */
+    it("names each variant in the Targets cell of the plan", () => {
+      codeTargetState.targets = [variant];
+      overviewState.byGroupBy.plan = {
+        totals: makeTotals(),
+        groups: [
+          makeGroup({
+            key: "checkout",
+            targetKeys: ["agent_prod", VARIANT_KEY],
+          }),
+        ],
+      };
+
+      renderList();
+
+      expect(
+        within(screen.getByTestId("run-plan-row-checkout")).getByTestId(
+          "plan-targets",
+        ),
+      ).toHaveTextContent("prod-agent vs prod-agent · model=gpt-5-mini");
+    });
+
+    /** @scenario "The Target filter offers a parameter variant" */
+    it("offers the variant in the Target filter and narrows the read to its key", async () => {
+      const user = userEvent.setup();
+      codeTargetState.targets = [variant];
+      renderList();
+
+      await user.click(screen.getByTestId("results-filter-target"));
+      await user.click(
+        await screen.findByRole("menuitemcheckbox", {
+          name: "prod-agent · model=gpt-5-mini",
+        }),
+      );
+
+      expect(overviewState.lastInput?.targetKeys).toEqual([VARIANT_KEY]);
     });
   });
 });
