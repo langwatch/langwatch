@@ -3,9 +3,7 @@ import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-f
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** A registrable Eventing definition, as the worker's one runtime accepts it. */
-type WorkerPipelineDefinition = Parameters<
-  WorkerEventingRuntime["eventSourcing"]["register"]
->[0];
+type WorkerPipelineDefinition = Parameters<WorkerEventingRuntime["eventSourcing"]["register"]>[0];
 
 /** Experiment's worker-facing capability after its server graph is composed. */
 export interface ExperimentWorkerCapability {

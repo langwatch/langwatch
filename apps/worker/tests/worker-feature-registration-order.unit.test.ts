@@ -24,6 +24,7 @@ import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { TraceTopicAssignmentPort, type AssignTopicCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 import { WorkerProductionComposition } from "../src/app/worker-production.composition";
+import { ApiKeyWorkerFeatureInstaller } from "../src/features/api-key/api-key-worker-feature.installer";
 import { AuthzWorkerFeatureInstaller } from "../src/features/authz/authz-worker-feature.installer";
 import { AutomationWorkerFeatureInstaller } from "../src/features/automation/automation-worker-feature.installer";
 import { BillingReportingWorkerFeatureInstaller } from "../src/features/billing/billing-reporting-worker-feature.installer";
@@ -38,6 +39,10 @@ import { GatewaySpendWorkerFeatureInstaller } from "../src/features/gateway/gate
 import { GithubWorkerFeatureInstaller } from "../src/features/github/github-worker-feature.installer";
 import { GovernanceEventsWorkerFeatureInstaller } from "../src/features/governance/governance-events-worker-feature.installer";
 import { GovernanceIngestionWorkerFeatureInstaller } from "../src/features/governance/governance-ingestion-worker-feature.installer";
+import { IdentityWorkerFeatureInstaller } from "../src/features/identity/identity-worker-feature.installer";
+import { JoinRequestWorkerFeatureInstaller } from "../src/features/identity/join-request-worker-feature.installer";
+import { ScimSyncWorkerFeatureInstaller } from "../src/features/identity/scim-sync-worker-feature.installer";
+import { SsoConnectionWorkerFeatureInstaller } from "../src/features/identity/sso-connection-worker-feature.installer";
 import { LogWorkerFeatureInstaller } from "../src/features/log/log-worker-feature.installer";
 import { MetricWorkerFeatureInstaller } from "../src/features/metric/metric-worker-feature.installer";
 import { ScenarioWorkerFeatureInstaller } from "../src/features/scenario/scenario-worker-feature.installer";
@@ -204,6 +209,10 @@ function createComposition(registered: string[]) {
       blobSweep: new BlobSweep(),
       retentionMetrics: new RetentionMetrics(),
     }),
+    apiKey: ApiKeyWorkerFeatureInstaller.create({
+      installer: { buildMaintenance: () => namedDefinition("agent_sandbox_maintenance") },
+      eventing,
+    }),
     github: GithubWorkerFeatureInstaller.create({
       installer: { buildMaintenance: () => namedDefinition("github_maintenance") },
       eventing,
@@ -277,6 +286,22 @@ function createComposition(registered: string[]) {
       },
       eventing,
     }),
+    identity: IdentityWorkerFeatureInstaller.create({
+      installer: { pipeline: namedDefinition("identity") },
+      eventing,
+    }),
+    ssoConnection: SsoConnectionWorkerFeatureInstaller.create({
+      installer: { pipeline: namedDefinition("sso_connections") },
+      eventing,
+    }),
+    scimSync: ScimSyncWorkerFeatureInstaller.create({
+      installer: { pipeline: namedDefinition("scim_sync") },
+      eventing,
+    }),
+    joinRequest: JoinRequestWorkerFeatureInstaller.create({
+      installer: { pipeline: namedDefinition("join_requests") },
+      eventing,
+    }),
   });
 }
 
@@ -292,6 +317,7 @@ describe("worker feature registration order", () => {
         expect(composition.featureInstallers.map((installer) => installer.name)).toEqual([
           "automation",
           "eventing-maintenance",
+          "api-key",
           "github",
           "evaluation",
           "coding-agent",
@@ -307,6 +333,10 @@ describe("worker feature registration order", () => {
           "governance-ingestion",
           "billing-reporting",
           "authz",
+          "identity",
+          "sso-connection",
+          "scim-sync",
+          "join-request",
         ]);
       });
 
@@ -317,7 +347,15 @@ describe("worker feature registration order", () => {
         await composition.application.start();
 
         expect(registered[0]).toBe("automations");
-        expect(registered.at(-1)).toBe("authz_grants");
+        // AuthZ is the last of the shared-graph producers; the four identity
+        // ledgers mount after it, in the legacy registry's order.
+        expect(registered.slice(-5)).toEqual([
+          "authz_grants",
+          "identity",
+          "sso_connections",
+          "scim_sync",
+          "join_requests",
+        ]);
         // The substrate's own sweeps mount together, blob before retention,
         // exactly as the live registry mounts them.
         expect(registered.slice(1, 3)).toEqual(["blob_maintenance", "process_manager_maintenance"]);
@@ -354,6 +392,7 @@ describe("worker feature registration order", () => {
           "automations",
           "blob_maintenance",
           "process_manager_maintenance",
+          "agent_sandbox_maintenance",
           "github_maintenance",
           "evaluation_processing",
           "coding_agent_processing",
@@ -372,6 +411,10 @@ describe("worker feature registration order", () => {
           "ingestion_pull",
           "billing_reporting",
           "authz_grants",
+          "identity",
+          "sso_connections",
+          "scim_sync",
+          "join_requests",
         ]);
       });
     });

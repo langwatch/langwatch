@@ -24,9 +24,11 @@ export interface ScimSyncWorkerCapability {
  * installer registers a fold and five command lanes and nothing that wakes on
  * a timer — an unregistered pipeline here loses writes, not a sweep.
  *
- * Registering it IS a behaviour change — nothing mounted it before. What keeps
- * a deploy quiet is `SCIM_V2_GRANTS`, which defaults off, so no SCIM request
- * path dispatches these commands and the previous write path is unchanged.
+ * It runs today: the legacy `PipelineRegistry` registers this pipeline, so
+ * this is where it MOVES to. What keeps the move quiet is `SCIM_V2_GRANTS`,
+ * which defaults off, so no SCIM request path dispatches these commands and
+ * the previous write path is unchanged. Whoever makes the worker composition
+ * the live one drops the legacy registration in the same change.
  */
 export class ScimSyncWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
   static create(options: {

@@ -24,9 +24,11 @@ export interface JoinRequestWorkerCapability {
  * an admin ever gets about a request — so with no process registering this
  * pipeline, a pending request neither expires nor reminds anyone.
  *
- * Registering it IS a behaviour change — nothing mounted it before. What keeps
- * a deploy quiet is the `JOIN_REQUESTS` flag, which defaults off: no command is
- * dispatched, no interstitial renders, and no panel appears.
+ * It runs today: the legacy `PipelineRegistry` registers this pipeline, so
+ * this is where it MOVES to. What keeps the move quiet is the `JOIN_REQUESTS`
+ * flag, which defaults off: no command is dispatched, no interstitial renders,
+ * and no panel appears. Whoever makes the worker composition the live one
+ * drops the legacy registration in the same change.
  */
 export class JoinRequestWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
   static create(options: {

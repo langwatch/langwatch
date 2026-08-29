@@ -25,12 +25,12 @@ export interface IdentityWorkerCapability {
  * resolve their sender lazily by pipeline NAME on first use rather than
  * closing over a handle at composition time.
  *
- * Registering it IS a behaviour change, and a deliberate one. Nothing mounted
- * this pipeline before — not the legacy `PipelineRegistry`, not any worker
- * graph — so its commands had nowhere to stage and its fold never ran. What
- * keeps a deploy quiet is the per-user write gate
- * (`app-layer/identity/write-gate.ts`), which ships CLOSED and opens only for
- * a user whose backfill is finalized.
+ * It runs today: the legacy `PipelineRegistry` registers this pipeline, so
+ * this is where it MOVES to rather than where it starts. What keeps the move
+ * quiet is the per-user write gate (`app-layer/identity/write-gate.ts`), which
+ * ships CLOSED and opens only for a user whose backfill is finalized. Whoever
+ * makes the worker composition the live one drops the legacy registration in
+ * the same change.
  */
 export class IdentityWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
   static create(options: {

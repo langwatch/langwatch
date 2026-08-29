@@ -23,9 +23,7 @@ export interface GovernanceIngestionWorkerCapability {
    * binds the deferred lifecycle commands, then reconciles the schedules where
    * this process runs workers.
    */
-  register(
-    eventSourcing: WorkerEventingRuntime["eventSourcing"],
-  ): GovernanceIngestionInstallation;
+  register(eventSourcing: WorkerEventingRuntime["eventSourcing"]): GovernanceIngestionInstallation;
 }
 
 /**

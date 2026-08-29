@@ -3,9 +3,7 @@ import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-f
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** A registrable Eventing definition, as the worker's one runtime accepts it. */
-type WorkerPipelineDefinition = Parameters<
-  WorkerEventingRuntime["eventSourcing"]["register"]
->[0];
+type WorkerPipelineDefinition = Parameters<WorkerEventingRuntime["eventSourcing"]["register"]>[0];
 
 /**
  * The two Governance signal senders the Gateway spend pipeline delivers into.
@@ -15,10 +13,7 @@ type WorkerPipelineDefinition = Parameters<
  * which is why the delivery seam is a pair of command senders and not a
  * service.
  */
-export interface GovernanceEventsWorkerCommands<
-  TVkLifecycle = unknown,
-  TBudgetCrossing = unknown,
-> {
+export interface GovernanceEventsWorkerCommands<TVkLifecycle = unknown, TBudgetCrossing = unknown> {
   recordVkLifecycle: CommandDispatcher<TVkLifecycle>;
   recordBudgetCrossing: CommandDispatcher<TBudgetCrossing>;
 }

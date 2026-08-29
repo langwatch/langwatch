@@ -3,9 +3,7 @@ import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-f
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** A registrable Eventing definition, as the worker's one runtime accepts it. */
-type WorkerPipelineDefinition = Parameters<
-  WorkerEventingRuntime["eventSourcing"]["register"]
->[0];
+type WorkerPipelineDefinition = Parameters<WorkerEventingRuntime["eventSourcing"]["register"]>[0];
 
 /** Billing reporting's worker-facing capability after its graph is composed. */
 export interface BillingReportingWorkerCapability<TReportUsage = unknown> {
@@ -65,9 +63,7 @@ export class BillingReportingWorkerFeatureInstaller extends WorkerFeatureInstall
       const commands = pipeline.commands as Record<string, { send(data: unknown): Promise<void> }>;
       const reportUsage = commands.reportUsageForMonth;
       if (!reportUsage) {
-        throw new Error(
-          "Billing reporting pipeline must register a reportUsageForMonth command.",
-        );
+        throw new Error("Billing reporting pipeline must register a reportUsageForMonth command.");
       }
       const dispatch: CommandDispatcher<unknown> = (data) => reportUsage.send(data);
       this.reportUsageForMonth.resolve(dispatch);

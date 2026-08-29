@@ -1,14 +1,7 @@
-import http, {
-  type IncomingMessage,
-  type RequestListener,
-  type ServerResponse,
-} from "node:http";
+import http, { type IncomingMessage, type RequestListener, type ServerResponse } from "node:http";
 import { Worker } from "node:worker_threads";
 import type { Logger } from "@langwatch/observability";
-import {
-  WORKER_HEARTBEAT_STALL_BUDGET_MS,
-  WORKER_LIVENESS_PATH,
-} from "./worker.liveness";
+import { WORKER_HEARTBEAT_STALL_BUDGET_MS, WORKER_LIVENESS_PATH } from "./worker.liveness";
 
 /**
  * The worker process's single HTTP listener: the Prometheus metrics port, which

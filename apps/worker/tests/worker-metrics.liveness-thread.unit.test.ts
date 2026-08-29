@@ -34,10 +34,7 @@ async function getFreePort(): Promise<number> {
   });
 }
 
-function fetchStatus(
-  port: number,
-  path: string,
-): Promise<{ status: number; body: string }> {
+function fetchStatus(port: number, path: string): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
     http
       .get({ port, path, timeout: 2_000 }, (res) => {
@@ -118,18 +115,15 @@ describe("worker liveness thread", () => {
       const heartbeat = new BigInt64Array(new SharedArrayBuffer(8));
       heartbeat[0] = BigInt(Date.now());
       const port = await bootThread(heartbeat);
-      thread!.on(
-        "message",
-        (msg: { id?: number; url?: string; authorization?: string | null }) => {
-          if (msg.id === undefined) return;
-          thread!.postMessage({
-            id: msg.id,
-            status: 200,
-            headers: { "Content-Type": "text/plain" },
-            body: `proxied:${msg.url}`,
-          });
-        },
-      );
+      thread!.on("message", (msg: { id?: number; url?: string; authorization?: string | null }) => {
+        if (msg.id === undefined) return;
+        thread!.postMessage({
+          id: msg.id,
+          status: 200,
+          headers: { "Content-Type": "text/plain" },
+          body: `proxied:${msg.url}`,
+        });
+      });
 
       const res = await fetchStatus(port, "/metrics");
       expect(res.status).toBe(200);

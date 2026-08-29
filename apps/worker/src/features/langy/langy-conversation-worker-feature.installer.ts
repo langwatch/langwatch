@@ -2,9 +2,7 @@ import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-f
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** A registrable Eventing definition, as the worker's one runtime accepts it. */
-type WorkerPipelineDefinition = Parameters<
-  WorkerEventingRuntime["eventSourcing"]["register"]
->[0];
+type WorkerPipelineDefinition = Parameters<WorkerEventingRuntime["eventSourcing"]["register"]>[0];
 
 /** A command this pipeline appends into, as the registered graph exposes it. */
 type WorkerCommandSender = { send(data: unknown): Promise<void> };

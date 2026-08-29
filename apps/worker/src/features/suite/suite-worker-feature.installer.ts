@@ -3,9 +3,7 @@ import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-f
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** A registrable Eventing definition, as the worker's one runtime accepts it. */
-type WorkerPipelineDefinition = Parameters<
-  WorkerEventingRuntime["eventSourcing"]["register"]
->[0];
+type WorkerPipelineDefinition = Parameters<WorkerEventingRuntime["eventSourcing"]["register"]>[0];
 
 /**
  * The two suite-run senders the Scenario pipeline's suite sync dispatches to.
@@ -14,10 +12,7 @@ type WorkerPipelineDefinition = Parameters<
  * suite begins, never by another worker pipeline, so exposing it here would
  * widen the cross-feature surface for nothing.
  */
-export interface SuiteWorkerCommands<
-  TRecordItemStarted = unknown,
-  TCompleteItem = unknown,
-> {
+export interface SuiteWorkerCommands<TRecordItemStarted = unknown, TCompleteItem = unknown> {
   recordSuiteRunItemStarted: CommandDispatcher<TRecordItemStarted>;
   completeSuiteRunItem: CommandDispatcher<TCompleteItem>;
 }

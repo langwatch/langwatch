@@ -17,16 +17,13 @@ export interface ApiKeyWorkerCapability {
  *
  * A sandbox key is minted per code agent run and has nothing that retires it
  * at the end of one, so this hourly sweep is the only thing that revokes an
- * elapsed key. It is the same class of defect the Langy session-key reaper
- * had — written, unit-tested, and mounted by nothing — except that this one
- * was never wired at all: `PipelineRegistry` has never carried a reference to
- * `agent_sandbox_maintenance`, in any revision.
+ * elapsed key.
  *
- * Registering it IS a behaviour change, and the first tick after it lands
- * clears the whole historical backlog of keys the sweep has never reached.
- * That backlog is inert either way — `ApiKeyService.verify` already refuses an
- * elapsed key — so what changes is the row state, not what any credential can
- * do.
+ * It runs today: the legacy `PipelineRegistry` picked `agent_sandbox_maintenance`
+ * up after this installer was written, so this is where the sweep MOVES to,
+ * not where it starts. Whoever makes the worker composition the live one drops
+ * the legacy registration in the same change — two graphs registering one
+ * pipeline name in a single process is not a migration step, it is a bug.
  */
 export class ApiKeyWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
   static create(options: {

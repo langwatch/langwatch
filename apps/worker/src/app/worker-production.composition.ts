@@ -14,6 +14,10 @@ import {
 } from "@langwatch/topic-server";
 import { TraceProcessingInstallerPort } from "@langwatch/trace-server";
 import {
+  ApiKeyWorkerFeatureInstaller,
+  type ApiKeyWorkerCapability,
+} from "../features/api-key/api-key-worker-feature.installer";
+import {
   AuthzWorkerFeatureInstaller,
   type AuthzWorkerCapability,
 } from "../features/authz/authz-worker-feature.installer";
@@ -83,6 +87,22 @@ import {
   SuiteWorkerFeatureInstaller,
   type SuiteWorkerCapability,
 } from "../features/suite/suite-worker-feature.installer";
+import {
+  IdentityWorkerFeatureInstaller,
+  type IdentityWorkerCapability,
+} from "../features/identity/identity-worker-feature.installer";
+import {
+  JoinRequestWorkerFeatureInstaller,
+  type JoinRequestWorkerCapability,
+} from "../features/identity/join-request-worker-feature.installer";
+import {
+  ScimSyncWorkerFeatureInstaller,
+  type ScimSyncWorkerCapability,
+} from "../features/identity/scim-sync-worker-feature.installer";
+import {
+  SsoConnectionWorkerFeatureInstaller,
+  type SsoConnectionWorkerCapability,
+} from "../features/identity/sso-connection-worker-feature.installer";
 import { TopicWorkerFeatureInstaller } from "../features/topic/topic-worker-feature.installer";
 import { TraceWorkerFeatureInstaller } from "../features/trace/trace-worker-feature.installer";
 import type { WorkerConfig } from "../platform/config/worker.config";
@@ -131,6 +151,27 @@ export type WorkerLangyConversationCompositionOptions = {
 /** Langy's session-key reaper, on the same footing as the substrate sweeps. */
 export type WorkerLangyMaintenanceCompositionOptions = {
   installer: LangyMaintenanceWorkerCapability;
+};
+
+/** The agent-sandbox credential sweep, on the same footing as Langy's reaper. */
+export type WorkerApiKeyCompositionOptions = {
+  installer: ApiKeyWorkerCapability;
+};
+
+/**
+ * The four identity pipelines (ADR-101), which mount as one group.
+ *
+ * One option rather than four because they are one feature's ledger: the app's
+ * writers resolve a sender by pipeline NAME on first use, so a graph carrying
+ * three of the four would stage commands for the fourth against a pipeline
+ * nothing had registered. They have no ordering requirement among themselves —
+ * none subscribes to another's events.
+ */
+export type WorkerIdentityCompositionOptions = {
+  identity: IdentityWorkerCapability;
+  ssoConnection: SsoConnectionWorkerCapability;
+  scimSync: ScimSyncWorkerCapability;
+  joinRequest: JoinRequestWorkerCapability;
 };
 
 /** GitHub pull-request linkage maintenance, fleet-wide rather than per replica. */
@@ -227,6 +268,7 @@ type WorkerProductionCompositionBaseOptions = {
   eventingMaintenance?: WorkerEventingMaintenanceCompositionOptions;
   langyConversation?: WorkerLangyConversationCompositionOptions;
   langyMaintenance?: WorkerLangyMaintenanceCompositionOptions;
+  apiKey?: WorkerApiKeyCompositionOptions;
   github?: WorkerGithubCompositionOptions;
   evaluation?: WorkerEvaluationCompositionOptions;
   codingAgent?: WorkerCodingAgentCompositionOptions;
@@ -239,6 +281,7 @@ type WorkerProductionCompositionBaseOptions = {
   governanceIngestion?: WorkerGovernanceIngestionCompositionOptions;
   billingReporting?: WorkerBillingReportingCompositionOptions;
   authz?: WorkerAuthzCompositionOptions;
+  identity?: WorkerIdentityCompositionOptions;
   enterprise?: EnterpriseWorkerCompositionOptions;
   observability?: ProcessObservability;
 };
@@ -302,6 +345,12 @@ export class WorkerProductionComposition {
     const langyConversation = options.langyConversation
       ? LangyConversationWorkerFeatureInstaller.create({
           installer: options.langyConversation.installer,
+          eventing,
+        })
+      : undefined;
+    const apiKey = options.apiKey
+      ? ApiKeyWorkerFeatureInstaller.create({
+          installer: options.apiKey.installer,
           eventing,
         })
       : undefined;
@@ -401,6 +450,30 @@ export class WorkerProductionComposition {
           eventing,
         })
       : undefined;
+    const identity = options.identity
+      ? IdentityWorkerFeatureInstaller.create({
+          installer: options.identity.identity,
+          eventing,
+        })
+      : undefined;
+    const ssoConnection = options.identity
+      ? SsoConnectionWorkerFeatureInstaller.create({
+          installer: options.identity.ssoConnection,
+          eventing,
+        })
+      : undefined;
+    const scimSync = options.identity
+      ? ScimSyncWorkerFeatureInstaller.create({
+          installer: options.identity.scimSync,
+          eventing,
+        })
+      : undefined;
+    const joinRequest = options.identity
+      ? JoinRequestWorkerFeatureInstaller.create({
+          installer: options.identity.joinRequest,
+          eventing,
+        })
+      : undefined;
     const enterprise = options.enterprise
       ? EnterpriseWorkerComposition.create(options.enterprise)
       : undefined;
@@ -414,6 +487,7 @@ export class WorkerProductionComposition {
       eventingMaintenance,
       langyMaintenance,
       langyConversation,
+      apiKey,
       github,
       evaluation,
       codingAgent,
@@ -429,6 +503,10 @@ export class WorkerProductionComposition {
       governanceIngestion,
       billingReporting,
       authz,
+      identity,
+      ssoConnection,
+      scimSync,
+      joinRequest,
       enterprise,
       observability: options.observability,
       resources: options.resources,
@@ -449,6 +527,7 @@ export class WorkerProductionComposition {
     eventingMaintenance?: EventingMaintenanceWorkerFeatureInstaller;
     langyConversation?: LangyConversationWorkerFeatureInstaller;
     langyMaintenance?: LangyMaintenanceWorkerFeatureInstaller;
+    apiKey?: ApiKeyWorkerFeatureInstaller;
     github?: GithubWorkerFeatureInstaller;
     evaluation?: EvaluationWorkerFeatureInstaller;
     codingAgent?: CodingAgentWorkerFeatureInstaller;
@@ -464,6 +543,10 @@ export class WorkerProductionComposition {
     governanceIngestion?: GovernanceIngestionWorkerFeatureInstaller;
     billingReporting?: BillingReportingWorkerFeatureInstaller;
     authz?: AuthzWorkerFeatureInstaller;
+    identity?: IdentityWorkerFeatureInstaller;
+    ssoConnection?: SsoConnectionWorkerFeatureInstaller;
+    scimSync?: ScimSyncWorkerFeatureInstaller;
+    joinRequest?: JoinRequestWorkerFeatureInstaller;
     enterprise?: EnterpriseWorkerComposition | EnterpriseWorkerCompositionOptions;
     observability?: ProcessObservability;
     resources?: ResourceScope;
@@ -599,6 +682,9 @@ export class WorkerProductionComposition {
  *                        belong to no feature and must not depend on one
  *   langy-maintenance    the session-key reaper, unconditional like the
  *                        substrate sweeps and mounted with them
+ *   api-key              the agent-sandbox key sweep, the same kind of
+ *                        unconditional reaper, and where the legacy registry
+ *                        mounts it: after Langy's, before GitHub's
  *   github               fleet-wide branch recheck, before the domain graphs
  *   evaluation           before trace, whose evaluation trigger and custom
  *                        evaluation sync dispatch its two commands
@@ -623,8 +709,13 @@ export class WorkerProductionComposition {
  *   topic
  *   governance-ingestion Enterprise pulled-usage and ingestion-pull
  *   billing-reporting
- *   authz                last, so the grants ledger opens its durable write
- *                        path only once every producer is registered
+ *   authz                the grants ledger opens its durable write path only
+ *                        once every producer is registered
+ *   identity             the four ADR-101 ledgers, after AuthZ exactly as the
+ *   sso-connection       legacy registry mounts them. Their relative order is
+ *   scim-sync            free — none subscribes to another's events — but the
+ *   join-request         group's position is not: they are the last producers
+ *                        to open a durable write path
  *
  * Gaps in the middle are pipeline groups still owned by the legacy registry.
  * A group landing later slots into its documented position; nothing here
@@ -635,6 +726,7 @@ function orderedFeatureInstallers(installers: {
   eventingMaintenance?: EventingMaintenanceWorkerFeatureInstaller;
   langyConversation?: LangyConversationWorkerFeatureInstaller;
   langyMaintenance?: LangyMaintenanceWorkerFeatureInstaller;
+  apiKey?: ApiKeyWorkerFeatureInstaller;
   github?: GithubWorkerFeatureInstaller;
   evaluation?: EvaluationWorkerFeatureInstaller;
   codingAgent?: CodingAgentWorkerFeatureInstaller;
@@ -650,11 +742,16 @@ function orderedFeatureInstallers(installers: {
   governanceIngestion?: GovernanceIngestionWorkerFeatureInstaller;
   billingReporting?: BillingReportingWorkerFeatureInstaller;
   authz?: AuthzWorkerFeatureInstaller;
+  identity?: IdentityWorkerFeatureInstaller;
+  ssoConnection?: SsoConnectionWorkerFeatureInstaller;
+  scimSync?: ScimSyncWorkerFeatureInstaller;
+  joinRequest?: JoinRequestWorkerFeatureInstaller;
 }): readonly WorkerFeatureInstallerPort[] {
   const ordered: (WorkerFeatureInstallerPort | undefined)[] = [
     installers.automation,
     installers.eventingMaintenance,
     installers.langyMaintenance,
+    installers.apiKey,
     installers.github,
     installers.evaluation,
     installers.codingAgent,
@@ -671,6 +768,10 @@ function orderedFeatureInstallers(installers: {
     installers.governanceIngestion,
     installers.billingReporting,
     installers.authz,
+    installers.identity,
+    installers.ssoConnection,
+    installers.scimSync,
+    installers.joinRequest,
   ];
   return ordered.filter(
     (installer): installer is WorkerFeatureInstallerPort => installer !== undefined,

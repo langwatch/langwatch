@@ -24,10 +24,12 @@ export interface SsoConnectionWorkerCapability {
  * a connection whose teardown was requested sits at the pending state for as
  * long as no process registers this pipeline.
  *
- * Registering it IS a behaviour change — nothing mounted it before. What keeps
- * a deploy quiet is `SSOCONN_ROUTING`, which defaults to `off`, so no sign-in
- * decision reads this projection and the grandfather migration remains the
- * only production writer.
+ * It runs today: the legacy `PipelineRegistry` registers this pipeline, so
+ * this is where it MOVES to. What keeps the move quiet is `SSOCONN_ROUTING`,
+ * which defaults to `off`, so no sign-in decision reads this projection and
+ * the grandfather migration remains the only production writer. Whoever makes
+ * the worker composition the live one drops the legacy registration in the
+ * same change.
  */
 export class SsoConnectionWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
   static create(options: {
