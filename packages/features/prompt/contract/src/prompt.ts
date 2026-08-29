@@ -56,6 +56,30 @@ export const promptDemonstrationsSchema = z
   })
   .strict();
 
+/**
+ * The structured-output format a prompt version publishes.
+ *
+ * This was `z.unknown()`, which typed the field as `unknown` on every service
+ * that returns a `VersionedPrompt` — while the REST DTO declares the real
+ * shape, so a prompt read could not be assigned to the response it is
+ * published as. The value is derived at read time by
+ * `deriveResponseFormatFromOutputs`, whose return type is this shape, so
+ * nothing that reaches here can fail to match it.
+ *
+ * Kept as its own declaration rather than imported from
+ * `prompt.field-schemas`, the way the demonstrations and prompting-technique
+ * shapes beside it are.
+ */
+export const promptResponseFormatSchema = z.object({
+  type: z.enum(["json_schema"]),
+  json_schema: z
+    .object({
+      name: z.string(),
+      schema: z.looseObject({}),
+    })
+    .nullable(),
+});
+
 export const promptingTechniqueSchema = z
   .object({
     type: z.enum(["few_shot", "in_context", "chain_of_thought"]),
@@ -139,7 +163,7 @@ export const versionedPromptSchema = z
       .optional(),
     inputs: z.array(promptInputSchema),
     outputs: z.array(promptOutputSchema),
-    responseFormat: z.unknown().optional(),
+    responseFormat: promptResponseFormatSchema.optional(),
     demonstrations: promptDemonstrationsSchema.optional(),
     promptingTechnique: promptingTechniqueSchema.optional(),
     commitMessage: z.string().optional(),

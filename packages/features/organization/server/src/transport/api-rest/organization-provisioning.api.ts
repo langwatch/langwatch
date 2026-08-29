@@ -23,7 +23,7 @@ import { timingSafeEqual } from "node:crypto";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { RoleBindingScopeType, TeamUserRole } from "@langwatch/prisma-client/generated";
-import type { Context, Next } from "hono";
+import type { Context, Env, Next } from "hono";
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
 
@@ -170,7 +170,7 @@ export function createOrganizationsRestApp(options: {
    * failure, so this one is only reported — never raised over the top of it.
    */
   reportError: (error: Error) => void;
-}): SecuredApp {
+}): SecuredApp<Env> {
   const { security, organizations, apiKeys, audit, reportError } = options;
 
   const secured = security.createServiceApp({

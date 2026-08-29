@@ -55,7 +55,7 @@ vi.mock("../../../../env.mjs", async (importOriginal) => {
   };
 });
 
-import { app } from "../[[...route]]/app";
+import { organizationRestApp as app } from "~/server/api/management/organization-rest";
 
 describe("Feature: Organization members and invites REST API", () => {
   const ns = `org-members-${nanoid(8)}`;

@@ -15,7 +15,7 @@ import type { SimulationExportRun } from "@langwatch/scenario-contract";
 import { globalForApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
-import { app } from "../[[...route]]/app";
+import { createScenarioRunExportApp } from "~/server/export/scenario-runs/scenario-run-export-rest";
 
 const session = {
   user: { id: "user_1", name: "Tester", email: "tester@example.com" },
@@ -77,6 +77,9 @@ function installApp() {
 }
 
 function download(body: Record<string, unknown> = {}) {
+  // Built per request against the App this test installed: the family takes
+  // its application from the mount, never from the module singleton.
+  const app = createScenarioRunExportApp(globalForApp.__langwatch_app!);
   return app.request("/api/export/scenario-runs/download", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

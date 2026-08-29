@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { getLatestConfigVersionSchema } from "@langwatch/prompt-contract";
-import { apiResponsePromptWithVersionDataSchema } from "../outputs";
+import { apiResponsePromptWithVersionDataSchema } from "@langwatch/prompt-server";
 
 describe("Schema compatibility", () => {
   describe("when storage schema allows defaults", () => {

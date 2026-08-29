@@ -25,7 +25,7 @@ import {
   type ManagementTestOrg,
   seedManagementOrg,
 } from "~/test-utils/managementApiOrg";
-import { app } from "../[[...route]]/app";
+import { organizationRestApp as app } from "~/server/api/management/organization-rest";
 
 describe("Feature: Organization REST API", () => {
   const ns = `org-rest-${nanoid(8)}`;

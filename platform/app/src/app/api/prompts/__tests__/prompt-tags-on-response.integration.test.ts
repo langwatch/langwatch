@@ -15,7 +15,11 @@ import type {
 } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import { app } from "../[[...route]]/app";
+import { getApp } from "~/server/app-layer/app";
+import { buildPromptsRestApp } from "~/server/api/prompts-rest";
+
+/** The family as the API router mounts it, resolving the service per request. */
+const app = buildPromptsRestApp(() => getApp().prompts.promptService);
 
 wireDefaultTestApp();
 

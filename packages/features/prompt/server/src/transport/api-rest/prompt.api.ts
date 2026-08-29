@@ -1,50 +1,334 @@
-import { createLogger } from "@langwatch/observability";
-import { HTTPException } from "hono/http-exception";
-import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod";
-import { afterPromptCreated } from "~/server/app-layer/billing/nurturing/promptCreation";
+/**
+ * The prompts REST family: a project's prompts, their versions and the tags
+ * that point at them.
+ *
+ * Moved out of the application unchanged (ADR-128): the routes, the wire
+ * schemas, the OpenAPI declarations and the three refusal mappers below are
+ * exactly what `/api/prompts` published before, and the process's capabilities
+ * that used to be read off the Hono context now arrive as ports.
+ *
+ * ## Why the raw service and not {@link PromptApp}
+ *
+ * `/api/prompts` authenticates a project API key, whose `apiKeyUserId` is
+ * OPTIONAL — a service key acts as nobody. The application's write operations
+ * stamp `authorId` from their caller, and `authorId` is a real foreign key to
+ * User, so there is no valid author to stamp for a service credential. The
+ * narrow service surface is what the credential can honestly reach; the
+ * application stays the browser's door.
+ */
+import { requires } from "@langwatch/api";
 import {
+  type AppRestProjectVariables,
+  type AppRestSecurity,
   badRequestSchema,
   baseResponses,
   conflictResponses,
-  requires,
+  type PlatformUrlBuilder,
+  type RouteResponse,
   type SecuredApp,
   successSchema,
   validator as zValidator,
-} from "@langwatch/platform-api/app-rest";
-import { prisma } from "~/server/db";
-import { commitMessageSchema, versionSchema } from "@langwatch/prompt-contract";
-import { parsePromptShorthand, ShorthandParseError } from "@langwatch/prompt-contract";
+} from "@langwatch/api/rest";
+import { createLogger } from "@langwatch/observability";
+import { PromptScope } from "@langwatch/prisma-client/generated";
 import {
+  commitMessageSchema,
+  getLatestConfigVersionSchema,
+  handleSchema,
+  inputsSchema,
+  messageSchema,
+  modelNameSchema,
+  outputsSchema,
+  parsePromptShorthand,
   PromptTagConflictError,
   PromptTagNotFoundError,
   PromptTagProtectedError,
   PromptTagValidationError,
+  runtimeParametersSchema,
+  schemaVersionSchema,
+  scopeSchema,
+  ShorthandParseError,
+  SystemPromptConflictError,
+  SystemPromptRequiredError,
+  versionSchema,
 } from "@langwatch/prompt-contract";
-import { getLatestConfigVersionSchema } from "@langwatch/prompt-contract";
-import {
-  type AuthMiddlewareVariables,
-  type OrganizationMiddlewareVariables,
-  organizationMiddleware,
-} from "../../middleware";
-import { platformUrl } from "../../shared/platform-url";
-import {
-  type ApiResponsePrompt,
-  apiResponsePromptWithVersionDataSchema,
-  createPromptInputSchema,
-  updatePromptInputSchema,
-} from "./schemas";
-import { buildStandardSuccessResponse, handlePossibleConflictError } from "./utils";
-import { handleSystemPromptHandledErrors } from "./utils/handle-system-prompt-handled-errors";
+import type { MiddlewareHandler } from "hono";
+import { HTTPException } from "hono/http-exception";
+import { describeRoute, resolver } from "hono-openapi";
+import { z, type ZodSchema } from "zod";
+
+import type { PromptApp } from "#app/prompt.app";
+
+// ── wire schemas ─────────────────────────────────────────────────────────────
+
+/**
+ * Schema for creating new prompt versions
+ * Uses the latest config version schema from the repository
+ */
+export const versionInputSchema = getLatestConfigVersionSchema();
+
+/**
+ * Create prompt input schema
+ */
+export const createPromptInputSchema = z.strictObject({
+  handle: handleSchema,
+  scope: scopeSchema.optional().default(PromptScope.PROJECT),
+  // Version data
+  model: modelNameSchema.optional(),
+  temperature: z.number().optional(),
+  maxTokens: z.number().optional(),
+  commitMessage: commitMessageSchema.optional(),
+  authorId: z.string().optional(),
+  prompt: z.string().optional(),
+  messages: z.array(messageSchema).optional(),
+  inputs: z.array(inputsSchema).optional(),
+  outputs: z.array(outputsSchema).optional(),
+  schemaVersion: schemaVersionSchema.optional(),
+  /** Tags to assign to the initial version (e.g. ["production", "staging", "canary"]) */
+  tags: z.array(z.string().min(1)).optional(),
+  parameters: runtimeParametersSchema.optional(),
+});
+
+export const updatePromptInputSchema = createPromptInputSchema
+  .omit({
+    scope: true,
+    handle: true,
+  })
+  .merge(
+    z.strictObject({
+      // commitMessage is required for updates (creates new version)
+      commitMessage: commitMessageSchema,
+      // Scope is optional, but on the update we don't want to set the default
+      scope: scopeSchema.optional(),
+      handle: handleSchema.optional(),
+    }),
+  );
+
+export const updateHandleInputSchema = z.strictObject({
+  handle: handleSchema,
+  scope: scopeSchema,
+});
+
+const configDataSchema = getLatestConfigVersionSchema().shape.configData;
+
+/**
+ * Base schema for API Response (only llm config)
+ */
+const apiResponsePromptSchemaBase = z.object({
+  id: z.string(),
+  handle: z.string().nullable(),
+  scope: z.nativeEnum(PromptScope),
+  name: z.string(),
+  updatedAt: z.date(),
+  projectId: z.string(),
+  organizationId: z.string(),
+});
+
+/**
+ * Tag association for a prompt version.
+ * `versionId` is the version this tag currently points to —
+ * included so callers can distinguish whether the tag points
+ * to the prompt/version they're looking at.
+ */
+export const apiResponsePromptTagSchema = z.object({
+  name: z.string(),
+  versionId: z.string(),
+});
+
+/**
+ * Schema for version output responses
+ * Derives configData fields from storage schema to prevent drift
+ */
+const apiResponseVersionOutputSchema = z.object({
+  configId: z.string(),
+  projectId: z.string(),
+  versionId: z.string(),
+  authorId: z.string().nullable().optional(),
+  version: z.number(),
+  createdAt: z.date(),
+  commitMessage: z.string().optional().nullable(),
+  // Derived from storage schema
+  prompt: configDataSchema.shape.prompt,
+  messages: configDataSchema.shape.messages,
+  inputs: configDataSchema.shape.inputs,
+  outputs: configDataSchema.shape.outputs,
+  model: configDataSchema.shape.model,
+  temperature: configDataSchema.shape.temperature,
+  maxTokens: configDataSchema.shape.max_tokens,
+  demonstrations: configDataSchema.shape.demonstrations,
+  promptingTechnique: configDataSchema.shape.prompting_technique,
+  responseFormat: configDataSchema.shape.response_format,
+  tags: z.array(apiResponsePromptTagSchema).default([]),
+  parameters: runtimeParametersSchema,
+});
+
+/**
+ * Expected shape for a returned prompt from the API
+ *
+ * Includes llm config + version data
+ */
+export const apiResponsePromptWithVersionDataSchema = apiResponsePromptSchemaBase.merge(
+  apiResponseVersionOutputSchema.omit({
+    configId: true,
+  }),
+);
+
+export type ApiResponsePrompt = z.infer<typeof apiResponsePromptWithVersionDataSchema>;
+
+// ── the process's capabilities ───────────────────────────────────────────────
+
+/**
+ * The prompt reads and writes this family makes.
+ *
+ * The raw service rather than {@link PromptApp}: see the module comment — a
+ * project API key may act as nobody, and the application's writes stamp an
+ * `authorId` that is a foreign key to a real user.
+ */
+export type PromptRestService = PromptApp["promptService"];
+
+/** What this family dispatches through that the prompt feature does not own. */
+export interface PromptRestPorts {
+  /**
+   * Organization resolution, applied per route after the access chain has
+   * authenticated the caller and set `project`.
+   */
+  organizationMiddleware: MiddlewareHandler;
+  /** Deep links back into the product, built from the deployment's origin. */
+  platformUrl: PlatformUrlBuilder;
+  /**
+   * The nurturing trail a first prompt leaves. Fired and forgotten: it is the
+   * process's product-analytics concern, not the write's.
+   */
+  afterPromptCreated(input: { projectId: string; userId?: string | null }): void;
+  /**
+   * The columns a database unique-constraint violation names, or an empty list
+   * when the failure is not one. Duck-typed against the driver's error shapes,
+   * which is a fact about the process's database client rather than about
+   * prompts.
+   */
+  uniqueConstraintTargets(error: unknown): string[];
+}
+
+// ── OpenAPI + refusal helpers ────────────────────────────────────────────────
+
+
+/**
+ * Builds a standard success response object for OpenAPI route definitions.
+ *
+ * This utility creates a consistent response structure for successful API operations,
+ * converting a Zod schema into the OpenAPI response format expected by hono-openapi.
+ *
+ * @param zodSchema - The Zod schema that defines the shape of the response data
+ * @returns A RouteResponse object with standardized success structure
+ * @throws Error if zodSchema is not provided
+ *
+ * @example
+ * ```typescript
+ * const userSchema = z.object({ id: z.string(), name: z.string() });
+ * const response = buildStandardSuccessResponse(userSchema);
+ * // Returns: { description: "Success", content: { "application/json": { schema: ... } } }
+ * ```
+ */
+export const buildStandardSuccessResponse = (zodSchema: ZodSchema): RouteResponse => {
+  return {
+    description: "Success",
+    content: {
+      "application/json": { schema: resolver(zodSchema) },
+    },
+  };
+};
+
+
+/**
+ * Handles a conflict error by throwing a 409 error with a message
+ * indicating that the prompt handle already exists for the given scope.
+ * If the error is not a conflict error, it will be re-thrown, it does nothing.
+ *
+ * @param ports - The process's capabilities; the constraint decoder is its own
+ * @param error - The error to handle
+ * @returns void
+ */
+export const handlePossibleConflictError = (
+  ports: PromptRestPorts,
+  error: unknown,
+  scope: PromptScope = PromptScope.PROJECT,
+) => {
+  if (ports.uniqueConstraintTargets(error).some((t) => t.includes("handle"))) {
+    throw new HTTPException(409, {
+      message: `Prompt handle already exists for scope ${scope}`,
+      cause: error,
+    });
+  }
+};
+
+/**
+ * Maps system-prompt HandledErrors thrown by the prompt service to Hono HTTP
+ * exceptions with the correct status code.
+ *
+ *   - {@link SystemPromptConflictError} → 409 Conflict
+ *     (both top-level `prompt` and a system message supplied)
+ *   - {@link SystemPromptRequiredError} → 400 Bad Request
+ *     (neither supplied — added in #3196)
+ *
+ * Any other error type is re-thrown unchanged so the global handler can deal
+ * with it. The error's own `message` is forwarded as the response body, since
+ * both HandledErrors carry user-facing copy.
+ *
+ * @param error - The error to handle
+ * @returns void
+ */
+export const handleSystemPromptHandledErrors = (error: unknown) => {
+  if (error instanceof SystemPromptRequiredError) {
+    throw new HTTPException(400, {
+      message: error.message,
+      cause: error,
+    });
+  }
+  if (error instanceof SystemPromptConflictError) {
+    throw new HTTPException(409, {
+      message: error.message,
+      cause: error,
+    });
+  }
+};
+
+// ── the family ───────────────────────────────────────────────────────────────
 
 const logger = createLogger("langwatch:api:prompts");
 
-// Define types for our Hono context variables
-export type PromptAppVariables = AuthMiddlewareVariables &
-  OrganizationMiddlewareVariables;
+/** What this family's own per-route organization middleware resolves. */
+export type PromptOrganizationVariables = { organization: Readonly<{ id: string }> };
+
+/**
+ * The context variables this family reads: what the process's project
+ * authentication sets, plus the organization resolved per route.
+ */
+export type PromptAppVariables = AppRestProjectVariables & PromptOrganizationVariables;
+
+/**
+ * REST for a project's prompts, built against one process's security.
+ */
+export function createPromptsRestApp(options: {
+  security: AppRestSecurity;
+  /**
+   * Resolved per request, as reading it off the Hono context used to be:
+   * mounting a family must not force its services to be constructed, which is
+   * what lets the OpenAPI spec generator build this app with none.
+   */
+  prompts: () => PromptRestService;
+  ports: PromptRestPorts;
+}): SecuredApp<{ Variables: PromptAppVariables }> {
+  const secured = options.security.createProjectApp<PromptOrganizationVariables>({
+    basePath: "/api/prompts",
+  });
+  registerPromptRoutes(secured, options.prompts, options.ports);
+  return secured;
+}
 
 export function registerPromptRoutes(
   secured: SecuredApp<{ Variables: PromptAppVariables }>,
+  prompts: () => PromptRestService,
+  ports: PromptRestPorts,
 ): void {
   // Organization resolution runs after the access chain, which authenticates
   // and sets `project`. The Prompt service is already process-owned on App.
@@ -52,7 +336,7 @@ export function registerPromptRoutes(
   // Get all prompts
   secured.access(requires("prompts:view")).get(
     "/",
-    organizationMiddleware,
+    ports.organizationMiddleware,
     describeRoute({
       description: "Get all prompts for a project",
       responses: {
@@ -68,7 +352,7 @@ export function registerPromptRoutes(
       },
     }),
     async (c) => {
-      const service = c.app.prompts.promptService;
+      const service = prompts();
       const project = c.get("project");
       const organization = c.get("organization");
 
@@ -86,7 +370,7 @@ export function registerPromptRoutes(
           .parse(configs)
           .map((p) => ({
             ...p,
-            platformUrl: platformUrl({
+            platformUrl: ports.platformUrl({
               projectSlug: project.slug,
               path: `/prompts`,
             }),
@@ -110,7 +394,7 @@ export function registerPromptRoutes(
   // the prompt rather than with the one that edits its text.
   secured.access(requires("prompts:manage")).put(
     "/:id{.+?}/tags/:tag",
-    organizationMiddleware,
+    ports.organizationMiddleware,
     describeRoute({
       description:
         'Assign a tag (e.g. "production", "staging") to a specific prompt version',
@@ -143,7 +427,7 @@ export function registerPromptRoutes(
     }),
     zValidator("json", z.object({ versionId: z.string() })),
     async (c) => {
-      const service = c.app.prompts.promptService;
+      const service = prompts();
       const project = c.get("project");
       const organization = c.get("organization");
       const { id, tag } = c.req.param();
@@ -204,7 +488,7 @@ export function registerPromptRoutes(
   // List all tag definitions for the org
   secured.access(requires("prompts:view")).get(
     "/tags",
-    organizationMiddleware,
+    ports.organizationMiddleware,
     describeRoute({
       description: "List all prompt tag definitions for the organization",
       responses: {
@@ -229,7 +513,7 @@ export function registerPromptRoutes(
     }),
     async (c) => {
       const organization = c.get("organization");
-      const tags = await c.app.prompts.promptService.listTags({ organizationId: organization.id });
+      const tags = await prompts().listTags({ organizationId: organization.id });
 
       return c.json(
         tags.map((tag) => ({
@@ -244,7 +528,7 @@ export function registerPromptRoutes(
   // Create a tag definition
   secured.access(requires("prompts:manage")).post(
     "/tags",
-    organizationMiddleware,
+    ports.organizationMiddleware,
     describeRoute({
       description: "Create a custom prompt tag definition for the organization",
       responses: {
@@ -270,7 +554,7 @@ export function registerPromptRoutes(
       const organization = c.get("organization");
       const { name } = c.req.valid("json");
       try {
-        const tag = await c.app.prompts.promptService.createTag({
+        const tag = await prompts().createTag({
           organizationId: organization.id,
           name,
         });
@@ -296,7 +580,7 @@ export function registerPromptRoutes(
   // Rename a tag definition
   secured.access(requires("prompts:manage")).put(
     "/tags/:tag",
-    organizationMiddleware,
+    ports.organizationMiddleware,
     describeRoute({
       description: "Rename a prompt tag definition",
       responses: {
@@ -323,7 +607,7 @@ export function registerPromptRoutes(
       const { tag: oldName } = c.req.param();
       const { name: newName } = c.req.valid("json");
       try {
-        const tag = await c.app.prompts.promptService.renameTag({
+        const tag = await prompts().renameTag({
           organizationId: organization.id,
           oldName,
           newName,
@@ -356,7 +640,7 @@ export function registerPromptRoutes(
   // Delete a tag definition
   secured.access(requires("prompts:manage")).delete(
     "/tags/:tag",
-    organizationMiddleware,
+    ports.organizationMiddleware,
     describeRoute({
       description: "Delete a prompt tag definition and cascade to assignments",
       responses: {
@@ -368,7 +652,7 @@ export function registerPromptRoutes(
       const organization = c.get("organization");
       const { tag: tagName } = c.req.param();
       try {
-        const tag = await c.app.prompts.promptService.tryDeleteTagByName({
+        const tag = await prompts().tryDeleteTagByName({
           organizationId: organization.id,
           name: tagName,
         });
@@ -397,7 +681,7 @@ export function registerPromptRoutes(
   // Get versions
   secured.access(requires("prompts:view")).get(
     "/:id{.+?}/versions",
-    organizationMiddleware,
+    ports.organizationMiddleware,
     describeRoute({
       description:
         "Get all versions for a prompt. Does not include base prompt data, only versioned data.",
@@ -415,7 +699,7 @@ export function registerPromptRoutes(
       },
     }),
     async (c) => {
-      const service = c.app.prompts.promptService;
+      const service = prompts();
       const project = c.get("project");
       const organization = c.get("organization");
       const { id } = c.req.param();
@@ -439,7 +723,7 @@ export function registerPromptRoutes(
           .parse(versions)
           .map((v) => ({
             ...v,
-            platformUrl: platformUrl({
+            platformUrl: ports.platformUrl({
               projectSlug: project.slug,
               path: `/prompts`,
             }),
@@ -452,7 +736,7 @@ export function registerPromptRoutes(
   // already exists, i.e. an update of that prompt.
   secured.access(requires("prompts:update")).post(
     "/:id{.+?}/versions/:versionId/restore",
-    organizationMiddleware,
+    ports.organizationMiddleware,
     describeRoute({
       description:
         "Restore a prompt to a previous version. Creates a new version with the same config data as the specified version.",
@@ -468,7 +752,7 @@ export function registerPromptRoutes(
       },
     }),
     async (c) => {
-      const service = c.app.prompts.promptService;
+      const service = prompts();
       const project = c.get("project");
       const organization = c.get("organization");
       const { id, versionId } = c.req.param();
@@ -496,7 +780,7 @@ export function registerPromptRoutes(
 
       return c.json({
         ...apiResponsePromptWithVersionDataSchema.parse(restored),
-        platformUrl: platformUrl({
+        platformUrl: ports.platformUrl({
           projectSlug: project.slug,
           path: `/prompts`,
         }),
@@ -507,7 +791,7 @@ export function registerPromptRoutes(
   // Get prompt by ID
   secured.access(requires("prompts:view")).get(
     "/:id{.+}",
-    organizationMiddleware,
+    ports.organizationMiddleware,
     describeRoute({
       description:
         "Get a specific prompt by slug, with optional shorthand syntax for tags and versions. " +
@@ -559,7 +843,7 @@ export function registerPromptRoutes(
       },
     }),
     async (c) => {
-      const service = c.app.prompts.promptService;
+      const service = prompts();
       const project = c.get("project");
       const organization = c.get("organization");
       const { id } = c.req.param();
@@ -606,7 +890,7 @@ export function registerPromptRoutes(
 
         return c.json({
           ...apiResponsePromptWithVersionDataSchema.parse(config),
-          platformUrl: platformUrl({
+          platformUrl: ports.platformUrl({
             projectSlug: project.slug,
             path: `/prompts`,
           }),
@@ -639,7 +923,7 @@ export function registerPromptRoutes(
   // `prompts:view` is declined exactly as before.
   secured.access(requires("prompts:create")).post(
     "/",
-    organizationMiddleware,
+    ports.organizationMiddleware,
     describeRoute({
       description: "Create a new prompt with default initial version",
       responses: {
@@ -650,7 +934,7 @@ export function registerPromptRoutes(
     }),
     zValidator("json", createPromptInputSchema),
     async (c) => {
-      const service = c.app.prompts.promptService;
+      const service = prompts();
       const project = c.get("project");
       const organization = c.get("organization");
       const { tags, ...data } = c.req.valid("json");
@@ -708,14 +992,11 @@ export function registerPromptRoutes(
           }
         }
 
-        afterPromptCreated({
-          prisma,
-          projectId: project.id,
-        });
+        ports.afterPromptCreated({ projectId: project.id });
 
         return c.json({
           ...apiResponsePromptWithVersionDataSchema.parse(responseConfig),
-          platformUrl: platformUrl({
+          platformUrl: ports.platformUrl({
             projectSlug: project.slug,
             path: `/prompts`,
           }),
@@ -727,7 +1008,7 @@ export function registerPromptRoutes(
             message: error.message,
           });
         }
-        handlePossibleConflictError(error, data.scope);
+        handlePossibleConflictError(ports, error, data.scope);
 
         // Re-throw other errors to be handled by the error middleware
         throw error;
@@ -738,7 +1019,7 @@ export function registerPromptRoutes(
   // Sync endpoint for upsert operations
   secured.access(requires("prompts:manage")).post(
     "/:id{.+?}/sync",
-    organizationMiddleware,
+    ports.organizationMiddleware,
     describeRoute({
       description: "Sync/upsert a prompt with local content",
       responses: {
@@ -777,7 +1058,7 @@ export function registerPromptRoutes(
       }),
     ),
     async (c) => {
-      const service = c.app.prompts.promptService;
+      const service = prompts();
       const project = c.get("project");
       const organization = c.get("organization");
       const { id } = c.req.param();
@@ -821,10 +1102,7 @@ export function registerPromptRoutes(
         );
 
         if (syncResult.action === "created") {
-          afterPromptCreated({
-            prisma,
-            projectId: project.id,
-          });
+          ports.afterPromptCreated({ projectId: project.id });
         }
 
         return c.json(response);
@@ -848,7 +1126,7 @@ export function registerPromptRoutes(
 
         // Translate Prisma unique-constraint violations on handle into a
         // readable 409 instead of bubbling up as "Internal server error".
-        handlePossibleConflictError(error);
+        handlePossibleConflictError(ports, error);
 
         // Re-throw other errors to be handled by the error middleware
         throw error;
@@ -859,7 +1137,7 @@ export function registerPromptRoutes(
   // Update prompt
   secured.access(requires("prompts:update")).put(
     "/:id{.+}",
-    organizationMiddleware,
+    ports.organizationMiddleware,
     describeRoute({
       description: "Update a prompt",
       responses: {
@@ -882,7 +1160,7 @@ export function registerPromptRoutes(
     }),
     zValidator("json", updatePromptInputSchema),
     async (c) => {
-      const service = c.app.prompts.promptService;
+      const service = prompts();
       const project = c.get("project");
       const organization = c.get("organization");
       const { id } = c.req.param();
@@ -965,7 +1243,7 @@ export function registerPromptRoutes(
 
         return c.json({
           ...apiResponsePromptWithVersionDataSchema.parse(responseConfig),
-          platformUrl: platformUrl({
+          platformUrl: ports.platformUrl({
             projectSlug: project.slug,
             path: `/prompts`,
           }),
@@ -977,7 +1255,7 @@ export function registerPromptRoutes(
             message: error.message,
           });
         }
-        handlePossibleConflictError(error, data.scope);
+        handlePossibleConflictError(ports, error, data.scope);
         handleSystemPromptHandledErrors(error);
 
         // Re-throw other errors to be handled by the error middleware
@@ -988,7 +1266,7 @@ export function registerPromptRoutes(
   // Delete prompt
   secured.access(requires("prompts:manage")).delete(
     "/:id{.+}",
-    organizationMiddleware,
+    ports.organizationMiddleware,
     describeRoute({
       description: "Delete a prompt",
       responses: {
@@ -1003,7 +1281,7 @@ export function registerPromptRoutes(
       },
     }),
     async (c) => {
-      const service = c.app.prompts.promptService;
+      const service = prompts();
       const project = c.get("project");
       const organization = c.get("organization");
       const { id } = c.req.param();

@@ -11,7 +11,7 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { app as organizationApp } from "~/app/api/organization/[[...route]]/app";
+import { organizationRestApp as organizationApp } from "~/server/api/management/organization-rest";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {

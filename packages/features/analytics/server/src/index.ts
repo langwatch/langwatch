@@ -20,3 +20,7 @@ export {
   type LangWatchQLAvailability,
   type LangWatchQLUnavailableReason,
 } from "./transport/api-trpc/langwatch-ql.api";
+export {
+  createAnalyticsRestApp,
+  type AnalyticsTimeseriesRestBody,
+} from "./transport/api-rest/analytics.api";

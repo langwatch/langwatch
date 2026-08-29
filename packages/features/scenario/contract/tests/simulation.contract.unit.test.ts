@@ -17,6 +17,34 @@ describe("Simulation contract", () => {
     expect(run.messages[0]).toMatchObject({ role: "assistant", tool_calls: [] });
   });
 
+  /**
+   * `ScenarioApp.queueSimulationRun` records the scenario version a run was
+   * queued from under the reserved namespace, and the REST door answers it.
+   * The namespace is a strict object, so a field it does not declare is
+   * dropped here rather than at either end — which is what happened to this
+   * one, leaving the API answering `scenarioVersion: null` for every run.
+   */
+  it("keeps the queued scenario version on the reserved namespace", () => {
+    const run = simulationRunDataSchema.parse({
+      scenarioId: "scenario_1",
+      batchRunId: "batch_1",
+      scenarioRunId: "run_1",
+      status: "SUCCESS",
+      messages: [],
+      timestamp: 1,
+      durationInMs: 2,
+      metadata: {
+        langwatch: {
+          targetReferenceId: "prompt_1",
+          targetType: "prompt",
+          scenarioVersion: 4,
+        },
+      },
+    });
+
+    expect(run.metadata?.langwatch?.scenarioVersion).toBe(4);
+  });
+
   it("keeps suite target metadata and the batch-to-set index in portable output", () => {
     const page = simulationAllSuitesRunDataSchema.parse({
       changed: true,

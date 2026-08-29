@@ -47,10 +47,11 @@ import deepmerge from "deepmerge";
 import fs from "fs";
 import { generateSpecs as generateSpecsUnpinned } from "hono-openapi";
 import path from "path";
-import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
+import type { AnalyticsApp } from "@langwatch/analytics-server";
+import { buildAnalyticsRestApp } from "../server/analytics/analytics-rest";
 import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";
 import rawCurrentSpec from "../app/api/openapiLangWatch.json";
-import { app as organizationApp } from "../app/api/organization/[[...route]]/app";
+import { organizationRestApp as organizationApp } from "../server/api/management/organization-rest";
 import { requireDefaultedResponseFields } from "../server/api/openapi-response-required";
 import { monitorMappingsSchema as realMonitorMappingsSchema } from "../server/tracer/tracesMapping";
 import {
@@ -185,7 +186,8 @@ const currentSpec = {
   ),
 };
 
-import { app as llmConfigsApp } from "../app/api/prompts/[[...route]]/app";
+import type { PromptRestService } from "@langwatch/prompt-server";
+import { buildPromptsRestApp } from "../server/api/prompts-rest";
 import { secretPublicRestApp } from "../runtime/app/features/secret";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 
@@ -278,7 +280,9 @@ export default async function execute() {
     }).hono,
   );
   console.log("Building analytics spec...");
-  const analyticsSpec = await generateSpecs(analyticsApp);
+  const analyticsSpec = await generateSpecs(
+    buildAnalyticsRestApp(specOnly<AnalyticsApp>("Analytics")),
+  );
   console.log("Building governed analytics SQL spec...");
   const analyticsSqlSpec = await generateSpecs(analyticsSqlApp);
   console.log("Building coding agent spec...");
@@ -367,7 +371,9 @@ export default async function execute() {
     }).hono,
   );
   console.log("Building llm configs spec...");
-  const llmConfigsSpec = await generateSpecs(llmConfigsApp);
+  const llmConfigsSpec = await generateSpecs(
+    buildPromptsRestApp(specOnly<PromptRestService>("Prompts")),
+  );
   console.log("Building scenario events spec...");
   const scenarioEventsSpec = await generateSpecs(
     createScenarioEventsRestApp({

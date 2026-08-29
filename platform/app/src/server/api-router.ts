@@ -20,11 +20,11 @@ import {
   requestTraceIds,
 } from "@langwatch/platform-api/app-rest";
 import { app as adminApp } from "~/server/routes/ops/admin";
-import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
+import { buildAnalyticsRestApp } from "./analytics/analytics-rest";
 import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";
-import { app as exportScenarioRunsApp } from "../app/api/export/scenario-runs/[[...route]]/app";
-import { app as organizationApp } from "../app/api/organization/[[...route]]/app";
-import { app as promptsApp } from "../app/api/prompts/[[...route]]/app";
+import { createScenarioRunExportApp } from "./export/scenario-runs/scenario-run-export-rest";
+import { organizationRestApp } from "./api/management/organization-rest";
+import { buildPromptsRestApp } from "./api/prompts-rest";
 import { secretPublicRestApp } from "../runtime/app/features/secret";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 import { app as annotationsApp } from "./routes/annotations";
@@ -187,7 +187,7 @@ export function createApiRouter(app: App) {
   api.route("/", workflowsApp); // /api/workflows/code-completion, /post_event
   api.route("/", healthChecksApp); // /api/health/collector, /evaluations, etc.
 
-  api.route("/", analyticsApp);
+  api.route("/", buildAnalyticsRestApp(() => app.analytics));
   api.route("/", analyticsSqlApp); // /api/v1/projects/:projectId/analytics/* — governed SQL
   // experimentsV3App owns the session-authenticated execute/abort endpoints and
   // the API-key-authenticated run/runs endpoints; the packaged experiments
@@ -224,7 +224,7 @@ export function createApiRouter(app: App) {
       },
     }).hono,
   );
-  api.route("/", exportScenarioRunsApp);
+  api.route("/", createScenarioRunExportApp(app));
   // ORDERING: the unauthenticated spec document shares the /api/gateway/v1
   // namespace with the credentialed resource routes, so it is mounted first
   // and cannot be shadowed by a sibling that later grows a parameterised
@@ -346,8 +346,8 @@ export function createApiRouter(app: App) {
   // sibling — the self-hosted instance-admin provisioning family, absent unless
   // the instance key is configured on a non-SaaS deployment — is a disjoint
   // surface and is now mounted from the factory loop above.
-  api.route("/", organizationApp);
-  api.route("/", promptsApp);
+  api.route("/", organizationRestApp);
+  api.route("/", buildPromptsRestApp(() => app.prompts.promptService));
   api.route("/", secretPublicRestApp);
   api.route("/", tracesApp);
 

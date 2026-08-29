@@ -19,3 +19,15 @@ export type {
   PromptTrpcPorts,
   PromptTrpcProcedures,
 } from "./transport/api-trpc/prompt.trpc-context";
+export {
+  apiResponsePromptWithVersionDataSchema,
+  createPromptInputSchema,
+  createPromptsRestApp,
+  registerPromptRoutes,
+  updatePromptInputSchema,
+  type ApiResponsePrompt,
+  type PromptAppVariables,
+  type PromptOrganizationVariables,
+  type PromptRestPorts,
+  type PromptRestService,
+} from "./transport/api-rest/prompt.api";

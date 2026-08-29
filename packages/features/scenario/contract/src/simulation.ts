@@ -54,6 +54,15 @@ export const simulationRunMetadataSchema = z
         targetReferenceId: z.string(),
         targetType: z.enum(["prompt", "http", "code", "workflow"]),
         simulationSuiteId: z.string().optional(),
+        /**
+         * The scenario version the run was queued from.
+         *
+         * `ScenarioApp.queueSimulationRun` has always written this, and the
+         * REST door has always read it back — but this object is strict, so
+         * every read parsed through here dropped it and the API answered
+         * `scenarioVersion: null` for runs that had one.
+         */
+        scenarioVersion: z.number().int().optional(),
       })
       .optional(),
   })

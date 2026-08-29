@@ -16,7 +16,7 @@
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { app as analyticsApp } from "~/app/api/analytics/[...route]/app";
+import { buildAnalyticsRestApp } from "~/server/analytics/analytics-rest";
 import {
   createCopilotKitRestApp,
   createExperimentsRestApp,
@@ -38,6 +38,9 @@ import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 wireDefaultTestApp();
+
+/** The analytics family as the API router mounts it. */
+const analyticsApp = buildAnalyticsRestApp(() => getApp().analytics);
 
 /** The experiments family as the API router mounts it. */
 const experimentsApp = createExperimentsRestApp({

@@ -11,7 +11,11 @@ import {
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
-import { app } from "../[[...route]]/app";
+import { getApp } from "~/server/app-layer/app";
+import { buildPromptsRestApp } from "~/server/api/prompts-rest";
+
+/** The family as the API router mounts it, resolving the service per request. */
+const app = buildPromptsRestApp(() => getApp().prompts.promptService);
 
 /**
  * Integration tests for shorthand prompt tag syntax in REST API.

@@ -10,7 +10,7 @@
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { app as promptsApp } from "~/app/api/prompts/[[...route]]/app";
+import { buildPromptsRestApp } from "~/server/api/prompts-rest";
 import {
   type Organization,
   OrganizationUserRole,
@@ -39,6 +39,9 @@ const { hono: app } = createAgentCacheRestApp({
 });
 
 wireDefaultTestApp();
+
+/** The prompts family as the API router mounts it. */
+const promptsApp = buildPromptsRestApp(() => getApp().prompts.promptService);
 
 const ENTRY_NAME = "ACME_SESSION";
 const ENTRY_VALUE = '{"session":"session-1"}';

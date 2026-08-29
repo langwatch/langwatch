@@ -20,7 +20,7 @@ import {
   createScimTokensRestApp,
 } from "@langwatch/platform-api";
 import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
-import { app as organizationApp } from "~/app/api/organization/[[...route]]/app";
+import { organizationRestApp as organizationApp } from "~/server/api/management/organization-rest";
 import { managementAuditPort } from "~/server/api/management/audit";
 import { requireEnterprisePlanRest } from "~/app/api/middleware/enterprise-gate";
 import { appRestSecurity } from "~/server/api/security";

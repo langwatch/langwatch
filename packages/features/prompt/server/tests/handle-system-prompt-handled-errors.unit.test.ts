@@ -16,7 +16,7 @@ import {
   SystemPromptRequiredError,
 } from "@langwatch/prompt-contract";
 
-import { handleSystemPromptHandledErrors } from "../handle-system-prompt-handled-errors";
+import { handleSystemPromptHandledErrors } from "../src/transport/api-rest/prompt.api";
 
 describe("handleSystemPromptHandledErrors", () => {
   describe("when given a SystemPromptRequiredError (Issue #3196)", () => {
@@ -29,7 +29,10 @@ describe("handleSystemPromptHandledErrors", () => {
         expect(err).toBeInstanceOf(HTTPException);
         const httpError = err as HTTPException;
         expect(httpError.status).toBe(400);
-        expect(httpError.message).toBe("System prompt is required.");
+        // The status and the domain error's own `code` are the contract; the
+        // message beside them is copy and has already been reworded once.
+        expect(domainError.code).toBe("prompt_system_prompt_required");
+        expect(httpError.message).toBe(domainError.message);
         // The user-facing message must not contain class names or stack
         // frames — the toast forwards `error.message` verbatim (AC 6).
         expect(httpError.message).not.toMatch(/SystemPromptConflictError/);
@@ -50,9 +53,9 @@ describe("handleSystemPromptHandledErrors", () => {
         expect(err).toBeInstanceOf(HTTPException);
         const httpError = err as HTTPException;
         expect(httpError.status).toBe(409);
-        expect(httpError.message).toBe(
-          "System prompt and prompt cannot be set at the same time",
-        );
+        expect(domainError.code).toBe("prompt_system_prompt_conflict");
+        expect(httpError.message).toBe(domainError.message);
+        expect(httpError.message).not.toMatch(/SystemPromptConflictError/);
         expect(httpError.cause).toBe(domainError);
         return;
       }
