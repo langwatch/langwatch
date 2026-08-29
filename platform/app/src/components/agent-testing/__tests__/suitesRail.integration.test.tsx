@@ -36,6 +36,23 @@ vi.mock("~/utils/formatTimeAgo", () => ({
   formatTimeAgo: () => "2 hours ago",
 }));
 
+// The recent runs of a suite hang off its row menu, so opening that submenu
+// reads the runs. What the list holds is covered against real runs in
+// casesTable; the rail only has to offer the way in.
+vi.mock("~/utils/api", () => ({
+  api: {
+    scenarios: {
+      getSuiteRunData: {
+        useQuery: () => ({
+          data: { runs: [], scenarioSetIds: {} },
+          isLoading: false,
+        }),
+      },
+    },
+    suites: { getAll: { useQuery: () => ({ data: [], isLoading: false }) } },
+  },
+}));
+
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
@@ -74,6 +91,10 @@ function renderRail(
     lastRunBySuiteId: new Map<string, SuiteLastRun>([
       ["suite_1", makeLastRun()],
     ]),
+    scenarioIdsBySuiteId: new Map<string, string[]>([
+      ["suite_1", ["case_1"]],
+      ["suite_default", ["case_1"]],
+    ]),
     collapsed: false,
     onToggleCollapsed: vi.fn(),
     onSelect: vi.fn(),
@@ -81,7 +102,6 @@ function renderRail(
     onNewTestCase: vi.fn(),
     onRunSuite: vi.fn(),
     onRenameSuite: vi.fn(),
-    onOpenLastRun: vi.fn(),
     onArchiveSuite: vi.fn(),
     period: THIRTY_DAYS,
     periodMode: "relative",
@@ -209,7 +229,7 @@ describe("the test suites rail", () => {
       "New scenario",
       "Run suite",
       "Rename",
-      "Open last run",
+      "Open recent runs",
       "Archive suite",
     ]);
   });
@@ -272,23 +292,24 @@ describe("the test suites rail", () => {
       "New scenario",
       "Run suite",
       "Rename",
-      "Open last run",
+      "Open recent runs",
       "Archive suite",
     ]);
   });
 
-  /** @scenario "Open last run goes straight to the last run of that suite" */
-  it("opens the last run of that suite", async () => {
-    const { props } = renderRail();
+  /** @scenario "Open recent runs holds the runs that covered the suite" */
+  it("hangs the recent runs of that suite off the row menu", async () => {
+    renderRail();
     const user = await openSuiteMenu("Refunds");
 
-    await user.click(
-      await screen.findByRole("menuitem", { name: "Open last run" }),
-    );
+    // The submenu is the way in; what it lists is the same list the button
+    // above the table lists, which casesTable covers against real runs.
+    const trigger = await screen.findByRole("menuitem", {
+      name: /Open recent runs/,
+    });
+    await user.click(trigger);
 
-    expect(props.onOpenLastRun).toHaveBeenCalledWith(
-      expect.objectContaining({ slug: "refunds" }),
-    );
+    expect(await screen.findByTestId("recent-runs-list")).toBeInTheDocument();
   });
 
   /** @scenario "Every action of the rail row menu carries its icon" */
@@ -309,8 +330,8 @@ describe("the test suites rail", () => {
     ]);
   });
 
-  /** @scenario "Open last run is not offered for a suite that never ran" */
-  it("does not offer Open last run for a suite that never ran", async () => {
+  /** @scenario "Open recent runs is not offered for a suite that never ran" */
+  it("does not offer Open recent runs for a suite that never ran", async () => {
     renderRail({ lastRunBySuiteId: new Map<string, SuiteLastRun>() });
     await openSuiteMenu("Refunds");
 
@@ -318,7 +339,7 @@ describe("the test suites rail", () => {
       await screen.findByRole("menuitem", { name: "Run suite" }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("menuitem", { name: "Open last run" }),
+      screen.queryByRole("menuitem", { name: /Open recent runs/ }),
     ).not.toBeInTheDocument();
   });
 
@@ -364,14 +385,14 @@ describe("the test suites rail", () => {
   });
 
   /** @scenario "A person with read-only access sees no changing actions in the row menu" */
-  it("offers only Open last run to a person with read-only access", async () => {
+  it("offers only Open recent runs to a person with read-only access", async () => {
     renderRail({ canManage: false });
     await openSuiteMenu("Refunds");
 
     const items = (await screen.findAllByRole("menuitem")).map(
       (item) => item.textContent,
     );
-    expect(items).toEqual(["Open last run"]);
+    expect(items).toEqual(["Open recent runs"]);
     expect(
       screen.queryByRole("button", { name: "New Test Suite" }),
     ).not.toBeInTheDocument();

@@ -24,7 +24,7 @@ export const FROM_CODE_HEADING = "From Code";
 
 export type SuiteRailSectionsProps = Omit<
   SuiteRailProps,
-  "onArchiveSuite" | "isArchiving" | "period" | "periodMode"
+  "onArchiveSuite" | "isArchiving" | "periodMode"
 > & {
   /** Asks for the archive confirmation of one suite. */
   onRequestArchive: (suite: TestSuiteEntry) => void;
@@ -90,10 +90,11 @@ function SuiteRailSuiteList(props: SuiteRailSectionsProps) {
                 suite={suite}
                 canManage={canManage}
                 hasRun={props.lastRunBySuiteId.has(suite.id)}
+                period={props.period}
+                scenarioIds={props.scenarioIdsBySuiteId.get(suite.id) ?? []}
                 onNewTestCase={props.onNewTestCase}
                 onRunSuite={props.onRunSuite}
                 onRenameSuite={props.onRenameSuite}
-                onOpenLastRun={props.onOpenLastRun}
                 onArchiveSuite={() => props.onRequestArchive(suite)}
               />
             )

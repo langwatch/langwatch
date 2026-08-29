@@ -33,7 +33,7 @@ describe("given the actions the suites rail and the scenario rows share", () => 
 
     // The button reads the icon from the shared list rather than naming one of
     // its own, so a way into a run cannot drift from the row menus.
-    expect(button).toContain("MENU_ACTION_ICONS.openLastRun");
+    expect(button).toContain("MENU_ACTION_ICONS.openRecentRuns");
     // The history icon means the version history of a scenario. A way into a
     // run that carried it read as a way into the versions.
     expect(button).not.toContain("History");

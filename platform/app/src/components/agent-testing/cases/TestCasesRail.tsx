@@ -5,17 +5,12 @@
  */
 
 import { SuiteRail } from "./SuiteRail";
-import { useOpenSuiteLastRun } from "./useOpenSuiteLastRun";
 import type { TestCasesTabModel } from "./useTestCasesTab";
 
 export function TestCasesRail({ model }: { model: TestCasesTabModel }) {
   const { base, data, view, suiteMutations, suiteDialog, run } = model;
   const { periodPicker } = base;
   const isExternal = base.selection.kind === "external";
-  const openSuiteLastRun = useOpenSuiteLastRun({
-    suites: data.suites,
-    lastRunBySuiteId: data.lastRunBySuiteId,
-  });
 
   return (
     <SuiteRail
@@ -26,6 +21,7 @@ export function TestCasesRail({ model }: { model: TestCasesTabModel }) {
       isLoading={data.isLoading}
       canManage={base.canManage}
       lastRunBySuiteId={data.lastRunBySuiteId}
+      scenarioIdsBySuiteId={data.scenarioIdsBySuiteId}
       collapsed={base.isRailCollapsed}
       onToggleCollapsed={base.toggleRail}
       onSelect={base.selectSuite}
@@ -33,7 +29,6 @@ export function TestCasesRail({ model }: { model: TestCasesTabModel }) {
       onNewTestCase={(suiteId) => base.onNewTestCase(suiteId)}
       onRunSuite={run.runSuiteById}
       onRenameSuite={suiteDialog.openRename}
-      onOpenLastRun={openSuiteLastRun}
       onArchiveSuite={suiteMutations.archiveSuite}
       isArchiving={suiteMutations.isArchiving}
       period={periodPicker.period}

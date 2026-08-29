@@ -49,6 +49,8 @@ export type SuiteRailProps = {
   canManage: boolean;
   /** The last run of every suite that has one, keyed by suite id. */
   lastRunBySuiteId: ReadonlyMap<string, SuiteLastRun>;
+  /** The scenarios filed under every suite, which its recent runs are read from. */
+  scenarioIdsBySuiteId: ReadonlyMap<string, string[]>;
   collapsed: boolean;
   onToggleCollapsed: () => void;
   onSelect: (selection: AgentTestingSelection) => void;
@@ -57,7 +59,6 @@ export type SuiteRailProps = {
   onNewTestCase: (suiteId: string) => void;
   onRunSuite: (suiteId: string) => void;
   onRenameSuite: (suiteId: string) => void;
-  onOpenLastRun: (suite: TestSuiteEntry) => void;
   onArchiveSuite: (suiteId: string) => void;
   isArchiving?: boolean;
   period: Period;

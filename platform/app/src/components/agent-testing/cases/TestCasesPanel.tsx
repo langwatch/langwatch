@@ -52,7 +52,6 @@ export function TestCasesPanel({ model }: { model: TestCasesTabModel }) {
       onEdit={open.openEditor}
       onDuplicate={caseMutations.duplicateCase}
       onMoveToSuite={caseMutations.moveCaseToSuite}
-      onOpenLastRun={open.openLastRun}
       onArchive={caseMutations.setCaseToArchive}
       onOpenExternalCase={() =>
         base.selectPlan(toExternalPlanSlug(view.externalSetId))

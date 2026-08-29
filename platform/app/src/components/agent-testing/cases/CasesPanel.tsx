@@ -66,7 +66,6 @@ export type CasesPanelProps = {
   onEdit: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
   onMoveToSuite: (testCase: TestCase, suiteId: string) => void;
-  onOpenLastRun: (testCase: TestCase) => void;
   onArchive: (testCase: TestCase) => void;
   onOpenExternalCase: (scenarioId: string) => void;
   /** Opens the name dialog on the open test suite. */
