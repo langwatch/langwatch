@@ -47,6 +47,9 @@ import {
   annotationApiUpdateInputSchema,
   resolveAnnotationSuggestionTarget,
   withReadableAnnotationAnchor,
+  type AnnotationQueueDetail,
+  type AnnotationQueueListEntry,
+  type AnnotationQueueRecord,
 } from "@langwatch/annotation-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
@@ -98,9 +101,13 @@ export type AnnotationQueueItemStatus = "pending" | "completed" | "all";
  * annotations, scores and queue-item creation; the queue rows themselves are
  * still application-owned storage, so the host answers for them.
  *
- * Return types are deliberately `unknown` wherever the transport only hands
- * the value back to the caller: the concrete row type flows from the host's
- * implementation through to the client, so this port cannot silently narrow it.
+ * The reads are typed, not `unknown`. They were the latter, under a note
+ * saying the concrete row flowed from the host's implementation through to
+ * the client — it does not. A tRPC procedure publishes what its handler
+ * returns, so `unknown` here is `{}` in the browser, and the queue drawer and
+ * the queue page read every field off nothing. It also meant nobody could see
+ * what these reads published, which is how `include: { user: true }` — every
+ * column of `User` — survived on four of them.
  */
 export type AnnotationQueueStore = Readonly<{
   /** Whether the project already has a queue addressed by this slug. */
@@ -114,7 +121,7 @@ export type AnnotationQueueStore = Readonly<{
       userIds: readonly string[];
       scoreTypeIds: readonly string[];
     }>,
-  ): Promise<unknown>;
+  ): Promise<AnnotationQueueRecord>;
   updateQueue(
     input: Readonly<{
       projectId: string;
@@ -125,9 +132,9 @@ export type AnnotationQueueStore = Readonly<{
       userIds: readonly string[];
       scoreTypeIds: readonly string[];
     }>,
-  ): Promise<unknown>;
+  ): Promise<AnnotationQueueRecord>;
   /** The project's queues, newest first, for the picker. */
-  listQueues(input: Readonly<{ projectId: string }>): Promise<unknown>;
+  listQueues(input: Readonly<{ projectId: string }>): Promise<AnnotationQueueListEntry[]>;
   /** One queue by slug or id, with its members and score types. */
   findQueue(
     input: Readonly<{
@@ -136,7 +143,7 @@ export type AnnotationQueueStore = Readonly<{
       slug?: string;
       queueId?: string;
     }>,
-  ): Promise<unknown>;
+  ): Promise<AnnotationQueueDetail | null>;
   /** Every queue item in the project the caller's organization can see. */
   listQueueItems(
     input: Readonly<{ projectId: string; organizationId: string }>,
