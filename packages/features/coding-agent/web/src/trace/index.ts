@@ -4,6 +4,10 @@ export * from "./terminal-ansi-parser";
 export { TerminalDiff } from "./terminal-diff";
 export * from "./terminal-line-diff";
 export { TerminalOutput } from "./terminal-output";
+// The screen's own colours. Exported because a host renders the terminal's
+// empty and loading states beside it and has to paint the same background;
+// without it the placeholder sat on the page's colour inside a black screen.
+export { TERMINAL_TOKENS } from "./terminal-palette";
 export { TerminalPatch } from "./terminal-patch";
 export { TerminalSkeleton } from "./terminal-skeleton";
 export { deriveSessionBanner } from "./terminal-session-banner";
@@ -28,9 +32,5 @@ export { deriveTokenTimeline, findCacheRebuilds } from "./token-timeline";
 export type { CacheRebuildEvent, TokenTimelinePoint } from "./token-timeline";
 export { toolResultBodyToString } from "./tool-result-body";
 export { SessionView } from "./session-view";
-export {
-  deriveSessionSignals,
-  formatCompact,
-  formatShortDuration,
-} from "./session-signals";
+export { deriveSessionSignals, formatCompact, formatShortDuration } from "./session-signals";
 export type { CodingAgentSessionDisplay } from "./session-display";

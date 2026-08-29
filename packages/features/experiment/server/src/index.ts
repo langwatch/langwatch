@@ -51,3 +51,9 @@ export {
   workbenchStateSchema,
   workbenchVersionProbeResponseSchema,
 } from "./transport/api-rest/experiment.schemas";
+
+/**
+ * The run-state fold store, composed for a process. The repository behind it
+ * stays internal — see the adapter's own note.
+ */
+export { ExperimentRunStateStoreAdapter } from "./adapters/experiment-run-state-store.adapter";

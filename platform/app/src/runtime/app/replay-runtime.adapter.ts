@@ -10,10 +10,7 @@ import { RedisConnectionService } from "@langwatch/redis-client";
 import { getApp } from "~/server/app-layer/app";
 import { TraceSummaryClickHouseRepository } from "@langwatch/trace-server";
 import { EvaluationEventingAdapter } from "@langwatch/evaluation-server";
-import {
-  createExperimentRunStateFoldStore,
-  ExperimentRunStateRepositoryClickHouse,
-} from "@langwatch/experiment-server";
+import { ExperimentRunStateStoreAdapter } from "@langwatch/experiment-server";
 import { SimulationRunStateStoreAdapter } from "@langwatch/scenario-server";
 import { AppSuiteRuntime } from "~/runtime/app/features/suite";
 import { createAppTraceSummaryStore } from "~/runtime/app/trace-summary-fold.adapter";
@@ -104,9 +101,11 @@ export function createReplayRuntime(config: {
     ],
     [
       "experiment_run_processing",
-      createExperimentRunStateFoldStore(
-        new ExperimentRunStateRepositoryClickHouse(clientResolver, PLATFORM_DEFAULT_RETENTION_DAYS),
-      ),
+      ExperimentRunStateStoreAdapter.create({
+        type: "clickhouse",
+        resolveClient: clientResolver,
+        defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+      }).createFoldStore(),
     ],
     [
       "simulation_processing",

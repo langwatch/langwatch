@@ -19,7 +19,8 @@ import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-import { BackofficeTable, EmptyCell, formatDateTime } from "../BackofficeTable";
+import { EmptyCell, formatDateTime } from "@langwatch/ops-web";
+import { BackofficeTable } from "../BackofficeTable";
 
 const PAGE_SIZE = 25;
 const COLUMN_COUNT = 6;
@@ -43,9 +44,7 @@ export default function SsoConnectionsView() {
   const [debouncedSearch] = useDebounce(search, 300);
   const [page, setPage] = useState(1);
   const openConnectionId =
-    typeof router.query.connection === "string"
-      ? router.query.connection
-      : null;
+    typeof router.query.connection === "string" ? router.query.connection : null;
 
   const list = api.ssoConnections.getAll.useQuery({
     page: page - 1,
@@ -84,16 +83,10 @@ export default function SsoConnectionsView() {
           onPageChange: setPage,
         }}
       >
-        <ConnectionsTable
-          connections={list.data?.connections}
-          onOpen={setOpenConnection}
-        />
+        <ConnectionsTable connections={list.data?.connections} onOpen={setOpenConnection} />
       </BackofficeTable>
 
-      <ConnectionDrawer
-        connectionId={openConnectionId}
-        onClose={() => setOpenConnection(null)}
-      />
+      <ConnectionDrawer connectionId={openConnectionId} onClose={() => setOpenConnection(null)} />
     </>
   );
 }
@@ -198,16 +191,9 @@ function ConnectionsTable({
             <Table.Cell>
               <ProvedBy connection={connection} />
             </Table.Cell>
-            <Table.Cell>
-              {formatDateTime(new Date(connection.updatedAtMs))}
-            </Table.Cell>
+            <Table.Cell>{formatDateTime(new Date(connection.updatedAtMs))}</Table.Cell>
             <Table.Cell textAlign="right">
-              <Box
-                width="full"
-                height="full"
-                display="flex"
-                justifyContent="end"
-              >
+              <Box width="full" height="full" display="flex" justifyContent="end">
                 <RowActions connection={connection} onOpen={onOpen} />
               </Box>
             </Table.Cell>
@@ -243,9 +229,7 @@ function ProvedBy({ connection }: { connection: ConnectionRow }) {
   if (connection.domainVerifications.length === 0) return <EmptyCell />;
   const methods = [
     ...new Set(
-      connection.domainVerifications.map(
-        (entry) => METHOD_LABEL[entry.method] ?? entry.method,
-      ),
+      connection.domainVerifications.map((entry) => METHOD_LABEL[entry.method] ?? entry.method),
     ),
   ];
   return <Text fontSize="sm">{methods.join(", ")}</Text>;
@@ -284,8 +268,7 @@ function rowActionsFor({
   };
   const claimed = connection.claimedDomains[0];
   const approved = connection.approvedDomains[0];
-  const live =
-    connection.state === "ACTIVE" || connection.state === "SUSPENDED";
+  const live = connection.state === "ACTIVE" || connection.state === "SUSPENDED";
 
   return [
     {
@@ -296,8 +279,7 @@ function rowActionsFor({
     claimed && {
       value: "approve",
       label: `Approve ${claimed}`,
-      run: () =>
-        commands.approveDomainClaim.mutate({ ...target, domain: claimed }),
+      run: () => commands.approveDomainClaim.mutate({ ...target, domain: claimed }),
     },
     approved && {
       value: "attest",
@@ -354,9 +336,7 @@ function RowActions({
           <Button
             size="xs"
             variant="ghost"
-            aria-label={`Actions for ${
-              connection.organizationName ?? connection.connectionId
-            }`}
+            aria-label={`Actions for ${connection.organizationName ?? connection.connectionId}`}
             onClick={(event) => event.stopPropagation()}
           >
             <MoreVertical size={14} />
@@ -441,15 +421,13 @@ function RemoveConnectionDialog({
             <VStack align="stretch" gap={3}>
               <Text>
                 Everyone at {connection.organizationName} who signs in through{" "}
-                {connection.verifiedDomains.join(", ")} loses that way in when
-                the removal completes. Anyone who has no other verified sign-in
-                method cannot get in at all, and the removal is refused until
-                they do.
+                {connection.verifiedDomains.join(", ")} loses that way in when the removal
+                completes. Anyone who has no other verified sign-in method cannot get in at all, and
+                the removal is refused until they do.
               </Text>
               <Text color="fg.muted" fontSize="sm">
-                The connection stays reversible for seven days. Pausing it
-                instead stops sign-ins immediately and can be undone at any
-                time.
+                The connection stays reversible for seven days. Pausing it instead stops sign-ins
+                immediately and can be undone at any time.
               </Text>
               <Textarea
                 value={reason}
@@ -460,9 +438,8 @@ function RemoveConnectionDialog({
             </VStack>
           ) : (
             <Text>
-              The organization behind this connection could not be resolved, so
-              there is no way to confirm which customer this would affect.
-              Removal is unavailable until it can be.
+              The organization behind this connection could not be resolved, so there is no way to
+              confirm which customer this would affect. Removal is unavailable until it can be.
             </Text>
           )}
         </Dialog.Body>
@@ -471,10 +448,7 @@ function RemoveConnectionDialog({
             Cancel
           </Button>
           {resolvable && (
-            <Button
-              colorPalette="red"
-              onClick={() => onConfirm(reason.trim() || null)}
-            >
+            <Button colorPalette="red" onClick={() => onConfirm(reason.trim() || null)}>
               Remove
             </Button>
           )}
@@ -559,9 +533,7 @@ function ConnectionDrawer({
     >
       <Drawer.Content>
         <Drawer.Header>
-          <Drawer.Title>
-            {held?.organizationName ?? "Single sign-on connection"}
-          </Drawer.Title>
+          <Drawer.Title>{held?.organizationName ?? "Single sign-on connection"}</Drawer.Title>
         </Drawer.Header>
         <Drawer.CloseTrigger />
         <Drawer.Body>
@@ -569,9 +541,7 @@ function ConnectionDrawer({
             <VStack align="stretch" gap={6}>
               <ConnectionFacts connection={held} />
               <ConnectionDomains connection={held} />
-              {held.state === "VERIFIED" && (
-                <ActivationPanel connection={held} />
-              )}
+              {held.state === "VERIFIED" && <ActivationPanel connection={held} />}
             </VStack>
           )}
         </Drawer.Body>
@@ -583,9 +553,7 @@ function ConnectionDrawer({
 function ConnectionFacts({ connection }: { connection: ConnectionRow }) {
   return (
     <SimpleGrid columns={2} gap={3}>
-      <Fact label="State">
-        {connection.state.replace(/_/g, " ").toLowerCase()}
-      </Fact>
+      <Fact label="State">{connection.state.replace(/_/g, " ").toLowerCase()}</Fact>
       <Fact label="Protocol">{connection.type.toUpperCase()}</Fact>
       <Fact label="Identity provider">{connection.providerId}</Fact>
       <Fact label="Issuer">{connection.issuer ?? "not recorded"}</Fact>
@@ -621,9 +589,7 @@ function ConnectionDomains({ connection }: { connection: ConnectionRow }) {
         {connection.domainVerifications.map((entry) => (
           <HStack key={entry.domain} gap={3}>
             <Text>{entry.domain}</Text>
-            <Badge colorPalette="gray">
-              {METHOD_LABEL[entry.method] ?? entry.method}
-            </Badge>
+            <Badge colorPalette="gray">{METHOD_LABEL[entry.method] ?? entry.method}</Badge>
             <Text fontSize="sm" color="fg.muted">
               {formatDateTime(new Date(entry.verifiedAtMs))}
               {entry.actorId ? ` by ${entry.actorId}` : ""}
@@ -643,8 +609,7 @@ function ConnectionDomains({ connection }: { connection: ConnectionRow }) {
       )}
       {connection.rejection && (
         <Text fontSize="sm" color="fg.muted" marginTop={2}>
-          {connection.rejection.domain} was turned down:{" "}
-          {connection.rejection.note}
+          {connection.rejection.domain} was turned down: {connection.rejection.note}
         </Text>
       )}
     </Box>
@@ -666,9 +631,8 @@ function ActivationPanel({ connection }: { connection: ConnectionRow }) {
         Turn this connection on
       </Text>
       <Text fontSize="sm" color="fg.muted" marginBottom={2}>
-        Someone at {connection.organizationName ?? "the organization"} completes
-        a test sign-in first. Name the account whose sign-in you are turning
-        this on against.
+        Someone at {connection.organizationName ?? "the organization"} completes a test sign-in
+        first. Name the account whose sign-in you are turning this on against.
       </Text>
       <HStack>
         <Textarea
@@ -694,13 +658,7 @@ function ActivationPanel({ connection }: { connection: ConnectionRow }) {
   );
 }
 
-function Fact({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <Box>
       <Text fontSize="xs" color="fg.muted">

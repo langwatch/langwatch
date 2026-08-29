@@ -1,7 +1,7 @@
 import { usePublicEnv } from "~/hooks/usePublicEnv.ts";
 import { parseSnippet } from "./snippets.ts";
-import type { FrameworkKey, PlatformKey } from "@langwatch/trace-server";
-import { getRegistryEntry } from "@langwatch/trace-server";
+import type { FrameworkKey, PlatformKey } from "../types";
+import { getRegistryEntry } from "./registry";
 
 interface CodegenResult {
   code: string;
@@ -10,10 +10,7 @@ interface CodegenResult {
   codeLanguage: string;
 }
 
-function getFrameworkCode(
-  language: PlatformKey,
-  framework: FrameworkKey,
-): CodegenResult | null {
+function getFrameworkCode(language: PlatformKey, framework: FrameworkKey): CodegenResult | null {
   const entry = getRegistryEntry(language, framework);
   if (entry?.snippet) {
     const parsed = parseSnippet(entry.snippet.file as unknown as string);
@@ -29,10 +26,7 @@ function getFrameworkCode(
 }
 
 // React hook wrapper that injects project-specific substitutions
-export function useCodegen(
-  language: PlatformKey,
-  framework: FrameworkKey,
-): CodegenResult | null {
+export function useCodegen(language: PlatformKey, framework: FrameworkKey): CodegenResult | null {
   const publicEnv = usePublicEnv();
   const { project } = useActiveProject();
   const projectName = project?.name ?? "my-llm-app";

@@ -16,7 +16,7 @@ import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRequiredCredentialKeys } from "../../hooks/useRequiredCredentialKeys";
 import {
-  type MaybeStoredModelProvider,
+  type ModelProviderEditorValue,
   modelProviders as modelProvidersRegistry,
 } from "@langwatch/model-provider-contract";
 import {
@@ -67,8 +67,7 @@ export const EditModelProviderForm = ({
   // `isAllProvidersReady` is the hook's "the list definitively arrived"
   // signal (react-query isSuccess), used below to tell a real stale miss
   // apart from a list that simply hasn't loaded.
-  const { providers: allProviders, isReady: isAllProvidersReady } =
-    useAllModelProvidersList();
+  const { providers: allProviders, isReady: isAllProvidersReady } = useAllModelProvidersList();
   const { closeDrawer } = useDrawer();
   const { project, team, organization, hasPermission } = useOrganizationTeamProject();
   const canManageOrganization = hasPermission("organization:manage");
@@ -78,14 +77,10 @@ export const EditModelProviderForm = ({
   // Include the current provider being edited since it will be enabled when saved
   const enabledProvidersCount = useMemo(() => {
     if (!providers) return 1; // Current provider will be enabled when (if) saved
-    const currentlyEnabledCount = Object.values(providers).filter(
-      (p) => p.enabled,
-    ).length;
+    const currentlyEnabledCount = Object.values(providers).filter((p) => p.enabled).length;
     // If the current provider is not already enabled, add 1 since it will be enabled when saved
     const isCurrentProviderAlreadyEnabled = providers[providerKey]?.enabled ?? false;
-    return isCurrentProviderAlreadyEnabled
-      ? currentlyEnabledCount
-      : currentlyEnabledCount + 1;
+    return isCurrentProviderAlreadyEnabled ? currentlyEnabledCount : currentlyEnabledCount + 1;
   }, [providers, providerKey]);
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -95,14 +90,11 @@ export const EditModelProviderForm = ({
   // Gateway feature flag — orgs without the gateway never see the
   // accordion AND the form never spreads advanced fields into the
   // payload, so toggling the flag has no payload-shape side effects.
-  const { enabled: gatewayMenuEnabled } = useFeatureFlag(
-    "release_ui_ai_gateway_menu_enabled",
-    {
-      projectId: project?.id ?? NOT_TARGETED,
-      organizationId: organization?.id,
-      enabled: !!organization?.id,
-    },
-  );
+  const { enabled: gatewayMenuEnabled } = useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
+    projectId: project?.id ?? NOT_TARGETED,
+    organizationId: organization?.id,
+    enabled: !!organization?.id,
+  });
   const [advancedDraft, setAdvancedDraft] =
     useState<ModelProviderAdvancedDraft>(EMPTY_ADVANCED_DRAFT);
   const [advancedJsonError, setAdvancedJsonError] = useState<string | null>(null);
@@ -150,7 +142,7 @@ export const EditModelProviderForm = ({
   // refire that effect each render → setState → re-render → "Maximum update
   // depth exceeded" and a wiped-out Add form. Keyed on the resolved row (or
   // its absence) and the provider key only.
-  const provider: MaybeStoredModelProvider = useMemo(
+  const provider: ModelProviderEditorValue = useMemo(
     () =>
       existingRow ?? {
         provider: providerKey,
@@ -193,8 +185,7 @@ export const EditModelProviderForm = ({
         rateLimitTpm: (provider as { rateLimitTpm?: number | null }).rateLimitTpm ?? null,
         rateLimitRpd: (provider as { rateLimitRpd?: number | null }).rateLimitRpd ?? null,
         fallbackPriorityGlobal:
-          (provider as { fallbackPriorityGlobal?: number | null })
-            .fallbackPriorityGlobal ?? null,
+          (provider as { fallbackPriorityGlobal?: number | null }).fallbackPriorityGlobal ?? null,
         providerConfig: (provider as { providerConfig?: unknown }).providerConfig,
       }),
     );
@@ -214,13 +205,11 @@ export const EditModelProviderForm = ({
       rateLimitTpm: (provider as { rateLimitTpm?: number | null }).rateLimitTpm ?? null,
       rateLimitRpd: (provider as { rateLimitRpd?: number | null }).rateLimitRpd ?? null,
       fallbackPriorityGlobal:
-        (provider as { fallbackPriorityGlobal?: number | null }).fallbackPriorityGlobal ??
-        null,
+        (provider as { fallbackPriorityGlobal?: number | null }).fallbackPriorityGlobal ?? null,
       providerConfig: (provider as { providerConfig?: unknown }).providerConfig,
     });
   }, [gatewayMenuEnabled, provider]);
-  const isAdvancedDirty =
-    JSON.stringify(advancedDraft) !== JSON.stringify(initialAdvancedDraft);
+  const isAdvancedDirty = JSON.stringify(advancedDraft) !== JSON.stringify(initialAdvancedDraft);
 
   // Controlled accordion state: collapsed by default, but expands
   // automatically when the user clicks Save with malformed JSON so the
@@ -282,8 +271,8 @@ export const EditModelProviderForm = ({
   // `satisfies`, so widen to read the optional authFlow: same pattern
   // as CredentialsSection's optionalKeys read.)
   const isOAuthDeviceProvider =
-    (providerDefinition as { authFlow?: "api-key" | "oauth-device" } | undefined)
-      ?.authFlow === "oauth-device";
+    (providerDefinition as { authFlow?: "api-key" | "oauth-device" } | undefined)?.authFlow ===
+    "oauth-device";
 
   const {
     validate: validateApiKey,
@@ -300,11 +289,10 @@ export const EditModelProviderForm = ({
 
   // Shared with onboarding and the Langy model gate, so a refusal is not the
   // end of the road on one surface and a hard block on the next.
-  const { probeRequired, recordRefusal, clearRefusal, saveLabel } =
-    useCredentialProbeGate({
-      customKeys: state.customKeys,
-      resetKey: providerId,
-    });
+  const { probeRequired, recordRefusal, clearRefusal, saveLabel } = useCredentialProbeGate({
+    customKeys: state.customKeys,
+    resetKey: providerId,
+  });
 
   const handleSave = useCallback(async () => {
     // Clear previous errors
@@ -315,10 +303,7 @@ export const EditModelProviderForm = ({
     const userEnteredNewApiKey = hasUserEnteredNewApiKey(state.customKeys);
 
     // Check if user modified non-API-key fields (like URLs)
-    const hasNonApiKeyChanges = hasUserModifiedNonApiKeyFields(
-      state.customKeys,
-      state.initialKeys,
-    );
+    const hasNonApiKeyChanges = hasUserModifiedNonApiKeyFields(state.customKeys, state.initialKeys);
 
     // Validate keys according to schema before submitting. oauth-device
     // providers skip this entirely: the user never types credentials
@@ -343,9 +328,7 @@ export const EditModelProviderForm = ({
         // instead) names no single field, so it has no path to land on and
         // would leave Save doing nothing visible. Anchor it on a required
         // field the customer has left empty.
-        const schemaWideMessage = zodError.issues.find(
-          (issue) => !issue.path?.length,
-        )?.message;
+        const schemaWideMessage = zodError.issues.find((issue) => !issue.path?.length)?.message;
         if (schemaWideMessage) {
           const anchorKey =
             getEmptyRequiredCredentialKeys({
@@ -370,12 +353,7 @@ export const EditModelProviderForm = ({
     // console, hit a temporary 401, etc.). Safety providers like
     // azure_safety also skip this — their endpoints can't answer the
     // OpenAI-compatible probe at all.
-    if (
-      isLlmProvider &&
-      !isOAuthDeviceProvider &&
-      userEnteredNewApiKey &&
-      probeRequired
-    ) {
+    if (isLlmProvider && !isOAuthDeviceProvider && userEnteredNewApiKey && probeRequired) {
       const isValid = await validateApiKey();
       if (!isValid) {
         recordRefusal();
@@ -406,8 +384,8 @@ export const EditModelProviderForm = ({
     <VStack gap={4} align="start" width="full">
       {isStaleMiss && (
         <Text color="red.500" fontSize="sm">
-          This provider configuration no longer exists. It may have been deleted from
-          another session.
+          This provider configuration no longer exists. It may have been deleted from another
+          session.
         </Text>
       )}
       <VStack align="start" width="full" gap={4}>
@@ -453,9 +431,7 @@ export const EditModelProviderForm = ({
           organizationName={organization?.name}
           projectId={project?.id}
           projectName={project?.name}
-          availableTeams={
-            organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? []
-          }
+          availableTeams={organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? []}
           availableProjects={
             organization?.teams?.flatMap((t) =>
               t.projects.map((p) => ({

@@ -1,5 +1,8 @@
 import { auditLog } from "~/runtime/app/features/audit-log";
-import type { AdminAuditRequest, AuditLogRequestLike } from "@langwatch/ops-contract";
+import type { AdminAuditRequest } from "@langwatch/ops-contract";
+// The request shape belongs to the audit-log adapter that consumes it, not to
+// the Ops contract that describes what a back-office call carries.
+import type { AuditLogRequestLike } from "@langwatch/enterprise-audit-log-server";
 import {
   AdminAuditSink,
   PostgresOpsAdapter,

@@ -1,7 +1,7 @@
 import type { DatasetNormalizePayload, DatasetService } from "@langwatch/dataset-contract";
 import {
   PostgresDatasetAdapter,
-  type DatasetExperimentPort,
+  type DatasetExperimentLookup,
   type DatasetNormalizeQueuePort,
   type DatasetUploadPort,
   type DatasetContentPort,
@@ -24,7 +24,7 @@ export class AppDatasetRuntime {
   private constructor(
     options: {
       database: PrismaClient;
-      experiments?: DatasetExperimentPort;
+      experiments?: DatasetExperimentLookup;
       storage?: DatasetUploadPort;
       queue?: DatasetNormalizeQueuePort;
       /** Object-backed dataset reads/mutations; selected by the composition root. */
@@ -42,7 +42,7 @@ export class AppDatasetRuntime {
 
   static create(options: {
     database: PrismaClient;
-    experiments?: DatasetExperimentPort;
+    experiments?: DatasetExperimentLookup;
     storage?: DatasetUploadPort;
     queue?: DatasetNormalizeQueuePort;
     /** Object-backed dataset reads/mutations; selected by the composition root. */
