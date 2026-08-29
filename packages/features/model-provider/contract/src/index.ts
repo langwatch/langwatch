@@ -24,3 +24,4 @@ export * from "./catalog/onboarding-defaults";
 export * from "./catalog/model-tiers";
 export * from "./catalog/resolve-supported-parameters";
 export * from "./catalog/static-model-costs";
+export * from "./model-cost-preview";

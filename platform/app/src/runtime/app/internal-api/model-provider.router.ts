@@ -27,10 +27,8 @@ import {
   checkDeclaredPermission,
   declaredServiceAuthorization,
 } from "~/server/app-layer/authz/trpc-middleware";
-import {
-  type CostRulePreviewInput,
-  previewCostRuleMatchingSpans,
-} from "~/server/app-layer/traces/model-cost-span-preview.service";
+import type { CostRulePreviewInput } from "@langwatch/model-provider-contract";
+import { previewCostRuleMatchingSpans } from "~/server/app-layer/traces/model-cost-span-preview.service";
 import type { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { CodexAccountService } from "~/server/modelProviders/codexAccount.service";
 import { assertCanManageAllScopes } from "~/server/modelProviders/modelProvider.authz";

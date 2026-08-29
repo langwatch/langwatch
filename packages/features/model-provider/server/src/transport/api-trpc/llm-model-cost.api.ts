@@ -29,6 +29,8 @@ import {
   modelCostDeleteTrpcInputSchema,
   modelCostModelLimitsTrpcInputSchema,
   modelCostProjectTrpcInputSchema,
+  type CostRuleMatchingSpansPreview,
+  type ModelLimits,
   type ModelProviderScopeType,
 } from "@langwatch/model-provider-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
@@ -90,7 +92,7 @@ type LlmModelCostTrpcPorts = Readonly<{
    */
   isSafeRegex(pattern: string): boolean;
   /** The registry's context-window and output ceilings for a model id. */
-  getModelLimits(model: string): unknown;
+  getModelLimits(model: string): ModelLimits | null;
   /** The live preview behind the cost-rule drawer's regex field. */
   previewMatchingSpans(input: {
     spans: SpanReader;
@@ -104,7 +106,7 @@ type LlmModelCostTrpcPorts = Readonly<{
       cacheCreationCostPerToken?: number;
       cacheCreation1hCostPerToken?: number;
     };
-  }): Promise<unknown>;
+  }): Promise<CostRuleMatchingSpansPreview>;
 }>;
 
 /**

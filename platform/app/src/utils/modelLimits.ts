@@ -1,3 +1,5 @@
+import type { ModelLimits } from "@langwatch/model-provider-contract";
+
 import { createLogger } from "@langwatch/observability";
 import { getModelById } from "@langwatch/model-provider-contract";
 
@@ -15,11 +17,6 @@ const logger = createLogger("modelLimits");
  * maxInputTokens is retained for semantic clarity in contexts that specifically
  * need to reference input limits vs output limits.
  */
-export interface ModelLimits {
-  maxInputTokens?: number;
-  maxOutputTokens?: number;
-  maxTokens?: number;
-}
 
 /**
  * Generate possible model name variations to try
