@@ -94,7 +94,7 @@ rest names, and why it is not a repoint:
 | `runBoardSnapshot.integration` | `../experiment-run.service` | Moved under `@langwatch/experiment-*`. |
 | `governance-ingestion-key-resolution.integration` | `~/server/api-key/token-resolver` | Deleted; no successor by that name. |
 | `savedWorkbenchChart.integration` (was) | — | Fixed. |
-| `langyProcessPipeline.prisma.integration` | `./helpers/langyEventFixtures` | A fixture the colocation move left behind. |
+| `langyProcessPipeline.prisma.integration` | `./helpers/langyEventFixtures` | The fixture went with #6051, and so did every module it imported — `process-manager/` now holds nothing but this one `__tests__`. Worth porting rather than dropping: it is the only place the exactly-once commit and the outbox dispatch are asserted against a real Postgres. The package's three process tests (`langyConversationProcess`, `pipelineShape`, `langy-process-trace-continuity`) are all unit, and none of them makes that claim. |
 | `virtualKeySpend.integration`, `budgetOverviewFixture` | each other | The fixture is itself in the broken set. |
 | `e2e/langy/fake-tab-*` (3) | `~/features/langy/uiActions/*` | The whole `uiActions` directory moved into the Langy package. |
 
