@@ -64,8 +64,10 @@ vi.mock("~/server/api/rbac", async (importOriginal) => {
 });
 
 import { BroadcastService } from "~/server/app-layer/broadcast/broadcast.service";
-import { LangyConversationService } from "@langwatch/langy-server/testing";
-import { PrismaLangyConversationRepository } from "@langwatch/langy-server/repositories/prisma/prisma.langy-conversation.repository";
+import {
+  LangyConversationService,
+  PrismaLangyConversationRepository,
+} from "@langwatch/langy-server/testing";
 import { createLangyConversationUpdateBroadcastSubscriber } from "@langwatch/langy-server";
 import { prisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "@langwatch/langy-server/event-sourcing/langy.events";
@@ -137,13 +139,7 @@ const eventsReader = {
  * same projection row, read for its cursor and its owner/share fields.
  */
 const freshnessReader = {
-  read: async ({
-    projectId,
-    conversationId,
-  }: {
-    projectId: string;
-    conversationId: string;
-  }) => {
+  read: async ({ projectId, conversationId }: { projectId: string; conversationId: string }) => {
     const row = await prisma.langyConversationProjection.findFirst({
       where: { projectId, ConversationId: conversationId },
     });
@@ -331,9 +327,7 @@ describe("Langy conversation updates reach exactly the members who may read", ()
           conversationId: PRIVATE_CONVERSATION,
           after: BEHIND_CURSOR,
         });
-        expect(forOwner.events.map((event) => event.id)).toEqual([
-          PROGRESS_CURSOR.eventId,
-        ]);
+        expect(forOwner.events.map((event) => event.id)).toEqual([PROGRESS_CURSOR.eventId]);
       });
     });
   });

@@ -12,7 +12,14 @@ import {
 import { nanoid } from "nanoid";
 import { afterEach, describe, expect, it } from "vitest";
 import { LangyConversationNotFoundError } from "@langwatch/langy-contract";
-import { LangyMessageService } from "@langwatch/langy-server/testing";
+import {
+  LangyMessageService,
+  PrismaLangyConversationProjectionRepository,
+  PrismaLangyConversationRepository,
+  PrismaLangyConversationTurnProjectionRepository,
+  PrismaLangyMessageProjectionRepository,
+  PrismaLangyMessageRepository,
+} from "@langwatch/langy-server/testing";
 import { prisma } from "~/server/db";
 import {
   LangyAgentRespondedEventSchema,
@@ -27,11 +34,6 @@ import {
   LangyToolCallSucceededEventSchema,
 } from "@langwatch/langy-server/eventing/langy-conversation-processing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import { PrismaLangyConversationRepository } from "@langwatch/langy-server/repositories/prisma/prisma.langy-conversation.repository";
-import { PrismaLangyConversationProjectionRepository } from "@langwatch/langy-server/repositories/prisma/prisma.langy-conversation-projection.repository";
-import { PrismaLangyConversationTurnProjectionRepository } from "@langwatch/langy-server/repositories/prisma/prisma.langy-conversation-turn-projection.repository";
-import { PrismaLangyMessageRepository } from "@langwatch/langy-server/repositories/prisma/prisma.langy-message.repository";
-import { PrismaLangyMessageProjectionRepository } from "@langwatch/langy-server/repositories/prisma/prisma.langy-message-projection.repository";
 
 const namespace = `langy-operational-${nanoid(10)}`;
 const projectIds = [`${namespace}-project-a`, `${namespace}-project-b`];
@@ -45,17 +47,12 @@ const otherUser = `${namespace}-other-user`;
 const stateExecutor = new StateProjectionExecutor();
 const mapExecutor = new MapProjectionExecutor();
 
-const conversationProjectionStore = new PrismaLangyConversationProjectionRepository(
-  prisma,
-);
+const conversationProjectionStore = new PrismaLangyConversationProjectionRepository(prisma);
 const turnProjectionStore = new PrismaLangyConversationTurnProjectionRepository(prisma);
 const messageProjectionStore = new PrismaLangyMessageProjectionRepository(prisma);
 const conversationReadRepository = new PrismaLangyConversationRepository(prisma);
 const messageReadRepository = new PrismaLangyMessageRepository(prisma);
-const messageService = new LangyMessageService(
-  messageReadRepository,
-  conversationReadRepository,
-);
+const messageService = new LangyMessageService(messageReadRepository, conversationReadRepository);
 
 const conversationProjection = new LangyConversationStateFoldProjection({
   store: conversationProjectionStore,
