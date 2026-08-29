@@ -355,6 +355,31 @@ type-checked for the first time.
 1018 -> 852 errors, and 172 -> 70 of the `{}` reads
 ```
 
+### What the untyped ports were hiding
+
+Typing them is not only tidiness. `AnnotationQueueStore` declared
+`Promise<unknown>` for its queue reads, so nothing — not the compiler, not a
+reviewer reading the procedure — could see what `getQueueBySlugOrId` actually
+published. It returns its Prisma row unmodified, with no output schema, and the
+row was built with `include: { user: true }` on every queue member.
+
+That selects the whole `User`: `email`, `emailVerified`, `image`,
+`pendingSsoSetup`, `twoFactorEnabled`, `lastLoginAt`, `deactivatedAt`,
+`lastHomePath` — and `userHashKey`, the per-user HMAC key ADR-101 §4 mints for
+identity event hashing. Anyone with `annotations:view` on the project received
+all of it, for every member of every queue they could open. Three more reads on
+the same store did the same for an item's reviewer and for whoever queued it.
+
+It is present on `main` too, so it is not something the extraction introduced —
+and the team had already corrected this exact shape once, in
+`annotation.getByTraceIds`, whose note names the cause. The queue reads were
+missed. All four now `select` the three columns the screens render, and
+`repository-service.md` carries the rule, which it did not before.
+
+A sweep for the same pattern found two more wide includes, both harmless: SCIM
+maps through `toScimUser` before responding, and `findWithAdmins` is read by
+the billing service to address an email, never by a browser.
+
 The remaining 70 are the same shape in other features — `annotation.*`,
 `llmModelCost.previewMatchingSpans`, `ingestionSources.*` are the next
 clusters. Each is the same repair, and each is a step the extraction wants
