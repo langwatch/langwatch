@@ -9,11 +9,7 @@ import {
   runNoteSchema,
   runParameterValuesSchema,
   ScenarioNotFoundError,
-  withNote,
   type RunParameterValues,
-  type RunSecretCiphertext,
-  type ScenarioService,
-  type SimulationService,
 } from "@langwatch/scenario-contract";
 import {
   TRPCError,
@@ -22,6 +18,7 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
+import type { ScenarioApp } from "#app/scenario.app";
 import { projectSchema } from "./scenario.schemas";
 import type { ScenarioTrpcContext, ScenarioTrpcProcedures } from "./scenario.trpc-context";
 
@@ -64,23 +61,18 @@ const runScenarioSchema = projectSchema.extend({
  * refuses the request rather than producing a run that fails halfway through.
  */
 async function resolveParametersForRun({
-  scenarios,
+  app,
   projectId,
   scenarioId,
   values,
 }: {
-  scenarios: ScenarioService;
+  app: ScenarioApp;
   projectId: string;
   scenarioId: string;
   values?: RunParameterValues;
-}): Promise<{
-  parameters: RunParameterValues;
-  secretParameters: RunSecretCiphertext;
-  /** The scenario version read with the parameters and stamped onto the run. */
-  scenarioVersion: number;
-}> {
+}) {
   try {
-    return await scenarios.resolveRunParameters({ projectId, scenarioId, values });
+    return await app.resolveRunParameters({ projectId, scenarioId, values });
   } catch (error) {
     if (error instanceof ScenarioNotFoundError) {
       throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
@@ -90,70 +82,30 @@ async function resolveParametersForRun({
 }
 
 /**
- * Dispatches the queued command, which is what writes QUEUED state to
- * ClickHouse before the execution job is scheduled, the same order
- * Suite execution port uses. The resolved parameters travel on the
- * metadata, which is the only channel that carries them into execution.
+ * Queues one run, and turns a failure to queue it into the transport's own
+ * refusal.
  *
- * The secret values travel beside the metadata rather than inside it, so the
- * fold projection cannot copy them into the runs store. Only their names go on
- * the metadata.
+ * The envelope itself — what a queued run's metadata carries, and the rule
+ * that the secret VALUES travel beside it rather than inside it — belongs to
+ * {@link ScenarioApp.queueSimulationRun}. What is left here is the wrapping:
+ * the log line and the tRPC error code a caller sees.
  */
-async function queueRun({
-  simulations,
-  projectId,
-  scenarioId,
-  scenarioRunId,
-  batchRunId,
-  setId,
-  name,
-  target,
-  parameters,
-  secretParameters,
-  note,
-  scenarioVersion,
-}: {
-  simulations: SimulationService;
-  projectId: string;
-  scenarioId: string;
-  scenarioRunId: string;
-  batchRunId: string;
-  setId: string;
-  name: string;
-  target: SimulationTarget;
-  parameters: RunParameterValues;
-  secretParameters: RunSecretCiphertext;
-  note: string | undefined;
-  scenarioVersion: number | undefined;
-}): Promise<void> {
-  const secretParameterNames = Object.keys(secretParameters);
-  const metadata = {
-    // The reserved namespace records the target this run was pointed at and
-    // the scenario version it was queued from, the same way a suite run does.
-    langwatch: {
-      targetReferenceId: target.referenceId,
-      targetType: target.type,
-      ...(scenarioVersion !== undefined ? { scenarioVersion } : {}),
-    },
-    ...withNote(note),
-    ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
-    ...(secretParameterNames.length > 0 ? { secretParameterNames } : {}),
-  };
+async function queueRun(
+  app: ScenarioApp,
+  input: Parameters<ScenarioApp["queueSimulationRun"]>[0],
+): Promise<void> {
   try {
-    await simulations.queueRun({
-      tenantId: projectId,
-      scenarioRunId,
-      scenarioId,
-      batchRunId,
-      scenarioSetId: setId,
-      name,
-      metadata,
-      ...(secretParameterNames.length > 0 ? { secretParameters } : {}),
-      target: { type: target.type, referenceId: target.referenceId },
-      occurredAt: Date.now(),
-    });
+    await app.queueSimulationRun(input);
   } catch (error) {
-    logger.error({ error, projectId, scenarioRunId, batchRunId }, "Failed to queue scenario run");
+    logger.error(
+      {
+        error,
+        projectId: input.projectId,
+        scenarioRunId: input.scenarioRunId,
+        batchRunId: input.batchRunId,
+      },
+      "Failed to queue scenario run",
+    );
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
       message: "Failed to queue scenario run",
@@ -186,13 +138,13 @@ export function createSimulationRunnerRouter<
         const batchRunId = input.batchRunId ?? generateBatchRunId();
 
         const { parameters, secretParameters, scenarioVersion } = await resolveParametersForRun({
-          scenarios: ctx.app.scenarios,
+          app: ctx.app.scenarios,
           projectId: input.projectId,
           scenarioId: input.scenarioId,
           values: input.parameters,
         });
 
-        const prefetchResult = await ctx.app.scenarioExecution.prefetch({
+        const prefetchResult = await ctx.app.scenarios.prefetchExecution({
           context: {
             projectId: input.projectId,
             scenarioId: input.scenarioId,
@@ -231,8 +183,7 @@ export function createSimulationRunnerRouter<
           "Scheduling scenario execution",
         );
 
-        await queueRun({
-          simulations: ctx.app.simulations,
+        await queueRun(ctx.app.scenarios, {
           projectId: input.projectId,
           scenarioId: input.scenarioId,
           scenarioRunId,

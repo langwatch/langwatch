@@ -20,7 +20,6 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type {
   AnalyticsReadInput,
-  AnalyticsService,
   AnalyticsTimeseriesInput,
 } from "@langwatch/analytics-contract";
 import {
@@ -30,38 +29,18 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
-
-/** One offered value for a filter field, exactly as the picker renders it. */
-type AnalyticsFilterOption = Readonly<{ field: string; label: string; count: number }>;
+import type { AnalyticsApp } from "#app/analytics.app";
 
 /**
- * The filter-value read this surface makes on the host's filter registry.
+ * The host supplies authentication; authorization arrives as `policy`.
  *
- * Declared as the one method it calls: which fields exist, and what a stored
- * filter means, is the host's catalogue rather than anything Analytics owns.
+ * `app` is the slice of the host's application this feature reaches, not the
+ * feature's application itself, because a tRPC root is shared by every feature
+ * mounted on it and so carries all of them.
  */
-type AnalyticsFilterOptionsLookup = Readonly<{
-  getFilterOptions(
-    input: Readonly<{
-      projectId: string;
-      field: string;
-      query?: string;
-      key?: string;
-      subkey?: string;
-      startDate: number;
-      endDate: number;
-      scopeFilters?: Record<string, unknown>;
-    }>,
-  ): Promise<AnalyticsFilterOption[]>;
+export type AnalyticsTrpcContext = Readonly<{
+  app: Readonly<{ analytics: AnalyticsApp }>;
 }>;
-
-type AnalyticsApplication = Readonly<{
-  analytics: AnalyticsService;
-  filters: Readonly<{ options: AnalyticsFilterOptionsLookup }>;
-}>;
-
-/** The host supplies authentication; authorization arrives as `policy`. */
-export type AnalyticsTrpcContext = Readonly<{ app: AnalyticsApplication }>;
 
 type AnalyticsTrpcProcedures<
   TContext extends AnalyticsTrpcContext,
@@ -171,25 +150,21 @@ export class AnalyticsTrpcApi {
           });
         }
 
-        // Exclude the current field from scope filters to avoid circular
-        // dependency: the values offered for a field must not already be
-        // narrowed by the selection being made on that same field.
-        const scopeFilters = Object.fromEntries(
-          Object.entries(input.filters ?? {}).filter(([name]) => name !== field),
-        );
-
-        const results = await ctx.app.filters.options.getFilterOptions({
+        // The narrowing rule — a field's own selection must not narrow the
+        // values offered for it — belongs to the application, so both doors
+        // ask the same question rather than each remembering to exclude it.
+        const options = await ctx.app.analytics.filterOptions({
           projectId: input.projectId,
           field,
-          ...(input.query === undefined ? {} : { query: input.query }),
-          ...(key === undefined ? {} : { key }),
-          ...(subkey === undefined ? {} : { subkey }),
+          query: input.query,
+          key,
+          subkey,
           startDate: input.startDate,
           endDate: input.endDate,
-          scopeFilters,
+          filters: input.filters,
         });
 
-        return { options: results };
+        return { options };
       }),
 
       // The full shared-filter schema is accepted for API compatibility even

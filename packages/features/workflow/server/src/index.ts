@@ -3,6 +3,11 @@ export {
   type PostgresWorkflowAdapterOptions,
 } from "./adapters/postgres.workflow.adapter";
 export {
+  WorkflowApp,
+  type WorkflowAppDependencies,
+  type WorkflowCaller,
+} from "./app/workflow.app";
+export {
   WorkflowDslMigrationPort,
   WorkflowLlmParametersPort,
   WorkflowProjectEnvironmentPort,

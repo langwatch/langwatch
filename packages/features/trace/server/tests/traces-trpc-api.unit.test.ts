@@ -14,6 +14,7 @@
  */
 import type { TraceLegacyReadPort } from "../src/ports/trace-legacy-read.port";
 import { TracesTrpcApi } from "../src/api/app-trpc/traces.api";
+import { TraceApp, type TraceAppDependencies } from "../src/app/trace.app";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -47,20 +48,25 @@ const fakeRead = {
   getTracesWithSpansByThreadIds: mockGetTracesWithSpansByThreadIds,
 } as unknown as TraceLegacyReadPort;
 
-type TestContext = {
-  app: {
-    traces: { read: TraceLegacyReadPort };
-    topics: {
-      getAll(input: {
-        projectId: string;
-      }): Promise<Array<{ id: string; name: string; parentId: string | null }>>;
-    };
-    broadcast: {
-      getTenantEmitter(tenantId: string): NodeJS.EventEmitter;
-      cleanupTenantEmitter(tenantId: string): void;
-    };
-  };
-};
+type TestContext = { app: { traces: TraceApp } };
+
+/**
+ * The App holds every service the trace feature's five doors reach; the
+ * `traces.*` surface reaches three of them. The bag is narrowed rather than
+ * stubbed whole because a complete one would mean hand-writing four service
+ * contracts nothing here calls — and a reach for any of them throws on the
+ * missing property, which is the loud failure we want.
+ */
+const app = TraceApp.create({
+  traces: { read: fakeRead },
+  topics: { getAll: async () => [] },
+  broadcast: {
+    getTenantEmitter: () => {
+      throw new Error("not used by these tests");
+    },
+    cleanupTenantEmitter: () => undefined,
+  },
+} as unknown as TraceAppDependencies);
 
 function harness({
   policy = <TProcedure>(procedure: TProcedure): TProcedure => procedure,
@@ -91,18 +97,7 @@ function harness({
 
   return {
     router,
-    caller: router.createCaller({
-      app: {
-        traces: { read: fakeRead },
-        topics: { getAll: async () => [] },
-        broadcast: {
-          getTenantEmitter: () => {
-            throw new Error("not used by these tests");
-          },
-          cleanupTenantEmitter: () => undefined,
-        },
-      },
-    }),
+    caller: router.createCaller({ app: { traces: app } }),
   };
 }
 

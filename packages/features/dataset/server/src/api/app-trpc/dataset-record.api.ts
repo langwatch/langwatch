@@ -13,7 +13,7 @@
  * `datasets:update`, and removing `datasets:delete`.
  *
  * Transport only: policy, the 4xx mapping below, and delegation to
- * `DatasetService`.
+ * `DatasetApp`.
  *
  * Spec: packages/features/dataset/specs/dataset-service.feature.
  */
@@ -25,7 +25,6 @@ import {
   DatasetTooLargeToExportError,
   DuplicateRecordIdError,
   newDatasetEntriesSchema,
-  type DatasetService,
 } from "@langwatch/dataset-contract";
 import {
   TRPCError,
@@ -34,13 +33,18 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
+import type { DatasetApp } from "#app/dataset.app";
 
+/**
+ * The editor loads into the browser, so it asks for a wider window than the
+ * 5 MB default (~3 rows of base64 images). A byte budget is what THIS door
+ * asks for, not a fact about the dataset, which is why it stays here rather
+ * than on the application both doors share.
+ */
 const DATASET_EDITOR_READ_LIMIT_MB = 13;
 
-type DatasetRecordApplication = Readonly<{ dataset: DatasetService }>;
-
 /** The host supplies authentication; authorization arrives as `policy`. */
-export type DatasetRecordTrpcContext = Readonly<{ app: DatasetRecordApplication }>;
+export type DatasetRecordTrpcContext = Readonly<{ app: Readonly<{ dataset: DatasetApp }> }>;
 
 type DatasetRecordTrpcProcedures<
   TContext extends DatasetRecordTrpcContext,
@@ -192,8 +196,6 @@ export class DatasetRecordTrpcApi {
             const result = await ctx.app.dataset.getDatasetWithRecords({
               slugOrId: input.datasetId,
               projectId: input.projectId,
-              // Editor view loads into the browser; give heavy-row datasets a useful
-              // window instead of the 5 MB default (~3 rows of base64 images).
               limitMb: DATASET_EDITOR_READ_LIMIT_MB,
             });
             return {

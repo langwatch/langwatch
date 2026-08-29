@@ -7,9 +7,22 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import { SpansTrpcApi } from "../src/api/app-trpc/spans.api";
+import { TraceApp, type TraceAppDependencies } from "../src/app/trace.app";
 import type { TraceLegacyReadPort } from "../src/ports/trace-legacy-read.port";
 
-type TestContext = { app: { traces: { read: TraceLegacyReadPort } } };
+type TestContext = { app: { traces: TraceApp } };
+
+/**
+ * The App holds every service the trace feature's five doors reach; the two
+ * procedures under test reach exactly one of them. The bag is narrowed rather
+ * than stubbed whole because a complete one would mean hand-writing four
+ * service contracts (`TraceService`, `EvaluationService`, `CodingAgentService`,
+ * `TraceCanonicalisationService`) that nothing here calls — and a reach for any
+ * of them throws on the missing property, which is the loud failure we want.
+ */
+function traceApp(read: TraceLegacyReadPort): TraceApp {
+  return TraceApp.create({ traces: { read } } as unknown as TraceAppDependencies);
+}
 
 function harness({
   getTracesWithSpans = vi.fn(async () => []),
@@ -33,9 +46,10 @@ function harness({
     getSpanForPromptStudio,
     caller: router.createCaller({
       app: {
-        traces: {
-          read: { getTracesWithSpans, getSpanForPromptStudio } as unknown as TraceLegacyReadPort,
-        },
+        traces: traceApp({
+          getTracesWithSpans,
+          getSpanForPromptStudio,
+        } as unknown as TraceLegacyReadPort),
       },
     }),
   };

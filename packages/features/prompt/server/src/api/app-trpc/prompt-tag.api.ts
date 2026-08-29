@@ -2,45 +2,17 @@
  * Prompt tag definitions over the process's tRPC transport.
  *
  * The organization's custom tag catalog (for example, behind
- * DeployPromptDialog). A tag is an organization-level name, so every
- * procedure resolves the project's organization first and the declared check
- * still gates on the project the caller named.
+ * DeployPromptDialog). A tag is an organization-level name, and resolving the
+ * project's organization is the application's job, not this door's — the
+ * declared check still gates on the project the caller named.
  *
- * Transport only: gates, input parsing and delegation to `PromptService`.
+ * Transport only: gates, input parsing and delegation to {@link PromptApp}.
+ * The tag service's domain failures reach the boundary as coded handled errors
+ * raised by the application, so there is no translation table here.
  */
-import {
-  PromptTagConflictError,
-  PromptTagNotFoundError,
-  PromptTagProtectedError,
-  PromptTagValidationError,
-} from "@langwatch/prompt-contract";
-import {
-  TRPCError,
-  type AnyTRPCRootTypes,
-  type TRPCRootObject,
-  type TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { PromptTrpcContext, PromptTrpcProcedures } from "./prompt.trpc-context";
-
-/**
- * Maps domain errors from the PromptTagService to tRPC errors.
- */
-function mapServiceError(error: unknown): never {
-  if (error instanceof PromptTagValidationError) {
-    throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
-  }
-  if (error instanceof PromptTagConflictError) {
-    throw new TRPCError({ code: "CONFLICT", message: error.message });
-  }
-  if (error instanceof PromptTagProtectedError) {
-    throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
-  }
-  if (error instanceof PromptTagNotFoundError) {
-    throw new TRPCError({ code: "NOT_FOUND", message: error.message });
-  }
-  throw error;
-}
 
 /** Installs the complete `promptTags.*` tRPC surface on a process-owned root. */
 export class PromptTagTrpcApi {
@@ -59,11 +31,8 @@ export class PromptTagTrpcApi {
        * Returns all prompt tag definitions for the project's organization.
        */
       getAll: policy("prompts:view")(procedure.input(z.object({ projectId: z.string() }))).query(
-        async ({ ctx, input }) => {
-          const organizationId = await ctx.app.projects.getOrganizationId(input.projectId);
-
-          return ctx.app.prompts.listTags({ organizationId });
-        },
+        async ({ ctx, input }) =>
+          ctx.app.prompts.listTagsForProject({ projectId: input.projectId }),
       ),
 
       /**
@@ -71,19 +40,12 @@ export class PromptTagTrpcApi {
        */
       create: policy("prompts:manage")(
         procedure.input(z.object({ projectId: z.string(), name: z.string() })),
-      ).mutation(async ({ ctx, input }) => {
-        const organizationId = await ctx.app.projects.getOrganizationId(input.projectId);
-
-        try {
-          return await ctx.app.prompts.createTag({
-            organizationId,
-            name: input.name,
-            createdById: ctx.actor().id,
-          });
-        } catch (error) {
-          mapServiceError(error);
-        }
-      }),
+      ).mutation(async ({ ctx, input }) =>
+        ctx.app.prompts.createTagForProject(
+          { projectId: input.projectId, name: input.name },
+          ctx.actor(),
+        ),
+      ),
 
       /**
        * Renames a tag definition and updates all corresponding assignments.
@@ -96,19 +58,13 @@ export class PromptTagTrpcApi {
             newName: z.string(),
           }),
         ),
-      ).mutation(async ({ ctx, input }) => {
-        const organizationId = await ctx.app.projects.getOrganizationId(input.projectId);
-
-        try {
-          return await ctx.app.prompts.renameTag({
-            organizationId,
-            oldName: input.oldName,
-            newName: input.newName,
-          });
-        } catch (error) {
-          mapServiceError(error);
-        }
-      }),
+      ).mutation(async ({ ctx, input }) =>
+        ctx.app.prompts.renameTagForProject({
+          projectId: input.projectId,
+          oldName: input.oldName,
+          newName: input.newName,
+        }),
+      ),
 
       /**
        * Deletes a tag definition by name and cascades to assignments.
@@ -116,28 +72,11 @@ export class PromptTagTrpcApi {
       delete: policy("prompts:manage")(
         procedure.input(z.object({ projectId: z.string(), name: z.string() })),
       ).mutation(async ({ ctx, input }) => {
-        const organizationId = await ctx.app.projects.getOrganizationId(input.projectId);
-
-        try {
-          const tag = await ctx.app.prompts.tryDeleteTagByName({
-            organizationId,
-            name: input.name,
-          });
-
-          if (!tag) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: `Tag not found: ${input.name}`,
-            });
-          }
-
-          return { success: true };
-        } catch (error) {
-          if (error instanceof TRPCError) {
-            throw error;
-          }
-          mapServiceError(error);
-        }
+        await ctx.app.prompts.deleteTagForProject({
+          projectId: input.projectId,
+          name: input.name,
+        });
+        return { success: true };
       }),
     });
   }

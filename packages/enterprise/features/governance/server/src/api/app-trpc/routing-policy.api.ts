@@ -9,34 +9,35 @@
  * list and read.
  *
  * The surface belongs to routing rather than to the gateway package because
- * every procedure answers from the Governance service and the three refusals it
- * translates are the Governance contract's. A core package may not depend on an
- * Enterprise one, so this is the side of the line the transport lives on.
+ * every procedure answers from the governance application and the three
+ * refusals it raises are the Governance contract's. A core package may not
+ * depend on an Enterprise one, so this is the side of the line the transport
+ * lives on.
  *
- * Transport only: input parsing, the typed-error translation, and delegation.
+ * Transport only: input parsing and delegation. The refusals are the
+ * application's, raised as handled errors with stable codes that the process's
+ * boundary renders — a transport does not construct a transport error.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import {
-  routingPolicyScopeTypeSchema,
-  RoutingPolicyModelMustBeConcreteError,
-  RoutingPolicyMustHaveProviderError,
-  RoutingPolicyMustHaveScopeError,
-  type GovernanceService,
-} from "@langwatch/enterprise-governance-contract";
+import { routingPolicyScopeTypeSchema } from "@langwatch/enterprise-governance-contract";
 import { suggestTierTargets, type SuggestTierTargetsInput } from "@langwatch/model-provider-server";
-import {
-  TRPCError,
-  type AnyTRPCRootTypes,
-  type TRPCRootObject,
-  type TRPCRuntimeConfigOptions,
+import type {
+  AnyTRPCRootTypes,
+  TRPCRootObject,
+  TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
+import type { GovernanceApp } from "#app/governance.app";
 
-type RoutingPolicyApplication = Readonly<{ governance: GovernanceService }>;
-
-/** The process supplies authentication; authorization arrives as `policy`. */
+/**
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them.
+ */
 export type RoutingPolicyTrpcContext = Readonly<{
-  app: RoutingPolicyApplication;
+  app: Readonly<{ governanceApp: GovernanceApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -57,36 +58,6 @@ type RoutingPolicyTrpcProcedures<
    */
   policy(permission: AuthzPermission): ProcedureDecorator;
 }>;
-
-/**
- * Translate the typed empty-providers / empty-scopes guards into 422 with
- * stable codes the frontend can branch on. Anything else is rethrown untouched
- * so it degrades to a generic unknown carrying a trace id, per ADR-045.
- */
-function mapServiceErrorToTrpc(err: unknown): never {
-  if (err instanceof RoutingPolicyMustHaveProviderError) {
-    throw new TRPCError({
-      code: "UNPROCESSABLE_CONTENT",
-      message: err.message,
-      cause: err,
-    });
-  }
-  if (err instanceof RoutingPolicyMustHaveScopeError) {
-    throw new TRPCError({
-      code: "UNPROCESSABLE_CONTENT",
-      message: err.message,
-      cause: err,
-    });
-  }
-  if (err instanceof RoutingPolicyModelMustBeConcreteError) {
-    throw new TRPCError({
-      code: "UNPROCESSABLE_CONTENT",
-      message: err.message,
-      cause: err,
-    });
-  }
-  throw err;
-}
 
 const scopeTypeSchema = routingPolicyScopeTypeSchema;
 const scopesArraySchema = z
@@ -138,7 +109,7 @@ export class RoutingPolicyTrpcApi {
           }),
         ),
       ).query(async ({ ctx, input }) =>
-        ctx.app.governance.routingPolicyList({
+        ctx.app.governanceApp.listRoutingPolicies({
           organizationId: input.organizationId,
           selectableForScope: input.selectableForScope,
         }),
@@ -147,7 +118,7 @@ export class RoutingPolicyTrpcApi {
       /** Get a single policy by id (includes its scope rows). */
       get: policy("routingPolicies:view")(procedure.input(policyIdSchema)).query(
         async ({ ctx, input }) =>
-          ctx.app.governance.routingPolicyGetById({
+          ctx.app.governanceApp.getRoutingPolicy({
             id: input.id,
             organizationId: input.organizationId,
           }),
@@ -189,9 +160,9 @@ export class RoutingPolicyTrpcApi {
             policyRules: policyRulesSchema,
           }),
         ),
-      ).mutation(async ({ ctx, input }) => {
-        try {
-          return await ctx.app.governance.routingPolicyCreate({
+      ).mutation(async ({ ctx, input }) =>
+        ctx.app.governanceApp.createRoutingPolicy(
+          {
             organizationId: input.organizationId,
             scopes: input.scopes,
             name: input.name,
@@ -201,12 +172,10 @@ export class RoutingPolicyTrpcApi {
             modelAliases: input.modelAliases,
             defaultModel: input.defaultModel ?? null,
             policyRules: input.policyRules,
-            actorUserId: ctx.actor().id,
-          });
-        } catch (err) {
-          mapServiceErrorToTrpc(err);
-        }
-      }),
+          },
+          ctx.actor(),
+        ),
+      ),
 
       update: policy("routingPolicies:manage")(
         procedure.input(
@@ -224,9 +193,9 @@ export class RoutingPolicyTrpcApi {
             policyRules: policyRulesSchema,
           }),
         ),
-      ).mutation(async ({ ctx, input }) => {
-        try {
-          return await ctx.app.governance.routingPolicyUpdate({
+      ).mutation(async ({ ctx, input }) =>
+        ctx.app.governanceApp.updateRoutingPolicy(
+          {
             id: input.id,
             organizationId: input.organizationId,
             name: input.name,
@@ -235,25 +204,22 @@ export class RoutingPolicyTrpcApi {
             modelAliases: input.modelAliases,
             defaultModel: input.defaultModel,
             policyRules: input.policyRules,
-            actorUserId: ctx.actor().id,
-          });
-        } catch (err) {
-          mapServiceErrorToTrpc(err);
-        }
-      }),
+          },
+          ctx.actor(),
+        ),
+      ),
 
       setDefault: policy("routingPolicies:manage")(procedure.input(policyIdSchema)).mutation(
         async ({ ctx, input }) =>
-          ctx.app.governance.routingPolicySetDefault({
-            id: input.id,
-            organizationId: input.organizationId,
-            actorUserId: ctx.actor().id,
-          }),
+          ctx.app.governanceApp.setDefaultRoutingPolicy(
+            { id: input.id, organizationId: input.organizationId },
+            ctx.actor(),
+          ),
       ),
 
       delete: policy("routingPolicies:manage")(procedure.input(policyIdSchema)).mutation(
         async ({ ctx, input }) => {
-          await ctx.app.governance.routingPolicyDelete({
+          await ctx.app.governanceApp.deleteRoutingPolicy({
             id: input.id,
             organizationId: input.organizationId,
           });

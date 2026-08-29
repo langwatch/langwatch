@@ -11,6 +11,13 @@ export {
   type StoredOrganizationSettings,
   type PersonalWorkspaceResourceIds,
 } from "./ports/organization.port";
+export {
+  OrganizationApp,
+  type FullyLoadedOrganization,
+  type OrganizationAppDependencies,
+  type OrganizationCaller,
+  type OrganizationWithMembersAndTheirTeams,
+} from "./app/organization.app";
 export { TeamTrpcApi, type TeamTrpcContext } from "./api/app-trpc/team.api";
 export {
   GroupTrpcApi,
@@ -24,10 +31,8 @@ export {
 } from "./api/app-trpc/join-request.api";
 export {
   OrganizationTrpcApi,
-  type FullyLoadedOrganization,
   type OrganizationTrpcContext,
   type OrganizationTrpcPorts,
-  type OrganizationWithMembersAndTheirTeams,
 } from "./api/app-trpc/organization.api";
 export {
   PersonalWorkspaceFeaturesTrpcApi,

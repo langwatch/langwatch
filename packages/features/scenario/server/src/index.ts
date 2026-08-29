@@ -61,6 +61,13 @@ export {
   SimulationProcessingPipelineAdapter,
   type SimulationProcessingPipelineDeps,
 } from "./adapters/simulation-processing-pipeline.adapter";
+export {
+  ScenarioApp,
+  type QueueSimulationRunInput,
+  type ScenarioAppDependencies,
+  type ScenarioBroadcast,
+  type ScenarioCaller,
+} from "./app/scenario.app";
 export { ScenarioTrpcApi } from "./api/app-trpc/scenario.api";
 export { filterRunsByTimestamp } from "./api/app-trpc/scenario-events.api";
 export {
@@ -68,8 +75,6 @@ export {
   type SimulationTarget,
 } from "./api/app-trpc/simulation-runner.api";
 export type {
-  ScenarioApplication,
-  ScenarioBroadcast,
   ScenarioTrpcContext,
   ScenarioTrpcPorts,
   ScenarioTrpcProcedures,

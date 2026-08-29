@@ -15,6 +15,7 @@
 import type { AuthzDeclaration } from "@langwatch/authz-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
+import type { AuthApp } from "#app/auth.app";
 
 /**
  * Authenticated or not, plus the operator allow-list the deployment
@@ -39,31 +40,9 @@ type PublicEnvTrpcProcedures<
   policy(declaration: AuthzDeclaration): <TProcedure>(procedure: TProcedure) => TProcedure;
 }>;
 
-/** The deployment decisions this procedure reports; neither is auth's own. */
-export type PublicEnvTrpcPorts = Readonly<{
-  /**
-   * Which sign-in mode the deployment offers.
-   *
-   * ADR-027: reports "email" whenever the license gate denies SSO, so the
-   * sign-in page renders the email form and never auto-redirects to a disabled
-   * identity provider. This is the single source of truth — the raw
-   * `NEXTAUTH_PROVIDER` is never read here.
-   */
-  resolveAuthProvider(): Promise<string>;
-}>;
-
 const PUBLIC_ENV_ACCESS: AuthzDeclaration = {
   kind: "no-permission",
   reason: "resolves sign-in mode and viewer UI visibility only; no tenant product data",
-};
-
-const isOpsSidebarEmail = (
-  userEmail: string | null | undefined,
-  allowList: readonly string[] | undefined,
-): boolean => {
-  if (!allowList?.length || !userEmail) return false;
-  const normalized = userEmail.toLowerCase().trim();
-  return allowList.includes(normalized);
 };
 
 export class PublicEnvTrpcApi {
@@ -76,13 +55,13 @@ export class PublicEnvTrpcApi {
     TContext extends PublicEnvTrpcContext,
     TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
     TRoot extends AnyTRPCRootTypes,
-  >(procedures: PublicEnvTrpcProcedures<TContext, TOptions, TRoot>, ports: PublicEnvTrpcPorts) {
+  >(procedures: PublicEnvTrpcProcedures<TContext, TOptions, TRoot>, app: AuthApp) {
     const { public: publicProcedure, policy } = procedures;
 
     return policy(PUBLIC_ENV_ACCESS)(publicProcedure.input(z.object({}).passthrough())).query(
       async ({ ctx }) => ({
-        NEXTAUTH_PROVIDER: await ports.resolveAuthProvider(),
-        SHOW_OPS_IN_MAIN_SIDEBAR: isOpsSidebarEmail(
+        NEXTAUTH_PROVIDER: await app.resolveAuthProvider(),
+        SHOW_OPS_IN_MAIN_SIDEBAR: app.showsOperatorEntry(
           ctx.session?.user?.email,
           ctx.app.config.opsSidebarEmails,
         ),

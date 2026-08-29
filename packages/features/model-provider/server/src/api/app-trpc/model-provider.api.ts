@@ -22,9 +22,10 @@
  * scopes, never the token set or the account email.
  *
  * Transport only: input parsing, the authorization declarations, and
- * delegation to `ModelProviderService`. The provider probes, the Codex device
- * flow and the audit trail arrive as ports because they are process
- * capabilities rather than the feature's own persistence.
+ * delegation to {@link ModelProviderApp}. No handler stamps the caller onto a
+ * write any more — the application does, once, for every write. The provider
+ * probes, the Codex device flow and the audit trail arrive as ports because
+ * they are process capabilities rather than the feature's own persistence.
  *
  * Specs: specs/model-providers/codex-account-provider.feature,
  * specs/model-providers/role-based-default-models.feature,
@@ -32,7 +33,6 @@
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
-  CODEX_DEFAULT_MODEL,
   modelDefaultConfigDeleteTrpcInputSchema,
   modelDefaultConfigSaveTrpcInputSchema,
   modelDefaultFeatureOverrideTrpcInputSchema,
@@ -52,15 +52,18 @@ import {
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
-
-type ModelProviderApplication = Readonly<{ modelProviders: ModelProviderService }>;
+import type { ModelProviderApp } from "#app/model-provider.app";
 
 /**
  * The process supplies authentication and the permission decision engine;
  * authorization declarations arrive as the `policy` bag below.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them.
  */
 export type ModelProviderTrpcContext = Readonly<{
-  app: ModelProviderApplication;
+  app: Readonly<{ modelProviders: ModelProviderApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -293,31 +296,33 @@ export class ModelProviderTrpcApi {
       update: tenantWritePolicy("project:update")(
         procedure.input(modelProviderUpdateTrpcInputSchema),
       ).mutation(async ({ input, ctx }) => {
-        const result = await ctx.app.modelProviders.upsert({
-          id: input.id,
-          actorId: ctx.actor().id,
-          projectId: input.projectId,
-          organizationId: input.organizationId,
-          provider: input.provider,
-          name: input.name,
-          enabled: input.enabled,
-          customKeys: input.customKeys as Record<string, unknown> | null | undefined,
-          customModels: toCanonicalModels(input.customModels, "chat"),
-          customEmbeddingsModels: toCanonicalModels(input.customEmbeddingsModels, "embedding"),
-          extraHeaders: input.extraHeaders,
-          defaultModel: input.defaultModel,
-          routingHandle: input.routingHandle,
-          scopes:
-            input.scopes ??
-            (input.scopeType && input.scopeId
-              ? [{ scopeType: input.scopeType, scopeId: input.scopeId }]
-              : undefined),
-          rateLimitRpm: input.rateLimitRpm,
-          rateLimitTpm: input.rateLimitTpm,
-          rateLimitRpd: input.rateLimitRpd,
-          fallbackPriorityGlobal: input.fallbackPriorityGlobal,
-          providerConfig: input.providerConfig as Record<string, unknown> | null | undefined,
-        });
+        const result = await ctx.app.modelProviders.upsert(
+          {
+            id: input.id,
+            projectId: input.projectId,
+            organizationId: input.organizationId,
+            provider: input.provider,
+            name: input.name,
+            enabled: input.enabled,
+            customKeys: input.customKeys as Record<string, unknown> | null | undefined,
+            customModels: toCanonicalModels(input.customModels, "chat"),
+            customEmbeddingsModels: toCanonicalModels(input.customEmbeddingsModels, "embedding"),
+            extraHeaders: input.extraHeaders,
+            defaultModel: input.defaultModel,
+            routingHandle: input.routingHandle,
+            scopes:
+              input.scopes ??
+              (input.scopeType && input.scopeId
+                ? [{ scopeType: input.scopeType, scopeId: input.scopeId }]
+                : undefined),
+            rateLimitRpm: input.rateLimitRpm,
+            rateLimitTpm: input.rateLimitTpm,
+            rateLimitRpd: input.rateLimitRpd,
+            fallbackPriorityGlobal: input.fallbackPriorityGlobal,
+            providerConfig: input.providerConfig as Record<string, unknown> | null | undefined,
+          },
+          ctx.actor(),
+        );
 
         return toLegacyProvider(result);
       }),
@@ -325,10 +330,7 @@ export class ModelProviderTrpcApi {
       delete: tenantWritePolicy("project:delete")(
         procedure.input(modelProviderDeleteTrpcInputSchema),
       ).mutation(async ({ input, ctx }) => {
-        return await ctx.app.modelProviders.delete({
-          ...input,
-          actorId: ctx.actor().id,
-        });
+        return await ctx.app.modelProviders.delete(input, ctx.actor());
       }),
 
       /**
@@ -367,10 +369,7 @@ export class ModelProviderTrpcApi {
       testConnection: tenantWritePolicy("project:update")(
         procedure.input(modelProviderTestConnectionTrpcInputSchema),
       ).mutation(async ({ input, ctx }) => {
-        return await ctx.app.modelProviders.testConnection({
-          ...input,
-          actorId: ctx.actor().id,
-        });
+        return await ctx.app.modelProviders.testConnection(input, ctx.actor());
       }),
 
       /**
@@ -405,34 +404,24 @@ export class ModelProviderTrpcApi {
           return { status: "pending" as const };
         }
 
-        const actorId = ctx.actor().id;
-        const saved = await ctx.app.modelProviders.upsert({
-          projectId: input.projectId,
-          actorId,
-          provider: "openai_codex",
-          enabled: true,
-          customKeys: poll.keys,
-          scopes: input.scopes,
-        });
+        const actor = ctx.actor();
+        const actorId = actor.id;
+        const saved = await ctx.app.modelProviders.upsert(
+          {
+            projectId: input.projectId,
+            provider: "openai_codex",
+            enabled: true,
+            customKeys: poll.keys,
+            scopes: input.scopes,
+          },
+          actor,
+        );
 
         if (input.setAsCodingDefaults) {
-          // The widest selected scope carries the defaults; role values
-          // cascade down from it. One scope is the norm (the sign-in surfaces
-          // pick the widest manageable), so this is scopes[0] in practice.
-          // ROLE-level writes, not per-feature: Langy's own role plus the
-          // Fast tier — the two roles whose whole feature set is
-          // codex-licensed. The Default role (playground, evaluators,
-          // workflows) is deliberately untouched.
-          const scope = input.scopes[0]!;
-          for (const role of ["LANGY", "FAST"] as const) {
-            await ctx.app.modelProviders.setDefault({
-              scope,
-              key: role,
-              model: CODEX_DEFAULT_MODEL,
-              authorId: actorId,
-              actorId,
-            });
-          }
+          await ctx.app.modelProviders.applyCodexCodingDefaults(
+            { scopes: input.scopes },
+            actor,
+          );
         }
 
         // The response hands the connector their own account email (PII), so
@@ -468,19 +457,10 @@ export class ModelProviderTrpcApi {
       codexApplyCodingDefaults: policy("project:update")(
         procedure.input(modelProviderCodexApplyCodingDefaultsTrpcInputSchema),
       ).mutation(async ({ input, ctx }) => {
-        const actorId = ctx.actor().id;
-        const scope = input.scopes[0]!;
-        for (const role of ["LANGY", "FAST"] as const) {
-          await ctx.app.modelProviders.setDefault({
-            scope,
-            key: role,
-            model: CODEX_DEFAULT_MODEL,
-            authorId: actorId,
-            actorId,
-          });
-        }
+        const actor = ctx.actor();
+        await ctx.app.modelProviders.applyCodexCodingDefaults({ scopes: input.scopes }, actor);
         ports.recordAudit({
-          userId: actorId,
+          userId: actor.id,
           projectId: input.projectId,
           action: "modelProvider.codexApplyCodingDefaults",
           args: { scopes: input.scopes },
@@ -522,7 +502,10 @@ export class ModelProviderTrpcApi {
           projectId,
           provider,
           customBaseUrl,
-          modelProviders: ctx.app.modelProviders,
+          // The probe is written against the service, so the application hands
+          // over the one it was composed with rather than this transport
+          // holding a second.
+          modelProviders: ctx.app.modelProviders.providerService,
         });
       }),
 
@@ -569,10 +552,10 @@ export class ModelProviderTrpcApi {
       getDefaultModelsForProject: policy("project:view")(
         procedure.input(modelProviderProjectTrpcInputSchema),
       ).query(async ({ input, ctx }) => {
-        return ctx.app.modelProviders.getDefaultSnapshot({
-          projectId: input.projectId,
-          actorId: ctx.actor().id,
-        });
+        return ctx.app.modelProviders.getDefaultSnapshot(
+          { projectId: input.projectId },
+          ctx.actor(),
+        );
       }),
 
       /**
@@ -593,14 +576,14 @@ export class ModelProviderTrpcApi {
         permissions: ["organization:manage", "team:manage", "project:manage"],
       })(procedure.input(modelDefaultRoleAssignmentTrpcInputSchema)).mutation(
         async ({ input, ctx }) => {
-          const actorId = ctx.actor().id;
-          await ctx.app.modelProviders.setDefault({
-            scope: { scopeType: input.scopeType, scopeId: input.scopeId },
-            key: input.role,
-            model: input.model,
-            authorId: actorId,
-            actorId,
-          });
+          await ctx.app.modelProviders.setDefault(
+            {
+              scope: { scopeType: input.scopeType, scopeId: input.scopeId },
+              key: input.role,
+              model: input.model,
+            },
+            ctx.actor(),
+          );
           return { ok: true };
         },
       ),
@@ -611,14 +594,14 @@ export class ModelProviderTrpcApi {
         permissions: ["organization:manage", "team:manage", "project:manage"],
       })(procedure.input(modelDefaultFeatureOverrideTrpcInputSchema)).mutation(
         async ({ input, ctx }) => {
-          const actorId = ctx.actor().id;
-          await ctx.app.modelProviders.setDefault({
-            scope: { scopeType: input.scopeType, scopeId: input.scopeId },
-            key: input.featureKey,
-            model: input.model,
-            authorId: actorId,
-            actorId,
-          });
+          await ctx.app.modelProviders.setDefault(
+            {
+              scope: { scopeType: input.scopeType, scopeId: input.scopeId },
+              key: input.featureKey,
+              model: input.model,
+            },
+            ctx.actor(),
+          );
           return { ok: true };
         },
       ),
@@ -647,12 +630,7 @@ export class ModelProviderTrpcApi {
         permissions: ["organization:manage", "team:manage", "project:manage"],
       })(procedure.input(modelDefaultConfigSaveTrpcInputSchema)).mutation(
         async ({ input, ctx }) => {
-          const actorId = ctx.actor().id;
-          const saved = await ctx.app.modelProviders.saveDefaultConfig({
-            ...input,
-            authorId: actorId,
-            actorId,
-          });
+          const saved = await ctx.app.modelProviders.saveDefaultConfig(input, ctx.actor());
           return { id: saved.id };
         },
       ),
@@ -668,10 +646,7 @@ export class ModelProviderTrpcApi {
         permissions: ["organization:manage", "team:manage", "project:manage"],
       })(procedure.input(modelDefaultConfigDeleteTrpcInputSchema)).mutation(
         async ({ input, ctx }) => {
-          await ctx.app.modelProviders.deleteDefaultConfig({
-            id: input.id,
-            actorId: ctx.actor().id,
-          });
+          await ctx.app.modelProviders.deleteDefaultConfig({ id: input.id }, ctx.actor());
           return { ok: true };
         },
       ),

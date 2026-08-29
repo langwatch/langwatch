@@ -8,6 +8,9 @@
     "src"
   ],
   "type": "module",
+  "imports": {
+    "#*": "./src/*.ts"
+  },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
@@ -22,11 +25,14 @@
   },
   "dependencies": {
     "@langwatch/actor": "workspace:*",
+    "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/role-contract": "workspace:*",
     "@trpc/server": "^11.18.0",
+    "hono": "^4.12.27",
     "nanoid": "^5.1.5",
     "zod": "^4.4.3"
   },

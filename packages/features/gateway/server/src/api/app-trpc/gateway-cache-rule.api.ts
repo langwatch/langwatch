@@ -5,8 +5,8 @@
  * through the config materialiser, not through here; this is the platform UI
  * and CLI surface for the rules themselves.
  *
- * Transport only: input parsing, the wire DTO, and delegation to the process's
- * cache-rule capability, which arrives as a port because it is built over
+ * Transport only: input parsing, the wire DTO, and delegation to the feature's
+ * application, which holds the cache-rule capability because it is built over
  * persistence this transport does not hold.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -18,9 +18,18 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
+import type { GatewayApp } from "#app/gateway.app";
 
-/** The process supplies authentication; authorization arrives as `policy`. */
+/**
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches, not the
+ * feature's application itself, because a tRPC root is shared by every feature
+ * mounted on it and so carries all of them. The REST family, built per process,
+ * holds {@link GatewayApp} directly.
+ */
 export type GatewayCacheRuleTrpcContext = Readonly<{
+  app: Readonly<{ gateway: GatewayApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -60,55 +69,6 @@ const actionSchema = z
   })
   .strict();
 
-type Matchers = z.infer<typeof matchersSchema>;
-type Action = z.infer<typeof actionSchema>;
-
-/**
- * The cache-rule operations this transport calls, exactly as the process's
- * cache-rule service exposes them.
- */
-export type GatewayCacheRuleOperations = Readonly<{
-  list(organizationId: string): Promise<GatewayCacheRule[]>;
-  get(id: string, organizationId: string): Promise<GatewayCacheRule | null>;
-  create(input: {
-    organizationId: string;
-    name: string;
-    description: string | null;
-    priority?: number;
-    enabled?: boolean;
-    matchers: Matchers;
-    action: Action;
-    actorUserId: string;
-  }): Promise<GatewayCacheRule>;
-  update(input: {
-    id: string;
-    organizationId: string;
-    name?: string;
-    description?: string | null;
-    priority?: number;
-    enabled?: boolean;
-    matchers?: Matchers;
-    action?: Action;
-    actorUserId: string;
-  }): Promise<GatewayCacheRule>;
-  archive(input: {
-    id: string;
-    organizationId: string;
-    actorUserId: string;
-  }): Promise<GatewayCacheRule>;
-}>;
-
-export type GatewayCacheRuleTrpcPorts = Readonly<{
-  /**
-   * Refuses an organization id that names no organization, with the same
-   * NOT_FOUND this surface has always answered. A tenancy anchor, not an
-   * authorization check.
-   */
-  assertOrganizationExists(organizationId: string): Promise<void>;
-  /** The process's cache-rule capability, built over its own persistence. */
-  cacheRules(): GatewayCacheRuleOperations;
-}>;
-
 const organizationScopeSchema = z.object({ organizationId: z.string() });
 const cacheRuleIdSchema = z.object({ organizationId: z.string(), id: z.string() });
 
@@ -135,27 +95,25 @@ export class GatewayCacheRuleTrpcApi {
     TContext extends GatewayCacheRuleTrpcContext,
     TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
     TRoot extends AnyTRPCRootTypes,
-    TPorts extends GatewayCacheRuleTrpcPorts,
   >(
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: GatewayCacheRuleTrpcProcedures<TContext, TOptions, TRoot>,
-    ports: TPorts,
   ) {
     const { protected: procedure, policy } = procedures;
 
     return trpc.router({
       list: policy("gatewayCacheRules:view")(procedure.input(organizationScopeSchema)).query(
-        async ({ input }) => {
-          await ports.assertOrganizationExists(input.organizationId);
-          const rows = await ports.cacheRules().list(input.organizationId);
+        async ({ ctx, input }) => {
+          await ctx.app.gateway.assertOrganizationExists(input.organizationId);
+          const rows = await ctx.app.gateway.cacheRules.list(input.organizationId);
           return rows.map(toDto);
         },
       ),
 
       get: policy("gatewayCacheRules:view")(procedure.input(cacheRuleIdSchema)).query(
-        async ({ input }) => {
-          await ports.assertOrganizationExists(input.organizationId);
-          const row = await ports.cacheRules().get(input.id, input.organizationId);
+        async ({ ctx, input }) => {
+          await ctx.app.gateway.assertOrganizationExists(input.organizationId);
+          const row = await ctx.app.gateway.cacheRules.get(input.id, input.organizationId);
           if (!row) {
             throw new TRPCError({
               code: "NOT_FOUND",
@@ -179,8 +137,8 @@ export class GatewayCacheRuleTrpcApi {
           }),
         ),
       ).mutation(async ({ ctx, input }) => {
-        await ports.assertOrganizationExists(input.organizationId);
-        const row = await ports.cacheRules().create({
+        await ctx.app.gateway.assertOrganizationExists(input.organizationId);
+        const row = await ctx.app.gateway.cacheRules.create({
           organizationId: input.organizationId,
           name: input.name,
           description: input.description ?? null,
@@ -207,8 +165,8 @@ export class GatewayCacheRuleTrpcApi {
           }),
         ),
       ).mutation(async ({ ctx, input }) => {
-        await ports.assertOrganizationExists(input.organizationId);
-        const row = await ports.cacheRules().update({
+        await ctx.app.gateway.assertOrganizationExists(input.organizationId);
+        const row = await ctx.app.gateway.cacheRules.update({
           id: input.id,
           organizationId: input.organizationId,
           name: input.name,
@@ -224,8 +182,8 @@ export class GatewayCacheRuleTrpcApi {
 
       archive: policy("gatewayCacheRules:delete")(procedure.input(cacheRuleIdSchema)).mutation(
         async ({ ctx, input }) => {
-          await ports.assertOrganizationExists(input.organizationId);
-          const row = await ports.cacheRules().archive({
+          await ctx.app.gateway.assertOrganizationExists(input.organizationId);
+          const row = await ctx.app.gateway.cacheRules.archive({
             id: input.id,
             organizationId: input.organizationId,
             actorUserId: ctx.actor().id,

@@ -6,15 +6,25 @@
  * requirement: a non-member resolves to the empty set, which is the engine's
  * no-default-access answering rather than a special case here.
  *
- * Transport only: gate, input parsing and delegation to `AuthzService`.
+ * Transport only: gate, input parsing and delegation to `AuthzApp`. Which
+ * scope "here" means — a project id wins over an organization id riding along
+ * with it — is decided there, because it is a decision about the domain rather
+ * than about this transport.
  */
-import type { AuthzDeclaration, AuthzService } from "@langwatch/authz-contract";
+import type { AuthzDeclaration } from "@langwatch/authz-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
+import type { AuthzApp } from "#app/authz.app";
 
-/** The process supplies authentication; authorization arrives as `policy`. */
+/**
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them.
+ */
 export type AuthzTrpcContext = Readonly<{
-  app: Readonly<{ permissions: AuthzService }>;
+  app: Readonly<{ permissions: AuthzApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -69,25 +79,9 @@ export class AuthzTrpcApi {
     return trpc.router({
       effectivePermissions: policy(RESOLVES_OWN_STANDING)(
         procedure.input(scopeInputSchema),
-      ).query(async ({ ctx, input }) => {
-        // The narrower id wins: a project id names a project scope even when
-        // an organization id rides along.
-        const scope = await ctx.app.permissions.tryResolveScope({
-          projectId: input.projectId,
-          organizationId: input.projectId ? undefined : input.organizationId,
-        });
-        if (!scope) {
-          return { scope: null, permissions: [] as string[] };
-        }
-        const permissions = await ctx.app.permissions.effectivePermissions({
-          principal: { type: "user", id: ctx.actor().id },
-          scope,
-        });
-        return {
-          scope: { type: scope.type, id: scope.id },
-          permissions,
-        };
-      }),
+      ).query(async ({ ctx, input }) =>
+        ctx.app.permissions.effectivePermissionsFor(input, ctx.actor()),
+      ),
     });
   }
 }

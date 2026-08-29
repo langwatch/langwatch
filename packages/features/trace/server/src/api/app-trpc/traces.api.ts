@@ -23,9 +23,12 @@
  *
  * Every procedure takes `traces:view`.
  *
- * Transport only: policy, input parsing and delegation to the legacy trace
- * read. Anonymous shared reads are NOT here — they go through the dedicated
- * `sharedTrace.get` surface, the single public trace read ADR-057 allows.
+ * Transport only: policy, input parsing and delegation to `TraceApp`. Which
+ * reads resolve offloaded values in full and which stay on the stored preview
+ * (#4991) is the application's decision, not this door's, so the same rule
+ * answers the explorer, the share page and the REST surface. Anonymous shared
+ * reads are NOT here — they go through the dedicated `sharedTrace.get`
+ * surface, the single public trace read ADR-057 allows.
  */
 import { on } from "node:events";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -43,35 +46,18 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
-import type { TraceLegacyReadPort } from "../../ports/trace-legacy-read.port";
+import type { TraceApp } from "#app/trace.app";
 
 const logger = createLogger("langwatch:traces:sse-subscription");
 
-/** The read side of the process's broadcast fabric. */
-export type TracesTrpcEmitters = Readonly<{
-  getTenantEmitter(tenantId: string): NodeJS.EventEmitter;
-  cleanupTenantEmitter(tenantId: string): void;
-}>;
-
 /**
- * The project's topic tree, as the topic-count read names its buckets. Only
- * the three fields the grid renders are declared: which topics exist is the
- * Topic feature's, and this surface only labels counts with them.
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them.
  */
-type TracesTopicReader = Readonly<{
-  getAll(
-    input: Readonly<{ projectId: string }>,
-  ): Promise<ReadonlyArray<Readonly<{ id: string; name: string; parentId: string | null }>>>;
-}>;
-
-type TracesApplication = Readonly<{
-  traces: Readonly<{ read: TraceLegacyReadPort }>;
-  topics: TracesTopicReader;
-  broadcast: TracesTrpcEmitters;
-}>;
-
-/** The process supplies authentication; authorization arrives as `policy`. */
-export type TracesTrpcContext = Readonly<{ app: TracesApplication }>;
+export type TracesTrpcContext = Readonly<{ app: Readonly<{ traces: TraceApp }> }>;
 
 type TracesTrpcProcedures<
   TContext extends TracesTrpcContext,
@@ -219,9 +205,10 @@ export class TracesTrpcApi {
             projectId: input.projectId,
           });
 
-          const traceService = ctx.app.traces.read;
-          return traceService.getAllTracesForProject(input, protections, {
-            scrollId: input.scrollId,
+          return ctx.app.traces.listTraces({
+            query: input,
+            protections,
+            options: { scrollId: input.scrollId },
           });
         },
       ),
@@ -233,9 +220,10 @@ export class TracesTrpcApi {
           projectId: input.projectId,
         });
 
-        const traceService = ctx.app.traces.read;
-        const trace = await traceService.getById(input.projectId, input.traceId, protections, {
-          full: true,
+        const trace = await ctx.app.traces.readTrace({
+          projectId: input.projectId,
+          traceId: input.traceId,
+          protections,
           withEditOverlay: input.withEditOverlay,
         });
 
@@ -252,12 +240,11 @@ export class TracesTrpcApi {
             projectId: input.projectId,
           });
 
-          const traceService = ctx.app.traces.read;
-          const evaluations = await traceService.getEvaluationsMultiple(
-            input.projectId,
-            [input.traceId],
+          const evaluations = await ctx.app.traces.readEvaluations({
+            projectId: input.projectId,
+            traceIds: [input.traceId],
             protections,
-          );
+          });
 
           return evaluations[input.traceId];
         },
@@ -273,8 +260,10 @@ export class TracesTrpcApi {
       getEvaluationInputs: policy("traces:view")(
         procedure.input(z.object({ projectId: z.string(), evaluationId: z.string() })),
       ).query(async ({ input, ctx }) => {
-        const traceService = ctx.app.traces.read;
-        return traceService.getEvaluationInputs(input.projectId, input.evaluationId);
+        return ctx.app.traces.readEvaluationInputs({
+          projectId: input.projectId,
+          evaluationId: input.evaluationId,
+        });
       }),
 
       getEvaluationsMultiple: policy("traces:view")(
@@ -284,17 +273,19 @@ export class TracesTrpcApi {
           projectId: input.projectId,
         });
 
-        const traceService = ctx.app.traces.read;
-        return traceService.getEvaluationsMultiple(input.projectId, input.traceIds, protections);
+        return ctx.app.traces.readEvaluations({
+          projectId: input.projectId,
+          traceIds: input.traceIds,
+          protections,
+        });
       }),
 
       getTopicCounts: policy("traces:view")(procedure.input(ports.filterInputSchema)).query(
         async ({ input, ctx }) => {
-          const traceService = ctx.app.traces.read;
-          const result = await traceService.getTopicCounts(input);
+          const result = await ctx.app.traces.readTopicCounts(input);
 
           const topicsMap = Object.fromEntries(
-            (await ctx.app.topics.getAll({ projectId: input.projectId })).map((topic) => [
+            (await ctx.app.traces.readTopics({ projectId: input.projectId })).map((topic) => [
               topic.id,
               topic,
             ]),
@@ -337,8 +328,7 @@ export class TracesTrpcApi {
 
       getCustomersAndLabels: policy("traces:view")(procedure.input(ports.filterInputSchema)).query(
         async ({ input, ctx }) => {
-          const traceService = ctx.app.traces.read;
-          return traceService.getCustomersAndLabels(input);
+          return ctx.app.traces.readCustomersAndLabels(input);
         },
       ),
 
@@ -351,14 +341,11 @@ export class TracesTrpcApi {
           projectId: input.projectId,
         });
 
-        // Thread-detail read consumes conversation content — resolve full IO
-        // (#4991), not the 64 KB preview. Anonymous shared reads go through the
-        // dedicated `sharedTrace.get` surface, never this endpoint. See ADR-057.
-        const traceService = ctx.app.traces.read;
-
-        return traceService.getTracesByThreadId(projectId, threadId, protections, {
-          full: true,
-        });
+        // Thread-detail read consumes conversation content, so the application
+        // resolves full IO (#4991) rather than the 64 KB preview. Anonymous
+        // shared reads go through the dedicated `sharedTrace.get` surface,
+        // never this endpoint. See ADR-057.
+        return ctx.app.traces.readThreadTraces({ projectId, threadId, protections });
       }),
 
       getTracesWithSpans: policy("traces:view")(
@@ -375,9 +362,10 @@ export class TracesTrpcApi {
           projectId: input.projectId,
         });
 
-        const traceService = ctx.app.traces.read;
-        return traceService.getTracesWithSpans(projectId, traceIds, protections, undefined, {
-          full: true,
+        return ctx.app.traces.readTracesWithSpans({
+          projectId,
+          traceIds,
+          protections,
           withEditOverlay: input.withEditOverlay,
         });
       }),
@@ -402,14 +390,12 @@ export class TracesTrpcApi {
         // It stays on previews all the same: this runs over a whole page of
         // traces at once, and resolving every offloaded value on all of them is
         // what #4991 kept off the grid. Applying a correction needs none of it.
-        const traceService = ctx.app.traces.read;
-        const traces = await traceService.getTracesWithSpans(
+        const traces = await ctx.app.traces.readTracesWithSpansPreview({
           projectId,
           traceIds,
           protections,
-          undefined,
-          { withEditOverlay: input.withEditOverlay },
-        );
+          withEditOverlay: input.withEditOverlay,
+        });
 
         return Object.fromEntries(
           await Promise.all(
@@ -432,10 +418,12 @@ export class TracesTrpcApi {
           projectId: input.projectId,
         });
 
-        // Thread reads consume conversation content — resolve full IO (#4991).
-        const traceService = ctx.app.traces.read;
-        return traceService.getTracesWithSpansByThreadIds(projectId, threadIds, protections, {
-          full: true,
+        // Thread reads consume conversation content, so the application
+        // resolves full IO (#4991).
+        return ctx.app.traces.readThreadsTraces({
+          projectId,
+          threadIds,
+          protections,
           withEditOverlay: input.withEditOverlay,
         });
       }),
@@ -447,28 +435,10 @@ export class TracesTrpcApi {
           projectId: input.projectId,
         });
 
-        // Dataset builder persists trace content — resolve full IO (#4991) so
-        // truncated rows never corrupt the dataset. The ID-only list read above
-        // stays on the preview (it reads no content).
-        const traceService = ctx.app.traces.read;
-        const { groups } = await traceService.getAllTracesForProject(
-          { ...input, groupBy: "none", pageSize: 10 },
-          protections,
-        );
-
-        const traceIds = groups.flatMap((group) => group.map((trace) => trace.trace_id));
-
-        if (traceIds.length === 0) {
-          return [];
-        }
-
-        return traceService.getTracesWithSpans(
-          input.projectId,
-          traceIds,
-          protections,
-          { from: input.startDate, to: input.endDate },
-          { full: true },
-        );
+        // Dataset builder persists trace content, so the application resolves
+        // full IO (#4991) and truncated rows never corrupt the dataset. The
+        // ID-only list read it draws from stays on the preview.
+        return ctx.app.traces.readSampleTraces({ query: input, protections, pageSize: 10 });
       }),
 
       getFieldNames: policy("traces:view")(
@@ -480,8 +450,11 @@ export class TracesTrpcApi {
           }),
         ),
       ).query(async ({ ctx, input }) => {
-        const traceService = ctx.app.traces.read;
-        return traceService.getDistinctFieldNames(input.projectId, input.startDate, input.endDate);
+        return ctx.app.traces.readFieldNames({
+          projectId: input.projectId,
+          startDate: input.startDate,
+          endDate: input.endDate,
+        });
       }),
 
       getSampleTraces: policy("traces:view")(
@@ -491,29 +464,16 @@ export class TracesTrpcApi {
           projectId: input.projectId,
         });
 
-        // Sample builder feeds dataset/evaluator content — resolve full IO
-        // (#4991). The ID-only list read stays on the preview.
-        const traceService = ctx.app.traces.read;
-        const { groups } = await traceService.getAllTracesForProject(
-          { ...input, groupBy: "none", pageSize: 100 },
+        // Sample builder feeds dataset/evaluator content, so the application
+        // resolves full IO (#4991). The ID-only list read it draws from stays
+        // on the preview.
+        const traceWithSpans = await ctx.app.traces.readSampleTraces({
+          query: input,
           protections,
-        );
+          pageSize: 100,
+        });
 
-        const traceIds = groups.flatMap((group) => group.map((trace) => trace.trace_id));
-
-        if (traceIds.length === 0) {
-          return [];
-        }
-
-        const { projectId, evaluatorType, preconditions, expectedResults } = input;
-
-        const traceWithSpans = await traceService.getTracesWithSpans(
-          projectId,
-          traceIds,
-          protections,
-          { from: input.startDate, to: input.endDate },
-          { full: true },
-        );
+        const { evaluatorType, preconditions, expectedResults } = input;
 
         const passedPreconditions = traceWithSpans.filter((trace) => {
           if (!evaluatorType) return false;
@@ -561,24 +521,23 @@ export class TracesTrpcApi {
         // this did) silently truncated any offloaded trace in a spans-less
         // download, the same data-loss bug fixed in ExportService for
         // summary-mode exports.
-        const traceService = ctx.app.traces.read;
-        return traceService.getAllTracesForProject(
-          { ...input, pageSize: input.pageSize ?? 10_000 },
+        return ctx.app.traces.listTraces({
+          query: { ...input, pageSize: input.pageSize ?? 10_000 },
           protections,
-          {
+          options: {
             downloadMode: true,
             includeSpans: input.includeSpans,
             resolveBlobs: true,
             scrollId: input.scrollId,
           },
-        );
+        });
       }),
 
       onTraceUpdate: policy("traces:view")(
         procedure.input(z.object({ projectId: z.string() })),
       ).subscription(async function* (opts) {
         const { projectId } = opts.input;
-        const emitter = opts.ctx.app.broadcast.getTenantEmitter(projectId);
+        const emitter = opts.ctx.app.traces.getTenantEmitter(projectId);
 
         logger.info({ projectId }, "SSE subscription started");
 
@@ -592,7 +551,7 @@ export class TracesTrpcApi {
           logger.info({ projectId }, "SSE subscription ended normally");
         } finally {
           logger.debug({ projectId }, "SSE subscription cleanup");
-          opts.ctx.app.broadcast.cleanupTenantEmitter(projectId);
+          opts.ctx.app.traces.cleanupTenantEmitter(projectId);
         }
       }),
     });

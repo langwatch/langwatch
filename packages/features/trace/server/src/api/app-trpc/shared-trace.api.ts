@@ -27,10 +27,8 @@ import {
 import {
   sharedTraceDtoSchema,
   SHARE_MAX_FULL_SPANS,
-  type Evaluation,
   type SharedTraceDto,
   type TraceResourceInfoDto,
-  type TraceSummaryData,
 } from "@langwatch/trace-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
@@ -50,7 +48,7 @@ import {
   gateTreeCost,
   withoutHiddenResourceAttrs,
 } from "./trace-view-gates.api";
-import type { TracesV2SpanReader } from "./traces-v2.api";
+import type { TraceApp } from "#app/trace.app";
 
 /**
  * Per-window ceilings for the anonymous read. Generous enough that a person
@@ -62,60 +60,19 @@ const SHARE_READ_LIMIT_WINDOW_SECONDS = 60;
 const SHARE_READ_LIMIT_PER_TOKEN = 60;
 const SHARE_READ_LIMIT_PER_IP = 120;
 
-/** The resolved share, as far as this read needs to know it. */
-type ResolvedShare = Readonly<{
-  resourceType: string;
-  projectId: string;
-  resourceId: string;
-}>;
-
-type SharedTraceApplication = Readonly<{
-  share: Readonly<{
-    resolveForViewer(input: {
-      token: string;
-      viewer: ShareViewer;
-      viewerKey?: string;
-    }): Promise<ResolvedShare>;
-    tryGetCachedPayload(input: { token: string; protections: Protections }): Promise<unknown>;
-    cachePayload(input: {
-      token: string;
-      protections: Protections;
-      payload: SharedTraceDto;
-    }): Promise<void>;
-  }>;
-  projects: Readonly<{
-    tryGetById(projectId: string): Promise<{
-      name: string | null;
-      slug: string | null;
-      language: string | null;
-      framework: string | null;
-    } | null>;
-  }>;
-  traces: Readonly<{
-    summary: Readonly<{
-      getByTraceId(
-        tenantId: string,
-        traceId: string,
-        options?: { visibilityCutoffMs?: number | null },
-      ): Promise<TraceSummaryData>;
-    }>;
-    spans: TracesV2SpanReader;
-    read: Readonly<{
-      getEvaluationsMultiple(
-        projectId: string,
-        traceIds: string[],
-        protections: Protections,
-      ): Promise<Record<string, Evaluation[]>>;
-    }>;
-  }>;
-}>;
-
 /**
  * The process supplies the request, the session (when there is one) and the
  * application. There is no authenticated actor here by design.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them. It is the SAME
+ * {@link TraceApp} the authenticated explorer reads through, which is what
+ * stops this surface drifting behind an in-app redaction: the five span reads
+ * below are the explorer's own, not a second copy of them.
  */
 export type SharedTraceTrpcContext = Readonly<{
-  app: SharedTraceApplication;
+  app: Readonly<{ traces: TraceApp }>;
   session: { user?: { id: string } } | null | undefined;
   req?: { headers?: Record<string, unknown> } | undefined;
 }>;
@@ -278,7 +235,7 @@ export class SharedTraceTrpcApi {
           // Throws typed share HandledErrors on any failure — handledErrorMiddleware
           // maps them to wire codes (not_found/kill-switch → 404, expired and
           // exhausted → 403, out-of-audience → 401).
-          const share = await ctx.app.share.resolveForViewer({
+          const share = await ctx.app.traces.resolveShareForViewer({
             token: input.token,
             viewer,
             ...(viewerKey !== undefined ? { viewerKey } : {}),
@@ -309,14 +266,14 @@ export class SharedTraceTrpcApi {
           });
           if (!protections) throw new ShareLinkNotFoundError();
 
-          const app = ctx.app;
+          const app = ctx.app.traces;
 
           // Cache lookup happens AFTER the token resolved and protections were
           // computed — never before. Authorization is re-run on every request, so
           // a revoked, expired or exhausted link stops serving immediately no
           // matter what is cached, and the key carries a protections fingerprint
           // so two viewers with different redactions can never share an entry.
-          const cached = await app.share.tryGetCachedPayload({
+          const cached = await app.readCachedSharePayload({
             token: input.token,
             protections,
           });
@@ -336,14 +293,16 @@ export class SharedTraceTrpcApi {
           // the same generic NOT_FOUND as a bad token.
           let summary;
           try {
-            summary = await app.traces.summary.getByTraceId(projectId, traceId, {
+            summary = await app.readTraceSummary({
+              projectId,
+              traceId,
               visibilityCutoffMs: protections.visibilityCutoffMs ?? null,
             });
           } catch (error) {
             if (ports.isTraceNotFound(error)) throw new ShareLinkNotFoundError();
             throw error;
           }
-          const occurredAtHint = { occurredAtMs: summary.occurredAt };
+          const occurredAtMs = summary.occurredAt;
 
           const [
             project,
@@ -354,34 +313,18 @@ export class SharedTraceTrpcApi {
             eventRows,
             evaluationsByTrace,
           ] = await Promise.all([
-            app.projects.tryGetById(projectId),
-            app.traces.spans.getSpanSummaryByTraceId({
-              tenantId: projectId,
+            app.readProject(projectId),
+            app.readSpanSummaries({ projectId, traceId, occurredAtMs }),
+            app.readSpans({
+              projectId,
               traceId,
-              ...occurredAtHint,
-            }),
-            app.traces.spans.getSpansByTraceId({
-              tenantId: projectId,
-              traceId,
+              occurredAtMs,
               visibilityCutoffMs: protections.visibilityCutoffMs ?? null,
-              ...occurredAtHint,
             }),
-            app.traces.spans.getLangwatchSignalsByTraceId({
-              tenantId: projectId,
-              traceId,
-              ...occurredAtHint,
-            }),
-            app.traces.spans.getSpanResourcesByTraceId({
-              tenantId: projectId,
-              traceId,
-              ...occurredAtHint,
-            }),
-            app.traces.spans.getTraceEventsByTraceId({
-              tenantId: projectId,
-              traceId,
-              ...occurredAtHint,
-            }),
-            app.traces.read.getEvaluationsMultiple(projectId, [traceId], protections),
+            app.readLangwatchSignals({ projectId, traceId, occurredAtMs }),
+            app.readSpanResources({ projectId, traceId, occurredAtMs }),
+            app.readTraceEvents({ projectId, traceId, occurredAtMs }),
+            app.readEvaluations({ projectId, traceIds: [traceId], protections }),
           ]);
 
           // Header (spend stripped; the DROP banner derives exactly as the
@@ -460,7 +403,7 @@ export class SharedTraceTrpcApi {
             evaluations,
           };
           // Best-effort: a cache write failure is logged, never fatal to the read.
-          await app.share.cachePayload({
+          await app.writeCachedSharePayload({
             token: input.token,
             protections,
             payload: dto,

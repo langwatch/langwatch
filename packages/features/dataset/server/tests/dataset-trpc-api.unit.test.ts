@@ -23,15 +23,9 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { DatasetTrpcApi } from "../src/api/app-trpc/dataset.api";
+import { DatasetApp } from "../src/app/dataset.app";
 
-type TestContext = {
-  app: {
-    dataset: DatasetService;
-    experiments: {
-      getById(input: { projectId: string; id: string }): Promise<{ name: string | null }>;
-    };
-  };
-};
+type TestContext = { app: { dataset: DatasetApp } };
 
 type PolicyCall = { permission: string; path: string; input: unknown };
 
@@ -76,7 +70,17 @@ function harness({
     probeProjectPermission,
     getById,
     caller: router.createCaller({
-      app: { dataset: datasetStub(dataset), experiments: { getById } },
+      app: {
+        dataset: DatasetApp.create({
+          dataset: datasetStub(dataset),
+          experiments: {
+            getById,
+            tryGetBySlug: async () => {
+              throw new Error("the dataset surface reads no experiment by slug");
+            },
+          },
+        }),
+      },
     }),
   };
 }

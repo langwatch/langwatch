@@ -11,6 +11,7 @@ import {
   LicenseEnforcementTrpcApi,
   type LicenseEnforcementTrpcContext,
 } from "../src/api/app-trpc/license-enforcement.api";
+import { LicensingApp } from "../src/app/licensing.app";
 
 const checkLimit = vi.fn();
 const notifyResourceLimitReached = vi.fn();
@@ -21,14 +22,41 @@ const trpc = initTRPC.context<LicenseEnforcementTrpcContext>().create();
 /** The process's chain is exercised in the app; here it is the identity. */
 const identityPolicy = <TProcedure>(procedure: TProcedure): TProcedure => procedure;
 
-const router = LicenseEnforcementTrpcApi.create(
-  trpc,
-  { protected: trpc.procedure, policy: () => identityPolicy },
-  { checkLimit, reportError },
-);
+const router = LicenseEnforcementTrpcApi.create(trpc, {
+  protected: trpc.procedure,
+  policy: () => identityPolicy,
+});
+
+/**
+ * The whole application, with everything the limit surface does not reach left
+ * as a refusal rather than a stub: if this surface ever starts asking one of
+ * them, the test says so out loud instead of quietly answering.
+ */
+const licensing = LicensingApp.create({
+  checkLimit,
+  reportError,
+  licenses: () => {
+    throw new Error("the limit surface does not read the license service");
+  },
+  cryptography: () => {
+    throw new Error("the limit surface does not sign anything");
+  },
+  configuredAuthProvider: () => {
+    throw new Error("the limit surface does not read the auth provider");
+  },
+  platformSsoAllowed: () => {
+    throw new Error("the limit surface does not read the single sign-on gate");
+  },
+  authProviderIsMounted: () => {
+    throw new Error("the limit surface does not read the auth provider");
+  },
+  reportSigningFailure: () => {
+    throw new Error("the limit surface signs nothing to fail");
+  },
+});
 
 const caller = router.createCaller({
-  app: { usageLimits: { notifyResourceLimitReached } },
+  app: { licensing, usageLimits: { notifyResourceLimitReached } },
   actor: () => ({ id: "user_ana" }),
   session: { user: { id: "user_ana", email: "ana@acme.com" } },
 });

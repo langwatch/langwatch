@@ -7,6 +7,8 @@
  * Corresponds to specs/migration/authz-grants-rollout.feature (the enrollment
  * scenarios).
  */
+import { HandledError } from "@langwatch/handled-error";
+import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -14,6 +16,7 @@ import {
   type OpsTrpcContext,
   type OpsTrpcPorts,
 } from "../src/api/app-trpc/ops.api";
+import { OpsApp, type OpsCapability } from "../src/app/ops.app";
 
 const service = {
   enroll: vi.fn<(...args: unknown[]) => Promise<void>>(),
@@ -73,11 +76,42 @@ const router = OpsTrpcApi.create(
   ports,
 );
 
+/**
+ * The application the migration procedures reach. Only the destructive-write
+ * gate runs on it here — nothing on this surface reaches the operations
+ * service, the flag store or the project index — so the composed capabilities
+ * stay empty and the gate is exercised for real.
+ */
+function buildApp(): OpsApp {
+  return OpsApp.create({
+    ops: {} as OpsCapability,
+    featureFlags: {} as FeatureFlagService,
+    projects: { searchByQuery: async () => [] },
+  });
+}
+
+/**
+ * The stable code of the handled refusal a call raised.
+ *
+ * Asserted instead of the tRPC code because that mapping belongs to the
+ * process's handled-error middleware, which this bare test root does not
+ * mount: the feature raises a coded `HandledError` and the boundary decides
+ * what status it becomes.
+ */
+async function refusalCodeOf(call: Promise<unknown>): Promise<string> {
+  try {
+    await call;
+  } catch (error) {
+    const cause = (error as { cause?: unknown }).cause;
+    if (HandledError.isHandled(cause)) return cause.code;
+    throw error;
+  }
+  throw new Error("expected the call to be refused");
+}
+
 function buildCaller() {
   return router.createCaller({
-    // Only the migration surface is exercised here; nothing on it reaches the
-    // operations service, the flag store or the project index.
-    app: {} as OpsTrpcContext["app"],
+    app: { ops: buildApp() },
     actor: () => ({ id: "user_alex" }),
     opsScope: { kind: "platform" },
     session: { user: { id: "user_alex", email: "staff@langwatch.ai" } },
@@ -116,11 +150,13 @@ describe("ops migration enrollment procedures", () => {
       const caller = buildCaller();
 
       await expect(
-        caller.enrollMigrationTenant({
-          organizationId: "org_acme",
-          migrationName: "authz-grants-cutover",
-        }),
-      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        refusalCodeOf(
+          caller.enrollMigrationTenant({
+            organizationId: "org_acme",
+            migrationName: "authz-grants-cutover",
+          }),
+        ),
+      ).resolves.toBe("ops_confirmation_required");
       expect(service.enroll).not.toHaveBeenCalled();
 
       const result = await caller.enrollMigrationTenant({
@@ -141,7 +177,7 @@ describe("ops migration enrollment procedures", () => {
       // posture for a flip of this size.
       service.enroll.mockResolvedValue(undefined);
       const impersonated = router.createCaller({
-        app: {} as OpsTrpcContext["app"],
+        app: { ops: buildApp() },
         actor: () => ({ id: "user_customer" }),
         opsScope: { kind: "platform" },
         session: {
@@ -154,12 +190,14 @@ describe("ops migration enrollment procedures", () => {
       });
 
       await expect(
-        impersonated.enrollMigrationTenant({
-          organizationId: "org_acme",
-          migrationName: "authz-grants-cutover",
-          confirm: "ENROLL",
-        }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+        refusalCodeOf(
+          impersonated.enrollMigrationTenant({
+            organizationId: "org_acme",
+            migrationName: "authz-grants-cutover",
+            confirm: "ENROLL",
+          }),
+        ),
+      ).resolves.toBe("ops_impersonated_operator_refused");
       expect(service.enroll).not.toHaveBeenCalled();
     });
   });
@@ -221,11 +259,13 @@ describe("ops migration enrollment procedures", () => {
       const caller = buildCaller();
 
       await expect(
-        caller.enrollMigrationCohort({
-          migrationName: "authz-grants-cutover",
-          sampleSize: 10,
-        }),
-      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        refusalCodeOf(
+          caller.enrollMigrationCohort({
+            migrationName: "authz-grants-cutover",
+            sampleSize: 10,
+          }),
+        ),
+      ).resolves.toBe("ops_confirmation_required");
       expect(service.enrollCohort).not.toHaveBeenCalled();
 
       await caller.enrollMigrationCohort({
@@ -277,11 +317,13 @@ describe("ops migration enrollment procedures", () => {
       const caller = buildCaller();
 
       await expect(
-        caller.runSystemMigrationForOrganization({
-          organizationId: "org_acme",
-          migrationName: "authz-grants-cutover",
-        }),
-      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        refusalCodeOf(
+          caller.runSystemMigrationForOrganization({
+            organizationId: "org_acme",
+            migrationName: "authz-grants-cutover",
+          }),
+        ),
+      ).resolves.toBe("ops_confirmation_required");
       expect(service.runForOrganization).not.toHaveBeenCalled();
 
       await caller.runSystemMigrationForOrganization({

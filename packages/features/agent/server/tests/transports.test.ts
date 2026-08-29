@@ -1,5 +1,6 @@
 import type { AgentService } from "@langwatch/agent-contract";
 import { describe, expect, it, vi } from "vitest";
+import { AgentApp } from "../src/app/agent.app";
 import { AgentsRpcApi } from "../src/api/internal/agent.api";
 import {
   LegacyAgentsRestApi,
@@ -9,7 +10,7 @@ import { agentFixture } from "../src/testing";
 
 describe("Agents transports", () => {
   /** @scenario Legacy REST delegates to the same Agent service */
-  it("keeps RPC and legacy REST as adapters over one service instance", async () => {
+  it("keeps RPC and legacy REST as adapters over one application", async () => {
     const create = vi.fn(async () => ({
       ...agentFixture(),
       inputFields: [],
@@ -17,8 +18,9 @@ describe("Agents transports", () => {
       fieldsResolved: true,
     }));
     const service = { create } as unknown as AgentService;
-    const rpc = AgentsRpcApi.create(service);
-    const rest = LegacyAgentsRestApi.create(service);
+    const app = AgentApp.create({ agents: service });
+    const rpc = AgentsRpcApi.create(app);
+    const rest = LegacyAgentsRestApi.create(app);
     const input = {
       projectId: "project_1",
       name: "Answerer",

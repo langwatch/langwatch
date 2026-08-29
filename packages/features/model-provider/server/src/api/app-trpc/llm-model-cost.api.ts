@@ -18,7 +18,7 @@
  * against the scope rather than against the caller-supplied `projectId`.
  *
  * Transport only: input parsing, the authorization declarations, and
- * delegation to `ModelProviderService`. The regex-safety predicate, the model
+ * delegation to `ModelProviderApp`. The regex-safety predicate, the model
  * registry lookup and the span preview arrive as ports because they are
  * process capabilities rather than this feature's persistence.
  */
@@ -30,26 +30,21 @@ import {
   modelCostModelLimitsTrpcInputSchema,
   modelCostProjectTrpcInputSchema,
   type ModelProviderScopeType,
-  type ModelProviderService,
 } from "@langwatch/model-provider-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
+import type { ModelProviderApp, SpanReader } from "#app/model-provider.app";
 
 /**
- * The process's span reader, opaque here. The preview port below owns its
- * shape; this transport only carries the handle from the context to the port
- * so the preview reads through the SAME request-scoped services as the rest
- * of the call rather than a process singleton.
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches. Costs
+ * are the model-provider feature answering, so they arrive through the same
+ * {@link ModelProviderApp} the provider and translation surfaces call — which
+ * is also where the request's span reader comes from, rather than from a
+ * `traces` entry this surface used to name for itself.
  */
-type SpanReader = unknown;
-
-type LlmModelCostApplication = Readonly<{
-  modelProviders: ModelProviderService;
-  traces: Readonly<{ spans: SpanReader }>;
-}>;
-
-/** The process supplies authentication; authorization arrives as `policy`. */
 export type LlmModelCostTrpcContext = Readonly<{
-  app: LlmModelCostApplication;
+  app: Readonly<{ modelProviders: ModelProviderApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -165,20 +160,22 @@ export class LlmModelCostTrpcApi {
         // The caller must hold manage on the scope they are writing to
         // (organization:manage / team:manage / project:manage), and the scope
         // must resolve to a single organization the cost is then anchored to.
-        return await ctx.app.modelProviders.upsertCost({
-          id,
-          projectId,
-          scopeType,
-          scopeId,
-          model,
-          regex,
-          actorId: ctx.actor().id,
-          inputCostPerToken,
-          outputCostPerToken,
-          cacheReadCostPerToken,
-          cacheCreationCostPerToken,
-          cacheCreation1hCostPerToken,
-        });
+        return await ctx.app.modelProviders.upsertCost(
+          {
+            id,
+            projectId,
+            scopeType,
+            scopeId,
+            model,
+            regex,
+            inputCostPerToken,
+            outputCostPerToken,
+            cacheReadCostPerToken,
+            cacheCreationCostPerToken,
+            cacheCreation1hCostPerToken,
+          },
+          ctx.actor(),
+        );
       }),
 
       delete: resolverAuthorizedPolicy({
@@ -187,10 +184,7 @@ export class LlmModelCostTrpcApi {
       })(procedure.input(modelCostDeleteTrpcInputSchema)).mutation(async ({ input, ctx }) => {
         // Derive the scope from the row itself, then authorize manage on that
         // scope. Never trust a caller-supplied scope for a delete.
-        return await ctx.app.modelProviders.deleteCost({
-          ...input,
-          actorId: ctx.actor().id,
-        });
+        return await ctx.app.modelProviders.deleteCost(input, ctx.actor());
       }),
 
       /**
@@ -212,7 +206,7 @@ export class LlmModelCostTrpcApi {
       previewMatchingSpans: policy("traces:view")(
         procedure.input(previewMatchingSpansInputSchema),
       ).query(async ({ input, ctx }) =>
-        ports.previewMatchingSpans({ spans: ctx.app.traces.spans, input }),
+        ports.previewMatchingSpans({ spans: ctx.app.modelProviders.spanReader, input }),
       ),
     });
   }

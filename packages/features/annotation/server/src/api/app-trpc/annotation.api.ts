@@ -23,15 +23,15 @@
  * editing `annotations:update`, and removing `annotations:delete`.
  *
  * Transport only: policy, host capabilities, and delegation to
- * `AnnotationService`. Queue persistence, trace resolution and the trace
- * correction overlay arrive as host ports, because they are not Annotation's
- * own storage.
+ * {@link AnnotationApp}. Joining a comment to the person who left it,
+ * attributing a new comment, and which queue names are already spent all live
+ * on the application, where the score door reaches them too. Queue
+ * persistence, trace resolution and the trace correction overlay arrive as
+ * host ports, because they are not Annotation's own storage.
  *
  * Spec: packages/features/annotation/specs/annotation-service.feature.
  */
-import type { Annotation, AnnotationService, AnnotationUser } from "@langwatch/annotation-contract";
 import {
-  AnnotationNotFoundError,
   annotationApiAnnotationScopeSchema,
   annotationApiByTraceIdInputSchema,
   annotationApiByTraceIdsInputSchema,
@@ -50,25 +50,24 @@ import {
 } from "@langwatch/annotation-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
-import type { UserFullProfile, UserService } from "@langwatch/user-contract";
-import {
-  TRPCError,
-  type AnyTRPCRootTypes,
-  type TRPCRootObject,
-  type TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { nanoid } from "nanoid";
+import type { AnnotationApp } from "#app/annotation.app";
 
 const logger = createLogger("langwatch:api:annotation");
 
-type AnnotationApplication = Readonly<{
-  annotations: AnnotationService;
-  users: Pick<UserService, "getProfiles">;
-}>;
-
-/** The host supplies authentication; authorization arrives as `policy`. */
+/**
+ * The host supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the host's application this feature reaches, not the
+ * feature's application itself, because a tRPC root is shared by every feature
+ * mounted on it and so carries all of them. A REST door, whose service is
+ * built per family, would hold {@link AnnotationApp} directly. The score door
+ * takes this same slice, which is what stopped the two describing the
+ * composition twice.
+ */
 export type AnnotationTrpcContext = Readonly<{
-  app: AnnotationApplication;
+  app: Readonly<{ annotations: AnnotationApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -291,45 +290,6 @@ export type AnnotationTrpcPorts = Readonly<{
   toQueueSlug(name: string): string;
 }>;
 
-/** Slugs the queue URL space already spends on something else. */
-const RESERVED_QUEUE_SLUGS = new Set(["all", "me", "my-queue"]);
-
-type AnnotationWithFullUser = Annotation & { user: UserFullProfile | null };
-type AnnotationWithUserSummary = Annotation & { user: AnnotationUser | null };
-
-function enrichAnnotationsWithUsers(
-  annotations: Annotation[],
-  users: Pick<UserService, "getProfiles">,
-  projection: "full",
-): Promise<AnnotationWithFullUser[]>;
-function enrichAnnotationsWithUsers(
-  annotations: Annotation[],
-  users: Pick<UserService, "getProfiles">,
-  projection: "summary",
-): Promise<AnnotationWithUserSummary[]>;
-async function enrichAnnotationsWithUsers(
-  annotations: Annotation[],
-  users: Pick<UserService, "getProfiles">,
-  projection: "full" | "summary",
-): Promise<Array<AnnotationWithFullUser | AnnotationWithUserSummary>> {
-  const userIds = [
-    ...new Set(
-      annotations.flatMap((annotation) => (annotation.userId === null ? [] : [annotation.userId])),
-    ),
-  ];
-  const profiles = await users.getProfiles({ userIds });
-  const profilesById = new Map(profiles.map((profile) => [profile.id, profile]));
-
-  return annotations.map((annotation) => {
-    const user = annotation.userId ? (profilesById.get(annotation.userId) ?? null) : null;
-    if (projection === "full") return { ...annotation, user };
-    return {
-      ...annotation,
-      user: user ? { id: user.id, name: user.name, image: user.image } : null,
-    };
-  });
-}
-
 /** The enriched items, in the order the queue listed them. */
 function enrichedInListOrder<TEnriched>(
   queueItems: ReadonlyArray<Readonly<{ id: string }>>,
@@ -429,17 +389,12 @@ export class AnnotationTrpcApi {
     ) => {
       const traceIds = [...new Set(queueItems.map((item) => item.traceId))];
 
-      const annotations = await ctx.app.annotations.list({
+      const annotationsWithUsers = await ctx.app.annotations.listWithFullUsers({
         projectId,
         traceIds,
         anchor: "all",
         order: "desc",
       });
-      const annotationsWithUsers = await enrichAnnotationsWithUsers(
-        annotations,
-        ctx.app.users,
-        "full",
-      );
 
       const traces = await ports.loadTraces(ctx, { projectId, traceIds });
 
@@ -479,19 +434,21 @@ export class AnnotationTrpcApi {
           anchorPath: input.anchorPath,
         });
 
-        const createdAnnotation = await ctx.app.annotations.create({
-          id: nanoid(),
-          projectId: input.projectId,
-          traceId: input.traceId,
-          userId: actor.id,
-          comment: input.comment ?? "",
-          isThumbsUp: input.isThumbsUp ?? null,
-          scoreOptions: input.scoreOptions ?? {},
-          expectedOutput: input.expectedOutput ?? null,
-          anchorKind: input.anchorKind,
-          anchorId: input.anchorId,
-          anchorPath: input.anchorPath,
-        });
+        const createdAnnotation = await ctx.app.annotations.create(
+          {
+            id: nanoid(),
+            projectId: input.projectId,
+            traceId: input.traceId,
+            comment: input.comment ?? "",
+            isThumbsUp: input.isThumbsUp ?? null,
+            scoreOptions: input.scoreOptions ?? {},
+            expectedOutput: input.expectedOutput ?? null,
+            anchorKind: input.anchorKind,
+            anchorId: input.anchorId,
+            anchorPath: input.anchorPath,
+          },
+          actor,
+        );
 
         // Best-effort trace sync: the annotation store is the source of
         // truth. Failures are logged but don't fail the mutation — the
@@ -521,14 +478,14 @@ export class AnnotationTrpcApi {
         procedure.input(annotationApiUpdateInputSchema),
       ).mutation(async ({ ctx, input }) => {
         const actor = ctx.actor();
-        const service = ctx.app.annotations;
+        const annotations = ctx.app.annotations;
 
         // The suggestion the annotation held before this save is what tells a
         // real edit apart from a form re-sending what it loaded, so it is read
         // before the row moves. The anchor comes from the same read rather
         // than from the input: editing a comment changes what it says, never
         // what it is about, so re-anchoring is a delete and a create.
-        const existing = await service.getById({
+        const existing = await annotations.getById({
           id: input.id,
           projectId: input.projectId,
         });
@@ -546,7 +503,7 @@ export class AnnotationTrpcApi {
           anchorPath: existing.anchorPath,
         });
 
-        return service.update({
+        return annotations.update({
           id: input.id,
           projectId: input.projectId,
           traceId: input.traceId,
@@ -569,18 +526,12 @@ export class AnnotationTrpcApi {
       getByTraceId: policy("annotations:view")(
         procedure.input(annotationApiByTraceIdInputSchema),
       ).query(async ({ ctx, input }) => {
-        const annotations = await ctx.app.annotations.list({
+        const annotationsWithUsers = await ctx.app.annotations.listWithUserSummaries({
           projectId: input.projectId,
           traceIds: [input.traceId],
           anchor: input.anchor,
           order: "asc",
         });
-
-        const annotationsWithUsers = await enrichAnnotationsWithUsers(
-          annotations,
-          ctx.app.users,
-          "summary",
-        );
         return annotationsWithUsers.map(withReadableAnnotationAnchor);
       }),
 
@@ -588,33 +539,22 @@ export class AnnotationTrpcApi {
       getByTraceIds: policy("annotations:view")(
         procedure.input(annotationApiByTraceIdsInputSchema),
       ).query(async ({ ctx, input }) => {
-        const annotations = await ctx.app.annotations.list({
+        const annotationsWithUsers = await ctx.app.annotations.listWithUserSummaries({
           projectId: input.projectId,
           traceIds: input.traceIds,
           anchor: input.anchor,
           order: "asc",
         });
-
-        const annotationsWithUsers = await enrichAnnotationsWithUsers(
-          annotations,
-          ctx.app.users,
-          "summary",
-        );
         return annotationsWithUsers.map(withReadableAnnotationAnchor);
       }),
 
       getById: policy("annotations:view")(
         procedure.input(annotationApiAnnotationScopeSchema),
       ).query(async ({ ctx, input }) => {
-        try {
-          return await ctx.app.annotations.getById({
-            id: input.annotationId,
-            projectId: input.projectId,
-          });
-        } catch (error) {
-          if (error instanceof AnnotationNotFoundError) return null;
-          throw error;
-        }
+        return await ctx.app.annotations.tryGetById({
+          id: input.annotationId,
+          projectId: input.projectId,
+        });
       }),
 
       deleteById: policy("annotations:delete")(
@@ -655,16 +595,14 @@ export class AnnotationTrpcApi {
        * keeps them readable.
        */
       getAll: policy("annotations:view")(procedure.input(annotationApiListAllInputSchema)).query(
-        async ({ ctx, input }) => {
-          const annotations = await ctx.app.annotations.list({
+        async ({ ctx, input }) =>
+          ctx.app.annotations.listWithFullUsers({
             projectId: input.projectId,
             anchor: "all",
             order: "desc",
             startDate: input.startDate,
             endDate: input.endDate,
-          });
-          return enrichAnnotationsWithUsers(annotations, ctx.app.users, "full");
-        },
+          }),
       ),
 
       createOrUpdateQueue: policy("annotations:create")(
@@ -677,13 +615,7 @@ export class AnnotationTrpcApi {
         });
 
         const slug = ports.toQueueSlug(input.name);
-
-        if (RESERVED_QUEUE_SLUGS.has(slug)) {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: "A annotation queue name is reserved.",
-          });
-        }
+        ctx.app.annotations.requireUnreservedQueueSlug(slug);
 
         const queue = {
           projectId: input.projectId,
@@ -699,10 +631,7 @@ export class AnnotationTrpcApi {
         }
 
         if (await ports.queues(ctx).queueSlugExists({ projectId: input.projectId, slug })) {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: "A annotation queue with this name already exists.",
-          });
+          throw ctx.app.annotations.queueNameTaken(slug);
         }
         return ports.queues(ctx).createQueue(queue);
       }),
@@ -714,7 +643,7 @@ export class AnnotationTrpcApi {
       getQueueItems: policy("annotations:view")(
         procedure.input(annotationApiProjectScopeSchema),
       ).query(async ({ ctx, input }) => {
-        const organizationId = await ctx.app.annotations.getProjectOrganizationId({
+        const organizationId = await ctx.app.annotations.organizationOf({
           projectId: input.projectId,
         });
         const queueItems = await ports.queues(ctx).listQueueItems({
@@ -786,7 +715,7 @@ export class AnnotationTrpcApi {
       deleteQueueItems: policy("annotations:update")(
         procedure.input(annotationApiDeleteQueueItemsInputSchema),
       ).mutation(async ({ ctx, input }) => {
-        const organizationId = await ctx.app.annotations.getProjectOrganizationId({
+        const organizationId = await ctx.app.annotations.organizationOf({
           projectId: input.projectId,
         });
         const deleted = await ports.queues(ctx).deleteQueueItems({
@@ -806,7 +735,7 @@ export class AnnotationTrpcApi {
       markQueueItemDone: policy("annotations:update")(
         procedure.input(annotationApiMarkQueueItemDoneInputSchema),
       ).mutation(async ({ ctx, input }) => {
-        const organizationId = await ctx.app.annotations.getProjectOrganizationId({
+        const organizationId = await ctx.app.annotations.organizationOf({
           projectId: input.projectId,
         });
         const marked = await ports.queues(ctx).markQueueItemDone({
@@ -816,7 +745,7 @@ export class AnnotationTrpcApi {
           queueItemId: input.queueItemId,
         });
         if (!marked.matched) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Queue item not found" });
+          throw ctx.app.annotations.queueItemNotFound(input.queueItemId);
         }
         return marked.item;
       }),
@@ -824,7 +753,7 @@ export class AnnotationTrpcApi {
       getQueueBySlugOrId: policy("annotations:view")(
         procedure.input(annotationApiQueueBySlugOrIdInputSchema),
       ).query(async ({ ctx, input }) => {
-        const organizationId = await ctx.app.annotations.getProjectOrganizationId({
+        const organizationId = await ctx.app.annotations.organizationOf({
           projectId: input.projectId,
         });
         return ports.queues(ctx).findQueue({
@@ -839,7 +768,7 @@ export class AnnotationTrpcApi {
         procedure.input(annotationApiOptimizedQueuesInputSchema),
       ).query(async ({ ctx, input }) => {
         const userId = ctx.actor().id;
-        const organizationId = await ctx.app.annotations.getProjectOrganizationId({
+        const organizationId = await ctx.app.annotations.organizationOf({
           projectId: input.projectId,
         });
 

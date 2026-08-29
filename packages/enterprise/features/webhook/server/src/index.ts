@@ -100,6 +100,18 @@ export {
 } from "./services/webhook-health.service";
 
 /**
+ * The feature's application: the one object both of its doors call. The
+ * process composes it from the endpoint store, the health report, the
+ * emitted-events log, the entitlement check, the delivery hop a test fire
+ * uses, and the `Idempotency-Key` ledger.
+ */
+export {
+  WebhookApp,
+  type WebhookAppDependencies,
+  type WebhookTestDispatch,
+} from "./app/webhook.app";
+
+/**
  * The app-process tRPC transport this feature owns. The process supplies its
  * root, authenticated procedure and policy chain; the procedure names, input
  * schemas, access declarations and delegation are the feature's.
@@ -107,5 +119,12 @@ export {
 export {
   WebhookEndpointTrpcApi,
   type WebhookEndpointTrpcContext,
-  type WebhookEndpointTrpcPorts,
 } from "./api/app-trpc/webhook-endpoint.api";
+
+/**
+ * The organization-key REST family this feature owns, `/api/webhooks/v1`. The
+ * process supplies the bound REST security service, a resolver for the
+ * application and its own canonical error mapping; every path, body, header,
+ * status code and enum spelling is the feature's published contract.
+ */
+export { createWebhookRestApp } from "./api/app-rest/webhook.api";

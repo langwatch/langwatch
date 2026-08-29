@@ -7,6 +7,9 @@
     "src"
   ],
   "type": "module",
+  "imports": {
+    "#*": "./src/*.ts"
+  },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
@@ -25,6 +28,7 @@
     "@langwatch/eventing": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",

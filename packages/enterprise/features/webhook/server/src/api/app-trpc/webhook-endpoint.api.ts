@@ -5,12 +5,13 @@
  * /api/webhooks/v1: same service, same RBAC scopes
  * (`webhookEndpoints:view` | `:manage`), same enterprise plan gate.
  *
- * The surface belongs to the webhook feature rather than to the gateway, even
- * though the process happens to park its endpoint and health capabilities under
- * `app.gateway`: the service, the views, the delivery controls and every
- * refusal here are the webhook contract's, and none of them mention a virtual
- * key or a budget. The context below mirrors the process's own shape rather
- * than asking it to rearrange.
+ * The surface belongs to the webhook feature rather than to the gateway. The
+ * process used to park the endpoint and health capabilities under
+ * `app.gateway` and this context mirrored that, which put a webhook surface
+ * behind a gateway key: the service, the views, the delivery controls and
+ * every refusal here are the webhook contract's, and none of them mention a
+ * virtual key or a budget. It now reaches its own application instead, the
+ * same one the REST family at /api/webhooks/v1 is given.
  *
  * ## Credentials
  *
@@ -18,37 +19,29 @@
  * `rollSecret` responses — and once each time. Every read path answers endpoint
  * views with no secret material.
  *
- * Transport only: input parsing, the entitlement gate, the typed-error
- * translation, and delegation.
+ * Transport only: input parsing, the entitlement gate, and delegation.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   WEBHOOK_EVENT_TYPES,
   webhookDestinationKindSchema,
-  WebhookEndpointNotFoundError,
-  WebhookEndpointsNotEntitledError,
-  WebhookEndpointValidationError,
 } from "@langwatch/enterprise-webhook-contract";
-import {
-  TRPCError,
-  type AnyTRPCRootTypes,
-  type TRPCRootObject,
-  type TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import type { WebhookEndpointRuntime } from "../../adapters/webhook-endpoint.webhook-endpoint.adapter";
-import type { WebhookHealthService } from "../../services/webhook-health.service";
+import type { WebhookApp } from "#app/webhook.app";
 
-type WebhookEndpointApplication = Readonly<{
-  gateway: Readonly<{
-    webhookEndpoints: WebhookEndpointRuntime;
-    webhookHealth: Pick<WebhookHealthService, "health">;
-  }>;
-}>;
-
-/** The process supplies authentication; authorization arrives as `policy`. */
+/**
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches. It is
+ * keyed on the feature rather than on `gateway`, where the process used to
+ * park the endpoint and health capabilities: the service, the views, the
+ * delivery controls and every refusal here are the webhook contract's, and
+ * none of them mention a virtual key or a budget. The REST family, built per
+ * family, holds the same {@link WebhookApp} directly.
+ */
 export type WebhookEndpointTrpcContext = Readonly<{
-  app: WebhookEndpointApplication;
+  app: Readonly<{ webhooks: WebhookApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -68,15 +61,6 @@ type WebhookEndpointTrpcProcedures<
    * organization id at all.
    */
   policy(permission: AuthzPermission): ProcedureDecorator;
-}>;
-
-export type WebhookEndpointTrpcPorts = Readonly<{
-  /**
-   * The enterprise gate for the whole surface: the organization's active plan
-   * must carry webhook endpoints. Entitlement is process state, so it arrives
-   * here rather than being read.
-   */
-  assertEntitled(organizationId: string): Promise<void>;
 }>;
 
 const orgInput = z.object({ organizationId: z.string() });
@@ -105,60 +89,37 @@ export class WebhookEndpointTrpcApi {
     TContext extends WebhookEndpointTrpcContext,
     TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
     TRoot extends AnyTRPCRootTypes,
-    TPorts extends WebhookEndpointTrpcPorts,
   >(
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: WebhookEndpointTrpcProcedures<TContext, TOptions, TRoot>,
-    ports: TPorts,
   ) {
     const { protected: procedure, policy } = procedures;
 
-    /**
-     * The plan gate, installed after the RBAC check so membership is already
-     * established when it runs — exactly the order this surface has always had.
-     */
-    const plan = async (input: { organizationId: string }): Promise<void> => {
-      try {
-        await ports.assertEntitled(input.organizationId);
-      } catch (error) {
-        if (error instanceof WebhookEndpointsNotEntitledError) {
-          throw new TRPCError({ code: "FORBIDDEN", message: error.message });
-        }
-        throw error;
-      }
-    };
-
-    /** Maps the service's named refusals onto their transport codes. */
-    async function translating<T>(fn: () => Promise<T>): Promise<T> {
-      try {
-        return await fn();
-      } catch (error) {
-        if (error instanceof WebhookEndpointValidationError) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
-        }
-        if (error instanceof WebhookEndpointNotFoundError) {
-          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
-        }
-        throw error;
-      }
-    }
-
+    // The plan gate is installed at each procedure AFTER the RBAC check, so
+    // membership is already established when it runs — exactly the order this
+    // surface has always had.
+    //
+    // Nothing translates an error here any more. Every refusal this surface
+    // raises is already a `HandledError` with the status it has always
+    // answered with: the entitlement gate's is a 403, the endpoint's
+    // validation refusal a 400 and its absence a 404, and the process's tRPC
+    // policy maps each to the code the `TRPCError`s built here used to name.
     return trpc.router({
       /** The event catalog the drawer renders its checkboxes from. */
       eventTypes: policy("webhookEndpoints:view")(procedure.input(orgInput))
-        .use(async ({ input, next }) => {
-          await plan(input);
+        .use(async ({ ctx, input, next }) => {
+          await ctx.app.webhooks.assertEntitled(input.organizationId);
           return next();
         })
         .query(() => WEBHOOK_EVENT_TYPES),
 
       list: policy("webhookEndpoints:view")(procedure.input(orgInput))
-        .use(async ({ input, next }) => {
-          await plan(input);
+        .use(async ({ ctx, input, next }) => {
+          await ctx.app.webhooks.assertEntitled(input.organizationId);
           return next();
         })
         .query(({ ctx, input }) =>
-          ctx.app.gateway.webhookEndpoints.getAll({ organizationId: input.organizationId }),
+          ctx.app.webhooks.endpoints.getAll({ organizationId: input.organizationId }),
         ),
 
       deliveries: policy("webhookEndpoints:view")(
@@ -169,19 +130,17 @@ export class WebhookEndpointTrpcApi {
           }),
         ),
       )
-        .use(async ({ input, next }) => {
-          await plan(input);
+        .use(async ({ ctx, input, next }) => {
+          await ctx.app.webhooks.assertEntitled(input.organizationId);
           return next();
         })
         .query(({ ctx, input }) =>
-          translating(() =>
-            ctx.app.gateway.webhookEndpoints.getDeliveries({
-              organizationId: input.organizationId,
-              endpointId: input.endpointId,
-              limit: input.limit,
-              cursor: input.cursor,
-            }),
-          ),
+          ctx.app.webhooks.endpoints.getDeliveries({
+            organizationId: input.organizationId,
+            endpointId: input.endpointId,
+            limit: input.limit,
+            cursor: input.cursor,
+          }),
         ),
 
       create: policy("webhookEndpoints:manage")(
@@ -197,37 +156,33 @@ export class WebhookEndpointTrpcApi {
           }),
         ),
       )
-        .use(async ({ input, next }) => {
-          await plan(input);
+        .use(async ({ ctx, input, next }) => {
+          await ctx.app.webhooks.assertEntitled(input.organizationId);
           return next();
         })
         .mutation(({ ctx, input }) =>
-          translating(() =>
-            ctx.app.gateway.webhookEndpoints.create({
-              organizationId: input.organizationId,
-              destinationKind: input.destinationKind,
-              url: input.url,
-              sqs: input.sqs,
-              enabledEvents: input.enabledEvents,
-              maxBatchSize: input.maxBatchSize,
-              maxBatchDelayMs: input.maxBatchDelayMs,
-              maxInFlight: input.maxInFlight,
-            }),
-          ),
+          ctx.app.webhooks.endpoints.create({
+            organizationId: input.organizationId,
+            destinationKind: input.destinationKind,
+            url: input.url,
+            sqs: input.sqs,
+            enabledEvents: input.enabledEvents,
+            maxBatchSize: input.maxBatchSize,
+            maxBatchDelayMs: input.maxBatchDelayMs,
+            maxInFlight: input.maxInFlight,
+          }),
         ),
 
       health: policy("webhookEndpoints:view")(procedure.input(endpointInput))
-        .use(async ({ input, next }) => {
-          await plan(input);
+        .use(async ({ ctx, input, next }) => {
+          await ctx.app.webhooks.assertEntitled(input.organizationId);
           return next();
         })
         .query(({ ctx, input }) =>
-          translating(() =>
-            ctx.app.gateway.webhookHealth.health({
-              organizationId: input.organizationId,
-              endpointId: input.endpointId,
-            }),
-          ),
+          ctx.app.webhooks.health.health({
+            organizationId: input.organizationId,
+            endpointId: input.endpointId,
+          }),
         ),
 
       update: policy("webhookEndpoints:manage")(
@@ -247,80 +202,70 @@ export class WebhookEndpointTrpcApi {
           }),
         ),
       )
-        .use(async ({ input, next }) => {
-          await plan(input);
+        .use(async ({ ctx, input, next }) => {
+          await ctx.app.webhooks.assertEntitled(input.organizationId);
           return next();
         })
         .mutation(({ ctx, input }) =>
-          translating(() =>
-            ctx.app.gateway.webhookEndpoints.update({
-              organizationId: input.organizationId,
-              endpointId: input.endpointId,
-              destinationKind: input.destinationKind,
-              url: input.url,
-              sqs: input.sqs,
-              enabledEvents: input.enabledEvents,
-              maxBatchSize: input.maxBatchSize,
-              maxBatchDelayMs: input.maxBatchDelayMs,
-              maxInFlight: input.maxInFlight,
-            }),
-          ),
+          ctx.app.webhooks.endpoints.update({
+            organizationId: input.organizationId,
+            endpointId: input.endpointId,
+            destinationKind: input.destinationKind,
+            url: input.url,
+            sqs: input.sqs,
+            enabledEvents: input.enabledEvents,
+            maxBatchSize: input.maxBatchSize,
+            maxBatchDelayMs: input.maxBatchDelayMs,
+            maxInFlight: input.maxInFlight,
+          }),
         ),
 
       rollSecret: policy("webhookEndpoints:manage")(procedure.input(endpointInput))
-        .use(async ({ input, next }) => {
-          await plan(input);
+        .use(async ({ ctx, input, next }) => {
+          await ctx.app.webhooks.assertEntitled(input.organizationId);
           return next();
         })
         .mutation(({ ctx, input }) =>
-          translating(() =>
-            ctx.app.gateway.webhookEndpoints.rollSecret({
-              organizationId: input.organizationId,
-              endpointId: input.endpointId,
-            }),
-          ),
+          ctx.app.webhooks.endpoints.rollSecret({
+            organizationId: input.organizationId,
+            endpointId: input.endpointId,
+          }),
         ),
 
       enable: policy("webhookEndpoints:manage")(procedure.input(endpointInput))
-        .use(async ({ input, next }) => {
-          await plan(input);
+        .use(async ({ ctx, input, next }) => {
+          await ctx.app.webhooks.assertEntitled(input.organizationId);
           return next();
         })
         .mutation(({ ctx, input }) =>
-          translating(() =>
-            ctx.app.gateway.webhookEndpoints.enable({
-              organizationId: input.organizationId,
-              endpointId: input.endpointId,
-            }),
-          ),
+          ctx.app.webhooks.endpoints.enable({
+            organizationId: input.organizationId,
+            endpointId: input.endpointId,
+          }),
         ),
 
       disable: policy("webhookEndpoints:manage")(procedure.input(endpointInput))
-        .use(async ({ input, next }) => {
-          await plan(input);
+        .use(async ({ ctx, input, next }) => {
+          await ctx.app.webhooks.assertEntitled(input.organizationId);
           return next();
         })
         .mutation(({ ctx, input }) =>
-          translating(() =>
-            ctx.app.gateway.webhookEndpoints.disable({
-              organizationId: input.organizationId,
-              endpointId: input.endpointId,
-            }),
-          ),
+          ctx.app.webhooks.endpoints.disable({
+            organizationId: input.organizationId,
+            endpointId: input.endpointId,
+          }),
         ),
 
       archive: policy("webhookEndpoints:manage")(procedure.input(endpointInput))
-        .use(async ({ input, next }) => {
-          await plan(input);
+        .use(async ({ ctx, input, next }) => {
+          await ctx.app.webhooks.assertEntitled(input.organizationId);
           return next();
         })
         .mutation(({ ctx, input }) =>
-          translating(() =>
-            ctx.app.gateway.webhookEndpoints.archive({
-              organizationId: input.organizationId,
-              endpointId: input.endpointId,
-            }),
-          ),
+          ctx.app.webhooks.endpoints.archive({
+            organizationId: input.organizationId,
+            endpointId: input.endpointId,
+          }),
         ),
     });
   }

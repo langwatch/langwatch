@@ -16,62 +16,40 @@
  *                            caller is currently in.
  *   triggerTopicClustering:  asks the scheduler for a manual clustering run.
  *
- * Transport only: gates, audit, and delegation to `ProjectService` and the
- * cross-feature services the process composes. Every process capability this
- * surface needs that is not the project's own — encryption, the caller's
- * content protections, an imperative permission probe, Langy's virtual key,
- * the audit trail and the error reporter — arrives as a port.
+ * Transport only: gates, audit, and delegation to {@link ProjectApp}. Every
+ * process capability this surface needs that is not the project's own —
+ * encryption, the caller's content protections, an imperative permission
+ * probe, Langy's virtual key, the audit trail and the error reporter — arrives
+ * as a port.
+ *
+ * Nothing here constructs a transport error. The project's named refusals are
+ * handled errors carrying their own status, so the process's handled-error
+ * middleware derives the tRPC code from the cause rather than from a
+ * translation table kept here and a second one kept by the REST family.
  *
  * Spec: packages/features/project/specs/project-service.feature.
  */
-import { ApiKeyNotFoundError, type ApiKeyService } from "@langwatch/api-key-contract";
-import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
-  DestinationTeamNotFoundError,
-  PersonalProjectProtectedError,
-  PersonalWorkspaceBoundaryError,
+  ProjectPermissionDeniedError,
+  type AuthzPermission,
+} from "@langwatch/authz-contract";
+import {
+  CannotArchiveCurrentProjectError,
   ProjectNotFoundError,
-  ProjectSlugConflictError,
-  TeamNotInOrganizationError,
-  type ProjectService,
 } from "@langwatch/project-contract";
-import type { ShareService } from "@langwatch/share-contract";
-import type { TopicService } from "@langwatch/topic-contract";
-import {
-  TRPCError,
-  type AnyTRPCRootTypes,
-  type TRPCRootObject,
-  type TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
+import type { ProjectApp } from "#app/project.app";
 
 /**
- * The scheduler command a manual clustering request is sent as. Named
- * structurally rather than imported, because the command lives in the topic
- * feature's own server package and this surface only ever sends one.
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them.
  */
-type TopicClusteringCommands = Readonly<{
-  requestClustering(
-    input: Readonly<{
-      tenantId: string;
-      occurredAt: number;
-      trigger: "manual";
-      requestedByUserId: string;
-    }>,
-  ): Promise<void>;
-}>;
-
-type ProjectApplication = Readonly<{
-  projects: ProjectService;
-  apiKeys: ApiKeyService;
-  share: ShareService;
-  topics: TopicService;
-  topicClustering: TopicClusteringCommands;
-}>;
-
-/** The process supplies authentication; authorization arrives as `policy`. */
 export type ProjectTrpcContext = Readonly<{
-  app: ProjectApplication;
+  app: Readonly<{ projects: ProjectApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -236,30 +214,18 @@ export class ProjectTrpcApi {
        * with it, which is what `PersonalWorkspaceBoundaryError` refuses.
        */
       create: createPolicy(procedure.input(createInputSchema)).mutation(async ({ input, ctx }) => {
-        const userId = ctx.actor().id;
-        let project;
-        try {
-          project = await ctx.app.projects.create({
+        const actor = ctx.actor();
+        const project = await ctx.app.projects.create(
+          {
             organizationId: input.organizationId,
-            userId,
             teamId: input.teamId,
             newTeamName: input.newTeamName,
             name: input.name,
             language: input.language,
             framework: input.framework,
-          });
-        } catch (error) {
-          if (error instanceof TeamNotInOrganizationError) {
-            throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
-          }
-          if (error instanceof PersonalWorkspaceBoundaryError) {
-            throw new TRPCError({ code: "FORBIDDEN", message: error.message });
-          }
-          if (error instanceof ProjectSlugConflictError) {
-            throw new TRPCError({ code: "CONFLICT", message: error.message });
-          }
-          throw error;
-        }
+          },
+          actor,
+        );
 
         // (The eager per-project Langy service key that used to be minted
         // here is gone — Langy now mints a per-turn, per-user session key
@@ -268,7 +234,7 @@ export class ProjectTrpcApi {
         await ports.provisionLangyVirtualKey(ctx, {
           projectId: project.id,
           organizationId: input.organizationId,
-          actorUserId: userId,
+          actorUserId: actor.id,
         });
 
         return { success: true, projectSlug: project.slug };
@@ -283,12 +249,7 @@ export class ProjectTrpcApi {
         async ({ input, ctx }) => {
           const project = await ctx.app.projects.tryGetById(input.projectId);
 
-          if (!project) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Project not found",
-            });
-          }
+          if (!project) throw new ProjectNotFoundError();
 
           return project;
         },
@@ -304,83 +265,40 @@ export class ProjectTrpcApi {
 
       regenerateApiKey: policy("project:manage")(procedure.input(projectScopeSchema)).mutation(
         async ({ input, ctx }) => {
-          try {
-            const apiKey = await ctx.app.apiKeys.regenerateLegacyProjectKey({
-              projectId: input.projectId,
-            });
+          const apiKey = await ctx.app.projects.regenerateLegacyProjectKey({
+            projectId: input.projectId,
+          });
 
-            // Audit log the security-critical action; non-fatal so an audit
-            // failure cannot prevent returning the new key to the user.
-            await ports.recordApiKeyRegenerated({
-              userId: ctx.actor().id,
-              projectId: input.projectId,
-            });
+          // Audit log the security-critical action; non-fatal so an audit
+          // failure cannot prevent returning the new key to the user.
+          await ports.recordApiKeyRegenerated({
+            userId: ctx.actor().id,
+            projectId: input.projectId,
+          });
 
-            return { apiKey };
-          } catch (error) {
-            if (error instanceof ProjectNotFoundError || error instanceof ApiKeyNotFoundError) {
-              throw new TRPCError({
-                code: "NOT_FOUND",
-                message: "Project not found",
-              });
-            }
-            throw error;
-          }
+          return { apiKey };
         },
       ),
 
       update: updatePolicy(procedure.input(updateInputSchema)).mutation(async ({ input, ctx }) => {
-        const project = await ctx.app.projects.tryGetWithTeam(input.projectId);
-
-        if (!project) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Project not found",
-          });
-        }
-
-        let updatedProject;
-        try {
-          updatedProject = await ctx.app.projects.update({
-            id: input.projectId,
-            organizationId: project.team.organizationId,
-            data: {
-              ...(input.name !== undefined && { name: input.name }),
-              ...(input.language !== undefined && { language: input.language }),
-              ...(input.framework !== undefined && { framework: input.framework }),
-              ...(input.userLinkTemplate !== undefined && {
-                userLinkTemplate: input.userLinkTemplate,
-              }),
-              ...(input.teamId && { teamId: input.teamId }),
-              traceSharingEnabled: input.traceSharingEnabled,
-              presenceEnabled: input.presenceEnabled,
-              s3Endpoint: input.s3Endpoint ? ports.encryptProjectSecret(input.s3Endpoint) : null,
-              s3AccessKeyId: input.s3AccessKeyId
-                ? ports.encryptProjectSecret(input.s3AccessKeyId)
-                : null,
-              s3SecretAccessKey: input.s3SecretAccessKey
-                ? ports.encryptProjectSecret(input.s3SecretAccessKey)
-                : null,
-              s3Bucket: input.s3Bucket,
-            },
-          });
-        } catch (error) {
-          if (error instanceof DestinationTeamNotFoundError) {
-            throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
-          }
-          if (error instanceof PersonalWorkspaceBoundaryError) {
-            throw new TRPCError({ code: "FORBIDDEN", message: error.message });
-          }
-          if (error instanceof ProjectNotFoundError) {
-            throw new TRPCError({ code: "NOT_FOUND", message: error.message });
-          }
-          throw error;
-        }
-
-        // If trace sharing was disabled, revoke all existing trace shares
-        if (input.traceSharingEnabled === false && project.traceSharingEnabled === true) {
-          await ctx.app.share.revokeAllTraceShares(input.projectId);
-        }
+        const updatedProject = await ctx.app.projects.updateSettings({
+          projectId: input.projectId,
+          name: input.name,
+          language: input.language,
+          framework: input.framework,
+          teamId: input.teamId,
+          traceSharingEnabled: input.traceSharingEnabled,
+          presenceEnabled: input.presenceEnabled,
+          userLinkTemplate: input.userLinkTemplate,
+          s3Endpoint: input.s3Endpoint ? ports.encryptProjectSecret(input.s3Endpoint) : null,
+          s3AccessKeyId: input.s3AccessKeyId
+            ? ports.encryptProjectSecret(input.s3AccessKeyId)
+            : null,
+          s3SecretAccessKey: input.s3SecretAccessKey
+            ? ports.encryptProjectSecret(input.s3SecretAccessKey)
+            : null,
+          s3Bucket: input.s3Bucket,
+        });
 
         return { success: true, projectSlug: updatedProject.slug };
       }),
@@ -416,10 +334,7 @@ export class ProjectTrpcApi {
       archiveById: policy("project:delete")(procedure.input(archiveByIdInputSchema)).mutation(
         async ({ input, ctx }) => {
           if (input.projectToArchiveId === input.projectId) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "You cannot archive the current project",
-            });
+            throw new CannotArchiveCurrentProjectError();
           }
           // The declared check covered `projectId`, the project the caller is
           // in. The project actually archived is the other one, so it is
@@ -429,28 +344,12 @@ export class ProjectTrpcApi {
             input.projectToArchiveId,
             "project:delete",
           );
-          if (!canDeleteTarget) {
-            throw new TRPCError({ code: "UNAUTHORIZED" });
-          }
+          if (!canDeleteTarget) throw new ProjectPermissionDeniedError("project:delete");
 
-          const target = await ctx.app.projects.tryGetWithTeam(input.projectToArchiveId);
-          if (!target) return { success: true, alreadyArchived: true };
-
-          try {
-            await ctx.app.projects.archive({
-              id: input.projectToArchiveId,
-              organizationId: target.team.organizationId,
-            });
-            return { success: true, alreadyArchived: false };
-          } catch (error) {
-            if (error instanceof PersonalProjectProtectedError) {
-              throw new TRPCError({ code: "FORBIDDEN", message: error.message });
-            }
-            if (error instanceof ProjectNotFoundError) {
-              return { success: true, alreadyArchived: true };
-            }
-            throw error;
-          }
+          const { alreadyArchived } = await ctx.app.projects.archive({
+            projectId: input.projectToArchiveId,
+          });
+          return { success: true, alreadyArchived };
         },
       ),
 
@@ -458,36 +357,15 @@ export class ProjectTrpcApi {
         procedure.input(projectScopeSchema),
       ).mutation(async ({ ctx, input }) => {
         try {
-          // A request made while a run is already underway is declined by the
-          // scheduler, not queued behind it, so an unconditional success would
-          // tell the user a run started when nothing did. The read model is the
-          // only place that answer is visible before the scheduler makes it, so
-          // ask it first and report which of the two the click actually did.
-          // Best effort by nature: the scheduler, not this check, is what keeps
-          // two runs off one project.
-          if ((await ctx.app.topics.getClusteringStatus(input)).isRunInFlight) {
-            return {
-              started: false as const,
-              reason: "already_running" as const,
-            };
-          }
-          await ctx.app.topicClustering.requestClustering({
-            tenantId: input.projectId,
-            occurredAt: Date.now(),
-            trigger: "manual",
-            requestedByUserId: ctx.actor().id,
-          });
-          return { started: true as const };
+          return await ctx.app.projects.requestTopicClustering(input, ctx.actor());
         } catch (error) {
           ports.reportTopicClusteringFailure(error, { projectId: input.projectId });
-          // The UI toasts this message verbatim, and the failures behind it are
-          // event-store/projection internals (Prisma detail, hostnames) — the
-          // same class of text the status read deliberately never exposes.
-          // Detail goes to the report above; the customer gets a fixed sentence.
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Failed to trigger topic clustering",
-          });
+          // The failures behind this are event-store and projection internals
+          // — Prisma detail, hostnames — which is a cause we cannot name and
+          // the caller cannot act on. It stays an ordinary error so the
+          // boundary degrades it to an unknown failure carrying a trace id
+          // rather than dressing an infrastructure fault up as handled.
+          throw new Error("Failed to trigger topic clustering", { cause: error });
         }
       }),
     });

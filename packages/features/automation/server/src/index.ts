@@ -141,3 +141,35 @@ export {
   type EmailSuppressionTrpcPorts,
 } from "./api/app-trpc/email-suppression.api";
 export { buildRetryAfterMessage } from "./api/app-trpc/retry-after-message";
+
+/**
+ * The feature's application: the one object all three of its doors call, and
+ * the refusals it names. The process composes it from the services below.
+ */
+export {
+  AutomationApp,
+  AutomationFiltersUnsupportedError,
+  AutomationNotInProjectError,
+  AutomationTraceFilterInvalidError,
+  AutomationWebhookNotEnabledError,
+  AutomationWebhookUpsertRequiredError,
+  GraphAlertChannelUnsupportedError,
+  GraphAlertSeverityRequiredError,
+  GraphAlertThresholdRequiredError,
+  GraphNotInProjectError,
+  ReportChannelUnsupportedError,
+  ReportScheduleMissingError,
+  TestFireRateLimitedError,
+  UnsubscribeLinkInvalidError,
+  UnsubscribeRateLimitedError,
+  type AutomationAppDependencies,
+  type AutomationProjectIdentity,
+} from "./app/automation.app";
+
+/**
+ * The app-process REST family this feature owns. The process supplies the
+ * bound REST security service, a resolver for the application and its own
+ * platform-URL builder; the base path, access declarations, schemas and
+ * delegation are the feature's.
+ */
+export { createTriggerRestApp } from "./api/app-rest/automation.api";

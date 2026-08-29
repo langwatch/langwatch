@@ -36,6 +36,14 @@ export {
   type TierTargetSuggestion,
 } from "./adapters/suggest-tier-targets.adapter";
 export {
+  ModelProviderApp,
+  type ModelProviderAppDependencies,
+  type ModelProviderCaller,
+  type SpanReader,
+} from "./app/model-provider.app";
+export { createModelProvidersRestApp } from "./api/app-rest/model-provider.api";
+export { createModelDefaultsRestApp } from "./api/app-rest/model-defaults.api";
+export {
   ModelProviderTrpcApi,
   type ModelProviderTrpcContext,
 } from "./api/app-trpc/model-provider.api";

@@ -11,37 +11,19 @@
  * membership rule as the keys table, so the page and the table agree on which
  * keys exist and what they spent.
  *
- * Transport only. Membership visibility and the construction of the usage
- * service both need persistence this transport does not hold, so they arrive as
- * ports.
+ * Transport only. Membership visibility and the usage reader both need
+ * persistence this transport does not hold, so the feature's application holds
+ * them.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import { VirtualKeyNotFoundError } from "@langwatch/gateway-contract";
-import type { GatewayBudgetSpendPort } from "../../ports/gateway-budget-spend.port";
-import type { GatewayVirtualKeySpendPort } from "../../ports/gateway-virtual-key-spend.port";
-import type { VirtualKeyWithScopes } from "../../ports/gateway-virtual-key.port";
-import type { GatewayUsageService } from "../../services/gateway-usage.service";
-
-/** The read half of the key service, as this surface uses it. */
-type VirtualKeyReads = Readonly<{
-  getAll(organizationId: string): Promise<VirtualKeyWithScopes[]>;
-  getById(id: string, organizationId: string): Promise<VirtualKeyWithScopes | null>;
-}>;
-
-type GatewayUsageApplication = Readonly<{
-  gateway: Readonly<{
-    /** The key reads this surface makes; a miss is not an error here. */
-    virtualKeys: VirtualKeyReads;
-    budgets: GatewayBudgetSpendPort | undefined;
-    virtualKeySpend: GatewayVirtualKeySpendPort | undefined;
-  }>;
-}>;
+import type { GatewayApp } from "#app/gateway.app";
 
 /** The process supplies authentication; authorization arrives as `policy`. */
 export type GatewayUsageTrpcContext = Readonly<{
-  app: GatewayUsageApplication;
+  app: Readonly<{ gateway: GatewayApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -65,32 +47,6 @@ type GatewayUsageTrpcProcedures<
   }): ProcedureDecorator;
 }>;
 
-export type GatewayUsageTrpcPorts = Readonly<{
-  /**
-   * The organization's keys, narrowed to the ones this caller can see.
-   *
-   * Visibility is membership-based, not permission-based: a caller sees a key
-   * when one of its scopes intersects their membership set. A non-member sees
-   * no keys, so the summary comes back empty rather than refused.
-   */
-  listVisibleVirtualKeys(input: {
-    organizationId: string;
-    userId: string;
-    virtualKeys: VirtualKeyReads;
-  }): Promise<VirtualKeyWithScopes[]>;
-  /** Whether one already-loaded key is visible to this caller. */
-  isVirtualKeyVisible(input: {
-    organizationId: string;
-    userId: string;
-    virtualKey: VirtualKeyWithScopes;
-  }): Promise<boolean>;
-  /** Builds the usage reader over the process's own persistence. */
-  createUsageService(input: {
-    chRepo: GatewayBudgetSpendPort | undefined;
-    spendRepo: GatewayVirtualKeySpendPort | undefined;
-  }): GatewayUsageService;
-}>;
-
 const summaryInputSchema = z.object({
   organizationId: z.string(),
   fromDate: z.string().datetime(),
@@ -112,11 +68,9 @@ export class GatewayUsageTrpcApi {
     TContext extends GatewayUsageTrpcContext,
     TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
     TRoot extends AnyTRPCRootTypes,
-    TPorts extends GatewayUsageTrpcPorts,
   >(
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: GatewayUsageTrpcProcedures<TContext, TOptions, TRoot>,
-    ports: TPorts,
   ) {
     const { protected: procedure, resolverAuthorizedPolicy } = procedures;
 
@@ -129,24 +83,18 @@ export class GatewayUsageTrpcApi {
           "usage is summed only over the keys the caller's membership in this organization makes visible; the membership filter in the resolver is the check",
         permissions: ["gatewayUsage:view"],
       })(procedure.input(summaryInputSchema)).query(async ({ ctx, input }) => {
-        const keys = await ports.listVisibleVirtualKeys({
+        const keys = await ctx.app.gateway.listVisibleVirtualKeys({
           organizationId: input.organizationId,
           userId: ctx.actor().id,
-          virtualKeys: ctx.app.gateway.virtualKeys,
         });
-        return ports
-          .createUsageService({
-            chRepo: ctx.app.gateway.budgets,
-            spendRepo: ctx.app.gateway.virtualKeySpend,
-          })
-          .summary({
-            organizationId: input.organizationId,
-            virtualKeyIds: keys.map((k) => k.id),
-            window: {
-              fromDate: new Date(input.fromDate),
-              toDate: new Date(input.toDate),
-            },
-          });
+        return ctx.app.gateway.usage.summary({
+          organizationId: input.organizationId,
+          virtualKeyIds: keys.map((k) => k.id),
+          window: {
+            fromDate: new Date(input.fromDate),
+            toDate: new Date(input.toDate),
+          },
+        });
       }),
 
       summaryForVirtualKey: resolverAuthorizedPolicy({
@@ -163,7 +111,7 @@ export class GatewayUsageTrpcApi {
         if (!vk) {
           throw new VirtualKeyNotFoundError();
         }
-        const visible = await ports.isVirtualKeyVisible({
+        const visible = await ctx.app.gateway.isVirtualKeyVisible({
           organizationId: input.organizationId,
           userId: ctx.actor().id,
           virtualKey: vk,
@@ -171,20 +119,15 @@ export class GatewayUsageTrpcApi {
         if (!visible) {
           throw new VirtualKeyNotFoundError();
         }
-        return ports
-          .createUsageService({
-            chRepo: ctx.app.gateway.budgets,
-            spendRepo: ctx.app.gateway.virtualKeySpend,
-          })
-          .summaryForVirtualKey({
-            organizationId: input.organizationId,
-            virtualKeyId: input.virtualKeyId,
-            window: {
-              fromDate: new Date(input.fromDate),
-              toDate: new Date(input.toDate),
-            },
-            model: input.model,
-          });
+        return ctx.app.gateway.usage.summaryForVirtualKey({
+          organizationId: input.organizationId,
+          virtualKeyId: input.virtualKeyId,
+          window: {
+            fromDate: new Date(input.fromDate),
+            toDate: new Date(input.toDate),
+          },
+          model: input.model,
+        });
       }),
     });
   }

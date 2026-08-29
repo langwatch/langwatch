@@ -12,16 +12,9 @@
  * canonical `CodingAgentService`.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type {
-  CodingAgentPersonalPullRequestUsageInput,
-  CodingAgentService,
-} from "@langwatch/coding-agent-contract";
-import {
-  GithubPullRequestNotMappedError,
-  type GithubService,
-} from "@langwatch/github-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
+import type { CodingAgentApp } from "#app/coding-agent.app";
 import {
   gatePullRequestSessionTitles,
   gateSessionListCost,
@@ -31,14 +24,15 @@ import {
 /** Default look-back for the personal usage card: the trailing 30 days. */
 const DEFAULT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
-type CodingAgentApplication = Readonly<{
-  codingAgents: CodingAgentService;
-  github: GithubService;
-}>;
-
-/** The process supplies authentication; authorization arrives as `policy`. */
+/**
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them.
+ */
 export type CodingAgentTrpcContext = Readonly<{
-  app: CodingAgentApplication;
+  app: Readonly<{ codingAgentApp: CodingAgentApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -61,16 +55,6 @@ type CodingAgentTrpcProcedures<
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
 }>;
 
-/**
- * The caller's permission cut over an organization: which of its projects they
- * may read, which of those they may also price, and how each is named to them.
- * Exactly the shape both priced reads take.
- */
-export type CodingAgentCallerScope = Pick<
-  CodingAgentPersonalPullRequestUsageInput,
-  "permittedProjectIds" | "costProjectIds" | "projects"
->;
-
 /** What a single viewer may see of one project. */
 export type CodingAgentViewerVisibility = Readonly<{
   /** Whether the generated session titles are readable — they paraphrase the conversation. */
@@ -87,19 +71,16 @@ export type CodingAgentViewerVisibility = Readonly<{
  */
 export type CodingAgentTrpcRequest = unknown;
 
-/** The process capabilities this transport needs that are not coding-agent's own. */
+/**
+ * The process capability this transport needs that is not coding-agent's own.
+ *
+ * The organization lookup and the caller's permission cut used to be here too;
+ * they are the application's now, because the REST family reached for the same
+ * two under different names. What is left is genuinely per-request: it reads a
+ * viewer's protections out of THIS request's session, which no constructed
+ * object can hold.
+ */
 export type CodingAgentTrpcPorts = Readonly<{
-  /**
-   * The organization a project belongs to, or undefined for an orphan project.
-   * Derived here rather than taken from the client, so a caller cannot ask
-   * about another tenant's pull requests by naming its id.
-   */
-  tryResolveOrganizationForProject(projectId: string): Promise<string | undefined>;
-  /** The caller's permission cut over one organization. */
-  resolveCallerProjectScope(input: {
-    userId: string;
-    organizationId: string;
-  }): Promise<CodingAgentCallerScope>;
   /**
    * What this viewer may see of one project. Throws when the policy cannot be
    * resolved at all, which the pull-request detail reads as "not visible" —
@@ -170,27 +151,6 @@ async function contentProjectIdsFor({
 }
 
 /**
- * The caller's permission cut over the project's organization. An empty cut
- * when the project belongs to no organization: nothing is readable, which is
- * the same answer the rest of this surface gives.
- */
-async function scopeFor({
-  ports,
-  userId,
-  projectId,
-}: {
-  ports: CodingAgentTrpcPorts;
-  userId: string;
-  projectId: string;
-}): Promise<CodingAgentCallerScope> {
-  const organizationId = await ports.tryResolveOrganizationForProject(projectId);
-  if (!organizationId) {
-    return { permittedProjectIds: [], costProjectIds: [], projects: {} };
-  }
-  return ports.resolveCallerProjectScope({ userId, organizationId });
-}
-
-/**
  * Installs the complete `codingAgents.*` tRPC surface on a process-owned root.
  * The procedure and the policy are injected by the process so its auth, audit,
  * error, logging and tracing policies wrap every feature procedure
@@ -219,7 +179,7 @@ export class CodingAgentTrpcApi {
       ).query(async ({ ctx, input }) => {
         const toMs = input.toMs ?? Date.now();
         const fromMs = input.fromMs ?? toMs - DEFAULT_WINDOW_MS;
-        return ctx.app.codingAgents.getUsageTotals({
+        return ctx.app.codingAgentApp.getUsageTotals({
           projectId: input.projectId,
           fromMs,
           toMs,
@@ -236,7 +196,7 @@ export class CodingAgentTrpcApi {
       ).query(async ({ ctx, input }) => {
         const toMs = input.toMs ?? Date.now();
         const fromMs = input.fromMs ?? toMs - DEFAULT_WINDOW_MS;
-        return ctx.app.codingAgents.listRecent({
+        return ctx.app.codingAgentApp.listRecent({
           projectId: input.projectId,
           fromMs,
           toMs,
@@ -264,7 +224,7 @@ export class CodingAgentTrpcApi {
         const visibility = await ports.readViewerVisibility(ctx, {
           projectId: input.projectId,
         });
-        const rows = await ctx.app.codingAgents.listForProject({
+        const rows = await ctx.app.codingAgentApp.listForProject({
           projectId: input.projectId,
         });
         return gateSessionListCost({
@@ -288,34 +248,12 @@ export class CodingAgentTrpcApi {
        */
       pullRequestUsage: policy(CODING_AGENT_PERMISSION)(
         procedure.input(projectScopeSchema),
-      ).query(async ({ ctx, input }) => {
-        const app = ctx.app;
-        const scope = await scopeFor({
-          ports,
-          userId: ctx.actor().id,
-          projectId: input.projectId,
-        });
-        const usage = await app.codingAgents.getForPersonalProject({
-          projectId: input.projectId,
-          ...scope,
-        });
-        const organizationId = await ports.tryResolveOrganizationForProject(input.projectId);
-        const installations = organizationId
-          ? await app.github.getAllForOrganization(organizationId)
-          : [];
-        return {
-          ...usage,
-          connection: {
-            connected: installations.length > 0,
-            installUrl:
-              organizationId &&
-              app.github.configured &&
-              Boolean(app.github.getAppConfig().appSlug)
-                ? `/api/github/install?organizationId=${encodeURIComponent(organizationId)}`
-                : null,
-          },
-        };
-      }),
+      ).query(async ({ ctx, input }) =>
+        ctx.app.codingAgentApp.getPersonalProjectPullRequestUsage(
+          { projectId: input.projectId },
+          ctx.actor(),
+        ),
+      ),
 
       /**
        * One pull request in full: its totals, who worked on it, what each model
@@ -331,24 +269,7 @@ export class CodingAgentTrpcApi {
       pullRequestDetail: policy(CODING_AGENT_PERMISSION)(
         procedure.input(pullRequestDetailInputSchema),
       ).query(async ({ ctx, input }) => {
-        const organizationId = await ports.tryResolveOrganizationForProject(input.projectId);
-        if (!organizationId) {
-          throw new GithubPullRequestNotMappedError({
-            repositoryFullName: input.repositoryFullName,
-            prNumber: input.prNumber,
-          });
-        }
-        const scope = await ports.resolveCallerProjectScope({
-          userId: ctx.actor().id,
-          organizationId,
-        });
-        const detail = await ctx.app.codingAgents.getPullRequestDetail({
-          organizationId,
-          repositoryHost: input.repositoryHost,
-          repositoryFullName: input.repositoryFullName,
-          prNumber: input.prNumber,
-          ...scope,
-        });
+        const detail = await ctx.app.codingAgentApp.getPullRequestDetail(input, ctx.actor());
         return {
           ...detail,
           sessions: gatePullRequestSessionTitles({

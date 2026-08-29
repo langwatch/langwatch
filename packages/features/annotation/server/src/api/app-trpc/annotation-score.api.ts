@@ -14,12 +14,11 @@
  * Reading takes `annotations:view`; defining takes `annotations:manage`,
  * retiring `annotations:update`, and removing `annotations:delete`.
  *
- * Transport only: policy and delegation to `AnnotationService`.
+ * Transport only: policy and delegation to {@link AnnotationApp}.
  *
  * Spec: packages/features/annotation/specs/annotation-service.feature.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { AnnotationService } from "@langwatch/annotation-contract";
 import type {
   AnyTRPCRootTypes,
   TRPCRootObject,
@@ -27,12 +26,18 @@ import type {
 } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import type { AnnotationApp } from "#app/annotation.app";
 
-type AnnotationScoreApplication = Readonly<{ annotations: AnnotationService }>;
-
-/** The host supplies authentication; authorization arrives as `policy`. */
+/**
+ * The host supplies authentication; authorization arrives as `policy`.
+ *
+ * The same slice the comment door takes, and the same {@link AnnotationApp}
+ * object: one application, two doors. Before it, this door declared
+ * `Readonly<{ annotations: AnnotationService }>` and the comment door declared
+ * a wider bag of its own, and neither could reach the other's.
+ */
 export type AnnotationScoreTrpcContext = Readonly<{
-  app: AnnotationScoreApplication;
+  app: Readonly<{ annotations: AnnotationApp }>;
 }>;
 
 type AnnotationScoreTrpcProcedures<

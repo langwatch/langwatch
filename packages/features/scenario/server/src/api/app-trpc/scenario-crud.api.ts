@@ -77,10 +77,7 @@ export function createScenarioCrudRouter<
         logger.info({ projectId: input.projectId }, "Creating scenario");
 
         const userId = ctx.actor().id;
-        const result = await ctx.app.scenarios.create({
-          ...input,
-          lastUpdatedById: userId,
-        });
+        const result = await ctx.app.scenarios.create(input, ctx.actor());
 
         ports.trackScenarioCreated({ userId, projectId: input.projectId });
 
@@ -137,16 +134,11 @@ export function createScenarioCrudRouter<
         logger.info({ projectId: input.projectId, scenarioId: input.id }, "Updating scenario");
 
         const { id, projectId, expectedVersion, ...data } = input;
-        const userId = ctx.actor().id;
         try {
-          const result = await ctx.app.scenarios.update({
-            id,
-            projectId,
-            ...data,
-            lastUpdatedById: userId,
-            actor: { userId, label: "user" },
-            expectedVersion,
-          });
+          const result = await ctx.app.scenarios.update(
+            { id, projectId, ...data, expectedVersion },
+            ctx.actor(),
+          );
 
           logger.info({ projectId, scenarioId: id }, "Scenario updated");
           return result;
@@ -220,11 +212,10 @@ export function createScenarioCrudRouter<
       );
 
       try {
-        return await ctx.app.scenarios.duplicate({
-          scenarioId: input.scenarioId,
-          projectId: input.projectId,
-          lastUpdatedById: ctx.actor().id,
-        });
+        return await ctx.app.scenarios.duplicate(
+          { scenarioId: input.scenarioId, projectId: input.projectId },
+          ctx.actor(),
+        );
       } catch (error) {
         if (error instanceof ScenarioNotFoundError) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Scenario not found" });

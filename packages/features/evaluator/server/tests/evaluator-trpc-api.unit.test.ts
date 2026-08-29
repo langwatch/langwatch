@@ -11,15 +11,28 @@
  * input rather than `undefined`.
  */
 import type { Evaluator, EvaluatorService } from "@langwatch/evaluator-contract";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { EvaluatorApp } from "../src/app/evaluator.app";
 import { EvaluatorTrpcApi, type EvaluatorTrpcPorts } from "../src/api/app-trpc/evaluator.api";
 
 type TestContext = {
-  app: { evaluators: EvaluatorService };
+  app: { evaluatorApp: EvaluatorApp };
   can(permission: string, target: { projectId: string }): Promise<boolean>;
 };
+
+/**
+ * The application the surface answers from. The tRPC door reaches no model
+ * provider, so the stub is the empty one the type demands and nothing calls.
+ */
+function anApp(evaluators: Partial<EvaluatorService>): EvaluatorApp {
+  return EvaluatorApp.create({
+    evaluators: evaluators as EvaluatorService,
+    modelProviders: {} as ModelProviderService,
+  });
+}
 
 const anEvaluator: Evaluator = {
   id: "evaluator-1",
@@ -73,7 +86,7 @@ function harness({
     policySawInput,
     ports: featurePorts,
     caller: router.createCaller({
-      app: { evaluators: evaluators as EvaluatorService },
+      app: { evaluatorApp: anApp(evaluators) },
       can: can as never,
     }),
   };
@@ -132,7 +145,10 @@ describe("EvaluatorTrpcApi", () => {
           type: "code",
           config: {},
         }),
-      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        // The refusal is the application's now, so the assertion is on its
+        // stable code rather than on the transport code a process boundary
+        // this bare harness does not install would derive from it.
+      ).rejects.toMatchObject({ cause: { code: "evaluator_config_invalid" } });
       expect(create).not.toHaveBeenCalled();
     });
   });
@@ -287,13 +303,13 @@ describe("EvaluatorTrpcApi", () => {
 
       await expect(
         caller.syncFromSource({ projectId: "project-1", evaluatorId: "evaluator-1" }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
       expect(syncFromSource).not.toHaveBeenCalled();
     });
   });
 
   describe("when copying an evaluator into another project", () => {
-    it("answers NOT_FOUND for a source that does not exist", async () => {
+    it("names the missing source rather than failing anonymously", async () => {
       const { caller } = harness({ evaluators: { tryGetById: async () => null } });
 
       await expect(
@@ -302,7 +318,7 @@ describe("EvaluatorTrpcApi", () => {
           projectId: "target",
           sourceProjectId: "source",
         }),
-      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      ).rejects.toMatchObject({ cause: { code: "evaluator_not_found" } });
     });
 
     it("refuses a workflow evaluator that names no workflow", async () => {
@@ -318,7 +334,7 @@ describe("EvaluatorTrpcApi", () => {
           projectId: "target",
           sourceProjectId: "source",
         }),
-      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      ).rejects.toMatchObject({ cause: { code: "evaluator_workflow_version_required" } });
     });
 
     it("clones the backing workflow and points the replica at it", async () => {

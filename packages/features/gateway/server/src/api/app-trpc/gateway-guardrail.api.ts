@@ -7,30 +7,23 @@
  * /gateway/guardrails.
  *
  * Transport only. The guardrail capability is built over persistence and the
- * evaluator and monitor services, so it arrives as a port that takes the two
- * services off the request's application.
+ * evaluator and monitor services, so the feature's application holds it
+ * already-built and this transport never sees either service.
  *
  * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
-import type { MonitorService } from "@langwatch/monitor-contract";
 import {
   GatewayGuardrailDirection,
   GatewayGuardrailFailureMode,
-  type GatewayGuardrail,
 } from "@langwatch/prisma-client/generated";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-
-type GatewayGuardrailApplication = Readonly<{
-  evaluators: EvaluatorService;
-  monitors: MonitorService;
-}>;
+import type { GatewayApp } from "#app/gateway.app";
 
 /** The process supplies authentication; authorization arrives as `policy`. */
 export type GatewayGuardrailTrpcContext = Readonly<{
-  app: GatewayGuardrailApplication;
+  app: Readonly<{ gateway: GatewayApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -50,40 +43,6 @@ type GatewayGuardrailTrpcProcedures<
   policy(permission: AuthzPermission): ProcedureDecorator;
 }>;
 
-/** The guardrail operations this transport calls, as the process exposes them. */
-export type GatewayGuardrailOperations = Readonly<{
-  list(projectId: string): Promise<GatewayGuardrail[]>;
-  get(id: string, projectId: string): Promise<GatewayGuardrail | null>;
-  create(input: {
-    projectId: string;
-    name: string;
-    description: string | null;
-    evaluatorId: string;
-    direction: GatewayGuardrailDirection;
-    failureMode?: GatewayGuardrailFailureMode;
-    actorUserId: string;
-  }): Promise<GatewayGuardrail>;
-  update(input: {
-    id: string;
-    projectId: string;
-    name?: string;
-    description?: string | null;
-    evaluatorId?: string;
-    direction?: GatewayGuardrailDirection;
-    failureMode?: GatewayGuardrailFailureMode;
-    actorUserId: string;
-  }): Promise<GatewayGuardrail>;
-  archive(input: { id: string; projectId: string; actorUserId: string }): Promise<void>;
-}>;
-
-export type GatewayGuardrailTrpcPorts = Readonly<{
-  /**
-   * The process's guardrail capability, built over its own persistence and the
-   * evaluator and monitor services this request carries.
-   */
-  guardrails(input: GatewayGuardrailApplication): GatewayGuardrailOperations;
-}>;
-
 const directionSchema = z.nativeEnum(GatewayGuardrailDirection);
 const failureModeSchema = z.nativeEnum(GatewayGuardrailFailureMode);
 
@@ -96,21 +55,19 @@ export class GatewayGuardrailTrpcApi {
     TContext extends GatewayGuardrailTrpcContext,
     TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
     TRoot extends AnyTRPCRootTypes,
-    TPorts extends GatewayGuardrailTrpcPorts,
   >(
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: GatewayGuardrailTrpcProcedures<TContext, TOptions, TRoot>,
-    ports: TPorts,
   ) {
     const { protected: procedure, policy } = procedures;
 
     return trpc.router({
       list: policy("gatewayGuardrails:view")(procedure.input(projectScopeSchema)).query(
-        async ({ ctx, input }) => ports.guardrails(ctx.app).list(input.projectId),
+        async ({ ctx, input }) => ctx.app.gateway.guardrails.list(input.projectId),
       ),
 
       get: policy("gatewayGuardrails:view")(procedure.input(guardrailIdSchema)).query(
-        async ({ ctx, input }) => ports.guardrails(ctx.app).get(input.id, input.projectId),
+        async ({ ctx, input }) => ctx.app.gateway.guardrails.get(input.id, input.projectId),
       ),
 
       create: policy("gatewayGuardrails:manage")(
@@ -125,7 +82,7 @@ export class GatewayGuardrailTrpcApi {
           }),
         ),
       ).mutation(async ({ ctx, input }) =>
-        ports.guardrails(ctx.app).create({
+        ctx.app.gateway.guardrails.create({
           projectId: input.projectId,
           name: input.name,
           description: input.description ?? null,
@@ -149,7 +106,7 @@ export class GatewayGuardrailTrpcApi {
           }),
         ),
       ).mutation(async ({ ctx, input }) =>
-        ports.guardrails(ctx.app).update({
+        ctx.app.gateway.guardrails.update({
           id: input.id,
           projectId: input.projectId,
           name: input.name,
@@ -163,7 +120,7 @@ export class GatewayGuardrailTrpcApi {
 
       archive: policy("gatewayGuardrails:manage")(procedure.input(guardrailIdSchema)).mutation(
         async ({ ctx, input }) => {
-          await ports.guardrails(ctx.app).archive({
+          await ctx.app.gateway.guardrails.archive({
             id: input.id,
             projectId: input.projectId,
             actorUserId: ctx.actor().id,

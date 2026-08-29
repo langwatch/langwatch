@@ -9,12 +9,13 @@
  * Spec: specs/monitors/replicate-monitor-to-project.feature.
  */
 import {
+  EvaluatorNotFoundError,
   evaluatorTypeSchema,
   type Evaluator,
   type EvaluatorService,
 } from "@langwatch/evaluator-contract";
-import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
+import { EvaluatorWorkflowVersionRequiredError } from "#app/evaluator.app";
 
 /**
  * Workflow replication, which the process owns: a workflow evaluator's backing
@@ -70,9 +71,7 @@ export class EvaluatorReplicationApi {
   }: EvaluatorCopyCommand): Promise<Evaluator> {
     const source = await evaluators.tryGetById({ id: evaluatorId, projectId: sourceProjectId });
 
-    if (!source) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Evaluator not found" });
-    }
+    if (!source) throw new EvaluatorNotFoundError(evaluatorId);
 
     const newWorkflowId = await this.copyWorkflowFor({
       source,
@@ -119,12 +118,7 @@ export class EvaluatorReplicationApi {
       return null;
     }
 
-    if (!source.workflowId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Cannot replicate a workflow evaluator without a saved workflow version",
-      });
-    }
+    if (!source.workflowId) throw new EvaluatorWorkflowVersionRequiredError(source.id);
 
     return this.ports.replicateEvaluatorWorkflow({
       workflowId: source.workflowId,

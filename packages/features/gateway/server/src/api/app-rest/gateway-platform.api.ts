@@ -5,11 +5,11 @@
  *
  * Auth: standard project API key (`Authorization: Bearer <projectApiKey>`
  * or `X-Auth-Token`), or a scoped API key. There is exactly one
- * implementation of every write rule: handlers route through the SAME
- * service-layer methods and pre-flight asserts the tRPC mutations use, which
- * reach this family as ports (see `gateway-platform-rest.ports.ts`), so the
- * two doors cannot drift apart. Handlers translate wire casing and map
- * TRPCError onto HTTP; they add no business rules of their own.
+ * implementation of every write rule: handlers call the SAME operations on
+ * `GatewayApp` that the tRPC mutations call — `authorizeVirtualKeyCreate`,
+ * `authorizeVirtualKeyUpdate`, `authorizeVirtualKeyOperation` — so the two
+ * doors cannot drift apart. Handlers translate wire casing and map TRPCError
+ * onto HTTP; they add no business rules of their own.
  *
  * Writes are audited to `AuditLog` (gateway shape). Which actor a credential
  * writes as — the key's owning user for a scoped API key, a synthetic machine
@@ -46,14 +46,13 @@ import type {
   GatewayCacheRuleCursor,
   GatewayCacheRuleResource,
 } from "@langwatch/gateway-contract";
-import { parseVirtualKeyConfig, virtualKeyConfigSchema } from "@langwatch/gateway-contract";
+import { virtualKeyConfigSchema } from "@langwatch/gateway-contract";
 import { toBudgetDto } from "../../adapters/gateway-budget-dto.adapter";
 import {
   EXTERNAL_ID_MAX_LENGTH,
   externalIdSchema,
   resourceMetadataSchema,
 } from "../../adapters/gateway-resource-metadata.adapter";
-import type { VirtualKeySnakeDto } from "../../adapters/gateway-virtual-key-dto.adapter";
 import { startOfCurrentMonthUTC } from "../../adapters/gateway-window.adapter";
 import { toStoredEnum, toWireEnum } from "../../adapters/gateway-wire-enums.adapter";
 import { USD_DISPLAY_STRING_FORMAT } from "../../adapters/gateway-wire-money.adapter";
@@ -63,15 +62,12 @@ import {
   PAGE_LIMIT_DEFAULT,
   PAGE_LIMIT_MAX,
 } from "../../adapters/gateway-wire-pagination.adapter";
+import type { GatewayVirtualKeyScope } from "../../ports/gateway-virtual-key.port";
 import type {
-  GatewayVirtualKeyScope,
-  VirtualKeyWithScopes,
-} from "../../ports/gateway-virtual-key.port";
-import type {
-  GatewayPlatformRestPorts,
-  GatewayRestActor,
-  GatewayRestVirtualKeyBudgetInput,
-} from "../../ports/gateway-platform-rest.port";
+  GatewayActor,
+  GatewayApp,
+  GatewayVirtualKeyBudgetInput,
+} from "#app/gateway.app";
 
 const logger = createLogger("langwatch:api:gateway-platform");
 
@@ -565,22 +561,6 @@ const createBudgetSchema = z.object({
     ),
 });
 
-/**
- * The published shape of one key. Async because `trace_project_archived` is a
- * fact about the project row rather than the key row, and a key goes on
- * sending its traces to a project the customer deleted, so nothing else the
- * caller can read says the destination is gone. The projection is a map over
- * a page, so a single key is a page of one.
- */
-async function toVkDto(
-  ports: GatewayPlatformRestPorts,
-  virtualKey: VirtualKeyWithScopes,
-): Promise<VirtualKeySnakeDto> {
-  const [dto] = await ports.toVirtualKeyDtos({ virtualKeys: [virtualKey] });
-  if (!dto) throw new Error("the virtual key projection returned no row");
-  return dto;
-}
-
 type GatewayContext = Context<{ Variables: AppRestProjectVariables }>;
 
 /**
@@ -588,14 +568,15 @@ type GatewayContext = Context<{ Variables: AppRestProjectVariables }>;
  *
  * Which principal a credential stands for is the process's decision — a
  * scoped API key acts as its owning user, a legacy project key carries none
- * and acts as a synthetic machine principal for its project — so it arrives
- * as a port and this transport only supplies the two facts it holds.
+ * and acts as a synthetic machine principal for its project — so the
+ * application answers it and this transport only supplies the two facts it
+ * holds.
  */
 function actorForRequest(
   c: GatewayContext,
-  ports: GatewayPlatformRestPorts,
-): { actor: GatewayRestActor; actorUserId: string } {
-  return ports.actorForCredential({
+  app: GatewayApp,
+): { actor: GatewayActor; actorUserId: string } {
+  return app.actorForCredential({
     projectId: c.get("project").id,
     resolvedToken: c.get("resolvedToken"),
   });
@@ -689,12 +670,12 @@ function scopesFromWire(
  * validates with, so a cap that tRPC would refuse cannot arrive via REST.
  */
 function budgetFromWire(
-  ports: GatewayPlatformRestPorts,
+  app: GatewayApp,
   budget: z.infer<typeof budgetWireSchema> | null | undefined,
-): GatewayRestVirtualKeyBudgetInput | null | undefined {
+): GatewayVirtualKeyBudgetInput | null | undefined {
   if (budget === undefined) return undefined;
   if (budget === null) return null;
-  const parsed = ports.schemas.virtualKeyBudgetInput.safeParse({
+  const parsed = app.schemas.virtualKeyBudgetInput.safeParse({
     limitUsd: typeof budget.limit_usd === "number" ? String(budget.limit_usd) : budget.limit_usd,
     window: toStoredEnum(budget.window),
     onBreach: budget.on_breach && toStoredEnum(budget.on_breach),
@@ -710,84 +691,8 @@ function budgetFromWire(
 }
 
 /**
- * The authorization pre-flight for a virtual key patch, and the scope set the
- * update should apply.
- *
- * The same two gates the tRPC update runs: `virtualKeys:update` on a scope the
- * key ALREADY lives in, plus `virtualKeys:manage` on every NEW scope. Lifted
- * out of the handler so the route body reads as "authorize, then update"
- * rather than interleaving eight awaits with the field mapping.
- */
-async function authorizeVirtualKeyUpdate({
-  actor,
-  ports,
-  id,
-  organizationId,
-  fallbackProjectId,
-  patch,
-}: {
-  actor: GatewayRestActor;
-  ports: GatewayPlatformRestPorts;
-  id: string;
-  organizationId: string;
-  fallbackProjectId: string;
-  patch: z.infer<typeof updateVirtualKeySchema>;
-}): Promise<GatewayVirtualKeyScope[] | undefined> {
-  const existing = await ports.requireExistingVirtualKey({ id, organizationId });
-  await ports.assertCanOperateOnAnyScope({
-    actor,
-    scopes: existing.scopes,
-    permission: "virtualKeys:update",
-  });
-
-  const scopes = patch.scopes ? scopesFromWire(patch.scopes, fallbackProjectId) : undefined;
-  if (scopes) {
-    await ports.assertCanManageAllScopes({ actor, scopes });
-    await ports.assertScopesBelongToOrganization({ organizationId, scopes });
-  }
-
-  if (patch.trace_project_id !== undefined) {
-    await ports.assertTraceProjectBelongsToOrganization({
-      organizationId,
-      traceProjectId: patch.trace_project_id,
-    });
-    // Re-pointing the destination is the same decision as choosing it at
-    // create: it needs manage on the target project.
-    if (patch.trace_project_id) {
-      await ports.assertCanManageAllScopes({
-        actor,
-        scopes: [{ scopeType: "PROJECT", scopeId: patch.trace_project_id }],
-      });
-    }
-  }
-
-  const vkProjectId = await ports.resolveVirtualKeyProjectId({
-    organizationId,
-    virtualKeyId: id,
-    scopes,
-    traceProjectId:
-      patch.trace_project_id !== undefined ? patch.trace_project_id : existing.traceProjectId,
-  });
-  // Newly-submitted attachments are always validated. A scope change without
-  // re-sent config revalidates the existing attachments against the new
-  // project; a plain metadata update touches neither.
-  const attachmentsToCheck =
-    patch.config?.guardrailAttachments ??
-    (scopes !== undefined
-      ? parseVirtualKeyConfig(existing.config).guardrailAttachments
-      : undefined);
-  await ports.assertGuardrailAttachmentsAllowed({
-    actor,
-    projectId: vkProjectId,
-    attachments: attachmentsToCheck,
-  });
-
-  return scopes;
-}
-
-/**
  * The public REST surface for the AI Gateway control plane, built against one
- * process's security and one process's gateway capabilities.
+ * process's security and one process's gateway application.
  *
  * `gateway()` is resolved per request rather than held: mounting the family
  * must not construct a service, which is what lets the OpenAPI generator and
@@ -795,7 +700,7 @@ async function authorizeVirtualKeyUpdate({
  */
 export function createGatewayPlatformRestApp(options: {
   security: AppRestSecurity;
-  gateway: () => GatewayPlatformRestPorts;
+  gateway: () => GatewayApp;
 }): SecuredApp<{ Variables: AppRestProjectVariables }> {
   const { security, gateway } = options;
 
@@ -832,14 +737,14 @@ export function createGatewayPlatformRestApp(options: {
     }),
     zValidator("query", virtualKeyListQuerySchema),
     async (c) => {
-      const ports = gateway();
+      const app = gateway();
       const project = c.get("project");
       const page = { data: c.req.valid("query") };
       const cursor = createdAtIdCursor(page.data.cursor);
       if (cursor === null) return invalidCursor(c);
 
-      const organizationId = await ports.organizationIdForProject(project.id);
-      const service = ports.virtualKeys;
+      const organizationId = await app.organizationIdForProject(project.id);
+      const service = app.virtualKeys;
       const rows = await service.getPage({
         organizationId,
         limit: page.data.limit,
@@ -852,8 +757,8 @@ export function createGatewayPlatformRestApp(options: {
       // cursor therefore advances over rows READ, so a page can be shorter than
       // `limit` without meaning the walk is done.
       return c.json({
-        data: await ports.toVirtualKeyDtos({
-          virtualKeys: ports.visibleToProjectCredential({ project, virtualKeys: rows }),
+        data: await app.toVirtualKeySnakeDtos({
+          virtualKeys: app.visibleToProjectCredential({ project, virtualKeys: rows }),
         }),
         next_cursor: nextPageCursor(rows, page.data.limit, (vk) => [vk.createdAt.getTime(), vk.id]),
       });
@@ -901,43 +806,25 @@ export function createGatewayPlatformRestApp(options: {
     }),
     zValidator("json", createVirtualKeySchema),
     async (c) => {
-      const ports = gateway();
+      const app = gateway();
       const project = c.get("project");
       const body = { data: c.req.valid("json") };
       const idempotencyKey = readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER));
-      const organizationId = await ports.organizationIdForProject(project.id);
-      const { actor, actorUserId } = actorForRequest(c, ports);
+      const organizationId = await app.organizationIdForProject(project.id);
+      const { actor, actorUserId } = actorForRequest(c, app);
       const scopes = scopesFromWire(body.data.scopes, project.id);
-      const service = ports.virtualKeys;
+      const service = app.virtualKeys;
       try {
-        // The SAME pre-flight sequence the tRPC create runs, with the actor
-        // swapped for the API credential: manage at every requested scope,
-        // scopes inside the caller's org, guardrail refs project-local.
-        await ports.assertCanManageAllScopes({ actor, scopes });
-        await ports.assertScopesBelongToOrganization({ organizationId, scopes });
-        await ports.assertTraceProjectBelongsToOrganization({
-          organizationId,
-          traceProjectId: body.data.trace_project_id,
-        });
-        // The destination routes traces AND budget debits into that
-        // project, so choosing it needs the same manage grant the old
-        // PROJECT scope enforced.
-        if (body.data.trace_project_id) {
-          await ports.assertCanManageAllScopes({
-            actor,
-            scopes: [{ scopeType: "PROJECT", scopeId: body.data.trace_project_id }],
-          });
-        }
-        const vkProjectId = await ports.resolveVirtualKeyProjectId({
-          organizationId,
-          virtualKeyId: null,
-          scopes,
-          traceProjectId: body.data.trace_project_id ?? null,
-        });
-        await ports.assertGuardrailAttachmentsAllowed({
+        // The SAME pre-flight the tRPC create runs — it is one operation on the
+        // application, with the actor swapped for the API credential: manage at
+        // every requested scope, scopes inside the caller's organization, the
+        // destination anchored and manageable, guardrail refs project-local.
+        await app.authorizeVirtualKeyCreate({
           actor,
-          projectId: vkProjectId,
-          attachments: body.data.config?.guardrailAttachments,
+          organizationId,
+          scopes,
+          traceProjectId: body.data.trace_project_id,
+          guardrailAttachments: body.data.config?.guardrailAttachments,
         });
         const input = {
           organizationId,
@@ -949,7 +836,7 @@ export function createGatewayPlatformRestApp(options: {
           routingPolicyId: body.data.routing_policy_id ?? null,
           routingMode: body.data.routing_mode && toStoredEnum(body.data.routing_mode),
           expiresAt: body.data.expires_at ?? null,
-          budget: budgetFromWire(ports, body.data.budget),
+          budget: budgetFromWire(app, body.data.budget),
           config: body.data.config,
           externalId: body.data.external_id,
           metadata: body.data.metadata,
@@ -958,7 +845,7 @@ export function createGatewayPlatformRestApp(options: {
         // Only the create is inside the idempotent section. The pre-flight
         // above is read-only, so leaving it out means a replay still re-checks
         // the caller's scopes rather than trusting a grant it held yesterday.
-        const outcome = await ports.idempotency({
+        const outcome = await app.idempotency({
           operation: "gateway.v1.virtual-keys.create",
           scopeId: project.id,
           key: idempotencyKey,
@@ -977,7 +864,7 @@ export function createGatewayPlatformRestApp(options: {
             // use, so the secret has to transit the receipt.
             return {
               status: 201,
-              body: { virtual_key: await toVkDto(ports, virtualKey), secret },
+              body: { virtual_key: await app.toVirtualKeySnakeDto(virtualKey), secret },
             };
           },
         });
@@ -1012,13 +899,13 @@ export function createGatewayPlatformRestApp(options: {
       },
     }),
     async (c) => {
-      const ports = gateway();
+      const app = gateway();
       const project = c.get("project");
       const id = c.req.param("id");
-      const organizationId = await ports.organizationIdForProject(project.id);
+      const organizationId = await app.organizationIdForProject(project.id);
       try {
-        const vk = await ports.requireVisibleVirtualKey({ project, id, organizationId });
-        return c.json({ virtual_key: await toVkDto(ports, vk) });
+        const vk = await app.requireVisibleVirtualKeyForProjectCredential({ project, id, organizationId });
+        return c.json({ virtual_key: await app.toVirtualKeySnakeDto(vk) });
       } catch (error) {
         return trpcErrorResponse(c, error);
       }
@@ -1056,7 +943,7 @@ export function createGatewayPlatformRestApp(options: {
     }),
     zValidator("query", vkSpendWindowSchema),
     async (c) => {
-      const ports = gateway();
+      const app = gateway();
       const project = c.get("project");
       const id = c.req.param("id");
       const windowParse = { data: c.req.valid("query") };
@@ -1074,10 +961,10 @@ export function createGatewayPlatformRestApp(options: {
         });
       }
 
-      const organizationId = await ports.organizationIdForProject(project.id);
+      const organizationId = await app.organizationIdForProject(project.id);
       let vk;
       try {
-        vk = await ports.requireVisibleVirtualKey({ project, id, organizationId });
+        vk = await app.requireVisibleVirtualKeyForProjectCredential({ project, id, organizationId });
       } catch (error) {
         return trpcErrorResponse(c, error);
       }
@@ -1085,7 +972,7 @@ export function createGatewayPlatformRestApp(options: {
       // Same failure the tRPC spend column raises (spend_source_unavailable):
       // without the ClickHouse spend source there is no number to report, and
       // a confident zero would be indistinguishable from a zero-spend key.
-      if (!ports.spendSourceAvailable) {
+      if (!app.spendSourceAvailable) {
         return errorResponse(c, {
           status: 412,
           code: "spend_source_unavailable",
@@ -1094,7 +981,7 @@ export function createGatewayPlatformRestApp(options: {
         });
       }
 
-      const spend = await ports.spendByVirtualKey({
+      const spend = await app.spendByVirtualKey({
         organizationId,
         virtualKeyIds: [vk.id],
         window: { fromDate, toDate },
@@ -1138,21 +1025,31 @@ export function createGatewayPlatformRestApp(options: {
     }),
     zValidator("json", updateVirtualKeySchema),
     async (c) => {
-      const ports = gateway();
+      const app = gateway();
       const project = c.get("project");
       const id = c.req.param("id");
       const body = { data: c.req.valid("json") };
-      const organizationId = await ports.organizationIdForProject(project.id);
-      const { actor, actorUserId } = actorForRequest(c, ports);
-      const service = ports.virtualKeys;
+      const organizationId = await app.organizationIdForProject(project.id);
+      const { actor, actorUserId } = actorForRequest(c, app);
+      const service = app.virtualKeys;
       try {
-        const scopes = await authorizeVirtualKeyUpdate({
+        // Absent `scopes` means "not re-scoping", which is what the
+        // application's update pre-flight reads to decide whether the stored
+        // guardrail attachments have to be revalidated against a new project.
+        const scopes = body.data.scopes
+          ? scopesFromWire(body.data.scopes, project.id)
+          : undefined;
+        // The SAME pre-flight the tRPC update runs: update on a scope the key
+        // already lives in, manage on every new scope, the destination anchored
+        // and manageable when it moves, attachments judged against the project
+        // the key resolves to.
+        await app.authorizeVirtualKeyUpdate({
           actor,
-          ports,
-          id,
           organizationId,
-          fallbackProjectId: project.id,
-          patch: body.data,
+          id,
+          scopes,
+          traceProjectId: body.data.trace_project_id,
+          guardrailAttachments: body.data.config?.guardrailAttachments,
         });
         const updated = await service.update({
           id,
@@ -1165,12 +1062,12 @@ export function createGatewayPlatformRestApp(options: {
           routingPolicyId: body.data.routing_policy_id,
           routingMode: body.data.routing_mode && toStoredEnum(body.data.routing_mode),
           expiresAt: body.data.expires_at,
-          budget: budgetFromWire(ports, body.data.budget),
+          budget: budgetFromWire(app, body.data.budget),
           config: body.data.config,
           externalId: body.data.external_id,
           metadata: body.data.metadata,
         });
-        return c.json({ virtual_key: await toVkDto(ports, updated) });
+        return c.json({ virtual_key: await app.toVirtualKeySnakeDto(updated) });
       } catch (error) {
         return trpcErrorResponse(c, error);
       }
@@ -1202,17 +1099,17 @@ export function createGatewayPlatformRestApp(options: {
       },
     }),
     async (c) => {
-      const ports = gateway();
+      const app = gateway();
       const project = c.get("project");
       const id = c.req.param("id");
-      const organizationId = await ports.organizationIdForProject(project.id);
-      const { actor, actorUserId } = actorForRequest(c, ports);
-      const service = ports.virtualKeys;
+      const organizationId = await app.organizationIdForProject(project.id);
+      const { actor, actorUserId } = actorForRequest(c, app);
+      const service = app.virtualKeys;
       try {
-        const existing = await ports.requireExistingVirtualKey({ id, organizationId });
-        await ports.assertCanOperateOnAnyScope({
+        await app.authorizeVirtualKeyOperation({
           actor,
-          scopes: existing.scopes,
+          organizationId,
+          id,
           permission: "virtualKeys:rotate",
         });
         const { virtualKey, secret } = await service.rotate({
@@ -1220,7 +1117,7 @@ export function createGatewayPlatformRestApp(options: {
           organizationId,
           actorUserId,
         });
-        return c.json({ virtual_key: await toVkDto(ports, virtualKey), secret });
+        return c.json({ virtual_key: await app.toVirtualKeySnakeDto(virtualKey), secret });
       } catch (error) {
         return trpcErrorResponse(c, error);
       }
@@ -1267,19 +1164,19 @@ export function createGatewayPlatformRestApp(options: {
       },
     }),
     async (c) => {
-      const ports = gateway();
+      const app = gateway();
       const project = c.get("project");
       const id = c.req.param("id");
       const body = disableVkSchema.safeParse(await c.req.json().catch(() => ({})));
       if (!body.success) return validationErrorResponse(c, body.error);
-      const organizationId = await ports.organizationIdForProject(project.id);
-      const { actor, actorUserId } = actorForRequest(c, ports);
-      const service = ports.virtualKeys;
+      const organizationId = await app.organizationIdForProject(project.id);
+      const { actor, actorUserId } = actorForRequest(c, app);
+      const service = app.virtualKeys;
       try {
-        const existing = await ports.requireExistingVirtualKey({ id, organizationId });
-        await ports.assertCanOperateOnAnyScope({
+        await app.authorizeVirtualKeyOperation({
           actor,
-          scopes: existing.scopes,
+          organizationId,
+          id,
           permission: "virtualKeys:update",
         });
         const updated = await service.disable({
@@ -1288,7 +1185,7 @@ export function createGatewayPlatformRestApp(options: {
           actorUserId,
           reason: body.data.reason ?? null,
         });
-        return c.json({ virtual_key: await toVkDto(ports, updated) });
+        return c.json({ virtual_key: await app.toVirtualKeySnakeDto(updated) });
       } catch (error) {
         return trpcErrorResponse(c, error);
       }
@@ -1315,17 +1212,17 @@ export function createGatewayPlatformRestApp(options: {
       },
     }),
     async (c) => {
-      const ports = gateway();
+      const app = gateway();
       const project = c.get("project");
       const id = c.req.param("id");
-      const organizationId = await ports.organizationIdForProject(project.id);
-      const { actor, actorUserId } = actorForRequest(c, ports);
-      const service = ports.virtualKeys;
+      const organizationId = await app.organizationIdForProject(project.id);
+      const { actor, actorUserId } = actorForRequest(c, app);
+      const service = app.virtualKeys;
       try {
-        const existing = await ports.requireExistingVirtualKey({ id, organizationId });
-        await ports.assertCanOperateOnAnyScope({
+        await app.authorizeVirtualKeyOperation({
           actor,
-          scopes: existing.scopes,
+          organizationId,
+          id,
           permission: "virtualKeys:update",
         });
         const updated = await service.enable({
@@ -1333,7 +1230,7 @@ export function createGatewayPlatformRestApp(options: {
           organizationId,
           actorUserId,
         });
-        return c.json({ virtual_key: await toVkDto(ports, updated) });
+        return c.json({ virtual_key: await app.toVirtualKeySnakeDto(updated) });
       } catch (error) {
         return trpcErrorResponse(c, error);
       }
@@ -1360,17 +1257,17 @@ export function createGatewayPlatformRestApp(options: {
       },
     }),
     async (c) => {
-      const ports = gateway();
+      const app = gateway();
       const project = c.get("project");
       const id = c.req.param("id");
-      const organizationId = await ports.organizationIdForProject(project.id);
-      const { actor, actorUserId } = actorForRequest(c, ports);
-      const service = ports.virtualKeys;
+      const organizationId = await app.organizationIdForProject(project.id);
+      const { actor, actorUserId } = actorForRequest(c, app);
+      const service = app.virtualKeys;
       try {
-        const existing = await ports.requireExistingVirtualKey({ id, organizationId });
-        await ports.assertCanOperateOnAnyScope({
+        await app.authorizeVirtualKeyOperation({
           actor,
-          scopes: existing.scopes,
+          organizationId,
+          id,
           permission: "virtualKeys:delete",
         });
         const updated = await service.revoke({
@@ -1378,7 +1275,7 @@ export function createGatewayPlatformRestApp(options: {
           organizationId,
           actorUserId,
         });
-        return c.json({ virtual_key: await toVkDto(ports, updated) });
+        return c.json({ virtual_key: await app.toVirtualKeySnakeDto(updated) });
       } catch (error) {
         return trpcErrorResponse(c, error);
       }
@@ -1476,7 +1373,7 @@ export function createGatewayPlatformRestApp(options: {
     }),
     zValidator("query", budgetListQuerySchema),
     async (c) => {
-      const ports = gateway();
+      const app = gateway();
       const project = c.get("project");
       const page = { data: c.req.valid("query") };
       const cursor = createdAtIdCursor(page.data.cursor);
@@ -1507,8 +1404,8 @@ export function createGatewayPlatformRestApp(options: {
         }
         scopeTypes = new Set(parsed.data);
       }
-      const organizationId = await ports.organizationIdForProject(project.id);
-      const service = ports.budgets;
+      const organizationId = await app.organizationIdForProject(project.id);
+      const service = app.budgetDecisions;
       const {
         budgets: rows,
         spendAvailable,
@@ -1524,7 +1421,7 @@ export function createGatewayPlatformRestApp(options: {
         scopeTypes: scopeTypes ? Array.from(scopeTypes, (t) => toStoredEnum(t)) : undefined,
         externalId: page.data.external_id,
       });
-      const memberCounts = await ports.groupMemberCounts(rows);
+      const memberCounts = await app.groupMemberCounts(rows);
       return c.json({
         spend_available: spendAvailable,
         data: rows.map((b) =>
@@ -1572,11 +1469,11 @@ export function createGatewayPlatformRestApp(options: {
       },
     }),
     async (c) => {
-      const ports = gateway();
+      const app = gateway();
       const project = c.get("project");
       const id = c.req.param("id");
-      const organizationId = await ports.organizationIdForProject(project.id);
-      const service = ports.budgets;
+      const organizationId = await app.organizationIdForProject(project.id);
+      const service = app.budgetDecisions;
       const found = await service.tryGetWithHealth(id, organizationId);
       if (!found) {
         return errorResponse(c, {
@@ -1585,7 +1482,7 @@ export function createGatewayPlatformRestApp(options: {
           message: `budget ${id} not found`,
         });
       }
-      const memberCounts = await ports.groupMemberCounts([found.budget]);
+      const memberCounts = await app.groupMemberCounts([found.budget]);
       return c.json({
         spend_available: found.spendAvailable,
         budget: toBudgetDto({
@@ -1629,18 +1526,18 @@ export function createGatewayPlatformRestApp(options: {
     }),
     zValidator("json", createBudgetSchema),
     async (c) => {
-      const ports = gateway();
+      const app = gateway();
       const project = c.get("project");
       const body = { data: c.req.valid("json") };
       // Read before the try: a malformed key is a request-validation failure and
       // takes the same route to the wire as one the schema caught, rather than
       // being reshaped by the service-error mapping below.
       const idempotencyKey = readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER));
-      const organizationId = await ports.organizationIdForProject(project.id);
-      const { actorUserId } = actorForRequest(c, ports);
-      const service = ports.budgets;
+      const organizationId = await app.organizationIdForProject(project.id);
+      const { actorUserId } = actorForRequest(c, app);
+      const service = app.budgetDecisions;
       try {
-        const outcome = await ports.idempotency({
+        const outcome = await app.idempotency({
           operation: "gateway.v1.budgets.create",
           scopeId: project.id,
           key: idempotencyKey,
@@ -1663,7 +1560,7 @@ export function createGatewayPlatformRestApp(options: {
               actorUserId,
             });
             const [memberCounts, reach] = await Promise.all([
-              ports.groupMemberCounts([row]),
+              app.groupMemberCounts([row]),
               service.scopeReach({ organizationId, scope: row }),
             ]);
             return {
@@ -1706,13 +1603,13 @@ export function createGatewayPlatformRestApp(options: {
     }),
     zValidator("json", updateBudgetSchema),
     async (c) => {
-      const ports = gateway();
+      const app = gateway();
       const project = c.get("project");
       const id = c.req.param("id");
       const body = { data: c.req.valid("json") };
-      const organizationId = await ports.organizationIdForProject(project.id);
-      const { actorUserId } = actorForRequest(c, ports);
-      const service = ports.budgets;
+      const organizationId = await app.organizationIdForProject(project.id);
+      const { actorUserId } = actorForRequest(c, app);
+      const service = app.budgetDecisions;
       try {
         const row = await service.update({
           id,
@@ -1726,7 +1623,7 @@ export function createGatewayPlatformRestApp(options: {
           metadata: body.data.metadata,
           actorUserId,
         });
-        const memberCounts = await ports.groupMemberCounts([row]);
+        const memberCounts = await app.groupMemberCounts([row]);
         return c.json({
           budget: toBudgetDto({
             budget: row,
@@ -1759,12 +1656,12 @@ export function createGatewayPlatformRestApp(options: {
       },
     }),
     async (c) => {
-      const ports = gateway();
+      const app = gateway();
       const project = c.get("project");
       const id = c.req.param("id");
-      const organizationId = await ports.organizationIdForProject(project.id);
-      const { actorUserId } = actorForRequest(c, ports);
-      const service = ports.budgets;
+      const organizationId = await app.organizationIdForProject(project.id);
+      const { actorUserId } = actorForRequest(c, app);
+      const service = app.budgetDecisions;
       try {
         const row = await service.archive({
           id,
@@ -1819,7 +1716,7 @@ export function createGatewayPlatformRestApp(options: {
     }),
     zValidator("query", resetBudgetQuerySchema),
     async (c) => {
-      const ports = gateway();
+      const app = gateway();
       const project = c.get("project");
       const id = c.req.param("id");
       const endUserId = c.req.valid("query").end_user_id ?? null;
@@ -1830,9 +1727,9 @@ export function createGatewayPlatformRestApp(options: {
       // describeRoute so the spec still shows it.
       const body = resetBudgetSchema.safeParse(await c.req.json().catch(() => ({})));
       if (!body.success) return validationErrorResponse(c, body.error);
-      const organizationId = await ports.organizationIdForProject(project.id);
-      const { actorUserId } = actorForRequest(c, ports);
-      const service = ports.budgets;
+      const organizationId = await app.organizationIdForProject(project.id);
+      const { actorUserId } = actorForRequest(c, app);
+      const service = app.budgetDecisions;
       try {
         const row = await service.reset({
           id,
@@ -1841,7 +1738,7 @@ export function createGatewayPlatformRestApp(options: {
           endUserId,
           reason: body.data.reason ?? null,
         });
-        const memberCounts = await ports.groupMemberCounts([row]);
+        const memberCounts = await app.groupMemberCounts([row]);
         return c.json({
           budget: toBudgetDto({
             budget: row,
@@ -1936,14 +1833,14 @@ export function createGatewayPlatformRestApp(options: {
     }),
     zValidator("query", pageQuerySchema),
     async (c) => {
-      const ports = gateway();
+      const app = gateway();
       const project = c.get("project");
       const page = { data: c.req.valid("query") };
       const cursor = cacheRuleCursor(page.data.cursor);
       if (cursor === null) return invalidCursor(c);
 
-      const organizationId = await ports.organizationIdForProject(project.id);
-      const service = ports.budgets;
+      const organizationId = await app.organizationIdForProject(project.id);
+      const service = app.budgetDecisions;
       const rows = await service.cacheRuleListPage({
         organizationId,
         limit: page.data.limit,
@@ -1980,11 +1877,11 @@ export function createGatewayPlatformRestApp(options: {
       },
     }),
     async (c) => {
-      const ports = gateway();
+      const app = gateway();
       const project = c.get("project");
       const id = c.req.param("id");
-      const organizationId = await ports.organizationIdForProject(project.id);
-      const service = ports.budgets;
+      const organizationId = await app.organizationIdForProject(project.id);
+      const service = app.budgetDecisions;
       const row = await service.tryCacheRuleGet(id, organizationId);
       if (!row) {
         return errorResponse(c, {
@@ -2027,15 +1924,15 @@ export function createGatewayPlatformRestApp(options: {
     }),
     zValidator("json", createCacheRuleSchema),
     async (c) => {
-      const ports = gateway();
+      const app = gateway();
       const project = c.get("project");
       const body = { data: c.req.valid("json") };
       const idempotencyKey = readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER));
-      const organizationId = await ports.organizationIdForProject(project.id);
-      const { actorUserId } = actorForRequest(c, ports);
-      const service = ports.budgets;
+      const organizationId = await app.organizationIdForProject(project.id);
+      const { actorUserId } = actorForRequest(c, app);
+      const service = app.budgetDecisions;
       try {
-        const outcome = await ports.idempotency({
+        const outcome = await app.idempotency({
           operation: "gateway.v1.cache-rules.create",
           scopeId: project.id,
           key: idempotencyKey,
@@ -2082,13 +1979,13 @@ export function createGatewayPlatformRestApp(options: {
     }),
     zValidator("json", updateCacheRuleSchema),
     async (c) => {
-      const ports = gateway();
+      const app = gateway();
       const project = c.get("project");
       const id = c.req.param("id");
       const body = { data: c.req.valid("json") };
-      const organizationId = await ports.organizationIdForProject(project.id);
-      const { actorUserId } = actorForRequest(c, ports);
-      const service = ports.budgets;
+      const organizationId = await app.organizationIdForProject(project.id);
+      const { actorUserId } = actorForRequest(c, app);
+      const service = app.budgetDecisions;
       try {
         const row = await service.cacheRuleUpdate({
           id,
@@ -2128,12 +2025,12 @@ export function createGatewayPlatformRestApp(options: {
       },
     }),
     async (c) => {
-      const ports = gateway();
+      const app = gateway();
       const project = c.get("project");
       const id = c.req.param("id");
-      const organizationId = await ports.organizationIdForProject(project.id);
-      const { actorUserId } = actorForRequest(c, ports);
-      const service = ports.budgets;
+      const organizationId = await app.organizationIdForProject(project.id);
+      const { actorUserId } = actorForRequest(c, app);
+      const service = app.budgetDecisions;
       try {
         const row = await service.cacheRuleArchive({
           id,

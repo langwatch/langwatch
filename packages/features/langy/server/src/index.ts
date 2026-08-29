@@ -24,11 +24,19 @@ export type { LangyTurnAdmissionCapability } from "@langwatch/langy-contract";
 export { LangyPublicApi } from "./api/public/langy.api";
 export { LangyInternalApi } from "./api/internal/langy.api";
 export {
+  LangyApp,
+  LangySessionRequiredError,
+  type LangyAppDependencies,
+  type LangyBroadcast,
+  type LangyEgressState,
+  type LangyRedis,
+  type LangyTurnRequest,
+  type LangyTurnStream,
+} from "./app/langy.app";
+export {
   LangyTrpcApi,
   type LangyTrpcContext,
-  type LangyTrpcEmitters,
   type LangyTrpcPorts,
-  type LangyTrpcRedis,
   type LangyUiActionPort,
 } from "./api/app-trpc/langy.api";
 export {

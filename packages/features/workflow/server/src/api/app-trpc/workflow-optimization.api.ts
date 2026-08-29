@@ -30,19 +30,25 @@
  * Spec: packages/features/workflow/specs/workflow-service.feature.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type {
   AnyTRPCRootTypes,
   TRPCRootObject,
   TRPCRuntimeConfigOptions,
 } from "@trpc/server";
-import { nanoid } from "nanoid";
 import { z } from "zod";
+import type { WorkflowApp } from "#app/workflow.app";
 
-type OptimizationApplication = Readonly<{ evaluators: EvaluatorService }>;
-
-/** The host supplies authentication; authorization arrives as `policy`. */
-export type WorkflowOptimizationTrpcContext = Readonly<{ app: OptimizationApplication }>;
+/**
+ * The host supplies authentication; authorization arrives as `policy`.
+ *
+ * The same slice `workflow.*` takes, and the same {@link WorkflowApp} object:
+ * this surface used to declare a bag of its own holding only the evaluator
+ * service, which is why the rule linking an evaluator to a workflow could not
+ * be shared with the door that reads those evaluators back.
+ */
+export type WorkflowOptimizationTrpcContext = Readonly<{
+  app: Readonly<{ workflows: WorkflowApp }>;
+}>;
 
 type WorkflowOptimizationTrpcProcedures<
   TContext extends WorkflowOptimizationTrpcContext,
@@ -209,14 +215,7 @@ export class WorkflowOptimizationTrpcApi {
 
         await ports.setWorkflowFlags(ctx, { workflowId, projectId, isEvaluator: false });
 
-        const linkedEvaluator = await ctx.app.evaluators.tryGetByWorkflow({
-          workflowId,
-          projectId,
-        });
-
-        if (linkedEvaluator) {
-          await ctx.app.evaluators.archive({ id: linkedEvaluator.id, projectId });
-        }
+        await ctx.app.workflows.unlinkEvaluatorFromWorkflow({ workflowId, projectId });
 
         return { success: true };
       }),
@@ -266,27 +265,11 @@ export class WorkflowOptimizationTrpcApi {
         });
 
         if (isEvaluator) {
-          const existingEvaluator = await ctx.app.evaluators.tryGetByWorkflow({
+          await ctx.app.workflows.linkEvaluatorToWorkflow({
             workflowId,
             projectId,
+            name: workflow.name,
           });
-
-          if (existingEvaluator) {
-            await ctx.app.evaluators.update({
-              id: existingEvaluator.id,
-              projectId,
-              data: { name: workflow.name },
-            });
-          } else {
-            await ctx.app.evaluators.create({
-              id: `evaluator_${nanoid()}`,
-              projectId,
-              name: workflow.name,
-              type: "workflow",
-              config: {},
-              workflowId,
-            });
-          }
         }
 
         return { success: true };

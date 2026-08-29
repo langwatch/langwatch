@@ -18,12 +18,24 @@ import { z } from "zod";
 import {
   OrganizationTrpcApi,
   type OrganizationTrpcPorts,
-} from "../src/api/app-trpc/organization.trpc-schemas";
+} from "../src/api/app-trpc/organization.api";
+import {
+  OrganizationApp,
+  type OrganizationAppDependencies,
+} from "../src/app/organization.app";
 
 type TestContext = {
-  app: { organizations: Record<string, unknown> };
+  app: { organizations: OrganizationApp };
   session: { user: { id: string; name?: string | null; email?: string | null } } | null;
 };
+
+/** The feature's application over a stub service, as the process builds it. */
+function application(organizations: Record<string, unknown>): OrganizationApp {
+  return OrganizationApp.create({
+    organizations: organizations as unknown as OrganizationAppDependencies["organizations"],
+    projects: {} as unknown as OrganizationAppDependencies["projects"],
+  });
+}
 
 const INVITE = {
   id: "inv-1",
@@ -135,7 +147,7 @@ function harness({
     router,
     ports,
     caller: router.createCaller({
-      app: { organizations },
+      app: { organizations: application(organizations) },
       session: { user },
     }),
   };
@@ -173,11 +185,7 @@ describe("OrganizationTrpcApi", () => {
 
       await router
         .createCaller({
-          app: {
-            organizations: {
-              getAllMembers: async () => [],
-            },
-          },
+          app: { organizations: application({ getAllMembers: async () => [] }) },
           session: { user: { id: "user-1" } },
         })
         .getAllOrganizationMembers({ organizationId: "org-1" });

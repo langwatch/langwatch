@@ -14,12 +14,8 @@
  * recent-items reader, which walks the audit trail and hydrates each entity.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import {
-  TRPCError,
-  type AnyTRPCRootTypes,
-  type TRPCRootObject,
-  type TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import { ProjectCallerUnauthenticatedError } from "@langwatch/project-contract";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
 /** The process supplies authentication; authorization arrives as `policy`. */
@@ -92,7 +88,7 @@ export class HomeTrpcApi {
           // `protectedProcedure` has already refused an anonymous caller; this
           // only narrows the type. A blank user id here would widen the read to
           // somebody else's trail rather than refusing it.
-          if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
+          if (!user) throw new ProjectCallerUnauthenticatedError();
           return ports.getRecentItems(ctx, {
             userId: user.id,
             projectId: input.projectId,

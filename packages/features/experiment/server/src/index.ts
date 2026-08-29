@@ -15,6 +15,14 @@ export {
   EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
 } from "./adapters/eventing.experiment-run-event-types.adapter";
 export {
+  ExperimentApp,
+  type ExperimentAppDependencies,
+  type ExperimentBroadcast,
+  type ExperimentCaller,
+  type ExperimentMonitorCascade,
+  type ExperimentWithRuns,
+} from "./app/experiment.app";
+export {
   ExperimentTrpcApi,
   type ExperimentTrpcContext,
   type ExperimentTrpcPorts,

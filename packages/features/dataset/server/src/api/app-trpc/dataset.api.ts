@@ -21,8 +21,7 @@
  * `datasets:update`, replacing `datasets:manage`, and archiving
  * `datasets:delete`.
  *
- * Transport only: policy, error translation, and delegation to
- * `DatasetService`.
+ * Transport only: policy, error translation, and delegation to `DatasetApp`.
  *
  * Spec: packages/features/dataset/specs/dataset-service.feature.
  */
@@ -37,7 +36,6 @@ import {
   datasetApiUpsertBaseInputSchema,
   datasetApiUpsertTargetInputSchema,
   datasetApiValidateNameInputSchema,
-  type DatasetService,
 } from "@langwatch/dataset-contract";
 import {
   TRPCError,
@@ -45,25 +43,18 @@ import {
   type TRPCRootObject,
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
+import type { DatasetApp } from "#app/dataset.app";
 
 /**
- * The experiment read `upsert` makes when the caller names an experiment
- * rather than a dataset name. Declared structurally: Dataset derives a name
- * from an experiment, and depends on nothing else the experiment feature owns.
+ * The host supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the host's application this feature reaches, not the
+ * feature's application itself, because a tRPC root is shared by every feature
+ * mounted on it and so carries all of them. The REST family, built per
+ * process, holds {@link DatasetApp} directly. Both reach the same object; only
+ * the path to it differs.
  */
-type DatasetExperimentLookup = Readonly<{
-  getById(
-    input: Readonly<{ projectId: string; id: string }>,
-  ): Promise<Readonly<{ name: string | null }>>;
-}>;
-
-type DatasetApplication = Readonly<{
-  dataset: DatasetService;
-  experiments: DatasetExperimentLookup;
-}>;
-
-/** The host supplies authentication; authorization arrives as `policy`. */
-export type DatasetTrpcContext = Readonly<{ app: DatasetApplication }>;
+export type DatasetTrpcContext = Readonly<{ app: Readonly<{ dataset: DatasetApp }> }>;
 
 type DatasetTrpcProcedures<
   TContext extends DatasetTrpcContext,
@@ -220,21 +211,14 @@ export class DatasetTrpcApi {
       )
         .use(datasetErrorHandler)
         .mutation(async ({ ctx, input }) => {
-          const experimentId = "experimentId" in input ? input.experimentId : undefined;
-          const experiment = experimentId
-            ? await ctx.app.experiments.getById({
-                projectId: input.projectId,
-                id: experimentId,
-              })
-            : undefined;
-          const name = "name" in input ? input.name : experiment?.name;
-          if (!name) {
-            throw new Error(`Experiment ${experimentId} has no name`);
-          }
-
+          // Borrowing the experiment's name when the caller named one is the
+          // application's rule, not this transport's: the REST patch fills the
+          // same hole from the dataset it is replacing, and one upsert decides
+          // both.
           return await ctx.app.dataset.upsertDataset({
             projectId: input.projectId,
-            name,
+            name: "name" in input ? input.name : undefined,
+            experimentId: "experimentId" in input ? input.experimentId : undefined,
             columnTypes: input.columnTypes,
             datasetId: "datasetId" in input ? input.datasetId : undefined,
             datasetRecords: input.datasetRecords,

@@ -1,4 +1,4 @@
-import type { AgentService } from "@langwatch/agent-contract";
+import type { AgentApp } from "#app/agent.app";
 
 export const legacyAgentsApiDocumentation = {
   deprecated: true,
@@ -7,30 +7,37 @@ export const legacyAgentsApiDocumentation = {
     "Legacy Agents REST compatibility API. New LangWatch product clients use the Agents RPC interface.",
 } as const;
 
+/**
+ * The legacy REST vocabulary over the feature's application.
+ *
+ * Transport-neutral: it renames `getById` to the `get` the deprecated surface
+ * has always published and forwards everything else, so the wire names a
+ * deployed caller depends on are not the names the application answers to.
+ */
 export class LegacyAgentsRestApi {
-  static create(service: AgentService): LegacyAgentsRestApi {
-    return new LegacyAgentsRestApi(service);
+  static create(app: AgentApp): LegacyAgentsRestApi {
+    return new LegacyAgentsRestApi(app);
   }
 
-  private constructor(private readonly service: AgentService) {}
+  private constructor(private readonly app: AgentApp) {}
 
-  list(input: { projectId: string; page: number; limit: number }) {
-    return this.service.list(input);
+  list(input: Parameters<AgentApp["list"]>[0]) {
+    return this.app.list(input);
   }
 
-  create(input: Parameters<AgentService["create"]>[0]) {
-    return this.service.create(input);
+  create(input: Parameters<AgentApp["create"]>[0]) {
+    return this.app.create(input);
   }
 
-  get(input: { id: string; projectId: string }) {
-    return this.service.getById(input);
+  get(input: Parameters<AgentApp["getById"]>[0]) {
+    return this.app.getById(input);
   }
 
-  update(input: Parameters<AgentService["update"]>[0]) {
-    return this.service.update(input);
+  update(input: Parameters<AgentApp["update"]>[0]) {
+    return this.app.update(input);
   }
 
-  archive(input: Parameters<AgentService["archive"]>[0]) {
-    return this.service.archive(input);
+  archive(input: Parameters<AgentApp["archive"]>[0]) {
+    return this.app.archive(input);
   }
 }

@@ -15,27 +15,19 @@
  * Transport only: gates, input shapes and delegation to `ScimService`. The plan
  * gate is a port, because the plan is the process's answer and not SCIM's.
  */
-import type { ScimService } from "@langwatch/enterprise-scim-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
+import type { ScimApp, ScimPlanProvider } from "#app/scim.app";
 
 /**
- * The plan the organization is on, as the process resolves it. Structural: the
- * plan source is the process's, and this surface only ever asks whether it is
- * the Enterprise one.
+ * The process supplies authentication; authorization arrives as a policy.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them.
  */
-type ScimPlanProvider = Readonly<{
-  getActivePlan(input: { organizationId: string }): Promise<Readonly<{ type: string }>>;
-}>;
-
-type ScimApplication = Readonly<{
-  scim: ScimService;
-  planProvider: ScimPlanProvider;
-}>;
-
-/** The process supplies authentication; authorization arrives as a policy. */
 export type ScimTokenTrpcContext = Readonly<{
-  app: ScimApplication;
+  app: Readonly<{ scimApp: ScimApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -90,7 +82,7 @@ export class ScimTokenTrpcApi {
       procedure.input(organizationScopeSchema),
     ).use(async ({ ctx, input, next }) => {
       await ports.requireEnterprisePlan({
-        planProvider: ctx.app.planProvider,
+        planProvider: ctx.app.scimApp.planProvider,
         organizationId: input.organizationId,
       });
       return next();
@@ -98,7 +90,7 @@ export class ScimTokenTrpcApi {
 
     return trpc.router({
       list: enterpriseScimProcedure.query(async ({ ctx, input }) => {
-        return ctx.app.scim.listTokens({ organizationId: input.organizationId });
+        return ctx.app.scimApp.listTokens({ organizationId: input.organizationId });
       }),
 
       generate: enterpriseScimProcedure
@@ -113,7 +105,7 @@ export class ScimTokenTrpcApi {
           }),
         )
         .mutation(async ({ ctx, input }) => {
-          return ctx.app.scim.generateToken({
+          return ctx.app.scimApp.generateToken({
             organizationId: input.organizationId,
             connectionId: input.connectionId,
             description: input.description,
@@ -123,7 +115,7 @@ export class ScimTokenTrpcApi {
       revoke: enterpriseScimProcedure
         .input(z.object({ tokenId: z.string() }))
         .mutation(async ({ ctx, input }) => {
-          return ctx.app.scim.revokeToken({
+          return ctx.app.scimApp.revokeToken({
             organizationId: input.organizationId,
             tokenId: input.tokenId,
           });

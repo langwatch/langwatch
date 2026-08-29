@@ -26,23 +26,19 @@
  * carry the eligible-provider derivation, and the legacy
  * `providerCredentialIds` / `providerChain` fields are not surfaced.
  *
- * Transport only. The per-scope authorization helpers, the DTO projection and
- * the budget resolvers are built over persistence this transport does not hold,
- * so they arrive as ports.
+ * Transport only. The per-scope authorization sequence, the DTO projection and
+ * the budget resolvers are the application's: they are built over persistence
+ * this transport does not hold, and the public REST door runs the same ones.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
-  parseVirtualKeyConfig,
   virtualKeyApiApplicableBudgetsInputSchema,
   virtualKeyApiCreateInputSchema,
   virtualKeyApiDisableInputSchema,
   virtualKeyApiKeyInputSchema,
   virtualKeyApiOrganizationInputSchema,
   virtualKeyApiUpdateInputSchema,
-  type GatewayService,
-  type VirtualKeyConfig,
 } from "@langwatch/gateway-contract";
-import type { ProjectService } from "@langwatch/project-contract";
 import {
   TRPCError,
   type AnyTRPCRootTypes,
@@ -51,126 +47,32 @@ import {
 } from "@trpc/server";
 import { z } from "zod";
 import { startOfCurrentMonthUTC } from "../../adapters/gateway-window.adapter";
-import type { GatewayBudgetSpendPort } from "../../ports/gateway-budget-spend.port";
-import type { GatewayVirtualKeySpendPort } from "../../ports/gateway-virtual-key-spend.port";
 import type {
-  GatewayVirtualKeyScope,
-  VirtualKeyWithScopes,
-} from "../../ports/gateway-virtual-key.port";
-
-/**
- * The virtual-key WRITE capability this transport calls. Reads go through the
- * visibility ports below, because who may see a key is not the service's
- * decision.
- */
-type VirtualKeyWrites = Readonly<{
-  create(input: {
-    organizationId: string;
-    name: string;
-    description?: string | null;
-    principalUserId?: string | null;
-    scopes: GatewayVirtualKeyScope[];
-    traceProjectId?: string | null;
-    routingPolicyId?: string | null;
-    routingMode?: "FALLBACK_ALL" | "NONE" | "POLICY";
-    expiresAt?: Date | null;
-    budget?: VirtualKeyBudgetInput | null;
-    config?: Partial<VirtualKeyConfig>;
-    actorUserId: string;
-  }): Promise<{ virtualKey: VirtualKeyWithScopes; secret: string }>;
-  update(input: {
-    id: string;
-    organizationId: string;
-    name?: string;
-    description?: string | null;
-    scopes?: GatewayVirtualKeyScope[];
-    traceProjectId?: string | null;
-    routingPolicyId?: string | null;
-    routingMode?: "FALLBACK_ALL" | "NONE" | "POLICY";
-    expiresAt?: Date | null;
-    budget?: VirtualKeyBudgetInput | null;
-    config?: Partial<VirtualKeyConfig>;
-    actorUserId: string;
-  }): Promise<VirtualKeyWithScopes>;
-  rotate(input: {
-    id: string;
-    organizationId: string;
-    actorUserId: string;
-  }): Promise<{ virtualKey: VirtualKeyWithScopes; secret: string }>;
-  revoke(input: {
-    id: string;
-    organizationId: string;
-    actorUserId: string;
-  }): Promise<VirtualKeyWithScopes>;
-  disable(input: {
-    id: string;
-    organizationId: string;
-    actorUserId: string;
-    reason: string | null;
-  }): Promise<VirtualKeyWithScopes>;
-  enable(input: {
-    id: string;
-    organizationId: string;
-    actorUserId: string;
-  }): Promise<VirtualKeyWithScopes>;
-}>;
-
-/**
- * The budget a key may carry of its own. The canonical parser is the process's
- * `virtualKeyBudgetInputSchema`, which arrives through `ports.schemas` so the
- * regex and the positive-amount refinement are never restated here; this type
- * is only what the transport hands back to the service.
- */
-export type VirtualKeyBudgetInput = Readonly<{
-  limitUsd: string;
-  window: "DAY" | "WEEK" | "MONTH";
-  onBreach?: "BLOCK" | "WARN";
-  name?: string;
-}>;
-
-/** The read half, kept separate: who may SEE a key is not the service's call. */
-type VirtualKeyReads = Readonly<{
-  getAll(organizationId: string): Promise<VirtualKeyWithScopes[]>;
-  getById(id: string, organizationId: string): Promise<VirtualKeyWithScopes | null>;
-}>;
-
-type VirtualKeyApplication = Readonly<{
-  /** Resolves the projects a key's traces land in, for the wire projection. */
-  projects: ProjectService;
-  gateway: Readonly<{
-    virtualKeys: VirtualKeyWrites & VirtualKeyReads;
-    /** The budget-decision service the applicable-budget resolver reads. */
-    budgetDecisions: GatewayService;
-    budgets: GatewayBudgetSpendPort | undefined;
-    /**
-     * Absent on a deployment without the ClickHouse spend path. `spendThisMonth`
-     * refuses rather than reporting a confident zero that cannot be told apart
-     * from a key that genuinely spent nothing.
-     */
-    virtualKeySpend: GatewayVirtualKeySpendPort | undefined;
-  }>;
-}>;
+  GatewayActor,
+  GatewayApp,
+  GatewayVirtualKeyBudgetInput,
+} from "#app/gateway.app";
 
 /** The process supplies authentication; authorization arrives as the policies. */
 export type VirtualKeyTrpcContext = Readonly<{
-  app: VirtualKeyApplication;
+  /**
+   * The slice of the process's application this feature reaches, not the
+   * feature's application itself: a tRPC root is shared by every feature
+   * mounted on it and so carries all of them. The REST family, built per
+   * process, holds {@link GatewayApp} directly.
+   */
+  app: Readonly<{ gateway: GatewayApp }>;
   actor(): Readonly<{ id: string }>;
   /**
    * The process's authenticated principal, carried straight back into the
-   * process's own per-scope checks below.
+   * application's per-scope checks.
    *
    * Opaque on purpose: a principal here is a browser session, and what a
    * session IS belongs to the process's authentication, not to this feature.
-   * The transport never reads it — it only hands it to the port that does.
+   * The transport never reads it — it only hands it on.
    */
-  session: ActorPrincipal;
+  session: GatewayActor;
 }>;
-
-/**
- * The process's authenticated principal. See `VirtualKeyTrpcContext.session`
- * for why it is opaque.
- */
-type ActorPrincipal = unknown;
 
 type ProcedureDecorator = <TProcedure>(procedure: TProcedure) => TProcedure;
 
@@ -198,126 +100,18 @@ type VirtualKeyTrpcProcedures<
   }): ProcedureDecorator;
 }>;
 
-/** A draft or existing key, as the applicable-budget resolver takes it. */
-type ApplicableBudgetTarget = Readonly<{
-  organizationId: string;
-  virtualKeyId: string | null;
-  scopes: readonly GatewayVirtualKeyScope[];
-  traceProjectId: string | null;
-  principalUserId: string | null;
-}>;
-
 /**
- * Everything this transport needs that is neither the key's own write service
- * nor decidable from the request alone.
+ * The canonical budget parser, taken rather than restated: its decimal regex
+ * and positive-amount refinement are the write path's contract and must not be
+ * able to drift from a second copy here.
  *
- * Consumed through a generic so the concrete DTO and budget shapes the process
- * wires in survive into the router's inferred output types rather than
- * collapsing to the loose constraint named here.
+ * An argument rather than something read off {@link GatewayApp}, and the only
+ * thing here that is: a tRPC procedure's input parser is fixed when the router
+ * is BUILT, and the application is a per-request value. The REST family reaches
+ * the same parser through `app.schemas`, at request time, where it can.
  */
-export type VirtualKeyTrpcPorts = Readonly<{
-  /**
-   * The organization's keys, narrowed to the ones this caller can see.
-   * Membership-based: an organization member sees organization-scoped keys, a
-   * team member sees that team's keys.
-   */
-  listVisibleVirtualKeys(input: {
-    organizationId: string;
-    userId: string;
-    virtualKeys: VirtualKeyReads;
-  }): Promise<VirtualKeyWithScopes[]>;
-  /**
-   * One key for a by-id READ, under the list's visibility rule: a key outside
-   * the caller's membership set is indistinguishable from one that does not
-   * exist. Mutations deliberately do NOT use this — their contract is
-   * permission-based, so a scope role-binding holder can operate without being
-   * a member and an unauthorized caller gets FORBIDDEN.
-   */
-  requireVisibleVirtualKey(input: {
-    organizationId: string;
-    id: string;
-    userId: string;
-    virtualKeys: VirtualKeyReads;
-  }): Promise<VirtualKeyWithScopes>;
-  /** One key anchored to this organization, without the visibility rule. */
-  requireExistingVirtualKey(input: {
-    organizationId: string;
-    id: string;
-    virtualKeys: VirtualKeyReads;
-  }): Promise<VirtualKeyWithScopes>;
-  /** `virtualKeys:manage` on EVERY named scope, fail-closed. */
-  assertCanManageAllScopes(input: {
-    principal: ActorPrincipal;
-    scopes: readonly GatewayVirtualKeyScope[];
-  }): Promise<void>;
-  /** One named permission on AT LEAST ONE of the key's existing scopes. */
-  assertCanOperateOnAnyScope(input: {
-    principal: ActorPrincipal;
-    scopes: readonly GatewayVirtualKeyScope[];
-    permission: AuthzPermission;
-  }): Promise<void>;
-  /** Anchors every scope in the set to this organization. */
-  assertScopesBelongToOrganization(input: {
-    organizationId: string;
-    scopes: readonly GatewayVirtualKeyScope[];
-  }): Promise<void>;
-  /** Anchors the trace destination to this organization. */
-  assertTraceProjectBelongsToOrganization(input: {
-    organizationId: string;
-    traceProjectId: string | null | undefined;
-  }): Promise<void>;
-  /** Refuses a guardrail attachment the caller may not make in this project. */
-  assertGuardrailAttachmentsAllowed(input: {
-    principal: ActorPrincipal;
-    projectId: string | null;
-    attachments: unknown;
-  }): Promise<void>;
-  /** The project a key's guardrail attachments are judged against. */
-  resolveVirtualKeyProjectId(input: {
-    organizationId: string;
-    virtualKeyId: string | null;
-    scopes: readonly GatewayVirtualKeyScope[] | undefined;
-    traceProjectId: string | null;
-  }): Promise<string | null>;
-  /** Whether a user belongs to this organization. */
-  isOrganizationMember(input: { organizationId: string; userId: string }): Promise<boolean>;
-  /**
-   * The wire projection for a page of keys, in one read of the destinations
-   * however large the page: a listing must not cost a query per key to say
-   * where each one's traffic goes.
-   */
-  toVirtualKeyDtos(input: {
-    virtualKeys: readonly VirtualKeyWithScopes[];
-    projects: ProjectService;
-  }): Promise<unknown[]>;
-  /** Every budget that would constrain a draft or existing key. */
-  resolveApplicableBudgets(input: {
-    target: ApplicableBudgetTarget;
-    projects: ProjectService;
-    budgetDecisions: GatewayService;
-    budgets: GatewayBudgetSpendPort | undefined;
-  }): Promise<unknown>;
-  /** The budget each named key carries of its own, with this period's spend. */
-  loadDirectBudgetsForKeys(input: {
-    organizationId: string;
-    virtualKeyIds: readonly string[];
-    now: Date;
-    chRepo: GatewayBudgetSpendPort | undefined;
-  }): Promise<Map<string, unknown>>;
-  /** Month-to-date spend per key from the cost path. */
-  spendByVirtualKey(input: {
-    organizationId: string;
-    virtualKeyIds: readonly string[];
-    window: { fromDate: Date; toDate: Date };
-    chRepo: GatewayBudgetSpendPort | undefined;
-    spendRepo: GatewayVirtualKeySpendPort | undefined;
-  }): Promise<Map<string, { spentUsd: string; requests: number }>>;
-  /**
-   * The canonical budget parser, taken rather than restated: its decimal regex
-   * and positive-amount refinement are the write path's contract and must not
-   * be able to drift from a second copy here.
-   */
-  schemas: Readonly<{ virtualKeyBudgetInput: z.ZodType<VirtualKeyBudgetInput> }>;
+export type VirtualKeyTrpcSchemas = Readonly<{
+  virtualKeyBudgetInput: z.ZodType<GatewayVirtualKeyBudgetInput>;
 }>;
 
 /**
@@ -334,31 +128,18 @@ export class VirtualKeyTrpcApi {
     TContext extends VirtualKeyTrpcContext,
     TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
     TRoot extends AnyTRPCRootTypes,
-    TPorts extends VirtualKeyTrpcPorts,
   >(
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: VirtualKeyTrpcProcedures<TContext, TOptions, TRoot>,
-    ports: TPorts,
+    schemas: VirtualKeyTrpcSchemas,
   ) {
     const { protected: procedure, resolverAuthorizedPolicy } = procedures;
     // The canonical budget parser the process injects, threaded into the two
     // contract schemas that accept a budget so the write path's decimal regex
     // and positive-amount refinement stay the one definition.
-    const budgetInputSchema = ports.schemas.virtualKeyBudgetInput;
+    const budgetInputSchema = schemas.virtualKeyBudgetInput;
     const createInputSchema = virtualKeyApiCreateInputSchema(budgetInputSchema);
     const updateInputSchema = virtualKeyApiUpdateInputSchema(budgetInputSchema);
-
-    /** One key projected through the same batched read a listing uses. */
-    const toDto = async (input: {
-      virtualKey: VirtualKeyWithScopes;
-      projects: VirtualKeyApplication["projects"];
-    }) => {
-      const [dto] = await ports.toVirtualKeyDtos({
-        virtualKeys: [input.virtualKey],
-        projects: input.projects,
-      });
-      return dto;
-    };
 
     return trpc.router({
       // Visibility is membership-based, not permission-based: a caller sees a
@@ -369,12 +150,11 @@ export class VirtualKeyTrpcApi {
         reason: `${RESOLVER_AUTHORIZED}; only keys whose scopes intersect the caller's membership in this organization are returned`,
         permissions: ["virtualKeys:view"],
       })(procedure.input(virtualKeyApiOrganizationInputSchema)).query(async ({ ctx, input }) => {
-        const keys = await ports.listVisibleVirtualKeys({
+        const keys = await ctx.app.gateway.listVisibleVirtualKeys({
           organizationId: input.organizationId,
           userId: ctx.actor().id,
-          virtualKeys: ctx.app.gateway.virtualKeys,
         });
-        return ports.toVirtualKeyDtos({ virtualKeys: keys, projects: ctx.app.projects });
+        return ctx.app.gateway.toVirtualKeyCamelDtos({ virtualKeys: keys });
       }),
 
       get: resolverAuthorizedPolicy({
@@ -383,13 +163,12 @@ export class VirtualKeyTrpcApi {
       })(procedure.input(virtualKeyApiKeyInputSchema)).query(async ({ ctx, input }) => {
         // A key the caller can't see is indistinguishable from one that
         // doesn't exist — same NOT_FOUND, no existence leak.
-        const vk = await ports.requireVisibleVirtualKey({
+        const vk = await ctx.app.gateway.requireVisibleVirtualKeyForUser({
           organizationId: input.organizationId,
           id: input.id,
           userId: ctx.actor().id,
-          virtualKeys: ctx.app.gateway.virtualKeys,
         });
-        return toDto({ virtualKey: vk, projects: ctx.app.projects });
+        return ctx.app.gateway.toVirtualKeyCamelDto(vk);
       }),
 
       /**
@@ -416,26 +195,22 @@ export class VirtualKeyTrpcApi {
             message: "spend_source_unavailable",
           });
         }
-        const keys = await ports.listVisibleVirtualKeys({
+        const keys = await ctx.app.gateway.listVisibleVirtualKeys({
           organizationId: input.organizationId,
           userId: ctx.actor().id,
-          virtualKeys: ctx.app.gateway.virtualKeys,
         });
         const now = new Date();
         const virtualKeyIds = keys.map((k) => k.id);
         const [spend, directBudgets] = await Promise.all([
-          ports.spendByVirtualKey({
+          ctx.app.gateway.spendByVirtualKey({
             organizationId: input.organizationId,
             virtualKeyIds,
             window: { fromDate: startOfCurrentMonthUTC(now), toDate: now },
-            chRepo: undefined,
-            spendRepo,
           }),
-          ports.loadDirectBudgetsForKeys({
+          ctx.app.gateway.loadDirectBudgetsForKeys({
             organizationId: input.organizationId,
             virtualKeyIds,
             now,
-            chRepo: ctx.app.gateway.budgets,
           }),
         ]);
         // Every visible key gets a row. With the spend source present, a
@@ -472,13 +247,12 @@ export class VirtualKeyTrpcApi {
           // read a sibling team's budget names and spend by injecting that team's
           // scope into the input.
           if (input.virtualKeyId) {
-            const vk = await ports.requireVisibleVirtualKey({
+            const vk = await ctx.app.gateway.requireVisibleVirtualKeyForUser({
               organizationId: input.organizationId,
               id: input.virtualKeyId,
               userId: ctx.actor().id,
-              virtualKeys: ctx.app.gateway.virtualKeys,
             });
-            return ports.resolveApplicableBudgets({
+            return ctx.app.gateway.resolveApplicableBudgets({
               target: {
                 organizationId: input.organizationId,
                 virtualKeyId: vk.id,
@@ -489,9 +263,6 @@ export class VirtualKeyTrpcApi {
                 traceProjectId: vk.traceProjectId,
                 principalUserId: vk.principalUserId,
               },
-              projects: ctx.app.projects,
-              budgetDecisions: ctx.app.gateway.budgetDecisions,
-              budgets: ctx.app.gateway.budgets,
             });
           }
           // For a draft (create drawer): the caller must hold
@@ -499,26 +270,16 @@ export class VirtualKeyTrpcApi {
           // destination — the exact boundary `create` will hold them to when they
           // submit. Previewing a target's budgets must not be cheaper than
           // creating a key against it.
-          const principal = ctx.session;
-          await ports.assertCanManageAllScopes({ principal, scopes: input.scopes });
-          await ports.assertScopesBelongToOrganization({
+          await ctx.app.gateway.authorizeVirtualKeyScopeSelection({
+            actor: ctx.session,
             organizationId: input.organizationId,
             scopes: input.scopes,
-          });
-          await ports.assertTraceProjectBelongsToOrganization({
-            organizationId: input.organizationId,
             traceProjectId: input.traceProjectId,
           });
-          if (input.traceProjectId) {
-            await ports.assertCanManageAllScopes({
-              principal,
-              scopes: [{ scopeType: "PROJECT", scopeId: input.traceProjectId }],
-            });
-          }
           // The principal id is still pinned to the organization: even an
           // authorized caller must not resolve another tenant's rows.
           if (input.principalUserId) {
-            const member = await ports.isOrganizationMember({
+            const member = await ctx.app.gateway.isOrganizationMember({
               organizationId: input.organizationId,
               userId: input.principalUserId,
             });
@@ -529,7 +290,7 @@ export class VirtualKeyTrpcApi {
               });
             }
           }
-          return ports.resolveApplicableBudgets({
+          return ctx.app.gateway.resolveApplicableBudgets({
             target: {
               organizationId: input.organizationId,
               virtualKeyId: null,
@@ -537,9 +298,6 @@ export class VirtualKeyTrpcApi {
               traceProjectId: input.traceProjectId ?? null,
               principalUserId: input.principalUserId ?? null,
             },
-            projects: ctx.app.projects,
-            budgetDecisions: ctx.app.gateway.budgetDecisions,
-            budgets: ctx.app.gateway.budgets,
           });
         },
       ),
@@ -549,36 +307,15 @@ export class VirtualKeyTrpcApi {
         permissions: ["virtualKeys:manage"],
       })(procedure.input(createInputSchema)).mutation(async ({ ctx, input }) => {
         const actorUserId = ctx.actor().id;
-        const principal = ctx.session;
-        await ports.assertCanManageAllScopes({ principal, scopes: input.scopes });
-        await ports.assertScopesBelongToOrganization({
+        // The same pre-flight the public REST create runs: manage at every
+        // requested scope, scopes inside the caller's organization, the
+        // destination anchored and manageable, guardrail refs project-local.
+        await ctx.app.gateway.authorizeVirtualKeyCreate({
+          actor: ctx.session,
           organizationId: input.organizationId,
           scopes: input.scopes,
-        });
-        await ports.assertTraceProjectBelongsToOrganization({
-          organizationId: input.organizationId,
           traceProjectId: input.traceProjectId,
-        });
-        // The destination routes traces AND budget debits into that project, so
-        // choosing it needs the same manage grant the old PROJECT scope
-        // enforced; tenancy alone would let a team manager point a key at a
-        // sibling team's project and consume its budget.
-        if (input.traceProjectId) {
-          await ports.assertCanManageAllScopes({
-            principal,
-            scopes: [{ scopeType: "PROJECT", scopeId: input.traceProjectId }],
-          });
-        }
-        const vkProjectId = await ports.resolveVirtualKeyProjectId({
-          organizationId: input.organizationId,
-          virtualKeyId: null,
-          scopes: input.scopes,
-          traceProjectId: input.traceProjectId ?? null,
-        });
-        await ports.assertGuardrailAttachmentsAllowed({
-          principal,
-          projectId: vkProjectId,
-          attachments: input.config?.guardrailAttachments,
+          guardrailAttachments: input.config?.guardrailAttachments,
         });
         const { virtualKey, secret } = await ctx.app.gateway.virtualKeys.create({
           organizationId: input.organizationId,
@@ -595,7 +332,7 @@ export class VirtualKeyTrpcApi {
           actorUserId,
         });
         // The one moment the plaintext key exists on the wire.
-        return { virtualKey: await toDto({ virtualKey, projects: ctx.app.projects }), secret };
+        return { virtualKey: await ctx.app.gateway.toVirtualKeyCamelDto(virtualKey), secret };
       }),
 
       update: resolverAuthorizedPolicy({
@@ -603,65 +340,17 @@ export class VirtualKeyTrpcApi {
         permissions: ["virtualKeys:update", "virtualKeys:manage"],
       })(procedure.input(updateInputSchema)).mutation(async ({ ctx, input }) => {
         const actorUserId = ctx.actor().id;
-        const principal = ctx.session;
-        const existing = await ports.requireExistingVirtualKey({
+        // The same pre-flight the public REST patch runs: update on a scope the
+        // key already lives in, manage on every new scope when re-scoping, the
+        // destination anchored and manageable when it moves, and the guardrail
+        // attachments judged against the project the key resolves to.
+        await ctx.app.gateway.authorizeVirtualKeyUpdate({
+          actor: ctx.session,
           organizationId: input.organizationId,
           id: input.id,
-          virtualKeys: ctx.app.gateway.virtualKeys,
-        });
-        // Mutating an existing key needs `virtualKeys:update` on one of the
-        // scopes it already lives in.
-        await ports.assertCanOperateOnAnyScope({
-          principal,
-          scopes: existing.scopes,
-          permission: "virtualKeys:update",
-        });
-        // Re-scoping additionally needs manage on every NEW scope, so a key
-        // can't be moved into a scope the caller doesn't control.
-        if (input.scopes) {
-          await ports.assertCanManageAllScopes({ principal, scopes: input.scopes });
-          await ports.assertScopesBelongToOrganization({
-            organizationId: input.organizationId,
-            scopes: input.scopes,
-          });
-        }
-        if (input.traceProjectId !== undefined) {
-          await ports.assertTraceProjectBelongsToOrganization({
-            organizationId: input.organizationId,
-            traceProjectId: input.traceProjectId,
-          });
-          // Re-pointing the destination is the same decision as choosing it at
-          // create: it needs manage on the target project.
-          if (input.traceProjectId) {
-            await ports.assertCanManageAllScopes({
-              principal,
-              scopes: [{ scopeType: "PROJECT", scopeId: input.traceProjectId }],
-            });
-          }
-        }
-        const vkProjectId = await ports.resolveVirtualKeyProjectId({
-          organizationId: input.organizationId,
-          virtualKeyId: input.id,
           scopes: input.scopes,
-          traceProjectId:
-            input.traceProjectId !== undefined ? input.traceProjectId : existing.traceProjectId,
-        });
-        // Newly-submitted attachments are always validated. When the caller is
-        // ALSO changing scopes (a possible project move) but did not re-send
-        // config, revalidate the existing attachments against the new project
-        // so a stale cross-project attachment can't survive the move. A plain
-        // metadata update (no scope change, no new attachments) must not
-        // re-touch existing attachments, otherwise renaming a key would demand
-        // `gatewayGuardrails:attach`.
-        const attachmentsToCheck =
-          input.config?.guardrailAttachments ??
-          (input.scopes !== undefined
-            ? parseVirtualKeyConfig(existing.config).guardrailAttachments
-            : undefined);
-        await ports.assertGuardrailAttachmentsAllowed({
-          principal,
-          projectId: vkProjectId,
-          attachments: attachmentsToCheck,
+          traceProjectId: input.traceProjectId,
+          guardrailAttachments: input.config?.guardrailAttachments,
         });
         const updated = await ctx.app.gateway.virtualKeys.update({
           id: input.id,
@@ -677,7 +366,7 @@ export class VirtualKeyTrpcApi {
           config: input.config,
           actorUserId,
         });
-        return toDto({ virtualKey: updated, projects: ctx.app.projects });
+        return ctx.app.gateway.toVirtualKeyCamelDto(updated);
       }),
 
       rotate: resolverAuthorizedPolicy({
@@ -685,15 +374,10 @@ export class VirtualKeyTrpcApi {
         permissions: ["virtualKeys:rotate"],
       })(procedure.input(virtualKeyApiKeyInputSchema)).mutation(async ({ ctx, input }) => {
         const actorUserId = ctx.actor().id;
-        const principal = ctx.session;
-        const existing = await ports.requireExistingVirtualKey({
+        await ctx.app.gateway.authorizeVirtualKeyOperation({
+          actor: ctx.session,
           organizationId: input.organizationId,
           id: input.id,
-          virtualKeys: ctx.app.gateway.virtualKeys,
-        });
-        await ports.assertCanOperateOnAnyScope({
-          principal,
-          scopes: existing.scopes,
           permission: "virtualKeys:rotate",
         });
         const { virtualKey, secret } = await ctx.app.gateway.virtualKeys.rotate({
@@ -702,7 +386,7 @@ export class VirtualKeyTrpcApi {
           actorUserId,
         });
         // The second and last moment the plaintext key exists on the wire.
-        return { virtualKey: await toDto({ virtualKey, projects: ctx.app.projects }), secret };
+        return { virtualKey: await ctx.app.gateway.toVirtualKeyCamelDto(virtualKey), secret };
       }),
 
       revoke: resolverAuthorizedPolicy({
@@ -710,15 +394,10 @@ export class VirtualKeyTrpcApi {
         permissions: ["virtualKeys:delete"],
       })(procedure.input(virtualKeyApiKeyInputSchema)).mutation(async ({ ctx, input }) => {
         const actorUserId = ctx.actor().id;
-        const principal = ctx.session;
-        const existing = await ports.requireExistingVirtualKey({
+        await ctx.app.gateway.authorizeVirtualKeyOperation({
+          actor: ctx.session,
           organizationId: input.organizationId,
           id: input.id,
-          virtualKeys: ctx.app.gateway.virtualKeys,
-        });
-        await ports.assertCanOperateOnAnyScope({
-          principal,
-          scopes: existing.scopes,
           permission: "virtualKeys:delete",
         });
         const updated = await ctx.app.gateway.virtualKeys.revoke({
@@ -726,7 +405,7 @@ export class VirtualKeyTrpcApi {
           organizationId: input.organizationId,
           actorUserId,
         });
-        return toDto({ virtualKey: updated, projects: ctx.app.projects });
+        return ctx.app.gateway.toVirtualKeyCamelDto(updated);
       }),
 
       disable: resolverAuthorizedPolicy({
@@ -734,15 +413,10 @@ export class VirtualKeyTrpcApi {
         permissions: ["virtualKeys:update"],
       })(procedure.input(virtualKeyApiDisableInputSchema)).mutation(async ({ ctx, input }) => {
         const actorUserId = ctx.actor().id;
-        const principal = ctx.session;
-        const existing = await ports.requireExistingVirtualKey({
+        await ctx.app.gateway.authorizeVirtualKeyOperation({
+          actor: ctx.session,
           organizationId: input.organizationId,
           id: input.id,
-          virtualKeys: ctx.app.gateway.virtualKeys,
-        });
-        await ports.assertCanOperateOnAnyScope({
-          principal,
-          scopes: existing.scopes,
           permission: "virtualKeys:update",
         });
         const updated = await ctx.app.gateway.virtualKeys.disable({
@@ -751,7 +425,7 @@ export class VirtualKeyTrpcApi {
           actorUserId,
           reason: input.reason ?? null,
         });
-        return toDto({ virtualKey: updated, projects: ctx.app.projects });
+        return ctx.app.gateway.toVirtualKeyCamelDto(updated);
       }),
 
       enable: resolverAuthorizedPolicy({
@@ -759,15 +433,10 @@ export class VirtualKeyTrpcApi {
         permissions: ["virtualKeys:update"],
       })(procedure.input(virtualKeyApiKeyInputSchema)).mutation(async ({ ctx, input }) => {
         const actorUserId = ctx.actor().id;
-        const principal = ctx.session;
-        const existing = await ports.requireExistingVirtualKey({
+        await ctx.app.gateway.authorizeVirtualKeyOperation({
+          actor: ctx.session,
           organizationId: input.organizationId,
           id: input.id,
-          virtualKeys: ctx.app.gateway.virtualKeys,
-        });
-        await ports.assertCanOperateOnAnyScope({
-          principal,
-          scopes: existing.scopes,
           permission: "virtualKeys:update",
         });
         const updated = await ctx.app.gateway.virtualKeys.enable({
@@ -775,7 +444,7 @@ export class VirtualKeyTrpcApi {
           organizationId: input.organizationId,
           actorUserId,
         });
-        return toDto({ virtualKey: updated, projects: ctx.app.projects });
+        return ctx.app.gateway.toVirtualKeyCamelDto(updated);
       }),
     });
   }

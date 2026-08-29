@@ -3,38 +3,21 @@
  * adapter shares.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type {
-  ScenarioExecutionService,
-  ScenarioService,
-  ScenarioTabRegistry,
-  SimulationService,
-} from "@langwatch/scenario-contract";
-import type { UserService } from "@langwatch/user-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
-import type { EventEmitter } from "node:events";
+import type { ScenarioApp } from "#app/scenario.app";
 
 /**
- * The process's per-tenant fan-out, as this transport uses it: one emitter
- * per project that relays the events another pod published. Structural rather
- * than the concrete broadcast service, because the subscription needs nothing
- * else from it.
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them. It was a
+ * `ScenarioApplication` bag of six services declared here, in the transport —
+ * which is why nothing but a tRPC context could be handed the feature's
+ * composition. {@link ScenarioApp} holds those six now.
  */
-export type ScenarioBroadcast = Readonly<{
-  getTenantEmitter(projectId: string): EventEmitter;
-}>;
-
-export type ScenarioApplication = Readonly<{
-  scenarios: ScenarioService;
-  simulations: SimulationService;
-  scenarioExecution: ScenarioExecutionService;
-  scenarioTabs: ScenarioTabRegistry;
-  users: UserService;
-  broadcast: ScenarioBroadcast;
-}>;
-
-/** The process supplies authentication; authorization arrives as `policy`. */
 export type ScenarioTrpcContext = Readonly<{
-  app: ScenarioApplication;
+  app: Readonly<{ scenarios: ScenarioApp }>;
   actor(): Readonly<{ id: string }>;
   /**
    * The request's own abort signal. tRPC v10 callers leave `opts.signal`

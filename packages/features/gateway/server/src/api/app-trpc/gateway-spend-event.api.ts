@@ -8,23 +8,17 @@
  *
  * Transport only: input parsing, the ClickHouse-absent degrade, and delegation.
  * Resolving virtual-key display names is a persistence read this transport does
- * not own, so it arrives as a port.
+ * not own, so the feature's application holds it.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { ProjectService } from "@langwatch/project-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import { spendFiltersSchema } from "../../adapters/gateway-spend-filters.adapter";
-import type { GatewaySpendEventsService } from "../../services/gateway-spend-events.service";
-
-type GatewaySpendEventApplication = Readonly<{
-  gateway: Readonly<{ spendEvents: GatewaySpendEventsService | undefined }>;
-  projects: Pick<ProjectService, "tryGetOrganizationId">;
-}>;
+import type { GatewayApp } from "#app/gateway.app";
 
 /** The process supplies authentication; authorization arrives as `policy`. */
 export type GatewaySpendEventTrpcContext = Readonly<{
-  app: GatewaySpendEventApplication;
+  app: Readonly<{ gateway: GatewayApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -44,20 +38,6 @@ type GatewaySpendEventTrpcProcedures<
    * input.
    */
   policy(permission: AuthzPermission): ProcedureDecorator;
-}>;
-
-export type GatewaySpendEventTrpcPorts = Readonly<{
-  /**
-   * Display names for the keys a page of spend rows names.
-   *
-   * VirtualKey is organization-scoped post-collapse (no projectId column), so
-   * the lookup is fenced by the owning organization the caller's project
-   * resolves to — never by the raw ids off the rows alone.
-   */
-  resolveVirtualKeyNames(input: {
-    organizationId: string;
-    virtualKeyIds: readonly string[];
-  }): Promise<ReadonlyArray<{ id: string; name: string }>>;
 }>;
 
 const listInputSchema = z.object({
@@ -84,11 +64,9 @@ export class GatewaySpendEventTrpcApi {
     TContext extends GatewaySpendEventTrpcContext,
     TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
     TRoot extends AnyTRPCRootTypes,
-    TPorts extends GatewaySpendEventTrpcPorts,
   >(
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: GatewaySpendEventTrpcProcedures<TContext, TOptions, TRoot>,
-    ports: TPorts,
   ) {
     const { protected: procedure, policy } = procedures;
 
@@ -119,10 +97,15 @@ export class GatewaySpendEventTrpcApi {
           // The ids come from this project's own tenant-filtered spend rows,
           // and the Project service resolves the owning-organization fence
           // without exposing Project persistence to this transport.
-          const organizationId = await ctx.app.projects.tryGetOrganizationId(input.projectId);
+          const organizationId = await ctx.app.gateway.projects.tryGetOrganizationId(
+            input.projectId,
+          );
           const vks =
             vkIds.length && organizationId
-              ? await ports.resolveVirtualKeyNames({ organizationId, virtualKeyIds: vkIds })
+              ? await ctx.app.gateway.resolveVirtualKeyNames({
+                  organizationId,
+                  virtualKeyIds: vkIds,
+                })
               : [];
           const virtualKeyNames = Object.fromEntries(vks.map((vk) => [vk.id, vk.name]));
 

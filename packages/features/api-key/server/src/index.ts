@@ -12,4 +12,13 @@ export { ApiKeyTokenAdapter } from "./adapters/api-key-token.api-key-token.adapt
 export { ApiKeyDiagnosticsPort } from "./ports/api-key-diagnostics.port";
 export { ApiKeyBindingIdPort } from "./ports/api-key-binding-id.port";
 export type { AuthzBindingIdDeriver } from "./services/legacy-api-key-grant.service";
+export {
+  ApiKeyApp,
+  type ApiKeyAppDependencies,
+  type ApiKeyCaller,
+  type CreateApiKeyRequest,
+  type NamedApiKeyBinding,
+  type UpdateApiKeyRequest,
+} from "./app/api-key.app";
+export { createApiKeysRestApp } from "./api/app-rest/api-key.api";
 export { ApiKeyTrpcApi, type ApiKeyTrpcContext } from "./api/app-trpc/api-key.api";

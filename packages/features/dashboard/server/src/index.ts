@@ -12,6 +12,8 @@ export {
   type GraphTrpcPorts,
 } from "./api/app-trpc/graph.api";
 export {
+  SavedViewNotThereError,
+  SavedViewReorderUnknownIdsError,
   SavedViewTrpcApi,
   type SavedViewTrpcContext,
   type SavedViewTrpcPorts,
@@ -25,8 +27,24 @@ export {
 } from "./api/app-trpc/saved-workbench-chart.api";
 
 /**
- * The public REST family this feature owns. The process supplies the bound
- * REST security service and a resolver for the dashboard service; the base
- * path, access declarations, schemas and delegation are the feature's.
+ * The feature's application: the one object every door calls, and the refusals
+ * it names. The process composes it from the dashboard service and the alert
+ * lookup the chart cards read.
+ */
+export {
+  DashboardApp,
+  DashboardNotThereError,
+  DashboardReorderUnknownIdsError,
+  GraphNotThereError,
+  type DashboardAppDependencies,
+  type DashboardGraphAlertLookup,
+} from "./app/dashboard.app";
+
+/**
+ * The REST families this feature owns. The process supplies the bound REST
+ * security service, a resolver for the application and its own platform-URL
+ * builder; the base paths, access declarations, schemas and delegation are the
+ * feature's.
  */
 export { createGraphsRestApp } from "./api/app-rest/graph.api";
+export { createDashboardsRestApp } from "./api/app-rest/dashboard.api";

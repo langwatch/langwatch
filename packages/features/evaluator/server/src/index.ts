@@ -3,6 +3,17 @@ export {
   type PostgresEvaluatorAdapterOptions,
 } from "./adapters/postgres.evaluator.adapter";
 export { EvaluatorAuditLogPort, EvaluatorCodeExecutionPort } from "./ports/evaluator.port";
+
+/**
+ * The feature's application: the one typed thing its transports are given.
+ * Both doors reach the same object, so a rule written on it is the rule both
+ * doors get.
+ */
+export {
+  EvaluatorApp,
+  EvaluatorWorkflowVersionRequiredError,
+  type EvaluatorAppDependencies,
+} from "./app/evaluator.app";
 export {
   EvaluatorTrpcApi,
   type EvaluatorTrpcContext,

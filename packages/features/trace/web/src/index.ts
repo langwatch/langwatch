@@ -90,3 +90,9 @@ export * from "./transcript/turn-view";
 export * from "./transcript/turns";
 export * from "./transcript/types";
 export * from "./transcript/user-turn-bubble";
+export * from "./editable-trace-name";
+export * from "./trace-peek-summary";
+export * from "./use-trace-header";
+// Exported so the process shell can mount `traceApi.Provider`. Nothing outside
+// this package should call `traceApi.*` directly — the hooks are the surface.
+export { traceApi, type TraceApiMap } from "./trace-api";

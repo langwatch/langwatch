@@ -1,15 +1,15 @@
 /**
  * Public Hono REST API for datasets.
  *
- * Mounted at `/api/dataset`. Every verb dispatches through the canonical
- * dataset service; this file owns the wire contract — route names, request
- * schemas, response shapes, status codes and the domain-error mapping — and
- * nothing else.
+ * Mounted at `/api/dataset`. Every verb dispatches through `DatasetApp`, the
+ * same application the tRPC doors call; this file owns the wire contract —
+ * route names, request schemas, response shapes, status codes and the
+ * domain-error mapping — and nothing else.
  *
- * The service, the platform-URL builder and the direct-upload authorizer all
- * arrive as arguments rather than being imported, so the family can be mounted
- * into any process that has them and can be BUILT (for the OpenAPI document and
- * the route-authorization audits) by a process that has none.
+ * The application, the platform-URL builder and the direct-upload authorizer
+ * all arrive as arguments rather than being imported, so the family can be
+ * mounted into any process that has them and can be BUILT (for the OpenAPI
+ * document and the route-authorization audits) by a process that has none.
  *
  * Spec: packages/features/dataset/specs/.
  */
@@ -36,12 +36,12 @@ import {
   type DatasetColumns,
   type DatasetConfirmColumns,
   type DatasetNotReadyError,
-  type DatasetService,
   UploadValidationError,
 } from "@langwatch/dataset-contract";
 import type { Context } from "hono";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
+import type { DatasetApp } from "#app/dataset.app";
 import { createDatasetErrorHandler } from "./dataset.error-handler";
 import { datasetOutputSchema } from "./dataset.schemas";
 
@@ -163,15 +163,15 @@ function mapDatasetNotReadyError(
 export function createDatasetRestApp(options: {
   security: AppRestSecurity;
   /**
-   * Resolved per request. Mounting the family must not force the service to be
-   * constructed, which is what lets the OpenAPI generator and the
-   * route-registry audits build every route without a running process.
+   * The feature's application, resolved per request. Mounting the family must
+   * not force it to be constructed, which is what lets the OpenAPI generator
+   * and the route-registry audits build every route without a running process.
    */
-  dataset: () => DatasetService;
+  app: () => DatasetApp;
   platformUrl: PlatformUrlBuilder;
   authorizeDirectUpload: DatasetDirectUploadAuthorizer;
 }): SecuredApp<{ Variables: AppRestProjectVariables }> {
-  const { security, dataset, platformUrl, authorizeDirectUpload } = options;
+  const { security, app, platformUrl, authorizeDirectUpload } = options;
 
   const secured = security.createProjectApp({
     basePath: "/api/dataset",
@@ -194,10 +194,10 @@ export function createDatasetRestApp(options: {
     credential: "both",
   });
 
-  // The dataset service arrives as a provider rather than being read off the
-  // request: mounting the family must not force the service to be constructed,
-  // which is what lets the OpenAPI generator and the route-registry audits build
-  // every route with none.
+  // The application arrives as a provider rather than being read off the
+  // request: mounting the family must not force it to be constructed, which is
+  // what lets the OpenAPI generator and the route-registry audits build every
+  // route with none.
 
   // ── List Datasets (paginated) ──────────────────────────────────
   secured.access(requires("datasets:view")).get(
@@ -209,9 +209,9 @@ export function createDatasetRestApp(options: {
     async (c) => {
       const project = c.get("project");
       const { page, limit } = c.req.valid("query");
-      const service = dataset();
+      const application = app();
 
-      const result = await service.listDatasets({
+      const result = await application.listDatasets({
         projectId: project.id,
         page,
         limit,
@@ -245,10 +245,10 @@ export function createDatasetRestApp(options: {
     async (c) => {
       const project = c.get("project");
       const { name, columnTypes } = c.req.valid("json");
-      const service = dataset();
+      const application = app();
 
       try {
-        const dataset = await service.upsertDataset({
+        const dataset = await application.upsertDataset({
           projectId: project.id,
           name,
           columnTypes,
@@ -295,7 +295,7 @@ export function createDatasetRestApp(options: {
     }),
     async (c) => {
       const project = c.get("project");
-      const service = dataset();
+      const application = app();
 
       const body = await c.req.parseBody();
       const file = body.file;
@@ -312,7 +312,7 @@ export function createDatasetRestApp(options: {
       const content = await file.text();
 
       try {
-        const result = await service.createDatasetFromUpload({
+        const result = await application.createDatasetFromUpload({
           projectId: project.id,
           name: name.trim(),
           filename: file.name,
@@ -355,7 +355,7 @@ export function createDatasetRestApp(options: {
       description: "Start a direct browser→S3 dataset upload (returns a presigned PUT)",
     }),
     async (c) => {
-      const service = dataset();
+      const application = app();
 
       const body = await c.req.parseBody();
       const projectId = body.projectId;
@@ -430,7 +430,7 @@ export function createDatasetRestApp(options: {
       // Domain errors map centrally in the family's `onError` (see DOMAIN_ERROR_HTTP).
       // Note: DirectUploadUnavailableError (→ 409) is the client's signal to fall
       // back to the backend /upload path.
-      const result = await service.createPendingUpload({
+      const result = await application.createPendingUpload({
         projectId: auth.projectId,
         name: name.trim(),
         filename: filename.trim(),
@@ -467,7 +467,7 @@ export function createDatasetRestApp(options: {
       if (!body) {
         throw new UnprocessableEntityError("request body is required");
       }
-      const service = dataset();
+      const application = app();
       // Domain errors map centrally in the family's `onError` (see DOMAIN_ERROR_HTTP).
       // Notes on the non-obvious ones: UploadNotPendingError (→ 409) means no
       // pending row owns this staging key (fabricated/replayed uploadId or already
@@ -475,7 +475,7 @@ export function createDatasetRestApp(options: {
       // (`storage_not_writable`, 500, platform fault) and answers with its own
       // code, so the browser must NOT mistake it for "no object storage" and
       // fall back.
-      await service.writeStagedUpload({
+      await application.writeStagedUpload({
         projectId: auth.projectId,
         uploadId,
         // Web ReadableStream → Node Readable; streamed to disk, never buffered.
@@ -505,12 +505,12 @@ export function createDatasetRestApp(options: {
         // handled error behind them.
         return c.json(auth.body ?? { error: auth.error }, auth.status);
       }
-      const service = dataset();
+      const application = app();
 
       // The staging key is the server-minted one bound to the row (C1); the
       // client no longer supplies it. Domain errors map centrally in
       // `handleDatasetError` (see DOMAIN_ERROR_HTTP).
-      const result = await service.finalizeUpload({
+      const result = await application.finalizeUpload({
         projectId: auth.projectId,
         datasetId,
       });
@@ -538,10 +538,10 @@ export function createDatasetRestApp(options: {
         // handled error behind them.
         return c.json(auth.body ?? { error: auth.error }, auth.status);
       }
-      const service = dataset();
+      const application = app();
 
       // Domain errors map centrally in the family's `onError` (see DOMAIN_ERROR_HTTP).
-      const result = await service.retryNormalize({
+      const result = await application.retryNormalize({
         projectId: auth.projectId,
         datasetId,
       });
@@ -571,10 +571,10 @@ export function createDatasetRestApp(options: {
         // handled error behind them.
         return c.json(auth.body ?? { error: auth.error }, auth.status);
       }
-      const service = dataset();
+      const application = app();
 
       // Domain errors map centrally in the family's `onError` (see DOMAIN_ERROR_HTTP).
-      const result = await service.abortPendingUpload({
+      const result = await application.abortPendingUpload({
         projectId: auth.projectId,
         datasetId,
       });
@@ -593,7 +593,7 @@ export function createDatasetRestApp(options: {
     async (c) => {
       const { slugOrId } = c.req.param();
       const project = c.get("project");
-      const service = dataset();
+      const application = app();
 
       const body = await c.req.parseBody();
       const file = body.file;
@@ -605,7 +605,7 @@ export function createDatasetRestApp(options: {
       const content = await file.text();
 
       try {
-        const result = await service.uploadToExistingDataset({
+        const result = await application.uploadToExistingDataset({
           slugOrId,
           projectId: project.id,
           filename: file.name,
@@ -652,10 +652,10 @@ export function createDatasetRestApp(options: {
       const { slugOrId } = c.req.param();
       const project = c.get("project");
       const { entries } = c.req.valid("json");
-      const service = dataset();
+      const application = app();
 
       try {
-        const records = await service.batchCreateRecords({
+        const records = await application.batchCreateRecords({
           slugOrId,
           projectId: project.id,
           entries,
@@ -702,7 +702,7 @@ export function createDatasetRestApp(options: {
       const { slug } = c.req.param();
       const project = c.get("project");
       const { entries } = c.req.valid("json");
-      const service = dataset();
+      const application = app();
 
       // Route through the service (parity with `/:slugOrId/records`) instead of
       // reaching into the tRPC-layer `createManyDatasetRecords` util: the service
@@ -710,7 +710,7 @@ export function createDatasetRestApp(options: {
       // s3_jsonl-vs-PG write routing. This handler only translates the result and
       // typed errors to the legacy `{ success }` HTTP shape.
       try {
-        await service.batchCreateRecords({
+        await application.batchCreateRecords({
           slugOrId: slug,
           projectId: project.id,
           entries,
@@ -754,11 +754,11 @@ export function createDatasetRestApp(options: {
       }
 
       const project = c.get("project");
-      const service = dataset();
+      const application = app();
 
       let result;
       try {
-        result = await service.getDatasetWithRecords({
+        result = await application.getDatasetWithRecords({
           slugOrId,
           projectId: project.id,
           limitMb: MAX_LIMIT_MB,
@@ -796,8 +796,9 @@ export function createDatasetRestApp(options: {
   // new set (`migrateS3JsonlColumns` / `migrateDatasetRecordColumns`), so the
   // shape of the whole dataset follows the payload. That is administering a
   // dataset, which is what `:manage` names. The tRPC `dataset.upsert` procedure
-  // calls the same service method and asks for the same grain; the two surfaces
-  // describing one operation differently is what this sweep set out to remove.
+  // calls the same application operation and asks for the same grain; the two
+  // surfaces describing one operation differently is what this sweep set out to
+  // remove.
   secured.access(requires("datasets:manage")).patch(
     "/:slugOrId",
     describeRoute({
@@ -808,25 +809,19 @@ export function createDatasetRestApp(options: {
       const { slugOrId } = c.req.param();
       const project = c.get("project");
       const body = c.req.valid("json");
-      const service = dataset();
+      const application = app();
 
-      let dataset;
       try {
-        dataset = await service.getBySlugOrId({
+        // Naming the dataset by slug is enough: the application resolves it and
+        // takes the name and columns this patch did not send from the row it is
+        // replacing. That fill used to live here, in a lookup-then-default pair
+        // this handler ran for itself, while the tRPC upsert filled the same
+        // hole from an experiment. One upsert now decides both.
+        const updated = await application.upsertDataset({
+          projectId: project.id,
           slugOrId,
-          projectId: project.id,
-        });
-      } catch (error) {
-        return mapDatasetNotFoundError(error);
-      }
-
-      try {
-        const updated = await service.upsertDataset({
-          projectId: project.id,
-          datasetId: dataset.id,
-          name: body.name ?? dataset.name,
-          columnTypes:
-            (body.columnTypes as DatasetColumns) ?? (dataset.columnTypes as DatasetColumns),
+          name: body.name,
+          columnTypes: body.columnTypes as DatasetColumns | undefined,
         });
 
         return c.json({
@@ -870,10 +865,10 @@ export function createDatasetRestApp(options: {
     async (c) => {
       const { slugOrId } = c.req.param();
       const project = c.get("project");
-      const service = dataset();
+      const application = app();
 
       try {
-        const result = await service.archiveDataset({
+        const result = await application.archiveDataset({
           slugOrId,
           projectId: project.id,
         });
@@ -895,10 +890,10 @@ export function createDatasetRestApp(options: {
       const { slugOrId } = c.req.param();
       const project = c.get("project");
       const { page, limit } = c.req.valid("query");
-      const service = dataset();
+      const application = app();
 
       try {
-        const result = await service.listRecords({
+        const result = await application.listRecords({
           slugOrId,
           projectId: project.id,
           page,
@@ -924,10 +919,10 @@ export function createDatasetRestApp(options: {
       const { slugOrId, recordId } = c.req.param();
       const project = c.get("project");
       const { entry } = c.req.valid("json");
-      const service = dataset();
+      const application = app();
 
       try {
-        const { record, created } = await service.upsertRecord({
+        const { record, created } = await application.upsertRecord({
           slugOrId,
           projectId: project.id,
           recordId,
@@ -956,11 +951,11 @@ export function createDatasetRestApp(options: {
       const { slugOrId } = c.req.param();
       const project = c.get("project");
       const { recordIds } = c.req.valid("json");
-      const service = dataset();
+      const application = app();
 
       let result;
       try {
-        result = await service.deleteRecords({
+        result = await application.deleteRecords({
           slugOrId,
           projectId: project.id,
           recordIds,

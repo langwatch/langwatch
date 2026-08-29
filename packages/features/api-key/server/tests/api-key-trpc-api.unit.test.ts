@@ -3,9 +3,13 @@
  *
  * The `apiKey.*` tRPC surface itself: the nine procedure names the drawers
  * call, the membership gate that runs inside every one of them before any key
- * is read, the admin gates on the two privileged create paths, the handled
- * failures mapped onto transport codes, and — the reason this file exists at
- * all — where key material is allowed to appear.
+ * is read, the admin gates on the two privileged create paths, the named
+ * refusal each failure raises, and — the reason this file exists at all —
+ * where key material is allowed to appear.
+ *
+ * Refusals are asserted by handled `code` and `httpStatus` rather than by tRPC
+ * code, because that pair IS what the surface decides: the process's
+ * handled-error middleware derives the tRPC code from the status.
  *
  * A minted token is returned exactly once, by `create`. Every read hands back
  * a five-character `lookupIdPrefix` and nothing more, and no audit record
@@ -28,6 +32,7 @@ import {
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { ApiKeyApp } from "../src/app/api-key.app";
 import { ApiKeyTrpcApi } from "../src/api/app-trpc/api-key.api";
 
 const USER_ID = "user_1";
@@ -36,10 +41,28 @@ const ACTIVE_PROJECT_ID = "project_active";
 const ARCHIVED_PROJECT_ID = "project_archived";
 
 type TestContext = {
-  app: { apiKeys: ApiKeyService };
+  app: { apiKeys: ApiKeyApp };
   actor(): { id: string };
   session: { user: { id: string } } | null;
 };
+
+/**
+ * The refusal the surface raised, read off the cause tRPC attached rather than
+ * off the tRPC code: without the process's handled-error middleware in the
+ * chain, every handled error arrives here as the cause of a generic wrapper.
+ */
+async function expectRefusal(
+  call: Promise<unknown>,
+  expected: { code: string; httpStatus: number; meta?: Record<string, unknown> },
+): Promise<void> {
+  await expect(call).rejects.toMatchObject({
+    cause: {
+      code: expected.code,
+      httpStatus: expected.httpStatus,
+      ...(expected.meta ? { meta: expected.meta } : {}),
+    },
+  });
+}
 
 function emptyBindingNames(overrides: Partial<ApiKeyBindingNames> = {}): ApiKeyBindingNames {
   return {
@@ -103,7 +126,7 @@ function harness({ apiKeys = {} }: { apiKeys?: Partial<ApiKeyService> } = {}) {
   return {
     recordAudit,
     caller: router.createCaller({
-      app: { apiKeys: service },
+      app: { apiKeys: ApiKeyApp.create({ apiKeys: service }) },
       actor: () => ({ id: USER_ID }),
       session: { user: { id: USER_ID } },
     }),
@@ -148,9 +171,10 @@ describe("ApiKeyTrpcApi", () => {
         },
       });
 
-      await expect(
-        caller.nameById({ organizationId: "victim_org", apiKeyId: "ak_1" }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expectRefusal(caller.nameById({ organizationId: "victim_org", apiKeyId: "ak_1" }), {
+        code: "api_key_not_owned",
+        httpStatus: 403,
+      });
       expect(tryGetNameByIdInOrg).not.toHaveBeenCalled();
     });
 
@@ -167,8 +191,9 @@ describe("ApiKeyTrpcApi", () => {
         },
       });
 
-      await expect(caller.list({ organizationId: "victim_org" })).rejects.toMatchObject({
-        code: "FORBIDDEN",
+      await expectRefusal(caller.list({ organizationId: "victim_org" }), {
+        code: "api_key_not_owned",
+        httpStatus: 403,
       });
       expect(listAll).not.toHaveBeenCalled();
       expect(list).not.toHaveBeenCalled();
@@ -185,9 +210,10 @@ describe("ApiKeyTrpcApi", () => {
         },
       });
 
-      await expect(
+      await expectRefusal(
         caller.create({ organizationId: "victim_org", name: "Key", bindings: [] }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+        { code: "api_key_not_owned", httpStatus: 403 },
+      );
       expect(create).not.toHaveBeenCalled();
     });
   });
@@ -410,17 +436,19 @@ describe("ApiKeyTrpcApi", () => {
         apiKeys: { isOrgAdmin: async () => false, create },
       });
 
-      await expect(
+      await expectRefusal(
         caller.create({
           organizationId: ORG_ID,
           name: "Service Key",
           keyType: "service",
           bindings: [],
         }),
-      ).rejects.toMatchObject({
-        code: "FORBIDDEN",
-        message: "Only organization admins can create service API keys",
-      });
+        {
+          code: "api_key_admin_required",
+          httpStatus: 403,
+          meta: { action: "create-service-key" },
+        },
+      );
       expect(create).not.toHaveBeenCalled();
     });
 
@@ -430,17 +458,19 @@ describe("ApiKeyTrpcApi", () => {
         apiKeys: { isOrgAdmin: async () => false, create },
       });
 
-      await expect(
+      await expectRefusal(
         caller.create({
           organizationId: ORG_ID,
           name: "Someone else's key",
           assignedToUserId: "user_2",
           bindings: [],
         }),
-      ).rejects.toMatchObject({
-        code: "FORBIDDEN",
-        message: "Only organization admins can create API keys for other users",
-      });
+        {
+          code: "api_key_admin_required",
+          httpStatus: 403,
+          meta: { action: "assign-to-another-user" },
+        },
+      );
       expect(create).not.toHaveBeenCalled();
     });
 
@@ -565,15 +595,16 @@ describe("ApiKeyTrpcApi", () => {
         },
       });
 
-      await expect(
-        caller.revoke({ organizationId: ORG_ID, apiKeyId: "ak_1" }),
-      ).rejects.toMatchObject({ code: "CONFLICT" });
+      await expectRefusal(caller.revoke({ organizationId: ORG_ID, apiKeyId: "ak_1" }), {
+        code: "api_key_already_revoked",
+        httpStatus: 409,
+      });
       expect(recordAudit).not.toHaveBeenCalled();
     });
   });
 
   describe("given the service raises a named failure", () => {
-    it("maps a missing key onto NOT_FOUND", async () => {
+    it("lets a missing key through as its own not-found refusal", async () => {
       const { caller } = harness({
         apiKeys: {
           update: async () => {
@@ -582,12 +613,13 @@ describe("ApiKeyTrpcApi", () => {
         },
       });
 
-      await expect(
-        caller.update({ organizationId: ORG_ID, apiKeyId: "ak_missing" }),
-      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      await expectRefusal(caller.update({ organizationId: ORG_ID, apiKeyId: "ak_missing" }), {
+        code: "api_key_not_found",
+        httpStatus: 404,
+      });
     });
 
-    it("maps a reserved name onto BAD_REQUEST", async () => {
+    it("lets a reserved name through as its own refusal", async () => {
       const { caller } = harness({
         apiKeys: {
           create: async () => {
@@ -596,13 +628,14 @@ describe("ApiKeyTrpcApi", () => {
         },
       });
 
-      await expect(
+      await expectRefusal(
         caller.create({
           organizationId: ORG_ID,
           name: "LangWatch CLI",
           bindings: [],
         }),
-      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        { code: "api_key_reserved_name", httpStatus: 422 },
+      );
     });
 
     /** An infrastructure failure is NOT dressed up as a handled one: it leaves

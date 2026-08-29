@@ -7,6 +7,9 @@
     "src"
   ],
   "type": "module",
+  "imports": {
+    "#*": "./src/*.ts"
+  },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
@@ -22,10 +25,12 @@
   },
   "dependencies": {
     "@clickhouse/client": "^1.23.0",
+    "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/github-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/log-contract": "workspace:*",
     "@langwatch/metric-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
@@ -33,6 +38,8 @@
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@trpc/server": "^11.18.0",
+    "hono": "^4.12.27",
+    "hono-openapi": "^1.3.1",
     "ioredis": "^5.9.3",
     "zod": "^4.4.3"
   },

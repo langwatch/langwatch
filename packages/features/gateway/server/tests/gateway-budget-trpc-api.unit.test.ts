@@ -15,9 +15,25 @@
  * transport talks to. The ledger arithmetic behind the standing keeps its own
  * coverage in `gateway-budget-dto.unit.test.ts`.
  */
+import type { GatewayService } from "@langwatch/gateway-contract";
+import type { ProjectService } from "@langwatch/project-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GatewayBudgetTrpcApi } from "../src/api/app-trpc/gateway-budget.api";
+import { GatewayApp, type GatewayAppDependencies } from "../src/app/gateway.app";
+
+/** The slice of the application this surface reaches, and nothing else. */
+function gatewayAppStub(dependencies: Partial<GatewayAppDependencies>): GatewayApp {
+  return GatewayApp.create(dependencies as GatewayAppDependencies);
+}
+
+function budgetDecisionsStub(overrides: Partial<GatewayService>): GatewayService {
+  return overrides as GatewayService;
+}
+
+function projectsStub(overrides: Partial<ProjectService>): ProjectService {
+  return overrides as ProjectService;
+}
 
 const ORG_ID = "org_1";
 const ANCHOR_VK_ID = "vk_anchor";
@@ -69,10 +85,7 @@ const listGroupTargets = vi.fn();
 function callerFor(budgets: Array<Record<string, unknown>>) {
   const trpc = initTRPC
     .context<{
-      app: {
-        gateway: { budgetDecisions: unknown };
-        projects: { tryGetOrganizationId(id: string): Promise<string | undefined> };
-      };
+      app: { gateway: GatewayApp };
       actor(): { id: string };
     }>()
     .create();
@@ -83,16 +96,20 @@ function callerFor(budgets: Array<Record<string, unknown>>) {
     scopeReach: new Map(),
   });
 
-  const router = GatewayBudgetTrpcApi.create(
-    trpc,
-    { protected: trpc.procedure, policy: () => (procedure) => procedure },
-    { assertOrganizationExists, resolveProviderLabels, listGroupTargets },
-  );
+  const router = GatewayBudgetTrpcApi.create(trpc, {
+    protected: trpc.procedure,
+    policy: () => (procedure) => procedure,
+  });
 
   return router.createCaller({
     app: {
-      gateway: { budgetDecisions: { listWithHealth, resolveScopeTargets } },
-      projects: { tryGetOrganizationId: async () => ORG_ID },
+      gateway: gatewayAppStub({
+        budgetDecisions: budgetDecisionsStub({ listWithHealth, resolveScopeTargets }),
+        projects: projectsStub({ tryGetOrganizationId: async () => ORG_ID }),
+        assertOrganizationExists,
+        resolveProviderLabels,
+        listGroupTargets,
+      }),
     },
     actor: () => ({ id: "usr_1" }),
   } as never);

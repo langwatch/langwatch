@@ -11,10 +11,12 @@
  * Both take `traces:view` — a span is trace content, and nothing here is
  * readable to a caller who may not read the trace it belongs to.
  *
- * Transport only: policy, input parsing and delegation to the legacy trace
- * read. The viewer's redactions are resolved by the process (they depend on
- * the request's session, the project's data-privacy policy and the plan's
- * visibility window) and handed to the read unchanged.
+ * Transport only: policy, input parsing and delegation to `TraceApp`. The
+ * waterfall order is the application's, not this door's, so the share page and
+ * the explorer read the same trace the same way round. The viewer's redactions
+ * are resolved by the process (they depend on the request's session, the
+ * project's data-privacy policy and the plan's visibility window) and handed to
+ * the read unchanged.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
@@ -24,14 +26,16 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
-import type { TraceLegacyReadPort } from "../../ports/trace-legacy-read.port";
+import type { TraceApp } from "#app/trace.app";
 
-type SpansApplication = Readonly<{
-  traces: Readonly<{ read: TraceLegacyReadPort }>;
-}>;
-
-/** The process supplies authentication; authorization arrives as `policy`. */
-export type SpansTrpcContext = Readonly<{ app: SpansApplication }>;
+/**
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them.
+ */
+export type SpansTrpcContext = Readonly<{ app: Readonly<{ traces: TraceApp }> }>;
 
 type SpansTrpcProcedures<
   TContext extends SpansTrpcContext,
@@ -86,41 +90,11 @@ export class SpansTrpcApi {
             projectId: input.projectId,
           });
 
-          const traceService = ctx.app.traces.read;
-          const traces = await traceService.getTracesWithSpans(
-            input.projectId,
-            [input.traceId],
+          return ctx.app.traces.readOrderedSpansForTrace({
+            projectId: input.projectId,
+            traceId: input.traceId,
             protections,
-            undefined,
-            { full: true },
-          );
-          if (traces.length === 0) {
-            return [];
-          }
-
-          const trace = traces.find((t) => t.trace_id === input.traceId);
-          if (!trace) {
-            return [];
-          }
-          if (!trace.spans) {
-            return [];
-          }
-
-          const sortedSpans = trace.spans.sort((a, b) => {
-            const aStart = a.timestamps?.started_at ?? 0;
-            const bStart = b.timestamps?.started_at ?? 0;
-
-            const startDiff = aStart - bStart;
-            if (startDiff === 0) {
-              const aEnd = a.timestamps?.finished_at ?? 0;
-              const bEnd = b.timestamps?.finished_at ?? 0;
-              return bEnd - aEnd;
-            }
-
-            return startDiff;
           });
-
-          return sortedSpans;
         },
       ),
 
@@ -130,8 +104,11 @@ export class SpansTrpcApi {
 
           const protections = await ports.getViewerProtections(ctx, { projectId });
 
-          const traceService = ctx.app.traces.read;
-          const result = await traceService.getSpanForPromptStudio(projectId, spanId, protections);
+          const result = await ctx.app.traces.readPromptStudioSpan({
+            projectId,
+            spanId,
+            protections,
+          });
 
           if (!result) {
             throw new TRPCError({

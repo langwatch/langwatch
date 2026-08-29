@@ -274,6 +274,23 @@ export {
 } from "./services/scenario-role-metrics.rules";
 
 export { TraceLegacyReadPort } from "./ports/trace-legacy-read.port";
+export {
+  TraceApp,
+  type ResolvedShare,
+  type TraceAppDependencies,
+  type TraceCaller,
+  type TraceEditOverlayStore,
+  type TraceLogRecordReader,
+  type TraceLogRecordReadRow,
+  type TraceProjectReader,
+  type TraceShareReader,
+  type TraceSummaryReader,
+  type TracesTopicReader,
+  type TracesTrpcEmitters,
+  type TracesV2ListReader,
+  type TracesV2SessionGroupsReader,
+  type TracesV2SpanReader,
+} from "./app/trace.app";
 export { SpansTrpcApi, type SpansTrpcContext, type SpansTrpcPorts } from "./api/app-trpc/spans.api";
 export {
   TraceEditOverlayTrpcApi,
@@ -284,7 +301,6 @@ export {
 export {
   TracesTrpcApi,
   type TracesTrpcContext,
-  type TracesTrpcEmitters,
   type TracesTrpcPorts,
 } from "./api/app-trpc/traces.api";
 export {
@@ -322,13 +338,9 @@ export {
 export {
   TracesV2TrpcApi,
   type TracesV2CodingAgentEnrichmentPort,
-  type TracesV2ListReader,
   type TracesV2ReadPorts,
-  type TracesV2SessionGroupsReader,
-  type TracesV2SpanReader,
   type TracesV2TrpcContext,
   type TracesV2TrpcPorts,
-  type TraceLogRecordReadRow,
 } from "./api/app-trpc/traces-v2.api";
 export {
   SharedTraceTrpcApi,

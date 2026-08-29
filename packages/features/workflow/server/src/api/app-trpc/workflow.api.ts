@@ -3,7 +3,7 @@
  * `workflow.*`.
  *
  * Everything a workflow IS — its versions, its copies, its publication state,
- * its archive cascade — is answered here, by delegating to `WorkflowService`
+ * its archive cascade — is answered here, by delegating to `WorkflowApp`
  * or, where the read is still a host-owned row, to a port the mount supplies.
  * The transport itself owns only procedure names, input parsing, the tRPC
  * error codes each failure maps to, and the shape of what goes back.
@@ -21,7 +21,6 @@
  * Spec: packages/features/workflow/specs/workflow-service.feature.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import {
   clearDsl,
   migrateDSLVersion,
@@ -45,22 +44,25 @@ import {
   WorkflowVersionNotFoundError,
   type StudioWorkflow,
   type Workflow,
-  type WorkflowService,
   type WorkflowVersion,
   type WorkflowVersionHistoryEntry,
   type WorkflowWithVersion,
 } from "@langwatch/workflow-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
+import type { WorkflowApp } from "#app/workflow.app";
 
-type WorkflowApplication = Readonly<{
-  workflows: WorkflowService;
-  evaluators: EvaluatorService;
-}>;
-
-/** The host supplies authentication; authorization arrives as `policy`. */
+/**
+ * The host supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the host's application this feature reaches, not the
+ * feature's application itself, because a tRPC root is shared by every feature
+ * mounted on it and so carries all of them. A REST door, whose service is
+ * built per family, would hold {@link WorkflowApp} directly; both reach the
+ * same object and only the path to it differs.
+ */
 export type WorkflowTrpcContext = Readonly<{
-  app: WorkflowApplication;
+  app: Readonly<{ workflows: WorkflowApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -345,13 +347,15 @@ export class WorkflowTrpcApi {
             projectId: input.projectId,
             dsl: input.dsl,
           });
-          const { workflow, version } = await ctx.app.workflows.create({
-            projectId: input.projectId,
-            dsl,
-            commitMessage: input.commitMessage,
-            publish: input.publish,
-            authorId: ctx.actor().id,
-          });
+          const { workflow, version } = await ctx.app.workflows.create(
+            {
+              projectId: input.projectId,
+              dsl,
+              commitMessage: input.commitMessage,
+              publish: input.publish,
+            },
+            ctx.actor(),
+          );
 
           void ctx.app.workflows
             .list({ projectId: input.projectId })
@@ -388,14 +392,16 @@ export class WorkflowTrpcApi {
             });
           }
 
-          const { workflow, version } = await ctx.app.workflows.copy({
-            sourceWorkflowId: input.workflowId,
-            targetProjectId: input.projectId,
-            sourceProjectId: input.sourceProjectId,
-            copyDatasets: input.copyDatasets,
-            copiedFromWorkflowId: input.workflowId,
-            authorId: ctx.actor().id,
-          });
+          const { workflow, version } = await ctx.app.workflows.copy(
+            {
+              sourceWorkflowId: input.workflowId,
+              targetProjectId: input.projectId,
+              sourceProjectId: input.sourceProjectId,
+              copyDatasets: input.copyDatasets,
+              copiedFromWorkflowId: input.workflowId,
+            },
+            ctx.actor(),
+          );
           return { workflow, version };
         },
       ),
@@ -608,12 +614,14 @@ export class WorkflowTrpcApi {
 
       publish: policy("workflows:update")(procedure.input(workflowApiPublishInputSchema)).mutation(
         async ({ ctx, input }) => {
-          return ctx.app.workflows.publish({
-            id: input.workflowId,
-            projectId: input.projectId,
-            versionId: input.versionId,
-            actorId: ctx.actor().id,
-          });
+          return ctx.app.workflows.publish(
+            {
+              id: input.workflowId,
+              projectId: input.projectId,
+              versionId: input.versionId,
+            },
+            ctx.actor(),
+          );
         },
       ),
 
@@ -808,7 +816,7 @@ export class WorkflowTrpcApi {
         procedure.input(workflowApiWorkflowInputSchema),
       ).query(async ({ ctx, input }) => {
         const evaluators = (
-          await ctx.app.evaluators.getAll({
+          await ctx.app.workflows.listEvaluators({
             projectId: input.projectId,
           })
         )

@@ -14,6 +14,33 @@ export class ApiKeyNotFoundError extends HandledError {
   }
 }
 
+/**
+ * The caller asked for a key that is not their own to hold.
+ *
+ * A service key belongs to the organization rather than to a person, and a key
+ * minted for somebody else is a credential the caller will never see again —
+ * both are administrative acts, so both take organization admin. Named as one
+ * refusal with the act in `meta`, because it is one rule with two subjects.
+ */
+export class ApiKeyAdminRequiredError extends HandledError {
+  declare readonly code: "api_key_admin_required";
+
+  constructor(action: "create-service-key" | "assign-to-another-user") {
+    super(
+      "api_key_admin_required",
+      action === "create-service-key"
+        ? "Only organization admins can create service API keys"
+        : "Only organization admins can create API keys for other users",
+      {
+        meta: { action },
+        httpStatus: 403,
+        fault: "customer",
+      },
+    );
+    this.name = "ApiKeyAdminRequiredError";
+  }
+}
+
 export class ApiKeyNotOwnedError extends HandledError {
   declare readonly code: "api_key_not_owned";
 

@@ -17,19 +17,24 @@
  * Transport only: gates, throttles and delegation to `AutomationService`.
  */
 import type { AuthzDeclaration } from "@langwatch/authz-contract";
-import {
-  InvalidUnsubscribeTokenError,
-  type AutomationService,
-} from "@langwatch/automation-contract";
+import { InvalidUnsubscribeTokenError } from "@langwatch/automation-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import {
+  UnsubscribeLinkInvalidError,
+  UnsubscribeRateLimitedError,
+  type AutomationApp,
+} from "#app/automation.app";
 
-type EmailSuppressionApplication = Readonly<{ automation: AutomationService }>;
-
-/** The process supplies authentication; authorization arrives as `policy`. */
+/**
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * The same slice the authoring surface takes, and the same {@link AutomationApp}
+ * object: two doors onto one feature reach one application, which is what stops
+ * a suppression rule from meaning one thing here and another there.
+ */
 export type EmailSuppressionTrpcContext = Readonly<{
-  app: EmailSuppressionApplication;
+  app: Readonly<{ automation: AutomationApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -125,10 +130,7 @@ export class EmailSuppressionTrpcApi {
         max,
       });
       if (!limit.allowed) {
-        throw new TRPCError({
-          code: "TOO_MANY_REQUESTS",
-          message: "Too many requests. Please try again shortly.",
-        });
+        throw new UnsubscribeRateLimitedError();
       }
     };
 
@@ -151,10 +153,10 @@ export class EmailSuppressionTrpcApi {
           token: input.token,
         });
         if (!view) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "This unsubscribe link is invalid or has expired.",
-          });
+          throw new UnsubscribeLinkInvalidError(
+            "This unsubscribe link is invalid or has expired.",
+            404,
+          );
         }
         return view;
       }),
@@ -175,19 +177,15 @@ export class EmailSuppressionTrpcApi {
             scope: input.scope,
           });
         } catch (err) {
-          // A bad/tampered token is the recipient's problem (4xx); a downstream
-          // persistence failure is ours (5xx) and must not masquerade as an
-          // "invalid link".
+          // A bad or tampered token is the recipient's problem, and they can
+          // act on it: ask for the link again. A downstream persistence
+          // failure is ours, has no action for them, and is re-raised exactly
+          // as it arrived so it degrades to "unknown" plus a trace id at the
+          // boundary rather than masquerading as an "invalid link".
           if (err instanceof InvalidUnsubscribeTokenError) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "This unsubscribe link is invalid.",
-            });
+            throw new UnsubscribeLinkInvalidError("This unsubscribe link is invalid.", 400);
           }
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Could not process unsubscribe. Please try again.",
-          });
+          throw err;
         }
         return { ok: true };
       }),
@@ -198,7 +196,7 @@ export class EmailSuppressionTrpcApi {
       getAll: policy({ kind: "permission", permission: "triggers:view" })(
         procedure.input(projectScopeSchema),
       ).query(async ({ input, ctx }) => {
-        const rows = await ctx.app.automation.getAllEnriched({
+        const rows = await ctx.app.automation.getSuppressionsEnriched({
           projectId: input.projectId,
         });
         void ports.recordAudit({

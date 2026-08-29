@@ -1,13 +1,14 @@
 /**
  * Public Hono REST API for evaluators.
  *
- * Mounted at `/api/evaluators`. Every verb dispatches through the canonical
- * evaluator service; this file owns the wire contract and nothing else.
+ * Mounted at `/api/evaluators`. Every verb dispatches through the feature's
+ * application — the same object the tRPC door reaches — and this file owns the
+ * wire contract and nothing else.
  *
- * The services, the platform-URL builder and the organization resolver arrive
- * as arguments, so the family can be mounted into any process that has them
- * and BUILT (for the OpenAPI document and the route-authorization audits) by a
- * process that has none.
+ * The application, the platform-URL builder and the organization resolver
+ * arrive as arguments, so the family can be mounted into any process that has
+ * them and BUILT (for the OpenAPI document and the route-authorization audits)
+ * by a process that has none.
  */
 import { requires } from "@langwatch/api";
 import {
@@ -19,17 +20,12 @@ import {
   type SecuredApp,
   validator as zValidator,
 } from "@langwatch/api/rest";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
-import {
-  ModelNotConfiguredError,
-  type ModelProviderService,
-} from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
-import { nanoid } from "nanoid";
 import { z } from "zod";
+import type { EvaluatorApp } from "#app/evaluator.app";
 import {
   apiResponseEvaluatorSchema,
   createEvaluatorInputSchema,
@@ -57,17 +53,16 @@ export type EvaluatorAppVariables = AppRestProjectVariables & EvaluatorOrganizat
 export function createEvaluatorsRestApp(options: {
   security: AppRestSecurity;
   /**
-   * Resolved per request. Mounting the family must not force the services to
-   * be constructed, which is what lets the OpenAPI generator and the
+   * Resolved per request. Mounting the family must not force the application
+   * to be constructed, which is what lets the OpenAPI generator and the
    * route-registry audits build every route without a running process.
    */
-  evaluators: () => EvaluatorService;
-  modelProviders: () => ModelProviderService;
+  app: () => EvaluatorApp;
   platformUrl: PlatformUrlBuilder;
   /** Sets `organization` on the request context, after authentication. */
   organizationMiddleware: MiddlewareHandler;
 }): SecuredApp<{ Variables: EvaluatorAppVariables }> {
-  const { security, evaluators, modelProviders, platformUrl, organizationMiddleware } = options;
+  const { security, app, platformUrl, organizationMiddleware } = options;
 
   const secured = security.createProjectApp<EvaluatorOrganizationVariables>({
     basePath: "/api/evaluators",
@@ -95,12 +90,11 @@ export function createEvaluatorsRestApp(options: {
       },
     }),
     async (c) => {
-      const service = evaluators();
       const project = c.get("project");
 
       logger.info({ projectId: project.id }, "Getting all evaluators for project");
 
-      const rows = await service.getAllWithFields({
+      const rows = await app().getAllWithFields({
         projectId: project.id,
       });
 
@@ -144,30 +138,15 @@ export function createEvaluatorsRestApp(options: {
       },
     }),
     async (c) => {
-      const service = evaluators();
       const project = c.get("project");
       const { idOrSlug } = c.req.param();
 
       logger.info({ projectId: project.id, idOrSlug }, "Getting evaluator");
 
-      // Try by ID first, then by slug
-      let evaluator = await service.tryGetByIdWithFields({
-        id: idOrSlug,
+      const evaluator = await app().tryGetByIdOrSlugWithFields({
+        idOrSlug,
         projectId: project.id,
       });
-
-      if (!evaluator) {
-        const bySlug = await service.tryGetBySlug({
-          slug: idOrSlug,
-          projectId: project.id,
-        });
-        if (bySlug) {
-          evaluator = await service.getByIdWithFields({
-            id: bySlug.id,
-            projectId: project.id,
-          });
-        }
-      }
 
       if (!evaluator) {
         throw new HTTPException(404, {
@@ -208,48 +187,19 @@ export function createEvaluatorsRestApp(options: {
     }),
     zValidator("json", createEvaluatorInputSchema),
     async (c) => {
-      const service = evaluators();
+      const application = app();
       const project = c.get("project");
       const data = c.req.valid("json");
 
       logger.info({ projectId: project.id, name: data.name }, "Creating evaluator");
 
-      const resolveEmbedding = async () => {
-        try {
-          return await modelProviders().resolveModelForFeature({
-            projectId: project.id,
-            featureKey: "analytics.topic_clustering_embeddings",
-          });
-        } catch (error) {
-          if (error instanceof ModelNotConfiguredError) {
-            return null;
-          }
-
-          throw error;
-        }
-      };
-
-      const [resolvedDefault, resolvedEmbedding] = await Promise.all([
-        modelProviders().resolveModelForFeature({
-          projectId: project.id,
-          featureKey: "evaluator.create_default",
-        }),
-        resolveEmbedding(),
-      ]);
-
-      const evaluator = await service.createWithDefaults({
-        id: `evaluator_${nanoid()}`,
+      const evaluator = await application.createWithResolvedDefaults({
         projectId: project.id,
         name: data.name,
-        type: "evaluator",
         config: data.config,
-        resolved: {
-          defaultModel: resolvedDefault.model,
-          embeddingsModel: resolvedEmbedding?.model ?? null,
-        },
       });
 
-      const enriched = await service.getByIdWithFields({
+      const enriched = await application.getByIdWithFields({
         id: evaluator.id,
         projectId: project.id,
       });
@@ -302,7 +252,7 @@ export function createEvaluatorsRestApp(options: {
     }),
     zValidator("json", updateEvaluatorInputSchema),
     async (c) => {
-      const service = evaluators();
+      const application = app();
       const project = c.get("project");
       const { id } = c.req.param();
       const data = c.req.valid("json");
@@ -310,7 +260,7 @@ export function createEvaluatorsRestApp(options: {
       logger.info({ projectId: project.id, evaluatorId: id }, "Updating evaluator");
 
       // Verify evaluator exists
-      const existing = await service.tryGetById({
+      const existing = await application.tryGetById({
         id,
         projectId: project.id,
       });
@@ -348,13 +298,13 @@ export function createEvaluatorsRestApp(options: {
         };
       }
 
-      const updated = await service.update({
+      const updated = await application.update({
         id,
         projectId: project.id,
         data: updateData,
       });
 
-      const enriched = await service.getByIdWithFields({
+      const enriched = await application.getByIdWithFields({
         id: updated.id,
         projectId: project.id,
       });
@@ -401,14 +351,14 @@ export function createEvaluatorsRestApp(options: {
       },
     }),
     async (c) => {
-      const service = evaluators();
+      const application = app();
       const project = c.get("project");
       const { id } = c.req.param();
 
       logger.info({ projectId: project.id, evaluatorId: id }, "Archiving evaluator");
 
       // Verify evaluator exists
-      const existing = await service.tryGetById({
+      const existing = await application.tryGetById({
         id,
         projectId: project.id,
       });
@@ -419,7 +369,7 @@ export function createEvaluatorsRestApp(options: {
         });
       }
 
-      await service.archive({
+      await application.archive({
         id,
         projectId: project.id,
       });

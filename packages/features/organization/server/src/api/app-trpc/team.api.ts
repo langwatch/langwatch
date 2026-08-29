@@ -23,9 +23,10 @@
  * organization-wide access matrix, takes `organization:manage`.
  *
  * Transport only: gates, plan enforcement, and delegation to
- * `OrganizationService` and the composed `ProjectService`. Custom team roles
- * are an Enterprise capability, and the plan lives in the process's billing
- * store, so that refusal arrives as a port.
+ * {@link OrganizationApp}, which is where the organization service, the
+ * composed project service and the ledger attribution now arrive from. Custom
+ * team roles are an Enterprise capability, and the plan lives in the process's
+ * billing store, so that refusal arrives as a port.
  *
  * Spec: packages/features/organization/specs/organization-service.feature.
  */
@@ -38,45 +39,26 @@ import {
   teamApiSlugWithOrganizationSchema,
   teamApiTeamScopeSchema,
   teamApiUpdateInputSchema,
-  type OrganizationService,
 } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
 import {
   type AnyTRPCRootTypes,
   type TRPCRootObject,
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
+import type { OrganizationApp } from "#app/organization.app";
 
 /**
- * The nine reads and writes this transport makes, named rather than taking
- * `OrganizationService` whole: the organization service is the widest surface
- * in the platform, and a team screen has no business depending on the parts of
- * it that answer billing, invites, groups or settings.
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them. Before
+ * {@link OrganizationApp} this door declared its own `TeamApplication` — nine
+ * organization methods and two project ones — which is why it could not reach
+ * the group screen's copy of the same composition.
  */
-type TeamOrganizationService = Pick<
-  OrganizationService,
-  | "getTeamBySlugForMember"
-  | "getTeamWithMembers"
-  | "listTeamsWithMembers"
-  | "listTeamAccess"
-  | "getTeamById"
-  | "createTeamWithMembers"
-  | "updateTeamWithMembers"
-  | "archiveTeam"
-  | "removeTeamMember"
->;
-
-/** The two project reads a team screen makes: what lives in the team. */
-type TeamProjectService = Pick<ProjectService, "listByOrganization" | "listByTeam">;
-
-type TeamApplication = Readonly<{
-  organizations: TeamOrganizationService;
-  projects: TeamProjectService;
-}>;
-
-/** The process supplies authentication; authorization arrives as `policy`. */
 export type TeamTrpcContext = Readonly<{
-  app: TeamApplication;
+  app: Readonly<{ organizations: OrganizationApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -151,11 +133,7 @@ export class TeamTrpcApi {
 
     return trpc.router({
       getBySlug: policy("organization:view")(procedure.input(teamApiSlugSchema)).query(
-        ({ input, ctx }) =>
-          ctx.app.organizations.getTeamBySlugForMember({
-            ...input,
-            userId: ctx.actor().id,
-          }),
+        ({ input, ctx }) => ctx.app.organizations.getTeamBySlugForMember(input, ctx.actor()),
       ),
 
       getTeamsWithMembers: policy("organization:view")(
@@ -167,12 +145,11 @@ export class TeamTrpcApi {
           "organization:manage",
         );
         const [teams, projects] = await Promise.all([
-          ctx.app.organizations.listTeamsWithMembers({
-            organizationId: input.organizationId,
-            callerUserId: ctx.actor().id,
-            callerCanManage,
-          }),
-          ctx.app.projects.listByOrganization({
+          ctx.app.organizations.listTeamsWithMembers(
+            { organizationId: input.organizationId, callerCanManage },
+            ctx.actor(),
+          ),
+          ctx.app.organizations.listProjectsByOrganization({
             organizationId: input.organizationId,
             ...ORGANIZATION_PROJECT_PAGE,
           }),
@@ -186,7 +163,7 @@ export class TeamTrpcApi {
       getTeamsWithRoleBindings: policy("organization:manage")(
         procedure.input(organizationApiScopeSchema),
       ).query(async ({ input, ctx }) => {
-        const projects = await ctx.app.projects.listByOrganization({
+        const projects = await ctx.app.organizations.listProjectsByOrganization({
           organizationId: input.organizationId,
           ...ORGANIZATION_PROJECT_PAGE,
         });
@@ -208,12 +185,11 @@ export class TeamTrpcApi {
           input.organizationId,
           "organization:manage",
         );
-        const team = await ctx.app.organizations.getTeamWithMembers({
-          ...input,
-          callerUserId: ctx.actor().id,
-          callerCanManage,
-        });
-        const projects = await ctx.app.projects.listByTeam({
+        const team = await ctx.app.organizations.getTeamWithMembers(
+          { ...input, callerCanManage },
+          ctx.actor(),
+        );
+        const projects = await ctx.app.organizations.listProjectsByTeam({
           organizationId: input.organizationId,
           teamId: team.id,
         });
@@ -229,10 +205,7 @@ export class TeamTrpcApi {
             organizationId: team.organizationId,
             members: input.members,
           });
-          await ctx.app.organizations.updateTeamWithMembers({
-            ...input,
-            actor: { type: "user", id: ctx.actor().id },
-          });
+          await ctx.app.organizations.updateTeamWithMembers(input, ctx.actor());
           return { success: true as const };
         },
       ),
@@ -244,10 +217,7 @@ export class TeamTrpcApi {
           organizationId: input.organizationId,
           members: input.members,
         });
-        return ctx.app.organizations.createTeamWithMembers({
-          ...input,
-          actor: { type: "user", id: ctx.actor().id },
-        });
+        return ctx.app.organizations.createTeamWithMembers(input, ctx.actor());
       }),
 
       archiveById: policy("team:manage")(procedure.input(teamApiTeamScopeSchema)).mutation(
@@ -266,11 +236,10 @@ export class TeamTrpcApi {
           const team = await ctx.app.organizations.getTeamById({
             teamId: input.teamId,
           });
-          await ctx.app.organizations.removeTeamMember({
-            ...input,
-            organizationId: team.organizationId,
-            actor: { type: "user", id: ctx.actor().id },
-          });
+          await ctx.app.organizations.removeTeamMember(
+            { ...input, organizationId: team.organizationId },
+            ctx.actor(),
+          );
           return { success: true as const, removedUserId: input.userId };
         },
       ),

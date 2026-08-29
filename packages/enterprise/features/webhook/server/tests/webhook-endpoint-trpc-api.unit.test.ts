@@ -20,6 +20,7 @@ import { WebhookEndpointsNotEntitledError } from "@langwatch/enterprise-webhook-
 import { WebhookEndpointAdapter } from "../src/adapters/webhook-endpoint.webhook-endpoint.adapter";
 import { WebhookIdPort } from "../src/ports/webhook-id.port";
 import { WebhookSecretPort } from "../src/ports/webhook-secret.port";
+import { WebhookApp } from "../src/app/webhook.app";
 import { WebhookEndpointTrpcApi } from "../src/api/app-trpc/webhook-endpoint.api";
 
 const ORG_ID = "org_1";
@@ -79,41 +80,54 @@ function buildMockPrisma() {
 }
 
 function buildCaller(prisma: ReturnType<typeof buildMockPrisma>) {
-  const webhookEndpoints = WebhookEndpointAdapter.create({
+  const endpoints = WebhookEndpointAdapter.create({
     prisma,
     ids: new TestIdPort(),
     secrets: new TestSecretPort(),
   });
 
-  const trpc = initTRPC
-    .context<{
-      app: { gateway: { webhookEndpoints: typeof webhookEndpoints; webhookHealth: unknown } };
-      actor(): { id: string };
-    }>()
-    .create();
-
-  const router = WebhookEndpointTrpcApi.create(
-    trpc,
-    {
-      protected: trpc.procedure,
-      policy: (permission) => (procedure) =>
-        (procedure as { use(m: unknown): unknown }).use(({ next }: { next: () => unknown }) => {
-          seenPermissions.push(permission);
-          if (denied.has(permission)) {
-            throw new TRPCError({ code: "FORBIDDEN", message: "You do not have permission" });
-          }
-          return next();
-        }) as typeof procedure,
-    },
-    {
-      assertEntitled: async () => {
-        if (!entitled) throw new WebhookEndpointsNotEntitledError();
+  // The three capabilities below belong to the REST door — the health report,
+  // the test fire's delivery hop and the `Idempotency-Key` ledger — and no
+  // procedure on this surface that the tests below call reaches them. They
+  // throw rather than answering so a future procedure that does reach one
+  // fails loudly here instead of passing against a silent stub.
+  const app = WebhookApp.create({
+    endpoints,
+    health: {
+      health: () => {
+        throw new Error("Delivery health is not exercised by these scenarios");
       },
     },
-  );
+    events: undefined,
+    assertEndpointsEntitled: async () => {
+      if (!entitled) throw new WebhookEndpointsNotEntitledError();
+    },
+    dispatch: () => {
+      throw new Error("The test fire is a REST-only path");
+    },
+    runIdempotent: () => {
+      throw new Error("Idempotent replay is a REST-only path");
+    },
+  });
+
+  const trpc = initTRPC
+    .context<{ app: { webhooks: WebhookApp }; actor(): { id: string } }>()
+    .create();
+
+  const router = WebhookEndpointTrpcApi.create(trpc, {
+    protected: trpc.procedure,
+    policy: (permission) => (procedure) =>
+      (procedure as { use(m: unknown): unknown }).use(({ next }: { next: () => unknown }) => {
+        seenPermissions.push(permission);
+        if (denied.has(permission)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You do not have permission" });
+        }
+        return next();
+      }) as typeof procedure,
+  });
 
   return router.createCaller({
-    app: { gateway: { webhookEndpoints, webhookHealth: { health: vi.fn() } } },
+    app: { webhooks: app },
     actor: () => ({ id: "user_1" }),
   } as never);
 }
@@ -198,15 +212,24 @@ describe("WebhookEndpointTrpcApi", () => {
   });
 
   describe("when an event selector names nothing the catalog knows", () => {
-    /** @scenario Unknown event selectors surface as a bad request in the session surface */
-    it("maps validation errors to BAD_REQUEST", async () => {
+    /**
+     * @scenario Unknown event selectors surface as a bad request in the session surface
+     *
+     * Asserted on the handled `code` rather than on `BAD_REQUEST`. The refusal
+     * is a `webhook_endpoint_invalid` carrying a 400, and the process's tRPC
+     * policy is what turns that status into the transport's `BAD_REQUEST` —
+     * this transport no longer builds one. The root here is a bare
+     * `initTRPC` with a stub policy, so what reaches the caller is the
+     * refusal itself, which is the thing this surface is responsible for.
+     */
+    it("refuses with the endpoint's own validation code", async () => {
       await expect(
         buildCaller(buildMockPrisma()).create({
           organizationId: ORG_ID,
           url: "https://example.com/hook",
           enabledEvents: ["nonsense.event"],
         }),
-      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      ).rejects.toMatchObject({ code: "webhook_endpoint_invalid", httpStatus: 400 });
     });
   });
 });

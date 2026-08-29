@@ -4,6 +4,7 @@ export * from "./derive-trace-status";
 export * from "./derive-trace-timestamp";
 export * from "./trace";
 export * from "./trace-view.contract";
+export * from "./trace-explorer.contract";
 export * from "./trace-canonicalisation";
 export * from "./trace-ingress.commands";
 export * from "./trace-ingress.events";

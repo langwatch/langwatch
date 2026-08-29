@@ -1,26 +1,27 @@
 /**
  * The context and procedure surface every suite tRPC adapter shares.
  *
- * The suite surface reads across four capabilities: suites themselves,
+ * The suite surface reads across four capabilities — suites themselves,
  * scenario folders (a folder IS a suite of kind "folder", so `suites.getAll`
  * and `suites.getById` answer for both), the project's owning organization,
- * and the simulation run summaries the suite list renders.
+ * and the simulation run summaries the suite list renders — and reaches all
+ * four through {@link SuiteApp}, which is what the four-key `SuiteApplication`
+ * bag this context used to declare has become.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { ProjectService } from "@langwatch/project-contract";
-import type { ScenarioService, SimulationService } from "@langwatch/scenario-contract";
-import type { SuiteService } from "@langwatch/suite-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
+import type { SuiteApp } from "#app/suite.app";
 
-export type SuiteApplication = Readonly<{
-  suites: SuiteService;
-  scenarios: ScenarioService;
-  projects: ProjectService;
-  simulations: SimulationService;
-}>;
-
-/** The process supplies authentication; authorization arrives as `policy`. */
-export type SuiteTrpcContext = Readonly<{ app: SuiteApplication }>;
+/**
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them. The REST family, built per
+ * family, holds {@link SuiteApp} directly. Both reach the same object; only the
+ * path to it differs.
+ */
+export type SuiteTrpcContext = Readonly<{ app: Readonly<{ suites: SuiteApp }> }>;
 
 export type SuiteTrpcProcedures<
   TContext extends SuiteTrpcContext,

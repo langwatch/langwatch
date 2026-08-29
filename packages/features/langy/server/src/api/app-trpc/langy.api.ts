@@ -18,12 +18,14 @@
  * internal-only gate the process chains into it, and differ only in which
  * permission they demand.
  *
- * Transport only: gates, rate limits, DTO mapping and delegation to the
- * canonical `LangyService`.
+ * Transport only: gates, rate limits, DTO mapping and delegation to
+ * {@link LangyApp}. Who may watch a turn, whether a caller can see the
+ * conversation a side effect is attributed to, and the turn-start operation
+ * create and continue share all live on the application, where the egress door
+ * reaches them too.
  */
 import { on } from "node:events";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { ValidationError } from "@langwatch/handled-error";
 import {
   isLangyConversationUpdateVisibleToUser,
   LANGY_CONVERSATION_STATUS,
@@ -40,58 +42,33 @@ import {
   type LangyConversationListItemDto,
   type LangyCredentialSession,
   type LangyMessageDto,
-  type LangyService,
-  type LangyTurnContext,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import {
-  TRPCError,
-  type AnyTRPCRootTypes,
-  type TRPCRootObject,
-  type TRPCRuntimeConfigOptions,
+import type {
+  AnyTRPCRootTypes,
+  TRPCRootObject,
+  TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
 import { AGENT_CHAT_TIMEOUT_MS } from "../../adapters/langy.turn-errors.adapter";
 import { ADOPTABLE_CONVERSATION_ID } from "../../services/langy-conversation.service";
 import type { LangyChatMessageInput } from "../../services/langy-turn.shared";
-import { LangyTokenBuffer, type LangyStreamEntry } from "../../streaming/langy-token-buffer";
-import { LangyTurnAccessStore } from "../../streaming/langy-turn-access";
-import { decideSyntheticTerminal } from "../../streaming/langy-turn-settlement";
-import { abortableDelay } from "../../streaming/langy-turn-settlement-waiter";
-import {
-  SETTLEMENT_CONFIRM_POLLS,
-  SETTLEMENT_POLL_MS,
-} from "../../streaming/langy-turn-tail";
+import type { LangyStreamEntry } from "../../streaming/langy-token-buffer";
+import { LangySessionRequiredError, type LangyApp } from "#app/langy.app";
 
 const logger = createLogger("langwatch:langy:router");
 
 /**
- * The Redis surface the live-turn transport needs: the turn-access record it
- * reads a just-started turn's actor from, and a dedicated connection for the
- * blocking tail. An ioredis standalone or cluster client satisfies it.
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them. A REST door, whose service
+ * is built per family, would hold {@link LangyApp} directly; both reach the
+ * same object and only the path to it differs.
  */
-export type LangyTrpcRedis = Readonly<{
-  get(key: string): Promise<string | null>;
-  set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
-  duplicate(): { disconnect(): void };
-}>;
-
-/** The read side of the process's broadcast fabric. */
-export type LangyTrpcEmitters = Readonly<{
-  getTenantEmitter(tenantId: string): NodeJS.EventEmitter;
-  cleanupTenantEmitter(tenantId: string): void;
-}>;
-
-type LangyApplication = Readonly<{
-  langy: LangyService;
-  /** Absent in a deployment without Redis; the live edge degrades to the fold. */
-  redis: LangyTrpcRedis | null;
-  broadcast: LangyTrpcEmitters;
-}>;
-
-/** The process supplies authentication; authorization arrives as `policy`. */
 export type LangyTrpcContext = Readonly<{
-  app: LangyApplication;
+  app: Readonly<{ langy: LangyApp }>;
   actor(): Readonly<{ id: string }>;
   /**
    * The authenticated session, handed to the turn service as the identity a
@@ -254,153 +231,8 @@ function toDetailDto(detail: ConversationDetail): LangyConversationDetailDto {
 function sessionOf(ctx: LangyTrpcContext): LangyCredentialSession {
   ctx.actor();
   const session = ctx.session;
-  if (!session) throw new TRPCError({ code: "UNAUTHORIZED" });
+  if (!session) throw new LangySessionRequiredError();
   return session;
-}
-
-/**
- * May this user watch this turn's live stream? Same gate the deleted Hono
- * `/stream` route used: the fast path confirms the turn's own actor from the
- * synchronously-written turn-access record (so a just-started turn doesn't 404
- * before its fold is projected); otherwise it falls back to the durable
- * visibility rule (owner or shared). It never widens access.
- */
-async function canWatchTurn({
-  langy,
-  projectId,
-  conversationId,
-  turnId,
-  userId,
-  redis,
-}: {
-  langy: LangyService;
-  projectId: string;
-  conversationId: string;
-  turnId: string;
-  userId: string;
-  redis: LangyTrpcRedis | null;
-}): Promise<boolean> {
-  if (redis) {
-    const access = LangyTurnAccessStore.create({ redis });
-    if (await access.isTurnActor({ projectId, conversationId, turnId, userId })) {
-      return true;
-    }
-  }
-  const conv = await langy.tryFindByIdVisible({
-    id: conversationId,
-    projectId,
-    userId,
-  });
-  return !!conv;
-}
-
-/**
- * Poll the durable fold and heartbeat while the live edge is being tailed.
- * A terminal is synthesized only after consecutive settled reads.
- */
-async function watchForMissedTerminal({
-  projectId,
-  conversationId,
-  turnId,
-  userId,
-  langy,
-  buffer,
-  signal,
-}: {
-  projectId: string;
-  conversationId: string;
-  turnId: string;
-  userId: string;
-  langy: LangyService;
-  buffer: {
-    liveness(a: { conversationId: string; turnId: string }): Promise<{ stale: boolean }>;
-  };
-  signal: AbortSignal;
-}): Promise<LangyStreamEntry | null> {
-  let settledStreak = 0;
-  while (!signal.aborted) {
-    if (!(await abortableDelay(SETTLEMENT_POLL_MS, signal))) return null;
-    const [conversation, liveness] = await Promise.all([
-      langy.getById({ id: conversationId, projectId, userId }).catch(() => null),
-      buffer.liveness({ conversationId, turnId }).catch(() => null),
-    ]);
-    if (!conversation || !liveness) {
-      settledStreak = 0;
-      continue;
-    }
-    const decision = decideSyntheticTerminal({
-      status: conversation.status,
-      lastError: conversation.lastError,
-      heartbeatStale: liveness.stale,
-    });
-    if (!decision) {
-      settledStreak = 0;
-      continue;
-    }
-    settledStreak += 1;
-    if (settledStreak >= SETTLEMENT_CONFIRM_POLLS) return decision;
-  }
-  return null;
-}
-
-/**
- * Dispatch a turn through the canonical turn service. Create and Continue are
- * the SAME operation — `isNewConversation` is the only difference (it emits the
- * semantically-first `conversation_started`). The service throws DomainErrors,
- * which the process's handled-error middleware maps to coded TRPCErrors carrying
- * `data.error` (read by the client's `readLangyTrpcError`).
- */
-async function acceptTurn({
-  langy,
-  input,
-  adoptConversationId,
-  session,
-}: {
-  langy: LangyService;
-  input: {
-    projectId: string;
-    idempotencyKey?: string | undefined;
-    requestId?: string | undefined;
-    conversationId?: string | null;
-    messages: LangyChatMessageInput[];
-    modelOverride?: string;
-    trigger?: "submit-message" | "regenerate-message" | "resume-stream";
-    pageContext?: LangyTurnContext["pageContext"];
-    skills?: LangyTurnContext["skills"];
-  };
-  /**
-   * Adopt an unknown `conversationId` as a NEW conversation instead of minting
-   * a fresh id. Only the CREATE path sets this, it is how a first message
-   * lands on the conversation a panel-open warm already booted a worker for
-   * (specs/langy/langy-worker-prewarm.feature). Continue keeps today's
-   * semantics: an unknown id there is stale client state and mints fresh.
-   */
-  adoptConversationId?: boolean;
-  session: LangyCredentialSession;
-}): Promise<{ conversationId: string; turnId: string }> {
-  // Alias resolution for pre-rename client bundles; new clients send
-  // idempotencyKey. Neither present is a malformed request. Imperative
-  // rather than a schema .refine: the procedure carries a projectId input,
-  // and tRPC merges .input() calls — which requires plain object schemas,
-  // not the ZodEffects a refine produces.
-  const idempotencyKey = input.idempotencyKey ?? input.requestId;
-  if (!idempotencyKey) {
-    const message = "idempotencyKey is required.";
-    // `meta.message` is the channel that survives serialize() (ADR-045) — the
-    // HandledError's own `message` is not put on the wire.
-    throw new ValidationError(message, { meta: { message } });
-  }
-  return langy.startConversationTurn({
-    projectId: input.projectId,
-    idempotencyKey,
-    session,
-    requestedConversationId: input.conversationId ?? null,
-    ...(adoptConversationId ? { adoptConversationId: true } : {}),
-    messages: input.messages,
-    ...(input.modelOverride ? { modelOverride: input.modelOverride } : {}),
-    isRetry: input.trigger === "regenerate-message",
-    turnContext: { pageContext: input.pageContext, skills: input.skills },
-  });
 }
 
 /**
@@ -475,7 +307,7 @@ export class LangyTrpcApi {
           items: LangyConversationListItemDto[];
           nextCursor: LangyConversationListCursorDto | null;
         }> => {
-          const page = await ctx.app.langy.getPage({
+          const page = await ctx.app.langy.listPage({
             projectId: input.projectId,
             userId: ctx.actor().id,
             limit: input.limit,
@@ -505,7 +337,7 @@ export class LangyTrpcApi {
           eventId: z.string(),
         }),
       }).query(async ({ input, ctx }) => {
-        return await ctx.app.langy.getEventsAfter({
+        return await ctx.app.langy.eventsAfter({
           projectId: input.projectId,
           conversationId: input.conversationId,
           userId: ctx.actor().id,
@@ -524,7 +356,7 @@ export class LangyTrpcApi {
           // caller for which absence is a real answer: `tryFindByIdVisible`, not
           // `getById`. Using the throwing form here would 500 the poll on every
           // first turn.
-          const detail = await ctx.app.langy.tryFindByIdVisible({
+          const detail = await ctx.app.langy.tryFindVisible({
             id: input.conversationId,
             projectId: input.projectId,
             userId: ctx.actor().id,
@@ -622,7 +454,7 @@ export class LangyTrpcApi {
             projectId: input.projectId,
             userId,
           });
-          const rows = await ctx.app.langy.getAllByConversation({
+          const rows = await ctx.app.langy.messages({
             conversationId: input.conversationId,
             projectId: input.projectId,
             userId,
@@ -676,7 +508,7 @@ export class LangyTrpcApi {
       deleteConversation: langyProcedure("langy:delete", {
         conversationId: z.string(),
       }).mutation(async ({ input, ctx }): Promise<{ success: boolean }> => {
-        const success = await ctx.app.langy.deleteById({
+        const success = await ctx.app.langy.deleteConversation({
           id: input.conversationId,
           projectId: input.projectId,
           userId: ctx.actor().id,
@@ -689,32 +521,27 @@ export class LangyTrpcApi {
         conversationId: z.string().min(1),
         title: z.string().trim().min(1).max(200),
       }).mutation(async ({ input, ctx }): Promise<LangyConversationDetailDto> => {
-        const detail = await ctx.app.langy.updateById({
-          id: input.conversationId,
-          projectId: input.projectId,
-          userId: ctx.actor().id,
-          title: input.title,
-        });
-        // Belt-and-braces for the declared `ConversationDetail | null`: the
-        // service ALREADY throws this same typed error for both "no such
-        // conversation" and "not yours" (deliberately indistinguishable), so in
-        // practice this branch is unreachable. It stays because the return type
-        // permits null and a silent `undefined` detail would be worse than a
-        // redundant throw.
-        if (!detail) throw new LangyConversationNotFoundError(input.conversationId);
-        return toDetailDto(detail);
+        return toDetailDto(
+          await ctx.app.langy.renameConversation({
+            id: input.conversationId,
+            projectId: input.projectId,
+            userId: ctx.actor().id,
+            title: input.title,
+          }),
+        );
       }),
 
       /** Branch a visible conversation into a private, independently editable one. */
       forkConversation: langyProcedure("langy:create", {
         conversationId: z.string().min(1),
       }).mutation(async ({ input, ctx }): Promise<LangyConversationDetailDto> => {
-        const { conversation } = await ctx.app.langy.forkById({
-          id: input.conversationId,
-          projectId: input.projectId,
-          userId: ctx.actor().id,
-        });
-        return toDetailDto(conversation);
+        return toDetailDto(
+          await ctx.app.langy.forkConversation({
+            id: input.conversationId,
+            projectId: input.projectId,
+            userId: ctx.actor().id,
+          }),
+        );
       }),
 
       /**
@@ -739,15 +566,20 @@ export class LangyTrpcApi {
         conversationId: adoptableConversationIdSchema.optional(),
         ...langyTurnInputShape,
       }).mutation(async ({ input, ctx }): Promise<{ conversationId: string; turnId: string }> => {
-        return acceptTurn({
-          langy: ctx.app.langy,
-          input: {
-            ...input,
+        return ctx.app.langy.startTurn(
+          {
+            projectId: input.projectId,
+            idempotencyKey: input.idempotencyKey,
+            requestId: input.requestId,
+            conversationId: input.conversationId,
             messages: input.messages as LangyChatMessageInput[],
+            modelOverride: input.modelOverride,
+            trigger: input.trigger,
+            turnContext: { pageContext: input.pageContext, skills: input.skills },
           },
-          ...(input.conversationId ? { adoptConversationId: true } : {}),
-          session: sessionOf(ctx),
-        });
+          sessionOf(ctx),
+          { adoptConversationId: Boolean(input.conversationId) },
+        );
       }),
 
       /**
@@ -760,14 +592,19 @@ export class LangyTrpcApi {
         conversationId: z.string().min(1),
         ...langyTurnInputShape,
       }).mutation(async ({ input, ctx }): Promise<{ conversationId: string; turnId: string }> => {
-        return acceptTurn({
-          langy: ctx.app.langy,
-          input: {
-            ...input,
+        return ctx.app.langy.startTurn(
+          {
+            projectId: input.projectId,
+            idempotencyKey: input.idempotencyKey,
+            requestId: input.requestId,
+            conversationId: input.conversationId,
             messages: input.messages as LangyChatMessageInput[],
+            modelOverride: input.modelOverride,
+            trigger: input.trigger,
+            turnContext: { pageContext: input.pageContext, skills: input.skills },
           },
-          session: sessionOf(ctx),
-        });
+          sessionOf(ctx),
+        );
       }),
 
       /**
@@ -813,12 +650,12 @@ export class LangyTrpcApi {
         actionId: z.string(),
       }).mutation(async ({ input, ctx }): Promise<{ isClaimed: boolean }> => {
         const userId = ctx.actor().id;
-        const conversation = await ctx.app.langy.tryFindByIdVisible({
+        const isVisible = await ctx.app.langy.isVisibleToCaller({
           id: input.conversationId,
           projectId: input.projectId,
           userId,
         });
-        if (!conversation) return { isClaimed: false };
+        if (!isVisible) return { isClaimed: false };
         return await ports.uiActions.claim({
           projectId: input.projectId,
           userId,
@@ -893,7 +730,7 @@ export class LangyTrpcApi {
                 warmed: false,
               };
             }
-            return await ctx.app.langy.warmConversationWorker({
+            return await ctx.app.langy.warmWorker({
               projectId: input.projectId,
               session: sessionOf(ctx),
               requestedConversationId: input.conversationId ?? null,
@@ -925,7 +762,7 @@ export class LangyTrpcApi {
        */
       modelsAllowed: langyProcedure("langy:view", {}).query(
         async ({ input, ctx }): Promise<{ modelsAllowed: string[] | null }> => {
-          const modelsAllowed = await ctx.app.langy.tryGetModelsAllowedForProject(input.projectId);
+          const modelsAllowed = await ctx.app.langy.tryGetModelsAllowed(input.projectId);
           return { modelsAllowed };
         },
       ),
@@ -972,12 +809,12 @@ export class LangyTrpcApi {
         // just carries no cross-user attribution.
         let conversationId = input.conversationId;
         if (conversationId) {
-          const conv = await ctx.app.langy.tryFindByIdVisible({
+          const isVisible = await ctx.app.langy.isVisibleToCaller({
             id: conversationId,
             projectId: input.projectId,
             userId,
           });
-          if (!conv) {
+          if (!isVisible) {
             logger.warn(
               {
                 projectId: input.projectId,
@@ -1027,12 +864,12 @@ export class LangyTrpcApi {
         // project + ownership/shared rules, so a forged or foreign id is a
         // silent no-op instead of stamping the caller's cadence record with
         // attribution they don't own.
-        const conversation = await ctx.app.langy.tryFindByIdVisible({
+        const isVisible = await ctx.app.langy.isVisibleToCaller({
           id: input.conversationId,
           projectId: input.projectId,
           userId,
         });
-        if (!conversation) {
+        if (!isVisible) {
           logger.warn(
             {
               projectId: input.projectId,
@@ -1060,7 +897,7 @@ export class LangyTrpcApi {
       onConversationUpdate: langyProcedure("langy:view", {}).subscription(async function* (opts) {
         const { projectId } = opts.input;
         const userId = opts.ctx.actor().id;
-        const emitter = opts.ctx.app.broadcast.getTenantEmitter(projectId);
+        const emitter = opts.ctx.app.langy.conversationUpdates(projectId);
         try {
           for await (const eventArgs of on(emitter, "langy_conversation_updated", {
             signal: opts.signal,
@@ -1082,7 +919,7 @@ export class LangyTrpcApi {
             yield data;
           }
         } finally {
-          opts.ctx.app.broadcast.cleanupTenantEmitter(projectId);
+          opts.ctx.app.langy.releaseConversationUpdates(projectId);
         }
       }),
 
@@ -1113,13 +950,11 @@ export class LangyTrpcApi {
           // because subscriptions are span- and log-silenced (SILENCED_LOG_TYPES),
           // so without this line a denied attach leaves no operator trace at all.
           if (
-            !(await canWatchTurn({
-              langy: opts.ctx.app.langy,
+            !(await opts.ctx.app.langy.canWatchTurn({
               projectId,
               conversationId,
               turnId,
               userId,
-              redis: opts.ctx.app.redis,
             }))
           ) {
             logger.warn(
@@ -1134,14 +969,10 @@ export class LangyTrpcApi {
           }
           // No Redis ⇒ no live buffer; the client falls back to the Postgres
           // conversation/message query.
-          const connection = opts.ctx.app.redis;
-          if (!connection) return;
+          const stream = opts.ctx.app.langy.tryOpenTurnStream();
+          if (!stream) return;
 
-          const blocking = connection.duplicate();
-          const buffer = LangyTokenBuffer.create({
-            redis: connection,
-            blockingRedis: blocking,
-          });
+          const { buffer } = stream;
           // Tear down on client disconnect OR the hard per-turn deadline, whichever
           // comes first — a wedged turn must not hold a blocking connection forever.
           const signals: AbortSignal[] = [AbortSignal.timeout(AGENT_CHAT_TIMEOUT_MS)];
@@ -1170,15 +1001,15 @@ export class LangyTrpcApi {
               const followSignal = AbortSignal.any([signal, settle.signal]);
               let synthesized: LangyStreamEntry | null = null;
 
-              const watcher = watchForMissedTerminal({
-                projectId,
-                conversationId,
-                turnId,
-                userId,
-                langy: opts.ctx.app.langy,
-                buffer,
-                signal: followSignal,
-              })
+              const watcher = opts.ctx.app.langy
+                .watchForMissedTerminal({
+                  projectId,
+                  conversationId,
+                  turnId,
+                  userId,
+                  buffer,
+                  signal: followSignal,
+                })
                 .then((entry) => {
                   if (!entry) return;
                   synthesized = entry;
@@ -1211,7 +1042,7 @@ export class LangyTrpcApi {
               if (synthesized) yield synthesized;
             }
           } finally {
-            blocking.disconnect();
+            stream.close();
           }
         }),
     });

@@ -22,9 +22,7 @@ import {
   gatewayBudgetApiUpdateInputSchema,
   scopeTargetKey,
   type GatewayBudgetWithSeats,
-  type GatewayService,
 } from "@langwatch/gateway-contract";
-import type { ProjectService } from "@langwatch/project-contract";
 import {
   TRPCError,
   type AnyTRPCRootTypes,
@@ -33,16 +31,11 @@ import {
 } from "@trpc/server";
 import { effectiveBudgetPeriod } from "../../adapters/gateway-period.adapter";
 import { providerLabelFor } from "../../repositories/prisma/prisma.gateway-provider-label.repository";
-
-type GatewayBudgetApplication = Readonly<{
-  gateway: Readonly<{ budgetDecisions: GatewayService }>;
-  /** Resolves the organization behind a project id, and nothing else. */
-  projects: Pick<ProjectService, "tryGetOrganizationId">;
-}>;
+import type { GatewayApp } from "#app/gateway.app";
 
 /** The process supplies authentication; authorization arrives as `policy`. */
 export type GatewayBudgetTrpcContext = Readonly<{
-  app: GatewayBudgetApplication;
+  app: Readonly<{ gateway: GatewayApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -65,30 +58,6 @@ type GatewayBudgetTrpcProcedures<
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
   /** Tracing, logging, error shaping, scope lineage, the check, and audit. */
   policy(permission: AuthzPermission): ProcedureDecorator;
-}>;
-
-/**
- * The reads this transport makes that are not the budget service's own.
- *
- * Consumed through a generic so the concrete shapes the process wires in
- * survive into the router's inferred output types instead of collapsing to the
- * loose constraint named here.
- */
-export type GatewayBudgetTrpcPorts = Readonly<{
-  /**
-   * Refuses an organization id that names no organization, with the same
-   * NOT_FOUND this surface has always answered. It is a tenancy anchor, not an
-   * authorization check — the policy above is what decides access.
-   */
-  assertOrganizationExists(organizationId: string): Promise<void>;
-  /** Provider row id to its display label, for the whole page in one read. */
-  resolveProviderLabels(
-    budgets: ReadonlyArray<{ providerKey: string | null }>,
-  ): Promise<Map<string, string>>;
-  /** The groups a per-member budget can target, with their sizes. */
-  listGroupTargets(
-    organizationId: string,
-  ): Promise<ReadonlyArray<{ id: string; name: string; memberCount: number }>>;
 }>;
 
 function toDto(b: GatewayBudgetWithSeats) {
@@ -130,11 +99,9 @@ export class GatewayBudgetTrpcApi {
     TContext extends GatewayBudgetTrpcContext,
     TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
     TRoot extends AnyTRPCRootTypes,
-    TPorts extends GatewayBudgetTrpcPorts,
   >(
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: GatewayBudgetTrpcProcedures<TContext, TOptions, TRoot>,
-    ports: TPorts,
   ) {
     const { protected: procedure, policy } = procedures;
 
@@ -142,14 +109,14 @@ export class GatewayBudgetTrpcApi {
       list: policy("gatewayBudgets:view")(
         procedure.input(gatewayBudgetApiOrganizationInputSchema),
       ).query(async ({ ctx, input }) => {
-        await ports.assertOrganizationExists(input.organizationId);
+        await ctx.app.gateway.assertOrganizationExists(input.organizationId);
         const { budgets, spendAvailable, scopeReach } =
           await ctx.app.gateway.budgetDecisions.listWithHealth(input.organizationId);
         const scopeTargets = await ctx.app.gateway.budgetDecisions.resolveScopeTargets(
           budgets,
           input.organizationId,
         );
-        const providerLabels = await ports.resolveProviderLabels(budgets);
+        const providerLabels = await ctx.app.gateway.resolveProviderLabels(budgets);
         return {
           spendAvailable,
           budgets: budgets.map((b) => ({
@@ -171,12 +138,12 @@ export class GatewayBudgetTrpcApi {
         // PRINCIPAL targets resolve inside the right tenant. Read through the
         // Project service rather than a Prisma client, which this transport
         // does not hold.
-        const organizationId = await ctx.app.projects.tryGetOrganizationId(input.projectId);
+        const organizationId = await ctx.app.gateway.projects.tryGetOrganizationId(input.projectId);
         const scopeTargets = await ctx.app.gateway.budgetDecisions.resolveScopeTargets(
           budgets,
           organizationId ?? null,
         );
-        const providerLabels = await ports.resolveProviderLabels(budgets);
+        const providerLabels = await ctx.app.gateway.resolveProviderLabels(budgets);
         return {
           spendAvailable,
           budgets: budgets.map((b) => ({
@@ -191,7 +158,7 @@ export class GatewayBudgetTrpcApi {
 
       get: policy("gatewayBudgets:view")(procedure.input(gatewayBudgetApiBudgetInputSchema)).query(
         async ({ ctx, input }) => {
-          await ports.assertOrganizationExists(input.organizationId);
+          await ctx.app.gateway.assertOrganizationExists(input.organizationId);
           const detail = await ctx.app.gateway.budgetDecisions.tryGetDetail(
             input.id,
             input.organizationId,
@@ -199,7 +166,7 @@ export class GatewayBudgetTrpcApi {
           if (!detail) {
             throw new TRPCError({ code: "NOT_FOUND", message: "budget not found" });
           }
-          const providerLabels = await ports.resolveProviderLabels([detail.budget]);
+          const providerLabels = await ctx.app.gateway.resolveProviderLabels([detail.budget]);
           return {
             ...toDto(detail.budget),
             spendAvailable: detail.spendAvailable,
@@ -228,7 +195,7 @@ export class GatewayBudgetTrpcApi {
        */
       groupTargets: policy("gatewayBudgets:create")(
         procedure.input(gatewayBudgetApiOrganizationInputSchema),
-      ).query(async ({ input }) => ports.listGroupTargets(input.organizationId)),
+      ).query(async ({ ctx, input }) => ctx.app.gateway.listGroupTargets(input.organizationId)),
 
       create: policy("gatewayBudgets:create")(
         procedure.input(gatewayBudgetApiCreateInputSchema),

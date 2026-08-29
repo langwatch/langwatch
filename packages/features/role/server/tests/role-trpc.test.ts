@@ -1,8 +1,10 @@
 import { initTRPC } from "@trpc/server";
+import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import type { Role, RoleService } from "@langwatch/role-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
+  RoleApp,
   RoleBindingTrpcApi,
   roleBindingTrpcInputSchemas,
   RoleTrpcApi,
@@ -64,7 +66,15 @@ function roleCaller(calls: Call[]) {
   });
 
   return router.createCaller({
-    app: { roles: recordingRoles(calls) },
+    app: {
+      roles: RoleApp.create({
+        roles: recordingRoles(calls),
+        // The definition surface never reaches the binding half of the
+        // application, and this asserts that: a call that did would throw.
+        permissions: {} as AuthzService,
+        authzGrants: {} as AuthzGrantsService,
+      }),
+    },
     actor: () => ({ id: USER_ID }),
   });
 }
@@ -236,17 +246,21 @@ function bindingCaller(calls: Call[]) {
 
   return router.createCaller({
     app: {
-      permissions: {
-        listManagedBindingsForOrganization: record("listManagedBindingsForOrganization", []),
-        listManagedBindingsForUser: record("listManagedBindingsForUser", []),
-        getAccessBreakdown: record("getAccessBreakdown", { bindings: [] }),
-      },
-      authzGrants: {
-        createBinding: record("createBinding", { id: "binding_1" }),
-        updateBinding: record("updateBinding", { id: "binding_1" }),
-        deleteBinding: record("deleteBinding", { success: true }),
-        applyMemberBindings: record("applyMemberBindings", { success: true }),
-      },
+      roles: RoleApp.create({
+        // The binding surface never reaches the definition half.
+        roles: {} as RoleService,
+        permissions: {
+          listManagedBindingsForOrganization: record("listManagedBindingsForOrganization", []),
+          listManagedBindingsForUser: record("listManagedBindingsForUser", []),
+          getAccessBreakdown: record("getAccessBreakdown", { bindings: [] }),
+        } as unknown as AuthzService,
+        authzGrants: {
+          createBinding: record("createBinding", { id: "binding_1" }),
+          updateBinding: record("updateBinding", { id: "binding_1" }),
+          deleteBinding: record("deleteBinding", { success: true }),
+          applyMemberBindings: record("applyMemberBindings", { success: true }),
+        } as unknown as AuthzGrantsService,
+      }),
     },
     actor: () => ({ id: USER_ID }),
     session: { user: { name: "Ada", email: "ada@example.com" } },

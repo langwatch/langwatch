@@ -7,10 +7,14 @@ import {
   type SecuredApp,
   validator as zValidator,
 } from "@langwatch/api/rest";
-import type { DashboardService } from "@langwatch/dashboard-contract";
 import { createLogger } from "@langwatch/observability";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
+import {
+  DashboardNotThereError,
+  GraphNotThereError,
+  type DashboardApp,
+} from "#app/dashboard.app";
 
 const logger = createLogger("langwatch:api:graphs");
 
@@ -76,8 +80,11 @@ function toGraphResponse(graph: {
 /**
  * REST for the custom graphs a dashboard is built from.
  *
- * The dashboard capability arrives as a service rather than being read off the
- * request, so this family can be mounted into any process that has one.
+ * The application arrives as a provider rather than being read off the
+ * request, so this family can be mounted into any process that has one. It is
+ * the SAME {@link DashboardApp} the tRPC surfaces are given, which is what lets
+ * the handlers below recognise a refusal by its class instead of by comparing
+ * `error.name` to a string literal.
  */
 export function createGraphsRestApp(options: {
   security: AppRestSecurity;
@@ -86,7 +93,7 @@ export function createGraphsRestApp(options: {
    * mounting a family must not force its services to be constructed, which is
    * what lets the OpenAPI spec generator build this app with none.
    */
-  dashboard: () => DashboardService;
+  dashboard: () => DashboardApp;
 }): SecuredApp<{ Variables: AppRestProjectVariables }> {
   const { security, dashboard } = options;
 
@@ -165,7 +172,7 @@ export function createGraphsRestApp(options: {
         });
         return c.json(toGraphResponse(graph));
       } catch (error) {
-        if (error instanceof Error && error.name === "GraphNotFoundError") {
+        if (error instanceof GraphNotThereError) {
           return c.json({ error: "Graph not found" }, 404);
         }
         throw error;
@@ -213,7 +220,7 @@ export function createGraphsRestApp(options: {
           },
         });
       } catch (error) {
-        if (error instanceof Error && error.name === "DashboardNotFoundError") {
+        if (error instanceof DashboardNotThereError) {
           return c.json({ error: "Dashboard not found" }, 404);
         }
         throw error;
@@ -262,7 +269,7 @@ export function createGraphsRestApp(options: {
           ...(body.filters === undefined ? {} : { filters: body.filters }),
         });
       } catch (error) {
-        if (error instanceof Error && error.name === "GraphNotFoundError") {
+        if (error instanceof GraphNotThereError) {
           return c.json({ error: "Graph not found" }, 404);
         }
         throw error;
@@ -303,7 +310,7 @@ export function createGraphsRestApp(options: {
       try {
         await dashboard().deleteGraph({ projectId: project.id, graphId: id });
       } catch (error) {
-        if (error instanceof Error && error.name === "GraphNotFoundError") {
+        if (error instanceof GraphNotThereError) {
           return c.json({ error: "Graph not found" }, 404);
         }
         throw error;

@@ -72,6 +72,24 @@ export type * from "./services/gateway.service";
 export type * from "./ports/gateway-budget-spend.port";
 
 /**
+ * The feature's application: the one thing every door is given, holding every
+ * service and port the seven transports reach and owning the virtual-key write
+ * pre-flight both doors used to run for themselves.
+ */
+export {
+  GatewayApp,
+  type GatewayActor,
+  type GatewayAppDependencies,
+  type GatewayApplicableBudgetTarget,
+  type GatewayCacheRuleAction,
+  type GatewayCacheRuleMatchers,
+  type GatewayCacheRuleOperations,
+  type GatewayGuardrailOperations,
+  type GatewayVirtualKeyBudgetInput,
+  type GatewayVirtualKeyOperations,
+} from "./app/gateway.app";
+
+/**
  * The app-process tRPC transports this feature owns. The process supplies its
  * root, authenticated procedure and policy chain; the procedure names, input
  * schemas, access declarations and delegation are the feature's.
@@ -79,48 +97,30 @@ export type * from "./ports/gateway-budget-spend.port";
 export {
   GatewayBudgetTrpcApi,
   type GatewayBudgetTrpcContext,
-  type GatewayBudgetTrpcPorts,
 } from "./api/app-trpc/gateway-budget.api";
 export {
   GatewayCacheRuleTrpcApi,
-  type GatewayCacheRuleOperations,
   type GatewayCacheRuleTrpcContext,
-  type GatewayCacheRuleTrpcPorts,
 } from "./api/app-trpc/gateway-cache-rule.api";
 export {
   GatewayGuardrailTrpcApi,
-  type GatewayGuardrailOperations,
   type GatewayGuardrailTrpcContext,
-  type GatewayGuardrailTrpcPorts,
 } from "./api/app-trpc/gateway-guardrail.api";
 export {
   GatewaySpendEventTrpcApi,
   type GatewaySpendEventTrpcContext,
-  type GatewaySpendEventTrpcPorts,
 } from "./api/app-trpc/gateway-spend-event.api";
 export {
   GatewayUsageTrpcApi,
   type GatewayUsageTrpcContext,
-  type GatewayUsageTrpcPorts,
 } from "./api/app-trpc/gateway-usage.api";
-export {
-  VirtualKeyTrpcApi,
-  type VirtualKeyBudgetInput,
-  type VirtualKeyTrpcContext,
-  type VirtualKeyTrpcPorts,
-} from "./api/app-trpc/virtual-key.api";
+export { VirtualKeyTrpcApi, type VirtualKeyTrpcContext } from "./api/app-trpc/virtual-key.api";
 
 /**
- * The public REST family this feature owns, and the seam it reaches its
- * process through. The process supplies the bound REST security service and
- * the ports below; the routes, wire casing and access declarations are the
- * feature's, so the REST and tRPC doors cannot drift apart.
+ * The public REST family this feature owns. The process supplies the bound REST
+ * security service and the application; the routes, wire casing and access
+ * declarations are the feature's, so the REST and tRPC doors cannot drift
+ * apart.
  */
 export { createGatewayPlatformRestApp } from "./api/app-rest/gateway-platform.api";
-export type {
-  GatewayPlatformRestPorts,
-  GatewayRestActor,
-  GatewayRestVirtualKeyBudgetInput,
-  GatewayRestVirtualKeyReads,
-  GatewayRestVirtualKeyWrites,
-} from "./ports/gateway-platform-rest.port";
+export { type VirtualKeyTrpcSchemas } from "./api/app-trpc/virtual-key.api";

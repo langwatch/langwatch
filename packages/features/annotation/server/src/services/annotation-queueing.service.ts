@@ -8,11 +8,33 @@
  * {@link FindExistingTraceIds} rather than being resolved here.
  */
 import type { AnnotationService } from "@langwatch/annotation-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 const logger = createLogger("langwatch:api:annotation");
+
+/**
+ * An annotator reference that is neither `queue-<id>` nor `user-<id>`.
+ *
+ * A handled failure rather than a `TRPCError`: this is a service, and a
+ * service that constructs a transport's error decides the wire shape for every
+ * transport that will ever call it. The cause is nameable and the caller can
+ * fix it, so it carries a stable code and the boundary picks the status — the
+ * 400 this has always answered.
+ */
+export class AnnotationAnnotatorReferenceInvalidError extends HandledError {
+  declare readonly code: "annotation_annotator_reference_invalid";
+
+  constructor(annotator: string) {
+    super("annotation_annotator_reference_invalid", "Invalid annotator", {
+      httpStatus: 400,
+      fault: "customer",
+      meta: { annotator },
+    });
+    this.name = "AnnotationAnnotatorReferenceInvalidError";
+  }
+}
 
 const annotatorReferenceSchema = z.string().transform((annotator, ctx) => {
   if (annotator.startsWith("queue-") && annotator.length > 6) {
@@ -69,8 +91,9 @@ const resolveQueueableTraceIds = async ({
  * Queues traces for annotation.
  *
  * An annotator reference that parses as neither `queue-<id>` nor `user-<id>`
- * is a `BAD_REQUEST` rather than a plain error, because the caller sent it and
- * the caller can fix it — the same answer this surface has always given.
+ * is a handled failure rather than a plain error, because the caller sent it
+ * and the caller can fix it. It carries the 400 this surface has always
+ * answered — see {@link AnnotationAnnotatorReferenceInvalidError}.
  *
  * @returns how many ids were queued and how many were skipped (everything sent
  *   that did not become work), so the surface that sent them can say what
@@ -93,12 +116,7 @@ export async function createOrUpdateQueueItems({
 }): Promise<{ created: number; skipped: number }> {
   const parsedAnnotators: AnnotatorReference[] = annotators.map((annotator) => {
     const parsed = annotatorReferenceSchema.safeParse(annotator);
-    if (!parsed.success) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Invalid annotator",
-      });
-    }
+    if (!parsed.success) throw new AnnotationAnnotatorReferenceInvalidError(annotator);
     return parsed.data;
   });
   const queueIds = parsedAnnotators

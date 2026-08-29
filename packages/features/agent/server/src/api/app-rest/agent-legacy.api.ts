@@ -21,9 +21,8 @@ import {
 } from "@langwatch/api/rest";
 import type { ErrorHandler } from "hono";
 import { describeRoute, resolver } from "hono-openapi";
-import { nanoid } from "nanoid";
 
-import type { LegacyAgentsRestApi } from "../legacy-rest/agent.api";
+import { AgentApp } from "#app/agent.app";
 
 /**
  * The platform's own address for ONE agent: the agents page with the editor
@@ -47,7 +46,12 @@ export type AgentPlatformUrlBuilder = (args: {
  */
 export function createAgentLegacyRestApp(options: {
   security: AppRestSecurity;
-  agents: () => LegacyAgentsRestApi;
+  /**
+   * The feature's application, as a provider: mounting the family must not
+   * force its services to be constructed, which is what lets the OpenAPI
+   * generator and the route-registry audits build it without a live process.
+   */
+  agents: () => AgentApp;
   agentPlatformUrl: AgentPlatformUrlBuilder;
 }): SecuredApp<{ Variables: AppRestProjectVariables }> {
   const { security, agents, agentPlatformUrl } = options;
@@ -143,7 +147,7 @@ export function createAgentLegacyRestApp(options: {
 
       const agent = await agents().create({
         ...body,
-        id: `agent_${nanoid()}`,
+        id: AgentApp.nextAgentId(),
         projectId: project.id,
       });
 
@@ -189,7 +193,7 @@ export function createAgentLegacyRestApp(options: {
       const { id } = c.req.param();
       const project = c.get("project");
 
-      const agent = await agents().get({
+      const agent = await agents().getById({
         id,
         projectId: project.id,
       });

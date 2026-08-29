@@ -28,7 +28,6 @@
  */
 import type { AuthzDeclaration } from "@langwatch/authz-contract";
 import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
-import type { RoutingDecision } from "@langwatch/identity";
 import {
   TRPCError,
   type AnyTRPCRootTypes,
@@ -36,19 +35,16 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
+import type { AuthApp, AuthRequestContext } from "#app/auth.app";
 
 /**
- * The authenticated principal, where there is one. Two of these procedures
- * act on the caller's own account and the rest run before an account exists.
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * It is the application's own request context: the process's capabilities are
+ * composed per request, so the request travels into every operation the door
+ * calls.
  */
-type FrontDoorSession = Readonly<{
-  user: Readonly<{ id: string; email?: string | null }>;
-}>;
-
-/** The process supplies authentication; authorization arrives as `policy`. */
-export type FrontDoorTrpcContext = Readonly<{
-  session: FrontDoorSession | null;
-}>;
+export type FrontDoorTrpcContext = AuthRequestContext;
 
 type FrontDoorTrpcProcedures<
   TContext extends FrontDoorTrpcContext,
@@ -69,66 +65,6 @@ type FrontDoorTrpcProcedures<
    * check installed before `.input()` would see no input at all.
    */
   policy(declaration: AuthzDeclaration): <TProcedure>(procedure: TProcedure) => TProcedure;
-}>;
-
-/** What an invitation link may say to whoever opens it. */
-export type InviteLanding = Readonly<{
-  organizationName: string;
-  inviterName: string | null;
-  alreadyAccepted: boolean;
-}>;
-
-/** The process capabilities the door needs; none of them are auth's own. */
-export type FrontDoorTrpcPorts = Readonly<{
-  /** The caller's IP. `"unknown"` where the transport cannot see one. */
-  clientIp(ctx: FrontDoorTrpcContext): string;
-  /** The shared counter. Returns whether this attempt is inside the budget. */
-  rateLimit(
-    input: Readonly<{ key: string; windowSeconds: number; max: number }>,
-  ): Promise<Readonly<{ allowed: boolean }>>;
-  /** Where this address signs in. The decision object IS the contract. */
-  route(
-    input: Readonly<{ identifier: string | null; breakGlass: boolean }>,
-  ): Promise<RoutingDecision>;
-  /** Whether an account already exists for this address. */
-  addressIsRegistered(
-    ctx: FrontDoorTrpcContext,
-    input: Readonly<{ email: string }>,
-  ): Promise<boolean>;
-  /** Mails a fresh confirmation link. Asking twice sends twice. */
-  requestSignUpVerification(
-    ctx: FrontDoorTrpcContext,
-    input: Readonly<{ email: string }>,
-  ): Promise<void>;
-  /** Spends a confirmation link and answers the address it confirmed. */
-  completeSignUpVerification(
-    ctx: FrontDoorTrpcContext,
-    input: Readonly<{ token: string }>,
-  ): Promise<
-    Readonly<{ email: string; accountCreated: boolean; accountExists: boolean }>
-  >;
-  /**
-   * The invitation behind a code, reduced to what its landing page may say.
-   *
-   * Refuses rather than answering, and the three refusals are deliberately
-   * NOT one: a missing invitation and a REVOKED one both raise
-   * `invite_not_found`, so a guessed code cannot tell the two apart and the
-   * journey ends quietly; an EXPIRED one raises `invite_expired`, because it
-   * is recoverable in one click by the inviter (D11).
-   */
-  readInviteLanding(
-    ctx: FrontDoorTrpcContext,
-    input: Readonly<{ inviteCode: string }>,
-  ): Promise<InviteLanding>;
-  /**
-   * Tells the organization's admins that somebody holding a stale code is
-   * waiting. Mints nothing: letting a stale code refresh itself would make
-   * the expiry decorative.
-   */
-  requestFreshInvite(
-    ctx: FrontDoorTrpcContext,
-    input: Readonly<{ inviteCode: string }>,
-  ): Promise<void>;
 }>;
 
 const ANONYMOUS_ROUTING: AuthzDeclaration = {
@@ -205,7 +141,7 @@ export class FrontDoorTrpcApi {
   >(
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: FrontDoorTrpcProcedures<TContext, TOptions, TRoot>,
-    ports: FrontDoorTrpcPorts,
+    app: AuthApp,
   ) {
     const { protected: procedure, public: publicProcedure, policy } = procedures;
 
@@ -222,16 +158,16 @@ export class FrontDoorTrpcApi {
        */
       route: policy(ANONYMOUS_ROUTING)(publicProcedure.input(routeInputSchema)).mutation(
         async ({ ctx, input }) => {
-          const limit = await ports.rateLimit({
-            key: `frontDoor.route:${ports.clientIp(ctx)}`,
+          const withinBudget = await app.isWithinBudget({
+            key: `frontDoor.route:${app.clientIp(ctx)}`,
             windowSeconds: 60 * 60,
             max: 200,
           });
-          if (!limit.allowed) {
+          if (!withinBudget) {
             throw throttled("Too many sign-in attempts. Please try again later.");
           }
 
-          return ports.route({
+          return app.route({
             identifier: input.identifier,
             breakGlass: input.breakGlass ?? false,
           });
@@ -250,20 +186,20 @@ export class FrontDoorTrpcApi {
       requestSignUpVerification: policy(OWN_SIGN_UP)(
         publicProcedure.input(emailInputSchema),
       ).mutation(async ({ ctx, input }) => {
-        const limit = await ports.rateLimit({
-          key: `frontDoor.requestSignUpVerification:${ports.clientIp(ctx)}`,
+        const withinBudget = await app.isWithinBudget({
+          key: `frontDoor.requestSignUpVerification:${app.clientIp(ctx)}`,
           windowSeconds: 60 * 60,
           max: 20,
         });
-        if (!limit.allowed) {
+        if (!withinBudget) {
           throw throttled("Too many signup attempts. Please try again later.");
         }
 
-        if (await ports.addressIsRegistered(ctx, { email: input.email })) {
+        if (await app.addressIsRegistered(ctx, { email: input.email })) {
           throw new EmailAlreadyRegisteredError();
         }
 
-        await ports.requestSignUpVerification(ctx, { email: input.email });
+        await app.requestSignUpVerification(ctx, { email: input.email });
         return { sent: true as const };
       }),
 
@@ -298,16 +234,16 @@ export class FrontDoorTrpcApi {
           });
         }
 
-        const limit = await ports.rateLimit({
+        const withinBudget = await app.isWithinBudget({
           key: `frontDoor.sendMyAddressConfirmation:${user.id}`,
           windowSeconds: 60 * 60,
           max: 10,
         });
-        if (!limit.allowed) {
+        if (!withinBudget) {
           throw throttled("Too many attempts. Please try again later.");
         }
 
-        await ports.requestSignUpVerification(ctx, { email });
+        await app.requestSignUpVerification(ctx, { email });
         return { sent: true as const };
       }),
 
@@ -321,16 +257,16 @@ export class FrontDoorTrpcApi {
       completeSignUpVerification: policy(OWN_EMAILED_TOKEN)(
         publicProcedure.input(tokenInputSchema),
       ).mutation(async ({ ctx, input }) => {
-        const limit = await ports.rateLimit({
-          key: `frontDoor.completeSignUpVerification:${ports.clientIp(ctx)}`,
+        const withinBudget = await app.isWithinBudget({
+          key: `frontDoor.completeSignUpVerification:${app.clientIp(ctx)}`,
           windowSeconds: 60 * 60,
           max: 60,
         });
-        if (!limit.allowed) {
+        if (!withinBudget) {
           throw throttled("Too many attempts. Please try again later.");
         }
 
-        return ports.completeSignUpVerification(ctx, { token: input.token });
+        return app.completeSignUpVerification(ctx, { token: input.token });
       }),
 
       /**
@@ -348,16 +284,16 @@ export class FrontDoorTrpcApi {
       inviteLanding: policy(INVITE_CODE_IS_THE_AUTHORIZATION)(
         publicProcedure.input(inviteCodeInputSchema),
       ).query(async ({ ctx, input }) => {
-        const limit = await ports.rateLimit({
-          key: `frontDoor.inviteLanding:${ports.clientIp(ctx)}`,
+        const withinBudget = await app.isWithinBudget({
+          key: `frontDoor.inviteLanding:${app.clientIp(ctx)}`,
           windowSeconds: 60 * 60,
           max: 60,
         });
-        if (!limit.allowed) {
+        if (!withinBudget) {
           throw throttled("Too many attempts. Please try again later.");
         }
 
-        return ports.readInviteLanding(ctx, { inviteCode: input.inviteCode });
+        return app.readInviteLanding(ctx, { inviteCode: input.inviteCode });
       }),
 
       /**
@@ -380,16 +316,16 @@ export class FrontDoorTrpcApi {
       requestFreshInvite: policy(FRESH_INVITE_REQUEST)(
         publicProcedure.input(inviteCodeInputSchema),
       ).mutation(async ({ ctx, input }) => {
-        const limit = await ports.rateLimit({
-          key: `frontDoor.requestFreshInvite:${ports.clientIp(ctx)}`,
+        const withinBudget = await app.isWithinBudget({
+          key: `frontDoor.requestFreshInvite:${app.clientIp(ctx)}`,
           windowSeconds: 60 * 60,
           max: 20,
         });
-        if (!limit.allowed) {
+        if (!withinBudget) {
           throw throttled("Too many attempts. Please try again later.");
         }
 
-        await ports.requestFreshInvite(ctx, { inviteCode: input.inviteCode });
+        await app.requestFreshInvite(ctx, { inviteCode: input.inviteCode });
 
         return { asked: true };
       }),

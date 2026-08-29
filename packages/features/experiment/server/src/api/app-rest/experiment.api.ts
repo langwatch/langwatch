@@ -17,11 +17,13 @@
  *
  * Auth: standard project API key (X-Auth-Token / Bearer / Basic).
  *
- * Routes go through the canonical experiment service, which arrives as an
- * argument — no direct Prisma access here, and none of the application's
- * composition either. Experiment runs are joined in via aggregate metadata so
- * each summary includes a run count and latest run timestamp without loading
- * run history.
+ * Routes go through the feature's application, which arrives as an argument —
+ * no direct Prisma access here, and none of the process's composition either.
+ * Experiment runs are joined in via aggregate metadata so each summary
+ * includes a run count and latest run timestamp without loading run history.
+ * What an experiment nobody has run aggregates to, and what a create with no
+ * setup starts from, are the application's answers, so the tRPC surface gives
+ * the same ones.
  */
 
 import { requires } from "@langwatch/api";
@@ -32,17 +34,16 @@ import {
   type SecuredApp,
   validator as zValidator,
 } from "@langwatch/api/rest";
-import type { Experiment, ExperimentService } from "@langwatch/experiment-contract";
+import type { Experiment } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import { createBlankWorkbenchState } from "./experiment.blank-workbench-state";
+import type { ExperimentApp } from "#app/experiment.app";
 import {
   createExperimentBodySchema,
   createExperimentResponseSchema,
   handledErrorEnvelopeSchema,
 } from "./experiment.schemas";
-import { workbenchActorFrom } from "./experiment.workbench-actor";
 
 const logger = createLogger("langwatch:api:experiments");
 
@@ -110,13 +111,13 @@ const toExperimentSummary = ({
 export function createExperimentsRestApp(options: {
   security: AppRestSecurity;
   /**
-   * Resolved per request. Mounting the family must not force the service to be
-   * constructed, which is what lets the OpenAPI generator and the
+   * Resolved per request. Mounting the family must not force the application
+   * to be constructed, which is what lets the OpenAPI generator and the
    * route-registry audits build every route without a running process.
    */
-  experiments: () => ExperimentService;
+  app: () => ExperimentApp;
 }): SecuredApp<{ Variables: AppRestProjectVariables }> {
-  const { security, experiments } = options;
+  const { security, app } = options;
 
   const secured = security.createProjectApp({
     basePath: "/api/experiments",
@@ -179,31 +180,21 @@ export function createExperimentsRestApp(options: {
 
       logger.info({ projectId: project.id, page, pageSize }, "Listing experiments");
 
-      const { experiments: paged, totalHits } = await experiments().getPage({
+      const { experiments: paged, totalHits } = await app().getPage({
         projectId: project.id,
         page,
         pageSize,
       });
 
-      const runAggregates =
-        paged.length > 0
-          ? await experiments().getRunAggregates({
-              projectId: project.id,
-              experimentIds: paged.map((e) => e.id),
-            })
-          : {};
-
-      const summaries = paged.map((experiment) => {
-        const aggregate = runAggregates[experiment.id] ?? {
-          runsCount: 0,
-          lastRunAt: null,
-        };
-        return toExperimentSummary({
-          experiment,
-          runsCount: aggregate.runsCount,
-          lastRunAt: aggregate.lastRunAt,
-        });
+      // What an experiment nobody has run aggregates to is the application's
+      // answer, not this family's; the read route below asks the same question
+      // and gets the same one.
+      const withRuns = await app().withRunAggregates({
+        projectId: project.id,
+        experiments: paged,
       });
+
+      const summaries = withRuns.map(toExperimentSummary);
 
       const offset = (page - 1) * pageSize;
       return c.json({
@@ -279,27 +270,19 @@ export function createExperimentsRestApp(options: {
       // what every sibling route in this namespace takes. The id is accepted too
       // rather than refused, since the same list row carries both and a caller
       // reaching for `id` is not making a mistake worth a 404.
-      const experiment = await experiments().getBySlugOrId({
+      const experiment = await app().getBySlugOrId({
         projectId: project.id,
         slugOrId,
       });
 
-      const aggregates = await experiments().getRunAggregates({
+      const [withRuns] = await app().withRunAggregates({
         projectId: project.id,
-        experimentIds: [experiment.id],
+        experiments: [experiment],
       });
-      const aggregate = aggregates[experiment.id] ?? {
-        runsCount: 0,
-        lastRunAt: null,
-      };
 
-      return c.json(
-        toExperimentSummary({
-          experiment,
-          runsCount: aggregate.runsCount,
-          lastRunAt: aggregate.lastRunAt,
-        }),
-      );
+      // One experiment in means one row out; the application answers for an
+      // experiment with no runs rather than leaving a hole to fill here.
+      return c.json(toExperimentSummary(withRuns!));
     },
   );
 
@@ -336,17 +319,18 @@ export function createExperimentsRestApp(options: {
       const project = c.get("project");
       const body = c.req.valid("json");
 
-      // A caller that sends no setup still gets a workbench they can open, so
-      // the create call is usable on its own rather than only as step one of a
-      // create-then-save pair.
-      const state = body.state ?? createBlankWorkbenchState({ name: body.name });
-
-      const created = await experiments().createEvaluationsV3({
-        projectId: project.id,
-        ...(body.name ? { name: body.name } : {}),
-        state,
-        actor: workbenchActorFrom({ resolved: c.get("resolvedToken") }),
-      });
+      // A caller that sends no setup still gets a workbench they can open. The
+      // default and the attribution are both the application's: they are
+      // properties of creating an experiment, not of the credential it arrived
+      // on.
+      const created = await app().createEvaluationsV3(
+        {
+          projectId: project.id,
+          ...(body.name ? { name: body.name } : {}),
+          ...(body.state ? { state: body.state } : {}),
+        },
+        { kind: "credential", resolved: c.get("resolvedToken") },
+      );
 
       logger.info({ projectId: project.id, slug: created.slug }, "Experiment created over REST");
 

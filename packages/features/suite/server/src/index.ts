@@ -34,8 +34,24 @@ export {
   type StartSuiteRunCommandData,
 } from "@langwatch/suite-contract";
 export { SuiteTrpcApi } from "./api/app-trpc/suite.api";
-export type {
-  SuiteApplication,
-  SuiteTrpcContext,
-  SuiteTrpcProcedures,
-} from "./api/app-trpc/suite.trpc-context";
+export type { SuiteTrpcContext, SuiteTrpcProcedures } from "./api/app-trpc/suite.trpc-context";
+
+/**
+ * The feature's application: the one object both of its doors call, and the
+ * refusal it names. The process composes it from the four services the suite
+ * surface reads across — what the `SuiteApplication` bag used to describe.
+ */
+export {
+  OrganizationNotFoundForProjectError,
+  SuiteApp,
+  type SuiteAppDependencies,
+  type SuiteOrFolder,
+} from "./app/suite.app";
+
+/**
+ * The app-process REST family this feature owns. The process supplies the
+ * bound REST security service, a resolver for the application and its own
+ * platform-URL builder; the base path, access declarations, schemas and
+ * delegation are the feature's.
+ */
+export { createSuiteRestApp } from "./api/app-rest/suite.api";

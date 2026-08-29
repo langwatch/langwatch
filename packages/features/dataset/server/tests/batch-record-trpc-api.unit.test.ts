@@ -14,15 +14,12 @@
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { BatchRecordTrpcApi } from "../src/api/app-trpc/batch-record.api";
+import type { DatasetService } from "@langwatch/dataset-contract";
 
-type TestContext = {
-  app: {
-    experiments: {
-      tryGetBySlug(input: { projectId: string; slug: string }): Promise<{ id: string } | null>;
-    };
-  };
-};
+import { BatchRecordTrpcApi } from "../src/api/app-trpc/batch-record.api";
+import { DatasetApp } from "../src/app/dataset.app";
+
+type TestContext = { app: { dataset: DatasetApp } };
 
 type PolicyCall = { permission: string; path: string; input: unknown };
 
@@ -56,7 +53,20 @@ function harness({ experiment = { id: "experiment-1" } as { id: string } | null 
     summariseByExperiment,
     listByExperiment,
     tryGetBySlug,
-    caller: router.createCaller({ app: { experiments: { tryGetBySlug } } }),
+    caller: router.createCaller({
+      app: {
+        dataset: DatasetApp.create({
+          // This surface reads no dataset: the two record reads are host ports.
+          dataset: {} as DatasetService,
+          experiments: {
+            tryGetBySlug,
+            getById: async () => {
+              throw new Error("the batch-record surface reads no experiment by id");
+            },
+          },
+        }),
+      },
+    }),
   };
 }
 

@@ -26,12 +26,13 @@
  * Enterprise plan. The plan lives in the process's billing store, so that
  * refusal arrives as a port.
  *
- * Transport only: gates, plan enforcement, name resolution for display, and
- * delegation to `OrganizationService` and the composed `ProjectService`.
+ * Transport only: gates, plan enforcement, and delegation to
+ * {@link OrganizationApp} — which is where the organization service, the
+ * composed project service, the ledger attribution and the binding-scope name
+ * resolution now arrive from.
  *
  * Spec: packages/features/organization/specs/organization-service.feature.
  */
-import type { LedgerActor } from "@langwatch/actor";
 import type { AuthzDeclaration } from "@langwatch/authz-contract";
 import {
   groupApiAddBindingInputSchema,
@@ -43,46 +44,22 @@ import {
   groupApiRemoveBindingInputSchema,
   groupApiRenameInputSchema,
   organizationApiScopeSchema,
-  type OrganizationGroupBinding,
-  type OrganizationService,
 } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
+import type { OrganizationApp } from "#app/organization.app";
 
 /**
- * The thirteen reads and writes this transport makes, named rather than taking
- * `OrganizationService` whole: the organization service is the widest surface
- * in the platform, and a group screen has no business depending on the parts
- * of it that answer billing seats, invites or settings.
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them. Before
+ * {@link OrganizationApp} this door declared its own `GroupApplication` —
+ * thirteen organization methods and one project one — which is why it could
+ * not reach the team screen's copy of the same composition.
  */
-type GroupOrganizationService = Pick<
-  OrganizationService,
-  | "getBillingProfile"
-  | "getTeam"
-  | "listGroups"
-  | "getGroup"
-  | "listGroupsForMember"
-  | "createGroup"
-  | "renameGroup"
-  | "deleteGroup"
-  | "addGroupMember"
-  | "removeGroupMember"
-  | "addGroupBinding"
-  | "removeGroupBinding"
-  | "applyGroupEdits"
->;
-
-/** The one project read a group screen makes: the name behind a binding. */
-type GroupProjectService = Pick<ProjectService, "tryGetById">;
-
-type GroupApplication = Readonly<{
-  organizations: GroupOrganizationService;
-  projects: GroupProjectService;
-}>;
-
-/** The process supplies authentication; authorization arrives as `policy`. */
 export type GroupTrpcContext = Readonly<{
-  app: GroupApplication;
+  app: Readonly<{ organizations: OrganizationApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -125,44 +102,6 @@ const ORGANIZATION_MANAGE: AuthzDeclaration = {
   permission: "organization:manage",
 };
 
-const ledgerActor = (userId: string): LedgerActor => ({ type: "user", id: userId });
-
-/**
- * The display name behind each binding's scope id, one lookup per distinct
- * scope rather than one per binding — a group bound to the same team through
- * several roles would otherwise read the team once for each.
- */
-async function resolveScopeNames(
-  app: GroupApplication,
-  organizationId: string,
-  bindings: readonly OrganizationGroupBinding[],
-): Promise<Map<string, string>> {
-  const names = new Map<string, string>();
-  const uniqueBindings = [
-    ...new Map(bindings.map((binding) => [binding.scopeId, binding])).values(),
-  ];
-  await Promise.all(
-    uniqueBindings.map(async (binding) => {
-      if (binding.scopeType === "ORGANIZATION") {
-        const organization = await app.organizations.getBillingProfile({ organizationId });
-        names.set(binding.scopeId, organization.name);
-        return;
-      }
-      if (binding.scopeType === "TEAM") {
-        const team = await app.organizations.getTeam({
-          organizationId,
-          teamId: binding.scopeId,
-        });
-        names.set(binding.scopeId, team.name);
-        return;
-      }
-      const project = await app.projects.tryGetById(binding.scopeId);
-      if (project) names.set(binding.scopeId, project.name);
-    }),
-  );
-  return names;
-}
-
 /**
  * Installs the complete `group.*` tRPC surface on a process-owned root. The
  * procedure and the policy are injected by the process so its auth, audit,
@@ -190,7 +129,10 @@ export class GroupTrpcApi {
             ...GROUP_PAGE,
           });
           const allBindings = page.data.flatMap(({ bindings }) => bindings);
-          const scopeNames = await resolveScopeNames(ctx.app, input.organizationId, allBindings);
+          const scopeNames = await ctx.app.organizations.resolveBindingScopeNames({
+            organizationId: input.organizationId,
+            bindings: allBindings,
+          });
           return page.data.map((group) => ({
             id: group.id,
             name: group.name,
@@ -210,7 +152,10 @@ export class GroupTrpcApi {
       getById: policy(ORGANIZATION_MANAGE)(procedure.input(groupApiGroupScopeSchema)).query(
         async ({ ctx, input }) => {
           const group = await ctx.app.organizations.getGroup(input);
-          const scopeNames = await resolveScopeNames(ctx.app, input.organizationId, group.bindings);
+          const scopeNames = await ctx.app.organizations.resolveBindingScopeNames({
+            organizationId: input.organizationId,
+            bindings: group.bindings,
+          });
           return {
             id: group.id,
             name: group.name,
@@ -229,10 +174,7 @@ export class GroupTrpcApi {
       create: policy(ORGANIZATION_MANAGE)(procedure.input(groupApiCreateInputSchema)).mutation(
         async ({ ctx, input }) => {
           await ports.assertScimAllowed(ctx, { organizationId: input.organizationId });
-          return ctx.app.organizations.createGroup({
-            ...input,
-            actor: ledgerActor(ctx.actor().id),
-          });
+          return ctx.app.organizations.createGroup(input, ctx.actor());
         },
       ),
 
@@ -240,22 +182,17 @@ export class GroupTrpcApi {
         procedure.input(groupApiAddBindingInputSchema),
       ).mutation(async ({ ctx, input }) => {
         const { organizationId, groupId, ...binding } = input;
-        const created = await ctx.app.organizations.addGroupBinding({
-          organizationId,
-          groupId,
-          binding,
-          actor: ledgerActor(ctx.actor().id),
-        });
+        const created = await ctx.app.organizations.addGroupBinding(
+          { organizationId, groupId, binding },
+          ctx.actor(),
+        );
         return { id: created.id };
       }),
 
       removeBinding: policy(ORGANIZATION_MANAGE)(
         procedure.input(groupApiRemoveBindingInputSchema),
       ).mutation(async ({ ctx, input }) => {
-        await ctx.app.organizations.removeGroupBinding({
-          ...input,
-          actor: ledgerActor(ctx.actor().id),
-        });
+        await ctx.app.organizations.removeGroupBinding(input, ctx.actor());
         return { success: true };
       }),
 
@@ -268,11 +205,10 @@ export class GroupTrpcApi {
 
       delete: policy(ORGANIZATION_MANAGE)(procedure.input(groupApiGroupScopeSchema)).mutation(
         async ({ ctx, input }) => {
-          await ctx.app.organizations.deleteGroup({
-            ...input,
-            actor: ledgerActor(ctx.actor().id),
-            allowScimManaged: true,
-          });
+          await ctx.app.organizations.deleteGroup(
+            { ...input, allowScimManaged: true },
+            ctx.actor(),
+          );
           return { success: true };
         },
       ),
@@ -285,7 +221,10 @@ export class GroupTrpcApi {
         async ({ ctx, input }) => {
           const groups = await ctx.app.organizations.listGroupsForMember(input);
           const allBindings = groups.flatMap(({ bindings }) => bindings);
-          const scopeNames = await resolveScopeNames(ctx.app, input.organizationId, allBindings);
+          const scopeNames = await ctx.app.organizations.resolveBindingScopeNames({
+            organizationId: input.organizationId,
+            bindings: allBindings,
+          });
           return groups.map((group) => ({
             id: group.id,
             name: group.name,
@@ -311,10 +250,7 @@ export class GroupTrpcApi {
       applyEdits: policy(ORGANIZATION_MANAGE)(
         procedure.input(groupApiApplyEditsInputSchema),
       ).mutation(async ({ ctx, input }) => {
-        await ctx.app.organizations.applyGroupEdits({
-          ...input,
-          actor: ledgerActor(ctx.actor().id),
-        });
+        await ctx.app.organizations.applyGroupEdits(input, ctx.actor());
         return { success: true };
       }),
     });

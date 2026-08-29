@@ -17,15 +17,16 @@
  *   orgProjects / orgTeams / orgMembers: the pickers the drawers render.
  *
  * Authorization is deliberately not declared as a permission: a personal API
- * key is the caller's own, and no `apiKey:*` permission exists to check. The
- * handler proves organization membership through
- * `ApiKeyService.ensureCallerIsOrgMember` before it reads anything, and the
- * admin-only paths (service keys, keys assigned to another user, another
- * user's key) ask `isOrgAdmin`. That is why every procedure below declares
- * `noPermission` with the organization id explicitly allowed.
+ * key is the caller's own, and no `apiKey:*` permission exists to check.
+ * {@link ApiKeyApp} proves organization membership before it reads anything,
+ * and asks `isOrgAdmin` on the admin-only paths. That is why every procedure
+ * below declares `noPermission` with the organization id explicitly allowed.
  *
- * Transport only: input validation, the membership and admin gates, audit,
- * and delegation to `ApiKeyService`.
+ * Transport only: input validation, audit, and delegation to
+ * {@link ApiKeyApp}. Nothing here constructs a transport error and nothing
+ * here catches one: the feature's refusals are handled errors carrying their
+ * own status, so the process's handled-error middleware derives the tRPC code
+ * from the cause rather than from a translation table kept here.
  */
 import {
   API_KEY_PERMISSION_MODES,
@@ -33,23 +34,21 @@ import {
   apiKeyRoleSchema,
   apiKeyScopeTypeSchema,
   refineRestrictedPermissions,
-  type ApiKeyBinding,
-  type ApiKeyService,
 } from "@langwatch/api-key-contract";
-import { HandledError } from "@langwatch/handled-error";
-import {
-  TRPCError,
-  type AnyTRPCRootTypes,
-  type TRPCRootObject,
-  type TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
+import type { ApiKeyApp } from "#app/api-key.app";
 
-type ApiKeyApplication = Readonly<{ apiKeys: ApiKeyService }>;
-
-/** The process supplies authentication; authorization arrives as `noPermission`. */
+/**
+ * The process supplies authentication; authorization arrives as
+ * `noPermission`.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them.
+ */
 export type ApiKeyTrpcContext = Readonly<{
-  app: ApiKeyApplication;
+  app: Readonly<{ apiKeys: ApiKeyApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -99,70 +98,10 @@ type ApiKeyTrpcPorts = Readonly<{
 
 /**
  * One shared reason: nothing here is gated on a permission, because a personal
- * key belongs to its owner and the handler proves that itself.
+ * key belongs to its owner and the application proves that itself.
  */
 const OWN_KEYS_REASON =
-  "personal API keys are the caller's own; the handler proves organization membership and ownership itself";
-
-/**
- * Translates the service's handled failures into their transport codes.
- *
- * Only the causes the service names are mapped. Anything else — an
- * infrastructure failure above all — is rethrown untouched so it degrades to a
- * generic unknown carrying a trace id, per ADR-045. Nothing here invents a
- * `HandledError` for a cause we cannot name.
- */
-function mapApiKeyHandledError(error: unknown): never {
-  if (HandledError.isHandled(error)) {
-    switch (error.code) {
-      case "api_key_not_found":
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: error.message,
-          cause: error,
-        });
-      case "api_key_not_owned":
-      case "api_key_permission_denied":
-      case "api_key_scope_violation":
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: error.message,
-          cause: error,
-        });
-      case "api_key_already_revoked":
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: error.message,
-          cause: error,
-        });
-      case "api_key_reserved_name":
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: error.message,
-          cause: error,
-        });
-      default:
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: error.message,
-          cause: error,
-        });
-    }
-  }
-  throw error;
-}
-
-async function ensureCallerIsOrgMember(
-  service: ApiKeyService,
-  userId: string,
-  organizationId: string,
-): Promise<void> {
-  try {
-    await service.ensureCallerIsOrgMember({ userId, organizationId });
-  } catch (error) {
-    mapApiKeyHandledError(error);
-  }
-}
+  "personal API keys are the caller's own; the application proves organization membership and ownership itself";
 
 /**
  * The binding shape the drawers post. Deliberately narrower than the
@@ -241,31 +180,9 @@ export class ApiKeyTrpcApi {
       myBindings: noPermission({
         reason: OWN_KEYS_REASON,
         allow: { organizationId: "listing caller's own role bindings" },
-      })(procedure.input(organizationScopeSchema)).query(async ({ ctx, input }) => {
-        const apiKeyService = ctx.app.apiKeys;
-        const actor = ctx.actor();
-        await ensureCallerIsOrgMember(apiKeyService, actor.id, input.organizationId);
-        const bindings = await apiKeyService.getUserBindings({
-          userId: actor.id,
-          organizationId: input.organizationId,
-        });
-
-        const { orgName, teamName, activeProjectIds, projectName, customRoleName } =
-          await apiKeyService.enrichBindingsWithNames({ bindings });
-
-        return bindings
-          .filter((b) => b.scopeType !== "PROJECT" || activeProjectIds.has(b.scopeId))
-          .map((b) => ({
-            ...b,
-            scopeName:
-              b.scopeType === "ORGANIZATION"
-                ? (orgName.get(b.scopeId) ?? null)
-                : b.scopeType === "TEAM"
-                  ? (teamName.get(b.scopeId) ?? null)
-                  : (projectName.get(b.scopeId) ?? null),
-            customRoleName: b.customRoleId ? (customRoleName.get(b.customRoleId) ?? null) : null,
-          }));
-      }),
+      })(procedure.input(organizationScopeSchema)).query(async ({ ctx, input }) =>
+        ctx.app.apiKeys.listCallerBindings(input, ctx.actor()),
+      ),
 
       /**
        * Resolve a single API key id to its display name.
@@ -285,15 +202,9 @@ export class ApiKeyTrpcApi {
       nameById: noPermission({
         reason: OWN_KEYS_REASON,
         allow: { organizationId: "naming an API key the caller can already see" },
-      })(procedure.input(nameByIdInputSchema)).query(async ({ ctx, input }) => {
-        const apiKeyService = ctx.app.apiKeys;
-        const actor = ctx.actor();
-        await ensureCallerIsOrgMember(apiKeyService, actor.id, input.organizationId);
-        return apiKeyService.tryGetNameByIdInOrg({
-          id: input.apiKeyId,
-          organizationId: input.organizationId,
-        });
-      }),
+      })(procedure.input(nameByIdInputSchema)).query(async ({ ctx, input }) =>
+        ctx.app.apiKeys.getKeyName(input, ctx.actor()),
+      ),
 
       /**
        * Lists API keys. Admins see all keys in the org; non-admins see only
@@ -303,80 +214,9 @@ export class ApiKeyTrpcApi {
       list: noPermission({
         reason: OWN_KEYS_REASON,
         allow: { organizationId: "listing API keys" },
-      })(procedure.input(organizationScopeSchema)).query(async ({ ctx, input }) => {
-        const apiKeyService = ctx.app.apiKeys;
-        const actor = ctx.actor();
-        await ensureCallerIsOrgMember(apiKeyService, actor.id, input.organizationId);
-        const callerIsAdmin = await apiKeyService.isOrgAdmin({
-          userId: actor.id,
-          organizationId: input.organizationId,
-        });
-
-        const apiKeys = callerIsAdmin
-          ? await apiKeyService.listAll({ organizationId: input.organizationId })
-          : await apiKeyService.list({
-              userId: actor.id,
-              organizationId: input.organizationId,
-            });
-
-        const allBindings = apiKeys.flatMap((k) => k.roleBindings);
-        const { orgName, teamName, projectName, customRoleName, customRoles } =
-          await apiKeyService.enrichBindingsWithNames({
-            bindings: allBindings.map((rb): ApiKeyBinding => ({
-              id: rb.id,
-              role: rb.role,
-              customRoleId: rb.customRoleId ?? null,
-              scopeType: rb.scopeType,
-              scopeId: rb.scopeId,
-            })),
-          });
-
-        const customRolePermissions = new Map(
-          customRoles.map((r) => [r.id, Array.isArray(r.permissions) ? r.permissions : []]),
-        );
-
-        const { users } = await apiKeyService.enrichApiKeyList({ apiKeys });
-        const userName = new Map(users.map((u) => [u.id, u.name ?? u.email]));
-        const userEmail = new Map(users.map((u) => [u.id, u.email]));
-
-        return apiKeys.map((apiKey) => ({
-          id: apiKey.id,
-          lookupIdPrefix: apiKey.lookupId.slice(0, 5),
-          name: apiKey.name,
-          description: apiKey.description,
-          permissionMode: apiKey.permissionMode,
-          userId: apiKey.userId,
-          userName: apiKey.userId ? (userName.get(apiKey.userId) ?? null) : null,
-          userEmail: apiKey.userId ? (userEmail.get(apiKey.userId) ?? null) : null,
-          createdByUserId: apiKey.createdByUserId,
-          createdByUserName: apiKey.createdByUserId
-            ? (userName.get(apiKey.createdByUserId) ?? null)
-            : null,
-          createdAt: apiKey.createdAt,
-          expiresAt: apiKey.expiresAt,
-          lastUsedAt: apiKey.lastUsedAt,
-          revokedAt: apiKey.revokedAt,
-          // Non-null marks this as an ingestion key (project-scoped, ingest-only
-          // write credential the `langwatch <tool>` CLI mints). null = regular
-          // personal / service key. Drives the API Keys page section split.
-          ingestSourceType: apiKey.ingestSourceType,
-          ingestionTemplateId: apiKey.ingestionTemplateId,
-          // Human label of the CLI device session that minted this ingestion key
-          // ("Rogerio's MacBook Pro"); null for keys without device provenance.
-          createdByDeviceLabel: apiKey.createdByDeviceLabel,
-          roleBindings: apiKey.roleBindings.map((rb) => ({
-            id: rb.id,
-            role: rb.role,
-            customRoleId: rb.customRoleId ?? null,
-            customRoleName: rb.customRoleId ? (customRoleName.get(rb.customRoleId) ?? null) : null,
-            customRolePermissions: rb.customRoleId
-              ? (customRolePermissions.get(rb.customRoleId) ?? null)
-              : null,
-            scopeType: rb.scopeType,
-            scopeId: rb.scopeId,
-          })),
-        }));
-      }),
+      })(procedure.input(organizationScopeSchema)).query(async ({ ctx, input }) =>
+        ctx.app.apiKeys.listKeys(input, ctx.actor()),
+      ),
 
       /**
        * Mints a key and hands back its plaintext token — once, here, and
@@ -387,145 +227,76 @@ export class ApiKeyTrpcApi {
         reason: OWN_KEYS_REASON,
         allow: { organizationId: "creating API key for user's own org" },
       })(procedure.input(createInputSchema)).mutation(async ({ ctx, input }) => {
-        const apiKeyService = ctx.app.apiKeys;
         const actor = ctx.actor();
-        await ensureCallerIsOrgMember(apiKeyService, actor.id, input.organizationId);
-        const isService = input.keyType === "service";
+        const { token, apiKey, assignedToUserId } = await ctx.app.apiKeys.createKey(
+          input,
+          actor,
+        );
 
-        // Service keys and assigning to another user both require admin
-        if (isService || (input.assignedToUserId && input.assignedToUserId !== actor.id)) {
-          const callerIsAdmin = await apiKeyService.isOrgAdmin({
-            userId: actor.id,
-            organizationId: input.organizationId,
-          });
-          if (!callerIsAdmin) {
-            throw new TRPCError({
-              code: "FORBIDDEN",
-              message: isService
-                ? "Only organization admins can create service API keys"
-                : "Only organization admins can create API keys for other users",
-            });
-          }
-        }
-
-        const targetUserId = isService ? null : (input.assignedToUserId ?? actor.id);
-        const createdByUserId = actor.id;
-        try {
-          const { token, apiKey } = await apiKeyService.create({
+        // The token is deliberately absent from the audit arguments: only the
+        // key's identity and shape are recorded, never its secret.
+        ports.recordAudit({
+          userId: actor.id,
+          organizationId: input.organizationId,
+          action: "apiKey.create",
+          args: {
+            apiKeyId: apiKey.id,
             name: input.name,
-            description: input.description,
-            userId: targetUserId,
-            createdByUserId,
-            organizationId: input.organizationId,
-            expiresAt: input.expiresAt,
+            keyType: input.keyType,
             permissionMode: input.permissionMode,
-            permissions: input.permissions,
-            bindings: input.bindings,
-          });
+            assignedToUserId,
+          },
+        });
 
-          // The token is deliberately absent from the audit arguments: only the
-          // key's identity and shape are recorded, never its secret.
-          ports.recordAudit({
-            userId: actor.id,
-            organizationId: input.organizationId,
-            action: "apiKey.create",
-            args: {
-              apiKeyId: apiKey.id,
-              name: input.name,
-              keyType: input.keyType,
-              permissionMode: input.permissionMode,
-              assignedToUserId: targetUserId,
-            },
-          });
-
-          return {
-            token,
-            apiKey: {
-              id: apiKey.id,
-              name: apiKey.name,
-              createdAt: apiKey.createdAt,
-            },
-          };
-        } catch (error) {
-          mapApiKeyHandledError(error);
-        }
+        return {
+          token,
+          apiKey: {
+            id: apiKey.id,
+            name: apiKey.name,
+            createdAt: apiKey.createdAt,
+          },
+        };
       }),
 
       update: noPermission({
         reason: OWN_KEYS_REASON,
         allow: { organizationId: "updating API key" },
       })(procedure.input(updateInputSchema)).mutation(async ({ ctx, input }) => {
-        const apiKeyService = ctx.app.apiKeys;
         const actor = ctx.actor();
-        await ensureCallerIsOrgMember(apiKeyService, actor.id, input.organizationId);
-        const callerIsAdmin = await apiKeyService.isOrgAdmin({
+        const updated = await ctx.app.apiKeys.updateKey(input, actor);
+
+        ports.recordAudit({
           userId: actor.id,
           organizationId: input.organizationId,
+          action: "apiKey.update",
+          args: {
+            apiKeyId: input.apiKeyId,
+            name: input.name,
+            permissionMode: input.permissionMode,
+          },
         });
 
-        try {
-          const updated = await apiKeyService.update({
-            id: input.apiKeyId,
-            callerUserId: actor.id,
-            callerIsAdmin,
-            organizationId: input.organizationId,
-            name: input.name,
-            description: input.description,
-            permissionMode: input.permissionMode,
-            permissions: input.permissions,
-            bindings: input.bindings,
-          });
-
-          ports.recordAudit({
-            userId: actor.id,
-            organizationId: input.organizationId,
-            action: "apiKey.update",
-            args: {
-              apiKeyId: input.apiKeyId,
-              name: input.name,
-              permissionMode: input.permissionMode,
-            },
-          });
-
-          return {
-            id: updated.id,
-            name: updated.name,
-            permissionMode: updated.permissionMode,
-          };
-        } catch (error) {
-          mapApiKeyHandledError(error);
-        }
+        return {
+          id: updated.id,
+          name: updated.name,
+          permissionMode: updated.permissionMode,
+        };
       }),
 
       revoke: noPermission({
         reason: OWN_KEYS_REASON,
         allow: { organizationId: "revoking API key" },
       })(procedure.input(revokeInputSchema)).mutation(async ({ ctx, input }) => {
-        const apiKeyService = ctx.app.apiKeys;
         const actor = ctx.actor();
-        await ensureCallerIsOrgMember(apiKeyService, actor.id, input.organizationId);
-        const callerIsAdmin = await apiKeyService.isOrgAdmin({
+        await ctx.app.apiKeys.revokeKey(input, actor);
+
+        ports.recordAudit({
           userId: actor.id,
           organizationId: input.organizationId,
+          action: "apiKey.revoke",
+          args: { apiKeyId: input.apiKeyId },
         });
 
-        try {
-          await apiKeyService.revoke({
-            id: input.apiKeyId,
-            callerUserId: actor.id,
-            callerIsAdmin,
-            organizationId: input.organizationId,
-          });
-
-          ports.recordAudit({
-            userId: actor.id,
-            organizationId: input.organizationId,
-            action: "apiKey.revoke",
-            args: { apiKeyId: input.apiKeyId },
-          });
-        } catch (error) {
-          mapApiKeyHandledError(error);
-        }
         return { success: true };
       }),
 
@@ -535,44 +306,23 @@ export class ApiKeyTrpcApi {
       orgProjects: noPermission({
         reason: OWN_KEYS_REASON,
         allow: { organizationId: "listing org projects for permission picker" },
-      })(procedure.input(organizationScopeSchema)).query(async ({ ctx, input }) => {
-        const apiKeyService = ctx.app.apiKeys;
-        const actor = ctx.actor();
-        await ensureCallerIsOrgMember(apiKeyService, actor.id, input.organizationId);
-        return apiKeyService.getOrgProjects({
-          organizationId: input.organizationId,
-        });
-      }),
+      })(procedure.input(organizationScopeSchema)).query(async ({ ctx, input }) =>
+        ctx.app.apiKeys.listOrganizationProjects(input, ctx.actor()),
+      ),
 
       orgTeams: noPermission({
         reason: OWN_KEYS_REASON,
         allow: { organizationId: "listing org teams for scope picker" },
-      })(procedure.input(organizationScopeSchema)).query(async ({ ctx, input }) => {
-        const apiKeyService = ctx.app.apiKeys;
-        const actor = ctx.actor();
-        await ensureCallerIsOrgMember(apiKeyService, actor.id, input.organizationId);
-        return apiKeyService.getOrgTeams({
-          organizationId: input.organizationId,
-        });
-      }),
+      })(procedure.input(organizationScopeSchema)).query(async ({ ctx, input }) =>
+        ctx.app.apiKeys.listOrganizationTeams(input, ctx.actor()),
+      ),
 
       orgMembers: noPermission({
         reason: OWN_KEYS_REASON,
         allow: { organizationId: "listing org members for key assignment" },
-      })(procedure.input(organizationScopeSchema)).query(async ({ ctx, input }) => {
-        const apiKeyService = ctx.app.apiKeys;
-        const actor = ctx.actor();
-        await ensureCallerIsOrgMember(apiKeyService, actor.id, input.organizationId);
-        const callerIsAdmin = await apiKeyService.isOrgAdmin({
-          userId: actor.id,
-          organizationId: input.organizationId,
-        });
-        if (!callerIsAdmin) return [];
-
-        return apiKeyService.getOrgMembers({
-          organizationId: input.organizationId,
-        });
-      }),
+      })(procedure.input(organizationScopeSchema)).query(async ({ ctx, input }) =>
+        ctx.app.apiKeys.listOrganizationMembers(input, ctx.actor()),
+      ),
     });
   }
 }

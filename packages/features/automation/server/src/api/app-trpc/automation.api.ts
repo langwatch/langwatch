@@ -37,34 +37,42 @@ import {
   EMAIL_RX,
   extractReportFromTriggerRow,
   hasActionableTriggerFilters,
+  InvalidActionParamsError,
   InvalidEmailRecipientError,
   MissingAnnotatorError,
+  MissingSlackWebhookError,
   NOTIFY_TRIGGER_ACTIONS,
   NotificationDeliveryError,
-  ProjectNotFoundError,
+  TestFireUnavailableError,
   TriggerAction,
   TriggerFiltersRequiredError,
   WEBHOOK_HEADER_VALUE_KEPT,
   type AutomationAction,
   type AutomationFilters,
-  type AutomationService,
   type CreateTriggerCommand,
   type GraphAlertActionParams,
   type NotificationCadence,
-  type TestFireProjectIdentity,
   type TestFireWebhookDestination,
 } from "@langwatch/automation-contract";
 import { isDispatchError } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
 import { generate as ksuid } from "@langwatch/ksuid";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
-import type { MonitorService } from "@langwatch/monitor-contract";
-import type { ProjectService } from "@langwatch/project-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { SlackChannelListing } from "../../adapters/slack-web-api.delivery.adapter";
 import type { AutomationWebhookStoredParams } from "../../ports/automation-provider.port";
+import {
+  AutomationFiltersUnsupportedError,
+  AutomationTraceFilterInvalidError,
+  AutomationWebhookUpsertRequiredError,
+  GraphAlertChannelUnsupportedError,
+  GraphAlertSeverityRequiredError,
+  GraphAlertThresholdRequiredError,
+  ReportChannelUnsupportedError,
+  ReportScheduleMissingError,
+  TestFireRateLimitedError,
+  type AutomationApp,
+} from "#app/automation.app";
 import { buildRetryAfterMessage } from "./retry-after-message";
 
 /**
@@ -74,22 +82,21 @@ import { buildRetryAfterMessage } from "./retry-after-message";
  */
 const TRIGGER_KSUID_RESOURCE = "trigger";
 
-type AutomationApplication = Readonly<{
-  automation: AutomationService;
-  monitors: MonitorService;
-  projects: ProjectService;
-  featureFlags: FeatureFlagService;
-}>;
-
 /**
  * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them. The REST family, which is
+ * built per family, holds {@link AutomationApp} directly. Both reach the same
+ * object; only the path to it differs.
  *
  * `session` rather than `actor()` alone: the test fire resolves its recipient
  * from the caller's own email address, which is the whole of ADR-031's
  * open-relay fix.
  */
 export type AutomationTrpcContext = Readonly<{
-  app: AutomationApplication;
+  app: Readonly<{ automation: AutomationApp }>;
   actor(): Readonly<{ id: string }>;
   session: Readonly<{ user: Readonly<{ email?: string | null }> }> | null;
 }>;
@@ -184,59 +191,32 @@ export type AutomationTrpcPorts = Readonly<{
   assertTraceFilterQueryCompiles(input: Readonly<{ query: string; projectId: string }>): void;
 }>;
 
-type TRPCErrorCode = ConstructorParameters<typeof TRPCError>[0]["code"];
-
-function httpStatusToTRPCCode(httpStatus: number): TRPCErrorCode {
-  switch (httpStatus) {
-    case 400:
-      return "BAD_REQUEST";
-    case 401:
-      return "UNAUTHORIZED";
-    case 403:
-      return "FORBIDDEN";
-    case 404:
-      return "NOT_FOUND";
-    case 409:
-      return "CONFLICT";
-    case 422:
-      return "UNPROCESSABLE_CONTENT";
-    case 429:
-      return "TOO_MANY_REQUESTS";
-    default:
-      return "INTERNAL_SERVER_ERROR";
-  }
-}
-
 /**
- * Wraps any thrown value as a `TRPCError` whose `cause` is preserved when the
- * value is a `HandledError`. The shared `errorFormatter` serialises that cause
- * as `error.data.error = { code, meta, traceId, spanId, … }` so the client gets
- * the full structured payload (see ADR-036 follow-up).
+ * Re-raises a thrown value on the typed channel, and never returns.
+ *
+ * A `HandledError` is already on that channel and leaves untouched: the
+ * process's tRPC policy maps its status to a code and its `serialize()` to
+ * `data.error`, which is the whole reason this transport no longer builds a
+ * `TRPCError` itself.
+ *
+ * A provider rejection (Slack `not_in_channel`, a dead webhook, a bad token)
+ * arrives as a `DispatchError` with an already-actionable message, so it is
+ * lifted onto the typed channel here rather than reaching the customer as a
+ * generic 500.
+ *
+ * Anything else is re-raised exactly as it arrived. That is deliberate: an
+ * unanticipated failure degrades to "unknown" plus a trace id at the boundary
+ * (ADR-045), and dressing it up as handled would promise the caller an action
+ * they do not have.
  */
-function toTemplateTRPCError(err: unknown): TRPCError {
-  if (err instanceof TRPCError) return err;
-  // A provider rejection (Slack not_in_channel, dead webhook, bad token) arrives
-  // as a DispatchError with an already-actionable message — lift it onto the
-  // typed HandledError channel so the UI shows a clean 4xx, not a generic 500.
-  const domainError = HandledError.isHandled(err)
-    ? err
-    : isDispatchError(err)
-      ? new NotificationDeliveryError(err.message, {
-          customerMessage: err.customerMessage,
-        })
-      : null;
-  if (domainError) {
-    return new TRPCError({
-      code: httpStatusToTRPCCode(domainError.httpStatus),
-      message: domainError.message,
-      cause: domainError,
+function raiseAsHandled(err: unknown): never {
+  if (HandledError.isHandled(err)) throw err;
+  if (isDispatchError(err)) {
+    throw new NotificationDeliveryError(err.message, {
+      customerMessage: err.customerMessage,
     });
   }
-  return new TRPCError({
-    code: "INTERNAL_SERVER_ERROR",
-    message: err instanceof Error ? err.message : "Unexpected error",
-    cause: err instanceof Error ? err : undefined,
-  });
+  throw err;
 }
 
 /**
@@ -325,15 +305,6 @@ function resolveCadenceForUpdate(
   return requested;
 }
 
-async function resolveProjectIdentity(
-  projectId: string,
-  projects: ProjectService,
-): Promise<TestFireProjectIdentity> {
-  const project = await projects.tryGetSummaryById(projectId);
-  if (!project) throw new ProjectNotFoundError(projectId);
-  return { name: project.name, slug: project.slug };
-}
-
 /**
  * Validates recipient addresses by RFC shape only — external addresses are
  * intentionally allowed (Slack's "email to a channel" pattern, partner
@@ -386,23 +357,15 @@ export class AutomationTrpcApi {
           // feature-flag-bypassing SEND_WEBHOOK row; the provider-aware upsert is
           // the sole webhook writer.
           if (input.action === TriggerAction.SEND_WEBHOOK) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "Webhook automations must be created through the provider-aware upsert API.",
-            });
+            throw new AutomationWebhookUpsertRequiredError();
           }
 
           // This path only ever writes AUTOMATION rows (it carries no graph or
-          // report shape), so the condition is always required here.
-          if (!hasActionableTriggerFilters(input.filters)) {
-            throw toTemplateTRPCError(new TriggerFiltersRequiredError());
-          }
+          // report shape), so the condition is always required here. The rule
+          // lives on the application, which the REST family reaches too.
+          ctx.app.automation.assertTraceConditionPresent(input.filters);
 
-          const project = await ctx.app.projects.tryGetSummaryById(input.projectId);
-
-          if (!project) {
-            throw toTemplateTRPCError(new ProjectNotFoundError(input.projectId));
-          }
+          await ctx.app.automation.getProjectIdentity(input.projectId);
 
           if (input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE) {
             // Server-stamp the creator — the schema does not expose this to the
@@ -410,19 +373,13 @@ export class AutomationTrpcApi {
             (input.actionParams as Record<string, unknown>).createdByUserId = ctx.actor().id;
 
             if (!input.actionParams.annotators) {
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: "Annotators are required",
-              });
+              throw new MissingAnnotatorError();
             }
           }
 
           if (input.action === TriggerAction.SEND_SLACK_MESSAGE) {
             if (!input.actionParams.slackWebhook) {
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: "Slack webhook is required",
-              });
+              throw new MissingSlackWebhookError();
             }
           } else if (input.action === TriggerAction.SEND_EMAIL) {
             // Align with `upsert` (and `validateEmailRecipientFormats`): RFC
@@ -432,11 +389,7 @@ export class AutomationTrpcApi {
             // contracts for the same action would force the drawer to
             // branch on create-vs-edit, which is a footgun.
             if (input.actionParams.members && input.actionParams.members.length > 0) {
-              try {
-                validateEmailRecipientFormats(input.actionParams.members);
-              } catch (err) {
-                throw toTemplateTRPCError(err);
-              }
+              validateEmailRecipientFormats(input.actionParams.members);
             }
           }
 
@@ -451,28 +404,23 @@ export class AutomationTrpcApi {
             notificationCadence: resolveCadenceForCreate(input.action, input.notificationCadence),
           });
 
-          await ctx.app.automation.invalidate(input.projectId);
-
           return redactTriggerForRead(trigger);
         },
       ),
 
+      /**
+       * Removal is one operation on the application: the soft delete, the
+       * retirement of any scheduled-report entry, and the dispatch-cache
+       * invalidation. Doing it in three calls here left the REST family free to
+       * do two of the three, which is exactly what it did.
+       */
       deleteById: policy("triggers:delete")(
         procedure.input(automationApiTriggerScopeSchema),
       ).mutation(async ({ input, ctx }) => {
-        await ctx.app.automation.softDeleteById({
+        await ctx.app.automation.delete({
           triggerId: input.triggerId,
           projectId: input.projectId,
         });
-
-        // Best-effort: deactivate any scheduled-report entry for this trigger
-        // (harmless no-op for non-report triggers).
-        await ctx.app.automation.removeReportSchedule({
-          projectId: input.projectId,
-          triggerId: input.triggerId,
-        });
-
-        await ctx.app.automation.invalidate(input.projectId);
 
         return { success: true };
       }),
@@ -485,7 +433,7 @@ export class AutomationTrpcApi {
 
           const allCheckIds = triggers.flatMap((trigger) => extractCheckKeys(trigger.filters));
 
-          const allChecks = await ctx.app.monitors.getAllByIds({
+          const allChecks = await ctx.app.automation.getMonitorsByIds({
             monitorIds: allCheckIds,
             projectId: input.projectId,
           });
@@ -630,16 +578,10 @@ export class AutomationTrpcApi {
       toggleTrigger: policy("triggers:update")(
         procedure.input(automationApiToggleTriggerInputSchema),
       ).mutation(async ({ input, ctx }) => {
-        const existing = await ctx.app.automation.tryGetById({
+        const existing = await ctx.app.automation.requireById({
           triggerId: input.triggerId,
           projectId: input.projectId,
         });
-        if (!existing) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Automation not found in this project.",
-          });
-        }
 
         // A report's schedule does not live on `Trigger.active` — it lives on the
         // scheduler. Flipping the flag alone left the `ScheduledJob` claiming its
@@ -649,11 +591,7 @@ export class AutomationTrpcApi {
         const isReport = existing.triggerKind === "REPORT";
         const report = isReport ? extractReportFromTriggerRow(existing.actionParams) : null;
         if (isReport && input.active && !report) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message:
-              "This report has no valid schedule. Edit it and pick a schedule before resuming it.",
-          });
+          throw new ReportScheduleMissingError();
         }
 
         const trigger = await ctx.app.automation.update({
@@ -682,8 +620,6 @@ export class AutomationTrpcApi {
             });
           }
         }
-
-        await ctx.app.automation.invalidate(input.projectId);
 
         return redactTriggerForRead(trigger);
       }),
@@ -732,32 +668,18 @@ export class AutomationTrpcApi {
         const { sanitized, unknownFields } = partitionFilterFields(input.filters);
 
         if (unknownFields.length > 0 && Object.keys(sanitized).length === 0) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message:
-              "This automation only contains unsupported legacy filters. Add at least one supported filter before saving.",
-          });
+          throw new AutomationFiltersUnsupportedError(unknownFields);
         }
 
         // Editing is the other way to end up with a match-everything automation:
-        // create it with a real condition, then clear it here. The existing row
-        // decides whether that is allowed — an automation whose condition lives
-        // in its query keeps a legitimately empty structured set, and alerts and
-        // reports have no trace condition to require in the first place.
+        // create it with a real condition, then clear it here. The rule — which
+        // the REST family enforces too — is the application's.
         if (!hasActionableTriggerFilters(sanitized)) {
-          const existing = await ctx.app.automation.tryGetById({
+          const existing = await ctx.app.automation.requireById({
             triggerId: input.triggerId,
             projectId: input.projectId,
           });
-          if (!existing) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Automation not found in this project.",
-            });
-          }
-          if (existing.triggerKind === "AUTOMATION" && (existing.filterQuery ?? "").trim() === "") {
-            throw toTemplateTRPCError(new TriggerFiltersRequiredError());
-          }
+          ctx.app.automation.assertConditionSurvivesEdit({ existing, filters: sanitized });
         }
 
         const trigger = await ctx.app.automation.update({
@@ -765,8 +687,6 @@ export class AutomationTrpcApi {
           projectId: input.projectId,
           filters: sanitized,
         });
-
-        await ctx.app.automation.invalidate(input.projectId);
 
         return redactTriggerForRead(trigger);
       }),
@@ -787,17 +707,10 @@ export class AutomationTrpcApi {
           // flag-gated client-side, and the server refuses the channel too so
           // the flag can't be bypassed by calling the API directly.
           if (input.channel === "webhook") {
-            const allowed = await ctx.app.featureFlags.isEnabled("release_webhook_automations", {
-              kind: "project",
-              userId: ctx.actor().id,
+            await ctx.app.automation.assertWebhookChannelEnabled({
               projectId: input.projectId,
+              userId: ctx.actor().id,
             });
-            if (!allowed) {
-              throw new TRPCError({
-                code: "FORBIDDEN",
-                message: "Webhook automations are not enabled for this project.",
-              });
-            }
           }
           // Email shares the mail provider; webhook fires at an ARBITRARY
           // customer URL from our worker IPs, so an uncapped test button would
@@ -810,23 +723,23 @@ export class AutomationTrpcApi {
               max: 10,
             });
             if (!limit.allowed) {
-              throw new TRPCError({
-                code: "TOO_MANY_REQUESTS",
-                message: buildRetryAfterMessage({
+              throw new TestFireRateLimitedError(
+                buildRetryAfterMessage({
                   prefix: "Too many test fires.",
                   resetAt: limit.resetAt,
                 }),
-              });
+                limit.resetAt,
+              );
             }
           }
           let recipients: string[] = [];
           if (input.channel === "email") {
             const email = ctx.session?.user.email;
             if (!email) {
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: "Your account has no email address to send a test fire to.",
-              });
+              throw new TestFireUnavailableError(
+                "email",
+                "Your account has no email address to send a test fire to.",
+              );
             }
             recipients = [email];
           }
@@ -844,10 +757,10 @@ export class AutomationTrpcApi {
               token = ports.providers.decryptSlackBotToken(saved?.actionParams ?? {});
             }
             if (!token || !channel) {
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: "Add a Slack bot token and channel before sending a test fire.",
-              });
+              throw new TestFireUnavailableError(
+                "slack",
+                "Add a Slack bot token and channel before sending a test fire.",
+              );
             }
             botDestination = { token, channel };
           }
@@ -874,10 +787,10 @@ export class AutomationTrpcApi {
               });
               const stored = (row?.actionParams ?? {}) as AutomationWebhookStoredParams;
               if (stored?.url !== webhookDestination.url) {
-                throw new TRPCError({
-                  code: "BAD_REQUEST",
-                  message: "Re-enter webhook header values after changing the destination URL.",
-                });
+                throw new TestFireUnavailableError(
+                  "webhook",
+                  "Re-enter webhook header values after changing the destination URL.",
+                );
               }
               saved = ports.providers.decryptWebhookHeaders(stored);
             }
@@ -909,7 +822,7 @@ export class AutomationTrpcApi {
             }
           }
 
-          const project = await resolveProjectIdentity(input.projectId, ctx.app.projects);
+          const project = await ctx.app.automation.getProjectIdentity(input.projectId);
           return await ctx.app.automation.testFire({
             channel: input.channel,
             trigger: input.trigger,
@@ -923,7 +836,7 @@ export class AutomationTrpcApi {
             report: input.report,
           });
         } catch (err) {
-          throw toTemplateTRPCError(err);
+          raiseAsHandled(err);
         }
       }),
 
@@ -937,54 +850,31 @@ export class AutomationTrpcApi {
             // The webhook channel ships dark (ADR-040 §7): gate the save route as
             // well as the picker, so the flag can't be bypassed via the API.
             if (input.action === TriggerAction.SEND_WEBHOOK) {
-              const allowed = await ctx.app.featureFlags.isEnabled("release_webhook_automations", {
-                kind: "project",
-                userId: ctx.actor().id,
+              await ctx.app.automation.assertWebhookChannelEnabled({
                 projectId: input.projectId,
+                userId: ctx.actor().id,
               });
-              if (!allowed) {
-                throw new TRPCError({
-                  code: "FORBIDDEN",
-                  message: "Webhook automations are not enabled for this project.",
-                });
-              }
             }
             if (isGraphAlert) {
               // Graph alerts only support notify channels — there is no
               // "ADD_TO_DATASET on a metric crossing a threshold" UX.
               if (!NOTIFY_TRIGGER_ACTIONS.has(input.action)) {
-                throw new TRPCError({
-                  code: "BAD_REQUEST",
-                  message:
-                    "Graph alerts only support notify channels (Email, Slack, or a webhook).",
-                });
+                throw new GraphAlertChannelUnsupportedError();
               }
               if (!input.graphAlert) {
-                throw new TRPCError({
-                  code: "BAD_REQUEST",
-                  message:
-                    "Graph alerts require a threshold rule (operator, threshold, time period, series).",
-                });
+                throw new GraphAlertThresholdRequiredError();
               }
               if (!input.alertType) {
-                throw new TRPCError({
-                  code: "BAD_REQUEST",
-                  message: "Graph alerts require an alert severity.",
-                });
+                throw new GraphAlertSeverityRequiredError();
               }
               // The graph must belong to the calling project — multitenancy
               // gate. Without this a hostile client could attach a trigger to
-              // a graph from another tenant.
-              const graphExists = await ctx.app.automation.customGraphExistsInProject({
+              // a graph from another tenant. The rule is the application's, so
+              // a second writing door cannot forget it.
+              await ctx.app.automation.requireCustomGraphInProject({
                 customGraphId: input.customGraphId ?? "",
                 projectId: input.projectId,
               });
-              if (!graphExists) {
-                throw new TRPCError({
-                  code: "NOT_FOUND",
-                  message: "Graph not found in this project.",
-                });
-              }
             }
             if (isReport) {
               // A report sends a rendered notification on a schedule — notify
@@ -993,10 +883,7 @@ export class AutomationTrpcApi {
                 input.action !== TriggerAction.SEND_EMAIL &&
                 input.action !== TriggerAction.SEND_SLACK_MESSAGE
               ) {
-                throw new TRPCError({
-                  code: "BAD_REQUEST",
-                  message: "Reports can only send Email or Slack notifications.",
-                });
+                throw new ReportChannelUnsupportedError();
               }
             }
             // Per-action shape validation: the provider registry's per-action
@@ -1008,10 +895,10 @@ export class AutomationTrpcApi {
             const perAction = ports.providers.actionParamsSchemaFor(input.action);
             const perActionParsed = perAction.safeParse(input.actionParams);
             if (!perActionParsed.success) {
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: `Invalid actionParams for ${input.action}: ${perActionParsed.error.issues[0]?.message ?? "validation failed"}`,
-              });
+              throw new InvalidActionParamsError(
+                `Invalid actionParams for ${input.action}: ${perActionParsed.error.issues[0]?.message ?? "validation failed"}`,
+                input.action,
+              );
             }
             // Persist the PARSED params, not the wire object: Zod strips keys the
             // action doesn't declare, so a Slack secret typed before switching the
@@ -1035,7 +922,7 @@ export class AutomationTrpcApi {
               throw new MissingAnnotatorError();
             }
           } catch (err) {
-            throw toTemplateTRPCError(err);
+            raiseAsHandled(err);
           }
 
           // ADR-043 Subject facet: normalise + validate the trace-filter query
@@ -1052,12 +939,9 @@ export class AutomationTrpcApi {
                 projectId: input.projectId,
               });
             } catch (err) {
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: `Invalid trace filter: ${
-                  err instanceof Error ? err.message : "could not parse the query"
-                }`,
-              });
+              throw new AutomationTraceFilterInvalidError(
+                err instanceof Error ? err.message : "could not parse the query",
+              );
             }
           }
 
@@ -1072,7 +956,7 @@ export class AutomationTrpcApi {
             filterQuery === null &&
             !hasActionableTriggerFilters(input.filters)
           ) {
-            throw toTemplateTRPCError(new TriggerFiltersRequiredError());
+            throw new TriggerFiltersRequiredError();
           }
 
           // ADR-041 Slack bot delivery: encrypt a freshly-entered bot token (or

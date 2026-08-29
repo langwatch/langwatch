@@ -37,19 +37,22 @@ import type {
   LangWatchQLProtections,
   LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
-import type { DashboardService } from "@langwatch/dashboard-contract";
 import type {
   AnyTRPCRootTypes,
   TRPCRootObject,
   TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
+import type { DashboardApp } from "#app/dashboard.app";
 
-type SavedWorkbenchChartApplication = Readonly<{ dashboard: DashboardService }>;
-
-/** The host supplies authentication; authorization arrives as `policy`. */
+/**
+ * The host supplies authentication; authorization arrives as `policy`.
+ *
+ * The same slice `dashboards.*` and `graphs.*` take, and the same
+ * {@link DashboardApp} object.
+ */
 export type SavedWorkbenchChartTrpcContext = Readonly<{
-  app: SavedWorkbenchChartApplication;
+  app: Readonly<{ dashboard: DashboardApp }>;
 }>;
 
 type SavedWorkbenchChartTrpcProcedures<

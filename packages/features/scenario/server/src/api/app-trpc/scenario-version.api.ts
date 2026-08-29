@@ -69,7 +69,7 @@ export function createScenarioVersionRouter<
         ),
       ];
       const authors =
-        authorIds.length > 0 ? await ctx.app.users.getProfiles({ userIds: authorIds }) : [];
+        authorIds.length > 0 ? await ctx.app.scenarios.getUserProfiles({ userIds: authorIds }) : [];
       const nameById = new Map(authors.map((author) => [author.id, author.name]));
 
       return {
@@ -115,12 +115,14 @@ export function createScenarioVersionRouter<
         "Restoring scenario version",
       );
       return await ctx.app.scenarios
-        .restoreVersion({
-          projectId: input.projectId,
-          scenarioId: input.scenarioId,
-          version: input.version,
-          actor: { userId: ctx.actor().id, label: "user" },
-        })
+        .restoreVersion(
+          {
+            projectId: input.projectId,
+            scenarioId: input.scenarioId,
+            version: input.version,
+          },
+          ctx.actor(),
+        )
         .catch(mapScenarioError);
     }),
   });

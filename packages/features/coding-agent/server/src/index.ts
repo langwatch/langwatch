@@ -25,11 +25,28 @@ export {
   NoopCodingAgentReadMetricsPort,
   type CodingAgentSessionListReadOutcome,
 } from "./adapters/coding-agent-read-metrics.adapter";
+/**
+ * The feature's application: the one typed thing its transports are given.
+ * Both doors reach the same object, so a rule written on it is the rule both
+ * doors get.
+ */
+export {
+  CodingAgentApp,
+  type CodingAgentAppDependencies,
+  type CodingAgentCaller,
+  type CodingAgentCallerScope,
+  type CodingAgentGithubConnection,
+  type CodingAgentPullRequestRef,
+  type CodingAgentScopePorts,
+} from "./app/coding-agent.app";
 export {
   CodingAgentTrpcApi,
-  type CodingAgentCallerScope,
   type CodingAgentTrpcContext,
   type CodingAgentTrpcPorts,
   type CodingAgentTrpcRequest,
   type CodingAgentViewerVisibility,
 } from "./api/app-trpc/coding-agent.api";
+export {
+  createCodingAgentRestApp,
+  type CodingAgentRestAuditPort,
+} from "./api/app-rest/coding-agent.api";

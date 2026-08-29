@@ -1,3 +1,24 @@
+/**
+ * The feature's application: the one typed thing its transports are given.
+ * Every door reaches the same object, so a rule written on it is the rule
+ * every door gets.
+ */
+export {
+  StoredObjectApp,
+  type StoredObjectAppDependencies,
+  type StoredObjectFileRead,
+  type StoredObjectFileReadPort,
+  type StoredObjectFileRow,
+  type StoredObjectHead,
+} from "./app/stored-object.app";
+export {
+  createFilesRestApp,
+  isPermissionDenial,
+  requiredPermissionForPurpose,
+  type FilesDualAuthVariables,
+  type FilesProjectPermissionCheck,
+  type FilesRateLimiter,
+} from "./api/app-rest/stored-object.api";
 export { StoredObjectsInternalApi } from "./api/internal/stored-object.api";
 export { StoredObjectOwnerLookupRuntime } from "./adapters/stored-object-owner-lookup.runtime";
 export {
@@ -56,7 +77,5 @@ export {
 export { PostgresStoredObjectAdapter } from "./adapters/postgres.stored-object.adapter";
 export {
   StoredObjectTrpcApi,
-  type StoredObjectHead,
-  type StoredObjectProbe,
   type StoredObjectTrpcContext,
 } from "./api/app-trpc/stored-object.api";

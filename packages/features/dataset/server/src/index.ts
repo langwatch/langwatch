@@ -1,4 +1,10 @@
 export {
+  DatasetApp,
+  type DatasetAppDependencies,
+  type DatasetExperimentLookup,
+  type DatasetUpsertInput,
+} from "./app/dataset.app";
+export {
   DatasetTrpcApi,
   type DatasetTrpcContext,
   type DatasetTrpcPorts,

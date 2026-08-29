@@ -5,8 +5,8 @@
  * `virtualKeys:manage` / `:rotate` / `:delete`. A personal key is authorised by
  * the caller BEING its principal user, not by RBAC: every member may mint, list
  * and revoke their OWN keys in any organization they belong to. Membership is
- * proved in the handler so a caller cannot operate against an organization they
- * are not in.
+ * proved by the application so a caller cannot operate against an organization
+ * they are not in.
  *
  * The one place a permission genuinely applies is auditing someone else's keys:
  * `virtualKeys:viewOtherPersonal` is what widens `list` past the caller's own,
@@ -17,39 +17,29 @@
  * `issuePersonal` returns the plaintext key once, at the moment of minting, and
  * the caller must persist it immediately. `list` never returns secret material.
  *
- * Transport only: input parsing, the membership and duplicate-label gates,
- * the typed-error translation, and delegation to the Governance service.
+ * Transport only: input parsing, the wire shape of the mint response, and
+ * delegation. The membership gate, the duplicate-label refusal and the typed
+ * refusals all belong to {@link GovernanceApp}, which both of this feature's
+ * transports reach.
  */
-import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
-import {
-  NoEligibleProvidersError,
-  PersonalVirtualKeyNotFoundError,
-  RoutingPolicyHasNoProvidersError,
-  type GovernanceService,
-} from "@langwatch/enterprise-governance-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
-import {
-  TRPCError,
-  type AnyTRPCRootTypes,
-  type TRPCRootObject,
-  type TRPCRuntimeConfigOptions,
+import type { AuthzPermission } from "@langwatch/authz-contract";
+import type {
+  AnyTRPCRootTypes,
+  TRPCRootObject,
+  TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
+import type { GovernanceApp } from "#app/governance.app";
 
-type PersonalVirtualKeyApplication = Readonly<{
-  governance: GovernanceService;
-  organizations: Pick<OrganizationService, "ensurePersonalWorkspace">;
-  /**
-   * The process's permission engine. Read directly rather than through a port
-   * because the one question this surface asks it — may the caller see somebody
-   * else's personal keys — is a plain decision at the organization scope.
-   */
-  permissions: Pick<AuthzService, "getDecision">;
-}>;
-
-/** The process supplies authentication; authorization arrives as the policies. */
+/**
+ * The process supplies authentication; authorization arrives as the policies.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them.
+ */
 export type PersonalVirtualKeyTrpcContext = Readonly<{
-  app: PersonalVirtualKeyApplication;
+  app: Readonly<{ governanceApp: GovernanceApp }>;
   actor(): Readonly<{ id: string }>;
   /**
    * The signed-in user's display identity. Read only for the lazy
@@ -86,23 +76,6 @@ type PersonalVirtualKeyTrpcProcedures<
   }): ProcedureDecorator;
 }>;
 
-export type PersonalVirtualKeyTrpcPorts = Readonly<{
-  /** Whether the caller belongs to this organization at all. */
-  isOrganizationMember(input: { organizationId: string; userId: string }): Promise<boolean>;
-  /**
-   * Whether this user already has an unrevoked personal key under this label.
-   *
-   * The (organizationId, principalUserId, name) tuple is the personal-key
-   * uniqueness contract: two members of one organization may each hold a
-   * "default", but one member may not hold two.
-   */
-  hasActivePersonalKeyLabelled(input: {
-    organizationId: string;
-    userId: string;
-    label: string;
-  }): Promise<boolean>;
-}>;
-
 const organizationScopeSchema = z.object({ organizationId: z.string() });
 
 /** Installs the complete `personalVirtualKeys.*` tRPC surface on a process root. */
@@ -111,26 +84,18 @@ export class PersonalVirtualKeyTrpcApi {
     TContext extends PersonalVirtualKeyTrpcContext,
     TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
     TRoot extends AnyTRPCRootTypes,
-    TPorts extends PersonalVirtualKeyTrpcPorts,
   >(
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: PersonalVirtualKeyTrpcProcedures<TContext, TOptions, TRoot>,
-    ports: TPorts,
   ) {
     const { protected: procedure, policy, resolverAuthorizedPolicy } = procedures;
 
-    /** Refuses a caller who is not in the organization they named. */
-    const assertOrganizationMembership = async (input: {
-      organizationId: string;
-      userId: string;
-    }): Promise<void> => {
-      if (!(await ports.isOrganizationMember(input))) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: `Not a member of organization ${input.organizationId}`,
-        });
-      }
-    };
+    /** The caller, plus the display identity the lazy workspace backfill names. */
+    const callerOf = (ctx: PersonalVirtualKeyTrpcContext) => ({
+      id: ctx.actor().id,
+      displayName: ctx.session?.user.name ?? null,
+      displayEmail: ctx.session?.user.email ?? null,
+    });
 
     return trpc.router({
       /**
@@ -152,44 +117,12 @@ export class PersonalVirtualKeyTrpcApi {
             targetUserId: z.string().optional(),
           }),
         ),
-      ).query(async ({ ctx, input }) => {
-        const callerId = ctx.actor().id;
-        await assertOrganizationMembership({
-          organizationId: input.organizationId,
-          userId: callerId,
-        });
-
-        // Resolve which principal(s) the result is scoped to. Own keys are
-        // always visible; anything wider needs viewOtherPersonal.
-        let principalUserId: string | undefined;
-        if (input.targetUserId === callerId) {
-          principalUserId = callerId;
-        } else {
-          const { permitted: canViewOthers } = await ctx.app.permissions.getDecision({
-            userId: callerId,
-            permission: "virtualKeys:viewOtherPersonal",
-            scope: { tier: "organization", id: input.organizationId },
-          });
-          if (input.targetUserId !== undefined) {
-            if (!canViewOthers) {
-              throw new TRPCError({
-                code: "FORBIDDEN",
-                message: "permission_denied: virtualKeys:viewOtherPersonal",
-              });
-            }
-            principalUserId = input.targetUserId;
-          } else {
-            // No target: an admin sweeps the whole organization, a plain member
-            // sees only their own keys.
-            principalUserId = canViewOthers ? undefined : callerId;
-          }
-        }
-
-        return ctx.app.governance.personalVirtualKeyList({
-          userId: principalUserId,
-          organizationId: input.organizationId,
-        });
-      }),
+      ).query(async ({ ctx, input }) =>
+        ctx.app.governanceApp.listPersonalVirtualKeys(
+          { organizationId: input.organizationId, targetUserId: input.targetUserId },
+          callerOf(ctx),
+        ),
+      ),
 
       /**
        * Issue a new personal key under the given label. Returns the secret
@@ -213,68 +146,14 @@ export class PersonalVirtualKeyTrpcApi {
           }),
         ),
       ).mutation(async ({ ctx, input }) => {
-        const actor = ctx.actor();
-        await assertOrganizationMembership({
-          organizationId: input.organizationId,
-          userId: actor.id,
-        });
-
-        // Make sure the personal workspace exists (lazy backfill for members
-        // who joined before this feature shipped).
-        const workspace = await ctx.app.organizations.ensurePersonalWorkspace({
-          userId: actor.id,
-          organizationId: input.organizationId,
-          displayName: ctx.session?.user.name ?? null,
-          displayEmail: ctx.session?.user.email ?? null,
-        });
-
-        // Duplicate labels are refused at the application layer.
-        const duplicate = await ports.hasActivePersonalKeyLabelled({
-          organizationId: input.organizationId,
-          userId: actor.id,
-          label: input.label,
-        });
-        if (duplicate) {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: `You already have a personal key labelled '${input.label}'`,
-          });
-        }
-
-        let issued;
-        try {
-          issued = await ctx.app.governance.personalVirtualKeyIssue({
-            userId: actor.id,
+        const issued = await ctx.app.governanceApp.issuePersonalVirtualKey(
+          {
             organizationId: input.organizationId,
-            personalProjectId: workspace.project.id,
-            personalTeamId: workspace.team.id,
             label: input.label,
             routingPolicyId: input.routingPolicyId,
-          });
-        } catch (err) {
-          // Default-resolution with zero accessible providers: the member
-          // genuinely has nothing to route through. Answered as 409 so the CLI
-          // and the /me screen can surface the actionable "ask your admin to
-          // add a provider" message at mint time, instead of letting the member
-          // discover the gap through a copy-pasted request that times out.
-          if (err instanceof NoEligibleProvidersError) {
-            throw new TRPCError({
-              code: "CONFLICT",
-              message: err.message,
-              cause: err,
-            });
-          }
-          // An empty routing policy the caller explicitly pinned. 422: the
-          // request is well formed, but the pinned policy cannot yet serve it.
-          if (err instanceof RoutingPolicyHasNoProvidersError) {
-            throw new TRPCError({
-              code: "UNPROCESSABLE_CONTENT",
-              message: err.message,
-              cause: err,
-            });
-          }
-          throw err;
-        }
+          },
+          callerOf(ctx),
+        );
 
         // The one moment the plaintext key exists on the wire.
         return {
@@ -291,27 +170,10 @@ export class PersonalVirtualKeyTrpcApi {
       revokePersonal: policy("organization:view")(
         procedure.input(organizationScopeSchema.extend({ id: z.string() })),
       ).mutation(async ({ ctx, input }) => {
-        const actorId = ctx.actor().id;
-        await assertOrganizationMembership({
-          organizationId: input.organizationId,
-          userId: actorId,
-        });
-
-        try {
-          await ctx.app.governance.personalVirtualKeyRevoke({
-            userId: actorId,
-            organizationId: input.organizationId,
-            virtualKeyId: input.id,
-          });
-        } catch (err) {
-          if (err instanceof PersonalVirtualKeyNotFoundError) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: err.message,
-            });
-          }
-          throw err;
-        }
+        await ctx.app.governanceApp.revokePersonalVirtualKey(
+          { organizationId: input.organizationId, id: input.id },
+          callerOf(ctx),
+        );
         return { ok: true };
       }),
     });

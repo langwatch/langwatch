@@ -34,7 +34,6 @@ import {
   langWatchQLSchema,
   type LangWatchQLCaller,
   type LangWatchQLProtections,
-  type LangWatchQLService,
   type LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
 import type {
@@ -43,8 +42,16 @@ import type {
   TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
+import type { AnalyticsApp } from "#app/analytics.app";
 
-type LangWatchQLApplication = Readonly<{ langWatchQL: LangWatchQLService }>;
+/**
+ * The workbench and the analytics reads are two doors onto ONE feature, so
+ * they reach one {@link AnalyticsApp} under one key. It was
+ * `Readonly<{ langWatchQL: LangWatchQLService }>` here and
+ * `Readonly<{ analytics: AnalyticsService }>` next door — two names for one
+ * feature, which is how a rule ends up living in only one of them.
+ */
+type LangWatchQLApplication = Readonly<{ analytics: AnalyticsApp }>;
 
 /** The host supplies authentication; authorization arrives as `policy`. */
 export type LangWatchQLTrpcContext = Readonly<{ app: LangWatchQLApplication }>;
@@ -178,7 +185,7 @@ export class LangWatchQLTrpcApi {
           });
           if (!enabled) return { available: false, reason: "disabled" };
 
-          if (!ctx.app.langWatchQL.available) {
+          if (!ctx.app.analytics.langWatchQLAvailable) {
             return { available: false, reason: "unprovisioned" };
           }
           return { available: true };
@@ -191,7 +198,7 @@ export class LangWatchQLTrpcApi {
       )
         .output(langWatchQLSchema)
         .query(async ({ ctx, input }) =>
-          ctx.app.langWatchQL.describeSchema({
+          ctx.app.analytics.describeLangWatchQLSchema({
             protections: await ports.resolveProtections(ctx, { projectId: input.projectId }),
           }),
         ),
@@ -220,7 +227,7 @@ export class LangWatchQLTrpcApi {
             projectId: input.projectId,
           });
 
-          return ctx.app.langWatchQL.execute({
+          return ctx.app.analytics.executeLangWatchQL({
             project,
             protections,
             sql: input.sql,

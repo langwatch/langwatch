@@ -15,18 +15,13 @@
  * `organization:manage`, because a license decides the seat and volume ceilings
  * for everybody in the organization.
  *
- * Transport only: gates, input shapes and delegation to `LicenseService` and
- * the cryptography adapter. Every process capability this surface needs that is
- * not licensing's own — the composed service instances, the resolved
- * authentication provider, the single sign-on gate, and the failure log —
- * arrives as a port.
+ * Transport only: gates, input shapes and delegation to `LicensingApp`. Every
+ * process capability this surface needs that is not licensing's own — the
+ * composed service instances, the resolved authentication provider, the single
+ * sign-on gate, and the failure log — is a dependency of that application
+ * rather than a second bag declared here, so the limit surface next door
+ * reaches the same ones.
  */
-import {
-  buildMintedPlan,
-  getPlanTemplate,
-  licenseValidationError,
-  type LicenseData,
-} from "@langwatch/enterprise-licensing-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   TRPCError,
@@ -35,11 +30,17 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
-import type { LicenseCryptographyPort } from "../../ports/license-cryptography.port";
-import type { LicenseService } from "../../services/license.service";
+import type { LicensingApp } from "#app/licensing.app";
 
-/** The process supplies authentication; authorization arrives as a policy. */
+/**
+ * The process supplies authentication; authorization arrives as a policy.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them.
+ */
 export type LicenseTrpcContext = Readonly<{
+  app: Readonly<{ licensing: LicensingApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -69,26 +70,6 @@ type LicenseTrpcProcedures<
    * anonymous visitor has no business learning that an install is unlicensed.
    */
   unscopedPolicy<TProcedure>(procedure: TProcedure): TProcedure;
-}>;
-
-/** The process capabilities this transport needs that are not licensing's own. */
-export type LicenseTrpcPorts = Readonly<{
-  /** The process-composed license service. */
-  licenses(): LicenseService;
-  /** The process-composed signing and encoding adapter. */
-  cryptography(): LicenseCryptographyPort;
-  /**
-   * The provider name the deployment is CONFIGURED with, before the license
-   * gate and the mount inspector have their say. `null` or `"email"` means
-   * nobody asked for federation.
-   */
-  configuredAuthProvider(): string | null | undefined;
-  /** Whether the license permits platform single sign-on. */
-  platformSsoAllowed(): Promise<boolean>;
-  /** Whether the configured provider actually mounted. */
-  authProviderIsMounted(): boolean;
-  /** Records a signing failure; the customer never sees the diagnostic. */
-  reportSigningFailure(entry: Readonly<{ organizationId: string; error: unknown }>): void;
 }>;
 
 /**
@@ -124,22 +105,20 @@ export class LicenseTrpcApi {
     TContext extends LicenseTrpcContext,
     TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
     TRoot extends AnyTRPCRootTypes,
-    TPorts extends LicenseTrpcPorts,
   >(
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: LicenseTrpcProcedures<TContext, TOptions, TRoot>,
-    ports: TPorts,
   ) {
     const { protected: procedure, policy, unscopedPolicy } = procedures;
 
     return trpc.router({
       /** The current license status for an organization. */
       getStatus: policy("organization:view")(procedure.input(organizationScopeSchema)).query(
-        async ({ input }) => {
+        async ({ ctx, input }) => {
           // No catch: `OrganizationNotFoundError` is a `HandledError`, so the
           // shared middleware maps it to NOT_FOUND and keeps it as the cause.
           // Re-wrapping it here threw away the code and the trace id.
-          return await ports.licenses().getLicenseStatus(input.organizationId);
+          return await ctx.app.licensing.getLicenseStatus(input.organizationId);
         },
       ),
 
@@ -163,18 +142,9 @@ export class LicenseTrpcApi {
        * visible on the sign-in page, and an operator who cannot see them may
        * believe federation is being enforced when it is not.
        */
-      getSsoGateStatus: unscopedPolicy(procedure.input(z.object({}))).query(async () => {
-        const configuredProvider = ports.configuredAuthProvider();
-        if (!configuredProvider || configuredProvider === "email") {
-          return { configuredProvider: null, licensed: true, mounted: true };
-        }
-
-        return {
-          configuredProvider,
-          licensed: await ports.platformSsoAllowed(),
-          mounted: ports.authProviderIsMounted(),
-        };
-      }),
+      getSsoGateStatus: unscopedPolicy(procedure.input(z.object({}))).query(
+        async ({ ctx }) => ctx.app.licensing.getSsoGateStatus(),
+      ),
 
       /** Uploads and validates a new license for an organization. */
       upload: policy("organization:manage")(
@@ -184,28 +154,23 @@ export class LicenseTrpcApi {
             licenseKey: z.string().min(1, "License key is required"),
           }),
         ),
-      ).mutation(async ({ input }) => {
-        const result = await ports
-          .licenses()
-          .validateAndStoreLicense(input.organizationId, input.licenseKey);
+      ).mutation(async ({ ctx, input }) => {
+        // The refusal for an unacceptable key is the application's: the
+        // service reports a `LICENSE_ERRORS` literal, and mapping that to the
+        // code the presentation registry writes copy against is a decision
+        // about the domain rather than about this transport.
+        const planInfo = await ctx.app.licensing.uploadLicense({
+          organizationId: input.organizationId,
+          licenseKey: input.licenseKey,
+        });
 
-        if (!result.success) {
-          // The handler reports its verdict as a `LICENSE_ERRORS` literal,
-          // which is a server discriminant and not copy. Map it to the code
-          // the presentation registry writes customer copy against.
-          throw licenseValidationError(result.error);
-        }
-
-        return {
-          success: true,
-          planInfo: result.planInfo,
-        };
+        return { success: true, planInfo };
       }),
 
       /** Removes the license from an organization. */
       remove: policy("organization:manage")(procedure.input(organizationScopeSchema)).mutation(
-        async ({ input }) => {
-          const result = await ports.licenses().removeLicense(input.organizationId);
+        async ({ ctx, input }) => {
+          const result = await ctx.app.licensing.removeLicense(input.organizationId);
 
           return {
             success: true,
@@ -222,7 +187,7 @@ export class LicenseTrpcApi {
         procedure.input(
           z.object({ organizationId: z.string().min(1) }).merge(generateLicenseSchema),
         ),
-      ).mutation(async ({ input }) => {
+      ).mutation(async ({ ctx, input }) => {
         const { privateKey, organizationName, email, expiresAt, planType, plan } = input;
 
         if (expiresAt <= new Date()) {
@@ -232,40 +197,26 @@ export class LicenseTrpcApi {
           });
         }
 
-        const template = getPlanTemplate(planType);
-        const planName = template?.name ?? planType;
-        const planTypeValue = template?.type ?? planType;
-
-        const licenseCryptography = ports.cryptography();
-        const licenseData: LicenseData = {
-          licenseId: licenseCryptography.generateLicenseId(),
-          version: 1,
-          organizationName,
-          email,
-          issuedAt: new Date().toISOString(),
-          expiresAt: expiresAt.toISOString(),
-          plan: buildMintedPlan({
-            type: planTypeValue,
-            name: planName,
-            maxMembers: plan.maxMembers,
-            maxMembersLite: plan.maxMembersLite,
-            maxMessagesPerMonth: plan.maxMessagesPerMonth,
-            canPublish: plan.canPublish,
-            webhookEndpointsEnabled: plan.webhookEndpointsEnabled,
-            usageUnit: plan.usageUnit,
-          }),
-        };
-
         try {
-          const signedLicense = licenseCryptography.signLicense(licenseData, privateKey);
-          const licenseKey = licenseCryptography.encodeLicenseKey(signedLicense);
+          // What a minted key CONTAINS — the plan template, the minted plan
+          // and the issue time — is the application's, so a second door
+          // cannot mint a key that means something slightly different.
+          const licenseKey = ctx.app.licensing.mintLicenseKey({
+            organizationId: input.organizationId,
+            privateKey,
+            organizationName,
+            email,
+            expiresAt,
+            planType,
+            plan,
+          });
 
           return { licenseKey };
         } catch (error) {
-          ports.reportSigningFailure({
-            organizationId: input.organizationId,
-            error,
-          });
+          // The application has already recorded the diagnostic; what is left
+          // here is the copy an operator reads, which belongs to the door that
+          // answers them.
+          //
           // A signing-key failure already says which of the three things went
           // wrong, and the handled-error middleware maps it to a 400 with that
           // code intact. Re-wrapping would flatten all three into one message

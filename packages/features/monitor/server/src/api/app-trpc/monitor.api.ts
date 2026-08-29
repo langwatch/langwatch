@@ -12,20 +12,14 @@
  *                            one, its evaluator and that evaluator's workflow —
  *                            into another project the caller also administers.
  *
- * Transport only: gates, input validation and delegation to `MonitorService`.
+ * Transport only: gates, input validation and delegation to `MonitorApp`.
+ * What a monitor is, and what a write does to one, is the application's; this
+ * decides only which status and which words a refusal reaches the wire as.
  *
  * Specs: specs/monitors/replicate-monitor-to-project.feature,
  * specs/monitors/online-evaluation-preconditions.feature.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { EvaluationService } from "@langwatch/evaluation-contract";
-import {
-  AVAILABLE_EVALUATORS,
-  evaluatorsSchema,
-  getEvaluatorDefinitions,
-  type EvaluatorService,
-  type EvaluatorTypes,
-} from "@langwatch/evaluator-contract";
 import {
   monitorApiCopyInputSchema,
   monitorApiCreateInputSchema,
@@ -37,7 +31,6 @@ import {
   monitorApiUpdateInputSchema,
   MonitorNotFoundError,
   type MonitorApiPreconditionsParser,
-  type MonitorService,
 } from "@langwatch/monitor-contract";
 import {
   TRPCError,
@@ -45,22 +38,18 @@ import {
   type TRPCRootObject,
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
-import { ZodError } from "zod";
+import type { MonitorApp } from "#app/monitor.app";
 
-/** The window `getPerformanceForProject` reports, and compares to the one before it. */
-const PERFORMANCE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
-
-type MonitorApplication = Readonly<{
-  monitors: MonitorService;
-  /** Reads the online-evaluation results the performance strip renders. */
-  evaluations: EvaluationService;
-  /** Rolls back an evaluator this router copied, when the monitor insert fails. */
-  evaluators: EvaluatorService;
-}>;
-
-/** The process supplies authentication; authorization arrives as `policy`. */
+/**
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them. The REST door, whose
+ * family is built per mount, holds {@link MonitorApp} directly.
+ */
 export type MonitorTrpcContext = Readonly<{
-  app: MonitorApplication;
+  app: Readonly<{ monitors: MonitorApp }>;
   /** Whether the caller holds `permission` on that project. */
   can(permission: AuthzPermission, target: Readonly<{ projectId: string }>): Promise<boolean>;
 }>;
@@ -134,45 +123,24 @@ type MonitorTrpcPorts = Readonly<{
 }>;
 
 /**
- * Refuses a monitor whose `checkType` names no evaluator we can run, and a
- * built-in evaluator whose settings do not match its own schema. Workflow,
- * code and custom evaluators carry their settings elsewhere, so only their
- * type is checked.
+ * Renders the application's verdict on a check as this transport's refusal.
+ *
+ * Which checks can run is `MonitorApp.checkFailure`'s answer; the status and
+ * the wording are this door's.
  */
-function validateCheckSettings(checkType: string, parameters: unknown): void {
-  // Allow workflow evaluators ("workflow") and code evaluators ("code/{id}")
-  const isWorkflowEvaluator = checkType === "workflow";
-  const isCodeEvaluator = checkType.startsWith("code/");
-
-  if (
-    AVAILABLE_EVALUATORS[checkType as EvaluatorTypes] === undefined &&
-    !checkType.startsWith("custom/") &&
-    !isWorkflowEvaluator &&
-    !isCodeEvaluator
-  ) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Invalid checkType",
-    });
-  }
-
-  // Skip settings validation for workflow, code, and custom evaluators
-  // (they don't have schema-based settings)
-  if (!checkType.startsWith("custom/") && !isWorkflowEvaluator && !isCodeEvaluator) {
-    const checkType_ = checkType as EvaluatorTypes;
-    try {
-      evaluatorsSchema.shape[checkType_].shape.settings.parse(parameters);
-    } catch (error) {
-      if (error instanceof ZodError) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `Invalid settings: ${error}`,
-        });
-      } else {
-        throw error;
-      }
-    }
-  }
+function assertRunnableCheck(
+  app: MonitorApp,
+  input: Readonly<{ checkType: string; parameters: unknown }>,
+): void {
+  const failure = app.checkFailure(input);
+  if (!failure) return;
+  throw new TRPCError({
+    code: "BAD_REQUEST",
+    message:
+      failure.reason === "unknown_check_type"
+        ? "Invalid checkType"
+        : `Invalid settings: ${failure.cause}`,
+  });
 }
 
 /**
@@ -204,38 +172,17 @@ export class MonitorTrpcApi {
         procedure.input(monitorApiProjectInputSchema),
       ).query(async ({ input, ctx }) => {
         const { projectId } = input;
-        return ctx.app.monitors.getAllForProject({ projectId });
+        return ctx.app.monitors.list({ projectId });
       }),
 
       getPerformanceForProject: alsoRequire("analytics:view")(
         policy("evaluations:view")(procedure.input(monitorApiPerformanceInputSchema)),
-      ).query(async ({ input, ctx }) => {
-        const monitors = await ctx.app.monitors.getAllForProject({
-          projectId: input.projectId,
-        });
-
-        if (monitors.length === 0) return [];
-
-        const performanceMonitors = monitors.map((monitor) => ({
-          id: monitor.id,
-          isGuardrail: getEvaluatorDefinitions(monitor.checkType)?.isGuardrail ?? false,
-        }));
-        const endMs = Date.now();
-        const currentStartMs = endMs - PERFORMANCE_PERIOD_MS;
-        const previousStartMs = ports.resolvePreviousPeriodStartMs({
-          projectId: input.projectId,
-          startMs: currentStartMs,
-          endMs,
-        });
-        return ctx.app.evaluations.getMonitorPerformance({
-          tenantId: input.projectId,
-          monitors: performanceMonitors,
-          previousStartMs,
-          currentStartMs,
-          endMs,
-          timeZone: input.timeZone ?? "UTC",
-        });
-      }),
+      ).query(async ({ input, ctx }) =>
+        ctx.app.monitors.performanceForProject(
+          { projectId: input.projectId, timeZone: input.timeZone },
+          ports.resolvePreviousPeriodStartMs,
+        ),
+      ),
 
       toggle: policy("evaluations:update")(procedure.input(monitorApiToggleInputSchema)).mutation(
         async ({ input, ctx }) => {
@@ -258,7 +205,7 @@ export class MonitorTrpcApi {
             level,
             threadIdleTimeout,
           } = input;
-          validateCheckSettings(checkType, parameters);
+          assertRunnableCheck(ctx.app.monitors, { checkType, parameters });
           return ctx.app.monitors.create({
             projectId,
             name,
@@ -288,62 +235,27 @@ export class MonitorTrpcApi {
             });
           }
 
-          let source;
+          // What a replication DOES — copying the evaluator across, starting
+          // the replica disabled, and rolling both back when the insert fails
+          // — is the application's. This door supplies the two process
+          // capabilities bound to its own request, and turns a missing source
+          // monitor into the status this transport answers with.
           try {
-            source = await ctx.app.monitors.getById({
-              id: monitorId,
-              projectId: sourceProjectId,
-            });
+            return await ctx.app.monitors.copy(
+              { monitorId, sourceProjectId, targetProjectId: projectId },
+              {
+                copyEvaluatorToProject: (replicationInput) =>
+                  ports.copyEvaluatorToProject(ctx, replicationInput),
+                deleteReplicatedWorkflow: (replicationInput) =>
+                  ports.deleteReplicatedWorkflow(ctx, replicationInput),
+              },
+            );
           } catch (error) {
             if (!(error instanceof MonitorNotFoundError)) throw error;
             throw new TRPCError({
               code: "NOT_FOUND",
               message: "Monitor not found",
             });
-          }
-
-          // Evaluator-backed monitors keep their settings (and, for workflow
-          // evaluators, the backing workflow) on a separate Evaluator record scoped
-          // to the source project. Copy it across so the replica is self-contained
-          // in the target project instead of dangling a cross-project reference.
-          // Legacy wizard monitors have no evaluator — their settings live inline on
-          // the monitor, so copying the monitor fields below is enough.
-          let newEvaluatorId: string | null = null;
-          let newWorkflowId: string | null = null;
-          if (source.evaluatorId) {
-            const copiedEvaluator = await ports.copyEvaluatorToProject(ctx, {
-              evaluatorId: source.evaluatorId,
-              sourceProjectId,
-              targetProjectId: projectId,
-            });
-            newEvaluatorId = copiedEvaluator.id;
-            newWorkflowId = copiedEvaluator.workflowId;
-          }
-
-          try {
-            // Replicas start disabled: a real-time evaluator runs (and bills) on
-            // every matching trace, so the user opts in after reviewing it in the
-            // target project rather than having it fire the moment it is replicated.
-            return await ctx.app.monitors.replicate({
-              sourceMonitorId: monitorId,
-              sourceProjectId,
-              targetProjectId: projectId,
-              evaluatorId: newEvaluatorId,
-            });
-          } catch (createError) {
-            // Roll back the evaluator (and its workflow) we copied for this monitor
-            // so a failed insert doesn't orphan them in the target project.
-            if (newEvaluatorId) {
-              await ctx.app.evaluators
-                .archive({ id: newEvaluatorId, projectId })
-                .catch(() => undefined);
-            }
-            if (newWorkflowId) {
-              await ports
-                .deleteReplicatedWorkflow(ctx, { workflowId: newWorkflowId, projectId })
-                .catch(() => undefined);
-            }
-            throw createError;
           }
         },
       ),
@@ -365,7 +277,7 @@ export class MonitorTrpcApi {
             level,
             threadIdleTimeout,
           } = input;
-          validateCheckSettings(checkType, parameters);
+          assertRunnableCheck(ctx.app.monitors, { checkType, parameters });
           return ctx.app.monitors.update({
             id,
             projectId,

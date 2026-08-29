@@ -70,22 +70,18 @@ import {
   opsSetScheduleActiveInputSchema,
   opsStartReplayInputSchema,
   runBlobCleanupOperatorInputSchema,
-  type OpsService,
-  type OpsSnapshotService,
 } from "@langwatch/ops-contract";
 import {
   featureFlagRulesSchema,
-  listFeatureFlags,
   operatorFeatureFlagCatalogueSchema,
-  type FeatureFlagService,
 } from "@langwatch/feature-flag-contract";
-import type { ProjectService } from "@langwatch/project-contract";
 import {
   TRPCError,
   type AnyTRPCRootTypes,
   type TRPCRootObject,
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
+import type { OpsApp, OpsOperator } from "#app/ops.app";
 
 /**
  * The operator's reach, as the process resolved it. `none` is an answer rather
@@ -93,139 +89,20 @@ import {
  */
 export type OpsScope = { kind: "none" } | { kind: "platform" };
 
-/** One process ref, the triple every process-manager read is keyed by. */
-type ProcessRefInput = {
-  processName: string;
-  projectId: string;
-  processKey: string;
-};
-
 /**
- * The event-sourcing explorers and the replay runner, each narrowed to what
- * this surface calls. Structural rather than imported: they are the process's
- * own composition over its event store, and the concrete return types reach
- * the client through the context type rather than through these shapes.
+ * The process supplies authentication and the resolved operator scope.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them. A REST door, whose service
+ * is built per family, would hold {@link OpsApp} directly.
  */
-type EventExplorer = {
-  discoverAggregates(input: {
-    projectionNames: string[];
-    since: string;
-    tenantIds: string[];
-  }): Promise<unknown>;
-  searchAggregates(input: {
-    query: string;
-    tenantIds: string[];
-    sinceMs: number;
-  }): Promise<unknown>;
-  getAggregateEvents(input: {
-    aggregateId: string;
-    tenantId: string;
-    limit: number;
-  }): Promise<unknown>;
-  computeProjectionState(input: {
-    aggregateId: string;
-    tenantId: string;
-    projectionName: string;
-    eventIndex: number;
-  }): Promise<{ aggregateType?: unknown }>;
-};
-
-type ManagerExplorer = {
-  getForAggregate(input: {
-    aggregateType: string;
-    projectId: string;
-    aggregateId: string;
-  }): Promise<unknown>;
-  requeueDeadMessages(input: {
-    processName: string;
-    projectId: string;
-    processKey: string;
-    messageKeyPrefix?: string;
-    requestedBy: string;
-  }): Promise<unknown>;
-  getFleetSummary(): Promise<unknown>;
-  getDeadLetters(input: { processName?: string; page: number; pageSize: number }): Promise<unknown>;
-  getDeadLetterCounts(): Promise<unknown>;
-  getInstances(input: {
-    processName?: string;
-    page: number;
-    pageSize: number;
-    search?: string;
-  }): Promise<unknown>;
-  getUpcomingWakes(input: { limit: number }): Promise<unknown>;
-  getInstanceDetail(input: { ref: ProcessRefInput }): Promise<unknown>;
-  getOutbox(input: { ref: ProcessRefInput; page: number; pageSize: number }): Promise<unknown>;
-  listRecentActions(input: { limit: number }): Promise<unknown>;
-  wakeNow(input: { ref: ProcessRefInput; actorUserId: string }): Promise<unknown>;
-  redriveDeadInstance(input: { ref: ProcessRefInput; actorUserId: string }): Promise<unknown>;
-  redriveDeadMessage(input: {
-    ref: ProcessRefInput;
-    messageId: string;
-    actorUserId: string;
-  }): Promise<unknown>;
-  discardDeadMessage(input: {
-    ref: ProcessRefInput;
-    messageId: string;
-    actorUserId: string;
-  }): Promise<unknown>;
-  redriveDeadLetters(input: { processName?: string; actorUserId: string }): Promise<unknown>;
-  discardDeadLetters(input: { processName?: string; actorUserId: string }): Promise<unknown>;
-  getOutboxAttempts(input: { outboxId: string; projectId: string }): Promise<unknown>;
-  releaseLapsedLease(input: {
-    ref: ProcessRefInput;
-    messageId: string;
-    actorUserId: string;
-  }): Promise<unknown>;
-};
-
-type ReplayRunner = {
-  getHistory(): Promise<unknown>;
-  findHistoryEntry(input: { runId: string }): Promise<unknown>;
-  startReplay(input: {
-    projectionNames: string[];
-    since: string;
-    tenantIds: string[];
-    aggregateIds?: string[];
-    fullRebuild?: boolean;
-    description: string;
-    userName: string;
-  }): Promise<unknown>;
-  getStatus(): Promise<unknown>;
-  cancelReplay(): Promise<unknown>;
-};
-
-/**
- * The operations capability plus the three explorers the process composes
- * alongside it, and the two collaborators this surface reaches that are not
- * operations' own.
- */
-type OpsApplication = Readonly<{
-  ops: OpsService & {
-    eventExplorer: EventExplorer;
-    managerExplorer: ManagerExplorer;
-    replay: ReplayRunner;
-    snapshots: OpsSnapshotService | null;
-  };
-  featureFlags: FeatureFlagService;
-  projects: Pick<ProjectService, "searchByQuery">;
-}>;
-
-/** The operator, as far as this surface reads them. */
-type OpsSessionUser = Readonly<{
-  id: string;
-  name?: string | null;
-  email?: string | null;
-  /** The real admin behind an impersonation session, if there is one. */
-  impersonator?: Readonly<{ email?: string | null }> | null;
-}>;
-
-/** The process supplies authentication and the resolved operator scope. */
 export type OpsTrpcContext = Readonly<{
-  app: OpsApplication;
+  app: Readonly<{ ops: OpsApp }>;
   actor(): Readonly<{ id: string }>;
   /** Populated by the process's operator middleware; absent means it never ran. */
   opsScope: OpsScope | undefined;
-  session: Readonly<{ user: OpsSessionUser }> | null;
+  session: Readonly<{ user: OpsOperator }> | null;
 }>;
 
 type OpsTrpcProcedures<
@@ -321,49 +198,18 @@ export type OpsTrpcPorts = Readonly<{
 }>;
 
 /**
- * The extra gate on an ops write whose damage nobody will notice in time.
+ * The extra gate on an ops write whose damage nobody will notice in time,
+ * applied to the operator the process authenticated.
  *
- * `ops:manage` already resolves through the admin allow-list, but it is not
- * enough on its own here for two reasons. It is inherited by an impersonation
- * session — the operator scope deliberately falls back to the impersonator's
- * own grant — and "acting as" another user is the wrong posture for
- * irreversible infrastructure surgery, because the audit trail names the
- * impersonated account. And the damage is silent: deleting a blob completes the
- * job that referenced it without its handler ever running, and pinning an
- * organization back onto the legacy authorization path changes which tables
- * answer every permission check for that tenant without failing anything. A
- * typed confirmation makes either a deliberate act rather than a mis-click.
- *
- * A confirmation dialog in the ops UI is not this guard — every one of these
- * procedures is callable directly.
+ * The rule itself is {@link OpsApp.requireDestructiveOperator}; this is only
+ * the transport reading its caller. A confirmation dialog in the ops UI is not
+ * the guard — every one of these procedures is callable directly.
  */
 function requireDestructiveOpsAuth(
-  ctx: { session: Readonly<{ user: OpsSessionUser }> | null },
+  ctx: OpsTrpcContext,
   confirm: string | undefined,
-) {
-  // An absent session is refused rather than skipped. The authenticated
-  // procedure this mounts behind makes it unreachable, but a guard whose
-  // strictest branch is the one a missing session bypasses is fail-open in
-  // shape, and this one stands in front of irreversible infrastructure work.
-  if (!ctx.session) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "This action needs a signed-in session.",
-    });
-  }
-  if (ctx.session.user.impersonator) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message:
-        "This action cannot be run from an impersonated session. Sign in directly to continue.",
-    });
-  }
-  if (!confirm) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "This action needs to be confirmed before it can run",
-    });
-  }
+): void {
+  ctx.app.ops.requireDestructiveOperator(ctx.session?.user ?? null, confirm);
 }
 
 /** Installs the complete `ops.*` tRPC surface on a process-owned root. */
@@ -395,17 +241,19 @@ export class OpsTrpcApi {
        * variant of the operator check — only this status probe relaxes it.
        */
       getScope: probePolicy(procedure).query(({ ctx }) => {
+        // A plain Error on purpose: the scope missing means the process's
+        // operator middleware never ran, which is a wiring fault with no
+        // action for the caller. It degrades to the generic unknown failure
+        // plus a trace id, which is the honest answer, and keeps the
+        // INTERNAL_SERVER_ERROR this always returned.
         if (!ctx.opsScope) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "opsScope not populated by middleware (probable bug)",
-          });
+          throw new Error("opsScope not populated by middleware (probable bug)");
         }
         return { scope: ctx.opsScope };
       }),
 
       getDashboardSnapshot: view(procedure).query(({ ctx }) => {
-        return ctx.app.ops.snapshots?.tryGetDashboardData() ?? null;
+        return ctx.app.ops.tryGetDashboardData();
       }),
 
       /**
@@ -422,29 +270,11 @@ export class OpsTrpcApi {
           blockedCount: number;
           dlqCount: number;
           computedAt: Date | null;
-        } => {
-          const snapshots = ctx.app.ops.snapshots;
-          if (!snapshots) {
-            // Same shape as the served path so no caller has to branch on
-            // whether the field exists — but `computedAt: null`, because these
-            // zeroes are "we cannot say" rather than "nothing is wrong".
-            // Stamping the current time would present unavailable data as a
-            // fresh all-clear.
-            return { blockedCount: 0, dlqCount: 0, computedAt: null };
-          }
-          return snapshots.getBadgeCounts();
-        },
+        } => ctx.app.ops.badgeCounts(),
       ),
 
       dashboardStream: view(procedure).subscription(async function* ({ signal, ctx }) {
-        const snapshots = ctx.app.ops.snapshots;
-        if (!snapshots) {
-          return;
-        }
-
-        for await (const data of snapshots.streamDashboard({ signal })) {
-          yield data;
-        }
+        yield* ctx.app.ops.streamDashboard({ signal });
       }),
 
       /**
@@ -456,19 +286,19 @@ export class OpsTrpcApi {
        */
       listParkedGroups: view(procedure.input(opsListParkedQueueGroupsInputSchema)).query(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.listParkedQueueGroups(input);
         },
       ),
 
       listQueues: view(procedure).query(async ({ ctx }) => {
-        const ops = ctx.app.ops;
+        const ops = ctx.app.ops.operations;
         return ops.listQueues();
       }),
 
       listScheduledJobs: view(procedure.input(opsListScheduledJobsInputSchema)).query(
         async ({ input, ctx }) => {
-          return ctx.app.ops.listScheduledJobs({ limit: input.limit });
+          return ctx.app.ops.operations.listScheduledJobs({ limit: input.limit });
         },
       ),
 
@@ -479,14 +309,14 @@ export class OpsTrpcApi {
        */
       listPausedSchedules: view(procedure.input(opsListPausedSchedulesInputSchema)).query(
         async ({ input, ctx }) => {
-          return ctx.app.ops.listPausedSchedules({ limit: input.limit });
+          return ctx.app.ops.operations.listPausedSchedules({ limit: input.limit });
         },
       ),
 
       /** Recent scheduler operator actions, so the page explains its own history. */
       listSchedulerActions: view(procedure.input(opsListSchedulerActionsInputSchema)).query(
         async ({ input, ctx }) => {
-          return ctx.app.ops.listSchedulerActions({ limit: input.limit });
+          return ctx.app.ops.operations.listSchedulerActions({ limit: input.limit });
         },
       ),
 
@@ -497,7 +327,7 @@ export class OpsTrpcApi {
        */
       setScheduleActive: manage(procedure.input(opsSetScheduleActiveInputSchema)).mutation(
         async ({ input, ctx }) => {
-          return ctx.app.ops.setScheduleActive({
+          return ctx.app.ops.operations.setScheduleActive({
             scheduleId: input.scheduleId,
             active: input.active,
             actorUserId: ctx.actor().id,
@@ -508,7 +338,7 @@ export class OpsTrpcApi {
       /** Release a slot whose worker stopped responding, so it can be claimed again. */
       clearScheduleSlot: manage(procedure.input(opsScheduleIdInputSchema)).mutation(
         async ({ input, ctx }) => {
-          return ctx.app.ops.clearStuckScheduleSlot({
+          return ctx.app.ops.operations.clearStuckScheduleSlot({
             scheduleId: input.scheduleId,
             actorUserId: ctx.actor().id,
           });
@@ -522,7 +352,7 @@ export class OpsTrpcApi {
        */
       runScheduleNow: manage(procedure.input(opsScheduleIdInputSchema)).mutation(
         async ({ input, ctx }) => {
-          return ctx.app.ops.runScheduleNow({
+          return ctx.app.ops.operations.runScheduleNow({
             scheduleId: input.scheduleId,
             actorUserId: ctx.actor().id,
           });
@@ -531,23 +361,13 @@ export class OpsTrpcApi {
 
       listGroups: view(procedure.input(opsListQueueGroupsInputSchema)).query(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.listQueueGroups(input);
         },
       ),
 
       getGroupDetail: view(procedure.input(opsQueueGroupInputSchema)).query(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
-          const group = await ops.tryGetQueueGroup(input);
-          if (!group) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: `Group "${input.groupId}" not found in queue "${input.queueName}"`,
-            });
-          }
-          return group;
-        },
+        async ({ input, ctx }) => ctx.app.ops.getQueueGroup(input),
       ),
 
       /**
@@ -562,83 +382,83 @@ export class OpsTrpcApi {
       }),
 
       getBlockedSummary: view(procedure).query(async ({ ctx }) => {
-        const ops = ctx.app.ops;
+        const ops = ctx.app.ops.operations;
         return ops.getBlockedQueueSummary();
       }),
 
       getGroupJobs: view(procedure.input(opsListQueueGroupJobsInputSchema)).query(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.listQueueGroupJobs(input);
         },
       ),
 
       unblockGroup: manage(procedure.input(opsQueueGroupInputSchema)).mutation(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.unblockQueueGroup(input);
         },
       ),
 
       unblockAll: manage(procedure.input(opsQueueNameInputSchema)).mutation(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.unblockAllQueueGroups(input);
         },
       ),
 
       drainGroup: manage(procedure.input(opsQueueGroupInputSchema)).mutation(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.drainQueueGroup(input);
         },
       ),
 
       pausePipeline: manage(procedure.input(opsQueuePipelineInputSchema)).mutation(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.pauseQueuePipeline(input);
         },
       ),
 
       unpausePipeline: manage(procedure.input(opsQueuePipelineInputSchema)).mutation(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.unpauseQueuePipeline(input);
         },
       ),
 
       pauseTenant: manage(procedure.input(opsQueueTenantInputSchema)).mutation(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.pauseQueueTenant(input);
         },
       ),
 
       unpauseTenant: manage(procedure.input(opsQueueTenantInputSchema)).mutation(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.unpauseQueueTenant(input);
         },
       ),
 
       listPausedTenants: view(procedure.input(opsQueueNameInputSchema)).query(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.listPausedQueueTenants(input);
         },
       ),
 
       drainTenant: manage(procedure.input(opsDrainQueueTenantInputSchema)).mutation(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.drainQueueTenant(input);
         },
       ),
 
       retryBlocked: manage(procedure.input(opsRetryBlockedQueueJobInputSchema)).mutation(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.retryBlockedQueueJob(input);
         },
       ),
@@ -656,7 +476,7 @@ export class OpsTrpcApi {
       getAggregateProcessManagers: view(
         procedure.input(opsAggregateProcessManagersInputSchema),
       ).query(async ({ input, ctx }) => {
-        return ctx.app.ops.managerExplorer.getForAggregate({
+        return ctx.app.ops.processes.getForAggregate({
           aggregateType: input.aggregateType,
           projectId: input.tenantId,
           aggregateId: input.aggregateId,
@@ -672,7 +492,7 @@ export class OpsTrpcApi {
       requeueDeadOutboxMessages: manage(
         procedure.input(opsRequeueDeadOutboxMessagesInputSchema),
       ).mutation(async ({ ctx, input }) => {
-        return ctx.app.ops.managerExplorer.requeueDeadMessages({
+        return ctx.app.ops.processes.requeueDeadMessages({
           processName: input.processName,
           projectId: input.tenantId,
           processKey: input.processKey,
@@ -685,7 +505,7 @@ export class OpsTrpcApi {
 
       /** One row per process name: registry identity + live trouble counts. */
       listProcessFleet: view(procedure).query(({ ctx }) => {
-        return ctx.app.ops.managerExplorer.getFleetSummary();
+        return ctx.app.ops.processes.getFleetSummary();
       }),
 
       /**
@@ -696,50 +516,50 @@ export class OpsTrpcApi {
        */
       listDeadLetters: view(procedure.input(opsListDeadLettersInputSchema)).query(
         ({ input, ctx }) => {
-          return ctx.app.ops.managerExplorer.getDeadLetters(input);
+          return ctx.app.ops.processes.getDeadLetters(input);
         },
       ),
 
       /** Dead totals per process, for the navigation badge and dashboard card. */
       listDeadLetterCounts: view(procedure).query(({ ctx }) => {
-        return ctx.app.ops.managerExplorer.getDeadLetterCounts();
+        return ctx.app.ops.processes.getDeadLetterCounts();
       }),
 
       listProcessInstances: view(procedure.input(opsListProcessInstancesInputSchema)).query(
         async ({ input, ctx }) => {
-          return ctx.app.ops.managerExplorer.getInstances(input);
+          return ctx.app.ops.processes.getInstances(input);
         },
       ),
 
       /** The soonest-due process wakes, for the dashboard's timed-work table. */
       listUpcomingWakes: view(procedure.input(opsListUpcomingWakesInputSchema)).query(
         async ({ input, ctx }) => {
-          return ctx.app.ops.managerExplorer.getUpcomingWakes(input);
+          return ctx.app.ops.processes.getUpcomingWakes(input);
         },
       ),
 
       getProcessInstance: view(procedure.input(opsProcessRefInputSchema)).query(
         async ({ input, ctx }) => {
-          return ctx.app.ops.managerExplorer.getInstanceDetail({ ref: input });
+          return ctx.app.ops.processes.getInstanceDetail({ ref: input });
         },
       ),
 
       listProcessOutbox: view(procedure.input(opsListProcessOutboxInputSchema)).query(
         async ({ input, ctx }) => {
           const { page, pageSize, ...ref } = input;
-          return ctx.app.ops.managerExplorer.getOutbox({ ref, page, pageSize });
+          return ctx.app.ops.processes.getOutbox({ ref, page, pageSize });
         },
       ),
 
       listProcessActions: view(procedure.input(opsListProcessActionsInputSchema)).query(
         async ({ input, ctx }) => {
-          return ctx.app.ops.managerExplorer.listRecentActions(input);
+          return ctx.app.ops.processes.listRecentActions(input);
         },
       ),
 
       processWakeNow: manage(procedure.input(opsProcessRefInputSchema)).mutation(
         async ({ ctx, input }) => {
-          return ctx.app.ops.managerExplorer.wakeNow({
+          return ctx.app.ops.processes.wakeNow({
             ref: input,
             actorUserId: ctx.actor().id,
           });
@@ -748,7 +568,7 @@ export class OpsTrpcApi {
 
       processRedriveDeadInstance: manage(procedure.input(opsProcessRefInputSchema)).mutation(
         async ({ ctx, input }) => {
-          return ctx.app.ops.managerExplorer.redriveDeadInstance({
+          return ctx.app.ops.processes.redriveDeadInstance({
             ref: input,
             actorUserId: ctx.actor().id,
           });
@@ -758,7 +578,7 @@ export class OpsTrpcApi {
       processRedriveDeadMessage: manage(procedure.input(opsProcessMessageInputSchema)).mutation(
         async ({ ctx, input }) => {
           const { messageId, ...ref } = input;
-          return ctx.app.ops.managerExplorer.redriveDeadMessage({
+          return ctx.app.ops.processes.redriveDeadMessage({
             ref,
             messageId,
             actorUserId: ctx.actor().id,
@@ -770,7 +590,7 @@ export class OpsTrpcApi {
       processDiscardDeadMessage: manage(procedure.input(opsProcessMessageInputSchema)).mutation(
         async ({ ctx, input }) => {
           const { messageId, ...ref } = input;
-          return ctx.app.ops.managerExplorer.discardDeadMessage({
+          return ctx.app.ops.processes.discardDeadMessage({
             ref,
             messageId,
             actorUserId: ctx.actor().id,
@@ -784,7 +604,7 @@ export class OpsTrpcApi {
        */
       redriveDeadLetters: manage(procedure.input(opsRedriveDeadLettersInputSchema)).mutation(
         async ({ ctx, input }) => {
-          return ctx.app.ops.managerExplorer.redriveDeadLetters({
+          return ctx.app.ops.processes.redriveDeadLetters({
             ...input,
             actorUserId: ctx.actor().id,
           });
@@ -802,7 +622,7 @@ export class OpsTrpcApi {
        */
       discardDeadLetters: manage(procedure.input(opsDiscardDeadLettersInputSchema)).mutation(
         async ({ ctx, input }) => {
-          return ctx.app.ops.managerExplorer.discardDeadLetters({
+          return ctx.app.ops.processes.discardDeadLetters({
             ...(input.processName ? { processName: input.processName } : {}),
             actorUserId: ctx.actor().id,
           });
@@ -812,14 +632,14 @@ export class OpsTrpcApi {
       /** The message's failed attempts, oldest first — why a dead letter died. */
       listOutboxAttempts: view(procedure.input(opsListOutboxAttemptsInputSchema)).query(
         async ({ input, ctx }) => {
-          return ctx.app.ops.managerExplorer.getOutboxAttempts(input);
+          return ctx.app.ops.processes.getOutboxAttempts(input);
         },
       ),
 
       processReleaseLapsedLease: manage(procedure.input(opsProcessMessageInputSchema)).mutation(
         async ({ ctx, input }) => {
           const { messageId, ...ref } = input;
-          return ctx.app.ops.managerExplorer.releaseLapsedLease({
+          return ctx.app.ops.processes.releaseLapsedLease({
             ref,
             messageId,
             actorUserId: ctx.actor().id,
@@ -829,9 +649,7 @@ export class OpsTrpcApi {
 
       discoverAggregates: view(procedure.input(opsDiscoverAggregatesInputSchema)).query(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
-
-          return ops.eventExplorer.discoverAggregates({
+          return ctx.app.ops.events.discoverAggregates({
             projectionNames: input.projectionNames,
             since: input.since,
             tenantIds: input.tenantIds ?? [],
@@ -841,7 +659,7 @@ export class OpsTrpcApi {
 
       searchTenants: view(procedure.input(opsSearchTenantsInputSchema)).query(
         async ({ input, ctx }) => {
-          return ctx.app.projects.searchByQuery({ query: input.query });
+          return ctx.app.ops.searchProjects({ query: input.query });
         },
       ),
 
@@ -857,26 +675,22 @@ export class OpsTrpcApi {
       ),
 
       getReplayHistory: view(procedure).query(async ({ ctx }) => {
-        const ops = ctx.app.ops;
-        return ops.replay.getHistory();
+        return ctx.app.ops.replay.getHistory();
       }),
 
       getReplayRun: view(procedure.input(opsGetReplayRunInputSchema)).query(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
-          return ops.replay.findHistoryEntry({ runId: input.runId });
+          return ctx.app.ops.replay.findHistoryEntry({ runId: input.runId });
         },
       ),
 
       startReplay: manage(procedure.input(opsStartReplayInputSchema)).mutation(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
-
           const user = ctx.session?.user;
           const userName = user?.name ?? user?.email ?? "unknown";
 
           try {
-            return await ops.replay.startReplay({
+            return await ctx.app.ops.replay.startReplay({
               projectionNames: input.projectionNames,
               since: input.since,
               tenantIds: input.tenantIds ?? [],
@@ -886,6 +700,15 @@ export class OpsTrpcApi {
               userName,
             });
           } catch (err) {
+            // Left as a raw TRPCError deliberately, and it is the one refusal
+            // on this surface that is. The branch answers CONFLICT for EVERY
+            // failure, including infrastructure ones: "already running" is a
+            // nameable cause a caller can act on, and everything else is not.
+            // Splitting it — a handled conflict for the first, the original
+            // error for the rest — is the correct shape, and it changes what
+            // an infrastructure failure puts on the wire from CONFLICT to a
+            // 500. That is a behaviour change, so it is reported rather than
+            // taken here.
             const rawMessage = err instanceof Error ? err.message : String(err);
             const safeMessage = rawMessage.includes("already running")
               ? rawMessage
@@ -899,65 +722,63 @@ export class OpsTrpcApi {
       ),
 
       getReplayStatus: view(procedure).query(async ({ ctx }) => {
-        const ops = ctx.app.ops;
-        return ops.replay.getStatus();
+        return ctx.app.ops.replay.getStatus();
       }),
 
       cancelReplay: manage(procedure).mutation(async ({ ctx }) => {
-        const ops = ctx.app.ops;
-        return ops.replay.cancelReplay();
+        return ctx.app.ops.replay.cancelReplay();
       }),
 
       listDlqGroups: view(procedure.input(opsQueueNameInputSchema)).query(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.listQueueDlqGroups(input);
         },
       ),
 
       listAllDlqGroups: view(procedure).query(async ({ ctx }) => {
-        const ops = ctx.app.ops;
+        const ops = ctx.app.ops.operations;
         return ops.listAllQueueDlqGroups();
       }),
 
       listPausedKeys: view(procedure.input(opsQueueNameInputSchema)).query(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.listPausedQueueKeys(input);
         },
       ),
 
       drainAllBlockedPreview: view(procedure.input(opsQueueFilterInputSchema)).query(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.getQueueDrainPreview(input);
         },
       ),
 
       moveToDlq: manage(procedure.input(opsQueueGroupInputSchema)).mutation(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.moveQueueGroupToDlq(input);
         },
       ),
 
       moveAllBlockedToDlq: manage(procedure.input(opsQueueFilterInputSchema)).mutation(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.moveAllBlockedQueueGroupsToDlq(input);
         },
       ),
 
       replayFromDlq: manage(procedure.input(opsQueueGroupInputSchema)).mutation(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.replayQueueGroupFromDlq(input);
         },
       ),
 
       replayAllFromDlq: manage(procedure.input(opsQueueFilterInputSchema)).mutation(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.replayAllQueueGroupsFromDlq(input);
         },
       ),
@@ -969,7 +790,7 @@ export class OpsTrpcApi {
        */
       redriveManyFromDlq: manage(procedure.input(opsQueueGroupIdsInputSchema)).mutation(
         async ({ ctx, input }) => {
-          return ctx.app.ops.redriveQueueDlqGroups({
+          return ctx.app.ops.operations.redriveQueueDlqGroups({
             ...input,
             requestedBy: ctx.actor().id,
           });
@@ -982,7 +803,7 @@ export class OpsTrpcApi {
        */
       discardManyFromDlq: manage(procedure.input(opsQueueGroupIdsInputSchema)).mutation(
         async ({ ctx, input }) => {
-          return ctx.app.ops.discardQueueDlqGroups({
+          return ctx.app.ops.operations.discardQueueDlqGroups({
             ...input,
             requestedBy: ctx.actor().id,
           });
@@ -991,25 +812,24 @@ export class OpsTrpcApi {
 
       canaryRedrive: manage(procedure.input(opsQueueCanaryInputSchema)).mutation(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.canaryRedriveQueueDlq(input);
         },
       ),
 
       canaryUnblock: manage(procedure.input(opsQueueCanaryInputSchema)).mutation(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
+          const ops = ctx.app.ops.operations;
           return ops.canaryUnblockQueueGroups(input);
         },
       ),
 
       searchAggregates: view(procedure.input(opsSearchAggregatesInputSchema)).query(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
           const DEFAULT_LOOKBACK_MS = 365 * 24 * 60 * 60 * 1000;
           const sinceMs = input.sinceMs ?? Date.now() - DEFAULT_LOOKBACK_MS;
 
-          return ops.eventExplorer.searchAggregates({
+          return ctx.app.ops.events.searchAggregates({
             query: input.query,
             tenantIds: input.tenantId ? [input.tenantId] : [],
             sinceMs,
@@ -1027,24 +847,12 @@ export class OpsTrpcApi {
 
       loadAggregateEvents: view(procedure.input(opsLoadAggregateEventsInputSchema)).query(
         async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
-          return ops.eventExplorer.getAggregateEvents(input);
+          return ctx.app.ops.events.getAggregateEvents(input);
         },
       ),
 
       computeProjectionState: view(procedure.input(opsComputeProjectionStateInputSchema)).query(
-        async ({ input, ctx }) => {
-          const ops = ctx.app.ops;
-
-          const result = await ops.eventExplorer.computeProjectionState(input);
-          if (!result.aggregateType) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: `Projection "${input.projectionName}" not found`,
-            });
-          }
-          return result;
-        },
+        async ({ input, ctx }) => ctx.app.ops.computeProjectionState(input),
       ),
 
       // ─────────────────────────────────────────────────────────────────────
@@ -1083,19 +891,12 @@ export class OpsTrpcApi {
        */
       listFeatureFlags: view(procedure)
         .output(operatorFeatureFlagCatalogueSchema)
-        .query(async ({ ctx }) => ctx.app.featureFlags.listOperatorCatalogue()),
+        .query(async ({ ctx }) => ctx.app.ops.featureFlagCatalogue()),
 
       setFeatureFlag: manage(procedure.input(opsSetFeatureFlagInputSchema))
         .output(opsOkOutputSchema)
         .mutation(async ({ ctx, input }) => {
-          const isExplicitKey = listFeatureFlags().some((flag) => flag.key === input.key);
-          if (!isExplicitKey) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: `Unknown feature flag key: ${input.key}`,
-            });
-          }
-          await ctx.app.featureFlags.setEnabled({
+          await ctx.app.ops.setFeatureFlagEnabled({
             key: input.key,
             enabled: input.enabled,
             lastEditedBy: ctx.actor().id,
@@ -1129,14 +930,7 @@ export class OpsTrpcApi {
       )
         .output(opsOkOutputSchema)
         .mutation(async ({ ctx, input }) => {
-          const isExplicitKey = listFeatureFlags().some((flag) => flag.key === input.key);
-          if (!isExplicitKey) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: `Unknown feature flag key: ${input.key}`,
-            });
-          }
-          await ctx.app.featureFlags.setRules({
+          await ctx.app.ops.setFeatureFlagRules({
             key: input.key,
             rules: input.rules,
             lastEditedBy: ctx.actor().id,
@@ -1147,11 +941,7 @@ export class OpsTrpcApi {
       clearFeatureFlag: manage(procedure.input(opsFeatureFlagKeyInputSchema))
         .output(opsOkOutputSchema)
         .mutation(async ({ ctx, input }) => {
-          // Deliberately permissive: listFeatureFlags surfaces orphan rows
-          // (DB keys that no longer match the registry or pipeline graph)
-          // so operators can delete them. Validating the key here would
-          // break that cleanup path.
-          await ctx.app.featureFlags.clearStoredFlag({
+          await ctx.app.ops.clearFeatureFlag({
             key: input.key,
             lastEditedBy: ctx.actor().id,
           });
@@ -1167,19 +957,19 @@ export class OpsTrpcApi {
       // ─────────────────────────────────────────────────────────────────────
 
       listBlobQueues: view(procedure).query(async ({ ctx }) => {
-        return ctx.app.ops.listBlobQueues();
+        return ctx.app.ops.operations.listBlobQueues();
       }),
 
       getBlobStoreStats: view(procedure).query(async ({ ctx }) => {
-        return ctx.app.ops.getBlobStoreStats();
+        return ctx.app.ops.operations.getBlobStoreStats();
       }),
 
       listBlobs: view(procedure.input(listBlobsInputSchema)).query(async ({ input, ctx }) => {
-        return ctx.app.ops.listBlobs(input);
+        return ctx.app.ops.operations.listBlobs(input);
       }),
 
       getBlob: view(procedure.input(getBlobInputSchema)).query(async ({ input, ctx }) => {
-        return ctx.app.ops.tryGetBlob(input);
+        return ctx.app.ops.operations.tryGetBlob(input);
       }),
 
       runBlobCleanup: manage(procedure.input(runBlobCleanupOperatorInputSchema)).mutation(
@@ -1187,7 +977,7 @@ export class OpsTrpcApi {
           if (!input.dryRun) {
             requireDestructiveOpsAuth(ctx, input.confirm);
           }
-          return ctx.app.ops.runBlobCleanup({
+          return ctx.app.ops.operations.runBlobCleanup({
             dryRun: input.dryRun,
             // Opaque id, not email: the audit trail must trace the actor without
             // carrying PII into the log stream.
@@ -1199,7 +989,7 @@ export class OpsTrpcApi {
       deleteBlob: manage(procedure.input(deleteBlobOperatorInputSchema)).mutation(
         async ({ ctx, input }) => {
           requireDestructiveOpsAuth(ctx, input.confirm);
-          return ctx.app.ops.deleteBlob({
+          return ctx.app.ops.operations.deleteBlob({
             queueName: input.queueName,
             projectId: input.projectId,
             hash: input.hash,

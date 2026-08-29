@@ -8,10 +8,10 @@ import {
   type SecuredApp,
   validator as zValidator,
 } from "@langwatch/api/rest";
-import { monitorSettingsSchema, type MonitorService } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
+import type { MonitorApp } from "#app/monitor.app";
 
 const logger = createLogger("langwatch:api:monitors");
 
@@ -94,14 +94,20 @@ function toMonitorResponse(monitor: {
  * would loosen or drift from the one the application enforces. It reaches the
  * routes as a schema so both the request validator and the published document
  * are built from the one definition.
+ *
+ * Every rule about a monitor is {@link MonitorApp}'s — what an unmentioned
+ * field on a partial update means, and what a write does to one. This family
+ * owns only its own wire shape and its status codes: `null` from the
+ * application is 404 here, and the tRPC twin renders the same `null` its own
+ * way.
  */
 export function createMonitorRestApp(options: {
   security: AppRestSecurity;
-  monitors: () => MonitorService;
+  app: () => MonitorApp;
   platformUrl: PlatformUrlBuilder;
   mappingsSchema: z.ZodType;
 }): SecuredApp<{ Variables: AppRestProjectVariables }> {
-  const { security, monitors, platformUrl, mappingsSchema } = options;
+  const { security, app, platformUrl, mappingsSchema } = options;
 
   const createMonitorSchema = z.object({
     name: z.string().min(1, "name is required"),
@@ -156,9 +162,7 @@ export function createMonitorRestApp(options: {
       const project = c.get("project");
       logger.info({ projectId: project.id }, "Listing monitors");
 
-      const list = await monitors().getAllForProject({
-        projectId: project.id,
-      });
+      const list = await app().list({ projectId: project.id });
 
       return c.json(
         list.map((m) => ({
@@ -200,10 +204,7 @@ export function createMonitorRestApp(options: {
       const { id } = c.req.param();
       logger.info({ projectId: project.id, monitorId: id }, "Getting monitor");
 
-      const monitor = await monitors().tryGetMonitorById({
-        id,
-        projectId: project.id,
-      });
+      const monitor = await app().tryGetById({ id, projectId: project.id });
 
       if (!monitor) {
         return c.json({ error: "Monitor not found" }, 404);
@@ -250,7 +251,7 @@ export function createMonitorRestApp(options: {
       const body = c.req.valid("json");
       logger.info({ projectId: project.id }, "Creating monitor");
 
-      const monitor = await monitors().create({
+      const monitor = await app().create({
         projectId: project.id,
         name: body.name,
         checkType: body.checkType,
@@ -307,36 +308,14 @@ export function createMonitorRestApp(options: {
       const body = c.req.valid("json");
       logger.info({ projectId: project.id, monitorId: id }, "Updating monitor");
 
-      const service = monitors();
-      const existing = await service.tryGetMonitorById({
-        id,
-        projectId: project.id,
-      });
+      // What an unmentioned field means on a partial update is the
+      // application's answer, not this family's. It was spelled out here as
+      // well, and the two copies had already begun to disagree.
+      const monitor = await app().patch({ id, projectId: project.id, changes: body });
 
-      if (!existing) {
+      if (!monitor) {
         return c.json({ error: "Monitor not found" }, 404);
       }
-
-      const existingParameters = monitorSettingsSchema.safeParse(existing.parameters);
-
-      const monitor = await service.update({
-        id,
-        projectId: project.id,
-        name: body.name ?? existing.name,
-        checkType: body.checkType ?? existing.checkType,
-        executionMode: body.executionMode ?? existing.executionMode,
-        preconditions: body.preconditions ?? existing.preconditions,
-        parameters: body.parameters ?? (existingParameters.success ? existingParameters.data : {}),
-        mappings: body.mappings !== undefined ? body.mappings : existing.mappings,
-        sample: body.sample ?? existing.sample,
-        enabled: body.enabled,
-        evaluatorId: body.evaluatorId,
-        level: body.level ?? (existing.level as "trace" | "thread"),
-        threadIdleTimeout:
-          body.threadIdleTimeout !== undefined
-            ? body.threadIdleTimeout
-            : existing.threadIdleTimeout,
-      });
 
       return c.json({
         ...toMonitorResponse(monitor),
@@ -379,21 +358,11 @@ export function createMonitorRestApp(options: {
       const { enabled } = c.req.valid("json");
       logger.info({ projectId: project.id, monitorId: id, enabled }, "Toggling monitor");
 
-      const service = monitors();
-      const existing = await service.tryGetMonitorById({
-        id,
-        projectId: project.id,
-      });
+      const toggled = await app().toggleExisting({ id, projectId: project.id, enabled });
 
-      if (!existing) {
+      if (!toggled) {
         return c.json({ error: "Monitor not found" }, 404);
       }
-
-      await service.toggle({
-        id,
-        projectId: project.id,
-        enabled,
-      });
 
       return c.json({ id, enabled });
     },
@@ -428,20 +397,11 @@ export function createMonitorRestApp(options: {
       const { id } = c.req.param();
       logger.info({ projectId: project.id, monitorId: id }, "Deleting monitor");
 
-      const service = monitors();
-      const existing = await service.tryGetMonitorById({
-        id,
-        projectId: project.id,
-      });
+      const deleted = await app().deleteExisting({ id, projectId: project.id });
 
-      if (!existing) {
+      if (!deleted) {
         return c.json({ error: "Monitor not found" }, 404);
       }
-
-      await service.delete({
-        id,
-        projectId: project.id,
-      });
 
       return c.json({ id, deleted: true });
     },

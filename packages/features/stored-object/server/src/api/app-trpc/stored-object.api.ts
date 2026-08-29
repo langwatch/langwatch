@@ -10,35 +10,18 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
+import type { StoredObjectApp } from "#app/stored-object.app";
 
 /**
- * The tri-state the probe answers with, matching the `/api/files/:id` HTTP
- * route:
- *  - `available` — row exists and storage has the bytes
- *  - `missing`   — row exists but the blob is gone (compensating delete
- *                  crashed, retention sweep, and so on)
- *  - `not_found` — no row matches
- */
-export type StoredObjectHead =
-  | { status: "available"; mediaType: string }
-  | { status: "missing"; mediaType: string }
-  | { status: "not_found" };
-
-/**
- * The probe capability this transport needs.
+ * The process supplies authentication; authorization arrives as `policyAny`.
  *
- * Deliberately narrower than `StoredObjectService`: the probe is the only
- * thing this surface may reach, and the process still supplies the complete
- * stored-objects capability behind it.
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them.
  */
-export type StoredObjectProbe = Readonly<{
-  headById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectHead>;
+export type StoredObjectTrpcContext = Readonly<{
+  app: Readonly<{ storedObjectApp: StoredObjectApp }>;
 }>;
-
-type StoredObjectApplication = Readonly<{ storedObjects: StoredObjectProbe }>;
-
-/** The process supplies authentication; authorization arrives as `policyAny`. */
-export type StoredObjectTrpcContext = Readonly<{ app: StoredObjectApplication }>;
 
 type StoredObjectTrpcProcedures<
   TContext extends StoredObjectTrpcContext,
@@ -99,7 +82,7 @@ export class StoredObjectTrpcApi {
         "scenarios:view",
       )(procedure.input(headByIdInputSchema)).query(async ({ ctx, input }) => {
         const { projectId, id } = input;
-        return ctx.app.storedObjects.headById({ projectId, id });
+        return ctx.app.storedObjectApp.headById({ projectId, id });
       }),
     });
   }

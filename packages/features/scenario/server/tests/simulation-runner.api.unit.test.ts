@@ -44,6 +44,7 @@ import {
 import { initTRPC } from "@trpc/server";
 import { createSimulationRunnerRouter } from "../src/api/app-trpc/simulation-runner.api";
 import type { ScenarioTrpcContext } from "../src/api/app-trpc/scenario.trpc-context";
+import { ScenarioApp, type ScenarioAppDependencies } from "../src/app/scenario.app";
 
 // The run resolves the scenario's declared parameters before it queues
 // anything, which is the transport's only database read. Stubbed here so this
@@ -69,18 +70,20 @@ function createTestCaller() {
     policy: () => (procedure) => procedure,
   });
 
-  return router.createCaller({
-    app: {
-      simulations: { queueRun: (...args: unknown[]) => mockQueueRun(...args) },
-      scenarios: {
-        getRunConfigs: (params: { ids: string[]; projectId: string }) =>
-          mockGetRunConfigByIds(params),
-        resolveRunParameters: (...args: unknown[]) => mockResolveRunParameters(...args),
-      },
-      scenarioExecution: {
-        prefetch: (...args: unknown[]) => mockPrefetchScenarioData(...args),
-      },
+  const app = ScenarioApp.create({
+    simulations: { queueRun: (...args: unknown[]) => mockQueueRun(...args) },
+    scenarios: {
+      getRunConfigs: (params: { ids: string[]; projectId: string }) =>
+        mockGetRunConfigByIds(params),
+      resolveRunParameters: (...args: unknown[]) => mockResolveRunParameters(...args),
     },
+    scenarioExecution: {
+      prefetch: (...args: unknown[]) => mockPrefetchScenarioData(...args),
+    },
+  } as unknown as ScenarioAppDependencies);
+
+  return router.createCaller({
+    app: { scenarios: app },
     actor: () => ({ id: "user_test_123" }),
     signal: undefined,
   } as unknown as ScenarioTrpcContext);

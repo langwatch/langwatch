@@ -4,6 +4,26 @@ export {
   type GovernanceInstallationOptions,
 } from "./adapters/postgres.governance-installation.adapter";
 
+/**
+ * The feature's application: the one typed thing its transports are given.
+ * Every door reaches the same object, so a rule written on it is the rule
+ * every door gets.
+ */
+export {
+  GovernanceApp,
+  NoEligibleModelProvidersError,
+  PersonalVirtualKeyLabelTakenError,
+  PersonalVirtualKeyMissingError,
+  RoutingPolicyEmptyError,
+  RoutingPolicyModelNotConcreteError,
+  RoutingPolicyProviderRequiredError,
+  RoutingPolicyScopeRequiredError,
+  type GovernanceAppDependencies,
+  type GovernanceCaller,
+  type GovernancePersonalVirtualKeyPorts,
+  type GovernanceProjectCaller,
+} from "./app/governance.app";
+
 // Process and eventing boundaries. Domain collaborators remain private to the
 // installation adapter and are never application capabilities.
 export * from "./adapters/governance-events.adapter";
@@ -103,7 +123,6 @@ export { TraceAlertTriggerMatchSubscriber } from "./subscribers/trace-alert-trig
 export {
   PersonalVirtualKeyTrpcApi,
   type PersonalVirtualKeyTrpcContext,
-  type PersonalVirtualKeyTrpcPorts,
 } from "./api/app-trpc/personal-virtual-key.api";
 export {
   RoutingPolicyTrpcApi,

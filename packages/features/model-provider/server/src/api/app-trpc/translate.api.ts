@@ -6,17 +6,13 @@
  * which configured model answers and how a provider failure is reported. The
  * text arrives from the caller; nothing here reads a trace.
  *
- * Transport only: gate, input parsing and delegation to `ModelProviderService`.
+ * Transport only: gate, input parsing and delegation to `ModelProviderApp`.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import {
-  featureByKey,
-  type ModelProviderService,
-  type ModelRole,
-} from "@langwatch/model-provider-contract";
+import { featureByKey, type ModelRole } from "@langwatch/model-provider-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import type { ModelProviderApp } from "#app/model-provider.app";
 
 const TRANSLATE_FEATURE_KEY = "translate.text";
 
@@ -26,10 +22,16 @@ const TRANSLATE_FEATURE_KEY = "translate.text";
  */
 const TRANSLATE_TEXT_MAX_CHARS = 100_000;
 
-type TranslateApplication = Readonly<{ modelProviders: ModelProviderService }>;
-
-/** The process supplies authentication; authorization arrives as `policy`. */
-export type TranslateTrpcContext = Readonly<{ app: TranslateApplication }>;
+/**
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches.
+ * Translation is the model-provider feature answering, so it arrives through
+ * the same {@link ModelProviderApp} the provider and cost surfaces call.
+ */
+export type TranslateTrpcContext = Readonly<{
+  app: Readonly<{ modelProviders: ModelProviderApp }>;
+}>;
 
 type TranslateTrpcProcedures<
   TContext extends TranslateTrpcContext,
@@ -88,11 +90,12 @@ export class TranslateTrpcApi {
       translate: policy("traces:view")(procedure.input(translateInputSchema)).mutation(
         async ({ ctx, input }) => {
           const feature = featureByKey(TRANSLATE_FEATURE_KEY);
+          // A missing registry entry is a build-time mistake in the process
+          // that composed this surface, not a cause a customer can act on, so
+          // it stays an ordinary error and degrades to an unknown failure
+          // carrying a trace id rather than being dressed up as handled.
           if (!feature) {
-            throw new TRPCError({
-              code: "INTERNAL_SERVER_ERROR",
-              message: `${TRANSLATE_FEATURE_KEY} feature is not registered`,
-            });
+            throw new Error(`${TRANSLATE_FEATURE_KEY} feature is not registered`);
           }
 
           // Any provider/SDK failure during the call surfaces as a typed

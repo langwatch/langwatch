@@ -12,34 +12,36 @@
  * who cannot invite anybody should still be told the seats are full rather than
  * shown a control that fails.
  *
- * Transport only: gates, input shapes and delegation. The enforcement service,
- * the operations notification and the error reporter arrive as ports, because
- * none of them is licensing's own.
+ * Transport only: gates, input shapes and delegation to `LicensingApp`. The
+ * enforcement check and the error channel are dependencies of that application
+ * rather than a second bag declared here, so a limit answered from a create
+ * button and the license that sets it are answered from one object. The
+ * operations notification is a second feature's slice on the context.
  */
-import {
-  limitTypeSchema,
-  limitTypes,
-  type LimitCheckResult,
-  type LimitType,
-} from "@langwatch/enterprise-licensing-contract";
+import { limitTypeSchema, type LimitType } from "@langwatch/enterprise-licensing-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
+import type { LicensingApp, LicensingCaller } from "#app/licensing.app";
 
 /**
- * The caller, as the enforcement service classifies them. Structural rather
- * than imported: the service's own notion of a member lives with the process
- * that composes it, and this surface only passes it straight through.
+ * The caller, as the enforcement service classifies them. The application
+ * names the shape, so a limit answered here and a limit answered by the
+ * license surface are answered about the same person.
  */
-type LimitActor = Readonly<{ id: string; email?: string | null }>;
+type LimitActor = LicensingCaller;
 
 /**
- * The process supplies authentication; authorization arrives as a policy. The
- * usage-limit notifier comes from the request's own application rather than a
- * port, because an alert must be raised through the same composition that
+ * The process supplies authentication; authorization arrives as a policy.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them. `usageLimits` is a second
+ * feature's slice: an alert must be raised through the same composition that
  * answered the check.
  */
 export type LicenseEnforcementTrpcContext = Readonly<{
   app: Readonly<{
+    licensing: LicensingApp;
     usageLimits: Readonly<{
       notifyResourceLimitReached(
         input: Readonly<{
@@ -70,20 +72,6 @@ type LicenseEnforcementTrpcProcedures<
   policy(permission: "organization:view"): <TProcedure>(procedure: TProcedure) => TProcedure;
 }>;
 
-/** The process capabilities this transport needs that are not licensing's own. */
-export type LicenseEnforcementTrpcPorts = Readonly<{
-  /** Whether one limit still admits another resource, for this caller. */
-  checkLimit(
-    input: Readonly<{
-      organizationId: string;
-      limitType: LimitType;
-      user: LimitActor;
-    }>,
-  ): Promise<LimitCheckResult>;
-  /** Swallows a notification failure into the process's error channel. */
-  reportError(error: unknown): void;
-}>;
-
 const organizationScopeSchema = z.object({ organizationId: z.string() });
 
 const limitScopeSchema = z.object({
@@ -97,11 +85,9 @@ export class LicenseEnforcementTrpcApi {
     TContext extends LicenseEnforcementTrpcContext,
     TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
     TRoot extends AnyTRPCRootTypes,
-    TPorts extends LicenseEnforcementTrpcPorts,
   >(
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: LicenseEnforcementTrpcProcedures<TContext, TOptions, TRoot>,
-    ports: TPorts,
   ) {
     const { protected: procedure, policy } = procedures;
 
@@ -123,7 +109,7 @@ export class LicenseEnforcementTrpcApi {
        */
       checkLimit: policy("organization:view")(procedure.input(limitScopeSchema)).query(
         async ({ ctx, input }) => {
-          return ports.checkLimit({
+          return ctx.app.licensing.checkLimit({
             organizationId: input.organizationId,
             limitType: input.limitType,
             user: callerOf(ctx),
@@ -134,24 +120,17 @@ export class LicenseEnforcementTrpcApi {
       /**
        * Every limit at once, for dashboards and settings pages that show
        * several.
+       *
+       * WHICH limits "every limit" means is the application's, not this
+       * door's: a surface that enumerated them here would go stale the day a
+       * limit is added, and silently show one fewer.
        */
       checkAllLimits: policy("organization:view")(procedure.input(organizationScopeSchema)).query(
-        async ({ ctx, input }) => {
-          const user = callerOf(ctx);
-          const results = await Promise.all(
-            limitTypes.map((type) =>
-              ports.checkLimit({
-                organizationId: input.organizationId,
-                limitType: type,
-                user,
-              }),
-            ),
-          );
-          return Object.fromEntries(results.map((result) => [result.limitType, result])) as Record<
-            (typeof limitTypes)[number],
-            (typeof results)[number]
-          >;
-        },
+        async ({ ctx, input }) =>
+          ctx.app.licensing.checkAllLimits({
+            organizationId: input.organizationId,
+            user: callerOf(ctx),
+          }),
       ),
 
       /**
@@ -164,7 +143,7 @@ export class LicenseEnforcementTrpcApi {
        */
       reportLimitBlocked: policy("organization:view")(procedure.input(limitScopeSchema)).mutation(
         async ({ ctx, input }) => {
-          const result = await ports.checkLimit({
+          const result = await ctx.app.licensing.checkLimit({
             organizationId: input.organizationId,
             limitType: input.limitType,
             user: callerOf(ctx),
@@ -178,7 +157,7 @@ export class LicenseEnforcementTrpcApi {
                 current: result.current,
                 max: result.max,
               })
-              .catch((error: unknown) => ports.reportError(error));
+              .catch((error: unknown) => ctx.app.licensing.reportError(error));
           }
         },
       ),

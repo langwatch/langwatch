@@ -5,9 +5,9 @@ import {
   type StoredObjectsCreateUploadInput,
   type StoredObjectsDeleteInput,
   type StoredObjectsGetInput,
-  type StoredObjectService,
 } from "@langwatch/stored-object-contract";
 import type { MiddlewareHandler } from "hono";
+import type { StoredObjectApp } from "#app/stored-object.app";
 
 export const STORED_OBJECTS_PUBLIC_API_VERSION = "2026-08-22" as const;
 
@@ -15,8 +15,14 @@ export type StoredObjectsPublicApiOptions = Readonly<{
   maximumUploadBytes: number;
 }>;
 
+/**
+ * The slice of the process's application this family reaches.
+ *
+ * The member is the feature's own {@link StoredObjectApp}, not the service
+ * behind it, so this door and the tRPC probe answer from one object.
+ */
 export interface StoredObjectsPublicApp {
-  readonly storedObjects: StoredObjectService;
+  readonly storedObjects: StoredObjectApp;
 }
 
 /** Thin public REST/RPC registration over the contract service capability. */

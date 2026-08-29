@@ -40,7 +40,6 @@
  */
 import { on } from "node:events";
 import type { CodingAgentService, CodingAgentTranscript } from "@langwatch/coding-agent-contract";
-import type { EvaluationService } from "@langwatch/evaluation-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -51,26 +50,17 @@ import {
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
   type DerivedTraceEvent,
-  type ElasticSearchEvent,
-  type DiscoverResult,
-  type SessionGroupsResult,
   type Span,
   type SpanDetail,
   type SpanLangwatchSignals,
-  type SpanResourceInfo,
   type SpanSummaryRow,
   type SpanTreeNode,
   type TraceCanonicalisationService,
   type TraceEventRollup,
   type TraceHeader,
-  type TraceListFacetCounts,
-  type TraceListPage,
   type TraceResourceInfoDto,
-  type TraceService,
-  type TraceSummaryData,
   type AiActionResult,
   type AiQueryResult,
-  type FacetValuesResult,
 } from "@langwatch/trace-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
@@ -101,154 +91,24 @@ import {
   gateTreeCost,
   withoutHiddenResourceAttrs,
 } from "./trace-view-gates.api";
-import type { TracesTrpcEmitters } from "./traces.api";
+import type {
+  TraceApp,
+  TraceLogRecordReader,
+  TraceLogRecordReadRow,
+} from "#app/trace.app";
 
 const logger = createLogger("langwatch:api:traces-v2");
 
-// ---------------------------------------------------------------------------
-// The application this transport reads through
-// ---------------------------------------------------------------------------
-
-/** One trace-correlated log record as the storage read answers it. */
-export type TraceLogRecordReadRow = Readonly<{
-  spanId: string;
-  timeUnixMs: number;
-  body: string;
-  attributes: Record<string, string>;
-  resourceAttributes: Record<string, string>;
-  scopeName: string;
-  scopeVersion: string | null;
-}>;
-
-/** The list, facet and discover reads behind the grid and its sidebar. */
-export type TracesV2ListReader = Readonly<{
-  getList(params: {
-    tenantId: string;
-    timeRange: { from: number; to: number };
-    sort: { columnId: string; direction: "asc" | "desc" };
-    page?: number;
-    pageSize: number;
-    cursor?: { sortValue: number; traceId: string };
-    filterWhere?: { sql: string; params: Record<string, unknown> };
-    visibilityCutoffMs?: number | null;
-  }): Promise<TraceListPage>;
-  getFacets(params: {
-    tenantId: string;
-    timeRange: { from: number; to: number };
-    filterWhere?: { sql: string; params: Record<string, unknown> };
-  }): Promise<TraceListFacetCounts>;
-  getNewCount(params: {
-    tenantId: string;
-    timeRange: { from: number; to: number };
-    since: number;
-    filterWhere?: { sql: string; params: Record<string, unknown> };
-  }): Promise<number>;
-  getSuggestions(params: {
-    tenantId: string;
-    field: string;
-    prefix: string;
-    limit?: number;
-  }): Promise<string[]>;
-  getDiscover(params: {
-    tenantId: string;
-    timeRange: { from: number; to: number };
-  }): Promise<DiscoverResult>;
-  getFacetValues(params: {
-    tenantId: string;
-    timeRange: { from: number; to: number };
-    facetKey: string;
-    prefix?: string;
-    limit: number;
-    offset: number;
-  }): Promise<FacetValuesResult>;
-}>;
-
-/** The Sessions lens read. */
-export type TracesV2SessionGroupsReader = Readonly<{
-  getSessionGroups(params: {
-    tenantId: string;
-    timeRange: { from: number; to: number; live?: boolean };
-    sort?: { columnId: string; direction: "asc" | "desc" };
-    pageSize: number;
-    cursor?: string;
-    filterWhere?: { sql: string; params: Record<string, unknown> };
-    contentTerms?: string[];
-    visibilityCutoffMs?: number | null;
-  }): Promise<SessionGroupsResult>;
-}>;
-
-type ByTrace = { tenantId: string; traceId: string; occurredAtMs?: number };
-
-/** Every per-span read the drawer and the waterfall issue. */
-export type TracesV2SpanReader = Readonly<{
-  getSpansByTraceId(
-    params: ByTrace & { limit?: number; visibilityCutoffMs?: number | null },
-  ): Promise<Span[]>;
-  getSpanById(
-    params: ByTrace & { spanId: string; visibilityCutoffMs?: number | null },
-  ): Promise<Span | null>;
-  getSpanEvents(params: ByTrace & { spanId: string }): Promise<ElasticSearchEvent[]>;
-  getSpansPaginated(
-    params: ByTrace & { limit: number; offset: number; visibilityCutoffMs?: number | null },
-  ): Promise<{ spans: Span[]; total: number }>;
-  getSpansSince(
-    params: ByTrace & { sinceStartTimeMs: number; visibilityCutoffMs?: number | null },
-  ): Promise<Span[]>;
-  getSpanSummaryByTraceId(params: ByTrace): Promise<SpanSummaryRow[]>;
-  getLangwatchSignalsByTraceId(
-    params: ByTrace,
-  ): Promise<Array<{ spanId: string; signals: SpanLangwatchSignals["signals"] }>>;
-  getSpanResourcesByTraceId(params: ByTrace): Promise<SpanResourceInfo[]>;
-  getTraceEventsByTraceId(params: ByTrace): Promise<DerivedTraceEvent[]>;
-  getTraceEventRollupsByTraceIds(params: {
-    tenantId: string;
-    traceIds: string[];
-    timeRange: { from: number; to: number };
-  }): Promise<Record<string, TraceEventRollup>>;
-}>;
-
-type TracesV2Application = Readonly<{
-  traces: Readonly<{
-    list: TracesV2ListReader;
-    sessionGroups: TracesV2SessionGroupsReader;
-    spans: TracesV2SpanReader;
-    summary: Readonly<{
-      getByTraceId(
-        tenantId: string,
-        traceId: string,
-        options?: {
-          occurredAtMs?: number;
-          visibilityCutoffMs?: number | null;
-          full?: boolean;
-        },
-      ): Promise<TraceSummaryData>;
-    }>;
-    tree: TraceService;
-    logRecords: Readonly<{
-      getLogsByTraceId(
-        tenantId: string,
-        traceId: string,
-        occurredAtMs?: number,
-        limit?: number,
-      ): Promise<TraceLogRecordReadRow[]>;
-    }>;
-    canonicalisation: TraceCanonicalisationService;
-    changeTraceName(input: {
-      tenantId: string;
-      traceId: string;
-      newName: string;
-      changedByUserId: string;
-      occurredAt: number;
-    }): Promise<unknown>;
-  }>;
-  evaluations: EvaluationService;
-  codingAgents: CodingAgentService;
-  broadcast: TracesTrpcEmitters;
-}>;
-
-/** The process supplies authentication; authorization arrives as `policy`. */
+/**
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them. `session` is who a rename
+ * is attributed to — read here, stamped once, by the application.
+ */
 export type TracesV2TrpcContext = Readonly<{
-  app: TracesV2Application;
+  app: Readonly<{ traces: TraceApp }>;
   session: Readonly<{ user: Readonly<{ id: string }> }>;
 }>;
 
@@ -394,7 +254,7 @@ export type TracesV2CodingAgentEnrichmentPort = Readonly<{
     traceId: string;
     spans: Span[];
     occurredAtMs?: number;
-    logRecords: TracesV2Application["traces"]["logRecords"];
+    logRecords: TraceLogRecordReader;
     traceCanonicalisation: TraceCanonicalisationService;
     codingAgents: CodingAgentService;
   }): Promise<Span[]>;
@@ -497,7 +357,7 @@ async function enrichSpanDetailFromCodingAgentLogs({
   occurredAtMs,
   codingAgentEnrichment,
 }: {
-  app: TracesV2Application;
+  app: TraceApp;
   span: Span;
   tenantId: string;
   traceId: string;
@@ -508,20 +368,16 @@ async function enrichSpanDetailFromCodingAgentLogs({
     const needsSiblingRefs =
       typeof (span.params as Record<string, unknown> | null)?.request_id === "string";
     const [logRows, summaryRows] = await Promise.all([
-      app.traces.logRecords.getLogsByTraceId(tenantId, traceId, occurredAtMs),
+      app.readTraceLogRecords({ projectId: tenantId, traceId, occurredAtMs }),
       needsSiblingRefs
-        ? app.traces.spans.getSpanSummaryByTraceId({
-            tenantId,
-            traceId,
-            ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
-          })
+        ? app.readSpanSummaries({ projectId: tenantId, traceId, occurredAtMs })
         : Promise.resolve([]),
     ]);
     return codingAgentEnrichment.enrichSingleSpanWithLogContent({
       span,
       modelCallRefs: codingAgentEnrichment.mapSummaryRowsToRefs(summaryRows),
       logRows,
-      traceCanonicalisation: app.traces.canonicalisation,
+      traceCanonicalisation: app.canonicalisation,
       codingAgents: app.codingAgents,
     });
   } catch (error) {
@@ -554,31 +410,30 @@ async function loadSpansFullWithProtections({
   occurredAtMs,
   protections,
 }: {
-  app: TracesV2Application;
+  app: TraceApp;
   ports: TracesV2ReadPorts;
   projectId: string;
   traceId: string;
   occurredAtMs?: number;
   protections: Protections;
 }): Promise<SpanDetail[]> {
-  const hint = occurredAtFromInput(occurredAtMs !== undefined ? { occurredAtMs } : {});
-  const storedSpans = await app.traces.spans.getSpansByTraceId({
-    tenantId: projectId,
+  const storedSpans = await app.readSpans({
+    projectId,
     traceId,
+    occurredAtMs,
     visibilityCutoffMs: await ports.getVisibilityCutoffMs(projectId),
-    ...hint,
   });
   // Claude Code's real `llm_request` spans carry tokens + `request_id` but NO
   // message content, which lives in the trace's OTLP log records. Join it on
   // BEFORE protections run, so the joined content goes through the same
   // redaction pass as any other span content rather than bypassing it.
   const spans = await ports.codingAgentEnrichment.enrichSpansFromLogs({
-    logRecords: app.traces.logRecords,
+    logRecords: app.logRecords,
     tenantId: projectId,
     traceId,
     spans: storedSpans,
     ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
-    traceCanonicalisation: app.traces.canonicalisation,
+    traceCanonicalisation: app.canonicalisation,
     codingAgents: app.codingAgents,
   });
 
@@ -595,7 +450,7 @@ async function loadTraceLogsWithProtections({
   protections,
   codingAgents,
 }: {
-  app: TracesV2Application;
+  app: TraceApp;
   ports: TracesV2ReadPorts;
   projectId: string;
   traceId: string;
@@ -604,7 +459,7 @@ async function loadTraceLogsWithProtections({
   codingAgents: CodingAgentService;
 }): Promise<TraceLogRecordDto[]> {
   const visibilityCutoffMs = await ports.getVisibilityCutoffMs(projectId);
-  const rows = await app.traces.logRecords.getLogsByTraceId(projectId, traceId, occurredAtMs);
+  const rows = await app.readTraceLogRecords({ projectId, traceId, occurredAtMs });
   return rows.map((row) =>
     gateTraceLogVisibility(
       {
@@ -647,7 +502,7 @@ export class TracesV2TrpcApi {
     protections,
     codingAgents,
   }: {
-    app: TracesV2Application;
+    app: TraceApp;
     ports: TracesV2ReadPorts;
     projectId: string;
     traceId: string;
@@ -706,7 +561,7 @@ export class TracesV2TrpcApi {
         const protections = await ports.getViewerProtections(ctx, {
           projectId: input.projectId,
         });
-        const page = await ctx.app.traces.list.getList({
+        const page = await ctx.app.traces.readTraceList({
           tenantId: input.projectId,
           timeRange: input.timeRange,
           sort: input.sort,
@@ -748,7 +603,7 @@ export class TracesV2TrpcApi {
         const protections = await ports.getViewerProtections(ctx, {
           projectId: input.projectId,
         });
-        const result = await ctx.app.traces.sessionGroups.getSessionGroups({
+        const result = await ctx.app.traces.readSessionGroups({
           tenantId: input.projectId,
           timeRange: input.timeRange,
           sort: input.sort,
@@ -795,8 +650,8 @@ export class TracesV2TrpcApi {
           }),
         ),
       ).query(async ({ input, ctx }): Promise<Record<string, TraceEventRollup>> =>
-        ctx.app.traces.spans.getTraceEventRollupsByTraceIds({
-          tenantId: input.projectId,
+        ctx.app.traces.readTraceEventRollups({
+          projectId: input.projectId,
           traceIds: input.traceIds,
           timeRange: input.timeRange,
         }),
@@ -811,7 +666,7 @@ export class TracesV2TrpcApi {
           }),
         ),
       ).query(async ({ input, ctx }) => {
-        return ctx.app.traces.list.getFacets({
+        return ctx.app.traces.readFacets({
           tenantId: input.projectId,
           timeRange: input.timeRange,
           filterWhere: buildFilterWhere(input, ports.queryTranslation),
@@ -828,7 +683,7 @@ export class TracesV2TrpcApi {
           }),
         ),
       ).query(async ({ input, ctx }) => {
-        const count = await ctx.app.traces.list.getNewCount({
+        const count = await ctx.app.traces.readNewCount({
           tenantId: input.projectId,
           timeRange: input.timeRange,
           since: input.since,
@@ -847,7 +702,7 @@ export class TracesV2TrpcApi {
           }),
         ),
       ).query(async ({ input, ctx }) => {
-        const values = await ctx.app.traces.list.getSuggestions({
+        const values = await ctx.app.traces.readSuggestions({
           tenantId: input.projectId,
           field: input.field,
           prefix: input.prefix,
@@ -880,7 +735,7 @@ export class TracesV2TrpcApi {
           sql: "Attributes['gen_ai.conversation.id'] = {threadConversationId:String}",
           params: { threadConversationId: input.conversationId },
         };
-        const page = await ctx.app.traces.list.getList({
+        const page = await ctx.app.traces.readTraceList({
           tenantId: input.projectId,
           timeRange,
           sort: { columnId: "time", direction: "asc" },
@@ -913,7 +768,7 @@ export class TracesV2TrpcApi {
           }),
         ),
       ).query(async ({ input, ctx }) => {
-        return ctx.app.traces.list.getDiscover({
+        return ctx.app.traces.readDiscover({
           tenantId: input.projectId,
           timeRange: input.timeRange,
         });
@@ -933,7 +788,7 @@ export class TracesV2TrpcApi {
         procedure.input(z.object({ projectId: z.string() })),
       ).subscription(async function* (opts) {
         const { projectId } = opts.input;
-        const emitter = opts.ctx.app.broadcast.getTenantEmitter(projectId);
+        const emitter = opts.ctx.app.traces.getTenantEmitter(projectId);
         try {
           for await (const eventArgs of on(emitter, "discover_updated", {
             signal: opts.signal,
@@ -941,7 +796,7 @@ export class TracesV2TrpcApi {
             yield eventArgs[0];
           }
         } finally {
-          opts.ctx.app.broadcast.cleanupTenantEmitter(projectId);
+          opts.ctx.app.traces.cleanupTenantEmitter(projectId);
         }
       }),
 
@@ -957,7 +812,7 @@ export class TracesV2TrpcApi {
           }),
         ),
       ).query(async ({ input, ctx }) => {
-        return ctx.app.traces.list.getFacetValues({
+        return ctx.app.traces.readFacetValues({
           tenantId: input.projectId,
           timeRange: input.timeRange,
           facetKey: input.facetKey,
@@ -1046,8 +901,10 @@ export class TracesV2TrpcApi {
         const protections = await ports.getViewerProtections(ctx, {
           projectId: input.projectId,
         });
-        const summary = await ctx.app.traces.summary.getByTraceId(input.projectId, input.traceId, {
-          ...(input.occurredAtMs !== undefined ? { occurredAtMs: input.occurredAtMs } : {}),
+        const summary = await ctx.app.traces.readTraceSummary({
+          projectId: input.projectId,
+          traceId: input.traceId,
+          occurredAtMs: input.occurredAtMs,
           visibilityCutoffMs: await ports.getVisibilityCutoffMs(input.projectId),
           full: input.full,
         });
@@ -1103,13 +960,14 @@ export class TracesV2TrpcApi {
           );
         }
 
-        await ctx.app.traces.changeTraceName({
-          tenantId: input.projectId,
-          traceId: input.traceId,
-          newName: parsed.data.newName,
-          changedByUserId: ctx.session.user.id,
-          occurredAt: Date.now(),
-        });
+        await ctx.app.traces.changeTraceName(
+          {
+            projectId: input.projectId,
+            traceId: input.traceId,
+            newName: parsed.data.newName,
+          },
+          ctx.session.user,
+        );
 
         return { traceId: input.traceId, newName: parsed.data.newName };
       }),
@@ -1141,13 +999,13 @@ export class TracesV2TrpcApi {
         const protections = await ports.getViewerProtections(ctx, {
           projectId: input.projectId,
         });
-        const page = await ctx.app.traces.spans.getSpansPaginated({
-          tenantId: input.projectId,
+        const page = await ctx.app.traces.readSpansPage({
+          projectId: input.projectId,
           traceId: input.traceId,
           visibilityCutoffMs: await ports.getVisibilityCutoffMs(input.projectId),
           limit: input.limit,
           offset: input.offset,
-          ...occurredAtFromInput(input),
+          occurredAtMs: input.occurredAtMs,
         });
         // These are full legacy spans (input/output/params/metrics), so the
         // legacy span protections apply as-is: category visibility, cost,
@@ -1179,12 +1037,12 @@ export class TracesV2TrpcApi {
         const protections = await ports.getViewerProtections(ctx, {
           projectId: input.projectId,
         });
-        const spans = await ctx.app.traces.spans.getSpansSince({
-          tenantId: input.projectId,
+        const spans = await ctx.app.traces.readSpansSince({
+          projectId: input.projectId,
           traceId: input.traceId,
           sinceStartTimeMs: input.sinceStartTimeMs,
           visibilityCutoffMs: await ports.getVisibilityCutoffMs(input.projectId),
-          ...occurredAtFromInput(input),
+          occurredAtMs: input.occurredAtMs,
         });
         const redactions = buildSpanContentRedactions(
           spans,
@@ -1208,7 +1066,7 @@ export class TracesV2TrpcApi {
           const protections = await ports.getViewerProtections(ctx, {
             projectId: input.projectId,
           });
-          return ctx.app.traces.tree.getSpanTreePage({
+          return ctx.app.traces.readSpanTreePage({
             ...input,
             canSeeCosts: protections.canSeeCosts === true,
           });
@@ -1228,7 +1086,7 @@ export class TracesV2TrpcApi {
         const protections = await ports.getViewerProtections(ctx, {
           projectId: input.projectId,
         });
-        return ctx.app.traces.tree.getSpanTreeDelta({
+        return ctx.app.traces.readSpanTreeDelta({
           ...input,
           canSeeCosts: protections.canSeeCosts === true,
         });
@@ -1254,10 +1112,10 @@ export class TracesV2TrpcApi {
         const protections = await ports.getViewerProtections(ctx, {
           projectId: input.projectId,
         });
-        const rows = await ctx.app.traces.spans.getSpanSummaryByTraceId({
-          tenantId: input.projectId,
+        const rows = await ctx.app.traces.readSpanSummaries({
+          projectId: input.projectId,
           traceId: input.traceId,
-          ...occurredAtFromInput(input),
+          occurredAtMs: input.occurredAtMs,
         });
         return gateTreeCost({
           nodes: rows.map(mapLegacySpanSummaryToTreeNode),
@@ -1280,10 +1138,10 @@ export class TracesV2TrpcApi {
           }),
         ),
       ).query(async ({ input, ctx }): Promise<SpanLangwatchSignals[]> => {
-        const rows = await ctx.app.traces.spans.getLangwatchSignalsByTraceId({
-          tenantId: input.projectId,
+        const rows = await ctx.app.traces.readLangwatchSignals({
+          projectId: input.projectId,
           traceId: input.traceId,
-          ...occurredAtFromInput(input),
+          occurredAtMs: input.occurredAtMs,
         });
         return rows.map((r) => ({ spanId: r.spanId, signals: r.signals }));
       }),
@@ -1306,7 +1164,7 @@ export class TracesV2TrpcApi {
           projectId: input.projectId,
         });
         return loadSpansFullWithProtections({
-          app: ctx.app,
+          app: ctx.app.traces,
           ports,
           projectId: input.projectId,
           traceId: input.traceId,
@@ -1341,13 +1199,13 @@ export class TracesV2TrpcApi {
           projectId: input.projectId,
         });
         return TracesV2TrpcApi.readCodingAgentTranscript({
-          app: ctx.app,
+          app: ctx.app.traces,
           ports,
           projectId: input.projectId,
           traceId: input.traceId,
           ...occurredAtFromInput(input),
           protections,
-          codingAgents: ctx.app.codingAgents,
+          codingAgents: ctx.app.traces.codingAgents,
         });
       }),
 
@@ -1364,25 +1222,24 @@ export class TracesV2TrpcApi {
         const protections = await ports.getViewerProtections(ctx, {
           projectId: input.projectId,
         });
-        const hint = occurredAtFromInput(input);
         // One narrow span fetch + one narrow events fetch in parallel —
         // both keyed by SpanId (and partition-pruned by occurredAtMs when
         // available). Replaces an older path that pulled every span in the
         // trace into Node memory just to .find() one, plus a third query
         // whose result was never read.
         const [span, rawEvents] = await Promise.all([
-          ctx.app.traces.spans.getSpanById({
-            tenantId: input.projectId,
+          ctx.app.traces.readSpan({
+            projectId: input.projectId,
             traceId: input.traceId,
             spanId: input.spanId,
             visibilityCutoffMs: await ports.getVisibilityCutoffMs(input.projectId),
-            ...hint,
+            occurredAtMs: input.occurredAtMs,
           }),
-          ctx.app.traces.spans.getSpanEvents({
-            tenantId: input.projectId,
+          ctx.app.traces.readSpanEvents({
+            projectId: input.projectId,
             traceId: input.traceId,
             spanId: input.spanId,
-            ...hint,
+            occurredAtMs: input.occurredAtMs,
           }),
         ]);
 
@@ -1397,11 +1254,11 @@ export class TracesV2TrpcApi {
         // only coding-agent-shaped spans pay the log read.
         const targetSpan = ports.codingAgentEnrichment.isCodingAgentShapedSpan(span)
           ? await enrichSpanDetailFromCodingAgentLogs({
-              app: ctx.app,
+              app: ctx.app.traces,
               span,
               tenantId: input.projectId,
               traceId: input.traceId,
-              ...(hint.occurredAtMs !== undefined ? { occurredAtMs: hint.occurredAtMs } : {}),
+              ...(input.occurredAtMs !== undefined ? { occurredAtMs: input.occurredAtMs } : {}),
               codingAgentEnrichment: ports.codingAgentEnrichment,
             })
           : span;
@@ -1507,10 +1364,10 @@ export class TracesV2TrpcApi {
         const protections = await ports.getViewerProtections(ctx, {
           projectId: input.projectId,
         });
-        const rows = await ctx.app.traces.spans.getSpanResourcesByTraceId({
-          tenantId: input.projectId,
+        const rows = await ctx.app.traces.readSpanResources({
+          projectId: input.projectId,
           traceId: input.traceId,
-          ...occurredAtFromInput(input),
+          occurredAtMs: input.occurredAtMs,
         });
 
         const spans = rows.map((r) => ({
@@ -1556,10 +1413,10 @@ export class TracesV2TrpcApi {
         const protections = await ports.getViewerProtections(ctx, {
           projectId: input.projectId,
         });
-        const events = await ctx.app.traces.spans.getTraceEventsByTraceId({
-          tenantId: input.projectId,
+        const events = await ctx.app.traces.readTraceEvents({
+          projectId: input.projectId,
           traceId: input.traceId,
-          ...occurredAtFromInput(input),
+          occurredAtMs: input.occurredAtMs,
         });
         // Event/exception attributes are captured content — same gating as the
         // shared-trace payload, so the two surfaces cannot drift apart.
@@ -1574,7 +1431,7 @@ export class TracesV2TrpcApi {
           }),
         ),
       ).query(async ({ input, ctx }) => {
-        return ctx.app.evaluations.findRunsByTraceId({
+        return ctx.app.traces.readEvaluationRuns({
           tenantId: input.projectId,
           traceId: input.traceId,
         });
@@ -1604,7 +1461,7 @@ export class TracesV2TrpcApi {
         // Two keyed seeks (ADR-056 §4): the (trace → session) map, then the
         // session row — which already spans every trace of the run, so no
         // conversation-membership fan-out is needed here anymore.
-        return ctx.app.codingAgents.tryGetSessionForTrace({
+        return ctx.app.traces.readCodingAgentSession({
           projectId: input.projectId,
           traceId: input.traceId,
         });
@@ -1640,13 +1497,13 @@ export class TracesV2TrpcApi {
           projectId: input.projectId,
         });
         return loadTraceLogsWithProtections({
-          app: ctx.app,
+          app: ctx.app.traces,
           ports,
           projectId: input.projectId,
           traceId: input.traceId,
           ...occurredAtFromInput(input),
           protections,
-          codingAgents: ctx.app.codingAgents,
+          codingAgents: ctx.app.traces.codingAgents,
         });
       }),
     });

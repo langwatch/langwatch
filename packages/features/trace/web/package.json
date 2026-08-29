@@ -54,6 +54,7 @@
     "@langwatch/annotation-web": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@tanstack/react-virtual": "^3.14.5",
     "liqe": "^3.8.7",
@@ -67,8 +68,11 @@
     "zustand": "^4.5.7"
   },
   "devDependencies": {
+    "@tanstack/react-query": "^5.101.4",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
+    "@trpc/client": "11.18.0",
+    "@trpc/server": "11.18.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "jsdom": "^30.0.1",

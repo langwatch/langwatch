@@ -1,4 +1,19 @@
 export {
+  OpsApp,
+  OpsConfirmationRequiredError,
+  OpsImpersonatedOperatorRefusedError,
+  OpsOperatorSessionRequiredError,
+  OpsUnknownFeatureFlagError,
+  type OpsAppDependencies,
+  type OpsBadgeReading,
+  type OpsCapability,
+  type OpsEventExplorer,
+  type OpsOperator,
+  type OpsProcessExplorer,
+  type OpsProcessRef,
+  type OpsReplayRunner,
+} from "./app/ops.app";
+export {
   OpsTrpcApi,
   type OpsScope,
   type OpsTrpcContext,

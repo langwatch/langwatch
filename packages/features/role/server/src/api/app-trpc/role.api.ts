@@ -1,4 +1,3 @@
-import { ledgerActorFor } from "@langwatch/actor";
 import {
   roleApiCreateInputSchema,
   roleApiOrganizationInputSchema,
@@ -6,17 +5,21 @@ import {
   roleApiUpdateInputSchema,
   roleApiUserRoleAssignmentInputSchema,
   type CustomRolePermissionSchema,
-  type RoleService,
 } from "@langwatch/role-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import type { ProcedureBuilder, UnsetMarker } from "@trpc/server/unstable-core-do-not-import";
 import { z } from "zod";
+import type { RoleApp } from "#app/role.app";
 
-type RoleApplication = Readonly<{ roles: RoleService }>;
-
-/** The process supplies authentication, authorization, plan and audit policy. */
+/**
+ * The process supplies authentication, authorization, plan and audit policy.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them.
+ */
 export type RoleTrpcContext = Readonly<{
-  app: RoleApplication;
+  app: Readonly<{ roles: RoleApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -82,59 +85,61 @@ export class RoleTrpcApi {
   ) {
     return trpc.router({
       getAll: procedures.getAll.query(async ({ ctx, input }) => {
-        return ctx.app.roles.list({ organizationId: input.organizationId });
+        return ctx.app.roles.listRoles({ organizationId: input.organizationId });
       }),
 
       getById: procedures.getById.query(async ({ ctx, input }) => {
-        return await ctx.app.roles.get({ roleId: input.roleId });
+        return await ctx.app.roles.getRole({ roleId: input.roleId });
       }),
 
       create: procedures.create.mutation(async ({ ctx, input }) => {
-        return await ctx.app.roles.create({
-          role: {
-            organizationId: input.organizationId,
-            name: input.name,
-            description: input.description,
-            permissions: input.permissions,
+        return await ctx.app.roles.createRole(
+          {
+            role: {
+              organizationId: input.organizationId,
+              name: input.name,
+              description: input.description,
+              permissions: input.permissions,
+            },
           },
-          actor: ledgerActorFor({ userId: ctx.actor().id, fallback: "managementApi" }),
-        });
+          ctx.actor(),
+        );
       }),
 
       update: procedures.update.mutation(async ({ ctx, input }) => {
-        return await ctx.app.roles.update({
-          roleId: input.roleId,
-          changes: {
-            name: input.name,
-            description: input.description,
-            permissions: input.permissions,
+        return await ctx.app.roles.updateRole(
+          {
+            roleId: input.roleId,
+            changes: {
+              name: input.name,
+              description: input.description,
+              permissions: input.permissions,
+            },
           },
-          actor: ledgerActorFor({ userId: ctx.actor().id, fallback: "managementApi" }),
-        });
+          ctx.actor(),
+        );
       }),
 
       delete: procedures.delete.mutation(async ({ ctx, input }) => {
-        return await ctx.app.roles.remove({
-          roleId: input.roleId,
-          actor: ledgerActorFor({ userId: ctx.actor().id, fallback: "managementApi" }),
-        });
+        return await ctx.app.roles.deleteRole({ roleId: input.roleId }, ctx.actor());
       }),
 
       assignToUser: procedures.assignToUser.mutation(async ({ ctx, input }) => {
-        return await ctx.app.roles.assignToUser({
-          userId: input.userId,
-          teamId: input.teamId,
-          customRoleId: input.customRoleId,
-          actor: ledgerActorFor({ userId: ctx.actor().id, fallback: "managementApi" }),
-        });
+        return await ctx.app.roles.assignRoleToUser(
+          {
+            userId: input.userId,
+            teamId: input.teamId,
+            customRoleId: input.customRoleId,
+          },
+          ctx.actor(),
+        );
       }),
 
       removeFromUser: procedures.removeFromUser.mutation(async ({ ctx, input }) => {
-        return await ctx.app.roles.removeFromUser({
-          userId: input.userId,
-          teamId: input.teamId,
-          actor: ledgerActorFor({ userId: ctx.actor().id, fallback: "managementApi" }),
-        });
+        return await ctx.app.roles.removeRoleFromUser(
+          { userId: input.userId, teamId: input.teamId },
+          ctx.actor(),
+        );
       }),
     });
   }

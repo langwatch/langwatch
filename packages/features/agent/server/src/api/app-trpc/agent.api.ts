@@ -11,7 +11,6 @@ import {
   AgentNotFoundError,
   AgentSourceNotFoundError,
   InvalidAgentConfigError,
-  type AgentService,
   updateAgentCommandSchema,
 } from "@langwatch/agent-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -21,9 +20,15 @@ import {
   type TRPCRootObject,
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
-import { nanoid } from "nanoid";
+import { AgentApp } from "#app/agent.app";
 
-type AgentApplication = Readonly<{ agents: AgentService }>;
+/**
+ * The slice of the process's application this feature reaches, not the
+ * feature's application itself, because a tRPC root is shared by every feature
+ * mounted on it and so carries all of them. The REST family, built per door,
+ * holds {@link AgentApp} directly. Both reach the same object.
+ */
+type AgentApplication = Readonly<{ agents: AgentApp }>;
 
 /** The process supplies authentication, authorization and audit policy. */
 export type AgentTrpcContext = Readonly<{
@@ -119,11 +124,13 @@ function withLegacyCopyCount<T extends { copyCount?: number }>(agent: T) {
   return { ...agent, _count: { copiedAgents: agent.copyCount ?? 0 } };
 }
 
-/** The process's agent-id scheme, handed to the two schemas that mint one. */
-const generateAgentId = (): string => `agent_${nanoid()}`;
-
-const createInput = agentApiCreateInputSchema(generateAgentId);
-const copyInput = agentApiCopyInputSchema(generateAgentId);
+/**
+ * The agent-id scheme, handed to the two schemas that mint one. It is the
+ * application's rather than this door's: the REST family mints the same ids
+ * from the same place.
+ */
+const createInput = agentApiCreateInputSchema(AgentApp.nextAgentId);
+const copyInput = agentApiCopyInputSchema(AgentApp.nextAgentId);
 
 /**
  * Installs the complete legacy `agents.*` tRPC surface on a process-owned root.

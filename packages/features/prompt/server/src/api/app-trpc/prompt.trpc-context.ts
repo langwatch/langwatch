@@ -3,18 +3,21 @@
  * shares.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { ProjectService } from "@langwatch/project-contract";
-import type { PromptService } from "@langwatch/prompt-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
+import type { PromptApp } from "#app/prompt.app";
 
-export type PromptApplication = Readonly<{
-  prompts: PromptService;
-  projects: ProjectService;
-}>;
-
-/** The process supplies authentication; authorization arrives as `policy`. */
+/**
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them. A REST door, whose service
+ * is built per family, would hold {@link PromptApp} directly. Both prompt
+ * doors take this same slice, which is what stopped them describing the
+ * composition twice.
+ */
 export type PromptTrpcContext = Readonly<{
-  app: PromptApplication;
+  app: Readonly<{ prompts: PromptApp }>;
   actor(): Readonly<{ id: string }>;
   /**
    * Whether the caller holds a permission on a project OTHER than the one the

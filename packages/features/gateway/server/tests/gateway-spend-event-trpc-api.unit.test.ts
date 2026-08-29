@@ -10,10 +10,28 @@
  * transport's side of that contract is that the handler never runs when the
  * policy refuses, which is what is asserted.
  */
+import type { ProjectService } from "@langwatch/project-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SpendEventRow } from "../src/repositories/clickhouse/clickhouse.gateway-spend-events.repository";
 import { GatewaySpendEventTrpcApi } from "../src/api/app-trpc/gateway-spend-event.api";
+import { GatewayApp, type GatewayAppDependencies } from "../src/app/gateway.app";
+import type { GatewaySpendEventsService } from "../src/services/gateway-spend-events.service";
+
+/** The slice of the application this surface reaches, and nothing else. */
+function gatewayAppStub(dependencies: Partial<GatewayAppDependencies>): GatewayApp {
+  return GatewayApp.create(dependencies as GatewayAppDependencies);
+}
+
+function spendEventsStub(
+  overrides: Partial<GatewaySpendEventsService>,
+): GatewaySpendEventsService {
+  return overrides as GatewaySpendEventsService;
+}
+
+function projectsStub(overrides: Partial<ProjectService>): ProjectService {
+  return overrides as ProjectService;
+}
 
 const PROJECT_ID = "project_1";
 
@@ -63,36 +81,32 @@ const denied = new Set<string>();
 function harness({ clickHouse = true } = {}) {
   const trpc = initTRPC
     .context<{
-      app: {
-        gateway: { spendEvents: { getSpendEventsPage: typeof getSpendEventsPage } | undefined };
-        projects: { tryGetOrganizationId: typeof tryGetOrganizationId };
-      };
+      app: { gateway: GatewayApp };
       actor(): { id: string };
     }>()
     .create();
 
-  const router = GatewaySpendEventTrpcApi.create(
-    trpc,
-    {
-      protected: trpc.procedure,
-      // Stands in for the process's chain: it records the declared permission
-      // and refuses before the handler, exactly where the real check sits.
-      policy: (permission) => (procedure) =>
-        (procedure as { use(m: unknown): unknown }).use(({ next }: { next: () => unknown }) => {
-          seenPermissions.push(permission);
-          if (denied.has(permission)) {
-            throw new TRPCError({ code: "FORBIDDEN", message: "You do not have permission" });
-          }
-          return next();
-        }) as typeof procedure,
-    },
-    { resolveVirtualKeyNames },
-  );
+  const router = GatewaySpendEventTrpcApi.create(trpc, {
+    protected: trpc.procedure,
+    // Stands in for the process's chain: it records the declared permission
+    // and refuses before the handler, exactly where the real check sits.
+    policy: (permission) => (procedure) =>
+      (procedure as { use(m: unknown): unknown }).use(({ next }: { next: () => unknown }) => {
+        seenPermissions.push(permission);
+        if (denied.has(permission)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You do not have permission" });
+        }
+        return next();
+      }) as typeof procedure,
+  });
 
   return router.createCaller({
     app: {
-      gateway: { spendEvents: clickHouse ? { getSpendEventsPage } : undefined },
-      projects: { tryGetOrganizationId },
+      gateway: gatewayAppStub({
+        spendEvents: clickHouse ? spendEventsStub({ getSpendEventsPage }) : undefined,
+        projects: projectsStub({ tryGetOrganizationId }),
+        resolveVirtualKeyNames,
+      }),
     },
     actor: () => ({ id: "user_1" }),
   });

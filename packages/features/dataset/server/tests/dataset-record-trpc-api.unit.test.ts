@@ -25,10 +25,21 @@ import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { DatasetRecordTrpcApi } from "../src/api/app-trpc/dataset-record.api";
+import { DatasetApp } from "../src/app/dataset.app";
 
-type TestContext = { app: { dataset: DatasetService } };
+type TestContext = { app: { dataset: DatasetApp } };
 
 type PolicyCall = { permission: string; path: string; input: unknown };
+
+/** This surface makes no experiment read; the lookups refuse if one appears. */
+const noExperiments = {
+  getById: async () => {
+    throw new Error("the record surface reads no experiment");
+  },
+  tryGetBySlug: async () => {
+    throw new Error("the record surface reads no experiment");
+  },
+};
 
 function harness(dataset: Partial<DatasetService> = {}) {
   const policyCalls: PolicyCall[] = [];
@@ -53,7 +64,14 @@ function harness(dataset: Partial<DatasetService> = {}) {
     router,
     policyCalls,
     declaredPermissions,
-    caller: router.createCaller({ app: { dataset: dataset as DatasetService } }),
+    caller: router.createCaller({
+      app: {
+        dataset: DatasetApp.create({
+          dataset: dataset as DatasetService,
+          experiments: noExperiments,
+        }),
+      },
+    }),
   };
 }
 

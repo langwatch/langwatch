@@ -1,0 +1,34 @@
+{
+  "name": "@langwatch/platform-api-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The browser's one typed tRPC client for the platform API. Feature web packages import it; the process shell supplies its transport.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/platform-api-contract": "workspace:*",
+    "@tanstack/react-query": "^5.101.4",
+    "@trpc/client": "11.18.0",
+    "@trpc/react-query": "11.18.0",
+    "react": "^19.2.7"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  },
+  "peerDependencies": {
+    "react": "^19.2.7"
+  }
+}

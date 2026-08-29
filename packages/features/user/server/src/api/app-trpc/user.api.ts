@@ -34,9 +34,10 @@
  * in the handler because the identity they authorize against is the platform
  * operator list rather than a tenant.
  *
- * Transport only: gates, throttles, and delegation to `UserService`, to the
- * composed `AuthService`, `OpsService` and `OrganizationService`, and to the
- * process capabilities that are not the user's own — the deployment's auth
+ * Transport only: gates, throttles, and delegation to {@link UserApp} — which
+ * is where the user's own service, the browser-session revocations, the
+ * operator check and the personal workspace now arrive from — and to the
+ * process capabilities that are not the user's own: the deployment's auth
  * provider, the Auth0 tenant, the governance and gateway rollups behind the
  * /me dashboard, and the mailer.
  *
@@ -44,11 +45,8 @@
  *       specs/settings/user-avatar.feature.
  */
 import type { AuthzDeclaration } from "@langwatch/authz-contract";
-import type { AuthService } from "@langwatch/auth-contract";
 import { passwordProblem } from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationService } from "@langwatch/organization-contract";
-import type { OpsService } from "@langwatch/ops-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import {
   EmailAlreadyRegisteredError,
@@ -63,7 +61,6 @@ import {
   userApiUnlinkAccountInputSchema,
   userApiUserInputSchema,
   UserAvatarRateLimitedError,
-  type UserService,
 } from "@langwatch/user-contract";
 import {
   TRPCError,
@@ -71,6 +68,7 @@ import {
   type TRPCRootObject,
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
+import type { UserApp } from "#app/user.app";
 
 const logger = createLogger("langwatch:user-router");
 
@@ -80,17 +78,6 @@ const logger = createLogger("langwatch:user-router");
  * they signed up is asked again once they have something worth protecting.
  */
 const PASSKEY_NUDGE_INTERVAL_DAYS = 30;
-
-/**
- * The composed services this transport calls, each narrowed to the methods it
- * actually uses so a user screen does not depend on the whole platform.
- */
-type UserApplication = Readonly<{
-  users: UserService;
-  auth: Pick<AuthService, "revokeOtherBrowserSessions" | "revokeAllBrowserSessions">;
-  ops: Pick<OpsService, "isAdmin">;
-  organizations: Pick<OrganizationService, "ensurePersonalWorkspace" | "tryFindPersonalWorkspace">;
-}>;
 
 /**
  * The authenticated principal, as the process's session carries it.
@@ -110,9 +97,18 @@ type UserTrpcSession = Readonly<{
   sessionId?: string;
 }>;
 
-/** The process supplies authentication; authorization arrives as `policy`. */
+/**
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them. Before {@link UserApp}
+ * this was an inline bag of four narrowed services declared here, which put
+ * the composition of the feature inside one of its transports and left
+ * nothing for a second door to be handed.
+ */
 export type UserTrpcContext = Readonly<{
-  app: UserApplication;
+  app: Readonly<{ users: UserApp }>;
   session: UserTrpcSession | null;
 }>;
 
@@ -426,7 +422,7 @@ export class UserTrpcApi {
        * independently via the same check.
        */
       isAdmin: policy(OWN_ACCOUNT)(procedure.input(userApiEmptyInputSchema)).query(({ ctx }) => ({
-        isAdmin: ctx.app.ops.isAdmin({ email: operatorOrSelf(ctx).email }),
+        isAdmin: ctx.app.users.isAdmin({ email: operatorOrSelf(ctx).email }),
       })),
 
       register: policy(OWN_ACCOUNT)(publicProcedure.input(userApiRegisterInputSchema)).mutation(
@@ -670,7 +666,7 @@ export class UserTrpcApi {
           // session revocation, so anything else holding a session at the
           // moment one appears must not keep it.
           const revoke = otherSessionsToRevoke(ctx);
-          if (revoke) await ctx.app.auth.revokeOtherBrowserSessions(revoke);
+          if (revoke) await ctx.app.users.revokeOtherBrowserSessions(revoke);
 
           return { success: true };
         },
@@ -753,7 +749,7 @@ export class UserTrpcApi {
           // devices' app sessions so a stolen session token cannot outlive a
           // password rotation. Same impersonation safeguard as the email path.
           const revokeAuth0 = otherSessionsToRevoke(ctx);
-          if (revokeAuth0) await ctx.app.auth.revokeOtherBrowserSessions(revokeAuth0);
+          if (revokeAuth0) await ctx.app.users.revokeOtherBrowserSessions(revokeAuth0);
           return { success: true };
         }
 
@@ -787,7 +783,7 @@ export class UserTrpcApi {
         // re-authenticated by typing the current password); any other device
         // or stolen session is force-logged-out.
         const revoke = otherSessionsToRevoke(ctx);
-        if (revoke) await ctx.app.auth.revokeOtherBrowserSessions(revoke);
+        if (revoke) await ctx.app.users.revokeOtherBrowserSessions(revoke);
 
         return { success: true };
       }),
@@ -797,7 +793,7 @@ export class UserTrpcApi {
           const user = sessionUserOf(ctx);
           if (
             input.userId !== user.id &&
-            !ctx.app.ops.isAdmin({ email: operatorOrSelf(ctx).email })
+            !ctx.app.users.isAdmin({ email: operatorOrSelf(ctx).email })
           ) {
             throw new TRPCError({ code: "FORBIDDEN" });
           }
@@ -807,7 +803,7 @@ export class UserTrpcApi {
           // credentials must be revoked without injecting Auth or Governance
           // callback ports into User (which would create a service cycle).
           await ctx.app.users.deactivate({ id: input.userId });
-          await ctx.app.auth.revokeAllBrowserSessions({ userId: input.userId });
+          await ctx.app.users.revokeAllBrowserSessions({ userId: input.userId });
           await ports.revokeCliTokensForUser(ctx, { userId: input.userId });
           return { success: true };
         },
@@ -815,7 +811,7 @@ export class UserTrpcApi {
 
       reactivate: policy(SELF_OR_INSTANCE_ADMIN)(procedure.input(userApiUserInputSchema)).mutation(
         async ({ ctx, input }) => {
-          if (!ctx.app.ops.isAdmin({ email: operatorOrSelf(ctx).email })) {
+          if (!ctx.app.users.isAdmin({ email: operatorOrSelf(ctx).email })) {
             throw new TRPCError({ code: "FORBIDDEN" });
           }
 
@@ -891,7 +887,7 @@ export class UserTrpcApi {
         // Caller must be a member of the organization.
         await assertMember(ports, ctx, user.id, input.organizationId);
 
-        const workspace = await ctx.app.organizations.ensurePersonalWorkspace({
+        const workspace = await ctx.app.users.ensurePersonalWorkspace({
           userId: user.id,
           organizationId: input.organizationId,
           displayName: user.name,
@@ -933,7 +929,7 @@ export class UserTrpcApi {
       ).query(async ({ ctx, input }) => {
         const user = sessionUserOf(ctx);
 
-        const workspace = await ctx.app.organizations.tryFindPersonalWorkspace({
+        const workspace = await ctx.app.users.tryFindPersonalWorkspace({
           userId: user.id,
           organizationId: input.organizationId,
         });

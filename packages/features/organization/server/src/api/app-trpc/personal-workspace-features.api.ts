@@ -21,28 +21,24 @@ import type { AuthzDeclaration } from "@langwatch/authz-contract";
 import {
   PersonalProjectNotFoundError,
   PersonalProjectOwnerMismatchError,
-  type OrganizationService,
 } from "@langwatch/organization-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import type { OrganizationApp } from "#app/organization.app";
 
 /**
- * The three reads and writes this transport makes, named rather than taking
- * `OrganizationService` whole: the organization service is the widest surface
- * in the platform, and a nav predicate has no business depending on the parts
- * of it that answer billing, invites, teams or settings.
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them. Before
+ * {@link OrganizationApp} this door declared its own three-method narrowing of
+ * `OrganizationService`, which is the fourth private description of one
+ * composition inside this feature.
  */
-type PersonalWorkspaceOrganizationService = Pick<
-  OrganizationService,
-  | "getPersonalWorkspaceFeatures"
-  | "enableAllPersonalWorkspaceFeatures"
-  | "disableAllPersonalWorkspaceFeatures"
->;
-
-/** The process supplies authentication; authorization arrives as `policy`. */
 export type PersonalWorkspaceFeaturesTrpcContext = Readonly<{
-  app: Readonly<{ organizations: PersonalWorkspaceOrganizationService }>;
+  app: Readonly<{ organizations: OrganizationApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -107,10 +103,10 @@ export class PersonalWorkspaceFeaturesTrpcApi {
       get: policy(OWNED_BY_ITS_OWNER)(procedure.input(projectScopeSchema)).query(
         async ({ ctx, input }) => {
           try {
-            return await ctx.app.organizations.getPersonalWorkspaceFeatures({
-              projectId: input.projectId,
-              callerUserId: ctx.actor().id,
-            });
+            return await ctx.app.organizations.getPersonalWorkspaceFeatures(
+              { projectId: input.projectId },
+              ctx.actor(),
+            );
           } catch (err) {
             return asNotFound(err);
           }
@@ -120,10 +116,10 @@ export class PersonalWorkspaceFeaturesTrpcApi {
       enableAll: policy(OWNED_BY_ITS_OWNER)(procedure.input(projectScopeSchema)).mutation(
         async ({ ctx, input }) => {
           try {
-            return await ctx.app.organizations.enableAllPersonalWorkspaceFeatures({
-              projectId: input.projectId,
-              callerUserId: ctx.actor().id,
-            });
+            return await ctx.app.organizations.enableAllPersonalWorkspaceFeatures(
+              { projectId: input.projectId },
+              ctx.actor(),
+            );
           } catch (err) {
             return asNotFound(err);
           }
@@ -133,10 +129,10 @@ export class PersonalWorkspaceFeaturesTrpcApi {
       disableAll: policy(OWNED_BY_ITS_OWNER)(procedure.input(projectScopeSchema)).mutation(
         async ({ ctx, input }) => {
           try {
-            return await ctx.app.organizations.disableAllPersonalWorkspaceFeatures({
-              projectId: input.projectId,
-              callerUserId: ctx.actor().id,
-            });
+            return await ctx.app.organizations.disableAllPersonalWorkspaceFeatures(
+              { projectId: input.projectId },
+              ctx.actor(),
+            );
           } catch (err) {
             return asNotFound(err);
           }

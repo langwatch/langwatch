@@ -19,54 +19,24 @@
  * application yet.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { createLogger } from "@langwatch/observability";
 import {
   traceEditOverlayPatchSchema,
-  type TraceEditOverlayDto,
   type TraceEditOverlayPatch,
-  type TraceSummaryData,
 } from "@langwatch/trace-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-
-const logger = createLogger("langwatch:api:trace-edit-overlay");
-
-/** The stored corrections, as this transport reads and writes them. */
-type TraceEditOverlayStore = Readonly<{
-  getByTraceId(
-    input: Readonly<{ projectId: string; traceId: string }>,
-  ): Promise<TraceEditOverlayDto | null>;
-  upsert(
-    input: Readonly<{
-      projectId: string;
-      traceId: string;
-      patch: unknown;
-      userId: string | null;
-    }>,
-  ): Promise<TraceEditOverlayDto>;
-  delete(input: Readonly<{ projectId: string; traceId: string }>): Promise<void>;
-}>;
+import type { TraceApp } from "#app/trace.app";
 
 /**
- * The trace's own summary read. Only its visibility-window verdict is used
- * here, but it is the same read the drawer header makes, which is what keeps
- * the two from disagreeing about whether a trace is teased.
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them. `actor()` is who the write
+ * is attributed to — read here, stamped once, by the application.
  */
-type TraceSummaryReader = Readonly<{
-  getByTraceId(
-    tenantId: string,
-    traceId: string,
-    options?: Readonly<{ visibilityCutoffMs?: number | null; full?: boolean }>,
-  ): Promise<TraceSummaryData>;
-}>;
-
-type TraceEditOverlayApplication = Readonly<{
-  traces: Readonly<{ editOverlay: TraceEditOverlayStore; summary: TraceSummaryReader }>;
-}>;
-
-/** The process supplies authentication; authorization arrives as `policy`. */
 export type TraceEditOverlayTrpcContext = Readonly<{
-  app: TraceEditOverlayApplication;
+  app: Readonly<{ traces: TraceApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -131,43 +101,6 @@ export type TraceEditOverlayTrpcPorts<TProtections extends TraceEditOverlayVisib
     ): TraceEditOverlayPatch;
   }>;
 
-/**
- * Whether the plan's visibility window teases this trace's content. Only free
- * plans have a window, so a plan without one answers without reading anything;
- * when there is one, the trace's own summary decides it, the same read the
- * drawer header uses. A summary that cannot be read answers "teased": a
- * correction quotes captured content, so a trace whose age we cannot establish
- * must not open it.
- */
-async function isTraceWindowRedacted({
-  projectId,
-  traceId,
-  visibilityCutoffMs,
-  traceSummary,
-}: {
-  projectId: string;
-  traceId: string;
-  visibilityCutoffMs: number | null | undefined;
-  traceSummary: TraceSummaryReader;
-}): Promise<boolean> {
-  if (visibilityCutoffMs === null || visibilityCutoffMs === undefined) {
-    return false;
-  }
-  try {
-    const summary = await traceSummary.getByTraceId(projectId, traceId, {
-      visibilityCutoffMs,
-      full: false,
-    });
-    return summary.redactedByVisibilityWindow === true;
-  } catch (error) {
-    logger.warn(
-      { error, projectId, traceId },
-      "trace summary unreadable; withholding corrected content",
-    );
-    return true;
-  }
-}
-
 const traceScopeSchema = z.object({ projectId: z.string(), traceId: z.string() });
 
 const upsertInputSchema = traceScopeSchema.extend({
@@ -191,7 +124,7 @@ export class TraceEditOverlayTrpcApi {
     return trpc.router({
       getByTraceId: policy("traces:view")(procedure.input(traceScopeSchema)).query(
         async ({ ctx, input }) => {
-          const overlay = await ctx.app.traces.editOverlay.getByTraceId({
+          const overlay = await ctx.app.traces.readTraceEditOverlay({
             projectId: input.projectId,
             traceId: input.traceId,
           });
@@ -200,11 +133,10 @@ export class TraceEditOverlayTrpcApi {
           const protections = await ports.getViewerProtections(ctx, {
             projectId: input.projectId,
           });
-          const isWindowRedacted = await isTraceWindowRedacted({
+          const isWindowRedacted = await ctx.app.traces.isTraceWindowRedacted({
             projectId: input.projectId,
             traceId: input.traceId,
             visibilityCutoffMs: protections.visibilityCutoffMs,
-            traceSummary: ctx.app.traces.summary,
           });
 
           return {
@@ -228,8 +160,7 @@ export class TraceEditOverlayTrpcApi {
        */
       upsert: policy("annotations:update")(procedure.input(upsertInputSchema)).mutation(
         async ({ ctx, input }) => {
-          const editOverlay = ctx.app.traces.editOverlay;
-          const stored = await editOverlay.getByTraceId({
+          const stored = await ctx.app.traces.readTraceEditOverlay({
             projectId: input.projectId,
             traceId: input.traceId,
           });
@@ -237,35 +168,38 @@ export class TraceEditOverlayTrpcApi {
           // The first correction on a trace has nothing to carry over and
           // nothing to redact: the answer is the caller's own patch.
           if (!stored) {
-            return editOverlay.upsert({
-              projectId: input.projectId,
-              traceId: input.traceId,
-              patch: input.patch,
-              userId: ctx.actor().id,
-            });
+            return ctx.app.traces.saveTraceEditOverlay(
+              {
+                projectId: input.projectId,
+                traceId: input.traceId,
+                patch: input.patch,
+              },
+              ctx.actor(),
+            );
           }
 
           const protections = await ports.getViewerProtections(ctx, {
             projectId: input.projectId,
           });
-          const isWindowRedacted = await isTraceWindowRedacted({
+          const isWindowRedacted = await ctx.app.traces.isTraceWindowRedacted({
             projectId: input.projectId,
             traceId: input.traceId,
             visibilityCutoffMs: protections.visibilityCutoffMs,
-            traceSummary: ctx.app.traces.summary,
           });
 
-          const saved = await editOverlay.upsert({
-            projectId: input.projectId,
-            traceId: input.traceId,
-            patch: ports.restoreWithheldEdits({
-              incoming: input.patch,
-              stored: stored.patch,
-              protections,
-              isWindowRedacted,
-            }),
-            userId: ctx.actor().id,
-          });
+          const saved = await ctx.app.traces.saveTraceEditOverlay(
+            {
+              projectId: input.projectId,
+              traceId: input.traceId,
+              patch: ports.restoreWithheldEdits({
+                incoming: input.patch,
+                stored: stored.patch,
+                protections,
+                isWindowRedacted,
+              }),
+            },
+            ctx.actor(),
+          );
 
           return {
             ...saved,
@@ -280,7 +214,7 @@ export class TraceEditOverlayTrpcApi {
 
       delete: policy("annotations:update")(procedure.input(traceScopeSchema)).mutation(
         async ({ ctx, input }) => {
-          await ctx.app.traces.editOverlay.delete({
+          await ctx.app.traces.deleteTraceEditOverlay({
             projectId: input.projectId,
             traceId: input.traceId,
           });

@@ -23,4 +23,11 @@ export {
   type AuthzCutoverCounter,
 } from "./adapters/observability.authz-cutover.adapter";
 export { deriveGrantId as deriveAuthzGrantId } from "./adapters/eventing.authz-grant.adapter";
+export {
+  AuthzApp,
+  type AuthzAppDependencies,
+  type AuthzCaller,
+  type EffectivePermissions,
+} from "./app/authz.app";
+export { createRoleBindingsRestApp } from "./api/app-rest/role-binding.api";
 export { AuthzTrpcApi, type AuthzTrpcContext } from "./api/app-trpc/authz.api";

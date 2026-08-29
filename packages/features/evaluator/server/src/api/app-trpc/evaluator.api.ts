@@ -20,9 +20,9 @@
  * Specs: specs/evaluators/evaluator-management.feature,
  * specs/monitors/replicate-monitor-to-project.feature.
  */
+import { PermissionDeniedError } from "@langwatch/authz-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
-  codeEvaluatorConfigSchema,
   evaluatorApiCopyInputSchema,
   evaluatorApiCreateInputSchema,
   evaluatorApiEvaluatorIdInputSchema,
@@ -31,7 +31,6 @@ import {
   evaluatorApiPushToCopiesInputSchema,
   evaluatorApiSlugInputSchema,
   evaluatorApiUpdateInputSchema,
-  type EvaluatorService,
 } from "@langwatch/evaluator-contract";
 import {
   TRPCError,
@@ -40,16 +39,21 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { nanoid } from "nanoid";
+import type { EvaluatorApp } from "#app/evaluator.app";
 import {
   EvaluatorReplicationApi,
   type EvaluatorReplicationPorts,
 } from "./evaluator-replication.api";
 
-type EvaluatorApplication = Readonly<{ evaluators: EvaluatorService }>;
-
-/** The process supplies authentication; authorization arrives as `policy`. */
+/**
+ * The process supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the process's application this feature reaches, not
+ * the feature's application itself, because a tRPC root is shared by every
+ * feature mounted on it and so carries all of them.
+ */
 export type EvaluatorTrpcContext = Readonly<{
-  app: EvaluatorApplication;
+  app: Readonly<{ evaluatorApp: EvaluatorApp }>;
   /** Whether the caller holds `permission` on that project. */
   can(permission: AuthzPermission, target: Readonly<{ projectId: string }>): Promise<boolean>;
 }>;
@@ -111,22 +115,17 @@ export type EvaluatorTrpcPorts = Readonly<{
   ): Promise<void>;
 }>;
 
-/** The process's evaluator-id scheme, handed to the schemas that mint one. */
+/**
+ * The evaluator-id scheme, handed to the schemas that mint one at parse time.
+ *
+ * The schemas need it before a context exists, which is why it is not read off
+ * {@link EvaluatorApp} here — `EvaluatorApp.newEvaluatorId` is the same rule
+ * and the one every code path that has an application uses.
+ */
 const generateEvaluatorId = (): string => `evaluator_${nanoid()}`;
 
 const createInputSchema = evaluatorApiCreateInputSchema(generateEvaluatorId);
 const copyInputSchema = evaluatorApiCopyInputSchema(generateEvaluatorId);
-
-/** Code evaluators carry their program on `config`; nothing else can run one. */
-function assertCodeEvaluatorConfig(config: unknown): void {
-  const parsed = codeEvaluatorConfigSchema.safeParse(config);
-  if (!parsed.success) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Code evaluators need code, inputs, and outputs",
-    });
-  }
-}
 
 /**
  * Installs the complete `evaluators.*` tRPC surface on a process-owned root.
@@ -159,7 +158,7 @@ export class EvaluatorTrpcApi {
        */
       getAll: policy("evaluations:view")(procedure.input(evaluatorApiProjectInputSchema)).query(
         async ({ ctx, input }) => {
-          return await ctx.app.evaluators.getAllWithFields({
+          return await ctx.app.evaluatorApp.getAllWithFields({
             projectId: input.projectId,
           });
         },
@@ -172,7 +171,7 @@ export class EvaluatorTrpcApi {
       getById: policy("evaluations:view")(
         procedure.input(evaluatorApiEvaluatorIdInputSchema),
       ).query(async ({ ctx, input }) => {
-        return await ctx.app.evaluators.tryGetByIdWithFields({
+        return await ctx.app.evaluatorApp.tryGetByIdWithFields({
           id: input.id,
           projectId: input.projectId,
         });
@@ -181,7 +180,7 @@ export class EvaluatorTrpcApi {
       /** Gets a single evaluator by slug. */
       getBySlug: policy("evaluations:view")(procedure.input(evaluatorApiSlugInputSchema)).query(
         async ({ ctx, input }) => {
-          return await ctx.app.evaluators.tryGetBySlug({
+          return await ctx.app.evaluatorApp.tryGetBySlug({
             slug: input.slug,
             projectId: input.projectId,
           });
@@ -191,18 +190,19 @@ export class EvaluatorTrpcApi {
       /** Creates a new evaluator. */
       create: policy("evaluations:manage")(procedure.input(createInputSchema)).mutation(
         async ({ ctx, input }) => {
-          if (input.type === "code") {
-            assertCodeEvaluatorConfig(input.config);
-          }
-
           // If workflowId is provided, check if an evaluator already exists for this workflow
           if (input.workflowId) {
-            const existingEvaluator = await ctx.app.evaluators.tryGetByWorkflow({
+            const existingEvaluator = await ctx.app.evaluatorApp.tryGetByWorkflow({
               workflowId: input.workflowId,
               projectId: input.projectId,
             });
 
             if (existingEvaluator) {
+              // Still a transport error, deliberately. The contract already
+              // names this refusal — `EvaluatorWorkflowAlreadyAssignedError` —
+              // but at 409, and this surface has answered 400 since it shipped.
+              // Converting would move the status a client branches on, so the
+              // handled error waits for a decision to change it.
               throw new TRPCError({
                 code: "BAD_REQUEST",
                 message: `An evaluator already exists for this workflow: "${existingEvaluator.name}"`,
@@ -210,7 +210,7 @@ export class EvaluatorTrpcApi {
             }
           }
 
-          return await ctx.app.evaluators.create({
+          return await ctx.app.evaluatorApp.create({
             id: input.id,
             projectId: input.projectId,
             name: input.name,
@@ -224,10 +224,7 @@ export class EvaluatorTrpcApi {
       /** Updates an existing evaluator. */
       update: policy("evaluations:manage")(procedure.input(evaluatorApiUpdateInputSchema)).mutation(
         async ({ ctx, input }) => {
-          if (input.type === "code" && input.config !== undefined) {
-            assertCodeEvaluatorConfig(input.config);
-          }
-          return await ctx.app.evaluators.update({
+          return await ctx.app.evaluatorApp.update({
             id: input.id,
             projectId: input.projectId,
             data: {
@@ -251,7 +248,7 @@ export class EvaluatorTrpcApi {
       getRelatedEntities: policy("evaluations:view")(
         procedure.input(evaluatorApiEvaluatorIdInputSchema),
       ).query(async ({ ctx, input }) => {
-        const evaluator = await ctx.app.evaluators.tryGetById({
+        const evaluator = await ctx.app.evaluatorApp.tryGetById({
           id: input.id,
           projectId: input.projectId,
         });
@@ -281,7 +278,7 @@ export class EvaluatorTrpcApi {
       cascadeArchive: policy("evaluations:manage")(
         procedure.input(evaluatorApiEvaluatorIdInputSchema),
       ).mutation(async ({ ctx, input }) => {
-        const evaluator = await ctx.app.evaluators.getById({
+        const evaluator = await ctx.app.evaluatorApp.getById({
           id: input.id,
           projectId: input.projectId,
         });
@@ -289,7 +286,7 @@ export class EvaluatorTrpcApi {
           evaluatorId: input.id,
           projectId: input.projectId,
         });
-        const archivedEvaluator = await ctx.app.evaluators.archive({
+        const archivedEvaluator = await ctx.app.evaluatorApp.archive({
           id: input.id,
           projectId: input.projectId,
         });
@@ -312,7 +309,7 @@ export class EvaluatorTrpcApi {
       delete: policy("evaluations:manage")(
         procedure.input(evaluatorApiEvaluatorIdInputSchema),
       ).mutation(async ({ ctx, input }) => {
-        return await ctx.app.evaluators.archive({
+        return await ctx.app.evaluatorApp.archive({
           id: input.id,
           projectId: input.projectId,
         });
@@ -327,14 +324,14 @@ export class EvaluatorTrpcApi {
         procedure.input(evaluatorApiEvaluatorIdInputSchema),
       ).query(async ({ ctx, input }) => {
         // Fetch the evaluator first, then scope its workflow to the same project.
-        return ctx.app.evaluators.getWorkflowFields(input);
+        return ctx.app.evaluatorApp.getWorkflowFields(input);
       }),
 
       /** Get copies of an evaluator (replicas in other projects) for push selection. */
       getCopies: policy("evaluations:view")(
         procedure.input(evaluatorApiEvaluatorInputSchema),
       ).query(async ({ ctx, input }) => {
-        const copies = await ctx.app.evaluators.getCopies(input);
+        const copies = await ctx.app.evaluatorApp.getCopies(input);
 
         const authorizedCopies = await Promise.all(
           copies.map(async (c) => ({
@@ -353,6 +350,10 @@ export class EvaluatorTrpcApi {
             projectId: input.sourceProjectId,
           });
           if (!hasSourcePermission) {
+            // Still a transport error, deliberately. `PermissionDeniedError`
+            // is a 403 and this refusal has answered 401 since it shipped;
+            // 401 for "authenticated but not permitted" is wrong, but fixing
+            // it is a wire change and not this pass's to make.
             throw new TRPCError({
               code: "UNAUTHORIZED",
               message: "You do not have permission to manage evaluations in the source project",
@@ -360,7 +361,7 @@ export class EvaluatorTrpcApi {
           }
 
           return await EvaluatorReplicationApi.create(replicationPorts(ctx)).copyToProject({
-            evaluators: ctx.app.evaluators,
+            evaluators: ctx.app.evaluatorApp.evaluatorService,
             evaluatorId: input.evaluatorId,
             sourceProjectId: input.sourceProjectId,
             targetProjectId: input.projectId,
@@ -373,7 +374,7 @@ export class EvaluatorTrpcApi {
       pushToCopies: policy("evaluations:manage")(
         procedure.input(evaluatorApiPushToCopiesInputSchema),
       ).mutation(async ({ ctx, input }) => {
-        const copies = await ctx.app.evaluators.getCopies(input);
+        const copies = await ctx.app.evaluatorApp.getCopies(input);
         const copiesToPush = input.copyIds
           ? copies.filter((copy) => input.copyIds!.includes(copy.id))
           : copies;
@@ -384,26 +385,27 @@ export class EvaluatorTrpcApi {
           });
           if (hasPermission) allowedProjectIds.push(copy.projectId);
         }
-        return ctx.app.evaluators.pushToCopies({ ...input, allowedProjectIds });
+        return ctx.app.evaluatorApp.pushToCopies({ ...input, allowedProjectIds });
       }),
 
       /** Sync a copied evaluator from its source. */
       syncFromSource: policy("evaluations:manage")(
         procedure.input(evaluatorApiEvaluatorInputSchema),
       ).mutation(async ({ ctx, input }) => {
-        const { source } = await ctx.app.evaluators.getCopySource(input);
+        const { source } = await ctx.app.evaluatorApp.getCopySource(input);
 
         const hasSourcePermission = await ctx.can("evaluations:manage", {
           projectId: source.projectId,
         });
         if (!hasSourcePermission) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "You do not have permission to read from the source evaluator's project",
+          throw new PermissionDeniedError({
+            permission: "evaluations:manage",
+            scope: { type: "project", id: source.projectId },
+            denialReason: "no-binding",
           });
         }
 
-        return ctx.app.evaluators.syncFromSource(input);
+        return ctx.app.evaluatorApp.syncFromSource(input);
       }),
 
       /**
@@ -413,7 +415,7 @@ export class EvaluatorTrpcApi {
       getHistory: policy("evaluations:view")(
         procedure.input(evaluatorApiEvaluatorInputSchema),
       ).query(async ({ ctx, input }) => {
-        return ctx.app.evaluators.getHistory({
+        return ctx.app.evaluatorApp.getHistory({
           evaluatorId: input.evaluatorId,
           projectId: input.projectId,
         });

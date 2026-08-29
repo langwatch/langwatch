@@ -4,28 +4,19 @@
  * CRUD, duplicate, archive and run, plus the folder sub-surface mounted at
  * `suites.folders.*`.
  *
- * Transport only: gates, input parsing and delegation to `SuiteService` and
- * the scenario folder capability behind it.
+ * Transport only: gates, input parsing and delegation to `SuiteApp`. The
+ * decisions a suite id makes — try the run plan, fall back to the folder;
+ * refuse a scope or a member list on a folder; resolve the project's
+ * organization — are the application's, and the REST family reaches the same
+ * ones.
  */
-import { ValidationError } from "@langwatch/handled-error";
-import { ProjectNotFoundError } from "@langwatch/project-contract";
 import {
   runNoteSchema,
   runParameterValuesSchema,
   type SuiteRunSummary,
 } from "@langwatch/scenario-contract";
-import {
-  SUITE_KINDS,
-  SuiteNotFoundError,
-  SuiteScopeNotAllowedError,
-  tryExtractSuiteId,
-} from "@langwatch/suite-contract";
-import {
-  TRPCError,
-  type AnyTRPCRootTypes,
-  type TRPCRootObject,
-  type TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import { SUITE_KINDS, tryExtractSuiteId } from "@langwatch/suite-contract";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import { createSuiteFolderRouter } from "./suite-folder.api";
 import {
@@ -74,7 +65,7 @@ export class SuiteTrpcApi {
             ? ctx.app.suites.list({ projectId: input.projectId })
             : Promise.resolve([]),
           kinds.includes("folder")
-            ? ctx.app.scenarios.listFolders({ projectId: input.projectId })
+            ? ctx.app.suites.listFolders({ projectId: input.projectId })
             : Promise.resolve([]),
         ]);
 
@@ -86,67 +77,14 @@ export class SuiteTrpcApi {
       getById: policy("scenarios:view")(
         procedure.input(projectSchema.extend({ id: z.string() })),
       ).query(async ({ ctx, input }) => {
-        try {
-          return await ctx.app.suites.get(input);
-        } catch (error) {
-          if (!(error instanceof SuiteNotFoundError)) throw error;
-        }
-
-        const folder = await ctx.app.scenarios.tryGetFolder({
-          folderId: input.id,
-          projectId: input.projectId,
-        });
-        if (!folder) throw new SuiteNotFoundError(input.id);
-        return folder;
+        const found = await ctx.app.suites.getByIdOrFolder(input);
+        return found.kind === "suite" ? found.suite : found.folder;
       }),
 
       update: policy("scenarios:manage")(procedure.input(updateSuiteSchema)).mutation(
         async ({ ctx, input }) => {
-          const folder = await ctx.app.scenarios.tryGetFolder({
-            folderId: input.id,
-            projectId: input.projectId,
-          });
-          if (folder) {
-            if (input.scope !== undefined) {
-              throw new SuiteScopeNotAllowedError();
-            }
-            if (input.scenarioIds !== undefined) {
-              throw new ValidationError(
-                "A folder's scenarios are managed by filing scenarios into it",
-                {
-                  meta: {
-                    fieldErrors: {
-                      scenarioIds: ["A folder's scenarios are managed by filing scenarios into it"],
-                    },
-                  },
-                },
-              );
-            }
-
-            const {
-              id,
-              projectId,
-              name,
-              description,
-              targets,
-              repeatCount,
-              labels,
-              simulatorModel,
-              judgeModel,
-            } = input;
-            return ctx.app.scenarios.updateFolder({
-              name,
-              description,
-              targets,
-              repeatCount,
-              labels,
-              simulatorModel,
-              judgeModel,
-              projectId,
-              folderId: id,
-            });
-          }
-          return ctx.app.suites.update(input);
+          const updated = await ctx.app.suites.update(input);
+          return updated.kind === "suite" ? updated.suite : updated.folder;
         },
       ),
 
@@ -170,19 +108,7 @@ export class SuiteTrpcApi {
             targets: z.array(suiteTargetSchema),
           }),
         ),
-      ).query(async ({ ctx, input }) => {
-        const project = await ctx.app.projects.tryGetWithTeam(input.projectId);
-        if (!project) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Organization not found for project",
-          });
-        }
-        return ctx.app.suites.resolveArchivedNames({
-          ...input,
-          organizationId: project.team.organizationId,
-        });
-      }),
+      ).query(async ({ ctx, input }) => ctx.app.suites.resolveArchivedNames(input)),
 
       run: policy("scenarios:manage")(
         procedure.input(
@@ -204,23 +130,16 @@ export class SuiteTrpcApi {
           }),
         ),
       ).mutation(async ({ ctx, input }) => {
-        const project = await ctx.app.projects.tryGetWithTeam(input.projectId);
-        if (!project) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Organization not found for project",
-          });
-        }
-
         // No catch: a Suite execution error is a HandledError, so the tRPC
         // handled-error middleware maps its code and status. Wrapping it in an
         // INTERNAL_SERVER_ERROR here would drop the `cause` the middleware keys
         // off, turning "every scenario is archived" — a customer-fault 422 the
-        // UI has a specific recovery action for — into an opaque 500.
+        // UI has a specific recovery action for — into an opaque 500. The
+        // project's organization is the application's to resolve, and it
+        // refuses with `organization_not_found_for_project` when it cannot.
         const result = await ctx.app.suites.run({
           id: input.id,
           projectId: input.projectId,
-          organizationId: project.team.organizationId,
           idempotencyKey: input.idempotencyKey,
           batchRunId: input.batchRunId,
           parameters: input.parameters,
@@ -250,22 +169,8 @@ export class SuiteTrpcApi {
           }),
         ),
       ).mutation(async ({ ctx, input }) => {
-        let organizationId: string;
-        try {
-          organizationId = await ctx.app.projects.getOrganizationId(input.projectId);
-        } catch (error) {
-          if (error instanceof ProjectNotFoundError) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Organization not found for project",
-            });
-          }
-          throw error;
-        }
-
         const result = await ctx.app.suites.runAll({
           projectId: input.projectId,
-          organizationId,
           idempotencyKey: input.idempotencyKey,
           batchRunId: input.batchRunId,
           targets: input.targets,
@@ -289,7 +194,7 @@ export class SuiteTrpcApi {
         const startDate = input.startDate ?? Date.now() - THIRTY_DAYS_MS;
         const endDate = input.endDate ?? Date.now();
 
-        const summaries = await ctx.app.simulations.getInternalSuiteSummaries({
+        const summaries = await ctx.app.suites.getInternalSuiteSummaries({
           projectId: input.projectId,
           startDate,
           endDate,

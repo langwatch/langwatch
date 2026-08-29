@@ -1,3 +1,5 @@
+export { RoleApp, type RoleAppDependencies, type RoleCaller } from "./app/role.app";
+export { createRolesRestApp } from "./api/app-rest/role.api";
 export {
   RoleBindingTrpcApi,
   roleBindingTrpcInputSchemas,

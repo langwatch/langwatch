@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
-  type GovernanceService,
   InvalidSourceTypeError,
   PlatformTemplateImmutableError,
   TemplateNotFoundError,
@@ -27,10 +26,9 @@ import { createLogger } from "@langwatch/observability";
  *
  * Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
  */
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import type { ProjectService } from "@langwatch/project-contract";
 import { apiKeyPermission } from "@langwatch/api";
 import {
   type AppRestProjectVariables,
@@ -38,6 +36,7 @@ import {
   baseResponses,
   type SecuredApp,
 } from "@langwatch/api/rest";
+import type { GovernanceApp, GovernanceProjectCaller } from "#app/governance.app";
 
 const logger = createLogger("langwatch:api:governance");
 
@@ -188,13 +187,6 @@ function mapTemplateError(error: unknown): {
   return null;
 }
 
-function callerUserIdFromContext(
-  apiKeyUserId: string | undefined,
-  projectId: string,
-): string {
-  return apiKeyUserId ?? `svc_${projectId}`;
-}
-
 /**
  * Resolves the audit-surface tag for the current request. Defaults to
  * `hono` (the route mount). The `langwatch` CLI sends
@@ -211,14 +203,30 @@ function resolveSurfaceFromRequest(c: {
   return declared === "cli" ? "cli" : "hono";
 }
 
+/**
+ * Who this request is attributed to, read off the Hono context.
+ *
+ * Reading the caller is the transport's job; deciding what to record when
+ * there is no user behind the key is not, so the `svc_<projectId>` fallback
+ * lives on {@link GovernanceApp} where every door gets the same answer.
+ */
+function callerOf(c: Context<{ Variables: Variables }>): GovernanceProjectCaller {
+  return {
+    projectId: c.get("project").id,
+    userId: c.get("apiKeyUserId") ?? null,
+    surface: resolveSurfaceFromRequest(c),
+  };
+}
+
 // ── App ─────────────────────────────────────────────────────────────────────
 
 /**
  * The governance REST family.
  *
- * The governance and project capabilities arrive as services rather than being
- * read off the request, so the family can be mounted into any process holding
- * them.
+ * The feature's application arrives as an argument rather than being read off
+ * the request, so the family can be mounted into any process holding one — and
+ * so this door and the two tRPC doors answer from the SAME object rather than
+ * from two descriptions of it.
  */
 export function createGovernanceRestApp(options: {
   security: AppRestSecurity;
@@ -227,10 +235,9 @@ export function createGovernanceRestApp(options: {
    * mounting a family must not force its services to be constructed, which is
    * what lets the OpenAPI spec generator build this app with none.
    */
-  governance: () => GovernanceService;
-  projects: () => ProjectService;
+  app: () => GovernanceApp;
 }): SecuredApp<{ Variables: Variables }> {
-  const { security, governance, projects } = options;
+  const { security, app } = options;
 
   const secured = security.createProjectApp({
     basePath: "/api/governance",
@@ -258,10 +265,8 @@ export function createGovernanceRestApp(options: {
       },
     }),
     async (c) => {
-      const project = c.get("project");
-      const organizationId = await projects().getOrganizationId(project.id);
-      const rows = await governance().templateListForUser({
-        organizationId,
+      const rows = await app().listIngestionTemplatesForMember({
+        projectId: c.get("project").id,
       });
       return c.json({ data: rows.map(toTemplateDto) });
     },
@@ -288,10 +293,8 @@ export function createGovernanceRestApp(options: {
     }),
     requireUserBoundCaller,
     async (c) => {
-      const project = c.get("project");
-      const organizationId = await projects().getOrganizationId(project.id);
-      const rows = await governance().templateListForOrgAdmin({
-        organizationId,
+      const rows = await app().listIngestionTemplatesForAdmin({
+        projectId: c.get("project").id,
       });
       return c.json({ data: rows.map(toTemplateDto) });
     },
@@ -325,12 +328,9 @@ export function createGovernanceRestApp(options: {
       },
     }),
     async (c) => {
-      const project = c.get("project");
-      const id = c.req.param("id");
-      const organizationId = await projects().getOrganizationId(project.id);
-      const row = await governance().templateGetByIdForOrg({
-        id,
-        organizationId,
+      const row = await app().getIngestionTemplate({
+        projectId: c.get("project").id,
+        id: c.req.param("id"),
       });
       return c.json({ ingestion_template: toTemplateDto(row) });
     },
@@ -363,7 +363,6 @@ export function createGovernanceRestApp(options: {
     }),
     requireUserBoundCaller,
     async (c) => {
-      const project = c.get("project");
       const body = createTemplateSchema.safeParse(await c.req.json());
       if (!body.success) {
         return c.json(
@@ -377,28 +376,26 @@ export function createGovernanceRestApp(options: {
           400,
         );
       }
-      const organizationId = await projects().getOrganizationId(project.id);
-      const callerUserId = callerUserIdFromContext(
-        c.get("apiKeyUserId") ?? undefined,
-        project.id,
-      );
+      const by = callerOf(c);
       try {
-        const row = await governance().templateCreateOrg({
-          organizationId,
-          callerUserId,
-          sourceType: body.data.source_type,
-          displayName: body.data.display_name,
-          description: body.data.description ?? null,
-          iconAsset: body.data.icon_asset ?? null,
-          credentialSchema:
-            body.data.credential_schema === "otlp_token"
-              ? null
-              : (body.data.credential_schema ?? null),
-          ottlRules: body.data.ottl_rules,
-          surface: resolveSurfaceFromRequest(c),
-        });
+        const row = await app().createIngestionTemplate(
+          {
+            sourceType: body.data.source_type,
+            displayName: body.data.display_name,
+            description: body.data.description ?? null,
+            iconAsset: body.data.icon_asset ?? null,
+            // `otlp_token` is this door's own vocabulary for "no credential
+            // schema at all"; the domain stores it as absent.
+            credentialSchema:
+              body.data.credential_schema === "otlp_token"
+                ? null
+                : (body.data.credential_schema ?? null),
+            ottlRules: body.data.ottl_rules,
+          },
+          by,
+        );
         logger.info(
-          { templateId: row.id, organizationId, callerUserId },
+          { templateId: row.id, projectId: by.projectId, apiKeyUserId: by.userId },
           "ingestion template created via REST",
         );
         return c.json({ ingestion_template: toTemplateDto(row) }, 201);
@@ -441,8 +438,6 @@ export function createGovernanceRestApp(options: {
     }),
     requireUserBoundCaller,
     async (c) => {
-      const project = c.get("project");
-      const id = c.req.param("id");
       const body = updateOttlRulesSchema.safeParse(await c.req.json());
       if (!body.success) {
         return c.json(
@@ -456,19 +451,11 @@ export function createGovernanceRestApp(options: {
           400,
         );
       }
-      const organizationId = await projects().getOrganizationId(project.id);
-      const callerUserId = callerUserIdFromContext(
-        c.get("apiKeyUserId") ?? undefined,
-        project.id,
-      );
       try {
-        const row = await governance().templateUpdateOttlRules({
-          organizationId,
-          callerUserId,
-          id,
-          ottlRules: body.data.ottl_rules,
-          surface: resolveSurfaceFromRequest(c),
-        });
+        const row = await app().updateIngestionTemplateOttlRules(
+          { id: c.req.param("id"), ottlRules: body.data.ottl_rules },
+          callerOf(c),
+        );
         return c.json({ ingestion_template: toTemplateDto(row) });
       } catch (err) {
         const mapped = mapTemplateError(err);
@@ -507,20 +494,8 @@ export function createGovernanceRestApp(options: {
     }),
     requireUserBoundCaller,
     async (c) => {
-      const project = c.get("project");
-      const id = c.req.param("id");
-      const organizationId = await projects().getOrganizationId(project.id);
-      const callerUserId = callerUserIdFromContext(
-        c.get("apiKeyUserId") ?? undefined,
-        project.id,
-      );
       try {
-        await governance().templateArchiveOrg({
-          organizationId,
-          callerUserId,
-          id,
-          surface: resolveSurfaceFromRequest(c),
-        });
+        await app().archiveIngestionTemplate({ id: c.req.param("id") }, callerOf(c));
         return c.json({ archived: true as const });
       } catch (err) {
         const mapped = mapTemplateError(err);
@@ -557,7 +532,6 @@ export function createGovernanceRestApp(options: {
     }),
     requireUserBoundCaller,
     async (c) => {
-      const project = c.get("project");
       const body = cloneTemplateSchema.safeParse(await c.req.json());
       if (!body.success) {
         return c.json(
@@ -571,18 +545,11 @@ export function createGovernanceRestApp(options: {
           400,
         );
       }
-      const organizationId = await projects().getOrganizationId(project.id);
-      const callerUserId = callerUserIdFromContext(
-        c.get("apiKeyUserId") ?? undefined,
-        project.id,
-      );
       try {
-        const row = await governance().templateCloneFromPlatform({
-          organizationId,
-          callerUserId,
-          sourceTemplateId: body.data.source_template_id,
-          surface: resolveSurfaceFromRequest(c),
-        });
+        const row = await app().cloneIngestionTemplate(
+          { sourceTemplateId: body.data.source_template_id },
+          callerOf(c),
+        );
         return c.json({ ingestion_template: toTemplateDto(row) }, 201);
       } catch (err) {
         const mapped = mapTemplateError(err);

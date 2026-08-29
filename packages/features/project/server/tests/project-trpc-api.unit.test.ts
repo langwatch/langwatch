@@ -2,11 +2,16 @@
  * @vitest-environment node
  *
  * The `project.*` tRPC surface: the eight procedure names the clients call,
- * the contract errors each maps to a status, the second permission probe
+ * the named refusal each failure raises, the second permission probe
  * `archiveById` runs on the project it actually archives, the trace-share
  * revocation that follows turning sharing off, and the two best-effort side
  * effects (Langy's virtual key, the rotation audit) that must never fail the
  * call they hang off.
+ *
+ * Refusals are asserted by handled `code` and `httpStatus` rather than by tRPC
+ * code, because that pair IS what the surface decides: the process's
+ * handled-error middleware derives the tRPC code from the status, so pinning
+ * the status pins the wire answer without restating the process's table here.
  *
  * The procedure handed in narrows its own context the way an authenticated
  * process procedure does, so this also pins that a process can hand over a
@@ -26,28 +31,28 @@ import type { TopicService } from "@langwatch/topic-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { ProjectApp, type TopicClusteringCommands } from "../src/app/project.app";
 import { ProjectTrpcApi } from "../src/api/app-trpc/project.api";
 
-type TopicClusteringCommands = {
-  requestClustering(input: {
-    tenantId: string;
-    occurredAt: number;
-    trigger: "manual";
-    requestedByUserId: string;
-  }): Promise<void>;
-};
-
 type TestContext = {
-  app: {
-    projects: ProjectService;
-    apiKeys: ApiKeyService;
-    share: ShareService;
-    topics: TopicService;
-    topicClustering: TopicClusteringCommands;
-  };
+  app: { projects: ProjectApp };
   actor(): { id: string };
   session: { user: { id: string } } | null;
 };
+
+/**
+ * The refusal the surface raised, read off the cause tRPC attached rather than
+ * off the tRPC code: without the process's handled-error middleware in the
+ * chain, every handled error arrives here as the cause of a generic wrapper.
+ */
+async function expectRefusal(
+  call: Promise<unknown>,
+  expected: { code: string; httpStatus: number },
+): Promise<void> {
+  await expect(call).rejects.toMatchObject({
+    cause: { code: expected.code, httpStatus: expected.httpStatus },
+  });
+}
 
 function harness({
   projects = {},
@@ -107,11 +112,13 @@ function harness({
     probeProjectPermission: probe,
     caller: router.createCaller({
       app: {
-        projects: projects as ProjectService,
-        apiKeys: apiKeys as ApiKeyService,
-        share: share as ShareService,
-        topics: topics as TopicService,
-        topicClustering: topicClustering as TopicClusteringCommands,
+        projects: ProjectApp.create({
+          projects: projects as ProjectService,
+          apiKeys: apiKeys as ApiKeyService,
+          share: share as ShareService,
+          topics: topics as TopicService,
+          topicClustering: topicClustering as TopicClusteringCommands,
+        }),
       },
       actor: () => ({ id: "test-user-id" }),
       session: { user: { id: "test-user-id" } },
@@ -164,11 +171,13 @@ describe("ProjectTrpcApi", () => {
       await router
         .createCaller({
           app: {
-            projects: { tryGetById: async () => null } as unknown as ProjectService,
-            apiKeys: {} as ApiKeyService,
-            share: {} as ShareService,
-            topics: {} as TopicService,
-            topicClustering: {} as TopicClusteringCommands,
+            projects: ProjectApp.create({
+              projects: { tryGetById: async () => null } as unknown as ProjectService,
+              apiKeys: {} as ApiKeyService,
+              share: {} as ShareService,
+              topics: {} as TopicService,
+              topicClustering: {} as TopicClusteringCommands,
+            }),
           },
           actor: () => ({ id: "test-user-id" }),
           session: { user: { id: "test-user-id" } },
@@ -231,12 +240,12 @@ describe("ProjectTrpcApi", () => {
   });
 
   describe("when the base key is read", () => {
-    it("refuses with NOT_FOUND for a project that does not exist", async () => {
+    it("refuses a project that does not exist as not found", async () => {
       const { caller } = harness({ projects: { tryGetById: async () => null } });
 
-      await expect(caller.getProjectAPIKey({ projectId: "nope" })).rejects.toMatchObject({
-        code: "NOT_FOUND",
-        message: "Project not found",
+      await expectRefusal(caller.getProjectAPIKey({ projectId: "nope" }), {
+        code: "project_not_found",
+        httpStatus: 404,
       });
     });
   });
@@ -256,7 +265,7 @@ describe("ProjectTrpcApi", () => {
       });
     });
 
-    it("reports a missing credential as NOT_FOUND without naming it", async () => {
+    it("lets the credential's own not-found refusal through", async () => {
       const { caller } = harness({
         apiKeys: {
           regenerateLegacyProjectKey: async () => {
@@ -265,9 +274,10 @@ describe("ProjectTrpcApi", () => {
         },
       });
 
-      await expect(
-        caller.regenerateApiKey({ projectId: "nonexistent_project" }),
-      ).rejects.toMatchObject({ code: "NOT_FOUND", message: "Project not found" });
+      await expectRefusal(caller.regenerateApiKey({ projectId: "nonexistent_project" }), {
+        code: "api_key_not_found",
+        httpStatus: 404,
+      });
     });
 
     it("re-throws any other service failure", async () => {
@@ -374,7 +384,16 @@ describe("ProjectTrpcApi", () => {
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     });
 
-    it("reports a move to a team outside the organization as BAD_REQUEST", async () => {
+    it("refuses a project that no longer exists as not found", async () => {
+      const { caller } = harness({ projects: { tryGetWithTeam: async () => null } });
+
+      await expectRefusal(caller.update({ projectId: "project_123", name: "Renamed" }), {
+        code: "project_not_found",
+        httpStatus: 404,
+      });
+    });
+
+    it("refuses a move that crosses the personal-workspace boundary", async () => {
       const { caller } = harness({
         projects: {
           tryGetWithTeam: async () =>
@@ -385,9 +404,10 @@ describe("ProjectTrpcApi", () => {
         },
       });
 
-      await expect(
-        caller.update({ projectId: "project_123", teamId: "team-2" }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expectRefusal(caller.update({ projectId: "project_123", teamId: "team-2" }), {
+        code: "personal_workspace_boundary",
+        httpStatus: 403,
+      });
     });
   });
 
@@ -395,9 +415,10 @@ describe("ProjectTrpcApi", () => {
     it("refuses to archive the project the caller is currently in", async () => {
       const { caller, probeProjectPermission } = harness();
 
-      await expect(
+      await expectRefusal(
         caller.archiveById({ projectId: "project_123", projectToArchiveId: "project_123" }),
-      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        { code: "project_cannot_archive_current", httpStatus: 400 },
+      );
       expect(probeProjectPermission).not.toHaveBeenCalled();
     });
 
@@ -408,9 +429,10 @@ describe("ProjectTrpcApi", () => {
         projects: { tryGetWithTeam },
       });
 
-      await expect(
+      await expectRefusal(
         caller.archiveById({ projectId: "project_123", projectToArchiveId: "victim" }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+        { code: "project_permission_denied", httpStatus: 403 },
+      );
       expect(probeProjectPermission).toHaveBeenCalledWith(
         expect.anything(),
         "victim",
@@ -437,9 +459,10 @@ describe("ProjectTrpcApi", () => {
         },
       });
 
-      await expect(
+      await expectRefusal(
         caller.archiveById({ projectId: "project_123", projectToArchiveId: "personal" }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+        { code: "personal_project_protected", httpStatus: 403 },
+      );
     });
 
     it("treats a project that vanished mid-archive as already archived", async () => {
@@ -460,11 +483,8 @@ describe("ProjectTrpcApi", () => {
 
   describe("when a project is created", () => {
     it("mints Langy's virtual key alongside it and returns the slug", async () => {
-      const { caller, provisionLangyVirtualKey } = harness({
-        projects: {
-          create: async () => ({ id: "project_new", slug: "new-project" }) as never,
-        },
-      });
+      const create = vi.fn(async () => ({ id: "project_new", slug: "new-project" }) as never);
+      const { caller, provisionLangyVirtualKey } = harness({ projects: { create } });
 
       await expect(
         caller.create({
@@ -476,6 +496,11 @@ describe("ProjectTrpcApi", () => {
         }),
       ).resolves.toEqual({ success: true, projectSlug: "new-project" });
 
+      // The creation is attributed to the caller by the application, not by
+      // the transport: no handler stamps a user id of its own.
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org-1", userId: "test-user-id" }),
+      );
       expect(provisionLangyVirtualKey).toHaveBeenCalledWith(expect.anything(), {
         projectId: "project_new",
         organizationId: "org-1",
@@ -483,7 +508,7 @@ describe("ProjectTrpcApi", () => {
       });
     });
 
-    it("reports a team from another organization as BAD_REQUEST", async () => {
+    it("refuses a team from another organization", async () => {
       const { caller } = harness({
         projects: {
           create: async () => {
@@ -492,7 +517,7 @@ describe("ProjectTrpcApi", () => {
         },
       });
 
-      await expect(
+      await expectRefusal(
         caller.create({
           organizationId: "org-1",
           teamId: "team-1",
@@ -500,10 +525,11 @@ describe("ProjectTrpcApi", () => {
           language: "python",
           framework: "openai",
         }),
-      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        { code: "team_not_in_organization", httpStatus: 400 },
+      );
     });
 
-    it("reports a slug that is already taken as CONFLICT", async () => {
+    it("refuses a slug that is already taken", async () => {
       const { caller } = harness({
         projects: {
           create: async () => {
@@ -512,7 +538,7 @@ describe("ProjectTrpcApi", () => {
         },
       });
 
-      await expect(
+      await expectRefusal(
         caller.create({
           organizationId: "org-1",
           teamId: "team-1",
@@ -520,7 +546,8 @@ describe("ProjectTrpcApi", () => {
           language: "python",
           framework: "openai",
         }),
-      ).rejects.toMatchObject({ code: "CONFLICT" });
+        { code: "project_slug_taken", httpStatus: 409 },
+      );
     });
   });
 
@@ -575,7 +602,12 @@ describe("ProjectTrpcApi", () => {
       );
     });
 
-    it("reports the failure and hands the customer a fixed sentence", async () => {
+    /**
+     * The cause is an event-store internal, which is neither nameable nor
+     * actionable, so it stays an ordinary error and degrades to an unknown
+     * failure with a trace id rather than being dressed up as handled.
+     */
+    it("reports the failure and raises an unhandled error", async () => {
       const { caller, reportTopicClusteringFailure } = harness({
         topics: {
           getClusteringStatus: async () => {

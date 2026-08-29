@@ -16,29 +16,27 @@
  * Reading takes `analytics:view`; creating takes `analytics:create`, editing
  * `analytics:update`, and removing `analytics:delete`.
  *
- * Transport only: policy, error translation, and delegation to
- * `DashboardService`.
+ * Transport only: policy and delegation to `DashboardApp`. The refusals it
+ * raises are named `HandledError`s, which the process's tRPC policy maps to a
+ * code and a status, so nothing here translates an error any more.
  *
  * Spec: packages/features/dashboard/specs/dashboard-service.feature.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import {
-  DashboardNotFoundError,
-  DashboardReorderError,
-  type DashboardService,
-} from "@langwatch/dashboard-contract";
-import {
-  TRPCError,
-  type AnyTRPCRootTypes,
-  type TRPCRootObject,
-  type TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
+import type { DashboardApp } from "#app/dashboard.app";
 
-type DashboardApplication = Readonly<{ dashboard: DashboardService }>;
-
-/** The host supplies authentication; authorization arrives as `policy`. */
-export type DashboardTrpcContext = Readonly<{ app: DashboardApplication }>;
+/**
+ * The host supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the host's application this feature reaches, not the
+ * feature's application itself, because a tRPC root is shared by every feature
+ * mounted on it and so carries all of them. The REST families, built per
+ * family, hold {@link DashboardApp} directly. Both reach the same object; only
+ * the path to it differs.
+ */
+export type DashboardTrpcContext = Readonly<{ app: Readonly<{ dashboard: DashboardApp }> }>;
 
 type DashboardTrpcProcedures<
   TContext extends DashboardTrpcContext,
@@ -58,29 +56,6 @@ type DashboardTrpcProcedures<
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
 }>;
-
-/**
- * Translates the two dashboard domain errors that still need it, and hands
- * everything else back untouched.
- *
- * Matched on the imported classes rather than on `error.name`: both halves now
- * come from this package, so identity is available and a renamed class cannot
- * silently stop being translated.
- */
-function mapDashboardError(error: unknown): never {
-  if (error instanceof DashboardNotFoundError || error instanceof DashboardReorderError) {
-    throw new TRPCError({ code: "NOT_FOUND", message: error.message });
-  }
-  throw error;
-}
-
-async function dashboardCall<T>(run: () => Promise<T>): Promise<T> {
-  try {
-    return await run();
-  } catch (error) {
-    mapDashboardError(error);
-  }
-}
 
 const projectScopeSchema = z.object({ projectId: z.string() });
 const dashboardScopeSchema = projectScopeSchema.extend({ dashboardId: z.string() });
@@ -112,12 +87,10 @@ export class DashboardTrpcApi {
        */
       getAll: policy("analytics:view")(procedure.input(projectScopeSchema)).query(
         async ({ ctx, input }) => {
-          const dashboards = await dashboardCall(() =>
-            ctx.app.dashboard.getAll({
-              projectId: input.projectId,
-              graphCountScope: "builder",
-            }),
-          );
+          const dashboards = await ctx.app.dashboard.getAll({
+            projectId: input.projectId,
+            graphCountScope: "builder",
+          });
           return dashboards.map(({ graphCount, ...dashboard }) => ({
             ...dashboard,
             _count: { graphs: graphCount },
@@ -127,65 +100,53 @@ export class DashboardTrpcApi {
 
       getById: policy("analytics:view")(procedure.input(dashboardScopeSchema)).query(
         async ({ ctx, input }) =>
-          await dashboardCall(() =>
-            ctx.app.dashboard.getById({
-              projectId: input.projectId,
-              dashboardId: input.dashboardId,
-            }),
-          ),
+          await ctx.app.dashboard.getById({
+            projectId: input.projectId,
+            dashboardId: input.dashboardId,
+          }),
       ),
 
       create: policy("analytics:create")(
         procedure.input(projectScopeSchema.extend({ name: z.string() })),
       ).mutation(
         async ({ ctx, input }) =>
-          await dashboardCall(() =>
-            ctx.app.dashboard.create({ projectId: input.projectId, name: input.name }),
-          ),
+          await ctx.app.dashboard.create({ projectId: input.projectId, name: input.name }),
       ),
 
       rename: policy("analytics:update")(
         procedure.input(dashboardScopeSchema.extend({ name: z.string() })),
       ).mutation(
         async ({ ctx, input }) =>
-          await dashboardCall(() =>
-            ctx.app.dashboard.rename({
-              projectId: input.projectId,
-              dashboardId: input.dashboardId,
-              name: input.name,
-            }),
-          ),
+          await ctx.app.dashboard.rename({
+            projectId: input.projectId,
+            dashboardId: input.dashboardId,
+            name: input.name,
+          }),
       ),
 
       /** Cascades to the dashboard's graphs. */
       delete: policy("analytics:delete")(procedure.input(dashboardScopeSchema)).mutation(
         async ({ ctx, input }) =>
-          await dashboardCall(() =>
-            ctx.app.dashboard.delete({
-              projectId: input.projectId,
-              dashboardId: input.dashboardId,
-            }),
-          ),
+          await ctx.app.dashboard.delete({
+            projectId: input.projectId,
+            dashboardId: input.dashboardId,
+          }),
       ),
 
       reorderDashboards: policy("analytics:update")(
         procedure.input(projectScopeSchema.extend({ dashboardIds: z.array(z.string()) })),
       ).mutation(
         async ({ ctx, input }) =>
-          await dashboardCall(() =>
-            ctx.app.dashboard.reorder({
-              projectId: input.projectId,
-              dashboardIds: input.dashboardIds,
-            }),
-          ),
+          await ctx.app.dashboard.reorder({
+            projectId: input.projectId,
+            dashboardIds: input.dashboardIds,
+          }),
       ),
 
       /** Every project has at least one dashboard once this has been asked. */
       getOrCreateFirst: policy("analytics:view")(procedure.input(projectScopeSchema)).query(
         async ({ ctx, input }) =>
-          await dashboardCall(() =>
-            ctx.app.dashboard.getOrCreateFirst({ projectId: input.projectId }),
-          ),
+          await ctx.app.dashboard.getOrCreateFirst({ projectId: input.projectId }),
       ),
     });
   }

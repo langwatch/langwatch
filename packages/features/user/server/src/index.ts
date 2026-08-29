@@ -1,4 +1,10 @@
 export { PostgresUserAdapter } from "./adapters/postgres.user.adapter";
+export {
+  PersonalProjectKeyRequiredError,
+  PersonalUsageKeyMismatchError,
+  UserApp,
+  type UserAppDependencies,
+} from "./app/user.app";
 export { UserAvatarStoragePort } from "./ports/user.port";
 export { UserService } from "./services/user.service";
 export {

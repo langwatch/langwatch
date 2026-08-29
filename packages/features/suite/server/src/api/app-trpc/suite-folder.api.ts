@@ -28,12 +28,12 @@ export function createSuiteFolderRouter<
     create: policy("scenarios:manage")(
       procedure.input(projectSchema.extend({ name: z.string().trim().min(1) })),
     ).mutation(async ({ ctx, input }) => {
-      return ctx.app.scenarios.createFolder(input);
+      return ctx.app.suites.createFolder(input);
     }),
 
     getAll: policy("scenarios:view")(procedure.input(projectSchema)).query(
       async ({ ctx, input }) => {
-        const folders = await ctx.app.scenarios.listFolders(input);
+        const folders = await ctx.app.suites.listFolders(input);
         // scenarioIds is the reconciled member cache; exposed as caseIds so the
         // UI reads the concept it renders.
         return folders.map((folder) => ({
@@ -52,7 +52,7 @@ export function createSuiteFolderRouter<
       ),
     ).mutation(async ({ ctx, input }) => {
       try {
-        return await ctx.app.scenarios.renameFolder(input);
+        return await ctx.app.suites.renameFolder(input);
       } catch (error) {
         if (error instanceof ScenarioFolderNotFoundError) {
           throw new SuiteNotFoundError(input.folderId);
@@ -65,7 +65,7 @@ export function createSuiteFolderRouter<
       procedure.input(projectSchema.extend({ folderId: z.string() })),
     ).mutation(async ({ ctx, input }) => {
       try {
-        return await ctx.app.scenarios.archiveFolder(input);
+        return await ctx.app.suites.archiveFolder(input);
       } catch (error) {
         if (error instanceof ScenarioFolderNotFoundError) {
           throw new SuiteNotFoundError(input.folderId);

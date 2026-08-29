@@ -19,17 +19,33 @@
  * Spec: packages/features/dashboard/specs/saved-views.feature.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import {
-  SavedViewNotFoundError,
-  SavedViewReorderError,
-} from "@langwatch/dashboard-contract";
-import {
-  TRPCError,
-  type AnyTRPCRootTypes,
-  type TRPCRootObject,
-  type TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import { SavedViewNotFoundError, SavedViewReorderError } from "@langwatch/dashboard-contract";
+import { HandledError } from "@langwatch/handled-error";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
+
+/** A saved view the project — or the caller — does not have. */
+export class SavedViewNotThereError extends HandledError {
+  declare readonly code: "saved_view_not_found";
+
+  constructor(message: string) {
+    super("saved_view_not_found", message, { httpStatus: 404 });
+    this.name = "SavedViewNotThereError";
+  }
+}
+
+/** A reorder naming saved views that are not there. */
+export class SavedViewReorderUnknownIdsError extends HandledError {
+  declare readonly code: "saved_view_reorder_unknown_ids";
+
+  constructor(missingIds: readonly string[]) {
+    super("saved_view_reorder_unknown_ids", `Saved views not found: ${missingIds.join(", ")}`, {
+      httpStatus: 404,
+      meta: { ids: [...missingIds] },
+    });
+    this.name = "SavedViewReorderUnknownIdsError";
+  }
+}
 
 /** The host supplies authentication; authorization arrives as `policy`. */
 export type SavedViewTrpcContext = Readonly<{ actor(): Readonly<{ id: string }> }>;
@@ -97,16 +113,27 @@ export type SavedViewsPort<TView> = Readonly<{
 export type SavedViewTrpcPorts<TView> = Readonly<{ savedViews: SavedViewsPort<TView> }>;
 
 /**
- * Translates the two saved-view domain errors that need it, and hands
- * everything else back untouched.
+ * Names the two saved-view absences on the typed channel, and hands everything
+ * else back untouched.
  *
- * A view that is not there, and a reorder naming ids that are not there, are
- * both the `NOT_FOUND` this surface has always answered with; the message is
- * the domain error's own, unchanged.
+ * Both were the `NOT_FOUND` this surface has always answered with, built by
+ * hand as a `TRPCError`. They are `HandledError`s now, each with its own
+ * stable code, so the client renders copy for the one that happened rather
+ * than for "not found" in general. Anything else is re-raised exactly as it
+ * arrived and degrades to "unknown" plus a trace id at the boundary, which is
+ * correct for a failure we cannot name.
+ *
+ * The lifecycle these come from is still the host's — it arrives as
+ * `ports.savedViews`, generic in the row shape the client sees — so this
+ * translation stays here rather than moving onto the application with the rest
+ * of the feature's refusals.
  */
 function mapSavedViewError(error: unknown): never {
-  if (error instanceof SavedViewNotFoundError || error instanceof SavedViewReorderError) {
-    throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+  if (error instanceof SavedViewNotFoundError) {
+    throw new SavedViewNotThereError(error.message);
+  }
+  if (error instanceof SavedViewReorderError) {
+    throw new SavedViewReorderUnknownIdsError(error.missingIds);
   }
   throw error;
 }

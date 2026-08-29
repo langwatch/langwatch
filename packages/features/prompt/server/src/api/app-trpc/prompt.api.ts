@@ -2,12 +2,13 @@
  * The prompt library over the process's tRPC transport.
  *
  * Transport only: gates, input parsing, the cross-project probes copy/push/sync
- * need, and delegation to `PromptService`.
+ * need, and delegation to {@link PromptApp}. Attribution, the not-found
+ * refusals and what a copy receives from its source all live on the
+ * application, where a second door reaches the same answers.
  */
 import {
   createPromptCreateTrpcInputSchema,
   createPromptUpdateTrpcInputSchema,
-  hoistSystemMessage,
   promptAssignTagTrpcInputSchema,
   promptConfigTagsTrpcInputSchema,
   promptCopyTrpcInputSchema,
@@ -17,7 +18,6 @@ import {
   promptProjectTrpcInputSchema,
   promptPushToCopiesTrpcInputSchema,
   promptRestoreVersionTrpcInputSchema,
-  PromptTagValidationError,
   promptUpdateHandleTrpcInputSchema,
 } from "@langwatch/prompt-contract";
 import { nodeDatasetSchema } from "@langwatch/workflow-contract";
@@ -27,6 +27,11 @@ import {
   type TRPCRootObject,
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
+import {
+  PromptApp,
+  PromptHasNoCopiesError,
+  PromptNoCopiesSelectedError,
+} from "#app/prompt.app";
 import type {
   PromptTrpcContext,
   PromptTrpcPorts,
@@ -62,8 +67,7 @@ export class PromptTrpcApi {
       getAllPromptsForProject: policy("prompts:view")(
         procedure.input(promptProjectTrpcInputSchema),
       ).query(async ({ ctx, input }) => {
-        const service = ctx.app.prompts;
-        return await service.getAllPrompts(input);
+        return await ctx.app.prompts.listForProject(input);
       }),
 
       /**
@@ -71,20 +75,12 @@ export class PromptTrpcApi {
        */
       getCopies: policy("prompts:view")(procedure.input(promptIdOrHandleTrpcInputSchema)).query(
         async ({ ctx, input }) => {
-          const service = ctx.app.prompts;
-          const prompt = await service.tryGetPromptByIdOrHandle({
+          const prompt = await ctx.app.prompts.getByIdOrHandle({
             idOrHandle: input.idOrHandle,
             projectId: input.projectId,
           });
 
-          if (!prompt) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Prompt not found",
-            });
-          }
-
-          const copies = await service.listCopies({ sourcePromptId: prompt.id });
+          const copies = await ctx.app.prompts.listCopies({ sourcePromptId: prompt.id });
 
           // Filter copies based on user's prompts:update permission
           const copiesWithPermissions = await Promise.all(
@@ -114,12 +110,7 @@ export class PromptTrpcApi {
       restoreVersion: policy("prompts:update")(
         procedure.input(promptRestoreVersionTrpcInputSchema),
       ).mutation(async ({ ctx, input }) => {
-        const service = ctx.app.prompts;
-        const authorId = ctx.actor().id;
-        return await service.restoreVersion({
-          ...input,
-          authorId,
-        });
+        return await ctx.app.prompts.restoreVersion(input, ctx.actor());
       }),
 
       /**
@@ -127,18 +118,16 @@ export class PromptTrpcApi {
        */
       create: policy("prompts:create")(procedure.input(createInputSchema)).mutation(
         async ({ ctx, input }) => {
-          const service = ctx.app.prompts;
-          const authorId = ctx.actor().id;
+          const author = ctx.actor();
 
-          const result = await service.createPrompt({
-            ...input.data,
-            projectId: input.projectId,
-            authorId,
-          });
+          const result = await ctx.app.prompts.create(
+            { ...input.data, projectId: input.projectId },
+            author,
+          );
 
           ports.afterPromptCreated({
             projectId: input.projectId,
-            userId: authorId,
+            userId: author.id,
           });
 
           return result;
@@ -152,17 +141,14 @@ export class PromptTrpcApi {
        */
       update: policy("prompts:update")(procedure.input(updateInputSchema)).mutation(
         async ({ ctx, input }) => {
-          const service = ctx.app.prompts;
-          const authorId = ctx.actor().id;
-
-          return await service.updatePrompt({
-            idOrHandle: input.id,
-            projectId: input.projectId,
-            data: {
-              ...input.data,
-              authorId,
+          return await ctx.app.prompts.update(
+            {
+              idOrHandle: input.id,
+              projectId: input.projectId,
+              data: input.data,
             },
-          });
+            ctx.actor(),
+          );
         },
       ),
 
@@ -172,8 +158,7 @@ export class PromptTrpcApi {
       updateHandle: policy("prompts:update")(
         procedure.input(promptUpdateHandleTrpcInputSchema),
       ).mutation(async ({ ctx, input }) => {
-        const service = ctx.app.prompts;
-        return await service.updateHandle({
+        return await ctx.app.prompts.updateHandle({
           idOrHandle: input.id,
           projectId: input.projectId,
           data: input.data,
@@ -182,26 +167,17 @@ export class PromptTrpcApi {
 
       /**
        * Get a prompt by id
+       *
+       * A `NotFoundError` is a `HandledError` carrying `prompt_not_found`, and
+       * an invalid tag reference is one carrying `prompt_tag_invalid`. Both are
+       * raised by the application, `handledErrorMiddleware` maps them to their
+       * statuses and the client reads its copy off the code, so there is
+       * nothing here to re-wrap.
        */
       getByIdOrHandle: policy("prompts:view")(
         procedure.input(promptGetByIdOrHandleTrpcInputSchema),
       ).query(async ({ ctx, input }) => {
-        try {
-          const service = ctx.app.prompts;
-          return await service.tryGetPromptByIdOrHandle(input);
-        } catch (error) {
-          if (error instanceof PromptTagValidationError) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: error.message,
-            });
-          }
-          // A `NotFoundError` is a `HandledError` carrying `prompt_not_found`.
-          // `handledErrorMiddleware` maps it to NOT_FOUND and the client reads
-          // its copy off the code, so re-wrapping it here only discarded the
-          // code in favour of one-off prose.
-          throw error;
-        }
+        return await ctx.app.prompts.tryGetByIdOrHandle(input);
       }),
 
       /**
@@ -210,8 +186,7 @@ export class PromptTrpcApi {
       checkHandleUniqueness: policy("prompts:view")(
         procedure.input(promptHandleUniquenessTrpcInputSchema),
       ).query(async ({ ctx, input }) => {
-        const service = ctx.app.prompts;
-        return await service.checkHandleUniqueness(input);
+        return await ctx.app.prompts.checkHandleUniqueness(input);
       }),
 
       /**
@@ -220,8 +195,7 @@ export class PromptTrpcApi {
       checkModifyPermission: policy("prompts:view")(
         procedure.input(promptIdOrHandleTrpcInputSchema),
       ).query(async ({ ctx, input }) => {
-        const service = ctx.app.prompts;
-        return await service.checkModifyPermission(input);
+        return await ctx.app.prompts.checkModifyPermission(input);
       }),
 
       /**
@@ -230,8 +204,7 @@ export class PromptTrpcApi {
       getAllVersionsForPrompt: policy("prompts:view")(
         procedure.input(promptIdOrHandleTrpcInputSchema),
       ).query(async ({ ctx, input }) => {
-        const service = ctx.app.prompts;
-        return await service.getAllVersions(input);
+        return await ctx.app.prompts.listVersions(input);
       }),
 
       /**
@@ -239,8 +212,7 @@ export class PromptTrpcApi {
        */
       delete: policy("prompts:delete")(procedure.input(promptIdOrHandleTrpcInputSchema)).mutation(
         async ({ ctx, input }) => {
-          const service = ctx.app.prompts;
-          return await service.deletePrompt(input);
+          return await ctx.app.prompts.delete(input);
         },
       ),
 
@@ -255,28 +227,35 @@ export class PromptTrpcApi {
           });
 
           if (!hasSourcePermission) {
+            // Left as a raw TRPCError deliberately. `ProjectPermissionDeniedError`
+            // is the right handled shape for this, and it is a 403 — this
+            // refusal has always answered UNAUTHORIZED (401). Converting it
+            // moves the wire status, which is a behaviour change the client's
+            // sign-in handling can see, so it is reported rather than taken
+            // here. The same holds for the two below.
             throw new TRPCError({
               code: "UNAUTHORIZED",
               message: "You do not have permission to create prompts in the source project",
             });
           }
 
-          const service = ctx.app.prompts;
-          const authorId = ctx.actor().id;
+          const author = ctx.actor();
 
           // A missing source prompt raises `prompt_not_found`, a HandledError:
           // `handledErrorMiddleware` gives it the NOT_FOUND tRPC code and the
           // client reads its copy off that code. Nothing to re-wrap.
-          const copiedPrompt = await service.copyPrompt({
-            idOrHandle: input.idOrHandle,
-            sourceProjectId: input.sourceProjectId,
-            targetProjectId: input.projectId,
-            authorId,
-          });
+          const copiedPrompt = await ctx.app.prompts.copyToProject(
+            {
+              idOrHandle: input.idOrHandle,
+              sourceProjectId: input.sourceProjectId,
+              targetProjectId: input.projectId,
+            },
+            author,
+          );
 
           ports.afterPromptCreated({
             projectId: input.projectId,
-            userId: authorId,
+            userId: author.id,
           });
 
           return copiedPrompt;
@@ -290,18 +269,16 @@ export class PromptTrpcApi {
       duplicate: policy("prompts:create")(
         procedure.input(promptIdOrHandleTrpcInputSchema),
       ).mutation(async ({ ctx, input }) => {
-        const service = ctx.app.prompts;
-        const authorId = ctx.actor().id;
+        const author = ctx.actor();
 
-        const duplicatedPrompt = await service.duplicatePrompt({
-          idOrHandle: input.idOrHandle,
-          projectId: input.projectId,
-          authorId,
-        });
+        const duplicatedPrompt = await ctx.app.prompts.duplicate(
+          { idOrHandle: input.idOrHandle, projectId: input.projectId },
+          author,
+        );
 
         ports.afterPromptCreated({
           projectId: input.projectId,
-          userId: authorId,
+          userId: author.id,
         });
 
         return duplicatedPrompt;
@@ -313,31 +290,18 @@ export class PromptTrpcApi {
       syncFromSource: policy("prompts:update")(
         procedure.input(promptIdOrHandleTrpcInputSchema),
       ).mutation(async ({ ctx, input }) => {
-        const service = ctx.app.prompts;
-        const authorId = ctx.actor().id;
+        const author = ctx.actor();
 
-        // Get the prompt (copy)
-        const prompt = await service.tryGetPromptByIdOrHandle({
+        // The copy. A missing one raises `prompt_not_found`; a prompt that was
+        // never copied from anywhere raises `prompt_not_a_copy`.
+        const copy = await ctx.app.prompts.getByIdOrHandle({
           idOrHandle: input.idOrHandle,
           projectId: input.projectId,
         });
+        const copySource = await ctx.app.prompts.getCopySource({ promptId: copy.id });
 
-        if (!prompt) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Prompt not found",
-          });
-        }
-
-        const copySource = await service.tryGetCopySource({ promptId: prompt.id });
-        if (!copySource) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "This prompt is not a copy and has no source to sync from",
-          });
-        }
-
-        // Check permissions on source project
+        // The declared check gated the copy's project; the source is a SECOND
+        // project this input names, so it is probed here.
         const hasSourcePermission = await ctx.can("prompts:view", {
           projectId: copySource.sourceProjectId,
         });
@@ -349,70 +313,20 @@ export class PromptTrpcApi {
           });
         }
 
-        // Get source prompt using service to get properly formatted data
-        const sourcePrompt = await service.tryGetPromptByIdOrHandle({
+        const source = await ctx.app.prompts.getByIdOrHandle({
           idOrHandle: copySource.sourcePromptId,
           projectId: copySource.sourceProjectId,
         });
 
-        if (!sourcePrompt) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Source prompt not found",
-          });
-        }
-
-        // Normalize prompt/messages to avoid system prompt conflict
-        const { prompt: normalizedPrompt, messages: normalizedMessages } = hoistSystemMessage({
-          prompt: sourcePrompt.prompt,
-          messages: sourcePrompt.messages,
-        });
-
-        // Update the copy with source's data
-        return await service.updatePrompt({
-          idOrHandle: input.idOrHandle,
-          projectId: input.projectId,
-          data: {
-            commitMessage: `Updated from source prompt "${sourcePrompt.handle ?? sourcePrompt.id}"`,
-            prompt: normalizedPrompt,
-            messages: normalizedMessages,
-            inputs: sourcePrompt.inputs,
-            outputs: sourcePrompt.outputs,
-            model: sourcePrompt.model,
-            temperature: sourcePrompt.temperature,
-            ...(sourcePrompt.maxTokens != null && {
-              maxTokens: sourcePrompt.maxTokens,
-            }),
-            // Traditional sampling parameters
-            ...(sourcePrompt.topP != null && { topP: sourcePrompt.topP }),
-            ...(sourcePrompt.frequencyPenalty != null && {
-              frequencyPenalty: sourcePrompt.frequencyPenalty,
-            }),
-            ...(sourcePrompt.presencePenalty != null && {
-              presencePenalty: sourcePrompt.presencePenalty,
-            }),
-            // Other sampling parameters
-            ...(sourcePrompt.seed != null && { seed: sourcePrompt.seed }),
-            ...(sourcePrompt.topK != null && { topK: sourcePrompt.topK }),
-            ...(sourcePrompt.minP != null && { minP: sourcePrompt.minP }),
-            ...(sourcePrompt.repetitionPenalty != null && {
-              repetitionPenalty: sourcePrompt.repetitionPenalty,
-            }),
-            // Reasoning parameter (canonical/unified field)
-            ...(sourcePrompt.reasoning != null && {
-              reasoning: sourcePrompt.reasoning,
-            }),
-            ...(sourcePrompt.verbosity != null && {
-              verbosity: sourcePrompt.verbosity,
-            }),
-            ...(sourcePrompt.promptingTechnique != null && {
-              promptingTechnique: sourcePrompt.promptingTechnique,
-            }),
-            demonstrations: sourcePrompt.demonstrations,
-            parameters: sourcePrompt.parameters,
-            authorId,
+        return await ctx.app.prompts.applySourceToCopy(
+          {
+            source,
+            targetIdOrHandle: input.idOrHandle,
+            targetProjectId: input.projectId,
+            commitMessage: PromptApp.commitMessageFor("synced", source),
           },
-        });
+          author,
+        );
       }),
 
       /**
@@ -421,110 +335,43 @@ export class PromptTrpcApi {
       pushToCopies: policy("prompts:update")(
         procedure.input(promptPushToCopiesTrpcInputSchema),
       ).mutation(async ({ ctx, input }) => {
-        const service = ctx.app.prompts;
-        const authorId = ctx.actor().id;
+        const author = ctx.actor();
 
-        // Get the source prompt
-        const sourcePrompt = await service.tryGetPromptByIdOrHandle({
+        const source = await ctx.app.prompts.getByIdOrHandle({
           idOrHandle: input.idOrHandle,
           projectId: input.projectId,
         });
 
-        if (!sourcePrompt) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Prompt not found",
-          });
-        }
-
-        const copies = await service.listCopies({ sourcePromptId: sourcePrompt.id });
-        if (copies.length === 0) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "This prompt has no copies to push to",
-          });
-        }
+        const copies = await ctx.app.prompts.listCopies({ sourcePromptId: source.id });
+        if (copies.length === 0) throw new PromptHasNoCopiesError();
 
         // Filter copies if copyIds is provided
         const copiesToPush = input.copyIds
           ? copies.filter((copy) => input.copyIds!.includes(copy.id))
           : copies;
 
-        if (copiesToPush.length === 0) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "No valid copies selected to push to",
-          });
-        }
+        if (copiesToPush.length === 0) throw new PromptNoCopiesSelectedError();
 
+        const commitMessage = PromptApp.commitMessageFor("pushed", source);
         const results = [];
 
         // Push to each copy
         for (const copy of copiesToPush) {
-          // Check permissions on copy's project
+          // Each copy lives in a SECOND project this input names, so the
+          // declared check does not cover it; a copy the caller cannot update
+          // is skipped rather than failing the whole push.
           const hasCopyPermission = await ctx.can("prompts:update", { projectId: copy.projectId });
+          if (!hasCopyPermission) continue;
 
-          if (!hasCopyPermission) {
-            // Skip copies where user doesn't have permission
-            continue;
-          }
-
-          // Normalize prompt/messages to avoid system prompt conflict
-          const { prompt: normalizedPrompt, messages: normalizedMessages } = hoistSystemMessage({
-            prompt: sourcePrompt.prompt,
-            messages: sourcePrompt.messages,
-          });
-
-          // Update the copy with source's data
-          const updated = await service.updatePrompt({
-            idOrHandle: copy.id,
-            projectId: copy.projectId,
-            data: {
-              commitMessage: `Pushed from source prompt "${
-                sourcePrompt.handle ?? sourcePrompt.id
-              }"`,
-              prompt: normalizedPrompt,
-              messages: normalizedMessages,
-              inputs: sourcePrompt.inputs,
-              outputs: sourcePrompt.outputs,
-              model: sourcePrompt.model,
-              temperature: sourcePrompt.temperature,
-              ...(sourcePrompt.maxTokens != null && {
-                maxTokens: sourcePrompt.maxTokens,
-              }),
-              // Traditional sampling parameters
-              ...(sourcePrompt.topP != null && { topP: sourcePrompt.topP }),
-              ...(sourcePrompt.frequencyPenalty != null && {
-                frequencyPenalty: sourcePrompt.frequencyPenalty,
-              }),
-              ...(sourcePrompt.presencePenalty != null && {
-                presencePenalty: sourcePrompt.presencePenalty,
-              }),
-              // Other sampling parameters
-              ...(sourcePrompt.seed != null && { seed: sourcePrompt.seed }),
-              ...(sourcePrompt.topK != null && { topK: sourcePrompt.topK }),
-              ...(sourcePrompt.minP != null && { minP: sourcePrompt.minP }),
-              ...(sourcePrompt.repetitionPenalty != null && {
-                repetitionPenalty: sourcePrompt.repetitionPenalty,
-              }),
-              // Reasoning parameter (canonical/unified field)
-              ...(sourcePrompt.reasoning != null && {
-                reasoning: sourcePrompt.reasoning,
-              }),
-              ...(sourcePrompt.verbosity != null && {
-                verbosity: sourcePrompt.verbosity,
-              }),
-              ...(sourcePrompt.promptingTechnique != null && {
-                promptingTechnique: sourcePrompt.promptingTechnique,
-              }),
-              demonstrations: sourcePrompt.demonstrations,
-              parameters: sourcePrompt.parameters,
-              ...(sourcePrompt.responseFormat != null && {
-                responseFormat: sourcePrompt.responseFormat,
-              }),
-              authorId,
+          const updated = await ctx.app.prompts.applySourceToCopy(
+            {
+              source,
+              targetIdOrHandle: copy.id,
+              targetProjectId: copy.projectId,
+              commitMessage,
             },
-          });
+            author,
+          );
 
           results.push({
             copyId: copy.id,
@@ -556,8 +403,7 @@ export class PromptTrpcApi {
       getTagsForConfig: policy("prompts:view")(
         procedure.input(promptConfigTagsTrpcInputSchema),
       ).query(async ({ ctx, input }) => {
-        const service = ctx.app.prompts;
-        return service.getTagsForConfig({
+        return ctx.app.prompts.getTagsForConfig({
           configId: input.configId,
           projectId: input.projectId,
         });
@@ -569,25 +415,15 @@ export class PromptTrpcApi {
        */
       assignTag: policy("prompts:update")(procedure.input(promptAssignTagTrpcInputSchema)).mutation(
         async ({ ctx, input }) => {
-          const service = ctx.app.prompts;
-
-          try {
-            return await service.assignTag({
+          return await ctx.app.prompts.assignTag(
+            {
               configId: input.configId,
               versionId: input.versionId,
               tag: input.tag,
               projectId: input.projectId,
-              userId: ctx.actor().id,
-            });
-          } catch (error) {
-            if (error instanceof PromptTagValidationError) {
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: error.message,
-              });
-            }
-            throw error;
-          }
+            },
+            ctx.actor(),
+          );
         },
       ),
     });

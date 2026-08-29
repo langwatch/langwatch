@@ -11,10 +11,11 @@
  * Both take `workflows:view`: a batch evaluation is a workflow run, and this is
  * the run history of one.
  *
- * Transport only. The two reads are host ports rather than Dataset service
- * calls, because `BatchEvaluation` is not Dataset-owned state — it is the
+ * Transport only. The two record reads are host ports rather than application
+ * operations, because `BatchEvaluation` is not Dataset-owned state — it is the
  * remaining seam this transport sits on, and the ports keep its persistence in
- * the host until it has a feature of its own.
+ * the host until it has a feature of its own. The slug-to-id read IS the
+ * application's, and goes through it.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
@@ -24,22 +25,17 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
+import type { DatasetApp } from "#app/dataset.app";
 
 /**
- * The experiment read `getAllByexperimentSlug` makes to turn the slug the URL
- * carries into the id the records are keyed by. Declared structurally: this
- * transport needs an id and nothing else the experiment feature owns.
+ * The host supplies authentication; authorization arrives as `policy`.
+ *
+ * The slug-to-id read this transport makes is on {@link DatasetApp} rather
+ * than on a second slice of the host bag: one application per feature is what
+ * lets a door reach everything the feature needs without knowing how the host
+ * happens to have arranged the rest of itself.
  */
-type BatchRecordExperimentLookup = Readonly<{
-  tryGetBySlug(
-    input: Readonly<{ projectId: string; slug: string }>,
-  ): Promise<Readonly<{ id: string }> | null>;
-}>;
-
-type BatchRecordApplication = Readonly<{ experiments: BatchRecordExperimentLookup }>;
-
-/** The host supplies authentication; authorization arrives as `policy`. */
-export type BatchRecordTrpcContext = Readonly<{ app: BatchRecordApplication }>;
+export type BatchRecordTrpcContext = Readonly<{ app: Readonly<{ dataset: DatasetApp }> }>;
 
 type BatchRecordTrpcProcedures<
   TContext extends BatchRecordTrpcContext,
@@ -121,7 +117,7 @@ export class BatchRecordTrpcApi {
       ).query(async ({ input, ctx }) => {
         const { projectId, experimentSlug } = input;
 
-        const experiment = await ctx.app.experiments.tryGetBySlug({
+        const experiment = await ctx.app.dataset.tryGetExperimentBySlug({
           projectId,
           slug: experimentSlug,
         });

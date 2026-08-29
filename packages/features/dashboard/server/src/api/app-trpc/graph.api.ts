@@ -18,56 +18,35 @@
  * `customGraphId` as of ADR-034 Phase 5.2, and the bell opens the automations
  * drawer. This surface only reads the persisted graph-alert trigger back.
  *
- * Transport only: policy, error translation, and delegation to
- * `DashboardService`.
+ * Transport only: policy and delegation to `DashboardApp`. The refusals it
+ * raises are named `HandledError`s, which the process's tRPC policy maps to a
+ * code and a status, so nothing here translates an error any more.
  *
  * Spec: packages/features/dashboard/specs/dashboard-service.feature.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { Trigger } from "@langwatch/automation-contract";
 import {
-  DashboardNotFoundError,
   graphApiBatchUpdateLayoutsInputSchema,
   graphApiCreateInputSchema,
   graphApiGraphInputSchema,
   graphApiListInputSchema,
   graphApiUpdateInputSchema,
   graphApiUpdateLayoutInputSchema,
-  GraphNotFoundError,
   type Graph,
-  type DashboardService,
 } from "@langwatch/dashboard-contract";
-import {
-  TRPCError,
-  type AnyTRPCRootTypes,
-  type TRPCRootObject,
-  type TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
+import type { DashboardApp } from "#app/dashboard.app";
 
 /**
- * The alert reads this surface makes on the Automation feature.
+ * The host supplies authentication; authorization arrives as `policy`.
  *
- * Declared as the two methods it calls rather than the whole automation
- * service: a chart card shows the trigger watching it, and depends on nothing
- * else Automation owns.
+ * The same slice `dashboards.*` takes, and the same {@link DashboardApp}
+ * object — including the alert lookup, which this surface reaches through the
+ * application rather than through a second entry in a bag of its own.
  */
-type GraphAlertLookup = Readonly<{
-  getByCustomGraphIds(
-    input: Readonly<{ projectId: string; customGraphIds: string[] }>,
-  ): Promise<Trigger[]>;
-  tryGetByCustomGraphId(
-    input: Readonly<{ projectId: string; customGraphId: string }>,
-  ): Promise<Trigger | null>;
-}>;
-
-type GraphApplication = Readonly<{
-  dashboard: DashboardService;
-  automation: GraphAlertLookup;
-}>;
-
-/** The host supplies authentication; authorization arrives as `policy`. */
-export type GraphTrpcContext = Readonly<{ app: GraphApplication }>;
+export type GraphTrpcContext = Readonly<{ app: Readonly<{ dashboard: DashboardApp }> }>;
 
 type GraphTrpcProcedures<
   TContext extends GraphTrpcContext,
@@ -124,28 +103,6 @@ interface AlertActionParams {
 }
 
 /**
- * Translates the two dashboard domain errors this surface can raise, and hands
- * everything else back untouched.
- */
-function mapGraphError(error: unknown): never {
-  if (error instanceof GraphNotFoundError) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Graph not found" });
-  }
-  if (error instanceof DashboardNotFoundError) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Dashboard not found" });
-  }
-  throw error;
-}
-
-async function graphCall<T>(run: () => Promise<T>): Promise<T> {
-  try {
-    return await run();
-  } catch (error) {
-    mapGraphError(error);
-  }
-}
-
-/**
  * Installs the complete `graphs.*` tRPC surface on a host-owned root. The
  * procedure and the policy are injected by the host so its auth, audit, error,
  * logging and tracing policies wrap every feature procedure consistently.
@@ -169,21 +126,19 @@ export class GraphTrpcApi {
           const graph = JSON.parse(input.graph) as Record<string, unknown>;
 
           return legacyGraph(
-            await graphCall(() =>
-              ctx.app.dashboard.createGraph({
-                projectId: input.projectId,
-                name: input.name,
-                graph,
-                filters: input.filterParams?.filters ?? {},
-                ...(input.dashboardId === undefined ? {} : { dashboardId: input.dashboardId }),
-                layout: {
-                  gridColumn: input.gridColumn ?? 0,
-                  ...(input.gridRow === undefined ? {} : { gridRow: input.gridRow }),
-                  colSpan: input.colSpan ?? 1,
-                  rowSpan: input.rowSpan ?? 1,
-                },
-              }),
-            ),
+            await ctx.app.dashboard.createGraph({
+              projectId: input.projectId,
+              name: input.name,
+              graph,
+              filters: input.filterParams?.filters ?? {},
+              ...(input.dashboardId === undefined ? {} : { dashboardId: input.dashboardId }),
+              layout: {
+                gridColumn: input.gridColumn ?? 0,
+                ...(input.gridRow === undefined ? {} : { gridRow: input.gridRow }),
+                colSpan: input.colSpan ?? 1,
+                rowSpan: input.rowSpan ?? 1,
+              },
+            }),
           );
         },
       ),
@@ -196,14 +151,12 @@ export class GraphTrpcApi {
       getAll: policy("analytics:view")(procedure.input(graphApiListInputSchema)).query(
         async ({ ctx, input }) => {
           const { projectId, dashboardId } = input;
-          const graphs = await graphCall(() =>
-            ctx.app.dashboard.listGraphs({
-              projectId,
-              ...(dashboardId === undefined ? {} : { dashboardId }),
-            }),
-          );
+          const graphs = await ctx.app.dashboard.listGraphs({
+            projectId,
+            ...(dashboardId === undefined ? {} : { dashboardId }),
+          });
 
-          const triggers = await ctx.app.automation.getByCustomGraphIds({
+          const triggers = await ctx.app.dashboard.getAlertsForGraphs({
             projectId,
             customGraphIds: graphs.map((graph) => graph.id),
           });
@@ -234,17 +187,19 @@ export class GraphTrpcApi {
       delete: policy("analytics:delete")(procedure.input(graphApiGraphInputSchema)).mutation(
         async ({ ctx, input }) =>
           legacyGraph(
-            await graphCall(() =>
-              ctx.app.dashboard.deleteGraph({ projectId: input.projectId, graphId: input.id }),
-            ),
+            await ctx.app.dashboard.deleteGraph({
+              projectId: input.projectId,
+              graphId: input.id,
+            }),
           ),
       ),
 
       getById: policy("analytics:view")(procedure.input(graphApiGraphInputSchema)).query(
         async ({ ctx, input }) => {
-          const graph = await graphCall(() =>
-            ctx.app.dashboard.getGraph({ projectId: input.projectId, graphId: input.id }),
-          );
+          const graph = await ctx.app.dashboard.getGraph({
+            projectId: input.projectId,
+            graphId: input.id,
+          });
 
           // Basic validation to ensure filters have the expected structure: a
           // stored graph can name a field the registry no longer offers.
@@ -269,7 +224,7 @@ export class GraphTrpcApi {
                 : undefined;
           }
 
-          const trigger = await ctx.app.automation.tryGetByCustomGraphId({
+          const trigger = await ctx.app.dashboard.tryGetAlertForGraph({
             customGraphId: input.id,
             projectId: input.projectId,
           });
@@ -305,15 +260,13 @@ export class GraphTrpcApi {
       updateById: policy("analytics:update")(procedure.input(graphApiUpdateInputSchema)).mutation(
         async ({ ctx, input }) =>
           legacyGraph(
-            await graphCall(() =>
-              ctx.app.dashboard.updateGraph({
-                projectId: input.projectId,
-                graphId: input.graphId,
-                name: input.name,
-                graph: JSON.parse(input.graph) as Record<string, unknown>,
-                filters: input.filterParams?.filters ?? {},
-              }),
-            ),
+            await ctx.app.dashboard.updateGraph({
+              projectId: input.projectId,
+              graphId: input.graphId,
+              name: input.name,
+              graph: JSON.parse(input.graph) as Record<string, unknown>,
+              filters: input.filterParams?.filters ?? {},
+            }),
           ),
       ),
 
@@ -321,18 +274,16 @@ export class GraphTrpcApi {
         procedure.input(graphApiUpdateLayoutInputSchema),
       ).mutation(async ({ ctx, input }) =>
         legacyGraph(
-          await graphCall(() =>
-            ctx.app.dashboard.updateGraphLayout({
-              projectId: input.projectId,
-              graphId: input.graphId,
-              layout: {
-                gridColumn: input.gridColumn,
-                gridRow: input.gridRow,
-                colSpan: input.colSpan,
-                rowSpan: input.rowSpan,
-              },
-            }),
-          ),
+          await ctx.app.dashboard.updateGraphLayout({
+            projectId: input.projectId,
+            graphId: input.graphId,
+            layout: {
+              gridColumn: input.gridColumn,
+              gridRow: input.gridRow,
+              colSpan: input.colSpan,
+              rowSpan: input.rowSpan,
+            },
+          }),
         ),
       ),
 
@@ -340,20 +291,18 @@ export class GraphTrpcApi {
         procedure.input(graphApiBatchUpdateLayoutsInputSchema),
       ).mutation(
         async ({ ctx, input }) =>
-          await graphCall(() =>
-            ctx.app.dashboard.batchUpdateGraphLayouts({
-              projectId: input.projectId,
-              layouts: input.layouts.map((layout) => ({
-                graphId: layout.graphId,
-                layout: {
-                  gridColumn: layout.gridColumn,
-                  gridRow: layout.gridRow,
-                  colSpan: layout.colSpan,
-                  rowSpan: layout.rowSpan,
-                },
-              })),
-            }),
-          ),
+          await ctx.app.dashboard.batchUpdateGraphLayouts({
+            projectId: input.projectId,
+            layouts: input.layouts.map((layout) => ({
+              graphId: layout.graphId,
+              layout: {
+                gridColumn: layout.gridColumn,
+                gridRow: layout.gridRow,
+                colSpan: layout.colSpan,
+                rowSpan: layout.rowSpan,
+              },
+            })),
+          }),
       ),
     });
   }

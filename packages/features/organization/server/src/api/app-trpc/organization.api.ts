@@ -27,7 +27,9 @@
  * invitation are all things a non-member does.
  *
  * Transport only: gates, input parsing, error translation and delegation. The
- * organization service is the caller's own (`ctx.app.organizations`);
+ * feature's own application is the caller's own (`ctx.app.organizations`, an
+ * `OrganizationApp`, which is also what `team.*`, `group.*` and the
+ * personal-workspace predicate call);
  * everything else this surface touches — the invitation service, the licence
  * seat guards, the Enterprise plan gate, the identity ledger behind
  * invitation matching, secret decryption and the product-analytics trail — is
@@ -44,15 +46,8 @@ import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-  type CustomRole,
   type Organization,
   type OrganizationInvite,
-  type OrganizationIntent,
-  type OrganizationUser,
-  type Project,
-  type Team,
-  type TeamUser,
-  type User,
 } from "@langwatch/prisma-client/generated";
 import {
   organizationApiAcceptInviteInputSchema,
@@ -76,39 +71,7 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
-
-// ---------------------------------------------------------------------------
-// The rows this transport hands back
-//
-// Restated from the same generated Prisma models the application reads them
-// with (`@langwatch/prisma-client/generated` IS `~/generated/prisma/client`),
-// so the shapes the client infers are byte-identical to the ones the legacy
-// router published.
-// ---------------------------------------------------------------------------
-
-type TeamWithProjectsAndMembers = Team & {
-  projects: Project[];
-  members: (TeamUser & { assignedRole?: CustomRole | null })[];
-};
-
-/** One organization with every team, project and member row loaded. */
-export type FullyLoadedOrganization = Organization & {
-  members: OrganizationUser[];
-  teams: TeamWithProjectsAndMembers[];
-};
-
-type TeamMemberWithTeam = TeamUser & {
-  team: Team;
-  assignedRole?: CustomRole | null;
-};
-
-type UserWithTeams = User & { teamMemberships: TeamMemberWithTeam[] };
-
-type OrganizationMemberWithUser = OrganizationUser & { user: UserWithTeams };
-
-export type OrganizationWithMembersAndTheirTeams = Organization & {
-  members: OrganizationMemberWithUser[];
-};
+import type { OrganizationApp } from "#app/organization.app";
 
 /**
  * The display status the invitation list renders per row. `WAITING_APPROVAL`
@@ -132,131 +95,6 @@ type ListedInvite = OrganizationInvite & {
 /** An invitation as `acceptInvite` reads it: the row plus its organization. */
 type InviteWithOrganization = OrganizationInvite & { organization: Organization };
 
-type EnrichedAuditLog = {
-  id: string;
-  createdAt: Date;
-  userId: string | null;
-  organizationId: string | null;
-  projectId: string | null;
-  action: string;
-  payload: unknown;
-  ipAddress: string | null;
-  userAgent: string | null;
-  error: string | null;
-  args: unknown;
-  user: { id: string; name: string | null; email: string | null } | null;
-  project: { id: string; name: string } | null;
-  source: "platform" | "gateway";
-  targetKind: string | null;
-  targetId: string | null;
-  before: unknown;
-  after: unknown;
-};
-
-// ---------------------------------------------------------------------------
-// The composed services this transport calls
-// ---------------------------------------------------------------------------
-
-/**
- * The twelve reads and writes this transport makes on the organization
- * service, named rather than taking the service whole: it is the widest
- * surface in the platform and this screen has no business depending on the
- * parts of it that answer groups, teams or billing.
- */
-type OrganizationsAppService = Readonly<{
-  createAndAssign(input: {
-    userId: string;
-    orgName?: string;
-    phoneNumber?: string;
-    signUpData?: Record<string, unknown>;
-    primaryIntent?: OrganizationIntent | null;
-    userDisplayName?: string | null;
-  }): Promise<{
-    organization: { id: string; name: string };
-    team: { id: string; slug: string; name: string };
-  }>;
-  deleteMember(input: {
-    organizationId: string;
-    userId: string;
-    actingUserId?: string | null;
-  }): Promise<void>;
-  setMemberDisabled(input: {
-    organizationId: string;
-    userId: string;
-    disabled: boolean;
-    actingUser?: { id: string; name?: string | null; email?: string | null } | null;
-  }): Promise<void>;
-  getAllForUser(input: {
-    userId: string;
-    isDemo: boolean;
-    demoProjectUserId: string;
-    demoProjectId: string;
-  }): Promise<FullyLoadedOrganization[]>;
-  updateSettings(input: {
-    organizationId: string;
-    name: string;
-    s3Endpoint: string | null;
-    s3AccessKeyId: string | null;
-    s3SecretAccessKey: string | null;
-    s3Bucket?: string;
-    presenceEnabled?: boolean;
-    traceSharingEnabled?: boolean;
-    supportContact?: string | null;
-    primaryIntent?: OrganizationIntent | null;
-  }): Promise<void>;
-  getOrganizationWithMembers(input: {
-    organizationId: string;
-    userId: string;
-    includeDeactivated: boolean;
-  }): Promise<OrganizationWithMembersAndTheirTeams | null>;
-  getMemberById(input: {
-    organizationId: string;
-    userId: string;
-    currentUserId: string;
-  }): Promise<OrganizationMemberWithUser | null>;
-  getAllMembers(organizationId: string): Promise<User[]>;
-  ensurePersonalWorkspace(input: {
-    userId: string;
-    organizationId: string;
-    displayName?: string | null;
-    displayEmail?: string | null;
-  }): Promise<unknown>;
-  updateTeamMemberRole(input: {
-    teamId: string;
-    userId: string;
-    role: string;
-    customRoleId?: string;
-    currentUserId: string;
-  }): Promise<void>;
-  changeMemberRole(input: {
-    organizationId: string;
-    userId: string;
-    role: OrganizationUserRole;
-    teamRoleUpdates?: {
-      teamId: string;
-      userId: string;
-      role: string;
-      customRoleId?: string;
-    }[];
-    currentUserId: string;
-    planUser?: { id: string; name?: string | null; email?: string | null };
-  }): Promise<{ teamsLeftWithoutAdmin: { id: string; name: string }[] }>;
-  getAuditLogs(input: {
-    organizationId: string;
-    projectId?: string;
-    userId?: string;
-    pageOffset: number;
-    pageSize: number;
-    action?: string;
-    startDate?: number;
-    endDate?: number;
-    targetKind?: string;
-    targetId?: string;
-  }): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }>;
-}>;
-
-type OrganizationApplication = Readonly<{ organizations: OrganizationsAppService }>;
-
 /**
  * The authenticated principal, as the process's session carries it. The whole
  * user travels rather than the id alone because three collaborators — the
@@ -271,7 +109,7 @@ type OrganizationTrpcSessionUser = Readonly<{
 
 /** The process supplies authentication; authorization arrives as `policy`. */
 export type OrganizationTrpcContext = Readonly<{
-  app: OrganizationApplication;
+  app: Readonly<{ organizations: OrganizationApp }>;
   session: Readonly<{ user: OrganizationTrpcSessionUser }> | null;
 }>;
 
@@ -708,14 +546,16 @@ export class OrganizationTrpcApi {
         procedure.input(createAndAssignInputSchema),
       ).mutation(async ({ input, ctx }) => {
         const user = sessionUser(ctx);
-        const result = await ctx.app.organizations.createAndAssign({
-          userId: user.id,
-          orgName: input.orgName,
-          phoneNumber: input.phoneNumber,
-          signUpData: input.signUpData as unknown as Record<string, unknown> | undefined,
-          primaryIntent: input.primaryIntent,
-          userDisplayName: user.name,
-        });
+        const result = await ctx.app.organizations.createAndAssign(
+          {
+            orgName: input.orgName,
+            phoneNumber: input.phoneNumber,
+            signUpData: input.signUpData as unknown as Record<string, unknown> | undefined,
+            primaryIntent: input.primaryIntent,
+            userDisplayName: user.name,
+          },
+          user,
+        );
 
         return {
           success: true,
@@ -730,11 +570,10 @@ export class OrganizationTrpcApi {
         // The self-removal guard lives in the service now; it refuses with
         // `cannot_remove_self`, which the handled-error middleware puts on the
         // wire for the client's code-keyed copy.
-        await ctx.app.organizations.deleteMember({
-          organizationId: input.organizationId,
-          userId: input.userId,
-          actingUserId: sessionUser(ctx).id,
-        });
+        await ctx.app.organizations.deleteMember(
+          { organizationId: input.organizationId, userId: input.userId },
+          sessionUser(ctx),
+        );
 
         return { success: true };
       }),
@@ -752,12 +591,14 @@ export class OrganizationTrpcApi {
         procedure.input(organizationApiSetMemberDisabledInputSchema),
       ).mutation(async ({ input, ctx }) => {
         try {
-          await ctx.app.organizations.setMemberDisabled({
-            organizationId: input.organizationId,
-            userId: input.userId,
-            disabled: input.disabled,
-            actingUser: sessionUser(ctx),
-          });
+          await ctx.app.organizations.setMemberDisabled(
+            {
+              organizationId: input.organizationId,
+              userId: input.userId,
+              disabled: input.disabled,
+            },
+            sessionUser(ctx),
+          );
         } catch (error) {
           const seatLimit = ports.asMemberSeatLimitReached(error);
           if (seatLimit) {
@@ -789,12 +630,10 @@ export class OrganizationTrpcApi {
           const demoProjectUserId = isDemo ? demo.userId : "";
           const demoProjectId = isDemo ? demo.projectId : "";
 
-          const organizations = await ctx.app.organizations.getAllForUser({
-            userId,
-            isDemo,
-            demoProjectUserId,
-            demoProjectId,
-          });
+          const organizations = await ctx.app.organizations.getAllForUser(
+            { isDemo, demoProjectUserId, demoProjectId },
+            sessionUser(ctx),
+          );
 
           // Fetch all team- and org-scoped RoleBindings for the user (direct or via group)
           // so we can synthesize team membership for users who have access only through groups.
@@ -1014,11 +853,13 @@ export class OrganizationTrpcApi {
       getOrganizationWithMembersAndTheirTeams: policy(ORGANIZATION_VIEW)(
         procedure.input(organizationApiWithMembersInputSchema),
       ).query(async ({ input, ctx }) => {
-        const organization = await ctx.app.organizations.getOrganizationWithMembers({
-          organizationId: input.organizationId,
-          userId: sessionUser(ctx).id,
-          includeDeactivated: input.includeDeactivated ?? false,
-        });
+        const organization = await ctx.app.organizations.getOrganizationWithMembers(
+          {
+            organizationId: input.organizationId,
+            includeDeactivated: input.includeDeactivated ?? false,
+          },
+          sessionUser(ctx),
+        );
 
         if (!organization) {
           throw new TRPCError({
@@ -1068,11 +909,10 @@ export class OrganizationTrpcApi {
       getMemberById: policy(ORGANIZATION_MANAGE)(
         procedure.input(organizationApiMemberScopeSchema),
       ).query(async ({ input, ctx }) => {
-        const member = await ctx.app.organizations.getMemberById({
-          organizationId: input.organizationId,
-          userId: input.userId,
-          currentUserId: sessionUser(ctx).id,
-        });
+        const member = await ctx.app.organizations.getMemberById(
+          { organizationId: input.organizationId, userId: input.userId },
+          sessionUser(ctx),
+        );
 
         if (!member) {
           throw new TRPCError({
@@ -1320,12 +1160,14 @@ export class OrganizationTrpcApi {
         // next login will retry via the lazy backfill in
         // `user.personalContext`.
         try {
-          await ctx.app.organizations.ensurePersonalWorkspace({
-            userId: user.id,
-            organizationId: invite.organizationId,
-            displayName: user.name,
-            displayEmail: user.email,
-          });
+          await ctx.app.organizations.ensurePersonalWorkspace(
+            {
+              organizationId: invite.organizationId,
+              displayName: user.name,
+              displayEmail: user.email,
+            },
+            user,
+          );
         } catch (err) {
           // Non-fatal — capture and continue. Lazy backfill will recover
           // on the user's next session resolution. PostHog signal lets
@@ -1422,13 +1264,15 @@ export class OrganizationTrpcApi {
           }
         }
 
-        await ctx.app.organizations.updateTeamMemberRole({
-          teamId: input.teamId,
-          userId: input.userId,
-          role: input.role,
-          customRoleId: input.customRoleId,
-          currentUserId: sessionUser(ctx).id,
-        });
+        await ctx.app.organizations.updateTeamMemberRole(
+          {
+            teamId: input.teamId,
+            userId: input.userId,
+            role: input.role,
+            customRoleId: input.customRoleId,
+          },
+          sessionUser(ctx),
+        );
 
         return { success: true };
       }),
@@ -1442,7 +1286,9 @@ export class OrganizationTrpcApi {
        */
       getAllOrganizationMembers: policy(ORGANIZATION_MANAGE)(
         procedure.input(organizationApiScopeSchema),
-      ).query(async ({ input, ctx }) => ctx.app.organizations.getAllMembers(input.organizationId)),
+      ).query(async ({ input, ctx }) =>
+        ctx.app.organizations.getAllMembers({ organizationId: input.organizationId }),
+      ),
 
       updateMemberRole: policy(ORGANIZATION_MANAGE)(
         procedure.input(organizationApiUpdateMemberRoleInputSchema),
@@ -1451,14 +1297,16 @@ export class OrganizationTrpcApi {
         // The whole orchestration (personal-workspace assertion, shared-team
         // scoping, seat classification, Enterprise gate for custom roles)
         // lives in the service so the REST surface runs the same rules.
-        const { teamsLeftWithoutAdmin } = await ctx.app.organizations.changeMemberRole({
-          organizationId: input.organizationId,
-          userId: input.userId,
-          role: input.role,
-          teamRoleUpdates: input.teamRoleUpdates,
-          currentUserId: user.id,
-          planUser: user,
-        });
+        const { teamsLeftWithoutAdmin } = await ctx.app.organizations.changeMemberRole(
+          {
+            organizationId: input.organizationId,
+            userId: input.userId,
+            role: input.role,
+            teamRoleUpdates: input.teamRoleUpdates,
+            planUser: user,
+          },
+          user,
+        );
 
         // Reported rather than refused: correcting a seat down to Viewer can take
         // away a shared team's only team-scoped admin, which is allowed because

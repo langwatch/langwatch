@@ -3,11 +3,7 @@
  * transport.
  */
 import { createLogger } from "@langwatch/observability";
-import {
-  startScenarioTabPresence,
-  type SimulationBatchRunData,
-  type SimulationService,
-} from "@langwatch/scenario-contract";
+import type { SimulationBatchRunData } from "@langwatch/scenario-contract";
 import {
   TRPCError,
   type AnyTRPCRootTypes,
@@ -42,74 +38,6 @@ const dateRangeFields = {
   startDate: z.number().int().nonnegative().optional(),
   endDate: z.number().int().nonnegative().optional(),
 } as const;
-
-/**
- * Unified helper that fetches suite run data for either a single suite
- * (when scenarioSetId is provided) or all suites (when absent).
- *
- * Returns data from ClickHouse. Pending items are visible immediately
- * because Suite execution dispatches simulation startRun commands at
- * scheduling time (before queued jobs begin processing).
- *
- * Real-time updates are delivered via SSE (onSimulationUpdate subscription).
- */
-async function fetchSuiteRunData({
-  simulations,
-  projectId,
-  scenarioSetId,
-  limit,
-  cursor,
-  startDate,
-  endDate,
-  sinceTimestamp,
-}: {
-  simulations: SimulationService;
-  projectId: string;
-  scenarioSetId?: string;
-  limit: number;
-  cursor?: string;
-  startDate?: number;
-  endDate?: number;
-  sinceTimestamp?: number;
-}) {
-  if (scenarioSetId) {
-    // Single suite/set view — no conditional fetch support yet
-    const data = await simulations.getRunDataForScenarioSet({
-      projectId,
-      scenarioSetId,
-      limit,
-      cursor,
-      startDate,
-      endDate,
-    });
-
-    const scenarioSetIds: Record<string, string> = {};
-    for (const run of data.runs) {
-      if (run.batchRunId) {
-        scenarioSetIds[run.batchRunId] = scenarioSetId;
-      }
-    }
-
-    return {
-      changed: true as const,
-      lastUpdatedAt: 0,
-      runs: data.runs,
-      scenarioSetIds,
-      hasMore: data.hasMore,
-      nextCursor: data.nextCursor,
-    };
-  }
-
-  // Cross-suite view — supports conditional fetch via sinceTimestamp
-  return simulations.getRunDataForAllSuites({
-    projectId,
-    limit,
-    cursor,
-    startDate,
-    endDate,
-    sinceTimestamp,
-  });
-}
 
 /**
  * Filter runs by per-run timestamps so only changed runs are returned.
@@ -156,7 +84,7 @@ export function createScenarioEventsRouter<
     ).query(async ({ input, ctx }) => {
       logger.debug({ projectId: input.projectId }, "Fetching scenario sets data");
       const dates = resolveDateRange(input);
-      return ctx.app.simulations.getScenarioSetsData({
+      return ctx.app.scenarios.getScenarioSetsData({
         projectId: input.projectId,
         ...dates,
       });
@@ -185,8 +113,7 @@ export function createScenarioEventsRouter<
         "Fetching suite run data (unified)",
       );
       const dates = resolveDateRange(input);
-      return fetchSuiteRunData({
-        simulations: ctx.app.simulations,
+      return ctx.app.scenarios.readSuiteRunData({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         limit: input.limit,
@@ -209,7 +136,7 @@ export function createScenarioEventsRouter<
       ),
     ).query(async ({ input, ctx }) => {
       const dates = resolveDateRange(input);
-      return ctx.app.simulations.getLastResultSummaries({
+      return ctx.app.scenarios.getLastResultSummaries({
         projectId: input.projectId,
         scenarioIds: input.scenarioIds,
         ...dates,
@@ -226,7 +153,7 @@ export function createScenarioEventsRouter<
       ),
     ).query(async ({ input, ctx }) => {
       const dates = resolveDateRange(input);
-      const lastUpdatedAt = await ctx.app.simulations.getLastUpdatedAt({
+      const lastUpdatedAt = await ctx.app.scenarios.getLastUpdatedAt({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         ...dates,
@@ -256,7 +183,7 @@ export function createScenarioEventsRouter<
         "Fetching scenario set run data",
       );
       const dates = resolveDateRange(input);
-      const data = await ctx.app.simulations.getRunDataForScenarioSet({
+      const data = await ctx.app.scenarios.getRunDataForScenarioSet({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         limit: input.limit,
@@ -277,8 +204,7 @@ export function createScenarioEventsRouter<
         "Fetching all scenario set run data (deprecated)",
       );
       const dates = resolveDateRange(input);
-      const result = await fetchSuiteRunData({
-        simulations: ctx.app.simulations,
+      const result = await ctx.app.scenarios.readSuiteRunData({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         limit: 100,
@@ -301,7 +227,7 @@ export function createScenarioEventsRouter<
       );
       // Point lookup by unique run id — no date window, so runs older than any
       // default range stay reachable.
-      const data = await ctx.app.simulations.tryGetScenarioRunData({
+      const data = await ctx.app.scenarios.tryGetScenarioRunData({
         projectId: input.projectId,
         scenarioRunId: input.scenarioRunId,
       });
@@ -324,7 +250,7 @@ export function createScenarioEventsRouter<
         "Fetching batch run count",
       );
       const dates = resolveDateRange(input);
-      const count = await ctx.app.simulations.getBatchRunCountForScenarioSet({
+      const count = await ctx.app.scenarios.getBatchRunCountForScenarioSet({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         ...dates,
@@ -353,7 +279,7 @@ export function createScenarioEventsRouter<
         "Fetching scenario set batch history",
       );
       const dates = resolveDateRange(input);
-      return ctx.app.simulations.getBatchHistoryForScenarioSet({
+      return ctx.app.scenarios.getBatchHistoryForScenarioSet({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         limit: input.limit,
@@ -383,7 +309,7 @@ export function createScenarioEventsRouter<
       );
       // Point lookup by batch run id — no date window, so old batches stay
       // reachable when opened directly.
-      const result = await ctx.app.simulations.getRunDataForBatchRun({
+      const result = await ctx.app.scenarios.getRunDataForBatchRun({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         batchRunId: input.batchRunId,
@@ -398,7 +324,7 @@ export function createScenarioEventsRouter<
     ).query(async ({ input, ctx }) => {
       logger.debug({ projectId: input.projectId }, "Fetching external set summaries");
       const dates = resolveDateRange(input);
-      return ctx.app.simulations.getExternalSetSummaries({
+      return ctx.app.scenarios.getExternalSetSummaries({
         projectId: input.projectId,
         ...dates,
       });
@@ -426,7 +352,7 @@ export function createScenarioEventsRouter<
         "Fetching all suite run data",
       );
       const dates = resolveDateRange(input);
-      return ctx.app.simulations.getRunDataForAllSuites({
+      return ctx.app.scenarios.getRunDataForAllSuites({
         projectId: input.projectId,
         limit: input.limit,
         cursor: input.cursor,
@@ -447,16 +373,13 @@ export function createScenarioEventsRouter<
       ),
     ).subscription(async function* (opts) {
       const { projectId, tabKey, tabId } = opts.input;
-      const emitter = opts.ctx.app.broadcast.getTenantEmitter(projectId);
+      const emitter = opts.ctx.app.scenarios.tenantEmitter(projectId);
 
       logger.info({ projectId }, "Simulation SSE subscription started");
 
       const presence =
         tabKey && tabId
-          ? await startScenarioTabPresence({
-              registration: { projectId, tabKey, tabId },
-              registry: opts.ctx.app.scenarioTabs,
-            })
+          ? await opts.ctx.app.scenarios.startTabPresence({ projectId, tabKey, tabId })
           : null;
 
       if (presence?.parkedNavigate) {

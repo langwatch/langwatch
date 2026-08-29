@@ -17,13 +17,10 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { MonitorTrpcApi } from "../src/api/app-trpc/monitor.api";
+import { MonitorApp } from "../src/app/monitor.app";
 
 type TestContext = {
-  app: {
-    monitors: MonitorService;
-    evaluations: EvaluationService;
-    evaluators: EvaluatorService;
-  };
+  app: { monitors: MonitorApp };
   can(permission: string, target: { projectId: string }): Promise<boolean>;
 };
 
@@ -74,9 +71,11 @@ function harness({
     deleteReplicatedWorkflow,
     caller: router.createCaller({
       app: {
-        monitors: monitors as MonitorService,
-        evaluations: evaluations as EvaluationService,
-        evaluators: evaluators as EvaluatorService,
+        monitors: MonitorApp.create({
+          monitors: monitors as MonitorService,
+          evaluations: evaluations as EvaluationService,
+          evaluators: evaluators as EvaluatorService,
+        }),
       },
       can: can as never,
     }),

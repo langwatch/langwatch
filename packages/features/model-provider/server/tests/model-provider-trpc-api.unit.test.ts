@@ -15,10 +15,11 @@ import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { ModelProviderApp } from "../src/app/model-provider.app";
 import { ModelProviderTrpcApi } from "../src/api/app-trpc/model-provider.api";
 
 type TestContext = {
-  app: { modelProviders: ModelProviderService };
+  app: { modelProviders: ModelProviderApp };
   actor(): { id: string };
   session: { user: { id: string } } | null;
 };
@@ -113,7 +114,14 @@ function harness({
     serviceDeclarations,
     permissions,
     caller: router.createCaller({
-      app: { modelProviders: serviceStub(modelProviders) },
+      app: {
+        modelProviders: ModelProviderApp.create({
+          modelProviders: serviceStub(modelProviders),
+          // The cost surface's reader, carried opaquely; no procedure under
+          // test here reaches it.
+          spans: {},
+        }),
+      },
       actor: () => ({ id: "user-1" }),
       session: { user: { id: "user-1" } },
     }),

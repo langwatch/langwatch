@@ -28,14 +28,17 @@
  * `evaluations:manage` on the target AND is probed for the same on the source,
  * because the declared check only ever covers the project in the input.
  *
- * Transport only: policy, error translation, and delegation. The workflow and
- * Prisma collaborators an experiment save still reaches for are host ports
- * while those verticals are drained.
+ * Transport only: policy, error translation, and delegation to
+ * `ExperimentApp`. The workflow, dataset, monitor and broadcast collaborators
+ * an experiment reaches are that application's dependencies; what still
+ * arrives as a host port is the work the host does per request — the workflow
+ * writes, the monitor upsert, the permission probe and the author-name lookup
+ * — while those verticals are drained.
  *
  * Spec: packages/features/experiment/specs/experiment-service.feature.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { Dataset, DatasetService } from "@langwatch/dataset-contract";
+import type { Dataset } from "@langwatch/dataset-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import {
@@ -43,15 +46,12 @@ import {
   isLegacyOnlineEvaluationWorkbenchState,
   persistedEvaluationsV3StateSchema,
   type DSPyStep,
-  type ExperimentService,
   type SaveExperimentInput,
 } from "@langwatch/experiment-contract";
 import {
   parseStudioWorkflow,
   studioWorkflowSchema,
-  WorkflowNotFoundError,
   type StudioWorkflow,
-  type WorkflowService,
 } from "@langwatch/workflow-contract";
 import {
   TRPCError,
@@ -61,35 +61,21 @@ import {
 } from "@trpc/server";
 import { on } from "node:events";
 import { z } from "zod";
+import type { ExperimentApp } from "#app/experiment.app";
 
 /**
- * The project-scoped signal fan-out an editor tab follows. Declared as the two
- * methods this transport calls: the emitter itself is the host's, shared with
- * every other subscription surface.
+ * The host supplies authentication; authorization arrives as `policy`.
+ *
+ * `app` is the slice of the host's application this feature reaches, not the
+ * feature's application itself, because a tRPC root is shared by every feature
+ * mounted on it and so carries all of them. The REST family, built per mount,
+ * holds {@link ExperimentApp} directly. The workflow, dataset, monitor and
+ * broadcast collaborators an experiment reaches are that application's
+ * dependencies rather than four more keys here, so a REST door can reach every
+ * one of them too.
  */
-type ExperimentBroadcast = Readonly<{
-  getTenantEmitter(projectId: string): NodeJS.EventEmitter;
-  cleanupTenantEmitter(projectId: string): void;
-}>;
-
-/** The one monitor write an archive cascades into. */
-type ExperimentMonitorCascade = Readonly<{
-  deleteForExperiment(
-    input: Readonly<{ projectId: string; experimentId: string }>,
-  ): Promise<unknown>;
-}>;
-
-type ExperimentApplication = Readonly<{
-  experiments: ExperimentService;
-  workflows: WorkflowService;
-  dataset: DatasetService;
-  monitors: ExperimentMonitorCascade;
-  broadcast: ExperimentBroadcast;
-}>;
-
-/** The host supplies authentication; authorization arrives as `policy`. */
 export type ExperimentTrpcContext = Readonly<{
-  app: ExperimentApplication;
+  app: Readonly<{ experiments: ExperimentApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -240,11 +226,6 @@ const mapExperimentError = (error: unknown): never => {
   throw error;
 };
 
-const tryWorkflow = (error: unknown) => {
-  if (error instanceof WorkflowNotFoundError) return null;
-  throw error;
-};
-
 /** The dataset a workflow's entry node draws from, when it names one. */
 const datasetIdOf = (dsl: unknown): string | undefined => {
   const parsed = studioWorkflowSchema.safeParse(dsl);
@@ -317,14 +298,14 @@ export class ExperimentTrpcApi {
               .map((node) => (node.data as { dataset?: { id?: string } }).dataset?.id)
               .filter((id): id is string => !!id);
 
-            const datasets = await ctx.app.dataset.getByIds({
+            const datasets = await ctx.app.experiments.getDatasets({
               datasetIds,
               projectId: input.projectId,
             });
 
             for (const dataset of datasets) {
               if (dataset.name.startsWith(currentExperiment.name)) {
-                await ctx.app.dataset.renameDataset({
+                await ctx.app.experiments.renameDataset({
                   datasetId: dataset.id,
                   projectId: input.projectId,
                   name: dataset.name.replace(currentExperiment.name, name),
@@ -392,15 +373,17 @@ export class ExperimentTrpcApi {
         const experimentId = input.experimentId ?? generate("experiment").toString();
 
         const saved = await experiments
-          .saveWorkbenchState({
-            projectId: input.projectId,
-            id: experimentId,
-            state: input.state,
-            ...(input.expectedVersion === undefined
-              ? {}
-              : { expectedVersion: input.expectedVersion }),
-            actor: { userId: ctx.actor().id, label: "user" },
-          })
+          .saveWorkbenchState(
+            {
+              projectId: input.projectId,
+              id: experimentId,
+              state: input.state,
+              ...(input.expectedVersion === undefined
+                ? {}
+                : { expectedVersion: input.expectedVersion }),
+            },
+            { kind: "user", id: ctx.actor().id },
+          )
           .catch(mapExperimentError);
         return await experiments
           .getById({ projectId: input.projectId, id: saved.experimentId })
@@ -441,7 +424,7 @@ export class ExperimentTrpcApi {
         procedure.input(projectScopeSchema),
       ).subscription(async function* (opts) {
         const { projectId } = opts.input;
-        const emitter = opts.ctx.app.broadcast.getTenantEmitter(projectId);
+        const emitter = opts.ctx.app.experiments.getTenantEmitter(projectId);
         try {
           for await (const eventArgs of on(emitter, "experiment_updated", {
             signal: (opts as { signal?: AbortSignal }).signal,
@@ -449,7 +432,7 @@ export class ExperimentTrpcApi {
             yield (eventArgs as unknown[])[0] as { event?: unknown; timestamp?: number };
           }
         } finally {
-          opts.ctx.app.broadcast.cleanupTenantEmitter(projectId);
+          opts.ctx.app.experiments.cleanupTenantEmitter(projectId);
         }
       }),
 
@@ -501,12 +484,14 @@ export class ExperimentTrpcApi {
       ).mutation(
         async ({ ctx, input }) =>
           await ctx.app.experiments
-            .commitWorkbenchVersion({
-              projectId: input.projectId,
-              id: input.experimentId,
-              commitMessage: input.commitMessage,
-              actor: { userId: ctx.actor().id, label: "user" },
-            })
+            .commitWorkbenchVersion(
+              {
+                projectId: input.projectId,
+                id: input.experimentId,
+                commitMessage: input.commitMessage,
+              },
+              { kind: "user", id: ctx.actor().id },
+            )
             .catch(mapExperimentError),
       ),
 
@@ -520,12 +505,14 @@ export class ExperimentTrpcApi {
       ).mutation(
         async ({ ctx, input }) =>
           await ctx.app.experiments
-            .restoreWorkbenchVersion({
-              projectId: input.projectId,
-              id: input.experimentId,
-              version: input.version,
-              actor: { userId: ctx.actor().id, label: "user" },
-            })
+            .restoreWorkbenchVersion(
+              {
+                projectId: input.projectId,
+                id: input.experimentId,
+                version: input.version,
+              },
+              { kind: "user", id: ctx.actor().id },
+            )
             .catch(mapExperimentError),
       ),
 
@@ -536,13 +523,11 @@ export class ExperimentTrpcApi {
           .getById({ projectId: input.projectId, id: input.experimentId })
           .catch(mapExperimentError);
         const workflow = experiment.workflowId
-          ? await ctx.app.workflows
-              .getById({
-                id: experiment.workflowId,
-                projectId: input.projectId,
-                includeVersion: true,
-              })
-              .catch(tryWorkflow)
+          ? await ctx.app.experiments.tryGetWorkflow({
+              id: experiment.workflowId,
+              projectId: input.projectId,
+              includeVersion: true,
+            })
           : null;
 
         const workbenchState = experiment.workbenchState as
@@ -623,13 +608,11 @@ export class ExperimentTrpcApi {
           .catch(mapExperimentError);
 
         const workflow = experiment.workflowId
-          ? await ctx.app.workflows
-              .getById({
-                id: experiment.workflowId,
-                projectId: input.projectId,
-                includeVersion: true,
-              })
-              .catch(tryWorkflow)
+          ? await ctx.app.experiments.tryGetWorkflow({
+              id: experiment.workflowId,
+              projectId: input.projectId,
+              includeVersion: true,
+            })
           : undefined;
 
         return {
@@ -665,13 +648,11 @@ export class ExperimentTrpcApi {
             async (experiment) => ({
               ...experiment,
               workflow: experiment.workflowId
-                ? await ctx.app.workflows
-                    .getById({
-                      id: experiment.workflowId,
-                      projectId: input.projectId,
-                      includeVersion: true,
-                    })
-                    .catch(tryWorkflow)
+                ? await ctx.app.experiments.tryGetWorkflow({
+                    id: experiment.workflowId,
+                    projectId: input.projectId,
+                    includeVersion: true,
+                  })
                 : null,
             }),
           ),
@@ -690,7 +671,7 @@ export class ExperimentTrpcApi {
 
         const datasetsById = Object.fromEntries(
           (
-            await ctx.app.dataset.getByIds({ projectId: input.projectId, datasetIds })
+            await ctx.app.experiments.getDatasets({ projectId: input.projectId, datasetIds })
           ).map((dataset: Dataset) => [dataset.id, { id: dataset.id, name: dataset.name }]),
         );
 
@@ -846,28 +827,16 @@ export class ExperimentTrpcApi {
        */
       deleteExperiment: policy("workflows:delete")(
         procedure.input(projectScopeSchema.extend({ experimentId: z.string() })),
-      ).mutation(async ({ ctx, input }) => {
-        const experiment = await ctx.app.experiments.tryGetById({
-          projectId: input.projectId,
-          id: input.experimentId,
-        });
-        const result = await ctx.app.experiments
-          .archive({ projectId: input.projectId, id: input.experimentId })
-          .catch(mapExperimentError);
-        if (experiment?.workflowId) {
-          await ctx.app.workflows.archive({
-            id: experiment.workflowId,
-            projectId: input.projectId,
-          });
-        }
-        if (experiment) {
-          await ctx.app.monitors.deleteForExperiment({
-            projectId: input.projectId,
-            experimentId: input.experimentId,
-          });
-        }
-        return result;
-      }),
+      ).mutation(
+        async ({ ctx, input }) =>
+          // The cascade — the workflow the experiment wrote versions into, and
+          // the monitor it was published as — is one act, and it is the
+          // application's. A second door sequencing the same three writes is a
+          // second chance to sequence them differently.
+          await ctx.app.experiments
+            .archive({ projectId: input.projectId, id: input.experimentId })
+            .catch(mapExperimentError),
+      ),
 
       copy: policy("evaluations:manage")(
         procedure.input(
@@ -902,8 +871,7 @@ export class ExperimentTrpcApi {
         // V3 experiments have no workflow; their state lives in workbenchState.
         if (experiment.type === "EVALUATIONS_V3") {
           return await copyEvaluationsV3Experiment({
-            experiments: ctx.app.experiments,
-            dataset: ctx.app.dataset,
+            app: ctx.app.experiments,
             slugify: ports.slugify,
             experiment,
             targetProjectId: input.projectId,
@@ -915,13 +883,11 @@ export class ExperimentTrpcApi {
         if (!experiment.workflowId) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Experiment workflow not found" });
         }
-        const sourceWorkflow = await ctx.app.workflows
-          .getById({
-            id: experiment.workflowId,
-            projectId: input.sourceProjectId,
-            includeVersion: true,
-          })
-          .catch(tryWorkflow);
+        const sourceWorkflow = await ctx.app.experiments.tryGetWorkflow({
+          id: experiment.workflowId,
+          projectId: input.sourceProjectId,
+          includeVersion: true,
+        });
         if (!sourceWorkflow?.latestVersion?.dsl) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Experiment workflow not found" });
         }
@@ -1002,16 +968,14 @@ export class ExperimentTrpcApi {
  * the copy is the state plus, optionally, the saved datasets it references.
  */
 const copyEvaluationsV3Experiment = async ({
-  experiments,
-  dataset,
+  app,
   slugify,
   experiment,
   targetProjectId,
   sourceProjectId,
   copyDatasets,
 }: {
-  experiments: ExperimentService;
-  dataset: DatasetService;
+  app: ExperimentApp;
   slugify(value: string): string;
   experiment: Readonly<{
     id: string;
@@ -1040,7 +1004,7 @@ const copyEvaluationsV3Experiment = async ({
     }>) {
       if (entry.type === "saved" && entry.datasetId) {
         try {
-          const newDataset = await dataset.copyDataset({
+          const newDataset = await app.copyDataset({
             sourceDatasetId: entry.datasetId,
             sourceProjectId,
             targetProjectId,
@@ -1067,7 +1031,7 @@ const copyEvaluationsV3Experiment = async ({
   }
 
   const experimentName = experiment.name ?? experiment.slug;
-  const newExperiment = await experiments.save({
+  const newExperiment = await app.save({
     id: generate("eval").toString(),
     name: experimentName,
     requestedSlug: slugify(experimentName),

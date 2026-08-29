@@ -16,10 +16,32 @@
  */
 import type { AuthService } from "@langwatch/auth-contract";
 import { HandledError, remediation } from "@langwatch/handled-error";
-import type { OpsService } from "@langwatch/ops-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import type { AdminIdentity, OpsService } from "@langwatch/ops-contract";
+import type {
+  EnsuredPersonalWorkspace,
+  FindPersonalWorkspaceInput,
+  OrganizationService,
+  PersonalWorkspace,
+  PersonalWorkspaceInput,
+} from "@langwatch/organization-contract";
 import type { ProjectIdentity } from "@langwatch/project-contract";
-import type { UserService } from "@langwatch/user-contract";
+import type {
+  CreateCredentialUserInput,
+  CreatedUser,
+  RemoveUserAvatarInput,
+  SetFirstUserPasswordInput,
+  SetFirstUserPasswordResult,
+  SetUserAvatarInput,
+  SetUserHomePathInput,
+  UserAccountInfo,
+  UserAvatarResult,
+  UserIdInput,
+  UserPasskeyNudgeStatus,
+  UserProfile,
+  UserService,
+  UserSsoStatus,
+  UserTourPreference,
+} from "@langwatch/user-contract";
 
 /**
  * The calling key belongs to a workspace that is not one person's.
@@ -124,5 +146,135 @@ export class UserApp {
     }
 
     return ownerUserId;
+  }
+
+  // -- the account itself ----------------------------------------------------
+
+  /** Everything the account screen reads about one user. */
+  getAccountInfo(input: UserIdInput): Promise<UserAccountInfo> {
+    return this.dependencies.users.getAccountInfo(input);
+  }
+
+  /** Whether this account signs in through an identity provider, and which. */
+  getSsoStatus(input: UserIdInput): Promise<UserSsoStatus> {
+    return this.dependencies.users.getSsoStatus(input);
+  }
+
+  /** Stamps the moment this user last signed in. */
+  updateLastLogin(input: UserIdInput): Promise<void> {
+    return this.dependencies.users.updateLastLogin(input);
+  }
+
+  /** Whether the trace explorer's introduction is still owed to this user. */
+  getTraceExplorerTourPreference(input: UserIdInput): Promise<UserTourPreference> {
+    return this.dependencies.users.getTraceExplorerTourPreference(input);
+  }
+
+  /** Records that this user has seen the trace explorer's introduction. */
+  dismissTraceExplorerTour(input: UserIdInput): Promise<UserTourPreference> {
+    return this.dependencies.users.dismissTraceExplorerTour(input);
+  }
+
+  /**
+   * Whether an identity is a platform operator.
+   *
+   * Synchronous, and it takes the identity rather than a user id, because that
+   * is what `OpsService.isAdmin` is: a lookup of an email against the
+   * deployment's operator list, with no record of its own to read.
+   */
+  isAdmin(identity: AdminIdentity): boolean {
+    return this.dependencies.ops.isAdmin(identity);
+  }
+
+  // -- credentials -----------------------------------------------------------
+
+  /** Mints an account that signs in with a password. */
+  createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser> {
+    return this.dependencies.users.createCredentialUser(input);
+  }
+
+  /** Whether this account can sign in with a password at all. */
+  hasPassword(input: UserIdInput): Promise<boolean> {
+    return this.dependencies.users.hasPassword(input);
+  }
+
+  /** Sets a first password on an account that has none. */
+  setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult> {
+    return this.dependencies.users.setFirstPassword(input);
+  }
+
+  /** Whether this deployment still owes the user a passkey offer, and when. */
+  getPasskeyNudgeStatus(input: UserIdInput): Promise<UserPasskeyNudgeStatus> {
+    return this.dependencies.users.getPasskeyNudgeStatus(input);
+  }
+
+  /** "Not now" on the passkey offer, dated rather than flagged. */
+  dismissPasskeyNudge(input: UserIdInput): Promise<void> {
+    return this.dependencies.users.dismissPasskeyNudge(input);
+  }
+
+  /**
+   * Ends every browser session of one user except the one named.
+   *
+   * A password outlives the session that set it, so the sessions a credential
+   * write must end are a property of the write, not of the transport it
+   * arrived over.
+   */
+  revokeOtherBrowserSessions(input: {
+    userId: string;
+    keepSessionId: string;
+  }): Promise<void> {
+    return this.dependencies.auth.revokeOtherBrowserSessions(input);
+  }
+
+  /** Ends every browser session of one user, keeping none. */
+  revokeAllBrowserSessions(input: { userId: string }): Promise<void> {
+    return this.dependencies.auth.revokeAllBrowserSessions(input);
+  }
+
+  // -- the account's lifecycle -----------------------------------------------
+
+  /** Retires an account. The effects that follow it are the process's. */
+  deactivate(input: UserIdInput): Promise<UserProfile> {
+    return this.dependencies.users.deactivate(input);
+  }
+
+  /** Restores a retired account. */
+  reactivate(input: UserIdInput): Promise<UserProfile> {
+    return this.dependencies.users.reactivate(input);
+  }
+
+  // -- the avatar ------------------------------------------------------------
+
+  /** Stores an uploaded avatar under the user's personal workspace. */
+  setAvatar(input: SetUserAvatarInput): Promise<UserAvatarResult> {
+    return this.dependencies.users.setAvatar(input);
+  }
+
+  /** Clears the uploaded avatar so the fallbacks apply again. */
+  removeAvatar(input: RemoveUserAvatarInput): Promise<void> {
+    return this.dependencies.users.removeAvatar(input);
+  }
+
+  // -- the /me dashboard -----------------------------------------------------
+
+  /** The user's personal workspace in one organization, creating it if absent. */
+  ensurePersonalWorkspace(input: PersonalWorkspaceInput): Promise<EnsuredPersonalWorkspace> {
+    return this.dependencies.organizations.ensurePersonalWorkspace(input);
+  }
+
+  /** The user's personal workspace in one organization, or null if none yet. */
+  tryFindPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null> {
+    return this.dependencies.organizations.tryFindPersonalWorkspace(input);
+  }
+
+  /** The path this user pinned as their home, or null if they pinned none. */
+  tryGetLastHomePath(input: UserIdInput): Promise<string | null> {
+    return this.dependencies.users.tryGetLastHomePath(input);
+  }
+
+  /** Pins one path as this user's home. */
+  setLastHomePath(input: SetUserHomePathInput): Promise<void> {
+    return this.dependencies.users.setLastHomePath(input);
   }
 }

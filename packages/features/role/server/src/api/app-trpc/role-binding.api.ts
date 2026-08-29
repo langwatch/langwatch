@@ -1,5 +1,3 @@
-import type { LedgerActor } from "@langwatch/actor";
-import { type AuthzGrantsService, type AuthzService } from "@langwatch/authz-contract";
 import {
   roleBindingApiApplyMemberBindingsInputSchema,
   roleBindingApiBindingInputSchema,
@@ -9,16 +7,19 @@ import {
   roleBindingApiUserInputSchema,
 } from "@langwatch/role-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
+import type { RoleApp } from "#app/role.app";
 import type { DeclaredProcedure } from "./role.api";
 
-type RoleBindingApplication = Readonly<{
-  permissions: AuthzService;
-  authzGrants: AuthzGrantsService;
-}>;
-
-/** The process supplies authentication, authorization and audit policy. */
+/**
+ * The process supplies authentication, authorization and audit policy.
+ *
+ * `app` is the slice of the process's application this feature reaches.
+ * Bindings are the role feature answering — who holds a role, and where — so
+ * they arrive through the same {@link RoleApp} the definitions surface calls,
+ * under the same `roles` key the process bag already uses.
+ */
 export type RoleBindingTrpcContext = Readonly<{
-  app: RoleBindingApplication;
+  app: Readonly<{ roles: RoleApp }>;
   actor(): Readonly<{ id: string }>;
   /** The signed-in member's own display identity, which the access breakdown
    *  labels their rows with. */
@@ -53,11 +54,6 @@ export type RoleBindingTrpcProcedures<TContext> = Readonly<{
   >;
 }>;
 
-const ledgerActor = (userId: string): LedgerActor => ({
-  type: "user",
-  id: userId,
-});
-
 /**
  * Installs the complete legacy `roleBinding.*` tRPC surface on a process-owned
  * root. Every procedure arrives with its access decision already declared, so
@@ -81,7 +77,7 @@ export class RoleBindingTrpcApi {
        * must also be hidden from non-managers.
        */
       listForOrg: procedures.listForOrg.query(async ({ ctx, input }) => {
-        return ctx.app.permissions.listManagedBindingsForOrganization({
+        return ctx.app.roles.listBindingsForOrganization({
           organizationId: input.organizationId,
         });
       }),
@@ -91,7 +87,7 @@ export class RoleBindingTrpcApi {
        * More efficient than listForOrg + client-side filter for large orgs.
        */
       listForUser: procedures.listForUser.query(async ({ ctx, input }) => {
-        return ctx.app.permissions.listManagedBindingsForUser({
+        return ctx.app.roles.listBindingsForUser({
           organizationId: input.organizationId,
           userId: input.userId,
         });
@@ -102,52 +98,57 @@ export class RoleBindingTrpcApi {
        * org role, group memberships + their bindings, direct bindings, all with resolved permissions.
        */
       getMyAccessBreakdown: procedures.getMyAccessBreakdown.query(async ({ ctx, input }) => {
-        return ctx.app.permissions.getAccessBreakdown({
-          organizationId: input.organizationId,
-          userId: ctx.actor().id,
-          userName: ctx.session?.user.name ?? null,
-          userEmail: ctx.session?.user.email ?? null,
-        });
+        return ctx.app.roles.getCallerAccessBreakdown(
+          {
+            organizationId: input.organizationId,
+            userName: ctx.session?.user.name ?? null,
+            userEmail: ctx.session?.user.email ?? null,
+          },
+          ctx.actor(),
+        );
       }),
 
       /**
        * Create a role binding (user or group) at a given scope.
        */
       create: procedures.create.mutation(async ({ ctx, input }) => {
-        return ctx.app.authzGrants.createBinding({
-          organizationId: input.organizationId,
-          actor: ledgerActor(ctx.actor().id),
-          userId: input.userId,
-          groupId: input.groupId,
-          role: input.role,
-          customRoleId: input.customRoleId,
-          scopeType: input.scopeType,
-          scopeId: input.scopeId,
-        });
+        return ctx.app.roles.createBinding(
+          {
+            organizationId: input.organizationId,
+            userId: input.userId,
+            groupId: input.groupId,
+            role: input.role,
+            customRoleId: input.customRoleId,
+            scopeType: input.scopeType,
+            scopeId: input.scopeId,
+          },
+          ctx.actor(),
+        );
       }),
 
       /**
        * Update the role on an existing binding.
        */
       update: procedures.update.mutation(async ({ ctx, input }) => {
-        return ctx.app.authzGrants.updateBinding({
-          organizationId: input.organizationId,
-          actor: ledgerActor(ctx.actor().id),
-          bindingId: input.bindingId,
-          role: input.role,
-          customRoleId: input.customRoleId,
-        });
+        return ctx.app.roles.updateBinding(
+          {
+            organizationId: input.organizationId,
+            bindingId: input.bindingId,
+            role: input.role,
+            customRoleId: input.customRoleId,
+          },
+          ctx.actor(),
+        );
       }),
 
       /**
        * Delete a role binding by id.
        */
       delete: procedures.delete.mutation(async ({ ctx, input }) => {
-        return ctx.app.authzGrants.deleteBinding({
-          organizationId: input.organizationId,
-          actor: ledgerActor(ctx.actor().id),
-          bindingId: input.bindingId,
-        });
+        return ctx.app.roles.deleteBinding(
+          { organizationId: input.organizationId, bindingId: input.bindingId },
+          ctx.actor(),
+        );
       }),
 
       /**
@@ -156,13 +157,15 @@ export class RoleBindingTrpcApi {
        * with some bindings deleted but others not added.
        */
       applyMemberBindings: procedures.applyMemberBindings.mutation(async ({ ctx, input }) => {
-        return ctx.app.authzGrants.applyMemberBindings({
-          organizationId: input.organizationId,
-          actor: ledgerActor(ctx.actor().id),
-          userId: input.userId,
-          bindingIdsToDelete: input.bindingIdsToDelete,
-          bindingsToCreate: input.bindingsToCreate,
-        });
+        return ctx.app.roles.applyMemberBindings(
+          {
+            organizationId: input.organizationId,
+            userId: input.userId,
+            bindingIdsToDelete: input.bindingIdsToDelete,
+            bindingsToCreate: input.bindingsToCreate,
+          },
+          ctx.actor(),
+        );
       }),
     });
   }

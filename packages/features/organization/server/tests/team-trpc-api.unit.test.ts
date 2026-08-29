@@ -16,13 +16,28 @@ import type { ProjectService } from "@langwatch/project-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { TeamTrpcApi } from "../src/api/app-trpc/team.trpc-schemas";
+import {
+  OrganizationApp,
+  type OrganizationAppDependencies,
+} from "../src/app/organization.app";
+import { TeamTrpcApi } from "../src/api/app-trpc/team.api";
 
 type TestContext = {
-  app: { organizations: OrganizationService; projects: ProjectService };
+  app: { organizations: OrganizationApp };
   actor(): { id: string };
   session: { user: { id: string } } | null;
 };
+
+/** The feature's application over two stub services, as the process builds it. */
+function application(
+  organizations: Partial<OrganizationService>,
+  projects: Partial<ProjectService>,
+): OrganizationApp {
+  return OrganizationApp.create({
+    organizations: organizations as unknown as OrganizationAppDependencies["organizations"],
+    projects: projects as unknown as OrganizationAppDependencies["projects"],
+  });
+}
 
 function harness({
   organizations = {},
@@ -60,10 +75,7 @@ function harness({
     probeOrganizationPermission,
     assertCustomRolesAllowed: assertCustomRoles,
     caller: router.createCaller({
-      app: {
-        organizations: organizations as OrganizationService,
-        projects: projects as ProjectService,
-      },
+      app: { organizations: application(organizations, projects) },
       actor: () => ({ id: "test-user-id" }),
       session: { user: { id: "test-user-id" } },
     }),
@@ -117,10 +129,7 @@ describe("TeamTrpcApi", () => {
       await router
         .createCaller({
           app: {
-            organizations: {
-              getTeamBySlugForMember: async () => team,
-            } as unknown as OrganizationService,
-            projects: {} as ProjectService,
+            organizations: application({ getTeamBySlugForMember: async () => team }, {}),
           },
           actor: () => ({ id: "test-user-id" }),
           session: { user: { id: "test-user-id" } },
