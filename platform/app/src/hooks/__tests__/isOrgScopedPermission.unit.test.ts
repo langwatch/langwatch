@@ -57,7 +57,9 @@ describe("isOrgScopedPermission", () => {
   // aiTools:manage before it. This walks the whole registry so the next
   // org-tier resource fails here instead of in front of an admin.
   describe("given the authz registry", () => {
-    /** @scenario Every org-tier-only permission routes against the org role */
+    // No @scenario: this pins an implementation invariant — the hook's list
+    // against the registry — not a behaviour a reader of the spec would
+    // recognize. The behaviours it protects are the cases above.
     it("routes exactly the org-tier-only permissions against the org role", () => {
       const registryOrgOnly: string[] = [];
       const hookOrgScoped: string[] = [];
