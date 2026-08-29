@@ -78,7 +78,6 @@ export {
   type TrackedEventSyncSubscriberDeps,
 } from "./subscribers/tracked-event-sync.subscriber";
 export {
-  normalizeOtlpAttributeMap,
   parseJsonStringValues,
   sanitizeInvalidJsonEscapes,
   TraceRequestUtils,

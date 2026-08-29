@@ -29,6 +29,7 @@
     "@langwatch/eventing": "workspace:*",
     "@langwatch/log-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/otlp": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

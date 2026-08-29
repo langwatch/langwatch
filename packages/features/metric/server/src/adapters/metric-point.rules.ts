@@ -1,4 +1,4 @@
-import { decodeBase64OpenTelemetryId } from "./otlp-id.rules";
+import { decodeBase64OpenTelemetryId } from "@langwatch/otlp";
 import { MAX_CANONICAL_METRIC_PAYLOAD_BYTES } from "@langwatch/metric-contract";
 import type {
   CanonicalMetricDataPoint,

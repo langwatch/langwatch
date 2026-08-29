@@ -1,5 +1,5 @@
 import { compareOrdinal } from "@langwatch/eventing";
-import { otlpAnyValueSchema, type OtlpAnyValue } from "./otlp-attribute.rules";
+import { otlpAnyValueSchema, type OtlpAnyValue } from "@langwatch/otlp";
 
 type OtlpKeyValue = { key: string; value: OtlpAnyValue };
 import { integerDecimal } from "./metric-numbers.rules";

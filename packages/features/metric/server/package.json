@@ -30,6 +30,7 @@
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/metric-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/otlp": "workspace:*",
     "@opentelemetry/core": "2.10.0",
     "zod": "^4.4.3"
   },
