@@ -35,12 +35,15 @@ import { listFeatureFlags } from "@langwatch/feature-flag-contract";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import type {
   AdminIdentity,
+  AggregateDiscovery,
+  AggregateEventView,
+  AggregateProcessManager,
+  AggregateSearchResult,
   Anomaly,
   AnomalyKind,
   DashboardData,
-  GroupInfo,
-  AggregateProcessManager,
   DeadLetterCount,
+  GroupInfo,
   DeadOutboxMessageView,
   OpsService,
   OpsSnapshotService,
