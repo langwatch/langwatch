@@ -42,6 +42,18 @@ export const PROJECT_DEFAULT_MODEL = "Project default model";
 
 const LABEL_WIDTH = "104px";
 
+/**
+ * The line every row of the block stands on.
+ *
+ * The rows are centred rather than aligned on a baseline. A row whose value is
+ * plain text has a text baseline to align to, but a model row holds an icon
+ * beside its name, and that value has no line box of its own: CSS then takes
+ * the bottom of the value as its baseline and drops the label to the foot of
+ * the taller row. One height for every row keeps the label beside its value
+ * whatever the value is drawn from.
+ */
+const ROW_HEIGHT = "18px";
+
 function SettingRow({
   label,
   testId,
@@ -52,7 +64,13 @@ function SettingRow({
   children: ReactNode;
 }) {
   return (
-    <HStack align="baseline" gap={3} width="full" data-testid={testId}>
+    <HStack
+      align="center"
+      gap={3}
+      width="full"
+      minHeight={ROW_HEIGHT}
+      data-testid={testId}
+    >
       <Text
         fontSize="11.5px"
         color={FG_MUTED}
@@ -62,7 +80,14 @@ function SettingRow({
       >
         {label}
       </Text>
-      <Box minWidth={0}>{children}</Box>
+      <Box
+        minWidth={0}
+        display="flex"
+        alignItems="center"
+        minHeight={ROW_HEIGHT}
+      >
+        {children}
+      </Box>
     </HStack>
   );
 }

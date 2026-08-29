@@ -1097,6 +1097,35 @@ describe("<RunPlanDetail/>", () => {
     expect(judge.querySelector("svg")).not.toBeNull();
   });
 
+  /** @scenario "Every label of the block sits beside its value" */
+  it("stands every row on one line, whatever its value is drawn from", async () => {
+    const user = userEvent.setup();
+    setRuns(configuredBatch());
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const block = screen.getByTestId("run-settings-block");
+    // A model row holds a provider icon beside the name and has no line box of
+    // its own, so a baseline alignment dropped its label to the foot of the
+    // row. Every row centres on one height instead, so the model rows sit the
+    // way the "Started" row does.
+    const rows = [
+      "run-settings-started",
+      "run-settings-simulator",
+      "run-settings-judge",
+    ].map((testId) => within(block).getByTestId(testId));
+
+    const startedHeight = window.getComputedStyle(rows[0]!).minHeight;
+    expect(startedHeight).not.toBe("");
+
+    for (const row of rows) {
+      const style = window.getComputedStyle(row);
+      expect(style.alignItems).toBe("center");
+      expect(style.minHeight).toBe(startedHeight);
+    }
+  });
+
   /** @scenario "The block names the models the run really ran on" */
   /** @scenario "The run settings read the resolved model, not the configured one" */
   it("names the models the run resolved, never the project default", async () => {
