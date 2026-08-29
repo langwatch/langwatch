@@ -18,6 +18,7 @@
  * A caller arrives as an argument, never read from a session or a request.
  */
 import {
+  AVAILABLE_EVALUATORS,
   codeEvaluatorConfigSchema,
   EvaluatorInvalidConfigError,
   type Evaluator,
@@ -220,7 +221,7 @@ export class EvaluatorApp {
         projectId: input.projectId,
         featureKey: "evaluator.create_default",
       }),
-      this.tryResolveEmbeddingsModel(input.projectId),
+      this.tryResolveEmbeddingsModel(input.projectId, input.config),
     ]);
 
     return this.dependencies.evaluators.createWithDefaults({
@@ -278,13 +279,27 @@ export class EvaluatorApp {
   }
 
   /**
-   * The project's embeddings model, or null when it has configured none.
+   * The project's embeddings model, or null when it has configured none AND
+   * the evaluator being created does not use one.
    *
-   * A missing embeddings model is a state, not a failure: only some evaluators
-   * use one. Every other resolution failure is left to propagate.
+   * Only some evaluator types take an embeddings model, so for the rest its
+   * absence is a state rather than a failure — an organization that configured
+   * DEFAULT and FAST and never got an EMBEDDINGS key must still be able to
+   * create a `ragas/faithfulness` evaluator, whose settings have no
+   * `embeddings_model` field at all (#7556).
+   *
+   * For a type that DOES declare one, the absence is a failure and has to
+   * reach the customer as one. Swallowing it here is worse than useless: the
+   * settings defaults fill `embeddings_model` from the catalog fallback, an
+   * OpenAI model the organization never configured, so the create succeeds and
+   * the evaluator fails at RUN time against a provider it has no key for. A
+   * nameable refusal at create time becomes an opaque failure later.
+   *
+   * Every other resolution failure is left to propagate.
    */
   private async tryResolveEmbeddingsModel(
     projectId: string,
+    config: EvaluatorConfig,
   ): Promise<{ model: string } | null> {
     try {
       return await this.dependencies.modelProviders.resolveModelForFeature({
@@ -292,10 +307,19 @@ export class EvaluatorApp {
         featureKey: "analytics.topic_clustering_embeddings",
       });
     } catch (error) {
-      if (error instanceof ModelNotConfiguredError) return null;
+      if (error instanceof ModelNotConfiguredError && !usesEmbeddingsModel(config)) return null;
       throw error;
     }
   }
+}
+
+/** Whether the evaluator type's own settings declare an embeddings model. */
+function usesEmbeddingsModel(config: EvaluatorConfig): boolean {
+  const evaluatorType = typeof config.evaluatorType === "string" ? config.evaluatorType : undefined;
+  if (!evaluatorType) return false;
+  const definition = AVAILABLE_EVALUATORS[evaluatorType as keyof typeof AVAILABLE_EVALUATORS];
+  if (!definition || !("settings" in definition)) return false;
+  return "embeddings_model" in definition.settings;
 }
 
 /** Code evaluators carry their program on `config`; nothing else can run one. */

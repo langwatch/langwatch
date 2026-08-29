@@ -231,6 +231,43 @@ describe("EvaluatorApp", () => {
       });
     });
 
+    /**
+     * @scenario A type that does need embeddings still refuses when none is configured
+     *
+     * The tolerance above is for types whose settings have no
+     * `embeddings_model` field. `ragas/response_relevancy` has one, and the
+     * settings defaults fill it from the catalog fallback — an OpenAI model
+     * this organization never configured — so swallowing the absence writes an
+     * evaluator that can only fail at RUN time against a provider it has no
+     * key for.
+     */
+    it("refuses for a type whose settings do carry an embeddings model", async () => {
+      const { app, evaluators } = harness({
+        modelProviders: {
+          resolveModelForFeature: vi.fn(async ({ featureKey }: { featureKey: string }) => {
+            if (featureKey === "analytics.topic_clustering_embeddings") {
+              throw new ModelNotConfiguredError(
+                featureKey,
+                "EMBEDDINGS",
+                "Topic clustering embeddings",
+                "project-1",
+              );
+            }
+            return { model: "anthropic/claude-sonnet-4-5" };
+          }),
+        },
+      });
+
+      await expect(
+        app.createWithResolvedDefaults({
+          projectId: "project-1",
+          name: "Response relevancy",
+          config: { evaluatorType: "ragas/response_relevancy" },
+        }),
+      ).rejects.toMatchObject({ code: "model_not_configured", meta: { role: "EMBEDDINGS" } });
+      expect(evaluators.createWithDefaults).not.toHaveBeenCalled();
+    });
+
     it("still refuses when the DEFAULT model itself is unconfigured", async () => {
       const { app, evaluators } = harness({
         modelProviders: {
