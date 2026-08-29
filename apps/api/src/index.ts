@@ -123,8 +123,8 @@ export {
   workbenchStateSchema,
   workbenchVersionProbeResponseSchema,
 } from "@langwatch/experiment-server";
-export { createDashboardsRestApp } from "./features/dashboard/dashboard-rest";
-export { createApiKeysRestApp } from "./features/api-key/api-keys-rest";
+export { createDashboardsRestApp } from "@langwatch/dashboard-server";
+export { createApiKeysRestApp } from "@langwatch/api-key-server";
 export {
   createFilesRestApp,
   isPermissionDenial,
@@ -132,7 +132,7 @@ export {
   type FilesDualAuthVariables,
   type FilesProjectPermissionCheck,
   type FilesRateLimiter,
-} from "./features/stored-object/files-rest";
+} from "@langwatch/stored-object-server";
 export {
   type AgentCacheStore,
   CACHE_ENTRY_NAME_REGEX,
@@ -159,19 +159,19 @@ export {
   type AgentPlatformUrlBuilder,
   createAgentLegacyRestApp,
 } from "@langwatch/agent-server";
-export { createTriggerRestApp } from "./features/automation/trigger-rest";
+export { createTriggerRestApp } from "@langwatch/automation-server";
 export {
   type CodingAgentCallerScope,
   type CodingAgentRestServices,
   createCodingAgentRestApp,
-} from "./features/coding-agent/coding-agent-rest";
+} from "@langwatch/coding-agent-server";
 export {
   type CopilotServiceAdapterFactory,
   createCopilotKitRestApp,
 } from "./features/copilotkit/copilotkit-rest";
 export { createMonitorRestApp } from "@langwatch/monitor-server";
 export { createSecretLegacyRestApp } from "./features/secret/secret-legacy-rest";
-export { createWebhookRestApp, type WebhookRestServices } from "./features/webhook/webhook-rest";
+export { createWebhookRestApp, type WebhookRestServices } from "@langwatch/enterprise-webhook-server";
 export { createEventsRestApp, type TrackedEventPorts } from "./features/trace/events-rest";
 export {
   createExportTracesRestApp,
@@ -180,8 +180,8 @@ export {
   type TraceExportRestPorts,
 } from "./features/trace/export-traces-rest";
 export { createGroupRestApp } from "./features/organization/group-rest";
-export { createModelDefaultsRestApp } from "./features/model-defaults/model-defaults-rest";
-export { createModelProvidersRestApp } from "./features/model-provider/model-provider-rest";
+export { createModelDefaultsRestApp } from "@langwatch/model-provider-server";
+export { createModelProvidersRestApp } from "@langwatch/model-provider-server";
 export { createMeRestApp, type MeRestTeamOrganizationLookup } from "./features/user/me-rest";
 export {
   createOrganizationsRestApp,
@@ -189,10 +189,10 @@ export {
   type OrganizationProvisioningSummary,
 } from "./features/organization/organizations-rest";
 export { ORGANIZATIONS_SPEC_OPTIONS } from "./features/organization/organizations-rest.openapi";
-export { createProjectRestApp } from "./features/project/project-rest";
-export { createRoleBindingsRestApp } from "./features/authz/role-bindings-rest";
-export { createRolesRestApp } from "./features/role/roles-rest";
-export { createScimTokensRestApp } from "./features/enterprise-scim/scim-tokens-rest";
+export { createProjectRestApp } from "@langwatch/project-server";
+export { createRoleBindingsRestApp } from "@langwatch/authz-server";
+export { createRolesRestApp } from "@langwatch/role-server";
+export { createScimTokensRestApp } from "@langwatch/enterprise-scim-server";
 export { createTeamsRestApp } from "./features/organization/teams-rest";
 export {
   createUserAvatarRestApp,
@@ -206,7 +206,7 @@ export {
 } from "./features/scenario/scenario-event-rest";
 export { createScenariosRestApp } from "./features/scenario/scenario-rest";
 export { createSimulationRunsRestApp } from "./features/scenario/simulation-run-rest";
-export { createSuiteRestApp } from "./features/suite/suite-rest";
+export { createSuiteRestApp } from "@langwatch/suite-server";
 export {
   createWorkflowsRestApp,
   type WorkflowEvaluationOutcome,

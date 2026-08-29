@@ -30,7 +30,7 @@ export {
  * directly: the API application may depend on the Enterprise API composition
  * and not on an Enterprise feature server.
  */
-export { createGovernanceRestApp } from "@langwatch/enterprise-governance-server";
+export { createGovernanceRestApp, GovernanceApp } from "@langwatch/enterprise-governance-server";
 
 export type EnterpriseApiCompositionOptions = {
   licensing?: LicensingService;

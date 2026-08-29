@@ -46,6 +46,10 @@ import {
   type ListPersonalVirtualKeysInput,
   type ListRoutingPoliciesInput,
   type PersonalVirtualKey,
+  type PersonalUsageBreakdown,
+  type PersonalUsageBucket,
+  type PersonalUsageQueryInput,
+  type PersonalUsageSummary,
   type RoutingPolicy,
   type SetDefaultRoutingPolicyInput,
   type UpdateRoutingPolicyInput,
@@ -443,6 +447,32 @@ export class GovernanceApp {
   // ── Routing policies ──────────────────────────────────────────────────────
 
   /** Policies in an organization, optionally narrowed to one scope's choices. */
+  /**
+   * One person's own usage: the totals, the per-day buckets, and the split by
+   * model.
+   *
+   * Three reads rather than one because they answer different questions, and
+   * issued together because ClickHouse multiplexes them happily — a caller
+   * awaiting them in sequence pays three round trips for one screen. That is
+   * a fact about the store, not about a transport, so it is decided here
+   * rather than in whichever door happens to ask.
+   */
+  async personalUsage(
+    input: PersonalUsageQueryInput,
+  ): Promise<{
+    summary: PersonalUsageSummary;
+    dailyBuckets: PersonalUsageBucket[];
+    breakdownByModel: PersonalUsageBreakdown[];
+  }> {
+    const [summary, dailyBuckets, breakdownByModel] = await Promise.all([
+      this.dependencies.governance.personalUsageSummary(input),
+      this.dependencies.governance.personalUsageDailyBuckets(input),
+      this.dependencies.governance.personalUsageBreakdownByModel(input),
+    ]);
+
+    return { summary, dailyBuckets, breakdownByModel };
+  }
+
   listRoutingPolicies(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]> {
     return this.dependencies.governance.routingPolicyList(input);
   }

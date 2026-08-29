@@ -1,4 +1,4 @@
-import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import type { GovernanceApp } from "@langwatch/enterprise-api";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import { describeRoute, resolver } from "hono-openapi";
@@ -59,7 +59,7 @@ export function createMeRestApp(options: {
    * mounting a family must not force its services to be constructed, which is
    * what lets the OpenAPI spec generator build this app with none.
    */
-  governance: () => GovernanceService;
+  governance: () => GovernanceApp;
   organizations: () => OrganizationService & MeRestTeamOrganizationLookup;
   projects: () => ProjectService;
 }): SecuredApp<{ Variables: AppRestProjectVariables }> {
@@ -74,7 +74,7 @@ export function createMeRestApp(options: {
 function registerUsageRoute(
   secured: SecuredApp<{ Variables: AppRestProjectVariables }>,
   services: {
-    governance: () => GovernanceService;
+    governance: () => GovernanceApp;
     organizations: () => OrganizationService & MeRestTeamOrganizationLookup;
     projects: () => ProjectService;
   },
@@ -132,7 +132,6 @@ function registerUsageRoute(
           })
         : null;
 
-      const usage = services.governance();
       const input = {
         personalProjectId: project.id,
         userId: ownerUserId,
@@ -140,14 +139,7 @@ function registerUsageRoute(
         window,
       };
 
-      // Independent rollups — CH multiplexes them happily.
-      const [summary, dailyBuckets, breakdownByModel] = await Promise.all([
-        usage.personalUsageSummary(input),
-        usage.personalUsageDailyBuckets(input),
-        usage.personalUsageBreakdownByModel(input),
-      ]);
-
-      return c.json({ summary, dailyBuckets, breakdownByModel });
+      return c.json(await services.governance().personalUsage(input));
     },
   );
 }

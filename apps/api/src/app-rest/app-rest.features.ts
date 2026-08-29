@@ -38,48 +38,51 @@ import {
   createAgentCacheRestApp,
 } from "../features/agent-cache/agent-cache-rest";
 import {
+  AgentApp,
   type AgentPlatformUrlBuilder,
   createAgentLegacyRestApp,
 } from "@langwatch/agent-server";
-import { createApiKeysRestApp } from "../features/api-key/api-keys-rest";
-import { createTriggerRestApp } from "../features/automation/trigger-rest";
-import { createRoleBindingsRestApp } from "../features/authz/role-bindings-rest";
+import { createApiKeysRestApp } from "@langwatch/api-key-server";
+import { AutomationApp, createTriggerRestApp } from "@langwatch/automation-server";
+import { createRoleBindingsRestApp } from "@langwatch/authz-server";
 import {
-  type CodingAgentRestServices,
+  CodingAgentApp,
+  type CodingAgentRestAuditPort,
   createCodingAgentRestApp,
-} from "../features/coding-agent/coding-agent-rest";
+} from "@langwatch/coding-agent-server";
 import {
   type CopilotServiceAdapterFactory,
   createCopilotKitRestApp,
 } from "../features/copilotkit/copilotkit-rest";
-import { createDashboardsRestApp } from "../features/dashboard/dashboard-rest";
+import { createDashboardsRestApp, DashboardApp } from "@langwatch/dashboard-server";
 import {
   createDatasetRestApp,
+  DatasetApp,
   type DatasetDirectUploadAuthorizer,
 } from "@langwatch/dataset-server";
-import { createScimTokensRestApp } from "../features/enterprise-scim/scim-tokens-rest";
-import { createEvaluatorsRestApp } from "@langwatch/evaluator-server";
-import { createExperimentsRestApp } from "@langwatch/experiment-server";
-import { createGovernanceRestApp } from "@langwatch/enterprise-api";
+import { createScimTokensRestApp, ScimApp } from "@langwatch/enterprise-scim-server";
+import { createEvaluatorsRestApp, EvaluatorApp } from "@langwatch/evaluator-server";
+import { createExperimentsRestApp, ExperimentApp } from "@langwatch/experiment-server";
+import { createGovernanceRestApp, GovernanceApp } from "@langwatch/enterprise-api";
 import { createGraphsRestApp } from "@langwatch/dashboard-server";
-import { createMonitorRestApp } from "@langwatch/monitor-server";
+import { createMonitorRestApp, MonitorApp } from "@langwatch/monitor-server";
 import {
   createGatewayPlatformRestApp,
-  type GatewayPlatformRestPorts,
+  GatewayApp,
 } from "@langwatch/gateway-server";
 import { createGatewaySpendRestApp } from "../features/gateway/gateway-spend-rest";
 import type { GatewaySpendRestPorts } from "../features/gateway/gateway-spend-rest.ports";
 import { createEventsRestApp, type TrackedEventPorts } from "../features/trace/events-rest";
-import { createModelDefaultsRestApp } from "../features/model-defaults/model-defaults-rest";
-import { createModelProvidersRestApp } from "../features/model-provider/model-provider-rest";
+import { createModelDefaultsRestApp } from "@langwatch/model-provider-server";
+import { createModelProvidersRestApp } from "@langwatch/model-provider-server";
 import { createGroupRestApp } from "../features/organization/group-rest";
 import {
   createOrganizationsRestApp,
   type OrganizationProvisioningPort,
 } from "../features/organization/organizations-rest";
 import { createTeamsRestApp } from "../features/organization/teams-rest";
-import { createProjectRestApp } from "../features/project/project-rest";
-import { createRolesRestApp } from "../features/role/roles-rest";
+import { createProjectRestApp } from "@langwatch/project-server";
+import { createRolesRestApp } from "@langwatch/role-server";
 import { createMeRestApp, type MeRestTeamOrganizationLookup } from "../features/user/me-rest";
 import {
   createUserAvatarRestApp,
@@ -102,10 +105,11 @@ import {
   createFilesRestApp,
   type FilesProjectPermissionCheck,
   type FilesRateLimiter,
-} from "../features/stored-object/files-rest";
+  StoredObjectApp,
+} from "@langwatch/stored-object-server";
 import { createSecretLegacyRestApp } from "../features/secret/secret-legacy-rest";
-import { createSuiteRestApp } from "../features/suite/suite-rest";
-import { createWebhookRestApp, type WebhookRestServices } from "../features/webhook/webhook-rest";
+import { createSuiteRestApp, SuiteApp } from "@langwatch/suite-server";
+import { createWebhookRestApp, WebhookApp } from "@langwatch/enterprise-webhook-server";
 import type {
   ApiErrorBody,
   AppRestBroadcast,
@@ -127,30 +131,32 @@ export interface AppRestFeatureServices {
   /** The per-project expiring entry store the agent cache reads and writes. */
   agentCache: () => AgentCacheStore;
   /** The deprecated `/api/agents` family's read/write capability. */
-  agents: () => LegacyAgentsRestApi;
+  agents: () => AgentApp;
   apiKeys: () => ApiKeyService;
   /** Writing role bindings: the grants ledger `/api/role-bindings` appends to. */
   authzGrants: () => AuthzGrantsService;
-  automation: () => AutomationService;
+  automation: () => AutomationApp;
   /** Fan-out to every browser watching one tenant. */
   broadcast: () => AppRestBroadcast;
-  dashboard: () => DashboardService;
-  datasets: () => DatasetService;
-  evaluators: () => EvaluatorService;
-  experiments: () => ExperimentService;
+  dashboard: () => DashboardApp;
+  datasets: () => DatasetApp;
+  evaluators: () => EvaluatorApp;
+  experiments: () => ExperimentApp;
   /**
    * The AI Gateway control plane's capabilities and the per-scope decisions
    * its writes are authorized against, in ONE bag: it is the same seam the
    * gateway's tRPC transports take, so the two doors cannot drift apart.
    */
-  gatewayPlatform: () => GatewayPlatformRestPorts;
+  gatewayPlatform: () => GatewayApp;
   /** The spend ledger, the webhook replay path, and the spend-scope resolver. */
   gatewaySpend: () => GatewaySpendRestPorts;
-  governance: () => GovernanceService;
+  governance: () => GovernanceApp;
   /** The coding-agent reads, plus the cross-project cuts they answer over. */
-  codingAgents: () => CodingAgentRestServices;
+  codingAgents: () => CodingAgentApp;
+  /** Records who read an answer that names people. REST audits; tRPC does not. */
+  codingAgentAudit: () => CodingAgentRestAuditPort;
   modelProviders: () => ModelProviderService;
-  monitors: () => MonitorService;
+  monitors: () => MonitorApp;
   /**
    * The organization capability, WIDER than the published contract.
    *
@@ -173,17 +179,17 @@ export interface AppRestFeatureServices {
   scenarios: () => ScenarioService;
   scenarioTabs: () => ScenarioTabRegistry;
   /** The SCIM provisioning tokens an identity provider authenticates with. */
-  scim: () => ScimService;
+  scim: () => ScimApp;
   secrets: () => SecretService;
   simulations: () => SimulationService;
   storedObjectOwners: () => StoredObjectOwnerResolver;
-  storedObjects: () => StoredObjectService;
-  suites: () => SuiteService;
+  storedObjects: () => StoredObjectApp;
+  suites: () => SuiteApp;
   /** The avatar bytes `/api/user-avatar` serves, by project and object id. */
   userAvatarObjects: () => UserAvatarObjectReader;
   /** The webhook platform: endpoints, health, the emitted-events log, the
    *  entitlement gate, the test-fire hop and the idempotency ledger. */
-  webhooks: () => WebhookRestServices;
+  webhooks: () => WebhookApp;
   workflows: () => WorkflowService;
 }
 
@@ -368,8 +374,7 @@ export function createAppRestFeatures(options: {
     }).hono,
     createGovernanceRestApp({
       security,
-      governance: services.governance,
-      projects: services.projects,
+      app: services.governance,
     }).hono,
     createDashboardsRestApp({
       security,
@@ -378,27 +383,25 @@ export function createAppRestFeatures(options: {
     }).hono,
     createDatasetRestApp({
       security,
-      dataset: services.datasets,
+      app: services.datasets,
       platformUrl: ports.platformUrl,
       authorizeDirectUpload: ports.authorizeDatasetDirectUpload,
     }).hono,
     createEventsRestApp({ security, ports: ports.trackedEvents }).hono,
     createFilesRestApp({
       security,
-      storedObjects: services.storedObjects,
-      storedObjectOwners: services.storedObjectOwners,
+      app: services.storedObjects,
       dualAuth: ports.dualAuth,
       requireProjectPermission: ports.requireProjectPermission,
       rateLimit: ports.rateLimit,
     }).hono,
     createEvaluatorsRestApp({
       security,
-      evaluators: services.evaluators,
-      modelProviders: services.modelProviders,
+      app: services.evaluators,
       platformUrl: ports.platformUrl,
       organizationMiddleware: ports.organizationMiddleware,
     }).hono,
-    createExperimentsRestApp({ security, experiments: services.experiments }).hono,
+    createExperimentsRestApp({ security, app: services.experiments }).hono,
     createGatewayPlatformRestApp({ security, gateway: services.gatewayPlatform }).hono,
     createGatewaySpendRestApp({
       security,
@@ -412,14 +415,14 @@ export function createAppRestFeatures(options: {
       agents: services.agents,
       agentPlatformUrl: ports.agentPlatformUrl,
     }).hono,
-    createCodingAgentRestApp({ security, codingAgents: services.codingAgents }).hono,
+    createCodingAgentRestApp({ security, app: services.codingAgents, audit: services.codingAgentAudit }).hono,
     createCopilotKitRestApp({
       security,
       serviceAdapterFor: ports.copilotServiceAdapterFor,
     }).hono,
     createMonitorRestApp({
       security,
-      monitors: services.monitors,
+      app: services.monitors,
       platformUrl: ports.platformUrl,
       mappingsSchema: ports.monitorMappingsSchema,
     }).hono,
@@ -457,8 +460,6 @@ export function createAppRestFeatures(options: {
     createSuiteRestApp({
       security,
       suites: services.suites,
-      scenarios: services.scenarios,
-      projects: services.projects,
       platformUrl: ports.platformUrl,
     }).hono,
     createGroupRestApp({
@@ -539,7 +540,7 @@ export function createAppRestFeatures(options: {
     createScimTokensRestApp({
       security,
       enterpriseGate: ports.enterpriseGate("SCIM"),
-      scim: services.scim,
+      app: services.scim,
       audit: ports.managementAudit,
     }),
   ];
@@ -568,6 +569,7 @@ export function servicesUnavailableOffRequestPath(reason: string): AppRestFeatur
     gatewaySpend: refuse("Gateway spend", reason),
     governance: refuse("Governance", reason),
     codingAgents: refuse("Coding agents", reason),
+    codingAgentAudit: refuse("Coding agent audit", reason),
     modelProviders: refuse("Model providers", reason),
     monitors: refuse("Monitors", reason),
     organizations: refuse("Organizations", reason),

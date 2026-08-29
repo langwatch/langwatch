@@ -25,17 +25,12 @@ import {
   GatewayUsageTrpcApi,
   VirtualKeyTrpcApi,
   type GatewayBudgetTrpcContext,
-  type GatewayBudgetTrpcPorts,
   type GatewayCacheRuleTrpcContext,
-  type GatewayCacheRuleTrpcPorts,
   type GatewayGuardrailTrpcContext,
-  type GatewayGuardrailTrpcPorts,
   type GatewaySpendEventTrpcContext,
-  type GatewaySpendEventTrpcPorts,
   type GatewayUsageTrpcContext,
-  type GatewayUsageTrpcPorts,
   type VirtualKeyTrpcContext,
-  type VirtualKeyTrpcPorts,
+  type VirtualKeyTrpcSchemas,
 } from "@langwatch/gateway-server";
 import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 
@@ -54,13 +49,15 @@ export type GatewayTrpcContext = GatewayBudgetTrpcContext &
  * persistence read the transports used to make directly. Nothing here is a new
  * abstraction: the names are the names of the functions the routers called.
  */
+/**
+ * What is left of the seam after the App.
+ *
+ * A tRPC input parser is fixed when the router is BUILT, and the application
+ * is a per-request value, so the budget parser cannot come off it. Everything
+ * else these ports carried now lives on `GatewayApp`.
+ */
 export type GatewayTrpcPorts = Readonly<{
-  budgets: GatewayBudgetTrpcPorts;
-  cacheRules: GatewayCacheRuleTrpcPorts;
-  guardrails: GatewayGuardrailTrpcPorts;
-  spendEvents: GatewaySpendEventTrpcPorts;
-  usage: GatewayUsageTrpcPorts;
-  virtualKeys: VirtualKeyTrpcPorts;
+  virtualKeys: VirtualKeyTrpcSchemas;
 }>;
 
 /**
@@ -85,14 +82,10 @@ export function createGatewayTrpcRouters<
 
   return {
     virtualKeys: VirtualKeyTrpcApi.create(mount.root, resolverAuthorized, mount.ports.virtualKeys),
-    gatewayUsage: GatewayUsageTrpcApi.create(mount.root, resolverAuthorized, mount.ports.usage),
-    gatewayBudgets: GatewayBudgetTrpcApi.create(mount.root, service, mount.ports.budgets),
-    gatewayCacheRules: GatewayCacheRuleTrpcApi.create(mount.root, service, mount.ports.cacheRules),
-    gatewayGuardrails: GatewayGuardrailTrpcApi.create(mount.root, service, mount.ports.guardrails),
-    gatewaySpendEvents: GatewaySpendEventTrpcApi.create(
-      mount.root,
-      service,
-      mount.ports.spendEvents,
-    ),
+    gatewayUsage: GatewayUsageTrpcApi.create(mount.root, resolverAuthorized),
+    gatewayBudgets: GatewayBudgetTrpcApi.create(mount.root, service),
+    gatewayCacheRules: GatewayCacheRuleTrpcApi.create(mount.root, service),
+    gatewayGuardrails: GatewayGuardrailTrpcApi.create(mount.root, service),
+    gatewaySpendEvents: GatewaySpendEventTrpcApi.create(mount.root, service),
   };
 }

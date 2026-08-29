@@ -6,6 +6,8 @@ const unsupported = <Method>(): Method =>
 /** Complete organization boundary for tests that only exercise one method. */
 export class TestOrganizationService extends OrganizationService {
   getOrganizationMembers = unsupported<OrganizationService["getOrganizationMembers"]>();
+  getSettings = unsupported<OrganizationService["getSettings"]>();
+  updateSettings = unsupported<OrganizationService["updateSettings"]>();
   isMember = unsupported<OrganizationService["isMember"]>();
   getOldestTeamId = unsupported<OrganizationService["getOldestTeamId"]>();
   getBillingProfile = unsupported<OrganizationService["getBillingProfile"]>();
