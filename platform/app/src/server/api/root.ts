@@ -549,7 +549,7 @@ const organizationRouter = createOrganizationTrpcRouter({
       const app = organizationCtx(ctx);
       await assertExternalTeamRoleChangeWithinSeatLimits({
         prisma: app.prisma,
-        roles: app.app.roles,
+        roles: app.app.roleService,
         planProvider: app.app.planProvider,
         organizationId: input.organizationId,
         teamId: input.teamId,

@@ -17,8 +17,8 @@ import { appRestSecurity } from "~/server/api/security";
  */
 const app = createModelProvidersRestApp({
   security: appRestSecurity,
-  modelProviders: () => getApp().modelProviders,
-  organizations: () => getApp().organizations,
+  modelProviders: () => getApp().modelProviders.providerService,
+  organizations: () => getApp().organizationService,
 }).hono;
 
 wireDefaultTestApp();

@@ -213,7 +213,7 @@ async function seedOffloadedTrace() {
 async function runExport(request: ExportRequest): Promise<string> {
   // The test App composes one blob-capable TraceService and one export facade;
   // the CH client it uses is the testcontainer, via the mocked resolver above.
-  const service = getApp().traces.export;
+  const service = getApp().traceExport;
   let payload = "";
   for await (const { chunk } of service.exportTraces({
     request,

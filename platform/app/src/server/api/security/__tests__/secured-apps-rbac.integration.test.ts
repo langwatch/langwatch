@@ -292,7 +292,7 @@ describe("Feature: migrated Hono apps enforce RBAC + tenant isolation", () => {
      */
     it("stops honouring the key on a write route the owner can no longer reach", async () => {
       const owner = await makeAdminUser(orgA, teamA);
-      const { token } = await getApp().apiKeys.create({
+      const { token } = await getApp().apiKeys.apiKeyService.create({
         name: `degrading-${nanoid(6)}`,
         userId: owner.id,
         createdByUserId: owner.id,

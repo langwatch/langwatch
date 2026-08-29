@@ -13,7 +13,7 @@ import { platformUrl } from "../../shared/platform-url";
 
 const { hono: app } = createMonitorRestApp({
   security: appRestSecurity,
-  monitors: () => getApp().monitors,
+  app: () => getApp().monitors,
   platformUrl,
   mappingsSchema: monitorMappingsSchema,
 });

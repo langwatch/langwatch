@@ -17,8 +17,29 @@ import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import { AppLangyNavigateFallbackAdapter } from "../langy-navigate-fallback.adapter";
 
+/**
+ * The adapter names the raw contracts rather than the App, because the process
+ * builds it before any application exists. Composing it here from the test
+ * App's own seams keeps this test on the SAME objects the process wires, which
+ * is the whole point of running it against real services.
+ */
+const navigateFallbackServices = () => {
+  const app = getApp();
+  return {
+    simulations: app.simulations,
+    prompts: app.prompts.promptService,
+    dataset: app.dataset,
+    workflows: app.workflows.workflowService,
+    experiments: app.experiments.experimentService,
+    monitors: app.monitors.monitorService,
+    evaluators: app.evaluators,
+    agents: app.agents,
+    projects: app.projects.projectService,
+  };
+};
+
 const resolveNavigateFallbackUrl = (input: { projectId: string; resourceId: string }) =>
-  AppLangyNavigateFallbackAdapter.create(getApp()).resolve(input);
+  AppLangyNavigateFallbackAdapter.create(navigateFallbackServices()).resolve(input);
 
 describe("Feature: the navigate fallback resolves a prompt with the project's own access", () => {
   let organization: Organization;
@@ -81,7 +102,7 @@ describe("Feature: the navigate fallback resolves a prompt with the project's ow
 
   describe("when the agent asks to open a prompt the project can see", () => {
     it("resolves the prompts-page drawer address for that prompt", async () => {
-      const prompt = await getApp().prompts.createPrompt({
+      const prompt = await getApp().prompts.promptService.createPrompt({
         projectId: project.id,
         organizationId: organization.id,
         handle: `navfix-prompt-${nanoid().toLowerCase()}`,
@@ -103,7 +124,7 @@ describe("Feature: the navigate fallback resolves a prompt with the project's ow
 
   describe("when the id does not resolve in the asking project", () => {
     it("returns null for another project's prompt id", async () => {
-      const prompt = await getApp().prompts.createPrompt({
+      const prompt = await getApp().prompts.promptService.createPrompt({
         projectId: project.id,
         organizationId: organization.id,
         handle: `navfix-prompt-${nanoid().toLowerCase()}`,

@@ -50,14 +50,16 @@ export const onboardingRouter = createTRPCRouter({
         // imports this router — calling it from here would close the cycle.
         // It declares no permission and adds no rule of its own, so the two
         // paths are the same work.
-        const orgResult = await ctx.app.organizations.createAndAssign({
-          userId: ctx.session.user.id,
-          orgName: input.orgName,
-          phoneNumber: input.phoneNumber,
-          signUpData: input.signUpData,
-          primaryIntent: input.primaryIntent,
-          userDisplayName: ctx.session.user.name,
-        });
+        const orgResult = await ctx.app.organizations.createAndAssign(
+          {
+            orgName: input.orgName,
+            phoneNumber: input.phoneNumber,
+            signUpData: input.signUpData,
+            primaryIntent: input.primaryIntent,
+            userDisplayName: ctx.session.user.name,
+          },
+          { id: ctx.session.user.id },
+        );
 
         // Every new org gets the standard AI tool catalog at creation, for
         // every intent: the /me portal must render tiles on its very first
@@ -91,7 +93,11 @@ export const onboardingRouter = createTRPCRouter({
         // `user.personalContext` backfills lazily on the next session.
         if (input.primaryIntent === "AGENT_GOVERNANCE") {
           try {
-            await ctx.app.organizations.ensurePersonalWorkspace({
+            // Through the user application: the personal workspace is a
+            // property of the person, and this is the read that names them,
+            // rather than the organization operation which attributes the
+            // provisioning to whoever is calling.
+            await ctx.app.users.ensurePersonalWorkspace({
               userId: ctx.session.user.id,
               organizationId: orgResult.organization.id,
               displayName: ctx.session.user.name,

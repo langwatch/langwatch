@@ -29,8 +29,8 @@ import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 const { hono: app } = createOrganizationsRestApp({
   security: appRestSecurity,
-  organizations: () => getApp().organizations,
-  apiKeys: () => getApp().apiKeys,
+  organizations: () => getApp().organizationService,
+  apiKeys: () => getApp().apiKeys.apiKeyService,
   instanceAdminKey: instanceAdminApiKey,
   isSaas: () => getApp().config.isSaas,
   audit: managementAuditPort,

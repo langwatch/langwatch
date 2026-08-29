@@ -62,7 +62,7 @@ const { service, policy } = appRestSecurity.createVersionedApp({
 
 export const app = service
   .provide({
-    organizations: (_base, context) => appFromContext(context).organizations,
+    organizations: (_base, context) => appFromContext(context).organizationService,
     invites: (_base, context) =>
       InviteService.create(prisma, { baseHost: appFromContext(context).config.baseHost }),
     authz: (_base, context) => appFromContext(context).permissions,

@@ -89,7 +89,7 @@ describe("automationRouter.testFireTemplate", () => {
     previousApp = globalForApp.__langwatch_app;
     const app = createTestApp();
     vi.spyOn(app.automation, "testFire").mockImplementation(mockTestFire);
-    vi.spyOn(app.projects, "tryGetSummaryById").mockImplementation(mockProjectGetById);
+    vi.spyOn(app.projects.projectService, "tryGetSummaryById").mockImplementation(mockProjectGetById);
     globalForApp.__langwatch_app = app;
   });
 

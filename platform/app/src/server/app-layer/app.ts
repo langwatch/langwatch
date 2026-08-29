@@ -164,6 +164,42 @@ export class App {
     logCollection: AppDependencies["traces"]["logCollection"];
     metricCollection: AppDependencies["traces"]["metricCollection"];
   }>;
+  /**
+   * The legacy trace read service, raw.
+   *
+   * `/api/v1/traces` asks it for two things `TraceApp` deliberately does not
+   * offer: an arbitrary `dateField` and `projection`, which live on the
+   * process service and not on the portable read port; and a PREVIEW read,
+   * where `TraceApp.readTrace` hard-codes full resolution because #4991 was
+   * a bug about content silently missing. Neither is a gap in the
+   * application — they are a published v1 contract the application chose not
+   * to reproduce.
+   */
+  readonly traceRead: AppDependencies["traces"]["read"];
+  /**
+   * Bulk export, raw. A long-running job that streams a whole tenant to a
+   * file — neither a read a screen makes nor a write a collector makes, so it
+   * belongs to neither `TraceApp` nor `traceIngestion`.
+   */
+  readonly traceExport: AppDependencies["traces"]["export"];
+  /**
+   * The role service in full, raw.
+   *
+   * `RoleApp` is the role-administration surface, and every method on it
+   * proves the caller may administer. The seat-limit guard asks a different
+   * question — what binding does this user already hold — on a path where
+   * there is no administrator, so it reads the service rather than borrowing
+   * an authority it does not have.
+   */
+  readonly roleService: AppDependencies["roles"];
+  /**
+   * The scenario service in full, raw.
+   *
+   * `/api/scenarios` still asks the service directly. It is a legacy family
+   * awaiting the modern builder, and giving it the application now would mean
+   * adapting seven call sites in a family that is about to be rewritten.
+   */
+  readonly scenarioService: AppDependencies["scenarios"];
   readonly evaluations: AppDependencies["evaluations"] & AppCommands["evaluations"];
   /** The ADR-034 analytics read API, and the restricted SQL surface beside it. */
   readonly analytics: AnalyticsApp;
@@ -412,6 +448,10 @@ export class App {
       github: deps.github,
       scope: deps.codingAgentScope,
     });
+    this.traceRead = deps.traces.read;
+    this.traceExport = deps.traces.export;
+    this.roleService = deps.roles;
+    this.scenarioService = deps.scenarios;
     this.traceIngestion = {
       collection: deps.traces.collection,
       logCollection: deps.traces.logCollection,

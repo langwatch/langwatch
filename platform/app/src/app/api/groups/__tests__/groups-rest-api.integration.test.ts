@@ -22,7 +22,7 @@ import { appRestSecurity } from "~/server/api/security";
 
 const { hono: app } = createGroupRestApp({
   security: appRestSecurity,
-  organizations: () => getApp().organizations,
+  organizations: () => getApp().organizationService,
   enterpriseGate: requireEnterprisePlanRest("GROUPS"),
   ledgerActor: orgRequestLedgerActor,
 });

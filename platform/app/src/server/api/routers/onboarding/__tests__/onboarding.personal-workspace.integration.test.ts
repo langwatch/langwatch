@@ -181,7 +181,7 @@ describe("onboarding.initializeOrganization personal workspace", () => {
 
     /** @scenario The personal workspace stays separate from the shared workspace */
     it("is idempotent, so a later CLI login adds no second workspace", async () => {
-      const again = await getApp().organizations.ensurePersonalWorkspace({
+      const again = await getApp().users.ensurePersonalWorkspace({
         userId,
         organizationId,
       });

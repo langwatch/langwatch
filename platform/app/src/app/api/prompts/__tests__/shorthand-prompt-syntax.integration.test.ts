@@ -230,7 +230,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
 
     beforeEach(() => {
       spy = vi
-        .spyOn(getApp().prompts, "tryGetPromptByIdOrHandle")
+        .spyOn(getApp().prompts.promptService, "tryGetPromptByIdOrHandle")
         .mockRejectedValue(new Error("database connection lost"));
     });
 

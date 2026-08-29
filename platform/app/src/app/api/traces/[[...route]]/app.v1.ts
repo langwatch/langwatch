@@ -193,7 +193,7 @@ export function registerTracesRoutes(
         }
       }
 
-      const traceService = c.app.traces.read;
+      const traceService = c.app.traceRead;
       const results = await traceService.getAllTracesForProject(
         {
           ...searchFields,
@@ -385,7 +385,7 @@ export function registerTracesRoutes(
       const protections = await getProtectionsForProject(prisma, {
         projectId: project.id,
       });
-      const traceService = c.app.traces.read;
+      const traceService = c.app.traceRead;
 
       let trace;
       try {
@@ -501,7 +501,7 @@ export function registerTracesRoutes(
       const protections = await getProtectionsForProject(prisma, {
         projectId: project.id,
       });
-      const traceService = c.app.traces.read;
+      const traceService = c.app.traceRead;
 
       let trace;
       try {

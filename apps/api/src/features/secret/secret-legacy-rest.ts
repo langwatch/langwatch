@@ -9,9 +9,9 @@ import {
   secretPublicCreateInputSchema,
   secretPublicRest,
   secretPublicUpdateInputSchema,
-  type SecretService,
   toSecretPublic,
 } from "@langwatch/secret-contract";
+import type { SecretApp } from "@langwatch/secret-server";
 import type { Context, MiddlewareHandler } from "hono";
 import { describeRoute, resolver } from "hono-openapi";
 
@@ -69,7 +69,7 @@ const legacyDeprecationWarning: MiddlewareHandler = async (context, next) => {
  */
 export function createSecretLegacyRestApp(options: {
   security: AppRestSecurity;
-  secrets: () => SecretService;
+  secrets: () => SecretApp;
 }): SecuredApp<{ Variables: AppRestProjectVariables }> {
   const { security, secrets } = options;
 
@@ -166,11 +166,10 @@ export function createSecretLegacyRestApp(options: {
       const input = context.req.valid("json");
       return context.json(
         toSecretPublic(
-          await secrets().create({
-            projectId: project.id,
-            actorId: legacySecretActorId(context),
-            ...input,
-          }),
+          await secrets().create(
+            { projectId: project.id, ...input },
+            { id: legacySecretActorId(context) },
+          ),
         ),
         201,
       );
@@ -208,12 +207,14 @@ export function createSecretLegacyRestApp(options: {
       const project = context.get("project");
       return context.json(
         toSecretPublic(
-          await secrets().update({
-            projectId: project.id,
-            id: context.req.param("id"),
-            value: context.req.valid("json").value,
-            actorId: legacySecretActorId(context),
-          }),
+          await secrets().update(
+            {
+              projectId: project.id,
+              id: context.req.param("id"),
+              value: context.req.valid("json").value,
+            },
+            { id: legacySecretActorId(context) },
+          ),
         ),
       );
     },

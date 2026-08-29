@@ -23,7 +23,7 @@ import { authorizeDirectUpload } from "../direct-upload-auth";
  */
 const app = createDatasetRestApp({
   security: appRestSecurity,
-  dataset: () => getApp().dataset,
+  app: () => getApp().dataset,
   platformUrl,
   authorizeDirectUpload,
 }).hono;

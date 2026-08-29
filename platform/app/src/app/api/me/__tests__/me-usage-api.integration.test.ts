@@ -27,9 +27,9 @@ import { appRestSecurity } from "~/server/api/security";
 
 const { hono: app } = createMeRestApp({
   security: appRestSecurity,
-  governance: () => getApp().governance,
-  organizations: () => getApp().organizations,
-  projects: () => getApp().projects,
+  governance: () => getApp().governanceApp,
+  organizations: () => getApp().organizationService,
+  projects: () => getApp().projects.projectService,
 });
 
 /** Minimal trace_summaries seed — mirrors the PersonalUsageService test helper. */

@@ -92,13 +92,16 @@ describe.skipIf(!hasCredentialsSecret)(
       // the tRPC-style authz ctx here would require seeding matching
       // OrganizationUser/RoleBinding rows for a user this test never
       // otherwise needs, which tests the RBAC layer, not the seam.
-      await app.modelProviders.upsert({
-        projectId,
-        provider: "openai",
-        enabled: true,
-        customKeys: { OPENAI_API_KEY: `sk-openai-${ns}` },
-        scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
-      }, { id: userId });
+      await app.modelProviders.upsert(
+        {
+          projectId,
+          provider: "openai",
+          enabled: true,
+          customKeys: { OPENAI_API_KEY: `sk-openai-${ns}` },
+          scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+        },
+        { id: userId },
+      );
 
       // A real, enabled Codex provider so that if this test regresses, the
       // failure it reproduces is the REPORTED one (the litellm-params
@@ -107,21 +110,24 @@ describe.skipIf(!hasCredentialsSecret)(
       // The Codex token schema requires the full
       // claims-derived key set, not just the two token fields — mirrors
       // CodexAccountService.toKeys().
-      await app.modelProviders.upsert({
-        projectId,
-        provider: "openai_codex",
-        enabled: true,
-        customKeys: {
-          CODEX_ACCESS_TOKEN: `codex-access-${ns}`,
-          CODEX_REFRESH_TOKEN: `codex-refresh-${ns}`,
-          CODEX_ID_TOKEN: `codex-id-token-${ns}`,
-          CODEX_ACCOUNT_ID: `codex-account-${ns}`,
-          CODEX_PLAN: "pro",
-          CODEX_EMAIL: `codex-coding-${ns}@example.com`,
-          CODEX_TOKENS_SAVED_AT: new Date().toISOString(),
+      await app.modelProviders.upsert(
+        {
+          projectId,
+          provider: "openai_codex",
+          enabled: true,
+          customKeys: {
+            CODEX_ACCESS_TOKEN: `codex-access-${ns}`,
+            CODEX_REFRESH_TOKEN: `codex-refresh-${ns}`,
+            CODEX_ID_TOKEN: `codex-id-token-${ns}`,
+            CODEX_ACCOUNT_ID: `codex-account-${ns}`,
+            CODEX_PLAN: "pro",
+            CODEX_EMAIL: `codex-coding-${ns}@example.com`,
+            CODEX_TOKENS_SAVED_AT: new Date().toISOString(),
+          },
+          scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
         },
-        scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
-      }, { id: userId });
+        { id: userId },
+      );
 
       // Exactly the pair codexApplyCodingDefaults writes for FAST, plus a
       // DEFAULT role default so the simulator/judge resolve.

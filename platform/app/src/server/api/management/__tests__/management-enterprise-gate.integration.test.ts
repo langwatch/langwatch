@@ -98,7 +98,7 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
       label: "view-only",
       hasOrgBinding: true,
     });
-    const memberKey = await getApp().apiKeys.create({
+    const memberKey = await getApp().apiKeys.apiKeyService.create({
       name: `mgmt-gate-member-key-${nanoid(6)}`,
       userId: member.userId,
       createdByUserId: member.userId,

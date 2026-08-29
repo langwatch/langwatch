@@ -107,6 +107,7 @@ import {
   type FilesRateLimiter,
   StoredObjectApp,
 } from "@langwatch/stored-object-server";
+import type { SecretApp } from "@langwatch/secret-server";
 import { createSecretLegacyRestApp } from "../features/secret/secret-legacy-rest";
 import { createSuiteRestApp, SuiteApp } from "@langwatch/suite-server";
 import { createWebhookRestApp, WebhookApp } from "@langwatch/enterprise-webhook-server";
@@ -180,7 +181,7 @@ export interface AppRestFeatureServices {
   scenarioTabs: () => ScenarioTabRegistry;
   /** The SCIM provisioning tokens an identity provider authenticates with. */
   scim: () => ScimApp;
-  secrets: () => SecretService;
+  secrets: () => SecretApp;
   simulations: () => SimulationService;
   storedObjectOwners: () => StoredObjectOwnerResolver;
   storedObjects: () => StoredObjectApp;

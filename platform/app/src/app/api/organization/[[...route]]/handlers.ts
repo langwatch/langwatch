@@ -43,7 +43,7 @@ export const updateOrganizationHandler = async (
   });
   await revokeTraceSharesAfterOrganizationSettingsUpdate(
     appFromContext(c).share,
-    appFromContext(c).projects,
+    appFromContext(c).projects.projectService,
     organization.id,
     result,
   );

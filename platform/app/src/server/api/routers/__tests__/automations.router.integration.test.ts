@@ -153,7 +153,7 @@ function persistCapDependencies() {
   const app = globalForApp.__langwatch_app;
   if (!app) throw new Error("test app has not been composed");
   return {
-    projects: app.projects,
+    projects: app.projects.projectService,
     planProvider: app.planProvider,
     config: {
       free: env.TRIGGER_PERSIST_DAILY_CAP_FREE,

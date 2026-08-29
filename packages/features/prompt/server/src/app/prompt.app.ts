@@ -171,6 +171,26 @@ export class PromptApp {
 
   private constructor(private readonly dependencies: PromptAppDependencies) {}
 
+  /**
+   * The prompt service in full, raw, for the credential-authenticated door.
+   *
+   * Every write above takes a `PromptCaller` and stamps `by.id` as the
+   * version's `authorId`, which is a real foreign key to `User`. The public
+   * REST family at `/api/prompts` authenticates an API key, and an API key
+   * need not act for a person — `apiKeyUserId` is optional, and a legacy
+   * project credential carries none at all. There is no id it could pass that
+   * would be both true and valid, and a synthetic one would break the key. It
+   * also calls `syncPrompt`, the CLI's push-with-conflict-detection, which
+   * this application does not model at all.
+   *
+   * So that door reads the service here rather than the application quietly
+   * growing a caller that is allowed to be nobody — the same seam
+   * `ApiKeyApp.apiKeyService` and `ProjectApp.projectService` keep.
+   */
+  get promptService(): PromptService {
+    return this.dependencies.prompts;
+  }
+
   // -- the library -----------------------------------------------------------
 
   /** Every prompt in the project. */

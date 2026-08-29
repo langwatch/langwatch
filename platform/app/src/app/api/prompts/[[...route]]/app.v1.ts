@@ -68,7 +68,7 @@ export function registerPromptRoutes(
       },
     }),
     async (c) => {
-      const service = c.app.prompts;
+      const service = c.app.prompts.promptService;
       const project = c.get("project");
       const organization = c.get("organization");
 
@@ -143,7 +143,7 @@ export function registerPromptRoutes(
     }),
     zValidator("json", z.object({ versionId: z.string() })),
     async (c) => {
-      const service = c.app.prompts;
+      const service = c.app.prompts.promptService;
       const project = c.get("project");
       const organization = c.get("organization");
       const { id, tag } = c.req.param();
@@ -229,7 +229,7 @@ export function registerPromptRoutes(
     }),
     async (c) => {
       const organization = c.get("organization");
-      const tags = await c.app.prompts.listTags({ organizationId: organization.id });
+      const tags = await c.app.prompts.promptService.listTags({ organizationId: organization.id });
 
       return c.json(
         tags.map((tag) => ({
@@ -270,7 +270,7 @@ export function registerPromptRoutes(
       const organization = c.get("organization");
       const { name } = c.req.valid("json");
       try {
-        const tag = await c.app.prompts.createTag({
+        const tag = await c.app.prompts.promptService.createTag({
           organizationId: organization.id,
           name,
         });
@@ -323,7 +323,7 @@ export function registerPromptRoutes(
       const { tag: oldName } = c.req.param();
       const { name: newName } = c.req.valid("json");
       try {
-        const tag = await c.app.prompts.renameTag({
+        const tag = await c.app.prompts.promptService.renameTag({
           organizationId: organization.id,
           oldName,
           newName,
@@ -368,7 +368,7 @@ export function registerPromptRoutes(
       const organization = c.get("organization");
       const { tag: tagName } = c.req.param();
       try {
-        const tag = await c.app.prompts.tryDeleteTagByName({
+        const tag = await c.app.prompts.promptService.tryDeleteTagByName({
           organizationId: organization.id,
           name: tagName,
         });
@@ -415,7 +415,7 @@ export function registerPromptRoutes(
       },
     }),
     async (c) => {
-      const service = c.app.prompts;
+      const service = c.app.prompts.promptService;
       const project = c.get("project");
       const organization = c.get("organization");
       const { id } = c.req.param();
@@ -468,7 +468,7 @@ export function registerPromptRoutes(
       },
     }),
     async (c) => {
-      const service = c.app.prompts;
+      const service = c.app.prompts.promptService;
       const project = c.get("project");
       const organization = c.get("organization");
       const { id, versionId } = c.req.param();
@@ -559,7 +559,7 @@ export function registerPromptRoutes(
       },
     }),
     async (c) => {
-      const service = c.app.prompts;
+      const service = c.app.prompts.promptService;
       const project = c.get("project");
       const organization = c.get("organization");
       const { id } = c.req.param();
@@ -650,7 +650,7 @@ export function registerPromptRoutes(
     }),
     zValidator("json", createPromptInputSchema),
     async (c) => {
-      const service = c.app.prompts;
+      const service = c.app.prompts.promptService;
       const project = c.get("project");
       const organization = c.get("organization");
       const { tags, ...data } = c.req.valid("json");
@@ -777,7 +777,7 @@ export function registerPromptRoutes(
       }),
     ),
     async (c) => {
-      const service = c.app.prompts;
+      const service = c.app.prompts.promptService;
       const project = c.get("project");
       const organization = c.get("organization");
       const { id } = c.req.param();
@@ -882,7 +882,7 @@ export function registerPromptRoutes(
     }),
     zValidator("json", updatePromptInputSchema),
     async (c) => {
-      const service = c.app.prompts;
+      const service = c.app.prompts.promptService;
       const project = c.get("project");
       const organization = c.get("organization");
       const { id } = c.req.param();
@@ -1003,7 +1003,7 @@ export function registerPromptRoutes(
       },
     }),
     async (c) => {
-      const service = c.app.prompts;
+      const service = c.app.prompts.promptService;
       const project = c.get("project");
       const organization = c.get("organization");
       const { id } = c.req.param();

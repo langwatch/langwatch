@@ -18,9 +18,9 @@ import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 
 const { hono: app } = createTeamsRestApp({
   security: appRestSecurity,
-  organizations: () => getApp().organizations,
+  organizations: () => getApp().organizationService,
   permissions: () => getApp().permissions,
-  projects: () => getApp().projects,
+  projects: () => getApp().projects.projectService,
   ledgerActor: orgRequestLedgerActor,
 });
 

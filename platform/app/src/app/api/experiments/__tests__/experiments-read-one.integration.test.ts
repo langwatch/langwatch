@@ -28,7 +28,7 @@ import { appRestSecurity } from "~/server/api/security";
 /** The family as the API router mounts it. */
 const app = createExperimentsRestApp({
   security: appRestSecurity,
-  experiments: () => getApp().experiments,
+  app: () => getApp().experiments,
 }).hono;
 
 /**
