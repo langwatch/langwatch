@@ -1,4 +1,4 @@
-import type { SignInMethod } from "@langwatch/identity";
+import type { SignInMethod } from "@langwatch/identity-contract";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { authClient, navigate, safeRedirectTarget } from "~/utils/auth-client";

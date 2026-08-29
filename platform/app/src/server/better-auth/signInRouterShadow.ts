@@ -1,5 +1,5 @@
 import { resolveAuthProvider } from "~/runtime/app/features/sso";
-import { compareToLegacy } from "@langwatch/identity";
+import { compareToLegacy } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
 import { signInRouter } from "~/server/app-layer/identity/runtime";

@@ -9,7 +9,7 @@ import {
   DOMAIN_CLAIMED_EVENT_TYPE,
   DOMAIN_VERIFIED_EVENT_TYPE,
   TEARDOWN_REQUESTED_EVENT_TYPE,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 import type {
   ProjectionStoreContext,

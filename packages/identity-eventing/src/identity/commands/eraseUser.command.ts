@@ -2,7 +2,7 @@ import {
   ERASE_USER_COMMAND_TYPE,
   type EraseUserCommandData,
   eraseUserCommandDataSchema,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type { IdentityGuards } from "@langwatch/identity-server";
 import {
   type Command,

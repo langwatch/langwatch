@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import { normalizeIdentifierValue } from "@langwatch/identity";
+import { normalizeIdentifierValue } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import type { UserService } from "@langwatch/user-contract";
 import type { GenericEndpointContext } from "better-auth";

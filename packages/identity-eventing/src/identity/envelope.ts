@@ -6,7 +6,7 @@ import {
   MFA_EVENT_VERSION_LATEST,
   type MfaCommand,
   type MfaFactInput,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
 import { USER_IDENTITY_AGGREGATE_TYPE } from "./schemas/constants";
 import type { IdentityEvent } from "./schemas/events";

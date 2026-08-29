@@ -3,7 +3,7 @@ import type {
   MfaEnrollmentLifecycleState,
   MfaEnrollmentState,
   MfaMethod,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type { MfaEnrollment, PrismaClient } from "~/generated/prisma/client";
 import type { MfaFoldState } from "@langwatch/identity-eventing";
 import type {

@@ -2,7 +2,7 @@ import {
   VERIFY_IDENTIFIER_COMMAND_TYPE,
   type VerifyIdentifierCommandData,
   verifyIdentifierCommandDataSchema,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type { IdentityGuards } from "@langwatch/identity-server";
 import {
   type Command,

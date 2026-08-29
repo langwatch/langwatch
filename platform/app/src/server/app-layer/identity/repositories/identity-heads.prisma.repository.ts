@@ -1,4 +1,4 @@
-import type { IdentifierFact, IdentityHeads } from "@langwatch/identity";
+import type { IdentifierFact, IdentityHeads } from "@langwatch/identity-contract";
 import type { IdentityHeadsRepository } from "@langwatch/identity-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { rowToFact } from "./identifier-row";

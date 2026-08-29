@@ -2,7 +2,7 @@ import {
   ATTACH_IDENTIFIER_COMMAND_TYPE,
   type AttachIdentifierCommandData,
   attachIdentifierCommandDataSchema,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type { IdentityGuards } from "@langwatch/identity-server";
 import {
   type Command,

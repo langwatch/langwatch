@@ -2,7 +2,7 @@ import {
   ATTACH_IDENTIFIER_COMMAND_TYPE,
   emptyIdentityHeads,
   reduceIdentity,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import {
   IdentityGuards,
   type IdentityHeadsRepository,

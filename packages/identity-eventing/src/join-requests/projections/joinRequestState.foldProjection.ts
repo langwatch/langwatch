@@ -2,7 +2,7 @@ import {
   emptyJoinRequest,
   type JoinRequestAggregateState,
   reduceJoinRequest,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,

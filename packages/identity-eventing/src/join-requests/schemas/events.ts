@@ -9,7 +9,7 @@ import {
   joinRejectedPayloadSchema,
   joinRequestedPayloadSchema,
   joinWithdrawnPayloadSchema,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import { z } from "zod";
 import { EventSchema } from "@langwatch/eventing";
 

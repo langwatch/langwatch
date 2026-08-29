@@ -2,7 +2,7 @@ import {
   emptyIdentityHeads,
   type IdentifierFact,
   type IdentityHeads,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import {
   IdentityGuards,
   type IdentityHeadsRepository,

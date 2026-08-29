@@ -20,7 +20,7 @@ import {
   SsoConnectionStringEditRetiredError,
   SsoConnectionTeardownStrandsUsersError,
   SsoSamlNotSelfServeError,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 import {
   explainAnyError,

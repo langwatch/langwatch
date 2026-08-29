@@ -3,7 +3,7 @@ import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * ADR-115's boundaries as graph facts (specs/identity/identity-packages.feature).
+ * ADR-115's boundaries as graph facts (packages/features/identity/specs/package-boundary.feature).
  * A folder cannot fail to resolve; a package can, and this test is where
  * the app states what each package may reach and what only the runtime may
  * construct. Deliberately a plain text scan over the sources: an import is
@@ -13,11 +13,13 @@ import { describe, expect, it } from "vitest";
 
 const APP_SRC = join(__dirname, "..", "..");
 const REPO_ROOT = join(APP_SRC, "..", "..", "..");
-const IDENTITY_SRC = join(REPO_ROOT, "packages", "identity", "src");
+const IDENTITY_SRC = join(REPO_ROOT, "packages", "features", "identity", "contract", "src");
 const IDENTITY_SERVER_SRC = join(
   REPO_ROOT,
   "packages",
-  "identity-server",
+  "features",
+  "identity",
+  "server",
   "src",
 );
 const IDENTITY_EVENTING_SRC = join(
@@ -151,7 +153,7 @@ describe("identity package boundaries", () => {
       for (const file of sourceFiles(join(APP_SRC, "server", "better-auth"))) {
         for (const specifier of importSpecifiers(file)) {
           // The PURE package is deliberately not in this set. The feature's
-          // own premise is that `@langwatch/identity` "stays importable by
+          // own premise is that `@langwatch/identity-contract` "stays importable by
           // the frontend" — it is vocabulary, facts and pure functions, and a
           // rule that let a browser bundle import it while forbidding
           // better-auth would be saying two different things about the same

@@ -397,7 +397,7 @@ here.
 
 Specs: `specs/identity/identifier-model.feature` keeps its 22 scenarios;
 the `@scenario` bindings move with the tests. A new
-`specs/identity/identity-packages.feature` states the boundaries as
+`packages/features/identity/specs/package-boundary.feature` states the boundaries as
 behaviour (`@unit`, bound to a graph-walking test in the `frontend-boundary`
 style): the pure package compiles without node types; identity-server
 imports no Prisma, env, or framework module; `better-auth/` reaches
@@ -525,3 +525,44 @@ package boundary refuses at the compiler and a folder merely frowns at.
 - `dev/docs/best_practices/repository-service.md`
 - `specs/identity/identifier-model.feature`, `specs/identity/auth-path-redis-loss.feature`
 - PR #7333
+
+## Amendment: identity ships as a feature (2026-08-29)
+
+The boundaries above stand. Where the packages live does not.
+
+`packages/authz` and `packages/authz-server` — the reference shape this ADR
+copied — have since moved to `packages/features/authz/{contract,server}`, and
+the strict feature layout that established is what every other feature follows.
+Identity was the last vertical still beside the shared infrastructure packages,
+so the feature catalogue, the layout checks and the per-feature CI job all
+skipped it.
+
+| ADR-115 said            | Now                                   |
+| ----------------------- | ------------------------------------- |
+| `packages/identity`     | `packages/features/identity/contract` |
+| `packages/identity-server` | `packages/features/identity/server` |
+
+`@langwatch/identity` is therefore `@langwatch/identity-contract`: the layout
+derives a package's name from its role, so a package at
+`packages/features/<feature>/<role>` must be `@langwatch/<feature>-<role>`.
+`@langwatch/identity-server` already matched. Everything this ADR decided about
+what each package may import, and in which direction, is unchanged — the rename
+touched 855 module specifiers and nothing else.
+
+`@langwatch/identity-eventing` did NOT move, and the reason is worth stating
+here because this ADR is where someone will look for it. The layout has three
+roles — contract, server, web — and event-sourcing code normally belongs in
+`server`; the strict layout has `projections/`, `processes/`, `intents/`,
+`stores/` and `subscribers/` for exactly that. But `identity-contract` and
+`identity-server` are on `zod@^3.25.76` while `identity-eventing` is on
+`zod@^4.4.3`, and one package cannot hold both majors: schemas built on one
+side stop satisfying `instanceof` on the other, which surfaces as a 500 rather
+than as a type error. Folding it in would also contradict this ADR's own rule
+that the server runtime never imports the event-sourcing framework — the reason
+the package was split out. So it stays at the root until the zod versions align.
+
+The feature's own record is
+[`packages/features/identity/adrs/001-identity-ships-as-a-feature.md`](../../../packages/features/identity/adrs/001-identity-ships-as-a-feature.md),
+and the behavioural contract moved with the packages, from
+`specs/identity/identity-packages.feature` to
+`packages/features/identity/specs/package-boundary.feature`.

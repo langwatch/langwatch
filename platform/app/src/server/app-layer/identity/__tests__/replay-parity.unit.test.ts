@@ -20,7 +20,7 @@ import {
   type IdentityFact,
   type IdentityHeads,
   reduceIdentity,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 import {
   factToRow,

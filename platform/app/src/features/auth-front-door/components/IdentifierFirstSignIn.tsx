@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
-import type { RoutingDecision, SignInMethod } from "@langwatch/identity";
+import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
 import { useEffect, useRef, useState } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
 import { HandledErrorAlert } from "~/features/errors";

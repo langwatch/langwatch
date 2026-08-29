@@ -6,7 +6,7 @@ import type {
   SsoDomainVerification,
   SsoIdpMetadata,
   SsoVerificationMethod,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type {
   Prisma,
   PrismaClient,

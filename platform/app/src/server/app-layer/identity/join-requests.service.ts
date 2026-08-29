@@ -17,7 +17,7 @@ import {
   normalizeDomain,
   organizationAdmitsDomain,
   resolveJoinLookup,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type {
   JoinCandidateRepository,
   JoinRequestService,

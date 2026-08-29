@@ -1,5 +1,5 @@
 import { Box } from "@chakra-ui/react";
-import type { SignInMethod } from "@langwatch/identity";
+import type { SignInMethod } from "@langwatch/identity-contract";
 import { Fingerprint, KeyRound, Mail } from "lucide-react";
 import type { ReactNode } from "react";
 import { GitHub } from "~/components/icons/GitHub";

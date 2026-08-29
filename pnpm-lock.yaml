@@ -2254,9 +2254,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
-      '@langwatch/identity':
+      '@langwatch/identity-contract':
         specifier: workspace:*
-        version: link:../../../identity
+        version: link:../../identity/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../observability
@@ -3746,6 +3746,59 @@ importers:
         specifier: ^4.1.9
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
+  packages/features/identity/contract:
+    dependencies:
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../handled-error
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^26
+        version: 26.2.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/features/identity/server:
+    dependencies:
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../handled-error
+      '@langwatch/identity-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@langwatch/ksuid':
+        specifier: ^2.0.2
+        version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../observability
+      nanoid:
+        specifier: ^6.0.0
+        version: 6.0.0
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^26
+        version: 26.2.0
+      better-auth:
+        specifier: ^1.7.1
+        version: 1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.15.3)(pg@8.22.0)(prisma@7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@4.1.10)
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
   packages/features/langy/contract:
     dependencies:
       '@langwatch/handled-error':
@@ -4317,9 +4370,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
-      '@langwatch/identity':
+      '@langwatch/identity-contract':
         specifier: workspace:*
-        version: link:../../../identity
+        version: link:../../identity/contract
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../contract
@@ -5592,9 +5645,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
-      '@langwatch/identity':
+      '@langwatch/identity-contract':
         specifier: workspace:*
-        version: link:../../../identity
+        version: link:../../identity/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../observability
@@ -5885,36 +5938,17 @@ importers:
         specifier: ^4.1.9
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
-  packages/identity:
-    dependencies:
-      '@langwatch/handled-error':
-        specifier: workspace:*
-        version: link:../handled-error
-      zod:
-        specifier: ^3.25.76
-        version: 3.25.76
-    devDependencies:
-      '@types/node':
-        specifier: ^26
-        version: 26.2.0
-      typescript:
-        specifier: ^7.0.2
-        version: 7.0.2
-      vitest:
-        specifier: ^4.1.9
-        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
-
   packages/identity-eventing:
     dependencies:
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../eventing
-      '@langwatch/identity':
+      '@langwatch/identity-contract':
         specifier: workspace:*
-        version: link:../identity
+        version: link:../features/identity/contract
       '@langwatch/identity-server':
         specifier: workspace:*
-        version: link:../identity-server
+        version: link:../features/identity/server
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability
@@ -5925,40 +5959,6 @@ importers:
       '@types/node':
         specifier: ^26
         version: 26.2.0
-      typescript:
-        specifier: ^7.0.2
-        version: 7.0.2
-      vitest:
-        specifier: ^4.1.9
-        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
-
-  packages/identity-server:
-    dependencies:
-      '@langwatch/handled-error':
-        specifier: workspace:*
-        version: link:../handled-error
-      '@langwatch/identity':
-        specifier: workspace:*
-        version: link:../identity
-      '@langwatch/ksuid':
-        specifier: ^2.0.2
-        version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
-      '@langwatch/observability':
-        specifier: workspace:*
-        version: link:../observability
-      nanoid:
-        specifier: ^6.0.0
-        version: 6.0.0
-      zod:
-        specifier: ^3.25.76
-        version: 3.25.76
-    devDependencies:
-      '@types/node':
-        specifier: ^26
-        version: 26.2.0
-      better-auth:
-        specifier: ^1.7.1
-        version: 1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.15.3)(pg@8.22.0)(prisma@7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@4.1.10)
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -6507,15 +6507,15 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../packages/handled-error
-      '@langwatch/identity':
+      '@langwatch/identity-contract':
         specifier: workspace:*
-        version: link:../../packages/identity
+        version: link:../../packages/features/identity/contract
       '@langwatch/identity-eventing':
         specifier: workspace:*
         version: link:../../packages/identity-eventing
       '@langwatch/identity-server':
         specifier: workspace:*
-        version: link:../../packages/identity-server
+        version: link:../../packages/features/identity/server
       '@langwatch/ksuid':
         specifier: ^2.0.2
         version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
@@ -17856,9 +17856,6 @@ packages:
     resolution: {integrity: sha512-xRXBn0pPqQTVQiC8wyQrKs2MOlX24zQ0POGaj0kultvoOCstBQM5yvOhAVSUwOMjQtTvsPWoNCHfPGwaaQJhTw==}
     engines: {node: '>= 18'}
 
-  set-cookie-parser@3.1.1:
-    resolution: {integrity: sha512-vM9SUhjsUYs6UeJUmygc5Ofm5eQGe85riob5ju6XCgFGJI5PLV4nrDAQpQjd+LkFBpAkADn5BQQpZ9EUNkyLuA==}
-
   set-cookie-parser@3.1.2:
     resolution: {integrity: sha512-5/r/lTwbJ3zQ+qwdUFZYeRNqda7P5HD8zQKqlSjdGt1/S0cjLAphHusj4Y58ahDtWn/g32xrIS58/ikOvwl0Lw==}
 
@@ -26607,7 +26604,7 @@ snapshots:
       '@better-auth/utils': 0.5.0
       '@better-fetch/fetch': 1.3.1
       rou3: 0.7.12
-      set-cookie-parser: 3.1.1
+      set-cookie-parser: 3.1.2
     optionalDependencies:
       zod: 4.4.3
 
@@ -28441,7 +28438,7 @@ snapshots:
   headers-polyfill@5.0.1:
     dependencies:
       '@types/set-cookie-parser': 2.4.10
-      set-cookie-parser: 3.1.1
+      set-cookie-parser: 3.1.2
 
   help-me@5.0.0: {}
 
@@ -31977,8 +31974,6 @@ snapshots:
       send: 1.2.1
     transitivePeerDependencies:
       - supports-color
-
-  set-cookie-parser@3.1.1: {}
 
   set-cookie-parser@3.1.2: {}
 

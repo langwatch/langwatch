@@ -6,7 +6,7 @@ import {
   IdentityEmailInUseError,
   type IdentityFactInput,
   normalizeIdentifierValue,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import {
   adoptUserEmailCommandId,
   deriveNewbornUserId,

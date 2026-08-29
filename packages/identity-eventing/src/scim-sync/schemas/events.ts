@@ -13,7 +13,7 @@ import {
   scimTokenIssuedPayloadSchema,
   scimTokenRevokedPayloadSchema,
   scimUserPushedPayloadSchema,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import { z } from "zod";
 import { EventSchema } from "@langwatch/eventing";
 

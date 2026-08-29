@@ -31,7 +31,7 @@ import {
   REJECT_JOIN_COMMAND_TYPE,
   REQUEST_JOIN_COMMAND_TYPE,
   WITHDRAW_JOIN_COMMAND_TYPE,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type { JoinRequestLedger } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import { tryGetApp } from "~/server/app-layer/app";

@@ -2,7 +2,7 @@ import {
   MARK_PRIMARY_COMMAND_TYPE,
   type MarkPrimaryCommandData,
   markPrimaryCommandDataSchema,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type { IdentityGuards } from "@langwatch/identity-server";
 import {
   type Command,

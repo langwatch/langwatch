@@ -1,4 +1,4 @@
-import type { BackfillIdentifierRow } from "@langwatch/identity";
+import type { BackfillIdentifierRow } from "@langwatch/identity-contract";
 import type {
   BackfillAccountRow,
   BackfillUserRow,

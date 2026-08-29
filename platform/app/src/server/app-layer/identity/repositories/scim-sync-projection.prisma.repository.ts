@@ -3,7 +3,7 @@ import type {
   ScimSyncFailure,
   ScimSyncLifecycleState,
   ScimSyncState,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type { ScimSyncReadRepository } from "@langwatch/identity-server";
 import type { Prisma, PrismaClient, ScimSyncState as ScimSyncRow } from "~/generated/prisma/client";
 import type { ScimSyncFoldState } from "@langwatch/identity-eventing";

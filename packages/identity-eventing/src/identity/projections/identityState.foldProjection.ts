@@ -2,7 +2,7 @@ import {
   emptyIdentityHeads,
   type IdentityHeads,
   reduceIdentity,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,

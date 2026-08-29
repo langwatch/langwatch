@@ -1,5 +1,5 @@
 import { Alert, Badge, HStack, Text, VStack } from "@chakra-ui/react";
-import type { SignInMethod } from "@langwatch/identity";
+import type { SignInMethod } from "@langwatch/identity-contract";
 import type { ReactNode } from "react";
 import { signInMethodActionLabel } from "../logic/methodLabels";
 import { signInRoutingReasonCopy } from "../logic/routingReasonCopy";

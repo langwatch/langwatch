@@ -34,7 +34,7 @@ import {
   type ScimSyncCommand,
   type ScimSyncCommandType,
   type ScimSyncFactInput,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type { ScimSyncLedger } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import { tryGetApp } from "~/server/app-layer/app";

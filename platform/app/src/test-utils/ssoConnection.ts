@@ -16,7 +16,7 @@
  * `sso-connection-grandfather.integration.test.ts` makes for the same reason.
  */
 import { createTenantId } from "@langwatch/eventing";
-import { emptySsoConnection } from "@langwatch/identity";
+import { emptySsoConnection } from "@langwatch/identity-contract";
 import { newSsoConnectionId } from "@langwatch/identity-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { PrismaSsoConnectionProjectionRepository } from "~/server/app-layer/identity/repositories/sso-connection-projection.prisma.repository";

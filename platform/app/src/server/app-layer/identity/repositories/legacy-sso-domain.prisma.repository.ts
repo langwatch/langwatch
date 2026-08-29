@@ -1,4 +1,4 @@
-import type { RoutableConnection, SignInMethod } from "@langwatch/identity";
+import type { RoutableConnection, SignInMethod } from "@langwatch/identity-contract";
 import type { SignInDomainRoutingPort } from "@langwatch/identity-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 

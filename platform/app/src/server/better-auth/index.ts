@@ -16,7 +16,7 @@ import {
 } from "@langwatch/enterprise-sso-contract";
 import { createLogger } from "@langwatch/observability";
 import type { AuthService } from "@langwatch/auth-contract";
-import type { SignInMethodPolicy } from "@langwatch/identity";
+import type { SignInMethodPolicy } from "@langwatch/identity-contract";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { UserService } from "@langwatch/user-contract";
 import type { EmailDeliveryPort } from "~/server/mailer/providers/types";

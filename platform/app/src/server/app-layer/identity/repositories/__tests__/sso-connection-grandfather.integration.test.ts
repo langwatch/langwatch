@@ -1,4 +1,4 @@
-import type { SignInMethod } from "@langwatch/identity";
+import type { SignInMethod } from "@langwatch/identity-contract";
 import type { SsoConnectionLedger } from "@langwatch/identity-server";
 import {
   SsoConnectionGrandfatherService,

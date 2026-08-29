@@ -3,7 +3,7 @@ import {
   type IdentifierFact,
   type IdentifierLifecycleState,
   identifierProviderSchema,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 
 /**
  * The `Identifier` row ⇄ `IdentifierFact` mapping every identity repository

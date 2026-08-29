@@ -4,7 +4,7 @@ import {
   JOIN_REJECTED_EVENT_TYPE,
   JOIN_REQUESTED_EVENT_TYPE,
   JOIN_WITHDRAWN_EVENT_TYPE,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type { JoinRequestGuards } from "@langwatch/identity-server";
 import {
   definePipeline,

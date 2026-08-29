@@ -8,7 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { DomainJoinSetting } from "@langwatch/identity";
+import type { DomainJoinSetting } from "@langwatch/identity-contract";
 import { useState } from "react";
 
 /**

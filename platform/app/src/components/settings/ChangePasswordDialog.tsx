@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   PASSWORD_REQUIREMENTS_HINT,
   passwordProblem,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -17,7 +17,7 @@ import { Dialog } from "../ui/dialog";
 import { toaster } from "../ui/toaster";
 
 /**
- * The rules come from `@langwatch/identity`, which both mutations behind this
+ * The rules come from `@langwatch/identity-contract`, which both mutations behind this
  * dialog read too, so the form cannot accept what the server refuses. Asked as
  * a refinement rather than restated as a `min(8)` for the same reason:
  * restating them is how they drift, and this dialog had drifted — it enforced

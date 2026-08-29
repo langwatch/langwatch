@@ -18,7 +18,7 @@
  * never read from ambient state, which is what lets one operation serve a
  * browser session and a background caller without knowing which it is serving.
  */
-import type { RoutingDecision } from "@langwatch/identity";
+import type { RoutingDecision } from "@langwatch/identity-contract";
 
 /**
  * The authenticated principal, where there is one. Two of the front door's

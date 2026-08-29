@@ -1,4 +1,4 @@
-import { SsoConnectionStringEditRetiredError } from "@langwatch/identity";
+import { SsoConnectionStringEditRetiredError } from "@langwatch/identity-contract";
 import { env } from "~/env.mjs";
 
 /**

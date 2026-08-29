@@ -42,7 +42,7 @@ import {
   VERIFY_DOMAIN_COMMAND_TYPE,
   type VerifyDomainCommandData,
   verifyDomainCommandDataSchema,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type { SsoConnectionGuards } from "@langwatch/identity-server";
 import type { ZodTypeAny, z } from "zod";
 import {

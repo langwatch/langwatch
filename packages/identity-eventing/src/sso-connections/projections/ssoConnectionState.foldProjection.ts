@@ -2,7 +2,7 @@ import {
   emptySsoConnection,
   reduceSsoConnection,
   type SsoConnectionState,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,

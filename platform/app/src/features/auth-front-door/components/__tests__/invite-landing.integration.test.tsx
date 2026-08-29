@@ -7,7 +7,7 @@
  *        specs/identity/resilient-invitations.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { RoutingDecision } from "@langwatch/identity";
+import type { RoutingDecision } from "@langwatch/identity-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";

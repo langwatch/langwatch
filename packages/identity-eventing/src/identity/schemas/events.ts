@@ -13,7 +13,7 @@ import {
   primaryChangedPayloadSchema,
   USER_ERASED_EVENT_TYPE,
   userErasedPayloadSchema,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import { z } from "zod";
 import { EventSchema } from "@langwatch/eventing";
 

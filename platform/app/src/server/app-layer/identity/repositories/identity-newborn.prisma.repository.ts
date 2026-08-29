@@ -1,4 +1,4 @@
-import { IdentityEmailInUseError } from "@langwatch/identity";
+import { IdentityEmailInUseError } from "@langwatch/identity-contract";
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../migration-name";
 

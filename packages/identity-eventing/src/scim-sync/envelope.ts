@@ -2,7 +2,7 @@ import {
   SCIM_SYNC_EVENT_VERSION_LATEST,
   type ScimSyncCommand,
   type ScimSyncFactInput,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
 import { SCIM_SYNC_AGGREGATE_TYPE } from "./schemas/constants";
 import type { ScimSyncEvent } from "./schemas/events";

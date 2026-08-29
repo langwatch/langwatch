@@ -2,7 +2,7 @@ import {
   emptyMfaEnrollment,
   type MfaEnrollmentState,
   reduceMfaEnrollment,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,

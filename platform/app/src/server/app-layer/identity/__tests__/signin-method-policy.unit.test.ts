@@ -36,7 +36,7 @@ vi.mock("~/runtime/app/features/sso", () => ({
   resolveAuthProvider: resolveAuthProviderMock,
 }));
 
-import { routeSignIn } from "@langwatch/identity";
+import { routeSignIn } from "@langwatch/identity-contract";
 import {
   deploymentIsFederationCapable,
   LOCAL_METHOD_SET,

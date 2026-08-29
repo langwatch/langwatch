@@ -1,8 +1,8 @@
-import type { IdentifierFact } from "@langwatch/identity";
+import type { IdentifierFact } from "@langwatch/identity-contract";
 import {
   isLiveIdentifierState,
   LIVE_IDENTIFIER_STATES,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type { IdentityReservationRepository } from "@langwatch/identity-server";
 import { issuerForProviderId } from "@langwatch/identity-server/better-auth";
 import { createLogger } from "@langwatch/observability";

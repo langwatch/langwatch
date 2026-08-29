@@ -9,7 +9,7 @@
  *
  * Corresponds to specs/identity/identifier-model.feature.
  */
-import { IdentityVerificationInvalidError } from "@langwatch/identity";
+import { IdentityVerificationInvalidError } from "@langwatch/identity-contract";
 import type { TRPCError } from "@trpc/server";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { beforeEach, describe, expect, it, vi } from "vitest";

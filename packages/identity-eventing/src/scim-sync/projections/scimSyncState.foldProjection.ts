@@ -2,7 +2,7 @@ import {
   emptyScimSync,
   reduceScimSync,
   type ScimSyncState,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,

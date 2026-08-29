@@ -5,7 +5,7 @@ import {
   isPublicEmailDomain,
   type JoinCandidateOrganization,
   type JoinRequestAggregateState,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type {
   JoinCandidateRepository,
   JoinRequestReadRepository,

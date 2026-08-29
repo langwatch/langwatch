@@ -1,6 +1,6 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import { DEFAULT_DOMAIN_JOIN_SETTING, type DomainJoinSetting } from "@langwatch/identity";
+import { DEFAULT_DOMAIN_JOIN_SETTING, type DomainJoinSetting } from "@langwatch/identity-contract";
 import { newJoinRequestCommandId } from "@langwatch/identity-server";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";

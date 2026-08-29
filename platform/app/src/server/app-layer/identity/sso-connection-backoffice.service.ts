@@ -3,7 +3,7 @@ import {
   type SsoConnectionState,
   type SsoDomainVerification,
   SsoSamlNotSelfServeError,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type { SsoConnectionService } from "@langwatch/identity-server";
 import {
   newSsoConnectionCommandId,

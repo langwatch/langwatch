@@ -1,4 +1,4 @@
-import type { SignInMethod } from "@langwatch/identity";
+import type { SignInMethod } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { LegacySsoDomainRoutingRepository } from "../legacy-sso-domain.prisma.repository";

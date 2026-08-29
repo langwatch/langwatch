@@ -28,7 +28,7 @@ const { loggerMock } = vi.hoisted(() => ({
 vi.mock("@langwatch/observability", () => ({ createLogger: () => loggerMock }));
 
 import { resolveAuthProvider } from "~/runtime/app/features/sso";
-import type { RoutingDecision, SignInMethod } from "@langwatch/identity";
+import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
 import { env } from "~/env.mjs";
 import { runSignInRouterShadow } from "../signInRouterShadow";
 

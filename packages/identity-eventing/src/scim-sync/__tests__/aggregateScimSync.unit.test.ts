@@ -2,7 +2,7 @@ import {
   emptyScimSync,
   type ScimSyncState,
   scimSyncIdFor,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import { ScimSyncGuards } from "@langwatch/identity-server";
 import { describe, expect, it } from "vitest";
 import {

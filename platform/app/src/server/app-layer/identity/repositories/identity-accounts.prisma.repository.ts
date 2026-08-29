@@ -1,4 +1,4 @@
-import { LIVE_IDENTIFIER_STATES } from "@langwatch/identity";
+import { LIVE_IDENTIFIER_STATES } from "@langwatch/identity-contract";
 import type {
   IdentityAccountRow,
   IdentityAccountSecrets,

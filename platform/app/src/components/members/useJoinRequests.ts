@@ -1,4 +1,4 @@
-import type { DomainJoinSetting } from "@langwatch/identity";
+import type { DomainJoinSetting } from "@langwatch/identity-contract";
 import { useCallback, useMemo, useState } from "react";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";

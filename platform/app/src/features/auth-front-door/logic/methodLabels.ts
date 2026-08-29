@@ -1,4 +1,4 @@
-import type { SignInMethod } from "@langwatch/identity";
+import type { SignInMethod } from "@langwatch/identity-contract";
 
 /**
  * What a sign-in method is called on screen.

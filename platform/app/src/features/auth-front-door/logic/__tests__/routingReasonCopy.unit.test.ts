@@ -1,4 +1,4 @@
-import { SIGNIN_ROUTING_REASON_CODES } from "@langwatch/identity";
+import { SIGNIN_ROUTING_REASON_CODES } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
 import {

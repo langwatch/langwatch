@@ -8,7 +8,7 @@
  * Covers @integration scenarios from specs/identity/resilient-invitations.feature
  */
 
-import { normalizeIdentifierValue } from "@langwatch/identity";
+import { normalizeIdentifierValue } from "@langwatch/identity-contract";
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {

@@ -45,7 +45,7 @@
  *       specs/settings/user-avatar.feature.
  */
 import type { AuthzDeclaration } from "@langwatch/authz-contract";
-import { passwordProblem } from "@langwatch/identity";
+import { passwordProblem } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import { ValidationError } from "@langwatch/handled-error";
 import {

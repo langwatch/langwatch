@@ -5,7 +5,7 @@ import {
   type MfaEnrollmentState,
   type MfaFact,
   reduceMfaEnrollment,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import {
   type MfaEnrollmentRepository,
   MfaGuards,

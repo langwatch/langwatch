@@ -10,7 +10,7 @@ import {
   recordScimUserPushCommandDataSchema,
   revokeScimSyncCommandDataSchema,
   type ScimSyncCommand,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type { ScimSyncGuards } from "@langwatch/identity-server";
 import type { ZodTypeAny, z } from "zod";
 import {

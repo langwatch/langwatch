@@ -2,7 +2,7 @@ import {
   isPublicEmailDomain,
   type JoinLookupDecision,
   joinDomainOf,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 
 /**
  * Join before create: the seam D13 left and D12 fills (ADR-117 §6).

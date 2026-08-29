@@ -2,7 +2,7 @@ import {
   SSO_CONNECTION_EVENT_VERSION_LATEST,
   type SsoConnectionCommand,
   type SsoConnectionFactInput,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
 import { SSO_CONNECTION_AGGREGATE_TYPE } from "./schemas/constants";
 import type { SsoConnectionEvent } from "./schemas/events";

@@ -1,5 +1,5 @@
 import { platformSSOAllowed, resolveAuthProvider } from "~/runtime/app/features/sso";
-import type { SignInMethod, SignInMethodPolicy } from "@langwatch/identity";
+import type { SignInMethod, SignInMethodPolicy } from "@langwatch/identity-contract";
 import type { SignInMethodPolicyPort } from "@langwatch/identity-server";
 import { env } from "~/env.mjs";
 

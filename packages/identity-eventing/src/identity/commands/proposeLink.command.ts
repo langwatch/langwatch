@@ -2,7 +2,7 @@ import {
   PROPOSE_LINK_COMMAND_TYPE,
   type ProposeLinkCommandData,
   proposeLinkCommandDataSchema,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type { IdentityGuards } from "@langwatch/identity-server";
 import {
   type Command,

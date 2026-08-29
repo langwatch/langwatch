@@ -2,7 +2,7 @@ import {
   type RoutableConnection,
   routingStateOf,
   type SignInMethod,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type { SignInDomainRoutingPort } from "@langwatch/identity-server";
 import type { PrismaClient, SsoConnection } from "~/generated/prisma/client";
 

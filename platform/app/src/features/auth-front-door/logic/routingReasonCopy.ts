@@ -1,4 +1,4 @@
-import type { SignInRoutingReasonCode } from "@langwatch/identity";
+import type { SignInRoutingReasonCode } from "@langwatch/identity-contract";
 
 /**
  * The words a routing reason code is worth on screen (D13, ADR-117 §6).

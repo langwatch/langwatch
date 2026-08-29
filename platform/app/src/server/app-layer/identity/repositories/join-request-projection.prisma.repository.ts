@@ -4,7 +4,7 @@ import type {
   JoinRequestState,
   JoinResolverType,
   JoinWithdrawalCause,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type { JoinRequest, PrismaClient } from "~/generated/prisma/client";
 import type { JoinRequestFoldState } from "@langwatch/identity-eventing";
 import type {

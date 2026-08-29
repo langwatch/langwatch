@@ -502,17 +502,17 @@ jobs:
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/authz-server run test
 
-      # @langwatch/identity is the pure identity core (ADR-115) and
+      # @langwatch/identity-contract is the pure identity core (ADR-115) and
       # @langwatch/identity-server its storage-port runtime — same raw
       # TypeScript, same shard-1 arrangement as authz. Both get the typecheck
       # step the authz pair lacks: sources and tests are only compiled here.
-      - name: Run @langwatch/identity unit tests
+      - name: Run @langwatch/identity-contract unit tests
         if: matrix.shard == 1
-        run: pnpm --filter @langwatch/identity run test
+        run: pnpm --filter @langwatch/identity-contract run test
 
-      - name: Typecheck @langwatch/identity
+      - name: Typecheck @langwatch/identity-contract
         if: matrix.shard == 1
-        run: pnpm --filter @langwatch/identity run typecheck
+        run: pnpm --filter @langwatch/identity-contract run typecheck
 
       - name: Run @langwatch/identity-server unit tests
         if: matrix.shard == 1

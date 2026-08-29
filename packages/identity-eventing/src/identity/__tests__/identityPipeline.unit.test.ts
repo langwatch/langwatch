@@ -1,4 +1,4 @@
-import { emptyIdentityHeads } from "@langwatch/identity";
+import { emptyIdentityHeads } from "@langwatch/identity-contract";
 import { IdentityGuards, type IdentityHeadsRepository } from "@langwatch/identity-server";
 import { describe, expect, it } from "vitest";
 import {

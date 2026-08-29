@@ -2,8 +2,8 @@ import type {
   DomainJoinSetting,
   JoinCandidateOrganization,
   JoinRequestAggregateState,
-} from "@langwatch/identity";
-import { emptyJoinRequest } from "@langwatch/identity";
+} from "@langwatch/identity-contract";
+import { emptyJoinRequest } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const rateLimitMock = vi.hoisted(() =>

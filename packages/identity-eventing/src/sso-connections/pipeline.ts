@@ -1,7 +1,7 @@
 import {
   CONNECTION_TORN_DOWN_EVENT_TYPE,
   TEARDOWN_REQUESTED_EVENT_TYPE,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type { SsoConnectionGuards } from "@langwatch/identity-server";
 import {
   definePipeline,

@@ -41,7 +41,7 @@ import {
   type SsoConnectionFactInput,
   SUSPEND_CONNECTION_COMMAND_TYPE,
   VERIFY_DOMAIN_COMMAND_TYPE,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type { SsoConnectionLedger } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import { tryGetApp } from "~/server/app-layer/app";

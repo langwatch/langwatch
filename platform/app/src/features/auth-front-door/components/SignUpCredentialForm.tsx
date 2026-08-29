@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   PASSWORD_REQUIREMENTS_HINT,
   passwordProblem,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -31,7 +31,7 @@ import { MethodDivider } from "./SignInMethodPicker";
 // putting it here charges a field at the one moment somebody has least
 // patience for one, to learn something the next screen learns anyway.
 //
-// The rules come from `@langwatch/identity`, which the mutation behind this
+// The rules come from `@langwatch/identity-contract`, which the mutation behind this
 // form reads too, so the form cannot accept what the server refuses. Asked as
 // a refinement rather than restated as zod constraints for the same reason:
 // restating them is how they drift.

@@ -28,7 +28,7 @@
     "@langwatch/auth-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/identity": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",

@@ -2,7 +2,7 @@ import {
   JOIN_REQUEST_EVENT_VERSION_LATEST,
   type JoinRequestCommand,
   type JoinRequestFactInput,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
 import { JOIN_REQUEST_AGGREGATE_TYPE } from "./schemas/constants";
 import type { JoinRequestEvent } from "./schemas/events";

@@ -52,7 +52,7 @@ import {
   MARK_PRIMARY_COMMAND_TYPE,
   PROPOSE_LINK_COMMAND_TYPE,
   VERIFY_IDENTIFIER_COMMAND_TYPE,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type { IdentityLedger } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import { tryGetApp } from "~/server/app-layer/app";

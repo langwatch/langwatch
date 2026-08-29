@@ -7,7 +7,7 @@ import {
   type VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
 import type { UserService } from "@langwatch/user-contract";
-import type { IdentityEmailService } from "@langwatch/identity";
+import type { IdentityEmailService } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import type { AuthClockPort } from "../ports/auth-clock.port";
 import type { AuthSecondaryStorePort } from "../ports/auth-secondary-store.port";

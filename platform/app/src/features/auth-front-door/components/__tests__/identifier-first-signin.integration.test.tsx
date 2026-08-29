@@ -8,7 +8,7 @@
  * Spec: specs/identity/signin-signup-screens.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { RoutingDecision, SignInMethod } from "@langwatch/identity";
+import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";

@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@langwatch/eventing": "workspace:*",
-    "@langwatch/identity": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
     "@langwatch/identity-server": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "zod": "^4.4.3"

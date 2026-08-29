@@ -13,7 +13,7 @@
  *       specs/identity/join-before-create.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { JoinLookupDecision } from "@langwatch/identity";
+import type { JoinLookupDecision } from "@langwatch/identity-contract";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 

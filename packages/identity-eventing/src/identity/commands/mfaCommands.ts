@@ -14,7 +14,7 @@ import {
   REGENERATE_BACKUP_CODES_COMMAND_TYPE,
   recordMfaVerificationFailureCommandDataSchema,
   regenerateBackupCodesCommandDataSchema,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type { MfaGuards } from "@langwatch/identity-server";
 import type { ZodTypeAny, z } from "zod";
 import {

@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import {
   IdentityVerificationExpiredError,
   normalizeIdentifierValue,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 
 /**
  * Sign-up's address confirmation (D13, ADR-117 §6).

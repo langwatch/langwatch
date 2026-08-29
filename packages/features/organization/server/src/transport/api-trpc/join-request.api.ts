@@ -34,7 +34,7 @@ import {
   type DomainJoinSetting,
   type JoinLookupDecision,
   type JoinRequestAggregateState,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import {
   joinRequestApiDecisionInputSchema,
   joinRequestApiOrganizationScopeSchema,

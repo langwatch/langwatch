@@ -1,7 +1,7 @@
 import {
   LIVE_IDENTIFIER_STATES,
   type SsoConnectionState,
-} from "@langwatch/identity";
+} from "@langwatch/identity-contract";
 import type {
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,

@@ -1,4 +1,4 @@
-import type { RoutingDecision } from "@langwatch/identity";
+import type { RoutingDecision } from "@langwatch/identity-contract";
 import { useCallback, useState } from "react";
 import { api } from "~/utils/api";
 

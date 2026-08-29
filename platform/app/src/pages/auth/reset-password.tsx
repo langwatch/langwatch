@@ -12,7 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { passwordProblem } from "@langwatch/identity";
+import { passwordProblem } from "@langwatch/identity-contract";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";

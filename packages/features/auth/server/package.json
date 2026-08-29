@@ -24,7 +24,7 @@
   "dependencies": {
     "@langwatch/auth-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
-    "@langwatch/identity": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
