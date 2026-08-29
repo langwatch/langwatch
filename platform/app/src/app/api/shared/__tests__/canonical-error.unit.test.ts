@@ -7,7 +7,7 @@ import {
 } from "~/server/analytics/lwql/errors";
 
 import { canonicalErrorFor } from "../canonical-error";
-import { InternalServerError } from "../errors";
+import { InternalServerError } from "@langwatch/platform-api/app-rest";
 
 class RetryableUnavailableError extends HandledError {
   constructor() {
