@@ -22,13 +22,11 @@ import {
   PersonalVirtualKeyTrpcApi,
   RoutingPolicyTrpcApi,
   type PersonalVirtualKeyTrpcContext,
-  type PersonalVirtualKeyTrpcPorts,
   type RoutingPolicyTrpcContext,
 } from "@langwatch/enterprise-governance-server";
 import {
   WebhookEndpointTrpcApi,
   type WebhookEndpointTrpcContext,
-  type WebhookEndpointTrpcPorts,
 } from "@langwatch/enterprise-webhook-server";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 
@@ -46,8 +44,6 @@ export class EnterpriseGatewayTrpcComposition {
     TContext extends EnterpriseGatewayTrpcContext,
     TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
     TRoot extends AnyTRPCRootTypes,
-    TPersonalVirtualKeyPorts extends PersonalVirtualKeyTrpcPorts,
-    TWebhookEndpointPorts extends WebhookEndpointTrpcPorts,
   >(options: {
     /** The process's one tRPC root; feature routers must not create a second. */
     root: TRPCRootObject<TContext, object, TOptions, TRoot>;
@@ -63,28 +59,23 @@ export class EnterpriseGatewayTrpcComposition {
       reason: string;
       permissions: readonly AuthzPermission[];
     }): EnterpriseTrpcPolicy;
-    ports: {
-      personalVirtualKeys: TPersonalVirtualKeyPorts;
-      webhookEndpoints: TWebhookEndpointPorts;
-    };
   }) {
-    const { root, protectedProcedure, policy, resolverAuthorizedPolicy, ports } = options;
+    const { root, protectedProcedure, policy, resolverAuthorizedPolicy } = options;
 
     return {
       routingPolicy: RoutingPolicyTrpcApi.create(root, {
         protected: protectedProcedure,
         policy,
       }),
-      personalVirtualKeys: PersonalVirtualKeyTrpcApi.create(
-        root,
-        { protected: protectedProcedure, policy, resolverAuthorizedPolicy },
-        ports.personalVirtualKeys,
-      ),
-      webhookEndpoints: WebhookEndpointTrpcApi.create(
-        root,
-        { protected: protectedProcedure, policy },
-        ports.webhookEndpoints,
-      ),
+      personalVirtualKeys: PersonalVirtualKeyTrpcApi.create(root, {
+        protected: protectedProcedure,
+        policy,
+        resolverAuthorizedPolicy,
+      }),
+      webhookEndpoints: WebhookEndpointTrpcApi.create(root, {
+        protected: protectedProcedure,
+        policy,
+      }),
     };
   }
 }

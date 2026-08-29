@@ -1,3 +1,4 @@
+import { EventSchema } from "@langwatch/eventing";
 import { z } from "zod";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
@@ -11,17 +12,21 @@ import {
   failSpendCommandDataSchema,
   settleSpendCommandDataSchema,
 } from "../processes/gateway-spend-commands.process";
+import { GATEWAY_SPEND_EVENT_VERSION_LATEST } from "./gateway-spend-constants.adapter";
 
-const eventEnvelope = z.object({
-  aggregateId: z.string(),
-  aggregateType: z.string(),
-  data: z.unknown(),
-  id: z.string(),
-  metadata: z.record(z.string(), z.unknown()),
-  occurredAt: z.coerce.date(),
-  tenantId: z.string(),
-  type: z.string(),
-  version: z.string(),
+/**
+ * The envelope is the framework's, not this feature's.
+ *
+ * It was a hand-written `z.object` here, and it disagreed with
+ * `@langwatch/eventing`'s in three ways that matter: no `createdAt`,
+ * `occurredAt` as a `Date` rather than the epoch milliseconds the store
+ * writes, and plain strings where the framework brands `tenantId`,
+ * `aggregateType` and `type`. Every event type below therefore failed the
+ * `Event` constraint the pipeline, the command handlers and the process
+ * manager all declare — eight compile errors saying the same thing.
+ */
+const eventEnvelope = EventSchema.extend({
+  version: z.literal(GATEWAY_SPEND_EVENT_VERSION_LATEST),
 });
 
 export const gatewaySpendAdmittedEventSchema = eventEnvelope.extend({
@@ -47,3 +52,16 @@ export const gatewaySpendSettledEventSchema = eventEnvelope.extend({
   data: settleSpendCommandDataSchema,
 });
 export type GatewaySpendSettledEvent = z.infer<typeof gatewaySpendSettledEventSchema>;
+
+/**
+ * Every event the spend pipeline folds and its process manager wakes on.
+ *
+ * Declared here because it is this module's own union; the pipeline, the
+ * settlement process manager and the fold projection each named it and none
+ * of them could resolve it.
+ */
+export type GatewaySpendProcessingEvent =
+  | GatewaySpendAdmittedEvent
+  | GatewaySpendConfirmedEvent
+  | GatewaySpendFailedEvent
+  | GatewaySpendSettledEvent;

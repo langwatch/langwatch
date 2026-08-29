@@ -41,9 +41,7 @@ export abstract class GovernanceSubscriberRuntime {
 }
 
 class AppGovernanceSubscriberDiagnostics extends GovernanceSubscriberDiagnosticsPort {
-  private readonly logger = createLogger(
-    "langwatch:trace-processing:governance-subscribers",
-  );
+  private readonly logger = createLogger("langwatch:trace-processing:governance-subscribers");
 
   warn(input: { code: string; tenantId: string; traceId: string }): void {
     this.logger.warn(input, input.code);

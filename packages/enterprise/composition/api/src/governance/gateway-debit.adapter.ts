@@ -182,9 +182,7 @@ export class AppGatewayGovernancePort extends GatewayGovernancePort {
       return [];
     }
 
-    const organizationIds = [
-      ...new Set(budgets.map(({ organizationId }) => organizationId)),
-    ];
+    const organizationIds = [...new Set(budgets.map(({ organizationId }) => organizationId))];
     const projects = await this.database.project.findMany({
       where: { team: { organizationId: { in: organizationIds } } },
       select: { id: true },
@@ -219,9 +217,7 @@ export class AppGatewayGovernancePort extends GatewayGovernancePort {
       targets,
       now,
     );
-    const spentByBudget = new Map(
-      spends.map(({ budgetId, spentUsd }) => [budgetId, spentUsd]),
-    );
+    const spentByBudget = new Map(spends.map(({ budgetId, spentUsd }) => [budgetId, spentUsd]));
 
     return liveCandidates.map((candidate, index) => {
       const budget = getResolvedBudget(budgetById, candidate.budgetId);
@@ -242,17 +238,13 @@ export class AppGatewayGovernancePort extends GatewayGovernancePort {
           onBreach: budget.onBreach,
         },
         spentUsd: spentByBudget.get(candidate.budgetId) ?? "0",
-        periodStartedAtMs:
-          target.periodFloorMs ?? currentPeriodStart(budget.window, now).getTime(),
+        periodStartedAtMs: target.periodFloorMs ?? currentPeriodStart(budget.window, now).getTime(),
       };
     });
   }
 }
 
-function getResolvedBudget(
-  budgets: Map<string, GatewayBudget>,
-  budgetId: string,
-): GatewayBudget {
+function getResolvedBudget(budgets: Map<string, GatewayBudget>, budgetId: string): GatewayBudget {
   const budget = budgets.get(budgetId);
   if (!budget) {
     throw new Error(`Missing resolved budget ${budgetId}`);
@@ -363,8 +355,6 @@ export class AppGatewayDebitAdapter {
   }
 
   build(): GatewayDebitProcess {
-    return GatewayDebitProcess.create(
-      AppGatewayDebitPort.create(this.gateway, this.delivery),
-    );
+    return GatewayDebitProcess.create(AppGatewayDebitPort.create(this.gateway, this.delivery));
   }
 }

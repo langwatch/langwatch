@@ -31,10 +31,7 @@ export class AppGovernanceTraceActivityAdapter {
    * True iff any governance-origin span landed for the tenant on or after
    * `sinceMs`.
    */
-  async hasRecentActivity(input: {
-    tenantId: string;
-    sinceMs: number;
-  }): Promise<boolean> {
+  async hasRecentActivity(input: { tenantId: string; sinceMs: number }): Promise<boolean> {
     const client = await this.resolveClient(input.tenantId);
     const result = await client.query({
       query: `

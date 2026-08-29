@@ -80,12 +80,7 @@ interface RawTransformResponse {
  * pulls in Hono context types we don't want in this lightweight EE
  * service module.
  */
-function canonical(
-  method: string,
-  path: string,
-  timestamp: string,
-  body: string,
-): string {
+function canonical(method: string, path: string, timestamp: string, body: string): string {
   const bodyHash = createHash("sha256").update(body).digest("hex");
   return `${method}\n${path}\n${timestamp}\n${bodyHash}`;
 }
@@ -94,9 +89,7 @@ function sign(secret: string, canonicalString: string): string {
   return createHmac("sha256", secret).update(canonicalString).digest("hex");
 }
 
-function normaliseErrors(
-  raw: RawValidateResponse | RawTransformResponse,
-): OttlValidationError[] {
+function normaliseErrors(raw: RawValidateResponse | RawTransformResponse): OttlValidationError[] {
   return (raw.errors ?? []).map((e, idx) => ({
     statementIndex: e.statement_index ?? idx,
     line: e.line ?? 0,
@@ -154,14 +147,10 @@ export class AppGovernanceOttlGateway extends GovernanceOttlGateway {
       return { status: "deferred", reason: "endpoint_unavailable" };
     }
     if (!response.ok) {
-      throw new Error(
-        `OTTL validate failed: ${response.status} ${await response.text()}`,
-      );
+      throw new Error(`OTTL validate failed: ${response.status} ${await response.text()}`);
     }
     const raw = (await response.json()) as RawValidateResponse;
-    return raw.ok
-      ? { status: "valid" }
-      : { status: "invalid", errors: normaliseErrors(raw) };
+    return raw.ok ? { status: "valid" } : { status: "invalid", errors: normaliseErrors(raw) };
   }
 
   async transform(input: OttlTransformInput): Promise<OttlTransformResult> {
@@ -175,9 +164,7 @@ export class AppGovernanceOttlGateway extends GovernanceOttlGateway {
       statements: parsed.statements,
     });
     if (!response.ok) {
-      throw new Error(
-        `OTTL transform failed: ${response.status} ${await response.text()}`,
-      );
+      throw new Error(`OTTL transform failed: ${response.status} ${await response.text()}`);
     }
     const raw = (await response.json()) as RawTransformResponse;
     if (raw.ok) {

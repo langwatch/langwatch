@@ -36,13 +36,8 @@ export type GovernanceActivityMonitorCapability = {
     windowDays: number;
     groupBy: SpendOverTimeGroupBy;
   }): Promise<SpendOverTimeResult>;
-  recentAnomalies(input: {
-    organizationId: string;
-    limit?: number;
-  }): Promise<RecentAnomalyRow[]>;
-  ingestionSourcesHealth(input: {
-    organizationId: string;
-  }): Promise<IngestionSourceHealthRow[]>;
+  recentAnomalies(input: { organizationId: string; limit?: number }): Promise<RecentAnomalyRow[]>;
+  ingestionSourcesHealth(input: { organizationId: string }): Promise<IngestionSourceHealthRow[]>;
   eventsForSource(input: {
     organizationId: string;
     sourceId: string;
@@ -71,9 +66,7 @@ class AppGovernanceClickHouseClientPort extends GovernanceClickHouseClientPort {
 
 class AppGovernanceClickHouseResolverPort extends GovernanceClickHouseResolverPort {
   private constructor(
-    private readonly resolveClient: (
-      organizationId: string,
-    ) => Promise<ClickHouseClient | null>,
+    private readonly resolveClient: (organizationId: string) => Promise<ClickHouseClient | null>,
   ) {
     super();
   }
@@ -84,9 +77,7 @@ class AppGovernanceClickHouseResolverPort extends GovernanceClickHouseResolverPo
     return new AppGovernanceClickHouseResolverPort(resolveClient);
   }
 
-  async tryResolve(
-    organizationId: string,
-  ): Promise<GovernanceClickHouseClientPort | null> {
+  async tryResolve(organizationId: string): Promise<GovernanceClickHouseClientPort | null> {
     const client = await this.resolveClient(organizationId);
     return client ? AppGovernanceClickHouseClientPort.create(client) : null;
   }

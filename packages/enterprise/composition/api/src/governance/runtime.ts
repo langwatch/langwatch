@@ -65,9 +65,7 @@ class AppGovernanceSetupActivityPort extends GovernanceSetupActivityPort {
     super();
   }
 
-  static create(
-    activity: AppGovernanceTraceActivityAdapter,
-  ): AppGovernanceSetupActivityPort {
+  static create(activity: AppGovernanceTraceActivityAdapter): AppGovernanceSetupActivityPort {
     return new AppGovernanceSetupActivityPort(activity);
   }
 
@@ -108,12 +106,8 @@ export class AppGovernanceRuntime {
       ingestionEncryption: options.ingestionEncryption,
       ingestionSecretPepper: options.ingestionSecretPepper,
       ingestionDiagnostics: options.ingestionDiagnostics,
-      personalUsageReader: AppPersonalUsageAdapter.create(
-        options.personalUsage,
-      ).buildReader(),
-      personalVirtualKeyIssuer: AppPersonalVirtualKeyIssuerPort.create(
-        options.virtualKeys,
-      ),
+      personalUsageReader: AppPersonalUsageAdapter.create(options.personalUsage).buildReader(),
+      personalVirtualKeyIssuer: AppPersonalVirtualKeyIssuerPort.create(options.virtualKeys),
       budgetOverview: options.budgetOverview,
       aiToolSlugs: new AppAiToolSlugPort(),
       aiToolProviders: AppAiToolProviderCatalogPort.create(options.providers),

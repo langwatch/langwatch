@@ -44,10 +44,7 @@ class AppGovernanceWebhookPort extends GovernanceWebhookPort {
     return plan.webhookEndpointsEnabled === true;
   }
 
-  async activeEndpointIds(input: {
-    organizationId: string;
-    eventType: string;
-  }): Promise<string[]> {
+  async activeEndpointIds(input: { organizationId: string; eventType: string }): Promise<string[]> {
     const endpoints = await this.dependencies.endpoints.getActiveByOrganization({
       organizationId: input.organizationId,
     });

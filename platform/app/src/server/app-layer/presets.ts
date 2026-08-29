@@ -28,7 +28,7 @@ import {
   getFreePlanLimits,
   getStripeEnvironmentFromNodeEnv,
 } from "@langwatch/enterprise-billing-contract";
-import { LicensingEntitlementSource } from "@langwatch/enterprise-licensing-server";
+import { LicensingApp, LicensingEntitlementSource } from "@langwatch/enterprise-licensing-server";
 import {
   applyPlanTypeEntitlements,
   FREE_PLAN,
@@ -224,6 +224,7 @@ import {
   hasPrismaConnection,
   prisma as globalPrisma,
 } from "~/server/db";
+import { authProviderIsMounted, platformSSOAllowed } from "~/runtime/app/features/sso";
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { createRetentionFloorService } from "~/server/app-layer/clients/clickhouse/retention-floor";
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
@@ -281,7 +282,10 @@ import {
   resolveVkProjectId,
   type VirtualKeyActor,
 } from "~/server/gateway/virtualKey.authz";
-import { VirtualKeyService, virtualKeyBudgetInputSchema } from "~/server/gateway/virtualKey.service";
+import {
+  VirtualKeyService,
+  virtualKeyBudgetInputSchema,
+} from "~/server/gateway/virtualKey.service";
 import {
   loadDirectBudgetsForKeys,
   type VirtualKeyDirectBudget,
@@ -365,7 +369,7 @@ import { InviteService } from "../invites/invite.service";
 import { resolveCallerProjectScope } from "../organizations/resolveCallerProjectScope";
 import { resolveOrganizationId } from "../organizations/resolveOrganizationId";
 import { OrganizationRepository } from "../repositories/organization.repository";
-import { getLicenseHandler } from "~/runtime/app/licensing";
+import { getLicenseCryptography, getLicenseHandler } from "~/runtime/app/licensing";
 import { TraceEditOverlayService } from "../traces/edit-overlay/traceEditOverlay.service";
 import { EventUsageService } from "../traces/event-usage.service";
 import { TraceService } from "../traces/trace.service";
@@ -798,6 +802,32 @@ function membershipForProjectCredential(project: ProjectIdentity): MembershipSet
  * is what stops the public REST door and the browser's tRPC door enforcing
  * different rules.
  */
+const licenseLogger = createLogger("langwatch:app-layer:licensing");
+
+/**
+ * The Licensing feature's application.
+ *
+ * Composed here rather than at the mount because both of its tRPC transports
+ * read it off the request context — `ctx.app.licensing` — and neither takes
+ * ports any more. Between those two facts nothing supplied it, so every
+ * `license.*` and `licenseEnforcement.*` call reached for a member the
+ * application did not have.
+ */
+function composeLicensingApp(input: { prisma: PrismaClient }): LicensingApp {
+  return LicensingApp.create({
+    licenses: getLicenseHandler,
+    cryptography: getLicenseCryptography,
+    configuredAuthProvider: () => env.NEXTAUTH_PROVIDER,
+    platformSsoAllowed: platformSSOAllowed,
+    authProviderIsMounted,
+    reportSigningFailure: ({ organizationId, error }) =>
+      licenseLogger.error({ organizationId, error }, "failed to sign a license"),
+    checkLimit: ({ organizationId, limitType, user }) =>
+      createLicenseEnforcementService(input.prisma).checkLimit(organizationId, limitType, user),
+    reportError: (error) => captureException(error),
+  });
+}
+
 function composeGatewayApp(input: {
   prisma: PrismaClient;
   projects: AppDependencies["projects"];
@@ -2823,6 +2853,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
       monitors,
       stores: gatewayStores,
     }),
+    licensingApp: composeLicensingApp({ prisma }),
     filters: {
       options: new FilterService(
         clickhouseEnabled ? new FilterOptionsClickHouseRepository(resolveClickHouseClient) : null,
@@ -3588,6 +3619,7 @@ export function createTestApp(
       monitors: testMonitors,
       stores: testGatewayStores,
     }),
+    licensingApp: composeLicensingApp({ prisma: testPrisma }),
     filters: { options: new FilterService(null) },
     clickhouse: {
       enabled: false,
@@ -3603,7 +3635,9 @@ export function createTestApp(
     // override, or injects a double into the unit directly.
     redis: null,
     billing: {
-      events: ClickHouseBillableEventsMeterAdapter.create({ resolveClient: async () => null }).build(),
+      events: ClickHouseBillableEventsMeterAdapter.create({
+        resolveClient: async () => null,
+      }).build(),
     },
     governance: testGovernance,
     billableEvents: undefined,

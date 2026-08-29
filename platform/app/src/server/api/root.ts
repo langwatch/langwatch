@@ -75,7 +75,6 @@ import {
   EnterpriseTrpcComposition,
   INSTANCE_LICENSE_NO_PERMISSION,
 } from "@langwatch/enterprise-api";
-import { createLogger } from "@langwatch/observability";
 import { evaluatorsSchema } from "@langwatch/evaluator-contract";
 import { z } from "zod";
 import {
@@ -90,12 +89,9 @@ import { restoreWithheldEdits } from "~/server/traces/edit-overlay/restoreWithhe
 import { getAllForProjectInput, tracesFilterInput } from "./routers/traces.schemas";
 import type { TRPCContext } from "./trpc.context";
 import { getUserProtectionsForProject } from "./utils";
-import { assertWebhookEndpointsEntitled } from "~/runtime/app/features/webhooks";
 import { virtualKeyBudgetInputSchema } from "~/server/gateway/virtualKey.service";
 import { env } from "~/env.mjs";
 import { auditLog } from "~/runtime/app/features/audit-log";
-import { authProviderIsMounted, platformSSOAllowed } from "~/runtime/app/features/sso";
-import { getLicenseCryptography, getLicenseHandler } from "~/runtime/app/licensing";
 import {
   identityEmail,
   joinRequestsService,
@@ -108,7 +104,6 @@ import {
   getEventSubscriberMetadata,
   getProjectionMetadata,
 } from "~/server/event-sourcing/registration/pipelineRegistry";
-import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { grafanaConfigFromEnv } from "~/utils/grafanaLinks";
 import {
   assertEnterprisePlan,
@@ -743,7 +738,6 @@ const opsRouter = createOpsTrpcRouter({
   },
 });
 
-const licenseLogger = createLogger("langwatch:api:licenseRouter");
 const noPermissionPolicy = appTrpcNoPermissionPolicy(appTrpcMiddlewares);
 
 const enterpriseRouters = EnterpriseTrpcComposition.create({
@@ -755,20 +749,6 @@ const enterpriseRouters = EnterpriseTrpcComposition.create({
   backOfficePolicyForOrganization: noPermissionPolicy(BACK_OFFICE_NO_PERMISSION_FOR_ORGANIZATION),
   saasBilling: env.IS_SAAS,
   ports: {
-    license: {
-      licenses: getLicenseHandler,
-      cryptography: getLicenseCryptography,
-      configuredAuthProvider: () => env.NEXTAUTH_PROVIDER,
-      platformSsoAllowed: platformSSOAllowed,
-      authProviderIsMounted,
-      reportSigningFailure: ({ organizationId, error }) =>
-        licenseLogger.error({ organizationId, error }, "[license] Failed to sign license"),
-    },
-    licenseEnforcement: {
-      checkLimit: ({ organizationId, limitType, user }) =>
-        createLicenseEnforcementService(prisma).checkLimit(organizationId, limitType, user),
-      reportError: captureException,
-    },
     scimToken: {
       requireEnterprisePlan: async ({ planProvider, organizationId }) => {
         const plan = await planProvider.getActivePlan({ organizationId });
@@ -814,27 +794,6 @@ const enterpriseGatewayRouters = EnterpriseGatewayTrpcComposition.create({
   protectedProcedure: authProtectedProcedure,
   policy: appTrpcPolicy(appTrpcMiddlewares),
   resolverAuthorizedPolicy: appTrpcServiceAuthorizedPolicy(appTrpcMiddlewares),
-  ports: {
-    personalVirtualKeys: {
-      isOrganizationMember: async ({ organizationId, userId }) =>
-        (await prisma.organizationUser.findUnique({
-          where: { userId_organizationId: { userId, organizationId } },
-        })) !== null,
-      // Post-collapse VirtualKey is organization-scoped; the
-      // (organizationId, principalUserId, name) tuple is the personal-key
-      // uniqueness contract.
-      hasActivePersonalKeyLabelled: async ({ organizationId, userId, label }) =>
-        (await prisma.virtualKey.findFirst({
-          where: {
-            organizationId,
-            principalUserId: userId,
-            name: label,
-            revokedAt: null,
-          },
-        })) !== null,
-    },
-    webhookEndpoints: { assertEntitled: assertWebhookEndpointsEntitled },
-  },
 });
 
 const coreRouters = {

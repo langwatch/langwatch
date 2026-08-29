@@ -99,18 +99,10 @@ export type GovernanceIngestionPullSchedulePort = {
  */
 export class AppIngestionPullPipeline {
   private constructor(
-    private configureCommand:
-      | ((input: IngestionPullConfigureCommand) => Promise<void>)
-      | undefined,
-    private disableCommand:
-      | ((input: IngestionPullDisableCommand) => Promise<void>)
-      | undefined,
-    private completedCommand:
-      | ((input: IngestionPullCompletedCommand) => Promise<void>)
-      | undefined,
-    private failedCommand:
-      | ((input: IngestionPullFailedCommand) => Promise<void>)
-      | undefined,
+    private configureCommand: ((input: IngestionPullConfigureCommand) => Promise<void>) | undefined,
+    private disableCommand: ((input: IngestionPullDisableCommand) => Promise<void>) | undefined,
+    private completedCommand: ((input: IngestionPullCompletedCommand) => Promise<void>) | undefined,
+    private failedCommand: ((input: IngestionPullFailedCommand) => Promise<void>) | undefined,
   ) {}
 
   static create(
@@ -139,20 +131,17 @@ export class AppIngestionPullPipeline {
   }
 
   configure(input: IngestionPullConfigureCommand): Promise<void> {
-    if (!this.configureCommand)
-      throw new Error("Ingestion pull pipeline is not registered");
+    if (!this.configureCommand) throw new Error("Ingestion pull pipeline is not registered");
     return this.configureCommand(input);
   }
 
   disable(input: IngestionPullDisableCommand): Promise<void> {
-    if (!this.disableCommand)
-      throw new Error("Ingestion pull pipeline is not registered");
+    if (!this.disableCommand) throw new Error("Ingestion pull pipeline is not registered");
     return this.disableCommand(input);
   }
 
   recordRunCompleted(input: IngestionPullCompletedCommand): Promise<void> {
-    if (!this.completedCommand)
-      throw new Error("Ingestion pull pipeline is not registered");
+    if (!this.completedCommand) throw new Error("Ingestion pull pipeline is not registered");
     return this.completedCommand(input);
   }
 
@@ -217,12 +206,7 @@ export class AppIngestionPullLifecycleRuntime {
     schedule: GovernanceIngestionPullSchedulePort,
     runsWorkers: boolean,
   ): AppIngestionPullLifecycleRuntime {
-    return new AppIngestionPullLifecycleRuntime(
-      database,
-      projects,
-      schedule,
-      runsWorkers,
-    );
+    return new AppIngestionPullLifecycleRuntime(database, projects, schedule, runsWorkers);
   }
 }
 
@@ -313,9 +297,7 @@ class AppIngestionPullMetricsPort extends IngestionPullMetricsPort {
     super();
   }
 
-  static create(
-    metrics: GovernanceIngestionPullMetricsPort,
-  ): AppIngestionPullMetricsPort {
+  static create(metrics: GovernanceIngestionPullMetricsPort): AppIngestionPullMetricsPort {
     return new AppIngestionPullMetricsPort(metrics);
   }
 
@@ -333,9 +315,7 @@ class UtcIngestionPullSchedulePort extends IngestionPullSchedulePort {
     super();
   }
 
-  static create(
-    schedule: GovernanceIngestionPullSchedulePort,
-  ): UtcIngestionPullSchedulePort {
+  static create(schedule: GovernanceIngestionPullSchedulePort): UtcIngestionPullSchedulePort {
     return new UtcIngestionPullSchedulePort(schedule);
   }
 
@@ -368,9 +348,7 @@ class AppIngestionPullLifecycleCommandPort extends IngestionPullLifecycleCommand
     super();
   }
 
-  static create(
-    pipeline: AppIngestionPullPipeline,
-  ): AppIngestionPullLifecycleCommandPort {
+  static create(pipeline: AppIngestionPullPipeline): AppIngestionPullLifecycleCommandPort {
     return new AppIngestionPullLifecycleCommandPort(pipeline);
   }
 
@@ -420,9 +398,7 @@ class AppPipelineGovernanceEventingPort extends GovernanceEventingPort {
     });
   }
 
-  async recordIngestionRunCompleted(
-    input: RecordIngestionPullRunCompletedCommand,
-  ): Promise<void> {
+  async recordIngestionRunCompleted(input: RecordIngestionPullRunCompletedCommand): Promise<void> {
     await this.ingestionPull.recordRunCompleted({
       tenantId: input.tenantId,
       occurredAt: input.occurredAt ?? Date.now(),
@@ -430,9 +406,7 @@ class AppPipelineGovernanceEventingPort extends GovernanceEventingPort {
     });
   }
 
-  async recordIngestionRunFailed(
-    input: RecordIngestionPullRunFailedCommand,
-  ): Promise<void> {
+  async recordIngestionRunFailed(input: RecordIngestionPullRunFailedCommand): Promise<void> {
     await this.ingestionPull.recordRunFailed({
       tenantId: input.tenantId,
       occurredAt: input.occurredAt ?? Date.now(),
@@ -513,9 +487,7 @@ export class AppGovernanceEventingAdapter {
       }).build(),
     );
     const pulledUsageCommands = mapCommands(pulledUsagePipeline.commands);
-    const pulledUsage = AppPulledUsagePipeline.create(
-      pulledUsageCommands.recordPulledUsage,
-    );
+    const pulledUsage = AppPulledUsagePipeline.create(pulledUsageCommands.recordPulledUsage);
     const ingestionPull = AppIngestionPullPipeline.deferred();
     const execution = IngestionPullService.create(
       AppIngestionPullRunPort.create({
@@ -545,11 +517,7 @@ export class AppGovernanceEventingAdapter {
     );
     const lifecycle = this.lifecycle(ingestionPull);
     this.reconcile(lifecycle);
-    return AppGovernanceEventingInstallation.create(
-      ingestionPull,
-      pulledUsage,
-      lifecycle,
-    );
+    return AppGovernanceEventingInstallation.create(ingestionPull, pulledUsage, lifecycle);
   }
 
   private lifecycle(pipeline: AppIngestionPullPipeline): IngestionPullLifecycleService {

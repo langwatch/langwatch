@@ -111,9 +111,7 @@ export class AppAiToolProviderCatalogPort extends AiToolProviderCatalogPort {
     super();
   }
 
-  static create(
-    providers: GovernanceModelProviderCatalogPort,
-  ): AppAiToolProviderCatalogPort {
+  static create(providers: GovernanceModelProviderCatalogPort): AppAiToolProviderCatalogPort {
     return new AppAiToolProviderCatalogPort(providers);
   }
 

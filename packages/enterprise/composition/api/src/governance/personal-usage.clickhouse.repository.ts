@@ -450,9 +450,7 @@ export class AppPersonalUsageReadAdapter {
       requestCount: Number(row.RequestCount) || 0,
       promptTokens: Number(row.PromptTokens) || 0,
       completionTokens: Number(row.CompletionTokens) || 0,
-      topModel: topRow
-        ? { name: topRow.Name, requests: Number(topRow.Requests) || 0 }
-        : null,
+      topModel: topRow ? { name: topRow.Name, requests: Number(topRow.Requests) || 0 } : null,
     };
   }
 

@@ -36,15 +36,11 @@ export class AppQuarantineTenantPort extends QuarantineTenantPort {
 }
 
 export class AppQuarantineTraceActivityPort extends QuarantineTraceActivityPort {
-  private constructor(
-    private readonly repository: AppGovernanceTraceActivityAdapter,
-  ) {
+  private constructor(private readonly repository: AppGovernanceTraceActivityAdapter) {
     super();
   }
 
-  static create(
-    repository: AppGovernanceTraceActivityAdapter,
-  ): AppQuarantineTraceActivityPort {
+  static create(repository: AppGovernanceTraceActivityAdapter): AppQuarantineTraceActivityPort {
     return new AppQuarantineTraceActivityPort(repository);
   }
 

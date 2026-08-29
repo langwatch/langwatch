@@ -23,9 +23,7 @@ import type { GovernanceClickHouseClientResolver } from "./clickhouse-client.por
 
 const TABLE_NAME = "governance_ocsf_events" as const;
 
-const logger = createLogger(
-  "langwatch:governance:governance-ocsf-events-clickhouse-repository",
-);
+const logger = createLogger("langwatch:governance:governance-ocsf-events-clickhouse-repository");
 
 /**
  * OCSF v1.1 SeverityId values.

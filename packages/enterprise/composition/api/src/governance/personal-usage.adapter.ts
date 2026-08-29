@@ -91,9 +91,7 @@ export class AppPersonalUsageReader extends PersonalUsageReaderPort {
     userId: string;
     window: PortablePersonalUsageWindow;
   }): Promise<PersonalUsageBreakdown[]> {
-    return this.repository.findIngestionPrincipalBreakdown(
-      this.toAppPrincipalInput(input),
-    );
+    return this.repository.findIngestionPrincipalBreakdown(this.toAppPrincipalInput(input));
   }
 
   private toAppInput(input: { tenantId: string; window: PortablePersonalUsageWindow }): {
@@ -120,13 +118,9 @@ export class AppPersonalUsageReader extends PersonalUsageReaderPort {
 
 /** Binds the app's ClickHouse client to the server installation reader port. */
 export class AppPersonalUsageAdapter {
-  private constructor(
-    private readonly repository: AppPersonalUsageReadAdapter | undefined,
-  ) {}
+  private constructor(private readonly repository: AppPersonalUsageReadAdapter | undefined) {}
 
-  static create(
-    repository: AppPersonalUsageReadAdapter | undefined,
-  ): AppPersonalUsageAdapter {
+  static create(repository: AppPersonalUsageReadAdapter | undefined): AppPersonalUsageAdapter {
     return new AppPersonalUsageAdapter(repository);
   }
 

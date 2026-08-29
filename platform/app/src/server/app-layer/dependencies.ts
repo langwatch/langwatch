@@ -32,6 +32,7 @@ import type { DashboardService } from "@langwatch/dashboard-contract";
 import type { LangWatchQLService } from "~/server/analytics/lwql";
 import type { AppCommands } from "~/server/event-sourcing/registration/pipelineRegistry";
 import type { FilterService } from "~/server/filters/filter.service";
+import type { LicensingApp } from "@langwatch/enterprise-licensing-server";
 import type { GatewayApp } from "@langwatch/gateway-server";
 import type { GatewayBudgetSpendPort } from "@langwatch/gateway-server";
 import type { GatewayChangeEventsPort } from "@langwatch/gateway-server";
@@ -236,6 +237,11 @@ export interface AppDependencies {
    * tRPC router built over the application keeps them on its wire contract.
    */
   gatewayApp: GatewayApp<ApplicableBudget[], VirtualKeyDirectBudget>;
+  /**
+   * The Licensing feature's application, which its two tRPC transports read
+   * off the request context rather than take as ports.
+   */
+  licensingApp: LicensingApp;
   /** The values a filter can offer, read from the trace store. */
   filters: {
     options: FilterService;

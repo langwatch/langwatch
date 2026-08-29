@@ -45,12 +45,7 @@ type SettleOutcome =
   | { status: "failed"; error: unknown }
   | { status: "timeout" };
 
-export const APP_SHUTDOWN_PHASES = [
-  "subscriber",
-  "redis",
-  "clickhouse",
-  "database",
-] as const;
+export const APP_SHUTDOWN_PHASES = ["subscriber", "redis", "clickhouse", "database"] as const;
 
 export type AppShutdownPhase = (typeof APP_SHUTDOWN_PHASES)[number];
 
@@ -84,10 +79,7 @@ export class AppShutdownResources {
       try {
         await resource.close();
       } catch (error) {
-        logger.error(
-          { phase, name: resource.name, error },
-          "Failed to close application resource",
-        );
+        logger.error({ phase, name: resource.name, error }, "Failed to close application resource");
       }
     }
   }
@@ -235,6 +227,14 @@ export class App {
   readonly gatewayStores: AppDependencies["gateway"];
   /** The Webhook feature's application, over the process's endpoint store. */
   readonly webhooks: WebhookApp;
+  /**
+   * The Licensing feature's application.
+   *
+   * On the App because its two transports read it off the request context —
+   * `ctx.app.licensing` — and nothing was supplying it: `license.*` and
+   * `licenseEnforcement.*` reached for a member this application did not have.
+   */
+  readonly licensing: AppDependencies["licensingApp"];
   readonly filters: AppDependencies["filters"];
   readonly clickhouse: AppDependencies["clickhouse"];
   /**
@@ -494,6 +494,7 @@ export class App {
       dispatch: ({ destination, ...input }) => webhookDestinationFor(destination).send(input),
       runIdempotent: (input) => withIdempotency({ prisma, ...input }),
     });
+    this.licensing = deps.licensingApp;
     this.filters = deps.filters;
     this.clickhouse = deps.clickhouse;
     this.redis = deps.redis;

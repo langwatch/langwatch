@@ -52,8 +52,7 @@ export class AppAdminWorkspaceViewOcsf extends AdminWorkspaceViewOcsfPort {
       eventId: input.auditLogId,
       traceId: "",
       sourceId: input.view.targetTeamId,
-      sourceType:
-        input.view.kind === "personal" ? "personal_workspace" : "team_workspace",
+      sourceType: input.view.kind === "personal" ? "personal_workspace" : "team_workspace",
       activityId: OCSF_ACTIVITY.READ,
       severityId: OCSF_SEVERITY.INFO,
       eventTime: new Date(input.createdAtMs),

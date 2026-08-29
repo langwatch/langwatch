@@ -131,6 +131,7 @@
     "@langwatch/enterprise-webhook-contract": "workspace:*",
     "@langwatch/enterprise-webhook-server": "workspace:*",
     "@langwatch/eventing": "workspace:*",
+    "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/gateway-server": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",

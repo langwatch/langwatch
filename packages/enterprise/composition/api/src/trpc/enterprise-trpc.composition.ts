@@ -25,9 +25,7 @@ import {
   LicenseEnforcementTrpcApi,
   LicenseTrpcApi,
   type LicenseEnforcementTrpcContext,
-  type LicenseEnforcementTrpcPorts,
   type LicenseTrpcContext,
-  type LicenseTrpcPorts,
 } from "@langwatch/enterprise-licensing-server";
 import {
   ScimTokenTrpcApi,
@@ -92,8 +90,6 @@ export class EnterpriseTrpcComposition {
     TContext extends EnterpriseTrpcContext,
     TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
     TRoot extends AnyTRPCRootTypes,
-    TLicensePorts extends LicenseTrpcPorts,
-    TLicenseEnforcementPorts extends LicenseEnforcementTrpcPorts,
     TScimTokenPorts extends ScimTokenTrpcPorts,
     TSsoConnectionPorts extends SsoConnectionTrpcPorts,
   >(options: {
@@ -112,29 +108,22 @@ export class EnterpriseTrpcComposition {
     /** Whether this installation bills through Stripe. */
     saasBilling: boolean;
     ports: {
-      license: TLicensePorts;
-      licenseEnforcement: TLicenseEnforcementPorts;
       scimToken: TScimTokenPorts;
       ssoConnections: TSsoConnectionPorts;
     };
   }) {
     const { root, protectedProcedure, policy, ports } = options;
 
-    const license = LicenseTrpcApi.create(
-      root,
-      {
-        protected: protectedProcedure,
-        policy,
-        unscopedPolicy: options.instanceLicensePolicy,
-      },
-      ports.license,
-    );
+    const license = LicenseTrpcApi.create(root, {
+      protected: protectedProcedure,
+      policy,
+      unscopedPolicy: options.instanceLicensePolicy,
+    });
 
-    const licenseEnforcement = LicenseEnforcementTrpcApi.create(
-      root,
-      { protected: protectedProcedure, policy },
-      ports.licenseEnforcement,
-    );
+    const licenseEnforcement = LicenseEnforcementTrpcApi.create(root, {
+      protected: protectedProcedure,
+      policy,
+    });
 
     const scimToken = ScimTokenTrpcApi.create(
       root,

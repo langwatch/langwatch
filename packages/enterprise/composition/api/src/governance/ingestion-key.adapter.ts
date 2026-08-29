@@ -62,9 +62,7 @@ export class AppIngestionKeyIssuerPort extends IngestionKeyIssuerPort {
     return new AppIngestionKeyIssuerPort(apiKeys);
   }
 
-  async create(
-    input: IngestionKeyCreateInput,
-  ): Promise<{ token: string; apiKey: { id: string } }> {
+  async create(input: IngestionKeyCreateInput): Promise<{ token: string; apiKey: { id: string } }> {
     const result = await this.apiKeys.create({
       ...input,
       permissions: [...input.permissions],
