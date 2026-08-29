@@ -36,7 +36,7 @@ import {
   LWQL_QUERY_RESULT_DATASET,
   validateVegaLiteSpecStructure,
 } from "@langwatch/analytics-web/validation";
-import type { CustomGraph, Prisma, PrismaClient } from "~/generated/prisma/client";
+import type { CustomGraph, Prisma } from "~/generated/prisma/client";
 
 import type { Protections } from "@langwatch/trace-server";
 import { isUniqueConstraintError } from "../../utils/prismaErrors";
@@ -48,10 +48,7 @@ import {
   SavedWorkbenchChartNotFoundError,
   SavedWorkbenchChartSpecificationRefusedError,
 } from "./errors";
-import {
-  SavedWorkbenchChartRepository,
-  type SavedWorkbenchChartStore,
-} from "./savedWorkbenchChart.repository";
+import type { SavedWorkbenchChartStore } from "./savedWorkbenchChart.repository";
 import {
   type WorkbenchChartDefinition,
   workbenchChartDefinitionSchema,
@@ -68,10 +65,7 @@ const logger = createLogger("langwatch:analytics:saved-workbench-charts");
 const chartNameSchema = z.string().trim().min(1).max(255);
 const chartIdSchema = z
   .string()
-  .regex(
-    /^[A-Za-z0-9_-]{1,64}$/,
-    "id must be 1-64 characters of letters, digits, '_' or '-'",
-  );
+  .regex(/^[A-Za-z0-9_-]{1,64}$/, "id must be 1-64 characters of letters, digits, '_' or '-'");
 
 /** A saved chart as every caller above this layer sees it. */
 export interface SavedWorkbenchChart {
@@ -109,8 +103,9 @@ export interface SavedWorkbenchChartServiceDependencies {
    * reason `repository` is an interface rather than the Prisma repository
    * itself.
    *
-   * @default the real {@link dashboardBelongsToProject}, bound to a Prisma
-   *   client by {@link SavedWorkbenchChartService.create}.
+   * Supplied by the caller. There is no default: the production path is the
+   * packaged `@langwatch/dashboard-server` service, which carries the same
+   * check as its `SavedWorkbenchChartPolicy` port.
    */
   readonly dashboardBelongsToProject: (input: {
     dashboardId: string;
@@ -122,8 +117,8 @@ export interface SavedWorkbenchChartServiceDependencies {
    * {@link allocateNextGridRow} so the two writers that can place a chart on
    * this grid never disagree about which row is free.
    *
-   * @default the real {@link allocateNextGridRow}, bound to a Prisma client
-   *   by {@link SavedWorkbenchChartService.create}.
+   * Supplied by the caller, for the same reason as
+   * {@link SavedWorkbenchChartServiceDependencies.dashboardBelongsToProject}.
    */
   readonly allocateNextGridRow: (input: {
     dashboardId: string;
@@ -158,17 +153,6 @@ const placementSchema = z
 
 export class SavedWorkbenchChartService {
   constructor(private readonly deps: SavedWorkbenchChartServiceDependencies) {}
-
-  /** Builds the compatibility service with explicit process-owned dependencies. */
-  static create(
-    prisma: PrismaClient,
-    lwql: LangWatchQLService,
-  ): SavedWorkbenchChartService {
-    return new SavedWorkbenchChartService({
-      repository: new SavedWorkbenchChartRepository(prisma),
-      lwql,
-    });
-  }
 
   /**
    * Every saved workbench chart in a project.
@@ -292,9 +276,7 @@ export class SavedWorkbenchChartService {
     const existing = await this.deps.repository.findById({ id, projectId });
     if (!existing) throw new SavedWorkbenchChartNotFoundError();
 
-    const identity = z
-      .object({ name: chartNameSchema.optional() })
-      .safeParse({ name: input.name });
+    const identity = z.object({ name: chartNameSchema.optional() }).safeParse({ name: input.name });
     if (!identity.success) throw ValidationError.fromZodError(identity.error);
 
     const definition =
@@ -310,9 +292,7 @@ export class SavedWorkbenchChartService {
       id,
       projectId,
       ...(identity.data.name === undefined ? {} : { name: identity.data.name }),
-      ...(definition === undefined
-        ? {}
-        : { definition: definition as Prisma.InputJsonValue }),
+      ...(definition === undefined ? {} : { definition: definition as Prisma.InputJsonValue }),
     });
     if (!row) throw new SavedWorkbenchChartNotFoundError();
 
@@ -385,9 +365,7 @@ export class SavedWorkbenchChartService {
       ...(input.granularitySeconds !== undefined
         ? { granularitySeconds: input.granularitySeconds }
         : {}),
-      ...(input.onBudgetOverflow
-        ? { onBudgetOverflow: input.onBudgetOverflow }
-        : {}),
+      ...(input.onBudgetOverflow ? { onBudgetOverflow: input.onBudgetOverflow } : {}),
     });
   }
 
@@ -437,8 +415,7 @@ export class SavedWorkbenchChartService {
       dashboardId: parsed.data.dashboardId,
       projectId,
     });
-    if (!isDashboardInProject)
-      throw new SavedWorkbenchChartDashboardNotFoundError();
+    if (!isDashboardInProject) throw new SavedWorkbenchChartDashboardNotFoundError();
 
     const gridRow =
       parsed.data.gridRow ??
@@ -612,10 +589,7 @@ export function mapDashboardSavedWorkbenchChartError(error: unknown): never {
   if (error instanceof Error && error.name === "SavedWorkbenchChartNotFoundError") {
     throw new SavedWorkbenchChartNotFoundError();
   }
-  if (
-    error instanceof Error &&
-    error.name === "SavedWorkbenchChartDefinitionInvalidError"
-  ) {
+  if (error instanceof Error && error.name === "SavedWorkbenchChartDefinitionInvalidError") {
     throw new SavedWorkbenchChartDefinitionInvalidError(
       (error as Error & { chartId?: string }).chartId ?? "unknown",
     );

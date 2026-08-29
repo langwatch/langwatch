@@ -14,7 +14,7 @@ import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-web/validation";
-import type { Organization, Project, Team } from "~/generated/prisma/client";
+import type { Dashboard, Organization, Project, Team } from "~/generated/prisma/client";
 import {
   AppAutomationRuntime,
   createAppAutomationTestFirePort,
@@ -26,7 +26,6 @@ import { prisma } from "~/server/db";
 import type { Protections } from "@langwatch/trace-server";
 import { allocateNextGridRow } from "../../allocateNextGridRow";
 import { BUILDER_CHART_KIND, WORKBENCH_SQL_CHART_KIND } from "../../chartKinds";
-import { dashboardBelongsToProject } from "../../dashboardBelongsToProject";
 import { LangWatchQLService } from "../../lwql/lwql.service";
 import { SavedWorkbenchChartRepository } from "../savedWorkbenchChart.repository";
 import {
@@ -42,8 +41,7 @@ const FULLY_PERMITTED: Protections = {
 };
 
 const SQL =
-  "SELECT count() AS value FROM analytics.traces " +
-  "WHERE OccurredAt >= {since:DateTime}";
+  "SELECT count() AS value FROM analytics.traces " + "WHERE OccurredAt >= {since:DateTime}";
 
 const SPEC = {
   $schema: VEGA_LITE_SCHEMA_URL,
@@ -128,8 +126,17 @@ describe("saved workbench charts (integration)", () => {
         executor: null,
         database: "analytics",
       }),
-      dashboardBelongsToProject: ({ dashboardId, projectId }) =>
-        dashboardBelongsToProject(prisma, dashboardId, projectId),
+      // The real predicate, against the real database — the whole point of
+      // this suite is that the tenancy refusal is asserted on the SQL that
+      // runs, not on an in-memory `filter`. It lives here rather than in a
+      // module of its own because this is its only caller: the production
+      // path is `@langwatch/dashboard-server`, which carries the same check
+      // as its own policy port.
+      dashboardBelongsToProject: async ({ dashboardId, projectId }) =>
+        (await prisma.dashboard.findFirst({
+          where: { id: dashboardId, projectId },
+          select: { id: true },
+        })) !== null,
       allocateNextGridRow: (input) => allocateNextGridRow(prisma, input),
     });
 
@@ -501,12 +508,8 @@ describe("saved workbench charts (integration)", () => {
             projectId: project.id,
           },
         });
-        expect(
-          stillAtTheirRows.find(({ id }) => id === builderRow0.id)?.gridRow,
-        ).toBe(0);
-        expect(
-          stillAtTheirRows.find(({ id }) => id === builderRow1.id)?.gridRow,
-        ).toBe(1);
+        expect(stillAtTheirRows.find(({ id }) => id === builderRow0.id)?.gridRow).toBe(0);
+        expect(stillAtTheirRows.find(({ id }) => id === builderRow1.id)?.gridRow).toBe(1);
       });
     });
   });
@@ -570,9 +573,7 @@ describe("saved workbench charts (integration)", () => {
           where: { dashboardId: dashboard.id, projectId: project.id },
         });
         expect(onDashboard.map(({ id }) => id)).toEqual([builder.id]);
-        expect(onDashboard.find(({ id }) => id === builder.id)?.gridRow).toBe(
-          0,
-        );
+        expect(onDashboard.find(({ id }) => id === builder.id)?.gridRow).toBe(0);
       });
     });
   });
