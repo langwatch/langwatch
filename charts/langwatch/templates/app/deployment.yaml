@@ -332,6 +332,11 @@ spec:
             {{- end }}
 
             {{- with .Values.app.extraEnvs}}
+            {{- range . }}
+            {{- if or (eq .name "NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS") (eq .name "NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS") }}
+            {{- fail (printf "app.extraEnvs must not set %s — it is a reserved timeout env var; use langwatch_nlp.codeBlockTimeoutSeconds instead" .name) }}
+            {{- end }}
+            {{- end }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
 

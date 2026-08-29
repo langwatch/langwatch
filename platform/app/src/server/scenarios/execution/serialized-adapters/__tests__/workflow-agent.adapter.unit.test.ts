@@ -3,7 +3,7 @@
  */
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkflowAgentData } from "../../types";
 
 vi.mock("@langwatch/observability/tracing", () => ({
@@ -517,6 +517,80 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
       const fetchOptions = mockFetch.mock.calls[0]![1];
       expect(fetchOptions.signal).toBeInstanceOf(AbortSignal);
+    });
+  });
+
+  describe("the fetch deadline it arms", () => {
+    /** Never resolves; rejects only when the adapter's own timer aborts it. */
+    const abortAwareFetch = (signal: AbortSignal) =>
+      new Promise<Response>((_resolve, reject) => {
+        if (signal.aborted) {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+          return;
+        }
+        const onAbort = () => {
+          signal.removeEventListener("abort", onAbort);
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        };
+        signal.addEventListener("abort", onAbort);
+      });
+
+    /**
+     * Whether the adapter aborted its own fetch within `advanceMs` of virtual
+     * time. The deadline is not reported on a span or in the thrown message,
+     * so bracketing it from both sides is the only way to pin the value.
+     */
+    const abortsWithin = async (advanceMs: number): Promise<boolean> => {
+      mockFetch.mockImplementation(
+        async (_url: string, opts: { signal: AbortSignal }) =>
+          abortAwareFetch(opts.signal),
+      );
+      vi.useFakeTimers();
+      let aborted = false;
+      try {
+        const adapter = new SerializedWorkflowAgentAdapter({
+          config: defaultConfig,
+          nlpServiceUrl,
+          projectApiKey: apiKey,
+        });
+        // Attach the rejection handler before advancing timers so the abort
+        // doesn't surface as an unhandled rejection. The promise stays pending
+        // forever when no abort fires, so it is deliberately not awaited.
+        void adapter.call(defaultInput).catch(() => {
+          aborted = true;
+        });
+        await vi.advanceTimersByTimeAsync(advanceMs);
+      } finally {
+        vi.useRealTimers();
+      }
+      return aborted;
+    };
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("still holds the socket just under the 630s default deadline", async () => {
+      expect(await abortsWithin(629_999)).toBe(false);
+    });
+
+    it("aborts at the 630s default deadline (engine ceiling + headroom)", async () => {
+      // Regression guard for the production bug this adapter's own hardcoded
+      // 120_000 caused: a run the engine was still legitimately working on
+      // was cut off client-side.
+      expect(await abortsWithin(630_001)).toBe(true);
+    });
+
+    it("still holds the socket just under the 900s platform maximum when the engine ceiling is raised past it", async () => {
+      vi.stubEnv("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", "1200");
+
+      expect(await abortsWithin(899_999)).toBe(false);
+    });
+
+    it("aborts at the 900s platform maximum when the engine ceiling is raised past it", async () => {
+      vi.stubEnv("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", "1200");
+
+      expect(await abortsWithin(900_001)).toBe(true);
     });
   });
 

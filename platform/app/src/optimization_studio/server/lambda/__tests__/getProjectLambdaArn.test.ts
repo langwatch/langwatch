@@ -373,6 +373,9 @@ describe("getProjectLambdaArn", () => {
 
         const arn = await getProjectLambdaArn("error-by-name");
         expect(arn).toBe(mockLambdaConfig.FunctionArn);
+        // Without this, a broken drift check that issues no update at all
+        // leaves the rejection unconsumed and the test still passes.
+        expect(configUpdateCalls(_send)).toHaveLength(1);
       });
 
       it("recognizes update-in-progress by message as fallback", async () => {
@@ -392,6 +395,7 @@ describe("getProjectLambdaArn", () => {
 
         const arn = await getProjectLambdaArn("error-by-message");
         expect(arn).toBe(mockLambdaConfig.FunctionArn);
+        expect(configUpdateCalls(_send)).toHaveLength(1);
       });
 
       it("throws unrelated errors", async () => {
@@ -436,32 +440,6 @@ describe("getProjectLambdaArn", () => {
       expect(updates).toHaveLength(1);
       expect(updates[0][0].input.MemorySize).toBe(NLP_LAMBDA_MEMORY_SIZE_MB);
       expect(NLP_LAMBDA_MEMORY_SIZE_MB).toBe(2048);
-    });
-
-    it("updates drifted Timeout", async () => {
-      const drifted = {
-        ...mockLambdaConfig,
-        Timeout: 300, // Short timeout, needs update to 900
-      };
-
-      const _send = vi
-        .spyOn(LambdaClient.prototype as any, "send")
-        // checkLambdaExists
-        .mockResolvedValueOnce({ Configuration: drifted })
-        // GetFunction for image/config details
-        .mockResolvedValueOnce({
-          Configuration: drifted,
-          Code: { ImageUri: currentImageUri },
-        })
-        .mockResolvedValueOnce(mockLambdaConfig)
-        .mockResolvedValue({ Configuration: mockLambdaConfig });
-
-      const arn = await getProjectLambdaArn("reconcile-timeout");
-      expect(arn).toBe(mockLambdaConfig.FunctionArn);
-
-      const updates = configUpdateCalls(_send);
-      expect(updates).toHaveLength(1);
-      expect(updates[0][0].input.Timeout).toBe(900);
     });
 
     it("updates drifted Timeout", async () => {
@@ -554,7 +532,8 @@ describe("getProjectLambdaArn", () => {
     it("swallows an in-progress conflict on the configuration update", async () => {
       const drifted = { ...mockLambdaConfig, MemorySize: 1024 };
 
-      vi.spyOn(LambdaClient.prototype as any, "send")
+      const _send = vi
+        .spyOn(LambdaClient.prototype as any, "send")
         .mockResolvedValueOnce({ Configuration: drifted })
         .mockResolvedValueOnce({
           Configuration: drifted,
@@ -565,6 +544,7 @@ describe("getProjectLambdaArn", () => {
 
       const arn = await getProjectLambdaArn("reconcile-conflict");
       expect(arn).toBe(mockLambdaConfig.FunctionArn);
+      expect(configUpdateCalls(_send)).toHaveLength(1);
     });
   });
 });

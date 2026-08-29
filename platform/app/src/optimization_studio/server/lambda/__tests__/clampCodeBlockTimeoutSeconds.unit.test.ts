@@ -53,6 +53,18 @@ describe("clampCodeBlockTimeoutSeconds", () => {
     expect(clampCodeBlockTimeoutSeconds("300")).toBe(300);
   });
 
+  it("returns the parsed value one second below MAX_SECONDS", () => {
+    expect(clampCodeBlockTimeoutSeconds("889")).toBe(889);
+  });
+
+  it("returns the parsed value at MAX_SECONDS", () => {
+    expect(clampCodeBlockTimeoutSeconds("890")).toBe(890);
+  });
+
+  it("clamps the first value above MAX_SECONDS to MAX_SECONDS", () => {
+    expect(clampCodeBlockTimeoutSeconds("891")).toBe(890);
+  });
+
   it("clamps values above MAX_SECONDS to MAX_SECONDS", () => {
     // MAX_SECONDS is 890 (900 - 10 safety margin)
     expect(clampCodeBlockTimeoutSeconds("900")).toBe(890);
