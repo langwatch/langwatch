@@ -20,11 +20,16 @@ import {
 /**
  * Whether a permission is org-scoped: it lives in ORGANIZATION_ROLE_PERMISSIONS
  * and must be resolved against the user's organization role, not any team-role
- * bag. Covers `organization:` itself plus the AI Governance resource family
- * (governance / ingestionSources / anomalyRules / complianceExport /
- * activityMonitor / aiTools). Team admins do NOT inherit these automatically;
- * delegation flows through the CustomRolePermissions JSON column at the team
- * level (matching the rest of the RBAC catalog).
+ * bag. Team admins do NOT inherit these automatically; delegation flows through
+ * the CustomRolePermissions JSON column at the team level (matching the rest of
+ * the RBAC catalog).
+ *
+ * The members are exactly the resources the authz registry declares grantable
+ * at the organization tier and no other — `ORG_EXCLUSIVE_RESOURCES` in rbac.ts,
+ * `permissionGrantTiers` in @langwatch/authz. Deliberately not enumerated here:
+ * this list has fallen behind the registry three times, and a docblock naming
+ * the members goes stale the same way. The unit test walks the registry and
+ * fails when the two disagree, so that check lives in CI rather than in prose.
  *
  * @internal Exported for testing only
  */
