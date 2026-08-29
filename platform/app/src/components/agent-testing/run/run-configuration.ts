@@ -14,10 +14,11 @@
 import type { RunParameterValues } from "~/server/scenarios/parameters";
 import {
   configurationKey,
+  parametersKey,
   scopeKey,
-  sortSuiteTargets,
 } from "~/server/suites/plan-config";
 import type { SuiteScope } from "~/server/suites/scope";
+import { targetLabelOf } from "~/server/suites/target-key";
 import type { SuiteTarget } from "~/server/suites/types";
 
 /**
@@ -89,9 +90,55 @@ export type RunConfigurationEntry = {
   lastRunAt: Date | null;
 };
 
-/** Targets in a stable order, whichever order they were picked in. */
+/**
+ * The identity of a target: its kind, its agent, and the overrides it runs
+ * with. The same agent twice with different overrides is two targets.
+ */
+function targetSortKey(target: SuiteTarget): string {
+  return `${target.type}:${target.referenceId}|${parametersKey(
+    target.runParameters,
+  )}`;
+}
+
+/**
+ * Targets in a stable order, whichever order they were picked in.
+ *
+ * The order is the one the run plan stores, so the name, the dropdown rows and
+ * the columns of the run detail read the targets the same way.
+ */
 export function sortTargets(targets: readonly SuiteTarget[]): SuiteTarget[] {
-  return sortSuiteTargets([...targets]);
+  return [...targets].sort((left, right) =>
+    targetSortKey(left).localeCompare(targetSortKey(right)),
+  );
+}
+
+/**
+ * What the targets are called, in sorted order.
+ *
+ * A target is named after its agent. The same agent appearing more than once
+ * is named with its overrides, so "dev-agent · model=gpt-5 vs dev-agent ·
+ * model=gpt-5-mini" tells the two apart.
+ */
+export function sortedTargetLabels({
+  targets,
+  targetLabels,
+  fallbackLabel,
+}: {
+  targets: readonly SuiteTarget[];
+  targetLabels: ReadonlyMap<string, string>;
+  /** What a target the project no longer offers reads as. */
+  fallbackLabel: (target: SuiteTarget) => string;
+}): string[] {
+  const sorted = sortTargets(targets);
+  return sorted.map((target) =>
+    targetLabelOf({
+      name: targetLabels.get(target.referenceId) ?? fallbackLabel(target),
+      runParameters: target.runParameters,
+      duplicated:
+        sorted.filter((other) => other.referenceId === target.referenceId)
+          .length > 1,
+    }),
+  );
 }
 
 /** The scenarios a rule names inside itself, which only a hand-picked one does. */
@@ -186,12 +233,11 @@ function factsOf({
     .join(", ");
 
   return {
-    targets: sortTargets(configuration.targets)
-      .map(
-        (target) =>
-          targetLabels.get(target.referenceId) ?? removedLabel(target),
-      )
-      .join(" vs "),
+    targets: sortedTargetLabels({
+      targets: configuration.targets,
+      targetLabels,
+      fallbackLabel: removedLabel,
+    }).join(" vs "),
     parameters: parameterNames
       .map((name) => `${name}=${entry.runParameters[name] ?? ""}`)
       .join(", "),

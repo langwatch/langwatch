@@ -6,8 +6,17 @@
  */
 
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
+import type { RunParameterValues } from "~/server/scenarios/parameters";
 import type { SuiteTarget } from "~/server/suites/types";
 import type { RunScope } from "./run-configuration";
+
+/**
+ * One target the run goes against: the agent, and in a comparison the
+ * overrides that target alone runs with.
+ */
+export type RunTarget = NonNullable<TargetValue> & {
+  runParameters?: RunParameterValues;
+};
 
 /**
  * What the dialog is about to run.
