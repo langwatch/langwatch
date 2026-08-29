@@ -50,3 +50,47 @@ export const opsStartReplayInputSchema = z.object({
   fullRebuild: z.boolean().optional(),
   description: z.string(),
 });
+
+// ---------------------------------------------------------------------------
+// The event explorer's answers.
+//
+// `OpsEventExplorer` said `Promise<unknown>` for all four of its operations,
+// so the replay wizard, the aggregate search and the projection-state viewer
+// read their fields off `{}`. Every shape below is the one
+// `EventExplorerService` already declares inline; naming them is what lets the
+// port publish them.
+// ---------------------------------------------------------------------------
+
+/** How many aggregates one projection would replay, and for whom. */
+export interface AggregateDiscovery {
+  projections: Array<{
+    projectionName: string;
+    aggregateCount: number;
+    tenantBreakdown: Array<{ tenantId: string; aggregateCount: number }>;
+  }>;
+}
+
+/** One aggregate the operator's search matched. */
+export interface AggregateSearchResult {
+  aggregateId: string;
+  aggregateType: string;
+  tenantId: string;
+  eventCount: number;
+  lastEventTime: string;
+}
+
+/** One stored event, with its payload parsed when it parses. */
+export interface AggregateEventView {
+  eventId: string;
+  eventType: string;
+  eventTimestamp: string;
+  payload: unknown;
+}
+
+/** A projection folded up to a chosen event, for the state viewer. */
+export interface ProjectionStateAtEvent {
+  state: unknown;
+  appliedEventCount: number;
+  projectionName: string;
+  aggregateType: string;
+}

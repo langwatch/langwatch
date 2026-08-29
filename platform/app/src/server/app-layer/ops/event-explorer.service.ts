@@ -3,10 +3,8 @@ import {
   getDejaViewProjections,
   getProjectionMetadata,
 } from "~/server/event-sourcing/registration/pipelineRegistry";
-import type {
-  AggregateSearchResult,
-  EventExplorerRepository,
-} from "./repositories/event-explorer.repository";
+import type { AggregateSearchResult } from "@langwatch/ops-contract";
+import type { EventExplorerRepository } from "./repositories/event-explorer.repository";
 
 const logger = createLogger("langwatch:ops:event-explorer");
 
@@ -45,10 +43,7 @@ export class EventExplorerService {
       tenantIds: params.tenantIds.length > 0 ? params.tenantIds : undefined,
     });
 
-    const byAggregateType = new Map<
-      string,
-      Array<{ tenantId: string; aggregateCount: number }>
-    >();
+    const byAggregateType = new Map<string, Array<{ tenantId: string; aggregateCount: number }>>();
     for (const row of rows) {
       const list = byAggregateType.get(row.aggregateType) ?? [];
       list.push({
@@ -69,10 +64,7 @@ export class EventExplorerService {
 
     for (const projection of selected) {
       const tenantBreakdown = byAggregateType.get(projection.aggregateType) ?? [];
-      const aggregateCount = tenantBreakdown.reduce(
-        (sum, t) => sum + t.aggregateCount,
-        0,
-      );
+      const aggregateCount = tenantBreakdown.reduce((sum, t) => sum + t.aggregateCount, 0);
       projections.push({
         projectionName: projection.projectionName,
         aggregateCount,
@@ -137,9 +129,7 @@ export class EventExplorerService {
     aggregateType: string;
   }> {
     const projections = getProjectionMetadata();
-    const projection = projections.find(
-      (p) => p.projectionName === params.projectionName,
-    );
+    const projection = projections.find((p) => p.projectionName === params.projectionName);
 
     if (!projection) {
       return {
@@ -176,8 +166,7 @@ export class EventExplorerService {
     for (const row of rows) {
       let parsedPayload: unknown;
       try {
-        parsedPayload =
-          typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload;
+        parsedPayload = typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload;
       } catch {
         parsedPayload = {};
       }

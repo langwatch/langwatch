@@ -51,6 +51,7 @@ import type {
   ProcessInstanceRow,
   ProcessOutboxMessageView,
   ProcessWakeRow,
+  ProjectionStateAtEvent,
   ReplayHistoryEntry,
   ReplayStatus,
 } from "@langwatch/ops-contract";
@@ -80,23 +81,23 @@ export type OpsEventExplorer = {
     projectionNames: string[];
     since: string;
     tenantIds: string[];
-  }): Promise<unknown>;
+  }): Promise<AggregateDiscovery>;
   searchAggregates(input: {
     query: string;
     tenantIds: string[];
     sinceMs: number;
-  }): Promise<unknown>;
+  }): Promise<AggregateSearchResult[]>;
   getAggregateEvents(input: {
     aggregateId: string;
     tenantId: string;
     limit: number;
-  }): Promise<unknown>;
+  }): Promise<AggregateEventView[]>;
   computeProjectionState(input: {
     aggregateId: string;
     tenantId: string;
     projectionName: string;
     eventIndex: number;
-  }): Promise<{ aggregateType?: unknown }>;
+  }): Promise<ProjectionStateAtEvent>;
 };
 
 export type OpsProcessExplorer = {

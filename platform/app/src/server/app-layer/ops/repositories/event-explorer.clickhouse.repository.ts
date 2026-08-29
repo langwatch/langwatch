@@ -1,7 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { AggregateSearchResult } from "@langwatch/ops-contract";
 import type {
   AggregateDiscoveryRow,
-  AggregateSearchResult,
   EventExplorerRepository,
   RawEventRow,
 } from "./event-explorer.repository";
@@ -19,9 +19,7 @@ export class EventExplorerClickHouseRepository implements EventExplorerRepositor
     tenantIds?: string[];
   }): Promise<AggregateDiscoveryRow[]> {
     const hasTenantFilter = params.tenantIds !== undefined && params.tenantIds.length > 0;
-    const tenantClause = hasTenantFilter
-      ? "AND TenantId IN ({tenantIds:Array(String)})"
-      : "";
+    const tenantClause = hasTenantFilter ? "AND TenantId IN ({tenantIds:Array(String)})" : "";
 
     const queryParams: Record<string, unknown> = {
       aggregateTypes: params.aggregateTypes,
@@ -94,9 +92,7 @@ export class EventExplorerClickHouseRepository implements EventExplorerRepositor
       // Rationale lives in the comment above (cross-tenant unbounded scan
       // over the whole event_log) but the message reaches the ops UI - the
       // user-facing text should tell them what to do, not name the method.
-      throw new Error(
-        "Enter a search query or pick at least one tenant before searching.",
-      );
+      throw new Error("Enter a search query or pick at least one tenant before searching.");
     }
 
     // No silent time clamp in the repo. The caller (the ops router for the
@@ -110,8 +106,7 @@ export class EventExplorerClickHouseRepository implements EventExplorerRepositor
     const queryParams: Record<string, unknown> = {};
     let timeBoundFilter = "";
     if (typeof params.sinceMs === "number" && params.sinceMs > 0) {
-      timeBoundFilter =
-        "AND (EventOccurredAt = 0 OR EventOccurredAt >= {sinceMs:UInt64})";
+      timeBoundFilter = "AND (EventOccurredAt = 0 OR EventOccurredAt >= {sinceMs:UInt64})";
       queryParams.sinceMs = params.sinceMs;
     }
 

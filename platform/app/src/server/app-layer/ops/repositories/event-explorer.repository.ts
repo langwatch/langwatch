@@ -1,15 +1,9 @@
+import type { AggregateSearchResult } from "@langwatch/ops-contract";
+
 export interface AggregateDiscoveryRow {
   aggregateType: string;
   tenantId: string;
   aggregateCount: number;
-}
-
-export interface AggregateSearchResult {
-  aggregateId: string;
-  aggregateType: string;
-  tenantId: string;
-  eventCount: number;
-  lastEventTime: string;
 }
 
 export interface RawEventRow {
