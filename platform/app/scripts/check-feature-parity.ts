@@ -545,7 +545,6 @@ const LEGACY_INERT: string[] = [
   "specs/scenarios/internal-scenario-namespace.feature",
   "specs/scenarios/internal-set-namespace.feature",
   "specs/scenarios/provider-setup-link-from-warnings.feature",
-  "specs/scenarios/scenario-api.feature",
   "specs/scenarios/scenario-bulk-actions.feature",
   "specs/scenarios/scenario-deferred-persistence.feature",
   "specs/scenarios/scenario-deletion.feature",

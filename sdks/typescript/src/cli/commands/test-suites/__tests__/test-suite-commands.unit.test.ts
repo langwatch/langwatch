@@ -7,8 +7,9 @@
  *
  * Spec: specs/features/test-suite-cli.feature
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { TestSuitesApiError } from "@/client-sdk/services/test-suites";
+import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 
 const listSpy = vi.hoisted(() => vi.fn());
 const createSpy = vi.hoisted(() => vi.fn());
@@ -90,8 +91,29 @@ const makeRunResult = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+/**
+ * The command resolves its output format from the flags AND the agent-mode env
+ * vars, so a test runner living inside a coding agent (CLAUDECODE set) must not
+ * flip the human-path tests into a machine format.
+ */
+let savedAgentEnv: Record<string, string | undefined> = {};
+
+/** Every JSON document the command printed on stdout. */
+const printedDocuments = (): string[] =>
+  vi
+    .mocked(console.log)
+    .mock.calls.map((call) => call[0] as unknown)
+    .filter(
+      (line): line is string =>
+        typeof line === "string" && line.trimStart().startsWith("{"),
+    );
+
 beforeEach(() => {
   vi.clearAllMocks();
+  savedAgentEnv = Object.fromEntries(
+    AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
+  );
+  for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
   listSpy.mockResolvedValue([makeSuite()]);
   createSpy.mockResolvedValue(makeSuite({ scenarioIds: [], scenarioCount: 0 }));
   getSpy.mockResolvedValue({
@@ -109,6 +131,17 @@ beforeEach(() => {
   vi.spyOn(process, "exit").mockImplementation((code) => {
     throw new ProcessExitError(code as number);
   });
+});
+
+afterEach(() => {
+  for (const name of AGENT_MODE_ENV_VARS) {
+    const value = savedAgentEnv[name];
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
+  // The wait paths set the exit code; a leftover value would fail the whole
+  // vitest process at the end of the run.
+  process.exitCode = undefined;
 });
 
 describe("listTestSuitesCommand()", () => {
@@ -427,6 +460,68 @@ describe("runTestSuiteCommand()", () => {
       });
 
       expect(fetchSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe("when --wait ends under a machine format", () => {
+    /** @scenario "Wait for a test suite run with machine-readable output" */
+    it("prints exactly one final document with the tallies, the per-run results and the outcome", async () => {
+      runSpy.mockResolvedValue(makeRunResult({ jobCount: 1 }));
+      // A fresh response per call: a `Response` body can be read once, so one
+      // shared object turns the second poll into a poll FAILURE.
+      vi.spyOn(globalThis, "fetch").mockImplementation(
+        async () =>
+          new Response(
+            JSON.stringify({
+              runs: [
+                {
+                  batchRunId: "batch_123",
+                  scenarioRunId: "run_1",
+                  scenarioId: "scenario_1",
+                  status: "SUCCESS",
+                  results: { verdict: "success" },
+                },
+              ],
+              hasMore: false,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+      );
+
+      vi.useFakeTimers();
+      try {
+        const promise = runTestSuiteCommand({
+          reference: "suite_abc",
+          options: {
+            target: ["http:agent_abc"],
+            wait: true,
+            format: "json",
+          },
+        });
+        await vi.advanceTimersByTimeAsync(3000);
+        await promise;
+      } finally {
+        vi.useRealTimers();
+      }
+
+      const documents = printedDocuments();
+      expect(documents).toHaveLength(1);
+      const document = JSON.parse(documents[0]!) as Record<string, unknown>;
+      expect(document.outcome).toBe("passed");
+      expect(document.tallies).toEqual({
+        total: 1,
+        completed: 1,
+        passed: 1,
+        failed: 0,
+      });
+      expect(document.results).toEqual([
+        {
+          scenarioRunId: "run_1",
+          scenarioId: "scenario_1",
+          status: "SUCCESS",
+          verdict: "success",
+        },
+      ]);
     });
   });
 

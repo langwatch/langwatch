@@ -303,6 +303,77 @@ export function buildStartedAtWindowClause(window: WindowFragment | null): {
   };
 }
 
+/**
+ * Page size ceilings for the set-level list reads. The trimmed projection
+ * takes up to 100 runs a page; a caller asking for whole conversations reads
+ * the full message arrays, which is what the trim exists to avoid, so its
+ * page is capped far lower rather than refused.
+ */
+export const LIST_PAGE_LIMIT = 100;
+export const FULL_MESSAGES_PAGE_LIMIT = 20;
+
+/**
+ * Cuts a full-message page at a batch boundary.
+ *
+ * The page limit selects batches, and one batch holds every run of a suite,
+ * so a page of 20 batches can carry far more than 20 runs. With whole
+ * conversations attached that is the payload the cap exists to prevent. The
+ * page therefore stops before the batch that would pass the run ceiling.
+ *
+ * The cut is always at a batch boundary, because the cursor advances by
+ * batch: a page ending inside a batch would skip the rest of it on the next
+ * read. The first batch is always kept whole, so a single batch larger than
+ * the ceiling still moves the cursor forward.
+ */
+function groupRunsByBatch(
+  runs: ScenarioRunData[],
+): Map<string, ScenarioRunData[]> {
+  const byBatch = new Map<string, ScenarioRunData[]>();
+  for (const run of runs) {
+    const existing = byBatch.get(run.batchRunId);
+    if (existing) existing.push(run);
+    else byBatch.set(run.batchRunId, [run]);
+  }
+  return byBatch;
+}
+
+export function capRunsAtBatchBoundary({
+  runs,
+  batchRunIds,
+  ceiling,
+}: {
+  runs: ScenarioRunData[];
+  batchRunIds: string[];
+  ceiling: number;
+}): { runs: ScenarioRunData[]; batchesKept: number } {
+  const byBatch = groupRunsByBatch(runs);
+
+  const kept: ScenarioRunData[] = [];
+  let batchesKept = 0;
+  for (const batchRunId of batchRunIds) {
+    const batch = byBatch.get(batchRunId) ?? [];
+    if (kept.length > 0 && kept.length + batch.length > ceiling) break;
+    kept.push(...batch);
+    batchesKept++;
+    if (kept.length >= ceiling) break;
+  }
+
+  return { runs: kept, batchesKept };
+}
+
+export function clampPageLimit({
+  limit,
+  shouldIncludeMessages,
+}: {
+  limit: number;
+  shouldIncludeMessages: boolean;
+}): number {
+  const ceiling = shouldIncludeMessages
+    ? FULL_MESSAGES_PAGE_LIMIT
+    : LIST_PAGE_LIMIT;
+  return Math.min(Math.max(1, limit), ceiling);
+}
+
 const RUN_COLUMNS = `
   ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
   Status, Name, Description, Metadata,
@@ -325,10 +396,18 @@ const RUN_COLUMNS = `
  * Reasoning and Error (detail-drawer-only payloads; Reasoning is the judge's
  * multi-paragraph rationale and Error can carry stack traces). MetCriteria /
  * UnmetCriteria stay: the list renders "Passed (met/total)" from their counts.
+ *
+ * `TotalMessageCount` is the one addition the slice itself needs: reading the
+ * array length costs nothing next to the payload, and without it a caller
+ * cannot tell a 6-message page from a 6-message conversation. It MUST stay
+ * table-qualified (`t.`) — ClickHouse resolves it against the SELECT aliases
+ * otherwise, so it would measure the sliced array and always report 6.
+ * This projection is therefore only valid in a query that reads through `t`.
  */
 const LIST_COLUMNS = `
   ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
   Status, Name, Description, Metadata,
+  toString(length(t.\`Messages.Role\`)) AS TotalMessageCount,
   arraySlice(\`Messages.Id\`, 1, 6) AS \`Messages.Id\`,
   arraySlice(\`Messages.Role\`, 1, 6) AS \`Messages.Role\`,
   arraySlice(\`Messages.Content\`, 1, 6) AS \`Messages.Content\`,
@@ -941,6 +1020,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     cursor,
     startDate,
     endDate,
+    shouldIncludeMessages = false,
   }: {
     projectId: string;
     scenarioSetId: string;
@@ -948,12 +1028,13 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     cursor?: string;
     startDate?: number;
     endDate?: number;
+    shouldIncludeMessages?: boolean;
   }): Promise<{
     runs: ScenarioRunData[];
     nextCursor?: string;
     hasMore: boolean;
   }> {
-    const validatedLimit = Math.min(Math.max(1, limit), 100);
+    const validatedLimit = clampPageLimit({ limit, shouldIncludeMessages });
     const decoded = cursor ? this.decodeCursor(cursor) : null;
 
     const cursorPredicate = decoded
@@ -1014,54 +1095,63 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       projectId,
       batchRunIds,
       scenarioSetId,
+      shouldIncludeMessages,
     });
 
-    return { runs, nextCursor, hasMore };
+    if (!shouldIncludeMessages) return { runs, nextCursor, hasMore };
+
+    const capped = capRunsAtBatchBoundary({
+      runs,
+      batchRunIds,
+      ceiling: FULL_MESSAGES_PAGE_LIMIT,
+    });
+    if (capped.batchesKept === pageRows.length) {
+      return { runs: capped.runs, nextCursor, hasMore };
+    }
+    const lastKept = pageRows[capped.batchesKept - 1]!;
+    return {
+      runs: capped.runs,
+      nextCursor: this.encodeCursor(lastKept.MaxCreatedAt, lastKept.BatchRunId),
+      hasMore: true,
+    };
   }
 
-  async getRunDataForAllSuites({
+  /** The newest UpdatedAt across every live run, for the cheap change check. */
+  private async readMaxUpdatedAt(projectId: string): Promise<number> {
+    const tsRows = await this.queryRows<{ LastUpdatedAt: string }>(
+      `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
+       FROM ${TABLE_NAME}
+       WHERE TenantId = {tenantId:String}
+         AND ArchivedAt IS NULL`,
+      { tenantId: projectId },
+    );
+    return Number(tsRows[0]?.LastUpdatedAt ?? "0");
+  }
+
+  /**
+   * One page of batch ids, newest first, with the cursor and the date filter
+   * applied.
+   *
+   * NOTE: The aggregate is aliased as NormalizedSetId (not ScenarioSetId) on
+   * purpose — aliasing as ScenarioSetId would shadow the underlying column
+   * referenced in the dedup IN-tuple below, causing ClickHouse to reject the
+   * query with "Aggregate function ... is found in WHERE in query".
+   */
+  private async selectBatchPage({
     projectId,
-    limit = 20,
-    cursor,
+    decoded,
     startDate,
     endDate,
-    sinceTimestamp,
+    fetchLimit,
   }: {
     projectId: string;
-    limit?: number;
-    cursor?: string;
+    decoded: CursorPayload | null;
     startDate?: number;
     endDate?: number;
-    sinceTimestamp?: number;
+    fetchLimit: number;
   }): Promise<
-    | { changed: false; lastUpdatedAt: number }
-    | {
-        changed: true;
-        lastUpdatedAt: number;
-        runs: ScenarioRunData[];
-        scenarioSetIds: Record<string, string>;
-        nextCursor?: string;
-        hasMore: boolean;
-      }
+    { BatchRunId: string; MaxCreatedAt: string; NormalizedSetId: string }[]
   > {
-    // Cheap timestamp check: skip heavy query if nothing changed
-    if (sinceTimestamp !== undefined) {
-      const tsRows = await this.queryRows<{ LastUpdatedAt: string }>(
-        `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
-         FROM ${TABLE_NAME}
-         WHERE TenantId = {tenantId:String}
-           AND ArchivedAt IS NULL`,
-        { tenantId: projectId },
-      );
-      const lastUpdatedAt = Number(tsRows[0]?.LastUpdatedAt ?? "0");
-      if (lastUpdatedAt <= sinceTimestamp) {
-        return { changed: false, lastUpdatedAt };
-      }
-    }
-
-    const validatedLimit = Math.min(Math.max(1, limit), 100);
-    const decoded = cursor ? this.decodeCursor(cursor) : null;
-
     const cursorPredicate = decoded
       ? `(
           (toString(toUnixTimestamp64Milli(max(CreatedAt))) < {cursorTs:String})
@@ -1073,11 +1163,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
     const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.havingClause].filter(Boolean).join(" AND ")}`;
 
-    // NOTE: The aggregate is aliased as NormalizedSetId (not ScenarioSetId) on
-    // purpose — aliasing as ScenarioSetId would shadow the underlying column
-    // referenced in the dedup IN-tuple below, causing ClickHouse to reject the
-    // query with "Aggregate function ... is found in WHERE in query".
-    const batchRows = await this.queryRows<{
+    return await this.queryRows<{
       BatchRunId: string;
       MaxCreatedAt: string;
       NormalizedSetId: string;
@@ -1101,9 +1187,88 @@ export class SimulationClickHouseRepository implements SimulationRepository {
           ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId }
           : {}),
         ...dateFilter.params,
-        fetchLimit: String(validatedLimit + 1),
+        fetchLimit: String(fetchLimit),
       },
     );
+  }
+
+  /**
+   * Stops a full-message page at a batch boundary and moves the cursor to the
+   * last batch that was kept.
+   */
+  private capPageAtBatchBoundary({
+    runs,
+    pageRows,
+    nextCursor,
+    hasMore,
+  }: {
+    runs: ScenarioRunData[];
+    pageRows: { BatchRunId: string; MaxCreatedAt: string }[];
+    nextCursor?: string;
+    hasMore: boolean;
+  }): { runs: ScenarioRunData[]; nextCursor?: string; hasMore: boolean } {
+    const capped = capRunsAtBatchBoundary({
+      runs,
+      batchRunIds: pageRows.map((row) => row.BatchRunId),
+      ceiling: FULL_MESSAGES_PAGE_LIMIT,
+    });
+    const cutShort = capped.batchesKept < pageRows.length;
+    const lastKept = pageRows[capped.batchesKept - 1];
+    return {
+      runs: capped.runs,
+      nextCursor:
+        cutShort && lastKept
+          ? this.encodeCursor(lastKept.MaxCreatedAt, lastKept.BatchRunId)
+          : nextCursor,
+      hasMore: cutShort ? true : hasMore,
+    };
+  }
+
+  async getRunDataForAllSuites({
+    projectId,
+    limit = 20,
+    cursor,
+    startDate,
+    endDate,
+    sinceTimestamp,
+    shouldIncludeMessages = false,
+  }: {
+    projectId: string;
+    limit?: number;
+    cursor?: string;
+    startDate?: number;
+    endDate?: number;
+    sinceTimestamp?: number;
+    shouldIncludeMessages?: boolean;
+  }): Promise<
+    | { changed: false; lastUpdatedAt: number }
+    | {
+        changed: true;
+        lastUpdatedAt: number;
+        runs: ScenarioRunData[];
+        scenarioSetIds: Record<string, string>;
+        nextCursor?: string;
+        hasMore: boolean;
+      }
+  > {
+    // Cheap timestamp check: skip heavy query if nothing changed
+    if (sinceTimestamp !== undefined) {
+      const lastUpdatedAt = await this.readMaxUpdatedAt(projectId);
+      if (lastUpdatedAt <= sinceTimestamp) {
+        return { changed: false, lastUpdatedAt };
+      }
+    }
+
+    const validatedLimit = clampPageLimit({ limit, shouldIncludeMessages });
+    const decoded = cursor ? this.decodeCursor(cursor) : null;
+
+    const batchRows = await this.selectBatchPage({
+      projectId,
+      decoded,
+      startDate,
+      endDate,
+      fetchLimit: validatedLimit + 1,
+    });
 
     const hasMore = batchRows.length > validatedLimit;
     const pageRows = hasMore ? batchRows.slice(0, validatedLimit) : batchRows;
@@ -1130,19 +1295,32 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     }
 
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
-    const runs = await this.getRunsForBatchIds({ projectId, batchRunIds });
+    const runs = await this.getRunsForBatchIds({
+      projectId,
+      batchRunIds,
+      shouldIncludeMessages,
+    });
     const lastUpdatedAt = runs.reduce(
       (max, r) => Math.max(max, r.timestamp),
       0,
     );
 
+    if (!shouldIncludeMessages) {
+      return {
+        changed: true,
+        lastUpdatedAt,
+        runs,
+        scenarioSetIds,
+        nextCursor,
+        hasMore,
+      };
+    }
+
     return {
       changed: true,
       lastUpdatedAt,
-      runs,
       scenarioSetIds,
-      nextCursor,
-      hasMore,
+      ...this.capPageAtBatchBoundary({ runs, pageRows, nextCursor, hasMore }),
     };
   }
 
@@ -1726,10 +1904,17 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     projectId,
     batchRunIds,
     scenarioSetId,
+    shouldIncludeMessages = false,
   }: {
     projectId: string;
     batchRunIds: string[];
     scenarioSetId?: string;
+    /**
+     * Reads the full message arrays instead of the trimmed list projection.
+     * Heavy: only for a caller that asked for whole conversations, and only
+     * with the page size already capped by FULL_MESSAGES_PAGE_LIMIT.
+     */
+    shouldIncludeMessages?: boolean;
   }): Promise<ScenarioRunData[]> {
     if (batchRunIds.length === 0) return [];
 
@@ -1741,7 +1926,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       : "";
 
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
-      `SELECT ${LIST_COLUMNS}
+      `SELECT ${shouldIncludeMessages ? RUN_COLUMNS : LIST_COLUMNS}
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
          AND t.BatchRunId IN ({batchRunIds:Array(String)})

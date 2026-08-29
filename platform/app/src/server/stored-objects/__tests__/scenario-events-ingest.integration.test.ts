@@ -40,17 +40,21 @@ import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 // onError handler turns that into a 500 — masking the route logic entirely.
 // Hoisted so the DELETE scope-guard tests can control the set-scoped run-id
 // lookup and assert which runs get archived (or that none do).
-const { mockGetRunIdsForSet, mockDeleteRun, mockMessageSnapshot } = vi.hoisted(
-  () => ({
-    mockGetRunIdsForSet: vi
-      .fn()
-      .mockResolvedValue({ runIds: [] as string[], reachedCap: false }),
-    mockDeleteRun: vi.fn().mockResolvedValue(undefined),
-    // Hoisted so tests can assert the REWRITTEN payload reaches dispatch —
-    // the seam between "route returned 201" and "the user sees the turn".
-    mockMessageSnapshot: vi.fn().mockResolvedValue(undefined),
-  }),
-);
+const {
+  mockGetRunIdsForSet,
+  mockDeleteRun,
+  mockGetScenarioRunData,
+  mockMessageSnapshot,
+} = vi.hoisted(() => ({
+  mockGetRunIdsForSet: vi
+    .fn()
+    .mockResolvedValue({ runIds: [] as string[], reachedCap: false }),
+  mockDeleteRun: vi.fn().mockResolvedValue(undefined),
+  mockGetScenarioRunData: vi.fn().mockResolvedValue(null),
+  // Hoisted so tests can assert the REWRITTEN payload reaches dispatch —
+  // the seam between "route returned 201" and "the user sees the turn".
+  mockMessageSnapshot: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
@@ -63,7 +67,10 @@ vi.mock("~/server/app-layer/app", () => ({
       textMessageEnd: vi.fn().mockResolvedValue(undefined),
       finishRun: vi.fn().mockResolvedValue(undefined),
       deleteRun: mockDeleteRun,
-      runs: { getRunIdsForSet: mockGetRunIdsForSet },
+      runs: {
+        getRunIdsForSet: mockGetRunIdsForSet,
+        getScenarioRunData: mockGetScenarioRunData,
+      },
     },
     broadcast: {
       broadcastToTenantRateLimited: vi.fn().mockResolvedValue(undefined),
@@ -715,11 +722,13 @@ describe("DELETE /api/scenario-events (scoped archive)", () => {
   beforeEach(() => {
     mockGetRunIdsForSet.mockClear();
     mockDeleteRun.mockClear();
+    mockGetScenarioRunData.mockClear();
     mockGetRunIdsForSet.mockResolvedValue({ runIds: [], reachedCap: false });
+    mockGetScenarioRunData.mockResolvedValue(null);
   });
 
-  describe("when no scenarioSetId is provided", () => {
-    /** @scenario "DELETE without scenarioSetId is refused" */
+  describe("when neither scenarioSetId nor scenarioRunId is provided", () => {
+    /** @scenario "DELETE without a scope is refused" */
     it("refuses the request and archives nothing — never wipes the whole project", async () => {
       const res = await app.request("/api/scenario-events", {
         method: "DELETE",
@@ -747,6 +756,67 @@ describe("DELETE /api/scenario-events (scoped archive)", () => {
 
       expect(res.status).toBe(422);
       expect(mockGetRunIdsForSet).not.toHaveBeenCalled();
+      expect(mockDeleteRun).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when both scenarioSetId and scenarioRunId are provided", () => {
+    /** @scenario "DELETE with both scenarioSetId and scenarioRunId is refused" */
+    it("refuses the request and archives nothing", async () => {
+      const res = await app.request(
+        "/api/scenario-events?scenarioSetId=set-a&scenarioRunId=run-a",
+        { method: "DELETE", headers: { "X-Auth-Token": testApiKey } },
+      );
+
+      expect(res.status).toBe(422);
+      expect(mockGetRunIdsForSet).not.toHaveBeenCalled();
+      expect(mockDeleteRun).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a scenarioRunId is provided", () => {
+    /** @scenario "DELETE with scenarioRunId archives exactly that run" */
+    it("archives only that run after an ownership check", async () => {
+      mockGetScenarioRunData.mockResolvedValueOnce({
+        scenarioRunId: "run-mine",
+      });
+
+      const res = await app.request(
+        "/api/scenario-events?scenarioRunId=run-mine",
+        { method: "DELETE", headers: { "X-Auth-Token": testApiKey } },
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toMatchObject({
+        archived: 1,
+        failed: 0,
+        scenarioRunId: "run-mine",
+      });
+      expect(mockGetScenarioRunData).toHaveBeenCalledWith({
+        projectId: testProjectId,
+        scenarioRunId: "run-mine",
+      });
+      expect(mockDeleteRun).toHaveBeenCalledTimes(1);
+      expect(mockDeleteRun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: testProjectId,
+          scenarioRunId: "run-mine",
+        }),
+      );
+      expect(mockGetRunIdsForSet).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "DELETE with a scenarioRunId the project does not hold is not found" */
+    it("returns 404 and archives nothing when the run is not in the project", async () => {
+      mockGetScenarioRunData.mockResolvedValueOnce(null);
+
+      const res = await app.request(
+        "/api/scenario-events?scenarioRunId=run-elsewhere",
+        { method: "DELETE", headers: { "X-Auth-Token": testApiKey } },
+      );
+
+      expect(res.status).toBe(404);
       expect(mockDeleteRun).not.toHaveBeenCalled();
     });
   });

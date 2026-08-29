@@ -640,13 +640,15 @@ export const httpComponentSchema = baseComponentSchema.extend({
   /**
    * Present while `langwatch agent dev` points this agent at a local tunnel:
    * `previousUrl` is what the CLI restores on exit, `connectedAt` when the
-   * session started. Set and removed by the CLI; the platform reads it to
-   * show the local-tunnel badge and to name tunnel failures.
+   * session started, `heartbeatAt` the last time the session's health monitor
+   * saw the tunnel answer. Set and removed by the CLI; the platform reads it
+   * to show the local-tunnel badge and to name tunnel failures.
    */
   devTunnel: z
     .object({
       previousUrl: z.string().optional(),
       connectedAt: z.string().optional(),
+      heartbeatAt: z.string().optional(),
     })
     .optional(),
 });

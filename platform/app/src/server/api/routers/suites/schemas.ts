@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { modelOverrideSchema } from "~/server/modelProviders/modelOverrideSchema";
 import { suiteScopeSchema } from "~/server/suites/scope";
 import { suiteTargetSchema } from "~/server/suites/types";
 
@@ -35,8 +36,8 @@ export const createSuiteSchema = projectSchema
     labels: z.array(z.string()).default([]),
     // Run-plan-wide model overrides; null = use the project default
     // (scenarios.user_simulator / scenarios.judge).
-    simulatorModel: z.string().nullish(),
-    judgeModel: z.string().nullish(),
+    simulatorModel: modelOverrideSchema.nullish(),
+    judgeModel: modelOverrideSchema.nullish(),
   })
   .superRefine((input, ctx) => {
     const picksCases = !input.scope || input.scope.mode === "scenarios";
@@ -58,6 +59,6 @@ export const updateSuiteSchema = projectSchema.extend({
   targets: z.array(suiteTargetSchema).optional(),
   repeatCount: z.number().int().min(1).max(100).optional(),
   labels: z.array(z.string()).optional(),
-  simulatorModel: z.string().nullish(),
-  judgeModel: z.string().nullish(),
+  simulatorModel: modelOverrideSchema.nullish(),
+  judgeModel: modelOverrideSchema.nullish(),
 });

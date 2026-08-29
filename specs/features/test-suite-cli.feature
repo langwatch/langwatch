@@ -136,6 +136,12 @@ Feature: Test Suite CLI Commands
     Then the CLI polls until every run of the batch has stopped
     And I see the pass and fail counts
 
+  @unit
+  Scenario: Wait for a test suite run with machine-readable output
+    When I run "langwatch test-suite run <suite-id> --target http:agent_abc --wait" asking for JSON output
+    Then exactly one final document carries the per-run results, the tallies and the outcome
+    And no other line is printed on stdout
+
   # ==========================================================================
   # Command tree
   # ==========================================================================

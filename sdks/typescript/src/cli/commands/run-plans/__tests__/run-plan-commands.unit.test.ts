@@ -8,8 +8,9 @@
  *
  * Spec: specs/features/run-plan-cli.feature
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { RunPlansApiError } from "@/client-sdk/services/run-plans";
+import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 
 const runSpy = vi.hoisted(() => vi.fn());
 const listSpy = vi.hoisted(() => vi.fn());
@@ -96,8 +97,29 @@ const makePlan = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+/**
+ * The command resolves its output format from the flags AND the agent-mode env
+ * vars, so a test runner living inside a coding agent (CLAUDECODE set) must not
+ * flip the human-path tests into a machine format.
+ */
+let savedAgentEnv: Record<string, string | undefined> = {};
+
+/** Every JSON document the command printed on stdout. */
+const printedDocuments = (): string[] =>
+  vi
+    .mocked(console.log)
+    .mock.calls.map((call) => call[0] as unknown)
+    .filter(
+      (line): line is string =>
+        typeof line === "string" && line.trimStart().startsWith("{"),
+    );
+
 beforeEach(() => {
   vi.clearAllMocks();
+  savedAgentEnv = Object.fromEntries(
+    AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
+  );
+  for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
   runSpy.mockResolvedValue(makeRunResult());
   listSpy.mockResolvedValue([]);
   getSpy.mockResolvedValue(makePlan());
@@ -109,6 +131,54 @@ beforeEach(() => {
     throw new ProcessExitError(code as number);
   });
 });
+
+afterEach(() => {
+  for (const name of AGENT_MODE_ENV_VARS) {
+    const value = savedAgentEnv[name];
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
+  // The wait paths set the exit code; a leftover value would fail the whole
+  // vitest process at the end of the run.
+  process.exitCode = undefined;
+});
+
+/**
+ * A fresh response per call. A `Response` body can be read once, so handing the
+ * same object to every poll turns the second read into a poll FAILURE.
+ */
+const answersWith = (runs: unknown[]) =>
+  vi.spyOn(globalThis, "fetch").mockImplementation(
+    async () =>
+      new Response(JSON.stringify({ runs, hasMore: false }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+  );
+
+/** Drives the poll without waiting out its real three-second interval. */
+const runWithFakeTimers = async ({
+  advanceMs,
+  format = "json",
+}: {
+  advanceMs: number;
+  /** The commander default is "table", which is the human path. */
+  format?: string;
+}): Promise<void> => {
+  vi.useFakeTimers();
+  try {
+    const promise = runRunPlanCommand({
+      all: true,
+      target: ["http:agent_abc"],
+      wait: true,
+      format,
+    });
+    await vi.advanceTimersByTimeAsync(advanceMs);
+    await promise;
+  } finally {
+    vi.useRealTimers();
+  }
+};
 
 describe("runRunPlanCommand()", () => {
   describe("when the scope covers every scenario", () => {
@@ -389,7 +459,8 @@ describe("runRunPlanCommand()", () => {
   });
 
   describe("when a machine format is requested", () => {
-    it("prints the raw run result", async () => {
+    /** @scenario "Run with machine-readable output" */
+    it("prints one document carrying the schedule payload and a scheduled outcome", async () => {
       const result = makeRunResult();
       runSpy.mockResolvedValue(result);
 
@@ -399,7 +470,119 @@ describe("runRunPlanCommand()", () => {
         format: "json",
       });
 
-      expect(console.log).toHaveBeenCalledWith(JSON.stringify(result, null, 2));
+      expect(printedDocuments()).toEqual([
+        JSON.stringify({ ...result, outcome: "scheduled" }, null, 2),
+      ]);
+    });
+  });
+
+  describe("when --wait ends under a machine format", () => {
+    /** @scenario "Wait with machine-readable output" */
+    it("prints exactly one final document with the tallies, the per-run results and the outcome", async () => {
+      runSpy.mockResolvedValue(makeRunResult({ jobCount: 2 }));
+      answersWith([
+        {
+          batchRunId: "batch_123",
+          scenarioRunId: "run_1",
+          scenarioId: "scenario_1",
+          status: "SUCCESS",
+          results: { verdict: "success" },
+        },
+        {
+          batchRunId: "batch_123",
+          scenarioRunId: "run_2",
+          scenarioId: "scenario_2",
+          status: "ERROR",
+          results: null,
+        },
+      ]);
+
+      await runWithFakeTimers({ advanceMs: 3000 });
+
+      const documents = printedDocuments();
+      expect(documents).toHaveLength(1);
+      const document = JSON.parse(documents[0]!) as Record<string, unknown>;
+      expect(document.batchRunId).toBe("batch_123");
+      expect(document.outcome).toBe("failed");
+      expect(document.tallies).toEqual({
+        total: 2,
+        completed: 2,
+        passed: 1,
+        failed: 1,
+      });
+      expect(document.results).toEqual([
+        {
+          scenarioRunId: "run_1",
+          scenarioId: "scenario_1",
+          status: "SUCCESS",
+          verdict: "success",
+        },
+        {
+          scenarioRunId: "run_2",
+          scenarioId: "scenario_2",
+          status: "ERROR",
+          verdict: null,
+        },
+      ]);
+      expect(process.exitCode).toBe(1);
+    });
+  });
+
+  describe("when the wait times out under a machine format", () => {
+    /** @scenario "A timed-out wait still emits the machine-readable document" */
+    it("still prints the final document, naming the timeout outcome", async () => {
+      runSpy.mockResolvedValue(makeRunResult({ jobCount: 1 }));
+      answersWith([{ batchRunId: "batch_123", status: "IN_PROGRESS" }]);
+
+      await runWithFakeTimers({ advanceMs: 10 * 60 * 1000 + 3000 });
+
+      const documents = printedDocuments();
+      expect(documents).toHaveLength(1);
+      const document = JSON.parse(documents[0]!) as Record<string, unknown>;
+      expect(document.outcome).toBe("timeout");
+      expect(process.exitCode).toBe(1);
+    });
+  });
+
+  describe("when the status endpoint keeps failing under a machine format", () => {
+    /** @scenario "A dead status endpoint still emits the machine-readable document" */
+    it("still prints the final document, naming the poll failure outcome", async () => {
+      runSpy.mockResolvedValue(makeRunResult({ jobCount: 1 }));
+      vi.spyOn(globalThis, "fetch").mockRejectedValue(
+        new Error("endpoint down"),
+      );
+
+      await runWithFakeTimers({ advanceMs: 5 * 3000 });
+
+      const documents = printedDocuments();
+      expect(documents).toHaveLength(1);
+      const document = JSON.parse(documents[0]!) as Record<string, unknown>;
+      expect(document.outcome).toBe("poll_failure");
+      expect(process.exitCode).toBe(1);
+    });
+  });
+
+  describe("when --wait completes in human mode", () => {
+    /** @scenario "Waiting in human mode prints no machine document" */
+    it("prints the human tail and no JSON document", async () => {
+      runSpy.mockResolvedValue(makeRunResult({ jobCount: 1 }));
+      answersWith([
+        {
+          batchRunId: "batch_123",
+          scenarioRunId: "run_1",
+          scenarioId: "scenario_1",
+          status: "SUCCESS",
+          results: { verdict: "success" },
+        },
+      ]);
+
+      await runWithFakeTimers({ advanceMs: 3000, format: "table" });
+
+      expect(printedDocuments()).toHaveLength(0);
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining("batch_123"),
+      );
+      expect(process.exitCode).not.toBe(1);
     });
   });
 

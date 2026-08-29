@@ -2872,21 +2872,24 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
-  scenarioCmd
-    .command("run <id>")
-    .description("Run one scenario against one or more targets")
-    .option("--target <target>", TARGET_FLAG_HELP, collectParam)
-    .option("--name <name>", RUN_NAME_FLAG_HELP)
-    .option("--repeat <n>", REPEAT_FLAG_HELP)
-    .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
-    .option("--note <text>", NOTE_FLAG_HELP)
-    .option("--idempotency-key <key>", IDEMPOTENCY_KEY_FLAG_HELP)
-    .option("--wait", "Wait for the run to complete")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { target?: string[]; name?: string; repeat?: string; param?: string[]; note?: string; idempotencyKey?: string; wait?: boolean; format?: string }) => {
-      const { runScenarioCommand: impl } = await import("./commands/scenarios/run.js");
-      await impl(id, options);
-    });
+  rendersOwnResult(
+    scenarioCmd
+      .command("run <id>")
+      .description("Run one scenario against one or more targets")
+      .option("--target <target>", TARGET_FLAG_HELP, collectParam)
+      .option("--name <name>", RUN_NAME_FLAG_HELP)
+      .option("--repeat <n>", REPEAT_FLAG_HELP)
+      .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
+      .option("--note <text>", NOTE_FLAG_HELP)
+      .option("--idempotency-key <key>", IDEMPOTENCY_KEY_FLAG_HELP)
+      .option("--wait", "Wait for the run to complete")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+  ).action(async (id: string, _options: unknown, command: Command) => {
+    const { runScenarioCommand: impl } = await import("./commands/scenarios/run.js");
+    // Merged globals: a root-position `--output` only lands on the ROOT
+    // command, so the leaf's own opts would silently drop it.
+    await impl(id, command.optsWithGlobals());
+  });
 
   // Version history of a scenario. Nested under `scenario` because a version
   // is a state of one case, never a resource of its own.
@@ -2935,40 +2938,43 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .command("run-plan")
     .description("Run scenarios and read the plans those runs are filed under");
 
-  runPlanCmd
-    .command("run")
-    .description("Run a configuration under a name")
-    .option("--target <target>", TARGET_FLAG_HELP, collectParam)
-    .option("--all", SCOPE_ALL_FLAG_HELP)
-    .option("--test-suite <name-or-id>", SCOPE_TEST_SUITE_FLAG_HELP, collectParam)
-    // `--suite` is the name this flag shipped under. It is kept as an alias so
-    // a saved command line still runs, and it is left out of the help so the
-    // canonical spelling is the one a reader learns.
-    .addOption(
-      new Option("--suite <name-or-id>", SCOPE_TEST_SUITE_FLAG_HELP)
-        .argParser(collectParam)
-        .hideHelp(),
-    )
-    .option("--label <label>", SCOPE_LABEL_FLAG_HELP, collectParam)
-    .option("--scenario <id>", SCOPE_SCENARIO_FLAG_HELP, collectParam)
-    .option("--name <name>", RUN_NAME_FLAG_HELP)
-    .option("--repeat <n>", REPEAT_FLAG_HELP)
-    .option("--simulator-model <model>", SIMULATOR_MODEL_FLAG_HELP)
-    .option("--judge-model <model>", JUDGE_MODEL_FLAG_HELP)
-    .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
-    .option("--note <text>", NOTE_FLAG_HELP)
-    .option("--idempotency-key <key>", IDEMPOTENCY_KEY_FLAG_HELP)
-    .option("--wait", "Wait for the run to complete")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (options: { target?: string[]; all?: boolean; testSuite?: string[]; suite?: string[]; label?: string[]; scenario?: string[]; name?: string; repeat?: string; simulatorModel?: string; judgeModel?: string; param?: string[]; note?: string; idempotencyKey?: string; wait?: boolean; format?: string }) => {
-      const { suite, ...rest } = options;
-      const testSuite = [...(options.testSuite ?? []), ...(suite ?? [])];
-      const { runRunPlanCommand: impl } = await import("./commands/run-plans/run.js");
-      await impl({
-        ...rest,
-        ...(testSuite.length > 0 ? { testSuite } : {}),
-      });
+  rendersOwnResult(
+    runPlanCmd
+      .command("run")
+      .description("Run a configuration under a name")
+      .option("--target <target>", TARGET_FLAG_HELP, collectParam)
+      .option("--all", SCOPE_ALL_FLAG_HELP)
+      .option("--test-suite <name-or-id>", SCOPE_TEST_SUITE_FLAG_HELP, collectParam)
+      // `--suite` is the name this flag shipped under. It is kept as an alias so
+      // a saved command line still runs, and it is left out of the help so the
+      // canonical spelling is the one a reader learns.
+      .addOption(
+        new Option("--suite <name-or-id>", SCOPE_TEST_SUITE_FLAG_HELP)
+          .argParser(collectParam)
+          .hideHelp(),
+      )
+      .option("--label <label>", SCOPE_LABEL_FLAG_HELP, collectParam)
+      .option("--scenario <id>", SCOPE_SCENARIO_FLAG_HELP, collectParam)
+      .option("--name <name>", RUN_NAME_FLAG_HELP)
+      .option("--repeat <n>", REPEAT_FLAG_HELP)
+      .option("--simulator-model <model>", SIMULATOR_MODEL_FLAG_HELP)
+      .option("--judge-model <model>", JUDGE_MODEL_FLAG_HELP)
+      .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
+      .option("--note <text>", NOTE_FLAG_HELP)
+      .option("--idempotency-key <key>", IDEMPOTENCY_KEY_FLAG_HELP)
+      .option("--wait", "Wait for the run to complete")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+  ).action(async (_options: unknown, command: Command) => {
+    // Merged globals: a root-position `--output` only lands on the ROOT
+    // command, so the leaf's own opts would silently drop it.
+    const { suite, ...rest } = command.optsWithGlobals();
+    const testSuite: string[] = [...(rest.testSuite ?? []), ...(suite ?? [])];
+    const { runRunPlanCommand: impl } = await import("./commands/run-plans/run.js");
+    await impl({
+      ...rest,
+      ...(testSuite.length > 0 ? { testSuite } : {}),
     });
+  });
 
   emitsResult(
     runPlanCmd
@@ -3067,23 +3073,26 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
-  testSuiteCmd
-    .command("run <suite>")
-    .description("Run every scenario filed in a test suite against the given targets")
-    .option("--target <target>", TARGET_FLAG_HELP, collectParam)
-    .option("--name <name>", RUN_NAME_FLAG_HELP)
-    .option("--repeat <n>", REPEAT_FLAG_HELP)
-    .option("--simulator-model <model>", SIMULATOR_MODEL_FLAG_HELP)
-    .option("--judge-model <model>", JUDGE_MODEL_FLAG_HELP)
-    .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
-    .option("--note <text>", NOTE_FLAG_HELP)
-    .option("--idempotency-key <key>", IDEMPOTENCY_KEY_FLAG_HELP)
-    .option("--wait", "Wait for the run to complete")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (suite: string, options: { target?: string[]; name?: string; repeat?: string; simulatorModel?: string; judgeModel?: string; param?: string[]; note?: string; idempotencyKey?: string; wait?: boolean; format?: string }) => {
-      const { runTestSuiteCommand: impl } = await import("./commands/test-suites/run.js");
-      await impl({ reference: suite, options });
-    });
+  rendersOwnResult(
+    testSuiteCmd
+      .command("run <suite>")
+      .description("Run every scenario filed in a test suite against the given targets")
+      .option("--target <target>", TARGET_FLAG_HELP, collectParam)
+      .option("--name <name>", RUN_NAME_FLAG_HELP)
+      .option("--repeat <n>", REPEAT_FLAG_HELP)
+      .option("--simulator-model <model>", SIMULATOR_MODEL_FLAG_HELP)
+      .option("--judge-model <model>", JUDGE_MODEL_FLAG_HELP)
+      .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
+      .option("--note <text>", NOTE_FLAG_HELP)
+      .option("--idempotency-key <key>", IDEMPOTENCY_KEY_FLAG_HELP)
+      .option("--wait", "Wait for the run to complete")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+  ).action(async (suite: string, _options: unknown, command: Command) => {
+    const { runTestSuiteCommand: impl } = await import("./commands/test-suites/run.js");
+    // Merged globals: a root-position `--output` only lands on the ROOT
+    // command, so the leaf's own opts would silently drop it.
+    await impl({ reference: suite, options: command.optsWithGlobals() });
+  });
 
   // Add graph command group
   const graphCmd = program

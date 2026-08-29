@@ -17,6 +17,7 @@
 
 import { z } from "zod";
 import type { SimulationSuite } from "~/generated/prisma/client";
+import { modelOverrideSchema } from "~/server/modelProviders/modelOverrideSchema";
 import { runParameterValuesSchema } from "~/server/scenarios/parameters";
 import { runNoteSchema } from "~/server/scenarios/run-note";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
@@ -89,14 +90,12 @@ export const runPlanConfigSchema = z.object({
     .describe(
       `How many times each scenario and target pairing runs. Between 1 and ${MAX_REPEAT_COUNT}; defaults to 1.`,
     ),
-  simulatorModel: z
-    .string()
+  simulatorModel: modelOverrideSchema
     .nullish()
     .describe(
       "The model that plays the user for every scenario in the run. Overrides each scenario's own choice. Leave it out for the scenario or project default.",
     ),
-  judgeModel: z
-    .string()
+  judgeModel: modelOverrideSchema
     .nullish()
     .describe(
       "The model that judges every scenario in the run. Overrides each scenario's own choice. Leave it out for the scenario or project default.",
@@ -174,14 +173,12 @@ export const testSuiteRunInputSchema = z.object({
     .describe(
       `How many times each scenario and target pairing runs. Between 1 and ${MAX_REPEAT_COUNT}; defaults to 1.`,
     ),
-  simulatorModel: z
-    .string()
+  simulatorModel: modelOverrideSchema
     .nullish()
     .describe(
       "The model that plays the user for every scenario in this run. Leave it out for the scenario or project default.",
     ),
-  judgeModel: z
-    .string()
+  judgeModel: modelOverrideSchema
     .nullish()
     .describe(
       "The model that judges every scenario in this run. Leave it out for the scenario or project default.",

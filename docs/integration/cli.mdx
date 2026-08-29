@@ -287,6 +287,8 @@ langwatch run-plan archive <id>
 | `--idempotency-key <key>` | Repeat it to make a retry join the first run instead of starting a second one. |
 | `--wait` | Block until the batch is complete, and exit non-zero when a run failed. |
 
+Add `--format json` (or `-o json`) to any of the three run commands and they print one final document on stdout. With `--wait` that document comes after the poll and carries `outcome`, `tallies` and the per-run `results`.
+
 `langwatch test-suite run` and `langwatch scenario run` are shorter forms of the same thing: they run a plan named after the test suite or the scenario and the target, and take `--name`, `--repeat`, `--param`, `--note` and `--wait` the same way.
 
 The `/api/suites` endpoints the older CLI versions called still answer and are deprecated. The commands above use `/api/v1/run-plans` and `/api/v1/test-suites`.

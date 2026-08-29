@@ -221,9 +221,11 @@ from .delete_api_prompts_tags_by_tag_response_400 import DeleteApiPromptsTagsByT
 from .delete_api_prompts_tags_by_tag_response_401 import DeleteApiPromptsTagsByTagResponse401
 from .delete_api_prompts_tags_by_tag_response_422 import DeleteApiPromptsTagsByTagResponse422
 from .delete_api_prompts_tags_by_tag_response_500 import DeleteApiPromptsTagsByTagResponse500
-from .delete_api_scenario_events_response_200 import DeleteApiScenarioEventsResponse200
+from .delete_api_scenario_events_response_200_type_0 import DeleteApiScenarioEventsResponse200Type0
+from .delete_api_scenario_events_response_200_type_1 import DeleteApiScenarioEventsResponse200Type1
 from .delete_api_scenario_events_response_400 import DeleteApiScenarioEventsResponse400
 from .delete_api_scenario_events_response_401 import DeleteApiScenarioEventsResponse401
+from .delete_api_scenario_events_response_404 import DeleteApiScenarioEventsResponse404
 from .delete_api_scenario_events_response_422 import DeleteApiScenarioEventsResponse422
 from .delete_api_scenario_events_response_500 import DeleteApiScenarioEventsResponse500
 from .delete_api_scenarios_by_id_response_200 import DeleteApiScenariosByIdResponse200
@@ -1973,6 +1975,11 @@ from .pagination import Pagination
 from .patch_api_agents_by_id_body import PatchApiAgentsByIdBody
 from .patch_api_agents_by_id_body_config import PatchApiAgentsByIdBodyConfig
 from .patch_api_agents_by_id_body_type import PatchApiAgentsByIdBodyType
+from .patch_api_agents_by_id_response_200 import PatchApiAgentsByIdResponse200
+from .patch_api_agents_by_id_response_200_config_type_0 import PatchApiAgentsByIdResponse200ConfigType0
+from .patch_api_agents_by_id_response_200_type import PatchApiAgentsByIdResponse200Type
+from .patch_api_agents_by_id_response_404 import PatchApiAgentsByIdResponse404
+from .patch_api_agents_by_id_response_422 import PatchApiAgentsByIdResponse422
 from .patch_api_annotations_id_body import PatchApiAnnotationsIdBody
 from .patch_api_annotations_id_response_200 import PatchApiAnnotationsIdResponse200
 from .patch_api_dashboards_by_id_body import PatchApiDashboardsByIdBody
@@ -2231,6 +2238,15 @@ from .patch_api_monitors_by_id_response_401 import PatchApiMonitorsByIdResponse4
 from .patch_api_monitors_by_id_response_404 import PatchApiMonitorsByIdResponse404
 from .patch_api_monitors_by_id_response_422 import PatchApiMonitorsByIdResponse422
 from .patch_api_monitors_by_id_response_500 import PatchApiMonitorsByIdResponse500
+from .patch_api_scenarios_by_id_body import PatchApiScenariosByIdBody
+from .patch_api_scenarios_by_id_body_parameters_item import PatchApiScenariosByIdBodyParametersItem
+from .patch_api_scenarios_by_id_response_200 import PatchApiScenariosByIdResponse200
+from .patch_api_scenarios_by_id_response_200_parameters_item import PatchApiScenariosByIdResponse200ParametersItem
+from .patch_api_scenarios_by_id_response_400 import PatchApiScenariosByIdResponse400
+from .patch_api_scenarios_by_id_response_401 import PatchApiScenariosByIdResponse401
+from .patch_api_scenarios_by_id_response_404 import PatchApiScenariosByIdResponse404
+from .patch_api_scenarios_by_id_response_422 import PatchApiScenariosByIdResponse422
+from .patch_api_scenarios_by_id_response_500 import PatchApiScenariosByIdResponse500
 from .patch_api_suites_by_id_body import PatchApiSuitesByIdBody
 from .patch_api_suites_by_id_body_scope_type_0 import PatchApiSuitesByIdBodyScopeType0
 from .patch_api_suites_by_id_body_scope_type_1 import PatchApiSuitesByIdBodyScopeType1
@@ -5469,6 +5485,14 @@ from .put_api_agent_cache_by_name_response_403_error_meta import PutApiAgentCach
 from .put_api_agent_cache_by_name_response_500 import PutApiAgentCacheByNameResponse500
 from .put_api_agent_cache_by_name_response_500_error import PutApiAgentCacheByNameResponse500Error
 from .put_api_agent_cache_by_name_response_500_error_meta import PutApiAgentCacheByNameResponse500ErrorMeta
+from .put_api_agents_by_id_body import PutApiAgentsByIdBody
+from .put_api_agents_by_id_body_config import PutApiAgentsByIdBodyConfig
+from .put_api_agents_by_id_body_type import PutApiAgentsByIdBodyType
+from .put_api_agents_by_id_response_200 import PutApiAgentsByIdResponse200
+from .put_api_agents_by_id_response_200_config_type_0 import PutApiAgentsByIdResponse200ConfigType0
+from .put_api_agents_by_id_response_200_type import PutApiAgentsByIdResponse200Type
+from .put_api_agents_by_id_response_404 import PutApiAgentsByIdResponse404
+from .put_api_agents_by_id_response_422 import PutApiAgentsByIdResponse422
 from .put_api_dashboards_reorder_body import PutApiDashboardsReorderBody
 from .put_api_evaluators_by_id_body import PutApiEvaluatorsByIdBody
 from .put_api_evaluators_by_id_body_config import PutApiEvaluatorsByIdBodyConfig
@@ -6051,9 +6075,11 @@ __all__ = (
     "DeleteApiPromptsTagsByTagResponse401",
     "DeleteApiPromptsTagsByTagResponse422",
     "DeleteApiPromptsTagsByTagResponse500",
-    "DeleteApiScenarioEventsResponse200",
+    "DeleteApiScenarioEventsResponse200Type0",
+    "DeleteApiScenarioEventsResponse200Type1",
     "DeleteApiScenarioEventsResponse400",
     "DeleteApiScenarioEventsResponse401",
+    "DeleteApiScenarioEventsResponse404",
     "DeleteApiScenarioEventsResponse422",
     "DeleteApiScenarioEventsResponse500",
     "DeleteApiScenariosByIdResponse200",
@@ -7101,6 +7127,11 @@ __all__ = (
     "PatchApiAgentsByIdBody",
     "PatchApiAgentsByIdBodyConfig",
     "PatchApiAgentsByIdBodyType",
+    "PatchApiAgentsByIdResponse200",
+    "PatchApiAgentsByIdResponse200ConfigType0",
+    "PatchApiAgentsByIdResponse200Type",
+    "PatchApiAgentsByIdResponse404",
+    "PatchApiAgentsByIdResponse422",
     "PatchApiAnnotationsIdBody",
     "PatchApiAnnotationsIdResponse200",
     "PatchApiDashboardsByIdBody",
@@ -7245,6 +7276,15 @@ __all__ = (
     "PatchApiMonitorsByIdResponse404",
     "PatchApiMonitorsByIdResponse422",
     "PatchApiMonitorsByIdResponse500",
+    "PatchApiScenariosByIdBody",
+    "PatchApiScenariosByIdBodyParametersItem",
+    "PatchApiScenariosByIdResponse200",
+    "PatchApiScenariosByIdResponse200ParametersItem",
+    "PatchApiScenariosByIdResponse400",
+    "PatchApiScenariosByIdResponse401",
+    "PatchApiScenariosByIdResponse404",
+    "PatchApiScenariosByIdResponse422",
+    "PatchApiScenariosByIdResponse500",
     "PatchApiSuitesByIdBody",
     "PatchApiSuitesByIdBodyScopeType0",
     "PatchApiSuitesByIdBodyScopeType1",
@@ -8811,6 +8851,14 @@ __all__ = (
     "PutApiAgentCacheByNameResponse500",
     "PutApiAgentCacheByNameResponse500Error",
     "PutApiAgentCacheByNameResponse500ErrorMeta",
+    "PutApiAgentsByIdBody",
+    "PutApiAgentsByIdBodyConfig",
+    "PutApiAgentsByIdBodyType",
+    "PutApiAgentsByIdResponse200",
+    "PutApiAgentsByIdResponse200ConfigType0",
+    "PutApiAgentsByIdResponse200Type",
+    "PutApiAgentsByIdResponse404",
+    "PutApiAgentsByIdResponse422",
     "PutApiDashboardsReorderBody",
     "PutApiEvaluatorsByIdBody",
     "PutApiEvaluatorsByIdBodyConfig",

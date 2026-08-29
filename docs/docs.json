@@ -1233,6 +1233,7 @@
               "api-reference/scenarios/list-a-scenario-s-versions",
               "api-reference/scenarios/read-one-scenario-version",
               "api-reference/scenarios/update-scenarios",
+              "api-reference/scenarios/patch-update-scenarios",
               "api-reference/scenarios/delete-scenarios"
             ]
           },
@@ -1299,6 +1300,7 @@
               "api-reference/agents/create-agents",
               "api-reference/agents/get-agents",
               "api-reference/agents/update-agents",
+              "api-reference/agents/put-update-agents",
               "api-reference/agents/delete-agents"
             ]
           },

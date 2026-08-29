@@ -4,6 +4,10 @@
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  classifyScenarioInfraError,
+  ScenarioInfraErrorCode,
+} from "~/server/scenarios/scenario-infra-error";
 import { TemplateRenderError } from "../../http-template-engine";
 import type { HttpAgentData } from "../../types";
 import { SerializedHttpAgentAdapter } from "../http-agent.adapter";
@@ -220,6 +224,92 @@ describe("SerializedHttpAgentAdapter", () => {
         body: undefined,
       }),
     );
+  });
+
+  describe("when the target cannot be reached at all", () => {
+    // A transport failure is not the target rejecting the request: nothing
+    // answered. What fetch throws reads as a Node crash, so the adapter has
+    // to restate it as a reason before it reaches a customer.
+    function rejectTransportWith(error: Error) {
+      mockSsrfSafeFetch.mockRejectedValue(error);
+      return new SerializedHttpAgentAdapter({ config: defaultConfig });
+    }
+
+    /** @scenario "An unreachable target produces a customer-safe transport error" */
+    it("names the target host and the failure, and keeps the raw error as cause", async () => {
+      const raw = new Error("getaddrinfo ENOTFOUND api.example.com");
+      const adapter = rejectTransportWith(raw);
+
+      const thrown = await adapter.call(defaultInput).catch((e: unknown) => e);
+
+      expect(thrown).toBeInstanceOf(Error);
+      const error = thrown as Error;
+      expect(error.message).toContain("api.example.com");
+      expect(error.message).toContain("could not be reached");
+      expect(error.cause).toBe(raw);
+    });
+
+    /** @scenario "A target url that does not parse is never repeated in the error" */
+    it("labels a url that does not parse instead of repeating it", async () => {
+      mockSsrfSafeFetch.mockRejectedValue(new Error("fetch failed"));
+      const adapter = new SerializedHttpAgentAdapter({
+        config: {
+          ...defaultConfig,
+          url: "not a url?token=super-secret-value",
+        },
+      });
+
+      const thrown = (await adapter
+        .call(defaultInput)
+        .catch((e: unknown) => e)) as Error;
+
+      expect(thrown.message).toContain("configured target");
+      expect(thrown.message).not.toContain("super-secret-value");
+    });
+
+    /** @scenario "A transport error keeps the underlying failure text for classification" */
+    it("keeps the underlying failure text so the classifier still sees it", async () => {
+      const adapter = rejectTransportWith(
+        new Error("connect ECONNREFUSED 127.0.0.1:443"),
+      );
+
+      const thrown = (await adapter
+        .call(defaultInput)
+        .catch((e: unknown) => e)) as Error;
+
+      expect(thrown.message).toContain("ECONNREFUSED");
+      expect(classifyScenarioInfraError(thrown.message).code).toBe(
+        ScenarioInfraErrorCode.PlatformUnreachable,
+      );
+    });
+
+    /** @scenario "A transport error never carries a Node stack in its message" */
+    it("carries no stack frames in the message", async () => {
+      const raw = new Error("fetch failed");
+      raw.stack =
+        "Error: fetch failed\n    at node:internal/deps/undici/undici:13502:13\n" +
+        "    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)";
+      const adapter = rejectTransportWith(raw);
+
+      const thrown = (await adapter
+        .call(defaultInput)
+        .catch((e: unknown) => e)) as Error;
+
+      expect(thrown.message).not.toContain("    at ");
+      expect(thrown.message).not.toContain("node:internal");
+    });
+
+    it("does not restate a template error as a transport failure", async () => {
+      // Only the fetch itself is a transport seam; errors raised before it
+      // must keep their own type so their own handling still applies.
+      const adapter = new SerializedHttpAgentAdapter({
+        config: { ...defaultConfig, bodyTemplate: "{{ unclosed " },
+      });
+
+      const thrown = await adapter.call(defaultInput).catch((e: unknown) => e);
+
+      expect(thrown).toBeInstanceOf(TemplateRenderError);
+    });
   });
 
   describe("body templating", () => {

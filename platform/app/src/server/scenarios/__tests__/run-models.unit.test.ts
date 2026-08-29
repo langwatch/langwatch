@@ -6,9 +6,11 @@
  * so a break here makes a run say one model and run another.
  *
  * @see specs/scenarios/resolved-run-models-on-runs.feature
+ * @see specs/scenarios/simulation-run-model-resolution.feature
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { resolveLatestAlias } from "~/server/modelProviders/latestAliases";
 import {
   JUDGE_MODEL_FEATURE_KEY,
   resolveRunModels,
@@ -71,6 +73,52 @@ describe("the models a run resolves", () => {
         simulatorModel: `default-for/${SIMULATOR_MODEL_FEATURE_KEY}`,
         judgeModel: `default-for/${JUDGE_MODEL_FEATURE_KEY}`,
       });
+    });
+  });
+
+  describe("when the model named is a latest alias", () => {
+    // The registry moves, so the expected concrete id comes from the same
+    // resolver the picker reads, not from a value written down here.
+    const simulatorAlias = "openai/latest";
+    const judgeAlias = "anthropic/latest-mini";
+
+    it("has a concrete model for each alias in the registry", () => {
+      expect(resolveLatestAlias(simulatorAlias)).toBeTruthy();
+      expect(resolveLatestAlias(judgeAlias)).toBeTruthy();
+    });
+
+    /** @scenario "A latest alias expands where the run models resolve" */
+    it("expands the plan's alias to the concrete model", async () => {
+      const models = await resolveRunModels({
+        plan: { simulatorModel: simulatorAlias },
+        scenario: {},
+        resolveFeatureModel: projectDefaults(),
+      });
+
+      expect(models.simulatorModel).toBe(resolveLatestAlias(simulatorAlias));
+      expect(models.simulatorModel).not.toBe(simulatorAlias);
+    });
+
+    /** @scenario "A latest alias resolves to the concrete model the run is stamped with" */
+    it("expands the case's own alias to the concrete model", async () => {
+      const models = await resolveRunModels({
+        plan: { judgeModel: null },
+        scenario: { judgeModel: judgeAlias },
+        resolveFeatureModel: projectDefaults(),
+      });
+
+      expect(models.judgeModel).toBe(resolveLatestAlias(judgeAlias));
+      expect(models.judgeModel).not.toBe(judgeAlias);
+    });
+
+    it("leaves a concrete model id unchanged", async () => {
+      const models = await resolveRunModels({
+        plan: { simulatorModel: "openai/gpt-5-mini" },
+        scenario: {},
+        resolveFeatureModel: projectDefaults(),
+      });
+
+      expect(models.simulatorModel).toBe("openai/gpt-5-mini");
     });
   });
 });

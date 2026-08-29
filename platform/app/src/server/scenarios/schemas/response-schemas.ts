@@ -66,6 +66,10 @@ export const runDataSchema = z.object({
   status: z.nativeEnum(ScenarioRunStatus),
   results: scenarioResultsSchema.optional().nullable(),
   messages: scenarioMessageSnapshotSchema.shape.messages,
+  // True when `messages` holds only the first few messages of a longer
+  // conversation. List reads trim the message arrays to protect ClickHouse;
+  // pass `include=messages` to read them all.
+  messagesTruncated: z.boolean().optional(),
   timestamp: z.number(), // Unix timestamp when run started (stable sort key)
   updatedAt: z.number().optional(), // Last update timestamp (for conditional fetch)
   durationInMs: z.number(), // Execution time in milliseconds
@@ -107,14 +111,23 @@ const batchesSchema = z.object({
 
 /**
  * Archive operation response schema
- * Returned by the DELETE /api/scenario-events endpoint after archiving runs for a scenario set
+ * Returned by the DELETE /api/scenario-events endpoint. Set-scoped archives
+ * report the set id plus whether more runs remain; run-scoped archives
+ * report the single run id.
  */
-export const archiveResponseSchema = z.object({
-  archived: z.number().int().nonnegative(),
-  failed: z.number().int().nonnegative(),
-  scenarioSetId: z.string(),
-  hasMore: z.boolean(),
-});
+export const archiveResponseSchema = z.union([
+  z.object({
+    archived: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative(),
+    scenarioSetId: z.string(),
+    hasMore: z.boolean(),
+  }),
+  z.object({
+    archived: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative(),
+    scenarioRunId: z.string(),
+  }),
+]);
 
 /**
  * Browser-tab handoff response schema

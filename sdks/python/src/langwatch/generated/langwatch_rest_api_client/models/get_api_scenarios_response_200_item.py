@@ -28,6 +28,14 @@ class GetApiScenariosResponse200Item:
         labels (list[str]):
         parameters (list[GetApiScenariosResponse200ItemParametersItem]):
         platform_url (str):
+        simulator_model (None | str | Unset): The model that plays the user, or null for the project default. Absent on
+            servers that predate model overrides on this family.
+        judge_model (None | str | Unset): The model that judges the run, or null for the project default. Absent on
+            servers that predate model overrides on this family.
+        max_turns (int | None | Unset): The most conversation turns a run of this scenario takes, or null for the
+            default. Absent on servers that predate turn limits on this family.
+        min_turns (int | None | Unset): The fewest conversation turns before the judge may end a run, or null for the
+            default. Absent on servers that predate turn limits on this family.
         test_suite_id (None | str | Unset): The test suite this scenario is filed in, or null when unfiled. Absent on
             servers that predate test suites.
     """
@@ -39,6 +47,10 @@ class GetApiScenariosResponse200Item:
     labels: list[str]
     parameters: list[GetApiScenariosResponse200ItemParametersItem]
     platform_url: str
+    simulator_model: None | str | Unset = UNSET
+    judge_model: None | str | Unset = UNSET
+    max_turns: int | None | Unset = UNSET
+    min_turns: int | None | Unset = UNSET
     test_suite_id: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -60,6 +72,30 @@ class GetApiScenariosResponse200Item:
 
         platform_url = self.platform_url
 
+        simulator_model: None | str | Unset
+        if isinstance(self.simulator_model, Unset):
+            simulator_model = UNSET
+        else:
+            simulator_model = self.simulator_model
+
+        judge_model: None | str | Unset
+        if isinstance(self.judge_model, Unset):
+            judge_model = UNSET
+        else:
+            judge_model = self.judge_model
+
+        max_turns: int | None | Unset
+        if isinstance(self.max_turns, Unset):
+            max_turns = UNSET
+        else:
+            max_turns = self.max_turns
+
+        min_turns: int | None | Unset
+        if isinstance(self.min_turns, Unset):
+            min_turns = UNSET
+        else:
+            min_turns = self.min_turns
+
         test_suite_id: None | str | Unset
         if isinstance(self.test_suite_id, Unset):
             test_suite_id = UNSET
@@ -79,6 +115,14 @@ class GetApiScenariosResponse200Item:
                 "platformUrl": platform_url,
             }
         )
+        if simulator_model is not UNSET:
+            field_dict["simulatorModel"] = simulator_model
+        if judge_model is not UNSET:
+            field_dict["judgeModel"] = judge_model
+        if max_turns is not UNSET:
+            field_dict["maxTurns"] = max_turns
+        if min_turns is not UNSET:
+            field_dict["minTurns"] = min_turns
         if test_suite_id is not UNSET:
             field_dict["testSuiteId"] = test_suite_id
 
@@ -110,6 +154,42 @@ class GetApiScenariosResponse200Item:
 
         platform_url = d.pop("platformUrl")
 
+        def _parse_simulator_model(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        simulator_model = _parse_simulator_model(d.pop("simulatorModel", UNSET))
+
+        def _parse_judge_model(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        judge_model = _parse_judge_model(d.pop("judgeModel", UNSET))
+
+        def _parse_max_turns(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        max_turns = _parse_max_turns(d.pop("maxTurns", UNSET))
+
+        def _parse_min_turns(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        min_turns = _parse_min_turns(d.pop("minTurns", UNSET))
+
         def _parse_test_suite_id(data: object) -> None | str | Unset:
             if data is None:
                 return data
@@ -127,6 +207,10 @@ class GetApiScenariosResponse200Item:
             labels=labels,
             parameters=parameters,
             platform_url=platform_url,
+            simulator_model=simulator_model,
+            judge_model=judge_model,
+            max_turns=max_turns,
+            min_turns=min_turns,
             test_suite_id=test_suite_id,
         )
 

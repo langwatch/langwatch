@@ -95,12 +95,25 @@ function walk({
   return { requiredLists, propertyPaths };
 }
 
-/** The merged walk of every success answer of one path family. */
-function walkFamily(family: string): Walk {
+/**
+ * The merged walk of every success answer of one path family.
+ *
+ * `bornWith` names the routes of the family that were published with the
+ * field from their first day, so no client generated before it exists. Their
+ * answers may read it as required.
+ */
+function walkFamily({
+  family,
+  bornWith = [],
+}: {
+  family: string;
+  bornWith?: string[];
+}): Walk {
   const requiredLists: Walk["requiredLists"] = [];
   const propertyPaths: string[] = [];
   for (const [path, operations] of Object.entries(document.paths)) {
     if (!path.startsWith(family)) continue;
+    if (bornWith.some((route) => path.startsWith(route))) continue;
     for (const [method, operation] of Object.entries(operations)) {
       if (!METHODS.includes(method)) continue;
       for (const [status, response] of Object.entries(
@@ -128,8 +141,16 @@ function walkFamily(family: string): Walk {
  * An empty `offenders` alone also holds for a field the document no longer
  * carries, so `occurrences` states the field is still there to be read.
  */
-function readingOf({ family, field }: { family: string; field: string }) {
-  const { requiredLists, propertyPaths } = walkFamily(family);
+function readingOf({
+  family,
+  field,
+  bornWith,
+}: {
+  family: string;
+  field: string;
+  bornWith?: string[];
+}) {
+  const { requiredLists, propertyPaths } = walkFamily({ family, bornWith });
   return {
     occurrences: propertyPaths.filter((path) => path.endsWith(`.${field}`)),
     offenders: requiredLists
@@ -148,6 +169,28 @@ describe("given the generated OpenAPI document", () => {
       });
       expect(testSuiteId.occurrences.length).toBeGreaterThan(0);
       expect(testSuiteId.offenders).toEqual([]);
+    });
+  });
+
+  describe("when the scenario model and turn fields are read", () => {
+    /** @scenario "The scenario answers read the model and turn fields as optional" */
+    it("lists simulatorModel, judgeModel, maxTurns and minTurns as optional on every success answer", () => {
+      for (const field of [
+        "simulatorModel",
+        "judgeModel",
+        "maxTurns",
+        "minTurns",
+      ]) {
+        // The version snapshot was published with these fields from its
+        // first day, so it may read them as required.
+        const reading = readingOf({
+          family: "/api/scenarios",
+          field,
+          bornWith: ["/api/scenarios/{id}/versions"],
+        });
+        expect(reading.occurrences.length, field).toBeGreaterThan(0);
+        expect(reading.offenders, field).toEqual([]);
+      }
     });
   });
 

@@ -101,6 +101,27 @@ export function applyDevTunnel({
 }
 
 /**
+ * The heartbeat: config with `devTunnel.heartbeatAt` refreshed and everything
+ * else untouched. Returns null when the config carries no `devTunnel` (the
+ * session's write-back is gone, e.g. someone restored the agent in the UI),
+ * so the caller skips the PATCH instead of recreating the marker.
+ */
+export function touchDevTunnel({
+  config,
+  heartbeatAt = new Date().toISOString(),
+}: {
+  config: Record<string, unknown>;
+  heartbeatAt?: string;
+}): Record<string, unknown> | null {
+  const stash = config.devTunnel;
+  if (!stash || typeof stash !== "object") return null;
+  return {
+    ...config,
+    devTunnel: { ...(stash as Record<string, unknown>), heartbeatAt },
+  };
+}
+
+/**
  * The restore: config with the previous URL back in place, the `devTunnel`
  * stash dropped, and the dev-secret header row removed. Returns null when the
  * config carries no `devTunnel`, meaning nothing to restore, so the caller can skip

@@ -8,7 +8,8 @@
  *
  * Spec: specs/features/scenario-cli.feature
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 
 const runSpy = vi.hoisted(() => vi.fn());
 vi.mock("../../run-plans/cli-run-plans-service", () => ({
@@ -60,15 +61,47 @@ const makeRunResult = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+/**
+ * The command resolves its output format from the flags AND the agent-mode env
+ * vars, so a test runner living inside a coding agent (CLAUDECODE set) must not
+ * flip the human-path tests into a machine format.
+ */
+let savedAgentEnv: Record<string, string | undefined> = {};
+
+/** Every JSON document the command printed on stdout. */
+const printedDocuments = (): string[] =>
+  vi
+    .mocked(console.log)
+    .mock.calls.map((call) => call[0] as unknown)
+    .filter(
+      (line): line is string =>
+        typeof line === "string" && line.trimStart().startsWith("{"),
+    );
+
 describe("runScenarioCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    savedAgentEnv = Object.fromEntries(
+      AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
+    );
+    for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
     runSpy.mockResolvedValue(makeRunResult());
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new ProcessExitError(code as number);
     });
+  });
+
+  afterEach(() => {
+    for (const name of AGENT_MODE_ENV_VARS) {
+      const value = savedAgentEnv[name];
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+    // The wait paths set the exit code; a leftover value would fail the whole
+    // vitest process at the end of the run.
+    process.exitCode = undefined;
   });
 
   describe("when a target is given", () => {
@@ -245,6 +278,66 @@ describe("runScenarioCommand()", () => {
       });
 
       expect(runSpy.mock.calls[0]![0]).not.toHaveProperty("note");
+    });
+  });
+
+  describe("when --wait ends under a machine format", () => {
+    /** @scenario "Wait for a scenario run with machine-readable output" */
+    it("prints exactly one final document with the tallies, the per-run results and the outcome", async () => {
+      runSpy.mockResolvedValue(makeRunResult({ jobCount: 1 }));
+      // A fresh response per call: a `Response` body can be read once, so one
+      // shared object turns the second poll into a poll FAILURE.
+      vi.spyOn(globalThis, "fetch").mockImplementation(
+        async () =>
+          new Response(
+            JSON.stringify({
+              runs: [
+                {
+                  batchRunId: "batch_1",
+                  scenarioRunId: "run_1",
+                  scenarioId: "scenario_1",
+                  status: "ERROR",
+                  results: null,
+                },
+              ],
+              hasMore: false,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+      );
+
+      vi.useFakeTimers();
+      try {
+        const promise = runScenarioCommand("scenario_1", {
+          target: ["http:agent_abc123"],
+          wait: true,
+          format: "json",
+        });
+        await vi.advanceTimersByTimeAsync(3000);
+        await promise;
+      } finally {
+        vi.useRealTimers();
+      }
+
+      const documents = printedDocuments();
+      expect(documents).toHaveLength(1);
+      const document = JSON.parse(documents[0]!) as Record<string, unknown>;
+      expect(document.outcome).toBe("failed");
+      expect(document.tallies).toEqual({
+        total: 1,
+        completed: 1,
+        passed: 0,
+        failed: 1,
+      });
+      expect(document.results).toEqual([
+        {
+          scenarioRunId: "run_1",
+          scenarioId: "scenario_1",
+          status: "ERROR",
+          verdict: null,
+        },
+      ]);
+      expect(process.exitCode).toBe(1);
     });
   });
 });

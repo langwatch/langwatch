@@ -52,6 +52,15 @@ Feature: A run records the models it really ran on
     Then the simulator model is the project default for "scenarios.user_simulator"
     And the judge model is the project default for "scenarios.judge"
 
+  @unit
+  Scenario: A latest alias resolves to the concrete model the run is stamped with
+    Given a run plan that names no judge model
+    And a scenario whose judge model is the alias "anthropic/latest-mini"
+    When the models of the run are resolved
+    Then the judge model is the concrete model the alias resolves to
+    # The scenario keeps the alias, so the pick keeps tracking upstream
+    # releases. See specs/scenarios/simulation-run-model-resolution.feature.
+
   # ============================================================================
   # What the run records
   # ============================================================================
