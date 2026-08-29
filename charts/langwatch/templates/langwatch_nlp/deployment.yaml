@@ -120,20 +120,13 @@ spec:
             {{- end }}
 
             # Ceiling on how long a workflow code block may run before nlpgo
-            # kills it. Kept below the engine's stream idle timeout by default
-            # so the code-block ceiling can't race the stream shutting down.
-            {{- if ge (int (.Values.langwatch_nlp.codeBlockTimeoutSeconds | default 600)) 720 }}
-            {{- fail "langwatch_nlp.codeBlockTimeoutSeconds must stay below the engine's stream idle timeout (720s) — a code-block ceiling at or above it races the stream shutting down" }}
-            {{- end }}
+            # kills it. Range-checked inside the helper, which is also what the
+            # app and workers read, so all three carry the same checked number.
             - name: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS
-              value: {{ .Values.langwatch_nlp.codeBlockTimeoutSeconds | default 600 | quote }}
+              value: {{ include "langwatch.codeBlockTimeoutSeconds" . | quote }}
 
             {{- with .Values.langwatch_nlp.extraEnvs}}
-            {{- range . }}
-            {{- if or (eq .name "NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS") (eq .name "NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS") }}
-            {{- fail (printf "langwatch_nlp.extraEnvs must not set %s — it is a reserved timeout env var; use langwatch_nlp.codeBlockTimeoutSeconds instead" .name) }}
-            {{- end }}
-            {{- end }}
+            {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "langwatch_nlp.extraEnvs") }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
 

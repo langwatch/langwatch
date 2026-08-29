@@ -115,8 +115,10 @@ describe("SerializedCodeAgentAdapter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     withActiveSpanCalls.length = 0;
-    // Pin the timeout explicitly so the test doesn't rely on ambient env
-    process.env.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS = "600";
+    // Pin the timeout explicitly so the test doesn't rely on ambient env.
+    // Stubbed, not assigned: a raw assignment here outlives the file and
+    // reaches whatever else shares this vitest worker.
+    vi.stubEnv("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", "600");
     // clearAllMocks keeps implementations, so pin the no-active-context
     // default here; tests that need a trace context override it themselves.
     mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
@@ -124,6 +126,10 @@ describe("SerializedCodeAgentAdapter", () => {
       traceId: undefined,
     }));
     mockFetch.mockResolvedValue(nlpResponse({ output: "processed: Hello" }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("has AGENT role", () => {

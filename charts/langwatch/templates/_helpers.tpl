@@ -700,6 +700,54 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{/* ============================================================ */}}
+{{/* nlpgo timeout coordination                                    */}}
+{{/* ============================================================ */}}
+
+{{/* The engine's code-block ceiling, range-checked, as a bare number.
+
+     The check lives WITH the value rather than in the NLP Deployment because
+     `langwatch.sharedEnv` hands the same number to the app and the workers,
+     and those render even when `langwatch_nlp.enabled` is false (an external,
+     shared or serverless nlpgo). A guard placed inside the optional Deployment
+     does not run in that supported mode, so an out-of-range ceiling would
+     reach the app and workers unchecked and their derived client deadline
+     would cut every turn short of the engine's own ceiling.
+
+     720 is the engine's stream idle timeout default
+     (`NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS`, `httpapi.DefaultStreamIdleTimeout`
+     in services/nlpgo); a code-block ceiling at or above it races the stream
+     shutting down.
+
+     With `langwatch_nlp.enabled` false the engine is external, so the chart can
+     only tell the CLIENTS about a ceiling it has no way to impose — hence the
+     second check: in that mode the value must stay at the engine's own default. */}}
+{{- define "langwatch.codeBlockTimeoutSeconds" -}}
+{{- $seconds := int (.Values.langwatch_nlp.codeBlockTimeoutSeconds | default 600) -}}
+{{- if ge $seconds 720 -}}
+{{- fail "langwatch_nlp.codeBlockTimeoutSeconds must stay below the engine's stream idle timeout (720s) — a code-block ceiling at or above it races the stream shutting down" -}}
+{{- end -}}
+{{- if and (not .Values.langwatch_nlp.enabled) (ne $seconds 600) -}}
+{{- fail "langwatch_nlp.codeBlockTimeoutSeconds is changed while langwatch_nlp.enabled is false. The chart cannot apply it to an NLP service it does not deploy, but it still hands it to the app and the workers, whose fetch deadline is derived from it — so they would abort turns the external engine is still working on. Set the ceiling on the external service and leave this at 600, the engine's own default." -}}
+{{- end -}}
+{{- $seconds -}}
+{{- end -}}
+
+{{/* Refuses an extraEnvs list that sets a timeout variable the chart owns.
+     Two of them are reserved: setting either by hand puts a second, unchecked
+     number next to `langwatch_nlp.codeBlockTimeoutSeconds` in exactly the
+     processes that must agree on one.
+
+     Call with (dict "envs" <list> "path" "<values path>"); `path` only names
+     the offending list in the message. */}}
+{{- define "langwatch.assertNoReservedTimeoutEnvs" -}}
+{{- range .envs }}
+{{- if or (eq .name "NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS") (eq .name "NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS") }}
+{{- fail (printf "%s must not set %s — it is a reserved timeout env var; use langwatch_nlp.codeBlockTimeoutSeconds instead" $.path .name) }}
+{{- end }}
+{{- end }}
+{{- end -}}
+
+{{/* ============================================================ */}}
 {{/* Shared Environment Variables                                  */}}
 {{/* ============================================================ */}}
 {{/* Common env vars shared between app and workers deployments */}}
@@ -733,9 +781,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: LANGEVALS_ENDPOINT
   value: {{ .Values.app.upstreams.langevals.scheme | default "http" }}://{{ .Values.app.upstreams.langevals.name | default (printf "%s-langevals" .Release.Name) }}:{{ .Values.app.upstreams.langevals.port | default 5562 }}
 
-# Engine code-block timeout (seconds), propagated to all processes that invoke nlpgo
+# Engine code-block timeout (seconds), propagated to all processes that invoke
+# nlpgo. Range-checked by the helper, which is why this is emitted through it
+# and not read straight from values.
 - name: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS
-  value: {{ .Values.langwatch_nlp.codeBlockTimeoutSeconds | default 600 | quote }}
+  value: {{ include "langwatch.codeBlockTimeoutSeconds" . | quote }}
 
 # PostgreSQL connection string
 {{- if .Values.postgresql.chartManaged }}

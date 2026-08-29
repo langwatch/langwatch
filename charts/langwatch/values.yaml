@@ -1128,7 +1128,14 @@ langwatch_nlp:
   # idle timeout (NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS, 720s default and
   # not yet exposed here) on purpose — a code-block ceiling at or above the
   # idle timeout races the stream shutting down.
-  ## @param langwatch_nlp.codeBlockTimeoutSeconds [default: 600] Seconds a code block may run before nlpgo kills it. Keep below the engine's stream idle timeout (default 720s).
+  #
+  # The app and the workers derive their own fetch deadline from this number
+  # and get it whether or not the NLP service is deployed here, so with
+  # langwatch_nlp.enabled false the chart refuses a changed value: it would
+  # shorten the clients' deadline against an external engine whose real ceiling
+  # the chart cannot set. In that mode, configure the ceiling on the external
+  # service and leave this alone.
+  ## @param langwatch_nlp.codeBlockTimeoutSeconds [default: 600] Seconds a code block may run before nlpgo kills it. Keep below the engine's stream idle timeout (default 720s). Must stay at 600 when langwatch_nlp.enabled is false.
   codeBlockTimeoutSeconds: 600
 
   # Resource requirements for the NLP service. The service is a lean static Go

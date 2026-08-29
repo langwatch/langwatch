@@ -41,8 +41,29 @@ export const NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV =
  * hasn't set the var anywhere, this client falls back to the exact number
  * the engine falls back to. Keep the two in sync if the Go default ever
  * changes.
+ *
+ * Exported because it is the ONLY copy of the engine default on this side:
+ * every other fallback to it — the Lambda clamp included — imports this
+ * rather than restating 600, which is the drift this module exists to stop.
  */
-const NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS = 600;
+export const NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS = 600;
+
+/**
+ * The engine's own default silence budget for an SSE stream —
+ * `NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS`, `httpapi.DefaultStreamIdleTimeout`
+ * in `services/nlpgo/adapters/httpapi/handlers.go`.
+ *
+ * A code block that runs longer than this emits nothing while it runs, so the
+ * stream is torn down underneath it and the caller never sees the engine's
+ * verdict. That makes this an upper bound on any code-block ceiling, alongside
+ * the Lambda invocation ceiling — see {@link clampCodeBlockTimeoutSeconds} and
+ * the chart's own `langwatch.codeBlockTimeoutSeconds` helper, which refuses a
+ * value at or above it.
+ *
+ * Not env-configurable here on purpose: the platform does not set the engine's
+ * idle timeout, it only has to stay under whatever the engine's default is.
+ */
+export const NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS = 720;
 
 /**
  * Slack the client's socket hold gets ABOVE the engine's code-block
@@ -66,14 +87,19 @@ export const NLP_FETCH_MAX_TIMEOUT_ENV = "NLP_FETCH_MAX_TIMEOUT_MS";
 export const NLP_FETCH_MAX_TIMEOUT_DEFAULT_MS = 900_000;
 
 /**
- * Parses an env var holding a count of SECONDS as a positive, finite
- * number, converts to milliseconds, and falls back on anything that
- * isn't one.
+ * Parses an env var holding a count of SECONDS as a positive whole number,
+ * converts to milliseconds, and falls back on anything that isn't one.
  *
- * Clamp, never reject: unset, empty, non-numeric, non-finite, zero and
- * negative all read as "use the default" — a nonsensical value must not
- * fail the scenario run, the same contract the engine keeps for its own
+ * Clamp, never reject: unset, empty, non-numeric, non-finite, fractional,
+ * zero and negative all read as "use the default" — a nonsensical value must
+ * not fail the scenario run, the same contract the engine keeps for its own
  * copy of this parse (`services/nlpgo/cmd/root.go`).
+ *
+ * Fractional is rejected rather than honoured so this parse agrees with the
+ * other reader of the same variable, `clampCodeBlockTimeoutSeconds` in
+ * `../../optimization_studio/server/lambda/index.ts`, which takes integers
+ * only. When the two disagreed, "0.5" made the Lambda run on the 600s default
+ * while this side derived a 30.5s deadline and cut every turn off against it.
  */
 function resolvePositiveSecondsEnvAsMs({
   name,
@@ -87,7 +113,7 @@ function resolvePositiveSecondsEnvAsMs({
     return fallbackSeconds * 1000;
   }
   const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed <= 0) {
     return fallbackSeconds * 1000;
   }
   return parsed * 1000;

@@ -54,28 +54,53 @@ describe("clampCodeBlockTimeoutSeconds", () => {
   });
 
   it("returns the parsed value one second below MAX_SECONDS", () => {
-    expect(clampCodeBlockTimeoutSeconds("889")).toBe(889);
+    expect(clampCodeBlockTimeoutSeconds("709")).toBe(709);
   });
 
   it("returns the parsed value at MAX_SECONDS", () => {
-    expect(clampCodeBlockTimeoutSeconds("890")).toBe(890);
+    expect(clampCodeBlockTimeoutSeconds("710")).toBe(710);
   });
 
   it("clamps the first value above MAX_SECONDS to MAX_SECONDS", () => {
-    expect(clampCodeBlockTimeoutSeconds("891")).toBe(890);
+    expect(clampCodeBlockTimeoutSeconds("711")).toBe(710);
   });
 
   it("clamps values above MAX_SECONDS to MAX_SECONDS", () => {
-    // MAX_SECONDS is 890 (900 - 10 safety margin)
-    expect(clampCodeBlockTimeoutSeconds("900")).toBe(890);
+    // MAX_SECONDS is 710: the lower of the Lambda invocation timeout (900)
+    // and the engine's stream idle timeout (720), less the 10s safety margin.
+    expect(clampCodeBlockTimeoutSeconds("900")).toBe(710);
   });
 
   it("clamps very large values to MAX_SECONDS", () => {
-    expect(clampCodeBlockTimeoutSeconds("100000")).toBe(890);
+    expect(clampCodeBlockTimeoutSeconds("100000")).toBe(710);
   });
 
   it("handles leading/trailing whitespace in numeric strings", () => {
     // Number() parser handles whitespace, so " 600 " should work
     expect(clampCodeBlockTimeoutSeconds(" 600 ")).toBe(600);
+  });
+
+  // Bounded by the Lambda invocation timeout alone, everything from 721 to 890
+  // came back unchanged — values the chart itself hard-fails, and which no
+  // Lambda can honour: NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS is not among
+  // the variables this module reconciles onto a per-project function, so every
+  // one of them runs the engine's own 720s silence budget. A code block that
+  // long emits nothing and the stream tears down before it can report.
+  describe("the engine's stream idle timeout bounds the ceiling too", () => {
+    it("clamps a value inside the old Lambda-only allowance", () => {
+      expect(clampCodeBlockTimeoutSeconds("760")).toBe(710);
+    });
+
+    it("clamps the stream idle timeout itself", () => {
+      expect(clampCodeBlockTimeoutSeconds("720")).toBe(710);
+    });
+
+    it("clamps the old Lambda-only ceiling", () => {
+      expect(clampCodeBlockTimeoutSeconds("890")).toBe(710);
+    });
+
+    it("leaves the default ceiling untouched, which sits below the bound", () => {
+      expect(clampCodeBlockTimeoutSeconds("600")).toBe(600);
+    });
   });
 });

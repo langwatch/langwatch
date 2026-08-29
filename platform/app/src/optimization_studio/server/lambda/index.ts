@@ -18,6 +18,8 @@ import {
   CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS,
   LAMBDA_INVOCATION_TIMEOUT_SECONDS,
   NLP_LAMBDA_MEMORY_SIZE_MB,
+  NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS,
+  NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS,
 } from "../../../server/nlpgo/timeouts";
 import {
   deleteStagedObject,
@@ -232,17 +234,33 @@ const createLogGroupWithRetention = async (
   }
 };
 
-// Operator-overridable via NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS, but the
-// override must stay below the Lambda's own Timeout (900s) or Lambda
-// terminates the invocation before nlpgo can report its own timeout to the
-// caller. Clamp rather than trust the raw env value.
+/**
+ * The code-block ceiling this Lambda is given, from the operator's raw
+ * `NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`.
+ *
+ * Two deadlines enclose a code block here, and the ceiling has to sit under
+ * BOTH or the block is killed by something that cannot say why:
+ *
+ *   - The Lambda's own invocation timeout. Past it, Lambda terminates the
+ *     invocation before nlpgo reports its own timeout to the caller.
+ *   - The engine's SSE stream idle timeout. A running code block emits no
+ *     events, so past that budget the stream is torn down underneath it and
+ *     the caller sees a dead socket instead of the engine's verdict. This
+ *     Lambda runs the engine's own default for it — the idle timeout is not
+ *     among the variables {@link buildDesiredLambdaEnvironmentVariables}
+ *     sets, so there is no per-project override to read.
+ *
+ * Clamp rather than trust the raw env value; the safety margin leaves nlpgo
+ * a moment to report its timeout before the enclosing deadline fires.
+ */
 export const clampCodeBlockTimeoutSeconds = (
   rawValue: string | undefined,
 ): number => {
-  const DEFAULT_SECONDS = 600;
   const MAX_SECONDS =
-    LAMBDA_INVOCATION_TIMEOUT_SECONDS -
-    CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS;
+    Math.min(
+      LAMBDA_INVOCATION_TIMEOUT_SECONDS,
+      NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS,
+    ) - CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS;
   const parsed = Number(rawValue);
   if (
     !rawValue ||
@@ -250,7 +268,7 @@ export const clampCodeBlockTimeoutSeconds = (
     !Number.isInteger(parsed) ||
     parsed <= 0
   ) {
-    return DEFAULT_SECONDS;
+    return NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS;
   }
   return Math.min(parsed, MAX_SECONDS);
 };

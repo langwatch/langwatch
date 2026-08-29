@@ -242,8 +242,8 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
    * the identifier and units the engine reads (`nodeTimeout` in
    * services/nlpgo/app/engine/engine.go). It is a request for a SHORTER
    * budget only: the code executor clamps it to the operator's ceiling
-   * (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`, 60s when unset), so a larger
-   * value buys the agent nothing. Omitted when unset, which leaves the engine
+   * (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`, 600s when unset — see
+   * `services/nlpgo/config.go`), so a larger value buys the agent nothing. Omitted when unset, which leaves the engine
    * on that operator default.
    */
   private buildCodeNode(
