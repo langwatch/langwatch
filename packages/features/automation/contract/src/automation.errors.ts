@@ -32,6 +32,31 @@ export class TriggerFiltersRequiredError extends HandledError {
   }
 }
 
+/**
+ * A graph alert or a scheduled report was asked to do something it cannot.
+ *
+ * Both kinds are notifications: they deliver by email, Slack or webhook and
+ * have nowhere to put a row. `ADD_TO_DATASET` and `ADD_TO_ANNOTATION_QUEUE`
+ * belong to a trace-filter automation, which has traces to add. The two
+ * builders have always said so in their types; nothing refused it at the
+ * door, so such a trigger was stored and then never delivered.
+ */
+export class TriggerActionUnsupportedError extends HandledError {
+  declare readonly code: "trigger_action_unsupported";
+
+  constructor(
+    public readonly triggerKind: "graph alert" | "report",
+    public readonly action: string,
+  ) {
+    super(
+      "trigger_action_unsupported",
+      `A ${triggerKind} cannot ${action === "ADD_TO_DATASET" ? "add to a dataset" : "add to an annotation queue"}; it can only send a notification.`,
+      { meta: { field: "action", triggerKind, action }, httpStatus: 422 },
+    );
+    this.name = "TriggerActionUnsupportedError";
+  }
+}
+
 export class TemplateValidationError extends HandledError {
   declare readonly code: "template_validation_error";
 

@@ -180,10 +180,7 @@ const BLOCKING_MIGRATION_LABELS: Record<string, string> = {
  * reword their prose) and unsafe (that string is the one carrying key
  * material). Same rule `promoteCodexAgentError` follows for Langy.
  */
-const hasReasonCode = (
-  reasons: readonly SerializedReason[],
-  codes: ReadonlySet<string>,
-): boolean =>
+const hasReasonCode = (reasons: readonly SerializedReason[], codes: ReadonlySet<string>): boolean =>
   reasons.some(
     (reason) =>
       codes.has(reason.code) ||
@@ -219,9 +216,7 @@ const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
   "upstream_forbidden",
 ]);
 
-const PROVIDER_RATE_LIMIT_REASONS: ReadonlySet<string> = new Set([
-  "upstream_rate_limited",
-]);
+const PROVIDER_RATE_LIMIT_REASONS: ReadonlySet<string> = new Set(["upstream_rate_limited"]);
 
 const PROVIDER_OUTAGE_REASONS: ReadonlySet<string> = new Set([
   "upstream_unavailable",
@@ -565,8 +560,7 @@ const presentations = {
     // Nothing was written: the save is refused before the update, so the copy
     // can promise the customer's own edit is still theirs to redo.
     title: "This evaluation changed since you loaded it",
-    describe: () =>
-      "Reload to pick up the latest version, then make your change again.",
+    describe: () => "Reload to pick up the latest version, then make your change again.",
   },
   experiment_workbench_missing_reference: {
     title: "This evaluation points at something that no longer exists",
@@ -610,8 +604,7 @@ const presentations = {
   },
   dspy_step_not_found: {
     title: "Optimization step not found",
-    describe: () =>
-      "It may have been removed along with its run. Reload to see the current steps.",
+    describe: () => "It may have been removed along with its run. Reload to see the current steps.",
   },
   email_already_registered: {
     // Reached from the sign-up screen, and the reader there is usually looking
@@ -733,9 +726,7 @@ const presentations = {
             .filter((type): type is string => typeof type === "string")
             .map((type) => type.replace(/^image\//, "").toUpperCase())
         : [];
-      return names.length > 0
-        ? `Use ${listLabels(names)}.`
-        : "Use a PNG, JPEG, WebP or GIF.";
+      return names.length > 0 ? `Use ${listLabels(names)}.` : "Use a PNG, JPEG, WebP or GIF.";
     },
   },
   avatar_rate_limited: {
@@ -780,10 +771,7 @@ const presentations = {
     // as "the one I already have just broke".
     title: "This provider has moved",
     describe: (error) => {
-      const replacement = label(
-        DEPRECATED_PROVIDER_REPLACEMENTS,
-        str(error, "replacement", ""),
-      );
+      const replacement = label(DEPRECATED_PROVIDER_REPLACEMENTS, str(error, "replacement", ""));
       return replacement
         ? `Add ${replacement} instead — it now covers this. Providers you already set up keep working.`
         : "It has been merged into another provider. Providers you already set up keep working.";
@@ -865,8 +853,7 @@ const presentations = {
     // Deliberate refusal, not a mistake to correct: the provider is managed
     // above where this person can act, so the copy points at who can.
     title: "You can't change this provider here",
-    describe: () =>
-      "It's managed outside this project. Ask an admin on your team to change it.",
+    describe: () => "It's managed outside this project. Ask an admin on your team to change it.",
   },
   model_provider_not_found: {
     // Also covers "exists but not in your scopes" — the service answers the
@@ -914,8 +901,7 @@ const presentations = {
   },
   provider_key_missing: {
     title: "No API key to check",
-    describe: () =>
-      "Nothing is stored for this provider yet. Enter a key, then try again.",
+    describe: () => "Nothing is stored for this provider yet. Enter a key, then try again.",
   },
   provider_key_restricted: {
     // fault: customer, and fixable — but never by minting a new key, which is
@@ -983,8 +969,7 @@ const presentations = {
   },
   project_slug_taken: {
     title: "That name is taken",
-    describe: () =>
-      "Another project in the selected team already uses it. Pick a different name.",
+    describe: () => "Another project in the selected team already uses it. Pick a different name.",
   },
   project_destination_team_not_found: {
     // Names the KIND, never whether the team exists: a team id that belongs to
@@ -1065,13 +1050,11 @@ const presentations = {
   },
   custom_role_in_use: {
     title: "This role is still in use",
-    describe: () =>
-      "Remove its member assignments and role bindings first, then delete it.",
+    describe: () => "Remove its member assignments and role bindings first, then delete it.",
   },
   custom_role_id_required: {
     title: "Pick the custom role to use",
-    describe: () =>
-      "A custom role binding needs the role's id. Choose one, then try again.",
+    describe: () => "A custom role binding needs the role's id. Choose one, then try again.",
   },
   custom_role_not_assignable: {
     // Covers a role from another organization and an API key's system role
@@ -1086,8 +1069,7 @@ const presentations = {
   },
   team_membership_not_found: {
     title: "That person isn't on this team",
-    describe: () =>
-      "They may have been removed since this page loaded. Reload to see who's on it.",
+    describe: () => "They may have been removed since this page loaded. Reload to see who's on it.",
   },
   team_member_already_added: {
     title: "They already hold that role here",
@@ -1217,8 +1199,7 @@ const presentations = {
   },
   member_seat_limit_reached: {
     title: "All member seats are in use",
-    describe: () =>
-      "Free a seat by disabling a membership, or upgrade the plan to add more.",
+    describe: () => "Free a seat by disabling a membership, or upgrade the plan to add more.",
   },
   membership_disabled: {
     // The person IS a member, so nothing here may suggest they are not, and
@@ -1231,10 +1212,7 @@ const presentations = {
   migration_enrolled_automatically: {
     title: "This migration already covers every organization",
     describe: (error) => {
-      const migration = label(
-        MIGRATION_NAME_LABELS,
-        str(error, "migrationName", ""),
-      );
+      const migration = label(MIGRATION_NAME_LABELS, str(error, "migrationName", ""));
       return migration
         ? `Every organization is already covered by ${migration}, including any created from now on, so there is nothing to enroll.`
         : "Every organization is already covered by this migration, including any created from now on, so there is nothing to enroll.";
@@ -1295,10 +1273,7 @@ const presentations = {
   migration_rollback_blocked_by_dependent: {
     title: "Another migration still stands on this one",
     describe: (error) => {
-      const blocking = label(
-        BLOCKING_MIGRATION_LABELS,
-        str(error, "blockingMigration", ""),
-      );
+      const blocking = label(BLOCKING_MIGRATION_LABELS, str(error, "blockingMigration", ""));
       return blocking
         ? `This organization's ${blocking} is still in force and depends on this migration's data. Roll the ${blocking} back first, then retry.`
         : "A migration that depends on this one is still in force. Roll that one back first, then retry.";
@@ -1320,8 +1295,7 @@ const presentations = {
   },
   invite_expired: {
     title: "This invitation has expired",
-    describe: () =>
-      "Ask for a fresh one and whoever invited you can send it in one click.",
+    describe: () => "Ask for a fresh one and whoever invited you can send it in one click.",
   },
   invite_not_found: {
     title: "Invite not found",
@@ -1369,8 +1343,7 @@ const presentations = {
   },
   join_request_not_pending: {
     title: "That request was already answered",
-    describe: () =>
-      "Somebody approved, rejected or withdrew it. Refresh to see where it ended up.",
+    describe: () => "Somebody approved, rejected or withdrew it. Refresh to see where it ended up.",
   },
   join_request_already_pending: {
     title: "You have already asked",
@@ -1423,8 +1396,7 @@ const presentations = {
   },
   group_not_found: {
     title: "Group not found",
-    describe: () =>
-      "It may have been deleted, or the id may belong to another organization.",
+    describe: () => "It may have been deleted, or the id may belong to another organization.",
   },
   group_member_already_added: {
     title: "They're already in this group",
@@ -1432,8 +1404,7 @@ const presentations = {
   },
   schedule_not_found: {
     title: "That schedule no longer exists",
-    describe: () =>
-      "It was removed while this page was open. Reload to see what is scheduled now.",
+    describe: () => "It was removed while this page was open. Reload to see what is scheduled now.",
   },
   schedule_inactive: {
     title: "That schedule is paused",
@@ -1497,8 +1468,7 @@ const presentations = {
   },
   role_binding_not_found: {
     title: "Role binding not found",
-    describe: () =>
-      "It may have been removed already. Reload to see the current bindings.",
+    describe: () => "It may have been removed already. Reload to see the current bindings.",
   },
   authz_ledger_unavailable: {
     title: "Access changes are paused",
@@ -1526,8 +1496,7 @@ const presentations = {
   },
   organization_slug_taken: {
     title: "That organization slug is already in use",
-    describe: () =>
-      "Pick a different slug, or leave it out to generate one from the name.",
+    describe: () => "Pick a different slug, or leave it out to generate one from the name.",
   },
   scim_token_not_found: {
     title: "SCIM token not found",
@@ -1691,8 +1660,7 @@ const presentations = {
     // The old line restated the title in HTTP vocabulary and left the reader
     // with nothing to do. A mismatched payload shape is almost always an old
     // SDK, so say that.
-    describe: () =>
-      "Update the LangWatch browser SDK to the latest version, then try again.",
+    describe: () => "Update the LangWatch browser SDK to the latest version, then try again.",
   },
   rum_payload_too_large: {
     title: "That telemetry report is too big",
@@ -1713,8 +1681,7 @@ const presentations = {
   },
   contested_credentials: {
     title: "This request carried more than one credential",
-    describe: () =>
-      "Send exactly one: either an API key or a signed-in session, not both.",
+    describe: () => "Send exactly one: either an API key or a signed-in session, not both.",
   },
   invalid_credentials: {
     // Deliberately says nothing about which credential class the route
@@ -1756,8 +1723,7 @@ const presentations = {
   },
   scenario_folder_not_found: {
     title: "That test suite isn't available",
-    describe: () =>
-      "It may have been archived or removed. Reload, then pick a test suite again.",
+    describe: () => "It may have been archived or removed. Reload, then pick a test suite again.",
   },
   scenario_folder_slug_unavailable: {
     title: "That test suite name isn't available",
@@ -1836,8 +1802,7 @@ const presentations = {
     // Nothing was written: the save is refused before the update, so the copy
     // can promise the customer's own edit is still theirs to redo.
     title: "This test case changed since you loaded it",
-    describe: () =>
-      "Reload to pick up the latest version, then make your change again.",
+    describe: () => "Reload to pick up the latest version, then make your change again.",
   },
   scenario_version_not_found: {
     title: "That version is not available",
@@ -1847,8 +1812,7 @@ const presentations = {
   // ---- billing ----
   billing_customer_email_required: {
     title: "Add a billing email first",
-    describe: () =>
-      "Billing needs an email address on the account before this can go through.",
+    describe: () => "Billing needs an email address on the account before this can go through.",
   },
   billing_plan_price_missing: {
     // fault: platform. The plan the customer picked has no price set up on our
@@ -1883,8 +1847,7 @@ const presentations = {
     // we refuse rather than charge a different number than the one on screen.
     // The action is to reopen, which is a real action the customer can take.
     title: "This quote is out of date",
-    describe: () =>
-      "Nothing was charged. Close this and open it again to see the current amount.",
+    describe: () => "Nothing was charged. Close this and open it again to see the current amount.",
   },
   seat_billing_unavailable: {
     // fault: provider. The payment provider didn't answer. Nothing was
@@ -1927,8 +1890,7 @@ const presentations = {
     // old "try again in a moment" invited the customer to keep retrying a
     // permanent condition.
     title: "Billing isn't available here",
-    describe: () =>
-      "This is a self-hosted deployment, so plans are managed outside the app.",
+    describe: () => "This is a self-hosted deployment, so plans are managed outside the app.",
   },
 
   // ---- identity ----
@@ -1943,8 +1905,7 @@ const presentations = {
   },
   identity_identifier_not_found: {
     title: "That sign-in method is no longer on your account",
-    describe: () =>
-      "Refresh the page to see your current sign-in methods, then try again.",
+    describe: () => "Refresh the page to see your current sign-in methods, then try again.",
   },
   identity_identifier_not_verifiable: {
     title: "That sign-in method can't be verified right now",
@@ -1953,8 +1914,7 @@ const presentations = {
   },
   identity_primary_must_demote_first: {
     title: "Your primary sign-in method can't be removed",
-    describe: () =>
-      "Make another verified sign-in method primary first, then remove this one.",
+    describe: () => "Make another verified sign-in method primary first, then remove this one.",
   },
   identity_primary_requires_verified: {
     title: "Only a verified sign-in method can be primary",
@@ -1973,13 +1933,11 @@ const presentations = {
     // set up on this account. A wrong code and a code for an enrollment
     // nobody holds read identically here, on purpose.
     title: "That code didn't work",
-    describe: () =>
-      "Check your authenticator app for the current code and enter it again.",
+    describe: () => "Check your authenticator app for the current code and enter it again.",
   },
   identity_mfa_enrollment_expired: {
     title: "That setup took too long",
-    describe: () =>
-      "Start setting up two-step verification again, and scan the new code.",
+    describe: () => "Start setting up two-step verification again, and scan the new code.",
   },
   identity_mfa_locked_out: {
     title: "Too many incorrect codes",
@@ -2074,8 +2032,7 @@ const presentations = {
   },
   identity_jit_disabled: {
     title: "This workspace does not create accounts automatically",
-    describe: () =>
-      "Ask a workspace administrator to invite you, then sign in again.",
+    describe: () => "Ask a workspace administrator to invite you, then sign in again.",
   },
   identity_unsupported_storage_query: {
     title: "We couldn't read your sign-in methods",
@@ -2104,15 +2061,13 @@ const presentations = {
   },
   ingestion_source_cap_reached: {
     title: "You've hit the limit for ingestion sources",
-    describe: () =>
-      "Archive one you no longer use, or upgrade your plan to raise the limit.",
+    describe: () => "Archive one you no longer use, or upgrade your plan to raise the limit.",
   },
   personal_virtual_key_label_taken: {
     // Scoped to the reader's own keys: two people in one organization may both
     // have a "default", so the sentence says "you", not "someone".
     title: "That label is taken",
-    describe: () =>
-      "You already have a personal key with this label. Pick a different one.",
+    describe: () => "You already have a personal key with this label. Pick a different one.",
   },
   no_eligible_model_providers: {
     // Nothing the reader can fix from where they are standing — minting the key
@@ -2160,8 +2115,7 @@ const presentations = {
     // Customer fault in the ADR-045 sense: they asked for something the format
     // can't do, and there is a way to get where they were going.
     title: "That column's type can't be changed",
-    describe: () =>
-      "Add a new column with the type you need, then move the values across.",
+    describe: () => "Add a new column with the type you need, then move the values across.",
   },
   dataset_not_ready: {
     // A state, not a breakage — the rows are still being prepared. Waiting is
@@ -2221,15 +2175,13 @@ const presentations = {
   },
   share_read_rate_limited: {
     title: "This shared trace is busy right now",
-    describe: () =>
-      "It's being opened a lot at the moment. Wait a few seconds, then refresh.",
+    describe: () => "It's being opened a lot at the moment. Wait a few seconds, then refresh.",
   },
   // The one sharer-facing code here: raised when someone tries to mint a trace
   // link while the project has sharing switched off.
   trace_sharing_disabled: {
     title: "Sharing is turned off for this project",
-    describe: () =>
-      "Ask a project admin to turn on trace sharing before creating a link.",
+    describe: () => "Ask a project admin to turn on trace sharing before creating a link.",
   },
 
   // ---- suites (run plans) ----
@@ -2259,8 +2211,7 @@ const presentations = {
   },
   suite_scope_empty: {
     title: "This run plan covers no test case",
-    describe: () =>
-      "Its scope matches nothing right now. Widen it in the plan, then run again.",
+    describe: () => "Its scope matches nothing right now. Widen it in the plan, then run again.",
   },
   suite_scope_not_allowed: {
     title: "A test suite takes no scope",
@@ -2329,8 +2280,7 @@ const presentations = {
     // ("Invalid filter syntax", "Too many filter conditions"). It names WHERE
     // the query went wrong, which the generic sentence cannot, and it is our
     // prose — clamped like every other server-authored sentence here.
-    describe: (error) =>
-      safeProse(str(error, "reason", "")) || "Check the query and try again.",
+    describe: (error) => safeProse(str(error, "reason", "")) || "Check the query and try again.",
   },
   graph_alert_channel_unsupported: {
     title: "A graph alert can only send a notification",
@@ -2443,6 +2393,13 @@ const presentations = {
         : "Configure the destination first.";
     },
   },
+  trigger_action_unsupported: {
+    title: "This automation cannot do that",
+    describe: () =>
+      "Graph alerts and scheduled reports send a notification — by email, " +
+      "Slack or webhook. To collect traces instead, build an automation on a " +
+      "trace filter.",
+  },
   trigger_filters_required: {
     title: "This automation needs a condition",
     describe: () =>
@@ -2475,13 +2432,11 @@ const presentations = {
   },
   langy_conversation_not_found: {
     title: "Conversation not found",
-    describe: () =>
-      "This conversation is no longer available. Start a new chat to keep going.",
+    describe: () => "This conversation is no longer available. Start a new chat to keep going.",
   },
   langy_conversation_not_owned: {
     title: "This conversation belongs to someone else",
-    describe: () =>
-      "You can view shared conversations but only the owner can continue them.",
+    describe: () => "You can view shared conversations but only the owner can continue them.",
   },
   langy_empty_message: {
     title: "Nothing to send",
@@ -2684,8 +2639,7 @@ const presentations = {
   },
   langy_github_not_connected: {
     title: "Install the GitHub App to continue",
-    describe: () =>
-      "Langy needs the LangWatch GitHub App installed to open pull requests.",
+    describe: () => "Langy needs the LangWatch GitHub App installed to open pull requests.",
   },
   langy_github_repo_not_accessible: {
     title: "That repository isn't available to Langy",
@@ -2737,9 +2691,7 @@ const presentations = {
       }
       const formErrors = error.meta.formErrors;
       if (Array.isArray(formErrors)) {
-        const first = formErrors.find(
-          (entry): entry is string => typeof entry === "string",
-        );
+        const first = formErrors.find((entry): entry is string => typeof entry === "string");
         if (first) return safeProse(first);
       }
       return "Some of the values aren't valid.";
@@ -2751,9 +2703,7 @@ const presentations = {
     title: "Check your input",
     describe: (error) => {
       const field = label(USER_VISIBLE_FIELDS, str(error, "field", ""));
-      return field
-        ? `There's a problem with ${field}.`
-        : "Some of the values aren't valid.";
+      return field ? `There's a problem with ${field}.` : "Some of the values aren't valid.";
     },
   },
   malformed_request: {
@@ -2852,8 +2802,7 @@ const presentations = {
     // bills for as long as it runs. What frees a slot is a call ending, so
     // the copy says that rather than "slow down".
     title: "This key has all its voice calls open",
-    describe: () =>
-      "Wait for a call to end, or raise the key's max open sessions in settings.",
+    describe: () => "Wait for a call to end, or raise the key's max open sessions in settings.",
   },
   realtime_registry_unavailable: {
     // Nothing was minted, so the reader is not holding a half-open session.
@@ -2984,8 +2933,7 @@ const presentations = {
     // Says what to do rather than what was wrong: the date is still in the
     // field, so the only useful sentence is the one that gets it saved.
     title: "That expiration date has already passed",
-    describe: () =>
-      "Pick a date in the future, or choose Never so the key does not expire.",
+    describe: () => "Pick a date in the future, or choose Never so the key does not expire.",
   },
   gateway_budget_not_found: {
     title: "Budget not found",
@@ -3001,8 +2949,7 @@ const presentations = {
   },
   gateway_guardrail_project_not_found: {
     title: "Project not found",
-    describe: () =>
-      "It may have been deleted, or your access to it may have been removed.",
+    describe: () => "It may have been deleted, or your access to it may have been removed.",
   },
   gateway_guardrail_evaluator_invalid: {
     // The wire message names the stored execution mode and an internal code.
@@ -3068,9 +3015,7 @@ const presentations = {
     title: "These totals would not add up yet",
     describe: (error) => {
       const settlesAt = str(error, "settles_at", "");
-      const when = settlesAt
-        ? ` Requests in this range finish arriving at ${settlesAt}.`
-        : "";
+      const when = settlesAt ? ` Requests in this range finish arriving at ${settlesAt}.` : "";
       return `Recent requests can still change which model or provider they are counted under, and which time bucket they fall in, so grouping this way now could count some twice and miss others. Ask for an older range, group by key or end user instead, or allow an approximate read if you only need a rough shape.${when}`;
     },
   },
@@ -3094,8 +3039,7 @@ const presentations = {
   gateway_spend_unavailable: {
     // fault: platform. Says what is missing, not which engine is missing it.
     title: "Spend isn't available for this key",
-    describe: () =>
-      "This deployment doesn't record spend per key, so there's no figure to show.",
+    describe: () => "This deployment doesn't record spend per key, so there's no figure to show.",
   },
   spend_source_unavailable: {
     // The public REST spelling of the refusal above. Both doors answer the
@@ -3103,8 +3047,7 @@ const presentations = {
     // differs because the REST one is published in the management API docs
     // and callers already branch on it.
     title: "Spend isn't available for this key",
-    describe: () =>
-      "This deployment doesn't record spend per key, so there's no figure to show.",
+    describe: () => "This deployment doesn't record spend per key, so there's no figure to show.",
   },
   webhook_endpoint_not_found: {
     // An archived endpoint reads the same as one that never existed, so the
@@ -3177,8 +3120,7 @@ const presentations = {
     // Restarting the walk silently would re-serve every row the caller already
     // has, so this refuses instead; the copy says what to do about it.
     title: "That page cursor isn't valid",
-    describe: () =>
-      "Start the list again from the beginning and follow next_cursor from there.",
+    describe: () => "Start the list again from the beginning and follow next_cursor from there.",
   },
   gateway_group_budget_unsupported: {
     // Refusing beats creating a cap that quietly means something else, so the
@@ -3264,8 +3206,7 @@ const presentations = {
   },
   invalid_conversation_id: {
     title: "Conversation not found",
-    describe: () =>
-      "This conversation link isn't one we can open. Start a new chat to keep going.",
+    describe: () => "This conversation link isn't one we can open. Start a new chat to keep going.",
   },
   opencode_session_not_found: {
     title: "The session was lost",
@@ -3329,8 +3270,7 @@ const presentations = {
   // ---- HTTP node ----
   http_error: {
     title: "Couldn't reach the agent",
-    describe: () =>
-      "Check the URL is correct and the service is reachable, then run again.",
+    describe: () => "Check the URL is correct and the service is reachable, then run again.",
   },
   http_executor_unavailable: {
     title: "HTTP requests are temporarily unavailable",
@@ -3379,8 +3319,7 @@ const presentations = {
         error,
         whenAbsent: "Check its configuration, then run again.",
         whenOther: "Check its configuration, then run again.",
-        whenRejected:
-          "Check the API key for this evaluator's model provider, then run again.",
+        whenRejected: "Check the API key for this evaluator's model provider, then run again.",
       }),
   },
   evaluator_executor_unavailable: {
@@ -3481,8 +3420,7 @@ const presentations = {
   },
   unsupported_parameter: {
     title: "That provider can't honor one of your parameters",
-    describe: () =>
-      "Remove the parameter named in the message, or pick a model that supports it.",
+    describe: () => "Remove the parameter named in the message, or pick a model that supports it.",
   },
 } satisfies Record<AppErrorCode | GoErrorCode | NodeErrorCode, ErrorPresentation>;
 
@@ -3682,9 +3620,7 @@ export function explainHandledError(error: HandledErrorShape): ErrorExplanation 
  * (a `target_result.domainError`, an evaluator `domainError`) rather than off a
  * transport envelope — the coded counterpart to reading a raw `error` string.
  */
-export function explainSerializedError(
-  domainError: SerializedHandledError,
-): ErrorExplanation {
+export function explainSerializedError(domainError: SerializedHandledError): ErrorExplanation {
   return explainHandledError(handledShapeFromSerialized(domainError));
 }
 

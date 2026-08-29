@@ -3,9 +3,9 @@ import type { CanonicalAttributes, CanonicalEvent } from "@langwatch/trace-contr
 import { canonicalisation } from "../../services/__tests__/canonicalisation/test-helpers";
 import type { ExtractorContext } from "../canonical-attributes.port";
 
-import codexBSpan from "../../../tests/canonicalisation/fixtures/codex-b.session-task-turn.json";
-import geminiBSpan from "../../../tests/canonicalisation/fixtures/gemini-b.llm-call.json";
-import opencodeBSpan from "../../../tests/canonicalisation/fixtures/opencode-b.do-stream.json";
+import codexBSpan from "./fixtures/codex-b.session-task-turn.json";
+import geminiBSpan from "./fixtures/gemini-b.llm-call.json";
+import opencodeBSpan from "./fixtures/opencode-b.do-stream.json";
 
 /**
  * Per-element canonicalization coverage, fed by the REAL Path B OTLP each coding

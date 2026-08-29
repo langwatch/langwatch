@@ -32,6 +32,7 @@ import {
   automationApiWebhookDeliveriesInputSchema,
   automationFilterFieldSchema,
   buildGraphAlertTriggerData,
+  type BuildGraphAlertTriggerDataInput,
   buildReportTriggerData,
   DEFAULT_TRACE_DEBOUNCE_MS,
   EMAIL_RX,
@@ -45,6 +46,7 @@ import {
   NotificationDeliveryError,
   TestFireUnavailableError,
   TriggerAction,
+  TriggerActionUnsupportedError,
   TriggerFiltersRequiredError,
   WEBHOOK_HEADER_VALUE_KEPT,
   type AutomationAction,
@@ -209,6 +211,24 @@ export type AutomationTrpcPorts = Readonly<{
  * (ADR-045), and dressing it up as handled would promise the caller an action
  * they do not have.
  */
+/**
+ * The action a graph alert or a report may carry, or a refusal.
+ *
+ * Both kinds deliver a notification and have nowhere to put a row, which is
+ * what their builders' input types have always said. The door did not enforce
+ * it: a graph alert asking to add to a dataset was stored with that action and
+ * then never delivered, because the dispatcher has no such path for it.
+ */
+function notifyingActionOr(
+  action: BuildGraphAlertTriggerDataInput["action"] | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE",
+  triggerKind: "graph alert" | "report",
+): BuildGraphAlertTriggerDataInput["action"] {
+  if (action === "ADD_TO_DATASET" || action === "ADD_TO_ANNOTATION_QUEUE") {
+    throw new TriggerActionUnsupportedError(triggerKind, action);
+  }
+  return action;
+}
+
 function raiseAsHandled(err: unknown): never {
   if (HandledError.isHandled(err)) throw err;
   if (isDispatchError(err)) {
@@ -1020,7 +1040,10 @@ export class AutomationTrpcApi {
                 ...graphAlert,
               },
             };
-            const built = buildGraphAlertTriggerData(builderInput);
+            const built = buildGraphAlertTriggerData({
+              ...builderInput,
+              action: notifyingActionOr(builderInput.action, "graph alert"),
+            });
             data = {
               name: built.name,
               action: built.action,
@@ -1042,7 +1065,7 @@ export class AutomationTrpcApi {
               id: input.triggerId ?? ksuid(TRIGGER_KSUID_RESOURCE).toString(),
               name: input.name,
               projectId: input.projectId,
-              action: input.action,
+              action: notifyingActionOr(input.action, "report"),
               actionParams: { ...actionParams, ...input.report },
             });
             data = {

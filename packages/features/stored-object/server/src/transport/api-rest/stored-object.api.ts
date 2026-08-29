@@ -14,7 +14,7 @@
 import { Readable } from "node:stream";
 import { HandledError } from "@langwatch/handled-error";
 import { StoredObjectOwnerLookupUnavailableError } from "@langwatch/stored-object-contract";
-import type { Env, MiddlewareHandler } from "hono";
+import type { Context, Env, MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { anyAuthenticated } from "@langwatch/api";
 import {
@@ -164,7 +164,14 @@ function streamFileResponse({
 }
 
 /** The files REST family, built against one process's security and services. */
-export function createFilesRestApp<E extends Env = { Variables: FilesDualAuthVariables }>(options: {
+export function createFilesRestApp<
+  // Constrained, not merely defaulted: the read handler below reads the
+  // dual-auth variables off the context, and a caller widening `E` must still
+  // be supplying them.
+  E extends Env & { Variables: FilesDualAuthVariables } = {
+    Variables: FilesDualAuthVariables;
+  },
+>(options: {
   security: AppRestSecurity;
   /**
    * Resolved per request, as reading it off the Hono context used to be:
@@ -290,7 +297,10 @@ export function createFilesRestApp<E extends Env = { Variables: FilesDualAuthVar
    * download).
    */
   async function handleFileRead(
-    c: Parameters<MiddlewareHandler<{ Variables: FilesDualAuthVariables }>>[0],
+    // `E`, not the default: Hono's `Context` is invariant in its environment,
+    // so a context built from the app's own `E` is not assignable to one
+    // written in terms of the default.
+    c: Context<E, string, Record<string, never>>,
     options: { method: "GET" | "HEAD" },
   ): Promise<Response> {
     const id = c.req.param("id");
