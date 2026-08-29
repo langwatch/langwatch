@@ -28,8 +28,8 @@
       "default": "./src/chart.ts"
     },
     "./testing": {
-      "types": "./tests/lwql-fixtures.ts",
-      "default": "./tests/lwql-fixtures.ts"
+      "types": "./src/components/__tests__/lwql-fixtures.ts",
+      "default": "./src/components/__tests__/lwql-fixtures.ts"
     }
   },
   "scripts": {

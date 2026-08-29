@@ -15,8 +15,8 @@
       "default": "./src/index.ts"
     },
     "./testing": {
-      "types": "./tests/test-helpers.ts",
-      "default": "./tests/test-helpers.ts"
+      "types": "./src/__tests__/test-helpers.ts",
+      "default": "./src/__tests__/test-helpers.ts"
     }
   },
   "scripts": {
