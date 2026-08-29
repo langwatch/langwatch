@@ -18,6 +18,7 @@ describe("isOrgScopedPermission", () => {
       "gatewaySpend:manage",
       "aiTools:view",
       "aiTools:manage",
+      "governanceCost:view",
     ] as const)("routes %s against the organization role", (permission) => {
       expect(isOrgScopedPermission(permission)).toBe(true);
     });
@@ -36,6 +37,15 @@ describe("isOrgScopedPermission", () => {
     // through to the member "your admin hasn't added any tools" empty-state.
     it("treats aiTools:manage as org-scoped so admins see the getting-started banner", () => {
       expect(isOrgScopedPermission("aiTools:manage")).toBe(true);
+    });
+
+    // Regression: the governance Costs screen gates on
+    // withPermissionGuard("governanceCost:view"). The resource is
+    // org-exclusive on the server (rbac.ts ORG_EXCLUSIVE_RESOURCES) and is
+    // granted only in the org ADMIN bags, so team-routing it denied the
+    // screen to every org admin while the router allowed them.
+    it("treats governanceCost:view as org-scoped so org admins can open Costs", () => {
+      expect(isOrgScopedPermission("governanceCost:view")).toBe(true);
     });
   });
 
