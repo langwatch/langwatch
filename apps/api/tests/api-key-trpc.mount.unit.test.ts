@@ -13,7 +13,8 @@
  * The second thing pinned here is credential handling: a minted token reaches
  * the caller and appears in NO audit entry.
  */
-import type { ApiKey, ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKey } from "@langwatch/api-key-contract";
+import type { ApiKeyApp } from "@langwatch/api-key-server";
 import {
   authzDeclarationOf,
   declareAuthzMiddleware,
@@ -28,7 +29,7 @@ const ORG_ID = "org_api_key_mount";
 const USER_ID = "user_api_key_mount";
 
 type TestContext = {
-  app: { apiKeys: ApiKeyService };
+  app: { apiKeys: ApiKeyApp };
   actor(): { id: string };
   session: { user: { id: string } } | null;
 };
@@ -72,7 +73,7 @@ function declarationsOf(router: unknown): Record<string, AuthzDeclaration | null
   );
 }
 
-function harness({ apiKeys = {} }: { apiKeys?: Partial<ApiKeyService> } = {}) {
+function harness({ apiKeys = {} }: { apiKeys?: Partial<ApiKeyApp> } = {}) {
   const trpc = initTRPC.context<TestContext>().create();
   const recordAudit = vi.fn();
   /** What each middleware in the chain saw, in the order they ran. */
@@ -107,20 +108,7 @@ function harness({ apiKeys = {} }: { apiKeys?: Partial<ApiKeyService> } = {}) {
     auditMutations: record("auditMutations"),
   };
 
-  const service = {
-    ensureCallerIsOrgMember: async () => {},
-    isOrgAdmin: async () => false,
-    enrichBindingsWithNames: async () => ({
-      orgName: new Map(),
-      teamName: new Map(),
-      activeProjectIds: new Set(),
-      projectName: new Map(),
-      customRoleName: new Map(),
-      customRoles: [],
-    }),
-    enrichApiKeyList: async () => ({ customRoles: [], users: [] }),
-    ...apiKeys,
-  } as unknown as ApiKeyService;
+  const app = { ...apiKeys } as unknown as ApiKeyApp;
 
   const router = createApiKeyTrpcRouter({
     root: trpc,
@@ -137,7 +125,7 @@ function harness({ apiKeys = {} }: { apiKeys?: Partial<ApiKeyService> } = {}) {
     recordAudit,
     seen,
     caller: router.createCaller({
-      app: { apiKeys: service },
+      app: { apiKeys: app },
       actor: () => ({ id: USER_ID }),
       session: { user: { id: USER_ID } },
     }),
@@ -176,7 +164,7 @@ describe("API-key transport mount", () => {
      */
     it("declares the same access decision, with the same reason, on every procedure", () => {
       const reason =
-        "personal API keys are the caller's own; the handler proves organization membership and ownership itself";
+        "personal API keys are the caller's own; the application proves organization membership and ownership itself";
       const { router } = harness();
 
       expect(declarationsOf(router)).toEqual({
@@ -232,7 +220,7 @@ describe("API-key transport mount", () => {
   describe("when a member reads their own bindings", () => {
     /** @scenario "The declared check reads the validated input" */
     it("hands every middleware the organization the validated input named", async () => {
-      const { caller, seen } = harness({ apiKeys: { getUserBindings: async () => [] } });
+      const { caller, seen } = harness({ apiKeys: { listCallerBindings: async () => [] } });
 
       await caller.myBindings({ organizationId: ORG_ID });
 
@@ -257,9 +245,10 @@ describe("API-key transport mount", () => {
     it("returns the token to the caller and keeps it out of the audit entry", async () => {
       const { caller, recordAudit } = harness({
         apiKeys: {
-          create: async () => ({
+          createKey: async () => ({
             token: "sk-lw-plaintext-shown-once",
             apiKey: storedKey(),
+            assignedToUserId: USER_ID,
           }),
         },
       });
@@ -288,11 +277,11 @@ describe("API-key transport mount", () => {
   });
 
   describe("when the caller has no session", () => {
-    it("refuses before the API-key service runs", async () => {
-      const ensureCallerIsOrgMember = vi.fn();
-      const { router } = harness({ apiKeys: { ensureCallerIsOrgMember } });
+    it("refuses before the API-key application runs", async () => {
+      const listKeys = vi.fn();
+      const { router } = harness({ apiKeys: { listKeys } });
       const caller = router.createCaller({
-        app: { apiKeys: { ensureCallerIsOrgMember } as unknown as ApiKeyService },
+        app: { apiKeys: { listKeys } as unknown as ApiKeyApp },
         actor: () => ({ id: USER_ID }),
         session: null,
       });
@@ -300,7 +289,7 @@ describe("API-key transport mount", () => {
       await expect(caller.list({ organizationId: ORG_ID })).rejects.toMatchObject({
         code: "UNAUTHORIZED",
       });
-      expect(ensureCallerIsOrgMember).not.toHaveBeenCalled();
+      expect(listKeys).not.toHaveBeenCalled();
     });
   });
 });

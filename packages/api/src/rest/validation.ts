@@ -65,9 +65,8 @@
 import { HandledError, remediation } from "@langwatch/handled-error";
 import type { MiddlewareHandler, ValidationTargets } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { uniqueSymbol, validator as openApiValidator } from "hono-openapi";
+import { validator as openApiValidator } from "hono-openapi";
 import type { ZodIssue, ZodSchema } from "zod";
-
 
 /** How each validation target reads in a sentence written for a human. */
 const TARGET_NOUN: Record<keyof ValidationTargets, string> = {
@@ -134,26 +133,19 @@ class SchemaFailure extends HandledError {
  * whole module exists to stop shipping.
  */
 export class RequestValidationError extends HandledError {
-  constructor(args: {
-    target: keyof ValidationTargets;
-    violations: readonly FieldViolation[];
-  }) {
-    super(
-      "validation_error",
-      `The ${TARGET_NOUN[args.target]} didn't match the expected shape.`,
-      {
-        httpStatus: 422,
-        fault: "customer",
-        meta: {
-          target: args.target,
-          // A flat list of the offending paths, so a caller that reads nothing
-          // else still learns WHERE without walking the reason chain.
-          fields: args.violations.map((v) => v.field),
-        },
-        reasons: args.violations.map((v) => new SchemaFailure(v)),
-        ...remediation("validation_error"),
+  constructor(args: { target: keyof ValidationTargets; violations: readonly FieldViolation[] }) {
+    super("validation_error", `The ${TARGET_NOUN[args.target]} didn't match the expected shape.`, {
+      httpStatus: 422,
+      fault: "customer",
+      meta: {
+        target: args.target,
+        // A flat list of the offending paths, so a caller that reads nothing
+        // else still learns WHERE without walking the reason chain.
+        fields: args.violations.map((v) => v.field),
       },
-    );
+      reasons: args.violations.map((v) => new SchemaFailure(v)),
+      ...remediation("validation_error"),
+    });
     this.name = "RequestValidationError";
   }
 }
@@ -305,9 +297,7 @@ interface ValidationResult {
 /** The issues a validation failure carries, from either container shape. */
 function issuesOf(error: ValidationResult["error"]): ZodIssue[] {
   if (!error) return [];
-  return Array.isArray(error)
-    ? [...error]
-    : ((error as { issues?: ZodIssue[] }).issues ?? []);
+  return Array.isArray(error) ? [...error] : ((error as { issues?: ZodIssue[] }).issues ?? []);
 }
 
 /**
@@ -326,14 +316,3 @@ function issuesOf(error: ValidationResult["error"]): ZodIssue[] {
  * precise one.
  */
 export const validator = build as unknown as typeof openApiValidator;
-
-/**
- * The same validation and handled-error behaviour without OpenAPI metadata.
- * Used only by live compatibility routes that have been removed from the
- * published API while clients migrate to their replacement.
- */
-export const hiddenValidator = ((...args: Parameters<typeof openApiValidator>) => {
-  const middleware = validator(...args);
-  delete (middleware as Partial<Record<typeof uniqueSymbol, unknown>>)[uniqueSymbol];
-  return middleware;
-}) as typeof openApiValidator;

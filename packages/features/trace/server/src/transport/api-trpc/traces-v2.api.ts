@@ -58,6 +58,7 @@ import {
   type TraceCanonicalisationService,
   type TraceEventRollup,
   type TraceHeader,
+  type TraceLogRecordDto,
   type TraceResourceInfoDto,
   type AiActionResult,
   type AiQueryResult,
@@ -80,7 +81,6 @@ import {
   toConversationContextTurn,
   mapLegacySpanSummaryToTreeNode,
   type TraceDerivedAttrPrefixes,
-  type TraceLogRecordDto,
   type TraceReadMapperPorts,
 } from "./trace-read-mappers.api";
 import {
@@ -91,11 +91,7 @@ import {
   gateTreeCost,
   withoutHiddenResourceAttrs,
 } from "./trace-view-gates.api";
-import type {
-  TraceApp,
-  TraceLogRecordReader,
-  TraceLogRecordReadRow,
-} from "#app/trace.app";
+import type { TraceApp, TraceLogRecordReader, TraceLogRecordReadRow } from "#app/trace.app";
 
 const logger = createLogger("langwatch:api:traces-v2");
 
@@ -155,6 +151,21 @@ export type TracesV2TrpcPorts<TMetadata = unknown, TMetadataRaw = unknown> = Rea
   mappers: TraceReadMapperPorts;
   /** The two ingest-derived content attribute prefixes. */
   derivedAttrPrefixes: TraceDerivedAttrPrefixes;
+  /**
+   * Trace's own filter translator and free-text extractor.
+   *
+   * A port only because the strict layout forbids a transport module from
+   * importing its feature's ClickHouse adapter. Every mount supplies this
+   * package's own implementation — there is no second one to supply.
+   */
+  queryTranslation: Readonly<{
+    translateFilterToClickHouse(
+      queryText: string,
+      tenantId: string,
+      timeRange: { from: number; to: number },
+    ): { sql: string; params: Record<string, unknown> } | null;
+    extractFreeTextTerms(queryText: string): string[];
+  }>;
   /** The AI composer, which needs the request's model providers. */
   runAiQuery(
     input: Readonly<{
@@ -1314,7 +1325,7 @@ export class TracesV2TrpcApi {
             tenantId: input.projectId,
             traceId: input.traceId,
             targetSpanId: input.spanId,
-            ...(hint.occurredAtMs !== undefined ? { occurredAtMs: hint.occurredAtMs } : {}),
+            ...occurredAtFromInput(input),
             currentParams: detail.params as Record<string, unknown> | null,
           });
           if (enriched) {

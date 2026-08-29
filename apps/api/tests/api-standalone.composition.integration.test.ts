@@ -33,7 +33,8 @@ describe("ApiStandaloneComposition", () => {
       });
 
       const address = await process.start();
-      if (!address) throw new Error("The standalone API process did not report a listener address.");
+      if (!address)
+        throw new Error("The standalone API process did not report a listener address.");
 
       const health = await fetch(`http://127.0.0.1:${address.port}/api/health`);
       expect(health.status).toBe(204);
@@ -64,7 +65,8 @@ describe("ApiStandaloneComposition", () => {
       });
 
       const address = await process.start();
-      if (!address) throw new Error("The standalone API process did not report a listener address.");
+      if (!address)
+        throw new Error("The standalone API process did not report a listener address.");
 
       const response = await fetch(`http://127.0.0.1:${address.port}/metrics`);
       expect(response.status).toBe(200);
@@ -130,9 +132,10 @@ describe("ApiStandaloneComposition", () => {
       const address = await composed.start();
       if (!address) throw new Error("The product API process did not report a listener address.");
 
-      expect(
-        await fetch(`http://127.0.0.1:${address.port}/api/health`),
-      ).toHaveProperty("status", 204);
+      expect(await fetch(`http://127.0.0.1:${address.port}/api/health`)).toHaveProperty(
+        "status",
+        204,
+      );
       const mounted = await fetch(`http://127.0.0.1:${address.port}/api/secret`, {
         method: "POST",
       });
@@ -147,7 +150,9 @@ describe("ApiStandaloneComposition", () => {
  * The six services a host owns. Only their identity matters here: the test
  * asserts which transports get mounted, not what any of them return.
  */
-function testProducts(): NonNullable<Parameters<typeof ApiStandaloneComposition.create>[0]["products"]> {
+function testProducts(): NonNullable<
+  Parameters<typeof ApiStandaloneComposition.create>[0]["products"]
+> {
   return {
     agents: new Proxy(AgentService.prototype, {}),
     secrets: new Proxy(SecretService.prototype, {}),

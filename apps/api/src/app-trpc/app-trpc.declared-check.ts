@@ -72,9 +72,7 @@ export function declaredCheckFrom(
         return builders.serviceAuthorized({
           reason: declaration.reason,
           permissions: declaration.permissions,
-          ...(declaration.enforces === undefined
-            ? {}
-            : { enforces: declaration.enforces }),
+          ...(declaration.enforces === undefined ? {} : { enforces: declaration.enforces }),
         });
       default:
         throw new Error(

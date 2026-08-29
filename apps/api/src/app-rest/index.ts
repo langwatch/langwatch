@@ -85,7 +85,6 @@ export {
   flexibleDateSchema,
   ForbiddenError,
   getRoutePolicy,
-  hiddenValidator,
   HttpError,
   IDEMPOTENCY_KEY_HEADER,
   IDEMPOTENT_REPLAY_HEADER,

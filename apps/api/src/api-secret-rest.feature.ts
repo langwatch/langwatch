@@ -9,8 +9,6 @@ const restVersionSelector = RestVersionSelector.create({
   latestVersion: "v1",
 });
 
-
-
 /** Installs all deployed Secret REST base paths over one composed service instance. */
 export class ApiSecretRestFeature {
   static create(options: { secrets: SecretService; security: ApiRestSecurityPort }): Hono {

@@ -4,17 +4,14 @@
  *
  * Behaviour is package-owned (`@langwatch/auth-server`); this supplies the
  * process's root, its public and authenticated procedures, the policy chain,
- * and the application ports the auth package does not own — the throttle, the
- * sign-in router, the sign-up ceremony, the invitation reads, and the
- * deployment's resolved sign-in mode.
+ * and the composed `AuthApp` both surfaces answer from.
  */
 import {
   FrontDoorTrpcApi,
   PublicEnvTrpcApi,
+  type AuthApp,
   type FrontDoorTrpcContext,
-  type FrontDoorTrpcPorts,
   type PublicEnvTrpcContext,
-  type PublicEnvTrpcPorts,
 } from "@langwatch/auth-server";
 import {
   createTrpcApiService,
@@ -39,7 +36,7 @@ export function createFrontDoorTrpcRouter<
 >(
   mount: TrpcApiMount<TContext, TOptions, TRoot> &
     TrpcApiPublicMount<TContext, TOptions, TRoot> &
-    TrpcApiPorts<FrontDoorTrpcPorts>,
+    TrpcApiPorts<AuthApp>,
 ) {
   return FrontDoorTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
 }
@@ -52,7 +49,7 @@ type PublicEnvMount<
   /** No session: the sign-in page asks this before anyone has one. */
   publicProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
   middlewares: AppTrpcPolicyMiddlewares;
-  ports: PublicEnvTrpcPorts;
+  ports: AuthApp;
 }>;
 
 /**

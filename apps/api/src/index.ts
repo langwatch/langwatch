@@ -152,14 +152,10 @@ export { createGatewaySpendRestApp } from "./features/gateway/gateway-spend-rest
 export type { GatewaySpendRestPorts } from "./features/gateway/gateway-spend-rest.ports";
 export { createGovernanceRestApp } from "@langwatch/enterprise-api";
 export { createGraphsRestApp } from "@langwatch/dashboard-server";
-export {
-  type AgentPlatformUrlBuilder,
-  createAgentLegacyRestApp,
-} from "@langwatch/agent-server";
+export { type AgentPlatformUrlBuilder, createAgentLegacyRestApp } from "@langwatch/agent-server";
 export { createTriggerRestApp } from "@langwatch/automation-server";
 export {
   type CodingAgentCallerScope,
-  type CodingAgentRestServices,
   createCodingAgentRestApp,
 } from "@langwatch/coding-agent-server";
 export {
@@ -168,7 +164,7 @@ export {
 } from "./features/copilotkit/copilotkit-rest";
 export { createMonitorRestApp } from "@langwatch/monitor-server";
 export { createSecretLegacyRestApp } from "./features/secret/secret-legacy-rest";
-export { createWebhookRestApp, type WebhookRestServices } from "@langwatch/enterprise-webhook-server";
+export { createWebhookRestApp } from "@langwatch/enterprise-webhook-server";
 export { createEventsRestApp, type TrackedEventPorts } from "@langwatch/trace-server";
 export {
   createExportTracesRestApp,

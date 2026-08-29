@@ -16,11 +16,7 @@ import {
   ApiReadinessPort,
 } from "../api-process.lifecycle";
 import { ApiAuditPort } from "../api-request.policy";
-import {
-  ApiFeatureDrainPort,
-  ApiProcessGraphPort,
-  closeApiProcessResources,
-} from "../api.process";
+import { ApiFeatureDrainPort, ApiProcessGraphPort, closeApiProcessResources } from "../api.process";
 import {
   ApiRuntimeCompositionPort,
   ApiRuntimeProcessPort,

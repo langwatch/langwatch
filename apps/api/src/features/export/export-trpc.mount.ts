@@ -96,9 +96,13 @@ export function createExportTrpcRouter<
    */
   const exportProgressSubscription = (permission: "traces:view" | "scenarios:view") =>
     policy(permission)(mount.protectedProcedure.input(subscriptionInputSchema)).subscription(
+      // `ctx` is annotated with the CONSTRAINT rather than `TContext`: tRPC
+      // hands the resolver a `Simplify<TContext>`, which satisfies the
+      // constraint but is not assignable to the type parameter itself. The
+      // relay reads nothing beyond the constraint anyway.
       async function* (opts: {
         input: { projectId: string; exportId: string };
-        ctx: TContext;
+        ctx: ExportTrpcContext;
         signal?: AbortSignal;
       }) {
         const { projectId, exportId } = opts.input;

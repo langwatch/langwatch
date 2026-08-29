@@ -18,43 +18,10 @@ const currentKey: ResolvedApiKeyToken = {
     id: "project-1",
     name: "Project one",
     slug: "project-one",
-    apiKey: "legacy-project-key",
-    lwqlKey: "lwql-key",
     teamId: "team-1",
-    language: "typescript",
-    framework: "nextjs",
-    kind: "APPLICATION",
-    firstMessage: false,
-    integrated: false,
-    createdAt: new Date("2026-08-28T00:00:00.000Z"),
-    updatedAt: new Date("2026-08-28T00:00:00.000Z"),
-    userLinkTemplate: null,
-    traceSharingEnabled: false,
-    presenceEnabled: false,
-    s3Endpoint: null,
-    s3AccessKeyId: null,
-    s3SecretAccessKey: null,
-    s3Bucket: null,
-    archivedAt: null,
+    organizationId: "org-1",
     isPersonal: false,
     ownerUserId: null,
-    personalFeatures: null,
-    departmentId: null,
-    langyEgressAllowlist: null,
-    lastCodingAgentSessionAt: null,
-    lastCodingAgentPullRequestAt: null,
-    team: {
-      id: "team-1",
-      name: "Team one",
-      slug: "team-one",
-      organizationId: "org-1",
-      createdAt: new Date("2026-08-28T00:00:00.000Z"),
-      updatedAt: new Date("2026-08-28T00:00:00.000Z"),
-      archivedAt: null,
-      isPersonal: false,
-      ownerUserId: null,
-      departmentId: null,
-    },
   },
 };
 
@@ -74,11 +41,10 @@ describe("ApiKeyRestSecurityAdapter", () => {
         }),
       ),
     ).resolves.toEqual({
-      projectId: "project-1",
+      project: currentKey.project,
       actor: { id: "user-1" },
       apiKeyId: "key-1",
       organizationId: "org-1",
-      teamId: "team-1",
       isLangySessionKey: false,
     });
     expect(apiKeys.tryResolveToken).toHaveBeenCalledWith({
@@ -131,7 +97,7 @@ describe("ApiKeyRestSecurityAdapter", () => {
     );
     await security.authorize({ request, permission: "secrets:manage" });
 
-    expect(request).toEqual({ projectId: "project-1", actor: null });
+    expect(request).toEqual({ project: currentKey.project, actor: null });
     expect(authz.hasApiKeyPermission).not.toHaveBeenCalled();
   });
 

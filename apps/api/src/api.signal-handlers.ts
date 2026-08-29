@@ -49,8 +49,7 @@ export function installApiSignalHandlers(options: ApiSignalHandlerOptions): () =
       signal,
       deadlineMs: options.deadlineMs,
       logger: options.logger,
-      onDeadline: () =>
-        finish({ code: 1, exit, finished: isFinished, markFinished }),
+      onDeadline: () => finish({ code: 1, exit, finished: isFinished, markFinished }),
     });
     closing = closeForSignal({ signal, close: options.close, logger: options.logger });
     void closing.then(

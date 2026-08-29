@@ -66,10 +66,7 @@ import { createExperimentsRestApp, ExperimentApp } from "@langwatch/experiment-s
 import { createGovernanceRestApp, GovernanceApp } from "@langwatch/enterprise-api";
 import { createGraphsRestApp } from "@langwatch/dashboard-server";
 import { createMonitorRestApp, MonitorApp } from "@langwatch/monitor-server";
-import {
-  createGatewayPlatformRestApp,
-  GatewayApp,
-} from "@langwatch/gateway-server";
+import { createGatewayPlatformRestApp, GatewayApp } from "@langwatch/gateway-server";
 import { createGatewaySpendRestApp } from "../features/gateway/gateway-spend-rest";
 import type { GatewaySpendRestPorts } from "../features/gateway/gateway-spend-rest.ports";
 import { createEventsRestApp, type TrackedEventPorts } from "@langwatch/trace-server";
@@ -84,14 +81,8 @@ import { createTeamsRestApp } from "@langwatch/organization-server";
 import { createProjectRestApp } from "@langwatch/project-server";
 import { createRolesRestApp } from "@langwatch/role-server";
 import { createMeRestApp, type MeRestTeamOrganizationLookup } from "../features/user/me-rest";
-import {
-  createUserAvatarRestApp,
-  type UserAvatarObjectReader,
-} from "@langwatch/user-server";
-import {
-  createWorkflowsRestApp,
-  type WorkflowEvaluationTrigger,
-} from "@langwatch/workflow-server";
+import { createUserAvatarRestApp, type UserAvatarObjectReader } from "@langwatch/user-server";
+import { createWorkflowsRestApp, type WorkflowEvaluationTrigger } from "@langwatch/workflow-server";
 import {
   createScenarioEventsRestApp,
   type InlineMediaExtraction,
@@ -416,7 +407,11 @@ export function createAppRestFeatures(options: {
       agents: services.agents,
       agentPlatformUrl: ports.agentPlatformUrl,
     }).hono,
-    createCodingAgentRestApp({ security, app: services.codingAgents, audit: services.codingAgentAudit }).hono,
+    createCodingAgentRestApp({
+      security,
+      app: services.codingAgents,
+      audit: services.codingAgentAudit,
+    }).hono,
     createCopilotKitRestApp({
       security,
       serviceAdapterFor: ports.copilotServiceAdapterFor,

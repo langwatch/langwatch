@@ -1,5 +1,5 @@
+import { AuthenticatedActorRequiredError } from "@langwatch/api";
 import { RestVersionSelector, restVersionSelectorMiddleware } from "@langwatch/api/rest";
-import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import {
   SecretDuplicateError,
@@ -20,8 +20,8 @@ import {
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
-  hiddenValidator,
   requires,
+  validator,
   type SecuredApp,
 } from "../../app-rest";
 
@@ -38,11 +38,7 @@ function legacySecretActorId(context: Context): string {
   if (typeof apiKeyUserId === "string" && apiKeyUserId.length > 0) {
     return apiKeyUserId;
   }
-  throw new HandledError(
-    "authenticated_actor_required",
-    "This operation requires a credential bound to a user",
-    { httpStatus: 403 },
-  );
+  throw new AuthenticatedActorRequiredError();
 }
 
 const legacyDeprecationWarning: MiddlewareHandler = async (context, next) => {
@@ -63,9 +59,7 @@ const legacyDeprecationWarning: MiddlewareHandler = async (context, next) => {
  * error body, which is why it still exists alongside the modern
  * `/api/v1/secret` family: both are deployed and their payload and error
  * semantics differ. No secret VALUE is ever read back — `toSecretPublic` is
- * the one projection every response goes through, and the create/update
- * inputs are parsed by `hiddenValidator`, which keeps the submitted value out
- * of any validation failure it reports.
+ * the one projection every response goes through.
  */
 export function createSecretLegacyRestApp(options: {
   security: AppRestSecurity;
@@ -139,15 +133,6 @@ export function createSecretLegacyRestApp(options: {
       operationId: "postApiSecrets",
       description:
         "Create a new project secret. The value is encrypted at rest and never returned.",
-      request: {
-        body: {
-          content: {
-            "application/json": {
-              schema: resolver(secretPublicCreateInputSchema.omit({ projectId: true })),
-            },
-          },
-        },
-      },
       responses: {
         ...baseResponses,
         201: {
@@ -160,7 +145,7 @@ export function createSecretLegacyRestApp(options: {
         },
       },
     }),
-    hiddenValidator("json", secretPublicCreateInputSchema.omit({ projectId: true })),
+    validator("json", secretPublicCreateInputSchema.omit({ projectId: true })),
     async (context) => {
       const project = context.get("project");
       const input = context.req.valid("json");
@@ -181,15 +166,6 @@ export function createSecretLegacyRestApp(options: {
     describeRoute({
       operationId: "putApiSecretsById",
       description: "Update a secret's value",
-      request: {
-        body: {
-          content: {
-            "application/json": {
-              schema: resolver(secretPublicUpdateInputSchema.omit({ id: true, projectId: true })),
-            },
-          },
-        },
-      },
       responses: {
         ...baseResponses,
         200: {
@@ -202,7 +178,7 @@ export function createSecretLegacyRestApp(options: {
         },
       },
     }),
-    hiddenValidator("json", secretPublicUpdateInputSchema.omit({ id: true, projectId: true })),
+    validator("json", secretPublicUpdateInputSchema.omit({ id: true, projectId: true })),
     async (context) => {
       const project = context.get("project");
       return context.json(

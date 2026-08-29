@@ -1,5 +1,5 @@
 import { AgentService } from "@langwatch/agent-contract";
-import { AgentTrpcApi, type AgentTrpcContext } from "@langwatch/agent-server";
+import { AgentApp, AgentTrpcApi, type AgentTrpcContext } from "@langwatch/agent-server";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -16,7 +16,7 @@ import type { TopicApiFeature } from "./features/topic/topic-api.feature";
 import type { ApiRequestFailureCapturePort } from "./api-process.lifecycle";
 
 export type ApiActor = Readonly<{ id: string }>;
-export type ApiServices = Readonly<{ agents: AgentService; secrets: SecretApp }>;
+export type ApiServices = Readonly<{ agents: AgentApp; secrets: SecretApp }>;
 
 /** The HTTP host authenticates a request then supplies these policy operations. */
 export type ApiRequestContext = Readonly<{
@@ -168,7 +168,9 @@ function createTrpcRoot(errorFormatter: ApiErrorFormatter) {
  * do not leak into feature packages.
  */
 export class ApiApplication {
-  private static readonly unavailableAgents = new MissingAgentService();
+  private static readonly unavailableAgents = AgentApp.create({
+    agents: new MissingAgentService(),
+  });
 
   static create(options: {
     agents?: AgentService;
@@ -179,7 +181,10 @@ export class ApiApplication {
   }): ApiApplication {
     options.topic?.install();
     return new ApiApplication(
-      { agents: options.agents, secrets: SecretApp.create({ secrets: options.secrets }) },
+      {
+        agents: options.agents ? AgentApp.create({ agents: options.agents }) : undefined,
+        secrets: SecretApp.create({ secrets: options.secrets }),
+      },
       options.http,
       options.rest,
       options.topic,
@@ -193,7 +198,7 @@ export class ApiApplication {
 
   private constructor(
     private readonly services: Readonly<{
-      agents: AgentService | undefined;
+      agents: AgentApp | undefined;
       secrets: SecretApp;
     }>,
     private readonly http: ApiHttpOptions | undefined,

@@ -218,9 +218,4 @@ export {
 export { requestTraceIds } from "./trace-ids.js";
 
 // The request validator that fails the way the rest of the boundary fails.
-export {
-  type FieldViolation,
-  hiddenValidator,
-  RequestValidationError,
-  validator,
-} from "./validation.js";
+export { type FieldViolation, RequestValidationError, validator } from "./validation.js";
