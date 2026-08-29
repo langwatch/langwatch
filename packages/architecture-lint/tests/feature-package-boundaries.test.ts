@@ -449,7 +449,7 @@ describe("strict feature source layout", () => {
       "export class PrismaAgentRepository { static create() { return new PrismaAgentRepository(); } }",
     );
     write(
-      "packages/features/agent/server/src/api/internal/agent.api.ts",
+      "packages/features/agent/server/src/transport/api-rest/agent.api.ts",
       "export class AgentApi { static create() { return new AgentApi(); } }",
     );
     write(

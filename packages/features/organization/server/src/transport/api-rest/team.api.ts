@@ -9,14 +9,14 @@ import type { Context } from "hono";
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
 
+import { requires } from "@langwatch/api";
 import {
   type AppRestOrganizationVariables,
   type AppRestSecurity,
   createFamilyErrorHandler,
-  requires,
   type SecuredApp,
   validator as zValidator,
-} from "../../app-rest";
+} from "@langwatch/api/rest";
 
 const paginationQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),

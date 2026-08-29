@@ -315,7 +315,9 @@ describe("Route handlers delegate to the service and never touch the repository 
       // The family moved to `@langwatch/platform-api`, which has no stored
       // objects of its own: the walk arrives as a port the process binds to
       // its own service, so the transport cannot reach past it.
-      const route = readRepoFile("apps/api/src/features/scenario/scenario-event-rest.ts");
+      const route = readRepoFile(
+        "packages/features/scenario/server/src/transport/api-rest/scenario-event.api.ts",
+      );
 
       expect(route).toContain("extractInlineMedia");
       // Direct repository import would be a layering violation
@@ -326,12 +328,14 @@ describe("Route handlers delegate to the service and never touch the repository 
   describe("when /api/files/:id route imports are inspected", () => {
     /** @scenario "Route handlers delegate to the service and never touch the repository directly" */
     it("imports the service factory and does not import the repository", () => {
-      const route = readRepoFile("apps/api/src/features/stored-object/files-rest.ts");
+      const route = readRepoFile(
+        "packages/features/stored-object/server/src/transport/api-rest/stored-object.api.ts",
+      );
 
-      // The family takes the stored-object services as arguments now, so the
-      // assertion is that it dispatches through a service at all and still
+      // The family takes the stored-object application as an argument now, so
+      // the assertion is that it dispatches through that seam at all and still
       // never names a repository.
-      expect(route).toContain("storedObjects()");
+      expect(route).toContain("app()");
       expect(route).not.toContain("stored-objects.repository");
     });
   });

@@ -27,18 +27,18 @@ import type { Context, Next } from "hono";
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
 
+import { internalSecret } from "@langwatch/api";
 import {
   type AppRestManagementAuditPort,
   type AppRestSecurity,
-  internalSecret,
   type SecuredApp,
   validator as zValidator,
-} from "../../app-rest";
+} from "@langwatch/api/rest";
 import {
   CREATE_ORGANIZATION,
   GET_ORGANIZATION,
   LIST_ORGANIZATIONS,
-} from "./organizations-rest.openapi";
+} from "./organization-provisioning.openapi";
 
 /** One organization as the instance-admin surface reports it. */
 export interface OrganizationProvisioningSummary {

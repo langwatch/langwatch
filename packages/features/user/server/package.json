@@ -24,6 +24,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/api": "workspace:*",
     "@langwatch/auth-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
@@ -35,6 +36,7 @@
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@trpc/server": "^11.18.0",
+    "hono": "^4.12.27",
     "zod": "^4.4.3"
   },
   "devDependencies": {

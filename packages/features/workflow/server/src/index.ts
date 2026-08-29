@@ -38,3 +38,9 @@ export {
   type WorkflowTrpcPorts,
   type WorkflowVersionRow,
 } from "./transport/api-trpc/workflow.api";
+export {
+  createWorkflowsRestApp,
+  type WorkflowEvaluationOutcome,
+  type WorkflowEvaluationTrigger,
+  type WorkflowRestPorts,
+} from "./transport/api-rest/workflow.api";

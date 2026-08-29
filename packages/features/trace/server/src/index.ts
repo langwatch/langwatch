@@ -358,3 +358,13 @@ export {
   withoutHiddenResourceAttrs,
   type SessionTitleRedactionFlag,
 } from "./transport/api-trpc/trace-view-gates.api";
+export {
+  createEventsRestApp,
+  type TrackedEventPorts,
+} from "./transport/api-rest/tracked-event.api";
+export {
+  createExportTracesRestApp,
+  type TraceExportPort,
+  type TraceExportRequestFields,
+  type TraceExportRestPorts,
+} from "./transport/api-rest/trace-export.api";

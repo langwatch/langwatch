@@ -28,6 +28,7 @@
     "test:unit": "vitest run --exclude '**/*.integration.test.ts'"
   },
   "dependencies": {
+    "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/data-privacy-contract": "workspace:*",
@@ -49,6 +50,8 @@
     "@opentelemetry/otlp-transformer": "0.55.0",
     "@opentelemetry/otlp-transformer-next": "npm:@opentelemetry/otlp-transformer@0.219.0",
     "@trpc/server": "^11.18.0",
+    "hono": "^4.12.27",
+    "hono-openapi": "^1.3.1",
     "langwatch": "workspace:*",
     "ts-pattern": "^5.9.0",
     "zod": "^4.4.3"

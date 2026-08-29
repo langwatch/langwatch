@@ -19,14 +19,14 @@ import {
 } from "@langwatch/trace-contract";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
+import { requires } from "@langwatch/api";
 import {
   type AppRestProjectVariables,
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
-  requires,
   type SecuredApp,
-} from "../../app-rest";
+} from "@langwatch/api/rest";
 
 const logger = createLogger("langwatch:api:events");
 

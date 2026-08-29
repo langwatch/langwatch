@@ -79,3 +79,19 @@ export type {
   ScenarioTrpcPorts,
   ScenarioTrpcProcedures,
 } from "./transport/api-trpc/scenario.trpc-context";
+export {
+  archiveScenarioSetRuns,
+  createScenarioEventsRestApp,
+  type InlineMediaExtraction,
+} from "./transport/api-rest/scenario-event.api";
+export {
+  createScenarioRunExportRestApp,
+  type ScenarioRunExportPort,
+  type ScenarioRunExportRequestFields,
+  type ScenarioRunExportRestPorts,
+} from "./transport/api-rest/scenario-run-export.api";
+export { createScenariosRestApp } from "./transport/api-rest/scenario.api";
+export {
+  createSimulationRunsRestApp,
+  type ScenarioRunPlatformUrlBuilder,
+} from "./transport/api-rest/simulation-run.api";

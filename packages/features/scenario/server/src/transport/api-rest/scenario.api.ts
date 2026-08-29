@@ -4,8 +4,8 @@ import {
   type AppRestSecurity,
   type PlatformUrlBuilder,
   type SecuredApp,
-} from "../../app-rest";
-import { registerScenarioRoutes } from "./scenario-rest.v1";
+} from "@langwatch/api/rest";
+import { registerScenarioRoutes } from "./scenario-v1.api";
 
 /**
  * REST for the scenarios (test cases) a project defines, and their version

@@ -1360,10 +1360,19 @@ const serviceDependenciesRule = {
   },
 };
 
+/**
+ * A door in a strict feature package: `src/transport/<surface>/<name>.api.ts`.
+ *
+ * `src/api/<surface>/` is the name that directory used to have, and four
+ * packages still publish a family from it, so both are matched. Matching only
+ * the new one silently stopped checking those four; matching only the old one
+ * silently stopped checking everything else, which is what happened when the
+ * rename landed.
+ */
 function isFeatureApi(classification) {
   return (
     classification.role === "server" &&
-    /^src\/transport\/[^/]+\/.+\.api\.ts$/.test(classification.relative ?? "")
+    /^src\/(?:transport|api)\/[^/]+\/.+\.api\.ts$/.test(classification.relative ?? "")
   );
 }
 

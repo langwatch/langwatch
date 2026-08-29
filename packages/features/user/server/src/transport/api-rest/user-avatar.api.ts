@@ -25,15 +25,28 @@ import {
 import type { Env, MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 
+import { anyAuthenticated } from "@langwatch/api";
 import {
-  anyAuthenticated,
   type AppRestSecurity,
   jsonResponse,
   rateLimitedResponse,
   type SecuredApp,
   STORED_OBJECT_RESPONSE_BASE_HEADERS,
-} from "../../app-rest";
-import type { FilesRateLimiter } from "../stored-object/files-rest";
+} from "@langwatch/api/rest";
+
+/**
+ * A fixed-window counter, keyed on the caller.
+ *
+ * Structurally the same port `/api/files` takes, and the process binds one
+ * implementation to both. It is declared here rather than imported because
+ * `user` is a core feature and the stored-object REST family lives in another
+ * feature's server package, which this one may not depend on.
+ */
+export type UserAvatarRateLimiter = (args: {
+  key: string;
+  windowSeconds: number;
+  max: number;
+}) => Promise<{ allowed: boolean; resetAt: number }>;
 
 /**
  * What the family's dual-auth verifier leaves on the request context.
@@ -126,7 +139,7 @@ export function createUserAvatarRestApp<
    * what lets the OpenAPI spec generator build this app with none.
    */
   userAvatarObjects: () => UserAvatarObjectReader;
-  rateLimit: FilesRateLimiter;
+  rateLimit: UserAvatarRateLimiter;
 }): SecuredApp<E> {
   const { security, dualAuth, userAvatarObjects, rateLimit } = options;
 

@@ -72,35 +72,35 @@ import {
 } from "@langwatch/gateway-server";
 import { createGatewaySpendRestApp } from "../features/gateway/gateway-spend-rest";
 import type { GatewaySpendRestPorts } from "../features/gateway/gateway-spend-rest.ports";
-import { createEventsRestApp, type TrackedEventPorts } from "../features/trace/events-rest";
+import { createEventsRestApp, type TrackedEventPorts } from "@langwatch/trace-server";
 import { createModelDefaultsRestApp } from "@langwatch/model-provider-server";
 import { createModelProvidersRestApp } from "@langwatch/model-provider-server";
-import { createGroupRestApp } from "../features/organization/group-rest";
+import { createGroupRestApp } from "@langwatch/organization-server";
 import {
   createOrganizationsRestApp,
   type OrganizationProvisioningPort,
-} from "../features/organization/organizations-rest";
-import { createTeamsRestApp } from "../features/organization/teams-rest";
+} from "@langwatch/organization-server";
+import { createTeamsRestApp } from "@langwatch/organization-server";
 import { createProjectRestApp } from "@langwatch/project-server";
 import { createRolesRestApp } from "@langwatch/role-server";
 import { createMeRestApp, type MeRestTeamOrganizationLookup } from "../features/user/me-rest";
 import {
   createUserAvatarRestApp,
   type UserAvatarObjectReader,
-} from "../features/user/user-avatar-rest";
+} from "@langwatch/user-server";
 import {
   createWorkflowsRestApp,
   type WorkflowEvaluationTrigger,
-} from "../features/workflow/workflow-rest";
+} from "@langwatch/workflow-server";
 import {
   createScenarioEventsRestApp,
   type InlineMediaExtraction,
-} from "../features/scenario/scenario-event-rest";
-import { createScenariosRestApp } from "../features/scenario/scenario-rest";
+} from "@langwatch/scenario-server";
+import { createScenariosRestApp } from "@langwatch/scenario-server";
 import {
   createSimulationRunsRestApp,
   type ScenarioRunPlatformUrlBuilder,
-} from "../features/scenario/simulation-run-rest";
+} from "@langwatch/scenario-server";
 import {
   createFilesRestApp,
   type FilesProjectPermissionCheck,

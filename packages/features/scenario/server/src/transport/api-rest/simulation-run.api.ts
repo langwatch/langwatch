@@ -6,15 +6,15 @@ import type {
 } from "@langwatch/scenario-contract";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
+import { requires } from "@langwatch/api";
 import {
   type AppRestProjectVariables,
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
-  requires,
   type SecuredApp,
   validator as zValidator,
-} from "../../app-rest";
+} from "@langwatch/api/rest";
 
 const logger = createLogger("langwatch:api:simulation-runs");
 

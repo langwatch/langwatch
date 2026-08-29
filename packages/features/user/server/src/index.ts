@@ -19,3 +19,10 @@ export {
   type UserTrpcContext,
   type UserTrpcPorts,
 } from "./transport/api-trpc/user.api";
+export {
+  createUserAvatarRestApp,
+  type UserAvatarDualAuthVariables,
+  type UserAvatarObjectReader,
+  type UserAvatarRateLimiter,
+  type UserAvatarStoredObjectRead,
+} from "./transport/api-rest/user-avatar.api";

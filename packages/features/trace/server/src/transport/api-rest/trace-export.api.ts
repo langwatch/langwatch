@@ -17,12 +17,12 @@ import { createLogger } from "@langwatch/observability";
 import crypto from "crypto";
 import type { Env } from "hono";
 import type { z } from "zod";
+import { handlerManagedAuth } from "@langwatch/api";
 import {
   type AppRestSecurity,
-  handlerManagedAuth,
   type SecuredApp,
   validator as zValidator,
-} from "../../app-rest";
+} from "@langwatch/api/rest";
 
 const logger = createLogger("langwatch:api:export-traces");
 

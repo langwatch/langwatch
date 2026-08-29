@@ -62,9 +62,19 @@ function transportSources(packages: readonly ClassifiedPackage[]): TransportSour
     const apiApplication = pkg.kind === "application" && pkg.applicationRole === "api";
     if (!strictFeatureApi && !apiApplication) continue;
 
-    const sourceRoot = strictFeatureApi ? join(pkg.root, "src", "api") : join(pkg.root, "src");
-    for (const file of walkFiles(sourceRoot, isProductionSource)) {
-      sources.set(file, { file, strictFeatureApi });
+    // A strict feature package keeps its doors under `src/transport/<surface>/`.
+    // `src/api/` is the name that directory used to have, and four packages
+    // still publish a family from it, so both roots are scanned: dropping the
+    // old one would stop checking them, and dropping the new one stopped
+    // checking everything else — which is what happened when the rename landed
+    // and this list still said `src/api` alone.
+    const sourceRoots = strictFeatureApi
+      ? [join(pkg.root, "src", "transport"), join(pkg.root, "src", "api")]
+      : [join(pkg.root, "src")];
+    for (const sourceRoot of sourceRoots) {
+      for (const file of walkFiles(sourceRoot, isProductionSource)) {
+        sources.set(file, { file, strictFeatureApi });
+      }
     }
   }
 

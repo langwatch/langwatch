@@ -70,10 +70,9 @@ describe("strict filename migration", () => {
         to.slice(root.length + 1),
       ]),
     ).toEqual([
-      [
-        "packages/features/agent/server/src/repositories/prisma.agent.repository.ts",
-        "packages/features/agent/server/src/repositories/prisma-agent.repository.ts",
-      ],
+      // `prisma.agent.repository.ts` is NOT in this list: the dotted
+      // technology qualifier is the canonical spelling, so the planner leaves
+      // it alone rather than flattening it to a dash.
       [
         "packages/features/agent/server/src/services/agentService.service.ts",
         "packages/features/agent/server/src/services/agent-service.service.ts",
@@ -118,17 +117,23 @@ describe("strict filename migration", () => {
     expect(plan.collisions[0]).toContain("target exists");
   });
 
-  it("collapses repeated technology and subject qualifiers", () => {
+  it("collapses a repeated qualifier only where the name is not already canonical", () => {
     root = mkdtempSync(join("/tmp", "langwatch-filename-qualifiers-"));
     packageFixture();
+    // Not canonical — the qualifiers are camel case — so both the kebab
+    // rewrite and the collapse apply.
     write(
-      "packages/features/agent/server/src/adapters/api-key-token.api-key-token.adapter.ts",
+      "packages/features/agent/server/src/adapters/apiKeyToken.apiKeyToken.adapter.ts",
       "export const apiKeyToken = true;",
     );
     write(
-      "packages/features/agent/server/src/adapters/github.github-host.adapter.ts",
+      "packages/features/agent/server/src/adapters/gitHub.gitHubHost.adapter.ts",
       "export const github = true;",
     );
+    // Canonical already: a dotted technology qualifier is the spelling the
+    // layout asks for, so the planner leaves these alone even when the two
+    // qualifiers repeat. Collapsing them here would rename files the layout
+    // lint accepts, which is why the check that skips them comes first.
     write(
       "packages/features/agent/server/src/adapters/postgres.postgres.adapter.ts",
       "export const postgres = true;",
@@ -143,20 +148,12 @@ describe("strict filename migration", () => {
     );
     expect(relativeMappings).toEqual([
       [
-        "packages/features/agent/server/src/adapters/anthropic-admin-puller.adapter.ts",
-        "packages/features/agent/server/src/adapters/anthropic-admin-puller.adapter.ts",
-      ],
-      [
-        "packages/features/agent/server/src/adapters/api-key-token.api-key-token.adapter.ts",
+        "packages/features/agent/server/src/adapters/apiKeyToken.apiKeyToken.adapter.ts",
         "packages/features/agent/server/src/adapters/api-key-token.adapter.ts",
       ],
       [
-        "packages/features/agent/server/src/adapters/github.github-host.adapter.ts",
-        "packages/features/agent/server/src/adapters/github-host.adapter.ts",
-      ],
-      [
-        "packages/features/agent/server/src/adapters/postgres.postgres.adapter.ts",
-        "packages/features/agent/server/src/adapters/postgres.adapter.ts",
+        "packages/features/agent/server/src/adapters/gitHub.gitHubHost.adapter.ts",
+        "packages/features/agent/server/src/adapters/git-hub-host.adapter.ts",
       ],
     ]);
   });

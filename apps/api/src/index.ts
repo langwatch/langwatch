@@ -169,47 +169,47 @@ export {
 export { createMonitorRestApp } from "@langwatch/monitor-server";
 export { createSecretLegacyRestApp } from "./features/secret/secret-legacy-rest";
 export { createWebhookRestApp, type WebhookRestServices } from "@langwatch/enterprise-webhook-server";
-export { createEventsRestApp, type TrackedEventPorts } from "./features/trace/events-rest";
+export { createEventsRestApp, type TrackedEventPorts } from "@langwatch/trace-server";
 export {
   createExportTracesRestApp,
   type TraceExportPort,
   type TraceExportRequestFields,
   type TraceExportRestPorts,
-} from "./features/trace/export-traces-rest";
-export { createGroupRestApp } from "./features/organization/group-rest";
+} from "@langwatch/trace-server";
+export { createGroupRestApp } from "@langwatch/organization-server";
 export { createModelDefaultsRestApp } from "@langwatch/model-provider-server";
 export { createModelProvidersRestApp } from "@langwatch/model-provider-server";
 export { createMeRestApp, type MeRestTeamOrganizationLookup } from "./features/user/me-rest";
 export {
   createOrganizationsRestApp,
+  ORGANIZATIONS_SPEC_OPTIONS,
   type OrganizationProvisioningPort,
   type OrganizationProvisioningSummary,
-} from "./features/organization/organizations-rest";
-export { ORGANIZATIONS_SPEC_OPTIONS } from "./features/organization/organizations-rest.openapi";
+} from "@langwatch/organization-server";
 export { createProjectRestApp } from "@langwatch/project-server";
 export { createRoleBindingsRestApp } from "@langwatch/authz-server";
 export { createRolesRestApp } from "@langwatch/role-server";
 export { createScimTokensRestApp } from "@langwatch/enterprise-scim-server";
-export { createTeamsRestApp } from "./features/organization/teams-rest";
+export { createTeamsRestApp } from "@langwatch/organization-server";
 export {
   createUserAvatarRestApp,
   type UserAvatarDualAuthVariables,
   type UserAvatarObjectReader,
   type UserAvatarStoredObjectRead,
-} from "./features/user/user-avatar-rest";
+} from "@langwatch/user-server";
 export {
   archiveScenarioSetRuns,
   createScenarioEventsRestApp,
-} from "./features/scenario/scenario-event-rest";
-export { createScenariosRestApp } from "./features/scenario/scenario-rest";
-export { createSimulationRunsRestApp } from "./features/scenario/simulation-run-rest";
+  createScenariosRestApp,
+  createSimulationRunsRestApp,
+} from "@langwatch/scenario-server";
 export { createSuiteRestApp } from "@langwatch/suite-server";
 export {
   createWorkflowsRestApp,
   type WorkflowEvaluationOutcome,
   type WorkflowEvaluationTrigger,
   type WorkflowRestPorts,
-} from "./features/workflow/workflow-rest";
+} from "@langwatch/workflow-server";
 export {
   apiConfigDefinition,
   apiObservabilityConfiguration,
