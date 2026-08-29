@@ -65,6 +65,7 @@ import type { TraceEditOverlayService } from "../traces/edit-overlay/traceEditOv
 import type { AutomationService } from "@langwatch/automation-contract";
 import type { BroadcastService } from "./broadcast/broadcast.service";
 import type { CodingAgentService } from "@langwatch/coding-agent-contract";
+import type { CodingAgentScopePorts } from "@langwatch/coding-agent-server";
 import type { AppConfig } from "./config";
 import type { GithubService } from "@langwatch/github-contract";
 import type { LangyService } from "@langwatch/langy-contract";
@@ -274,6 +275,17 @@ export interface AppDependencies {
   billingQueries: BillableEventsQueryService;
   /** ADR-056: the canonical coding-agent session aggregate. */
   codingAgents: CodingAgentService;
+  /**
+   * The two process directory reads the coding-agent application makes: the
+   * organization behind a project, and one caller's cut over that
+   * organization's projects.
+   *
+   * A port rather than something the App builds for itself, because both
+   * resolvers live under `server/organizations/**` and one of them reaches
+   * `server/api/rbac` — importing either here would put a cycle back through
+   * this module into every backend process's graph.
+   */
+  codingAgentScope: CodingAgentScopePorts;
   /**
    * The organization's GitHub connection, consumed by Langy for writes and by
    * pull-request linkage for reads.

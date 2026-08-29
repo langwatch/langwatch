@@ -24,7 +24,7 @@ import type { AuthzApp } from "#app/authz.app";
  * feature mounted on it and so carries all of them.
  */
 export type AuthzTrpcContext = Readonly<{
-  app: Readonly<{ permissions: AuthzApp }>;
+  app: Readonly<{ authzApp: AuthzApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -80,7 +80,7 @@ export class AuthzTrpcApi {
       effectivePermissions: policy(RESOLVES_OWN_STANDING)(
         procedure.input(scopeInputSchema),
       ).query(async ({ ctx, input }) =>
-        ctx.app.permissions.effectivePermissionsFor(input, ctx.actor()),
+        ctx.app.authzApp.effectivePermissionsFor(input, ctx.actor()),
       ),
     });
   }

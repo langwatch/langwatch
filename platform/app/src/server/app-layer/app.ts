@@ -1,13 +1,42 @@
+import { AgentApp } from "@langwatch/agent-server";
+import { AnalyticsApp } from "@langwatch/analytics-server";
+import { AnnotationApp } from "@langwatch/annotation-server";
+import { ApiKeyApp } from "@langwatch/api-key-server";
+import { AuthzApp } from "@langwatch/authz-server";
+import { AutomationApp } from "@langwatch/automation-server";
+import { CodingAgentApp } from "@langwatch/coding-agent-server";
+import { DashboardApp } from "@langwatch/dashboard-server";
+import { DatasetApp } from "@langwatch/dataset-server";
+import { GovernanceApp } from "@langwatch/enterprise-governance-server";
+import { ScimApp } from "@langwatch/enterprise-scim-server";
+import { WebhookApp } from "@langwatch/enterprise-webhook-server";
+import { EvaluatorApp } from "@langwatch/evaluator-server";
 import type { EventSourcing } from "@langwatch/eventing";
+import { ExperimentApp } from "@langwatch/experiment-server";
+import { LangyApp } from "@langwatch/langy-server";
+import { ModelProviderApp } from "@langwatch/model-provider-server";
+import { MonitorApp } from "@langwatch/monitor-server";
 import { createLogger } from "@langwatch/observability";
+import { OpsApp } from "@langwatch/ops-server";
+import { OrganizationApp } from "@langwatch/organization-server";
+import { ProjectApp } from "@langwatch/project-server";
+import { PromptApp } from "@langwatch/prompt-server";
+import { RoleApp } from "@langwatch/role-server";
+import { ScenarioApp } from "@langwatch/scenario-server";
+import { SecretApp } from "@langwatch/secret-server";
+import { StoredObjectApp } from "@langwatch/stored-object-server";
+import { SuiteApp } from "@langwatch/suite-server";
+import { TraceApp } from "@langwatch/trace-server";
+import { UserApp } from "@langwatch/user-server";
+import { WorkflowApp } from "@langwatch/workflow-server";
+import { assertWebhookEndpointsEntitled } from "~/runtime/app/features/webhooks";
 import type { AppCommands } from "~/server/event-sourcing/registration/pipelineRegistry";
+import { withIdempotency } from "~/server/api/idempotency";
+import { prisma } from "~/server/db";
+import { webhookDestinationFor } from "~/server/webhooks/destinations";
 import { SHUTDOWN_BUDGET } from "../shutdown/budget";
 import type { AppConfig } from "./config";
-import type {
-  AppDependencies,
-  DataRetentionDependencies,
-  OpsDependencies,
-} from "./dependencies";
+import type { AppDependencies, DataRetentionDependencies } from "./dependencies";
 
 const logger = createLogger("langwatch:app");
 
@@ -98,35 +127,43 @@ async function settleWithTimeout({
 export class App {
   readonly config: AppConfig;
   readonly nlpLambda: AppDependencies["nlpLambda"];
-  readonly agents: AppDependencies["agents"];
-  readonly dataset: AppDependencies["dataset"];
-  readonly annotations: AppDependencies["annotations"];
-  readonly apiKeys: AppDependencies["apiKeys"];
+  readonly agents: AgentApp;
+  readonly dataset: DatasetApp;
+  readonly annotations: AnnotationApp;
+  readonly apiKeys: ApiKeyApp;
   readonly managedProviders: AppDependencies["managedProviders"];
   readonly scim: AppDependencies["scim"];
-  readonly modelProviders: AppDependencies["modelProviders"];
-  readonly prompts: AppDependencies["prompts"];
+  /** The SCIM feature's application; `scim` above is the raw capability. */
+  readonly scimApp: ScimApp;
+  readonly modelProviders: ModelProviderApp;
+  readonly prompts: PromptApp;
   readonly evaluators: AppDependencies["evaluators"];
-  readonly workflows: AppDependencies["workflows"];
-  readonly monitors: AppDependencies["monitors"];
+  /** The Evaluator feature's application; `evaluators` above is the raw service. */
+  readonly evaluatorApp: EvaluatorApp;
+  readonly workflows: WorkflowApp;
+  readonly monitors: MonitorApp;
 
   readonly broadcast: AppDependencies["broadcast"];
   readonly presence: AppDependencies["presence"];
-  readonly secrets: AppDependencies["secrets"];
-  readonly traces: AppDependencies["traces"] & AppCommands["traces"];
+  readonly secrets: SecretApp;
+  readonly traces: TraceApp;
   readonly evaluations: AppDependencies["evaluations"] & AppCommands["evaluations"];
-  /** The ADR-034 analytics read API. */
-  readonly analytics: AppDependencies["analytics"];
+  /** The ADR-034 analytics read API, and the restricted SQL surface beside it. */
+  readonly analytics: AnalyticsApp;
   /** The process-owned restricted analytics SQL service. */
   readonly langWatchQL: AppDependencies["langWatchQL"];
-  /** The process-owned dashboard, graph, and saved-chart lifecycle service. */
-  readonly dashboard: AppDependencies["dashboard"];
+  /** The process-owned dashboard, graph, and saved-chart lifecycle application. */
+  readonly dashboard: DashboardApp;
   readonly simulations: AppDependencies["simulations"];
   readonly simulationExports: AppDependencies["simulationExports"];
   readonly topics: AppDependencies["topics"];
   readonly topicClustering: AppCommands["topicClustering"];
   readonly codingAgents: AppDependencies["codingAgents"] & AppCommands["codingAgents"];
+  /** The Coding Agent feature's application; `codingAgents` above is the raw capability. */
+  readonly codingAgentApp: CodingAgentApp;
   readonly gateway: AppDependencies["gateway"];
+  /** The Webhook feature's application, over the process's endpoint store. */
+  readonly webhooks: WebhookApp;
   readonly filters: AppDependencies["filters"];
   readonly clickhouse: AppDependencies["clickhouse"];
   /**
@@ -137,28 +174,43 @@ export class App {
   readonly redis: AppDependencies["redis"];
   readonly billing: AppDependencies["billing"];
   readonly governance: AppDependencies["governance"];
+  /** The Governance feature's application; `governance` above is the raw capability. */
+  readonly governanceApp: GovernanceApp;
   readonly billableEvents: AppDependencies["billableEvents"];
   readonly billingQueries: AppDependencies["billingQueries"];
   readonly commands: AppCommands;
   readonly storedObjects: AppDependencies["storedObjects"];
+  /** The Stored Object feature's application; `storedObjects` above is the raw service. */
+  readonly storedObjectApp: StoredObjectApp;
   readonly userAvatarObjects: AppDependencies["userAvatarObjects"];
   readonly storedObjectOwners: AppDependencies["storedObjectOwners"];
   readonly opsExplain: AppDependencies["opsExplain"];
   readonly github: AppDependencies["github"];
-  readonly langy: AppDependencies["langy"];
+  readonly langy: LangyApp;
   readonly featureFlags: AppDependencies["featureFlags"];
-  readonly experiments: AppDependencies["experiments"];
-  readonly scenarios: AppDependencies["scenarios"];
+  readonly experiments: ExperimentApp;
+  readonly scenarios: ScenarioApp;
   readonly scenarioTabs: AppDependencies["scenarioTabs"];
   readonly scenarioExecution: AppDependencies["scenarioExecution"];
   readonly scenarioExecutionPool: AppDependencies["scenarioExecutionPool"];
-  readonly suites: AppDependencies["suites"];
-  readonly automation: AppDependencies["automation"];
-  readonly organizations: AppDependencies["organizations"];
-  readonly projects: AppDependencies["projects"];
-  readonly users: AppDependencies["users"];
-  readonly roles: AppDependencies["roles"];
+  readonly suites: SuiteApp;
+  readonly automation: AutomationApp;
+  readonly organizations: OrganizationApp;
+  readonly projects: ProjectApp;
+  readonly users: UserApp;
+  readonly roles: RoleApp;
+  /**
+   * The authorization engine itself, not an application over it.
+   *
+   * Ten framework sites ask it questions — the org-auth middleware, the
+   * role-binding resolver, the tRPC scope-lineage guard, `rbac.ts`. `AuthzApp`
+   * answers exactly one procedure (`effectivePermissionsFor`), so retyping
+   * this to hold it would take the engine away from the plumbing in order to
+   * serve one read. The application sits beside it as `authzApp`, which is
+   * also the key its own door asks for.
+   */
   readonly permissions: AppDependencies["permissions"];
+  readonly authzApp: AuthzApp;
   readonly authzGrants: AppDependencies["authzGrants"];
   readonly tokenizer: AppDependencies["tokenizer"];
   readonly usage: AppDependencies["usage"];
@@ -173,7 +225,7 @@ export class App {
   readonly betterAuth: AppDependencies["betterAuth"];
   readonly nurturing?: AppDependencies["nurturing"];
   readonly usageLimits: AppDependencies["usageLimits"];
-  readonly ops: OpsDependencies;
+  readonly ops: OpsApp;
   readonly dataRetention: DataRetentionDependencies;
   readonly share: AppDependencies["share"];
 
@@ -195,30 +247,99 @@ export class App {
   constructor(deps: AppDependencies) {
     this.config = deps.config;
     this.nlpLambda = deps.nlpLambda;
-    this.agents = deps.agents;
-    this.dataset = deps.dataset;
-    this.annotations = deps.annotations;
-    this.apiKeys = deps.apiKeys;
+    this.agents = AgentApp.create({ agents: deps.agents });
+    this.dataset = DatasetApp.create({
+      dataset: deps.dataset,
+      experiments: deps.experiments,
+    });
+    this.annotations = AnnotationApp.create({
+      annotations: deps.annotations,
+      users: deps.users,
+    });
+    this.apiKeys = ApiKeyApp.create({ apiKeys: deps.apiKeys });
     this.managedProviders = deps.managedProviders;
     this.scim = deps.scim;
-    this.modelProviders = deps.modelProviders;
-    this.prompts = deps.prompts;
+    this.scimApp = ScimApp.create({
+      scim: deps.scim,
+      planProvider: deps.planProvider,
+    });
+    this.modelProviders = ModelProviderApp.create({
+      modelProviders: deps.modelProviders,
+      spans: deps.traces.spans,
+    });
+    this.prompts = PromptApp.create({
+      prompts: deps.prompts,
+      projects: deps.projects,
+    });
     this.evaluators = deps.evaluators;
-    this.workflows = deps.workflows;
-    this.monitors = deps.monitors;
+    this.evaluatorApp = EvaluatorApp.create({
+      evaluators: deps.evaluators,
+      modelProviders: deps.modelProviders,
+    });
+    this.workflows = WorkflowApp.create({
+      workflows: deps.workflows,
+      evaluators: deps.evaluators,
+    });
+    this.monitors = MonitorApp.create({
+      monitors: deps.monitors,
+      evaluations: deps.evaluations,
+      evaluators: deps.evaluators,
+    });
     this.featureFlags = deps.featureFlags;
-    this.experiments = deps.experiments;
-    this.scenarios = deps.scenarios;
+    this.experiments = ExperimentApp.create({
+      experiments: deps.experiments,
+      workflows: deps.workflows,
+      dataset: deps.dataset,
+      monitors: deps.monitors,
+      broadcast: deps.broadcast,
+    });
+    this.scenarios = ScenarioApp.create({
+      scenarios: deps.scenarios,
+      simulations: deps.simulations,
+      scenarioExecution: deps.scenarioExecution,
+      scenarioTabs: deps.scenarioTabs,
+      users: deps.users,
+      broadcast: deps.broadcast,
+    });
     this.scenarioTabs = deps.scenarioTabs;
     this.scenarioExecution = deps.scenarioExecution;
     this.scenarioExecutionPool = deps.scenarioExecutionPool;
-    this.suites = deps.suites;
-    this.automation = deps.automation;
-    this.organizations = deps.organizations;
-    this.projects = deps.projects;
-    this.users = deps.users;
-    this.roles = deps.roles;
+    this.suites = SuiteApp.create({
+      suites: deps.suites,
+      scenarios: deps.scenarios,
+      projects: deps.projects,
+      simulations: deps.simulations,
+    });
+    this.automation = AutomationApp.create({
+      automation: deps.automation,
+      monitors: deps.monitors,
+      projects: deps.projects,
+      featureFlags: deps.featureFlags,
+    });
+    this.organizations = OrganizationApp.create({
+      organizations: deps.organizations,
+      projects: deps.projects,
+    });
+    this.projects = ProjectApp.create({
+      projects: deps.projects,
+      apiKeys: deps.apiKeys,
+      share: deps.share,
+      topics: deps.topics,
+      topicClustering: deps.commands.topicClustering,
+    });
+    this.users = UserApp.create({
+      users: deps.users,
+      auth: deps.auth,
+      ops: deps.ops,
+      organizations: deps.organizations,
+    });
+    this.roles = RoleApp.create({
+      roles: deps.roles,
+      permissions: deps.permissions,
+      authzGrants: deps.authzGrants,
+    });
     this.permissions = deps.permissions;
+    this.authzApp = AuthzApp.create({ permissions: deps.permissions });
     this.authzGrants = deps.authzGrants;
     this.tokenizer = deps.tokenizer;
     this.usage = deps.usage;
@@ -235,12 +356,19 @@ export class App {
     this.usageLimits = deps.usageLimits;
     this.broadcast = deps.broadcast;
     this.presence = deps.presence;
-    this.secrets = deps.secrets;
-    this.traces = { ...deps.traces, ...deps.commands.traces };
+    this.secrets = SecretApp.create({ secrets: deps.secrets });
+    const traces = { ...deps.traces, ...deps.commands.traces };
     this.evaluations = Object.assign(deps.evaluations, deps.commands.evaluations);
-    this.analytics = deps.analytics;
+    this.analytics = AnalyticsApp.create({
+      analytics: deps.analytics,
+      filterOptions: deps.filters.options,
+      langWatchQL: deps.langWatchQL,
+    });
     this.langWatchQL = deps.langWatchQL;
-    this.dashboard = deps.dashboard;
+    this.dashboard = DashboardApp.create({
+      dashboard: deps.dashboard,
+      automation: deps.automation,
+    });
     this.simulations = deps.simulations;
     this.simulationExports = deps.simulationExports;
     this.topics = deps.topics;
@@ -249,22 +377,85 @@ export class App {
     // would copy the commands and silently drop every method. Same shape as
     // `evaluations` above.
     this.codingAgents = Object.assign(deps.codingAgents, deps.commands.codingAgents);
+    this.codingAgentApp = CodingAgentApp.create({
+      codingAgents: this.codingAgents,
+      github: deps.github,
+      scope: deps.codingAgentScope,
+    });
+    this.traces = TraceApp.create({
+      traces,
+      topics: deps.topics,
+      broadcast: deps.broadcast,
+      evaluations: deps.evaluations,
+      codingAgents: this.codingAgents,
+      share: deps.share,
+      projects: deps.projects,
+    });
     this.gateway = deps.gateway;
+    this.webhooks = WebhookApp.create({
+      endpoints: deps.gateway.webhookEndpoints,
+      health: deps.gateway.webhookHealth,
+      events: deps.gateway.webhookEvents,
+      assertEndpointsEntitled: assertWebhookEndpointsEntitled,
+      dispatch: ({ destination, ...input }) => webhookDestinationFor(destination).send(input),
+      runIdempotent: (input) => withIdempotency({ prisma, ...input }),
+    });
     this.filters = deps.filters;
     this.clickhouse = deps.clickhouse;
     this.redis = deps.redis;
     this.billing = deps.billing;
     this.governance = deps.governance;
+    this.governanceApp = GovernanceApp.create({
+      governance: deps.governance,
+      projects: deps.projects,
+      organizations: deps.organizations,
+      permissions: deps.permissions,
+      // Post-collapse VirtualKey is organization-scoped; the
+      // (organizationId, principalUserId, name) tuple is the personal-key
+      // uniqueness contract. Both reads were supplied per mount in
+      // `server/api/root.ts` before this.
+      personalVirtualKeys: {
+        isOrganizationMember: async ({ organizationId, userId }) =>
+          (await prisma.organizationUser.findUnique({
+            where: { userId_organizationId: { userId, organizationId } },
+          })) !== null,
+        hasActivePersonalKeyLabelled: async ({ organizationId, userId, label }) =>
+          (await prisma.virtualKey.findFirst({
+            where: {
+              organizationId,
+              principalUserId: userId,
+              name: label,
+              revokedAt: null,
+            },
+          })) !== null,
+      },
+    });
     this.billableEvents = deps.billableEvents;
     this.billingQueries = deps.billingQueries;
     this.commands = deps.commands;
     this.storedObjects = deps.storedObjects;
+    // One object for both keys: the process's stored-object service answers
+    // the portable capability AND the row-and-stream reads the file surface
+    // makes. See `StoredObjectFileReadPort` for why the two are named apart.
+    this.storedObjectApp = StoredObjectApp.create({
+      storedObjects: deps.storedObjects,
+      files: deps.storedObjects,
+      owners: deps.storedObjectOwners,
+    });
     this.userAvatarObjects = deps.userAvatarObjects;
     this.storedObjectOwners = deps.storedObjectOwners;
     this.opsExplain = deps.opsExplain;
     this.github = deps.github;
-    this.langy = deps.langy;
-    this.ops = deps.ops;
+    this.langy = LangyApp.create({
+      langy: deps.langy,
+      redis: deps.redis,
+      broadcast: deps.broadcast,
+    });
+    this.ops = OpsApp.create({
+      ops: deps.ops,
+      featureFlags: deps.featureFlags,
+      projects: deps.projects,
+    });
     this.dataRetention = deps.dataRetention;
     this.share = deps.share;
     this._eventSourcing = deps._eventSourcing;

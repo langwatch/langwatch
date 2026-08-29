@@ -332,6 +332,7 @@ import {
 import { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";
 import { ExportService } from "../export/export.service";
 import { InviteService } from "../invites/invite.service";
+import { resolveCallerProjectScope } from "../organizations/resolveCallerProjectScope";
 import { resolveOrganizationId } from "../organizations/resolveOrganizationId";
 import { OrganizationRepository } from "../repositories/organization.repository";
 import { getLicenseHandler } from "~/runtime/app/licensing";
@@ -2504,6 +2505,16 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     billableEvents: billableEventsRepository ?? undefined,
     billingQueries,
     codingAgents,
+    // Ports rather than inline calls: `resolveOrganizationId` and
+    // `resolveCallerProjectScope` both reach the App again through the ttl
+    // cache and `rbac.ts`, so building them inside `app.ts` would be an
+    // import cycle — and would drag all of rbac into every process's eager
+    // graph for the sake of two directory reads.
+    codingAgentScope: {
+      tryResolveOrganizationForProject: resolveOrganizationId,
+      resolveCallerProjectScope: ({ userId, organizationId }) =>
+        resolveCallerProjectScope({ userId, organizationId }),
+    },
     github: githubService,
     storedObjects: storedObjectsService,
     userAvatarObjects,
@@ -3241,6 +3252,11 @@ export function createTestApp(
     billableEvents: undefined,
     billingQueries: BillableEventsQueryService.create(null),
     codingAgents: testCodingAgents,
+    codingAgentScope: {
+      tryResolveOrganizationForProject: resolveOrganizationId,
+      resolveCallerProjectScope: ({ userId, organizationId }) =>
+        resolveCallerProjectScope({ userId, organizationId }),
+    },
     github: testGithub,
     storedObjects: storedObjectsService,
     userAvatarObjects,

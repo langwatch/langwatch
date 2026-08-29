@@ -23,18 +23,35 @@
 import { agentPlatformUrl } from "~/app/api/agents/agent-platform-url";
 import { platformUrl } from "~/app/api/shared/platform-url";
 import { scenarioRunPlatformUrl } from "~/app/api/simulation-runs/scenario-run-platform-url";
-import type { RequestAppServices } from "~/runtime/app/requestApp";
+import type { AgentService } from "@langwatch/agent-contract";
+import type { DatasetService } from "@langwatch/dataset-contract";
+import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { ExperimentService } from "@langwatch/experiment-contract";
+import type { MonitorService } from "@langwatch/monitor-contract";
+import type { ProjectService } from "@langwatch/project-contract";
+import type { PromptService } from "@langwatch/prompt-contract";
+import type { SimulationService } from "@langwatch/scenario-contract";
+import type { WorkflowService } from "@langwatch/workflow-contract";
 
+/**
+ * The services this resolver reads, named directly rather than derived from
+ * `RequestAppServices`.
+ *
+ * It is built at composition time, before the `App` exists, and it asks each
+ * one a single lookup. Deriving the type from the App class made it demand
+ * the feature APPLICATIONS the moment those keys held one, which nothing at
+ * this point in composition has yet built.
+ */
 type LangyNavigateFallbackServices = {
-  simulations: RequestAppServices["simulations"];
-  prompts: RequestAppServices["prompts"];
-  dataset: RequestAppServices["dataset"];
-  workflows: RequestAppServices["workflows"];
-  experiments: RequestAppServices["experiments"];
-  monitors: RequestAppServices["monitors"];
-  evaluators: RequestAppServices["evaluators"];
-  agents: RequestAppServices["agents"];
-  projects: RequestAppServices["projects"];
+  simulations: Pick<SimulationService, "tryGetScenarioRunData">;
+  prompts: Pick<PromptService, "tryGetPromptByIdOrHandle">;
+  dataset: Pick<DatasetService, "getBySlugOrId">;
+  workflows: Pick<WorkflowService, "getById">;
+  experiments: Pick<ExperimentService, "tryGetById">;
+  monitors: Pick<MonitorService, "tryGetMonitorById">;
+  evaluators: Pick<EvaluatorService, "tryGetById">;
+  agents: Pick<AgentService, "getById">;
+  projects: Pick<ProjectService, "tryGetById">;
 };
 
 type UrlForProjectSlug = (projectSlug: string) => string;
