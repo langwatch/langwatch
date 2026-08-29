@@ -1,0 +1,26 @@
+# Workspace packages whose test suite `.github/scripts/run-package-suites.sh`
+# does NOT run. One package per line, `<name>  # reason`, and the reason is
+# mandatory — the script rejects a bare name.
+#
+# Only two reasons qualify:
+#
+#   1. Another workflow already runs the same suite. Running it twice buys
+#      nothing and doubles the surface a flake can land on.
+#   2. It cannot produce a result on this runner at any exit code — it needs the
+#      app up, a provider API key, or a browser. A suite like that would spend
+#      minutes failing on purpose, which is not a signal, it is a bill.
+#
+# "It is red today" is NOT one of them. That goes in
+# .github/package-suites.allowed-failures, which still RUNS the suite, so the
+# day it goes green the job says so.
+#
+# A line naming a package the workspace no longer has fails the job. That is the
+# only automatic pressure on this file, and it is deliberate: nothing mechanical
+# can tell a justified exclusion from a capitulation, so the reason column is
+# what a reviewer reads.
+
+@langwatch/web  # this workflow's own test-unit, test-component and test-integration jobs are its suite
+langwatch  # sdk-javascript-ci.yml runs the TypeScript SDK's suite
+@langwatch/mcp-server  # mcp-javascript-ci.yml runs it
+@langwatch/agent-plugin  # agent-plugin-ci.yml runs it
+langwatch-e2e-tests  # e2e-ci.yml runs it, against an app it starts first; Playwright against nothing is 30 failed connection attempts
