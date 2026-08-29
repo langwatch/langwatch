@@ -392,6 +392,36 @@ const presentations = {
     describe: () =>
       "We can't read what was stored for it. Rebuild the chart in the workbench and save it again.",
   },
+
+  // ---- dashboards, graphs & saved views ----
+  // The reorder pair reads the same to a customer whichever list they were
+  // dragging: the drop landed on something that is no longer there, and the
+  // order they see is now behind the one that is stored. Both say the order
+  // was not saved, because a silent no-op on a drag is the reading people
+  // otherwise take.
+  dashboard_not_found: {
+    title: "Dashboard not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  dashboard_reorder_unknown_ids: {
+    title: "Some of those dashboards are gone",
+    describe: () =>
+      "The new order wasn't saved. Reload to see the current list, then arrange it again.",
+  },
+  graph_not_found: {
+    title: "Graph not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  saved_view_not_found: {
+    title: "Saved view not found",
+    describe: () =>
+      "It may have been deleted, or it isn't shared with you. Reload to see the views you can open.",
+  },
+  saved_view_reorder_unknown_ids: {
+    title: "Some of those saved views are gone",
+    describe: () =>
+      "The new order wasn't saved. Reload to see the current list, then arrange it again.",
+  },
   lwql_unavailable: {
     // Names the workspace administrator first: on a self-hosted deployment
     // the reader's own operator controls whether this is provisioned, and
@@ -469,6 +499,14 @@ const presentations = {
       "Pick an existing evaluator or create one first, then attach it to the evaluation.",
   },
   evaluator_not_found: { title: "Evaluator not found" },
+  evaluator_workflow_version_required: {
+    // Raised while copying a workflow evaluator into another project: there is
+    // no saved version to replicate, so the copy would be a broken replica.
+    // The reader is looking at the copy dialog, so the copy names the one step
+    // that unblocks it rather than explaining the replica.
+    title: "This evaluator's workflow hasn't been saved yet",
+    describe: () => "Open its workflow, save a version, then copy the evaluator again.",
+  },
   evaluator_config_error: {
     title: "This evaluator isn't configured correctly",
     describe: () => "Check its settings and try again.",
@@ -589,6 +627,26 @@ const presentations = {
     title: "Prompt not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
+  prompt_not_a_copy: {
+    // Refused on "sync from source". This prompt was written here rather than
+    // copied from somewhere, so there is nothing to sync from and no retry to
+    // offer — only the way to get the relationship it is missing.
+    title: "This prompt isn't a copy",
+    describe: () =>
+      "It has no source prompt to sync from. Copy it from the prompt you want to follow instead.",
+  },
+  prompt_has_no_copies: {
+    // Refused on "push to copies" when nothing has ever been copied from it.
+    title: "Nothing has been copied from this prompt",
+    describe: () => "There's nothing to push changes to yet.",
+  },
+  prompt_no_copies_selected: {
+    // The push named ids and none of them is a copy of THIS prompt — usually a
+    // stale list. Reload is the move, not a different selection.
+    title: "Choose which copies to update",
+    describe: () =>
+      "None of the prompts you picked is a copy of this one. Reload to see its current copies, then pick again.",
+  },
   system_prompt_required: {
     title: "A system prompt is required",
     describe: () => "Add one before running this.",
@@ -609,6 +667,17 @@ const presentations = {
   api_key_permission_denied: {
     title: "You don't have permission to manage API keys",
     describe: () => "Ask an admin on your team for access.",
+  },
+  api_key_admin_required: {
+    // One refusal, two subjects: a key that belongs to the organization rather
+    // than to a person, and a key minted for somebody else. `meta.action` says
+    // which, and the two need different sentences because only one of them is
+    // about another person.
+    title: "Only an organization admin can create this key",
+    describe: (error) =>
+      strEq(error, "action", "assign-to-another-user")
+        ? "Ask an organization admin to create it for them, or create a key for yourself."
+        : "Ask an organization admin to create the service key, or create a personal key instead.",
   },
   api_key_permission_not_delegable: {
     title: "This is not something the assistant can do for you",
@@ -906,6 +975,43 @@ const presentations = {
     title: "Organization not found",
     describe: () =>
       "This team isn't attached to an organization you can see. Reload to see the current list.",
+  },
+  organization_not_found_for_project: {
+    title: "Organization not found",
+    describe: () =>
+      "This project isn't attached to an organization you can see. Reload to see the projects you can open.",
+  },
+  project_slug_taken: {
+    title: "That name is taken",
+    describe: () =>
+      "Another project in the selected team already uses it. Pick a different name.",
+  },
+  project_destination_team_not_found: {
+    // Names the KIND, never whether the team exists: a team id that belongs to
+    // another organization is exactly what this refusal declines to confirm.
+    // Same rule as `scope_not_in_organization`.
+    title: "That team isn't available",
+    describe: () =>
+      "It may have been archived, or it isn't one of this organization's teams. Pick a different team.",
+  },
+  project_cannot_archive_current: {
+    // Refused rather than performed: archiving the project you are working in
+    // leaves every screen after it answering "not found".
+    title: "Switch projects before archiving this one",
+    describe: () => "You're working in it right now. Open another project, then archive it.",
+  },
+  personal_workspace_boundary: {
+    // One code over three moves — out of a personal workspace, into one, and
+    // creating a second project inside one — so the copy has to hold for all
+    // three. It says the rule once and points at the way around it.
+    title: "Personal workspaces hold only their own project",
+    describe: () =>
+      "A personal project can't be moved out, and nothing can be moved or created inside a personal workspace. Use a team project instead.",
+  },
+  personal_project_protected: {
+    title: "Your personal project can't be archived",
+    describe: () =>
+      "Every personal workspace keeps its own project. Archive a team project instead.",
   },
   organization_not_found: {
     title: "Organization not found",
@@ -1533,6 +1639,32 @@ const presentations = {
     title: "User not found",
     describe: () => "They may have been removed since this page loaded.",
   },
+  // The operator console's own four refusals. The reader is an operator with a
+  // destructive action in front of them, so each one says which condition was
+  // not met and what to do next, and none of them offers a plain retry.
+  ops_operator_session_required: {
+    title: "You need to be signed in",
+    describe: () => "Nothing was changed. Sign in again, then try this action.",
+  },
+  ops_impersonated_operator_refused: {
+    // The audit trail would name the account being impersonated, not the
+    // person doing the work, which is why this is refused rather than allowed.
+    title: "This can't be run while impersonating",
+    describe: () => "Stop impersonating and sign in as yourself to run it.",
+  },
+  ops_confirmation_required: {
+    title: "Confirm before running this",
+    describe: () => "This action can't be undone, so it has to be confirmed first.",
+  },
+  ops_feature_flag_unknown: {
+    title: "That flag isn't one we know",
+    describe: (error) => {
+      const key = str(error, "key", "");
+      return key
+        ? `Nothing is set up under "${key}". Check the spelling, or pick one from the list.`
+        : "Check the spelling, or pick one from the list.";
+    },
+  },
   resource_limit_exceeded: {
     title: "You've hit a plan limit",
     // Names the allowance and where it stands, because "a plan limit" leaves
@@ -1975,6 +2107,49 @@ const presentations = {
     describe: () =>
       "Archive one you no longer use, or upgrade your plan to raise the limit.",
   },
+  personal_virtual_key_label_taken: {
+    // Scoped to the reader's own keys: two people in one organization may both
+    // have a "default", so the sentence says "you", not "someone".
+    title: "That label is taken",
+    describe: () =>
+      "You already have a personal key with this label. Pick a different one.",
+  },
+  no_eligible_model_providers: {
+    // Nothing the reader can fix from where they are standing — minting the key
+    // needs a provider credential their organization has not added — so the
+    // copy names who to ask rather than offering a retry.
+    title: "No model provider is set up yet",
+    describe: () =>
+      "Ask an admin to add a model provider to your organization, then create the key again.",
+  },
+  routing_policy_has_no_providers: {
+    title: "That routing policy has no providers",
+    describe: (error) => {
+      const name = str(error, "routingPolicyName", "");
+      return name
+        ? `Add at least one model provider to "${name}", then use it here.`
+        : "Add at least one model provider to it, then use it here.";
+    },
+  },
+  routing_policy_must_have_provider: {
+    title: "This routing policy needs a provider",
+    describe: () => "Add at least one model provider before saving.",
+  },
+  routing_policy_must_have_scope: {
+    title: "This routing policy needs a scope",
+    describe: () => "Choose where it applies before saving.",
+  },
+  routing_policy_model_must_be_concrete: {
+    // Names the value the customer typed, because "one specific model" on its
+    // own leaves them looking at a field that reads fine to them.
+    title: "Pick one specific model",
+    describe: (error) => {
+      const value = str(error, "value", "");
+      return value
+        ? `"${value}" can point at a different model over time. Choose an exact model instead.`
+        : "A name that moves, like the newest of a family, changes what runs without anyone editing this. Choose an exact model instead.";
+    },
+  },
 
   // ---- datasets ----
   dataset_name_taken: {
@@ -2098,7 +2273,104 @@ const presentations = {
       "This suite has no agent or prompt to test yet. Pick one in the run dialog, then run again.",
   },
 
+  // ---- annotations & review queues ----
+  annotation_annotator_reference_invalid: {
+    // `meta.annotator` is the raw reference the caller sent, which is an id
+    // with a prefix on it — nothing a reader recognises, so it stays out of
+    // the sentence and the copy names the two things they can pick instead.
+    title: "That annotator isn't valid",
+    describe: () => "Assign this to a person on the team, or to an annotation queue.",
+  },
+  annotation_queue_item_not_found: {
+    title: "That queue item isn't here",
+    describe: () =>
+      "It may already be done, or it may have been assigned to someone else. Reload to see what's still in your queue.",
+  },
+  annotation_queue_name_reserved: {
+    title: "That name is reserved",
+    describe: () => "Pick a different name for this annotation queue.",
+  },
+  annotation_queue_name_taken: {
+    title: "That name is taken",
+    describe: () =>
+      "Another annotation queue in this project already uses it. Pick a different name.",
+  },
+
   // ---- automations & notifications ----
+  automation_not_found: {
+    title: "Automation not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  automation_webhook_upsert_required: {
+    // The refusal exists because this write cannot carry a checked, encrypted
+    // destination. That is a fact about how the destination is stored, not
+    // something to explain: the reader gets the place that can do it.
+    title: "Webhook automations can't be created this way",
+    describe: () =>
+      "Set this one up on the automations page, where the destination is checked before it's saved.",
+  },
+  automation_webhook_not_enabled: {
+    title: "Webhook automations aren't turned on for this project",
+    describe: () =>
+      "Send this one to email or Slack instead, or ask your account team to turn on webhooks.",
+  },
+  automation_filters_unsupported: {
+    // `meta.fields` holds the field names that no longer match anything. They
+    // are our vocabulary, not the author's, so the copy says the shape of the
+    // problem and leaves the reader in the filter editor where the fields are
+    // named for them.
+    title: "This automation needs a supported filter",
+    describe: () =>
+      "None of the filters on it can be matched, so it would fire on nothing. Add a supported filter, then save.",
+  },
+  automation_trace_filter_invalid: {
+    title: "That filter query isn't valid",
+    // `meta.reason` is the filter parser's own line about the author's query
+    // ("Invalid filter syntax", "Too many filter conditions"). It names WHERE
+    // the query went wrong, which the generic sentence cannot, and it is our
+    // prose — clamped like every other server-authored sentence here.
+    describe: (error) =>
+      safeProse(str(error, "reason", "")) || "Check the query and try again.",
+  },
+  graph_alert_channel_unsupported: {
+    title: "A graph alert can only send a notification",
+    describe: () => "Choose email, Slack, or a webhook.",
+  },
+  graph_alert_threshold_required: {
+    title: "This alert needs a threshold",
+    describe: () =>
+      "Pick the series to watch, the comparison, the value, and the time period it applies to.",
+  },
+  graph_alert_severity_required: {
+    title: "This alert needs a severity",
+    describe: () => "Say how urgent it is, so it reaches the right people.",
+  },
+  report_schedule_missing: {
+    title: "This report has no schedule",
+    describe: () => "Edit it and pick when it should be sent, then resume it.",
+  },
+  report_channel_unsupported: {
+    title: "A report can only be sent as a notification",
+    describe: () => "Choose email or Slack.",
+  },
+  test_fire_rate_limited: {
+    // Hygiene on the test button rather than anti-abuse — the recipient is
+    // always the person pressing it — so the copy is a short wait, not a
+    // warning.
+    title: "Too many test sends just now",
+    describe: () => "That one wasn't sent. Wait a minute, then try again.",
+  },
+  unsubscribe_rate_limited: {
+    // Read on the unsubscribe page, by someone with no session and nothing to
+    // fix. Waiting is the whole remedy.
+    title: "Too many requests just now",
+    describe: () => "Wait a minute, then open the link again.",
+  },
+  unsubscribe_link_invalid: {
+    title: "This unsubscribe link doesn't work",
+    describe: () =>
+      "It may have expired, or been cut short by the email client. Use the link in the most recent email, or change what you get from your notification settings.",
+  },
   template_not_found: {
     title: "Template not found",
     describe: () => "It may have been deleted. Reload to see the current list.",

@@ -325,6 +325,14 @@ const UNCOPIED_CODES_BACKLOG = new Set<string>([
 /** Copy that outlived the code raising it. Renames left these behind. */
 const DEAD_COPY_BACKLOG = new Set<string>([
   "model_default_user_key_required",
+  /**
+   * Its declaring class went with `subscription/errors.ts` in 8a32e35208. The
+   * copy stays on purpose, and so does the retry rule: a rolling deploy can
+   * still have an older process emitting the code, and a client that meets it
+   * should read the sentence rather than the slug. Listed here because the
+   * orphan check is what that commit's reasoning missed.
+   */
+  "subscription_service_unavailable",
   "system_prompt_conflict",
   "system_prompt_required",
 ]);

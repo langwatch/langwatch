@@ -191,6 +191,9 @@ importers:
       '@langwatch/enterprise-scim-contract':
         specifier: workspace:*
         version: link:../../packages/enterprise/features/scim/contract
+      '@langwatch/enterprise-scim-server':
+        specifier: workspace:*
+        version: link:../../packages/enterprise/features/scim/server
       '@langwatch/enterprise-webhook-contract':
         specifier: workspace:*
         version: link:../../packages/enterprise/features/webhook/contract
@@ -281,6 +284,9 @@ importers:
       '@langwatch/role-contract':
         specifier: workspace:*
         version: link:../../packages/features/role/contract
+      '@langwatch/role-server':
+        specifier: workspace:*
+        version: link:../../packages/features/role/server
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../packages/runtime-composition
@@ -2690,6 +2696,9 @@ importers:
       '@langwatch/dashboard-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../handled-error
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../observability
