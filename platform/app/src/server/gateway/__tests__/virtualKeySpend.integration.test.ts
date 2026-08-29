@@ -26,11 +26,8 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { GatewayUsageService } from "../usage.service";
-import {
-  GatewayVirtualKeySpendAdapter,
-  startOfCurrentMonthUTC,
-} from "@langwatch/gateway-server";
+import { GatewayUsageService } from "@langwatch/gateway-server/testing";
+import { GatewayVirtualKeySpendAdapter, startOfCurrentMonthUTC } from "@langwatch/gateway-server";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-spend-${suffix}`;
@@ -469,10 +466,7 @@ describe("virtual key spend (real PG + real CH)", () => {
       virtualKeyIds: [VK_ORG_SCOPED_ID],
       window,
     });
-    expect(Number(column.get(VK_ORG_SCOPED_ID)?.spentUsd)).toBeCloseTo(
-      Number(perKey.totalUsd),
-      6,
-    );
+    expect(Number(column.get(VK_ORG_SCOPED_ID)?.spentUsd)).toBeCloseTo(Number(perKey.totalUsd), 6);
     expect(column.get(VK_ORG_SCOPED_ID)?.requests).toBe(perKey.totalRequests);
   });
 

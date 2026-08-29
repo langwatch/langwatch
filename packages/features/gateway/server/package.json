@@ -17,6 +17,10 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./testing": {
+      "types": "./src/testing.ts",
+      "default": "./src/testing.ts"
+    },
     "./realtime-session-reconciliation": {
       "types": "./src/adapters/realtime-session-reconciliation.adapter.ts",
       "default": "./src/adapters/realtime-session-reconciliation.adapter.ts"

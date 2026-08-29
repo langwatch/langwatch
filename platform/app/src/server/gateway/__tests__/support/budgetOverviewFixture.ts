@@ -21,7 +21,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { GatewayBudgetClickHouseRepository } from "../../budget.clickhouse.repository";
+import { GatewayBudgetClickHouseRepository } from "@langwatch/gateway-server/testing";
 import { BudgetOverviewService } from "../../budgetOverview.service";
 
 export const suffix = nanoid(8);
@@ -405,13 +405,11 @@ export async function teardownBudgetOverviewFixture(): Promise<void> {
   if (ch) {
     for (const tenantId of TENANTS) {
       await ch.command({
-        query:
-          "DELETE FROM gateway_budget_ledger_events WHERE TenantId = {tenantId:String}",
+        query: "DELETE FROM gateway_budget_ledger_events WHERE TenantId = {tenantId:String}",
         query_params: { tenantId },
       });
       await ch.command({
-        query:
-          "DELETE FROM gateway_budget_scope_totals WHERE TenantId = {tenantId:String}",
+        query: "DELETE FROM gateway_budget_scope_totals WHERE TenantId = {tenantId:String}",
         query_params: { tenantId },
       });
     }
