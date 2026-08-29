@@ -76,3 +76,40 @@ internals:
   now reports `invalid_key` wrapping the real issue, and `flatten()` reads
   only the outer message. See the record-key section in
   `dev/docs/best_practices/error-handling.md`.
+
+## Both majors are installed, and the boundary is (currently) safe
+
+`pnpm` resolves two zods in this workspace:
+
+| what | zod |
+| --- | --- |
+| `platform/app`, and 113 other package manifests | 4.4.3 |
+| `@langwatch/identity-contract`, `@langwatch/identity-server` | 3.25.76 |
+
+Ten files in the identity packages import zod, so identity really does produce
+**zod 3** errors that travel into zod 4 code. Measured rather than reasoned
+about:
+
+```
+zod4: instanceof z4.ZodError = false→true | fromZodError -> validation_error
+zod3: instanceof z4.ZodError = FALSE      | fromZodError -> validation_error
+```
+
+So the trap is live — a zod 3 `ZodError` is not an instance of zod 4's class —
+and the boundary survives it anyway, because the tRPC error formatter tests
+`isZodLikeError` (structurally: an `issues` array and a `flatten` method) and
+converts with `ValidationError.fromZodError`. Both majors satisfy both.
+
+**This is load-bearing and unenforced.** Replacing that structural check with
+`instanceof z.ZodError` would turn every identity validation failure into an
+unknown 500 — the failure mode has been seen before. `anomalyRules.ts` says as
+much in a comment at its own boundary.
+
+The `instanceof` uses that remain (`governance/aiTools.ts`,
+`routes/evaluations-legacy.ts`) are safe today for a boring reason: they parse
+with `platform/app`'s own zod 4 and catch the error a line later, so no
+boundary is crossed. They stop being safe the moment a schema arrives from
+somewhere else.
+
+The durable fix is one zod. Until then, `isZodLikeError` at any boundary that
+can receive a schema or an error it did not itself create.
