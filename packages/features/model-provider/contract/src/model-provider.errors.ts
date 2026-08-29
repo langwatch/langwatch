@@ -194,17 +194,13 @@ export class ModelProviderDeprecatedError extends HandledError {
   declare readonly code: "model_provider_deprecated";
 
   constructor(input: { provider: string; replacement?: string }) {
-    super(
-      "model_provider_deprecated",
-      "This model provider is no longer available to add.",
-      {
-        meta: input.replacement
-          ? { provider: input.provider, replacement: input.replacement }
-          : { provider: input.provider },
-        httpStatus: 400,
-        fault: "customer",
-      },
-    );
+    super("model_provider_deprecated", "This model provider is no longer available to add.", {
+      meta: input.replacement
+        ? { provider: input.provider, replacement: input.replacement }
+        : { provider: input.provider },
+      httpStatus: 400,
+      fault: "customer",
+    });
     this.name = "ModelProviderDeprecatedError";
   }
 }
@@ -298,6 +294,31 @@ export class ModelDefaultScopeForbiddenError extends HandledError {
       { meta: input, httpStatus: 403, fault: "customer" },
     );
     this.name = "ModelDefaultScopeForbiddenError";
+  }
+}
+
+/**
+ * A credential that names a project but nobody in it tried to write a default.
+ *
+ * Not a permission refusal like {@link ModelDefaultScopeForbiddenError}: the
+ * caller may well be allowed, but the key does not say who they are, so there
+ * is nobody to check. 403 rather than 401 because the request IS
+ * authenticated — telling an API caller they are not sends them to inspect a
+ * key that is working, which is the confusion this error was written to end.
+ *
+ * Only an API or CLI caller can reach it, so the copy names the two ways out
+ * rather than sending them to an admin.
+ */
+export class ModelDefaultUserKeyRequiredError extends HandledError {
+  declare readonly code: "model_default_user_key_required";
+
+  constructor() {
+    super(
+      "model_default_user_key_required",
+      "Default models are set per user, and this API key is not tied to one. Use a user API key, or change the default in settings.",
+      { httpStatus: 403, fault: "customer" },
+    );
+    this.name = "ModelDefaultUserKeyRequiredError";
   }
 }
 

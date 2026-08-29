@@ -4,6 +4,7 @@ import {
   ModelCostNotFoundError,
   ModelDefaultNotFoundError,
   ModelDefaultScopeForbiddenError,
+  ModelDefaultUserKeyRequiredError,
   ModelDefaultValidationError,
   ModelNotConfiguredError,
   ModelProviderAnchorRequiredError,
@@ -124,6 +125,21 @@ describe("model provider handled errors", () => {
         },
       },
     );
+    /**
+     * @scenario Saving with a key that names no user is refused with a handled error
+     *
+     * 403 and not 401, deliberately. The request IS authenticated; telling an
+     * API caller otherwise sends them to inspect a key that is working, which
+     * is the exact confusion this error was written to end — `model-default
+     * list` answered and `model-default set` said "HTTP 400: Not
+     * authenticated" for the same key.
+     */
+    expectHandledWire(new ModelDefaultUserKeyRequiredError(), {
+      code: "model_default_user_key_required",
+      message:
+        "Default models are set per user, and this API key is not tied to one. Use a user API key, or change the default in settings.",
+      httpStatus: 403,
+    });
     expectHandledWire(new ModelProviderCredentialsWouldBeDroppedError("azure"), {
       code: "model_provider_credentials_would_be_dropped",
       message:

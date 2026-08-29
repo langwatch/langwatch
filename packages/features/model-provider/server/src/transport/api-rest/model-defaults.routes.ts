@@ -2,7 +2,10 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import {
+  ModelDefaultUserKeyRequiredError,
+  type ModelProviderService,
+} from "@langwatch/model-provider-contract";
 import { anyAuthenticated, requires } from "@langwatch/api";
 import {
   type AppRestProjectVariables,
@@ -119,10 +122,7 @@ export function registerModelDefaultsRoutes(
       const body = c.req.valid("json");
 
       try {
-        if (!userId)
-          throw new HTTPException(401, {
-            message: "A user-bound credential is required for default-model writes",
-          });
+        if (!userId) throw new ModelDefaultUserKeyRequiredError();
         const saved = await modelProviders().saveDefaultConfig({
           config: body.config,
           scopes: body.scopes,
@@ -161,10 +161,7 @@ export function registerModelDefaultsRoutes(
       const body = c.req.valid("json");
 
       try {
-        if (!userId)
-          throw new HTTPException(401, {
-            message: "A user-bound credential is required for default-model writes",
-          });
+        if (!userId) throw new ModelDefaultUserKeyRequiredError();
         const saved = await modelProviders().saveDefaultConfig({
           id,
           config: body.config,
@@ -200,10 +197,7 @@ export function registerModelDefaultsRoutes(
       const { id } = c.req.param();
 
       try {
-        if (!userId)
-          throw new HTTPException(401, {
-            message: "A user-bound credential is required for default-model writes",
-          });
+        if (!userId) throw new ModelDefaultUserKeyRequiredError();
         await modelProviders().deleteDefaultConfig({
           id,
           actorId: userId,
