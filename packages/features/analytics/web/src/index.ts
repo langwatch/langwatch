@@ -11,6 +11,7 @@ export * from "./hooks/use-langwatch-ql-monaco";
 export * from "./components/langwatch-ql-chart-failure";
 export * from "./components/langwatch-ql-diagnostics";
 export * from "./components/langwatch-ql-editor";
+export * from "./components/langwatch-ql-granularity-picker";
 export * from "./components/langwatch-ql-parameters-editor";
 export * from "./components/langwatch-ql-result-meta";
 export * from "./components/langwatch-ql-result-pane";

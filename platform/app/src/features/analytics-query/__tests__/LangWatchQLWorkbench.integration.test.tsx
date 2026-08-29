@@ -160,10 +160,7 @@ vi.mock("../components/LazyLangWatchQLChartMode", () => ({
       data-spec-text={props.editedSpecText ?? ""}
     >
       {JSON.stringify(props.result.rows)}
-      <button
-        type="button"
-        onClick={() => props.onEditedSpecTextChange(harness.editedSpec)}
-      >
+      <button type="button" onClick={() => props.onEditedSpecTextChange(harness.editedSpec)}>
         Edit the specification
       </button>
     </div>
@@ -195,9 +192,7 @@ const PAGE_WINDOW = {
  * off the URL, and the thing worth proving is that the URL the member is
  * looking at is the window the request carries.
  */
-async function renderWorkbench(
-  period: { startDate: string; endDate: string } = PAGE_PERIOD,
-) {
+async function renderWorkbench(period: { startDate: string; endDate: string } = PAGE_PERIOD) {
   const url =
     "/my-project/analytics/query" +
     `?startDate=${encodeURIComponent(period.startDate)}` +
@@ -248,8 +243,7 @@ describe("the LangWatchQL workbench", () => {
         await renderWorkbench();
 
         expect(screen.getByText("Query")).toBeInTheDocument();
-        const escapeRegExp = (value: string) =>
-          value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         for (const name of SCHEMA_DATASET_NAMES) {
           expect(
             screen.getByRole("button", {
@@ -408,9 +402,7 @@ describe("the LangWatchQL workbench", () => {
         );
 
         // A refusal takes the whole result body off the page, chart and all.
-        harness.mutation.mockRejectedValue(
-          handledErrorEnvelope({ code: "lwql_not_permitted" }),
-        );
+        harness.mutation.mockRejectedValue(handledErrorEnvelope({ code: "lwql_not_permitted" }));
         typeSql(editor, `${SQL} FORMAT JSON`);
         fireEvent.click(screen.getByRole("button", { name: "Run query" }));
         await waitFor(() => expect(screen.queryByTestId("stub-chart-mode")).toBeNull());
@@ -550,9 +542,7 @@ describe("the LangWatchQL workbench", () => {
         // The catch-22 this pins: the step was listed as a value to type in,
         // and typing it is itself refused as a reserved name.
         const parameters = screen.getByTestId("lwql-parameters");
-        expect(
-          within(parameters).queryByText("Give these parameters a value"),
-        ).toBeNull();
+        expect(within(parameters).queryByText("Give these parameters a value")).toBeNull();
         expect(parameters).not.toHaveTextContent("period_granularity_seconds");
       });
 
@@ -584,9 +574,7 @@ describe("the LangWatchQL workbench", () => {
 
         const picker = screen.getByTestId("lwql-granularity");
         for (const label of ["1 second", "1 minute", "1 hour"]) {
-          expect(
-            within(picker).getByRole("button", { name: label }),
-          ).toBeTruthy();
+          expect(within(picker).getByRole("button", { name: label })).toBeTruthy();
         }
       });
 
@@ -601,15 +589,13 @@ describe("the LangWatchQL workbench", () => {
         fireEvent.click(screen.getByRole("button", { name: "Run query" }));
 
         await waitFor(() => {
-          const [, input] = harness.mutation.mock.calls.at(-1) ?? [];
+          const [input] = harness.mutation.mock.calls.at(-1) ?? [];
           expect(input).toMatchObject({ granularitySeconds: 60 });
         });
-        const [, input] = harness.mutation.mock.calls.at(-1) ?? [];
+        const [input] = harness.mutation.mock.calls.at(-1) ?? [];
         const sent = input as { parameters?: Record<string, unknown> };
         // Sending it as a parameter is what the backend refuses outright.
-        expect(sent.parameters ?? {}).not.toHaveProperty(
-          "period_granularity_seconds",
-        );
+        expect(sent.parameters ?? {}).not.toHaveProperty("period_granularity_seconds");
       });
 
       /** @scenario "Choosing a step sends it beside the query rather than among its parameters" */
@@ -632,7 +618,7 @@ describe("the LangWatchQL workbench", () => {
         fireEvent.click(screen.getByRole("button", { name: "Run query" }));
 
         await waitFor(() => {
-          const [, input] = harness.mutation.mock.calls.at(-1) ?? [];
+          const [input] = harness.mutation.mock.calls.at(-1) ?? [];
           expect(input).toMatchObject({ granularitySeconds: 3600 });
         });
         // And nothing prompts for a value: the alert that would have named
@@ -660,13 +646,11 @@ describe("the LangWatchQL workbench", () => {
         // Reachable at all is the point: before the picker there was no way to
         // ask for a step, so this refusal could not be produced from the UI.
         await waitFor(() => {
-          const [, input] = harness.mutation.mock.calls.at(-1) ?? [];
+          const [input] = harness.mutation.mock.calls.at(-1) ?? [];
           expect(input).toMatchObject({ granularitySeconds: 1 });
         });
         expect(
-          await screen.findByText(
-            "That granularity would return too many datapoints",
-          ),
+          await screen.findByText("That granularity would return too many datapoints"),
         ).toBeTruthy();
       });
 
@@ -680,7 +664,7 @@ describe("the LangWatchQL workbench", () => {
 
         await waitFor(() => expect(harness.mutation).toHaveBeenCalled());
         expect(screen.queryByTestId("lwql-granularity")).toBeNull();
-        const [, input] = harness.mutation.mock.calls.at(-1) ?? [];
+        const [input] = harness.mutation.mock.calls.at(-1) ?? [];
         // A step sent for an undeclared statement is a reserved value the
         // backend refuses.
         expect(input).not.toHaveProperty("granularitySeconds");
@@ -718,9 +702,10 @@ describe("the LangWatchQL workbench", () => {
           fireEvent.click(screen.getByRole("button", { name: "Run query" }));
           await screen.findByTestId("lwql-granularity");
           fireEvent.click(screen.getByRole("button", { name: "1 second" }));
-          expect(
-            screen.getByRole("button", { name: "1 second" }),
-          ).toHaveAttribute("aria-pressed", "true");
+          expect(screen.getByRole("button", { name: "1 second" })).toHaveAttribute(
+            "aria-pressed",
+            "true",
+          );
 
           // Opening Chart B replaces the statement with one that never
           // declares the parameter — nothing has run for it yet, so there is
@@ -742,7 +727,7 @@ describe("the LangWatchQL workbench", () => {
           fireEvent.click(screen.getByRole("button", { name: "Run query" }));
 
           await waitFor(() => expect(harness.mutation).toHaveBeenCalled());
-          const [, input] = harness.mutation.mock.calls.at(-1) ?? [];
+          const [input] = harness.mutation.mock.calls.at(-1) ?? [];
           expect(input).not.toHaveProperty("granularitySeconds");
         });
 
@@ -783,12 +768,14 @@ describe("the LangWatchQL workbench", () => {
 
           // The coarsest offered step is the default shown before anyone has
           // picked for THIS chart — never Chart A's leftover `1 second`.
-          expect(
-            screen.getByRole("button", { name: "1 hour" }),
-          ).toHaveAttribute("aria-pressed", "true");
-          expect(
-            screen.getByRole("button", { name: "1 second" }),
-          ).toHaveAttribute("aria-pressed", "false");
+          expect(screen.getByRole("button", { name: "1 hour" })).toHaveAttribute(
+            "aria-pressed",
+            "true",
+          );
+          expect(screen.getByRole("button", { name: "1 second" })).toHaveAttribute(
+            "aria-pressed",
+            "false",
+          );
         });
       });
 

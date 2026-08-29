@@ -86,6 +86,40 @@ Feature: LangWatchQL query workbench
       When the member runs it with a selected or one-off window
       Then it executes unchanged and reports that it does not follow the page period
 
+    @integration
+    Scenario: The step a statement declares is offered as a control, not as a parameter to fill in
+      Given a statement whose first run is refused for an unfilled period_granularity_seconds
+      When the workbench shows the refusal
+      Then the step is not listed among the parameters to give a value
+      And a granularity control offers the steps the contract admits
+
+    @integration
+    Scenario: Choosing a step sends it beside the query rather than among its parameters
+      Given the workbench is showing the granularity control
+      When the member chooses a step and runs the query
+      Then the request carries that step in its own field
+      And no reserved name appears among the parameters sent
+
+    @integration
+    Scenario: A step too fine for the window is refused where the member chose it
+      Given the workbench is showing the granularity control
+      When the member chooses a step that would exceed the bucket ceiling
+      Then the refusal is shown against the query
+
+    @unit
+    Scenario: Changing the granularity step marks the result stale and restores Run query
+      Given a successful result for a submitted snapshot at one granularity step
+      When the member picks a different granularity step
+      Then the visible result is marked stale
+      And the action reads Run query again
+
+    @unit
+    Scenario: Clearing the chosen step sends no step at all, not an empty one
+      Given a submission that had chosen a granularity step
+      When the member clears the step and runs the query
+      Then the request carries no granularity field at all
+      And it is not sent as a present field holding no value
+
   Rule: Results preserve transport fields, ordering, and readable states
 
     @integration
