@@ -3,7 +3,11 @@ import { createHash } from "node:crypto";
 import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import { projectWithTeamSchema, type ProjectService } from "@langwatch/project-contract";
+import {
+  projectIdentitySchema,
+  projectWithTeamSchema,
+  type ProjectService,
+} from "@langwatch/project-contract";
 import { ApiKeyService, type ApiKeyDependencies } from "../src/services/api-key.service";
 import {
   ApiKeyRepository,
@@ -175,6 +179,21 @@ const resolvedProject = projectWithTeamSchema.parse({
   },
 });
 
+/**
+ * What token resolution actually reads back for a project: five indexed
+ * columns and the organization flat, rather than the whole row it used to
+ * carry through the boundary.
+ */
+const resolvedIdentity = projectIdentitySchema.parse({
+  id: resolvedProject.id,
+  name: resolvedProject.name,
+  slug: resolvedProject.slug,
+  teamId: resolvedProject.teamId,
+  organizationId: resolvedProject.team.organizationId,
+  isPersonal: false,
+  ownerUserId: null,
+});
+
 function dependencies(overrides: Partial<ApiKeyDependencies> = {}): ApiKeyDependencies {
   return {
     authz: {
@@ -199,6 +218,7 @@ function dependencies(overrides: Partial<ApiKeyDependencies> = {}): ApiKeyDepend
     projects: {
       getWithTeam: vi.fn().mockResolvedValue(resolvedProject),
       tryGetWithTeam: vi.fn().mockResolvedValue(resolvedProject),
+      tryGetIdentity: vi.fn().mockResolvedValue(resolvedIdentity),
       getById: vi.fn().mockResolvedValue(null),
       listByOrganization: vi.fn().mockResolvedValue({ data: [] }),
       listActiveByScopes: vi.fn().mockResolvedValue({ data: [], hasMore: false }),
@@ -272,7 +292,7 @@ describe("API-key service", () => {
     const repository = new MemoryApiKeys();
     repository.legacyProjectId = resolvedProject.id;
     const projects = {
-      tryGetWithTeam: vi.fn().mockResolvedValue(resolvedProject),
+      tryGetIdentity: vi.fn().mockResolvedValue(resolvedIdentity),
     } as unknown as ProjectService;
     const service = createService(repository, dependencies({ projects }));
     const token = `sk-lw-${"a".repeat(16)}_${"b".repeat(48)}`;
@@ -281,7 +301,7 @@ describe("API-key service", () => {
       type: "legacyProjectKey",
       project: { id: "project-1" },
     });
-    expect(projects.tryGetWithTeam).toHaveBeenCalledWith(resolvedProject.id);
+    expect(projects.tryGetIdentity).toHaveBeenCalledWith(resolvedProject.id);
   });
 
   it("keeps a deprecated project credential bound to its resolved project", async () => {
@@ -298,11 +318,11 @@ describe("API-key service", () => {
   });
 
   it("allows a current organization-scoped key to select a project target", async () => {
-    const targetProject = { ...resolvedProject, id: "project-2" };
+    const targetProject = { ...resolvedIdentity, id: "project-2" };
     const deps = dependencies();
     const projects = deps.projects;
-    const tryGetWithTeam = vi.fn().mockResolvedValue(targetProject);
-    projects.tryGetWithTeam = tryGetWithTeam;
+    const tryGetIdentity = vi.fn().mockResolvedValue(targetProject);
+    projects.tryGetIdentity = tryGetIdentity;
     const service = createService(new MemoryApiKeys(), { ...deps, projects });
     const created = await service.create({
       name: "organization key",
@@ -314,7 +334,7 @@ describe("API-key service", () => {
     await expect(
       service.tryResolveToken({ token: created.token, projectId: targetProject.id }),
     ).resolves.toMatchObject({ type: "apiKey", project: { id: targetProject.id } });
-    expect(tryGetWithTeam).toHaveBeenCalledWith(targetProject.id);
+    expect(tryGetIdentity).toHaveBeenCalledWith(targetProject.id);
   });
 
   it("upgrades a legacy SHA-256 hash after successful verification", async () => {
@@ -483,6 +503,38 @@ describe("API-key service", () => {
         bindings: [{ scopeType: "TEAM", scopeId: "personal-team", role: "VIEWER" }],
       }),
     ).rejects.toMatchObject({ code: "api_key_scope_violation" });
+  });
+
+  /**
+   * @scenario The owner of a personal workspace may bind their own key into it
+   *
+   * Ported from
+   * `platform/app/src/app/api/api-keys/__tests__/api-keys-security.integration.test.ts`.
+   * The refusal above is not a ban on personal scopes; it is a ban on granting
+   * somebody else's. A key its owner holds is what the workspace is for, and
+   * without this the guard could tighten into "no personal scopes at all" and
+   * still look correct.
+   */
+  it("allows a personal scope for the owner the workspace belongs to", async () => {
+    class OwnedPersonalWorkspace extends MemoryApiKeys {
+      override tryFindPersonalWorkspaceOwner(): Promise<{
+        ownerUserId: string | null;
+      } | null> {
+        return Promise.resolve({ ownerUserId: "owner-1" });
+      }
+    }
+    const service = createService(new OwnedPersonalWorkspace());
+
+    const created = await service.create({
+      name: "owner-personal",
+      userId: "owner-1",
+      createdByUserId: "owner-1",
+      organizationId: "org-1",
+      permissionMode: "all",
+      bindings: [{ scopeType: "PROJECT", scopeId: "personal-project", role: "ADMIN" }],
+    });
+
+    expect(created.apiKey.id).toBeDefined();
   });
 
   it("resolves visible projects through Project candidates and one AuthZ batch", async () => {
