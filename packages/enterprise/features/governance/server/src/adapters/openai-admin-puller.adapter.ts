@@ -38,7 +38,12 @@
 
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
+import {
+  OPENAI_ADMIN_ADAPTER_ID,
+  openaiAdminPullConfigSchema,
+  PULLED_USAGE_HINT_KEY,
+  type OpenAiAdminPullConfig,
+} from "@langwatch/enterprise-governance-contract";
 import type {
   GovernancePuller as PullerAdapter,
   NormalizedPullEvent,
@@ -108,22 +113,6 @@ const COST_GROUP_BY_WITHOUT_KEY = ["user_id"] as const;
 const RESTATEMENT_LOOKBACK_DAYS = 3;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
-export const OPENAI_ADMIN_ADAPTER_ID = "openai_admin" as const;
-
-export const openaiAdminPullConfigSchema = z.object({
-  adapter: z.literal(OPENAI_ADMIN_ADAPTER_ID),
-  /**
-   * A single-value enum rather than a bare constant, so a second report could
-   * be added later without re-keying the rows this one wrote — `report` rides
-   * the restatement key.
-   */
-  report: z.enum(["cost"]).default("cost"),
-  /** ISO instant the very first run starts from. Later runs use the cursor. */
-  startingAt: z.string().datetime().optional(),
-  schedule: z.string().default("0 * * * *"),
-});
-export type OpenAiAdminPullConfig = z.infer<typeof openaiAdminPullConfigSchema>;
 
 /**
  * The durable cursor.

@@ -47,7 +47,7 @@ import {
   RotateCw,
   Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
 import { EnterpriseOttlEditor as OttlEditor } from "~/components/governance/OttlEditor.enterprise";
 import { SourceTypeIconGlyph } from "~/components/governance/SourceTypeIconGlyph";
@@ -95,10 +95,7 @@ type SecretDetails = {
   sourceName: string;
   sourceType: SourceType;
 };
-const STATUS_META: Record<
-  string,
-  { icon: typeof CircleCheck; label: string; color: string }
-> = {
+const STATUS_META: Record<string, { icon: typeof CircleCheck; label: string; color: string }> = {
   active: { icon: CircleCheck, label: "Active", color: "green.500" },
   awaiting_first_event: {
     icon: CircleDashed,
@@ -190,14 +187,11 @@ export const SOURCE_TYPES_WITH_PULL_CONFIG_BUILDER = [
   "anthropic_admin",
 ] as const;
 
-type PullConfigBuilderSourceType =
-  (typeof SOURCE_TYPES_WITH_PULL_CONFIG_BUILDER)[number];
+type PullConfigBuilderSourceType = (typeof SOURCE_TYPES_WITH_PULL_CONFIG_BUILDER)[number];
 
 function resolvePullConfig(
   composer: ComposerState,
-  {
-    shouldRequireCredentials = true,
-  }: { shouldRequireCredentials?: boolean } = {},
+  { shouldRequireCredentials = true }: { shouldRequireCredentials?: boolean } = {},
 ): { pullConfig: Record<string, unknown> | null } | null {
   const pullAdapter = PULL_ADAPTER_FOR_SOURCE[composer.sourceType];
   // For BYO `http_custom` we send the FULL HttpPollingConfig shape so the
@@ -228,8 +222,7 @@ function resolvePullConfig(
         : "The backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z). Leave the admin API key blank to keep the current one.",
     ],
     anthropic_admin: [
-      () =>
-        buildAnthropicAdminPullConfig(composer, { shouldRequireCredentials }),
+      () => buildAnthropicAdminPullConfig(composer, { shouldRequireCredentials }),
       "Missing or invalid Anthropic fields",
       shouldRequireCredentials
         ? "Admin API key is required, report must be `usage` or `cost`, bucket width is usage-only and must be 1m/1h/1d, and the backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z)."
@@ -238,9 +231,7 @@ function resolvePullConfig(
   };
 
   const builder = (
-    builders as Partial<
-      Record<SourceType, (typeof builders)[keyof typeof builders]>
-    >
+    builders as Partial<Record<SourceType, (typeof builders)[keyof typeof builders]>>
   )[composer.sourceType];
   if (builder) {
     const [build, title, description] = builder;
@@ -265,25 +256,14 @@ function InventoryHeader() {
           </Badge>
         </HStack>
         <Text color="fg.muted" fontSize="sm" maxW="3xl">
-          Configure cross-platform feeds for the activity monitor. Each source maps an
-          external AI platform into the normalised activity stream via OTel push, webhook,
-          or S3 audit drops.{" "}
+          Configure cross-platform feeds for the activity monitor. Each source maps an external AI
+          platform into the normalised activity stream via OTel push, webhook, or S3 audit drops.{" "}
           <Link href="/governance" color="blue.600">
             Back to governance
           </Link>
           .
         </Text>
       </VStack>
-      <Spacer />
-      {/* The writes are all `ingestionSources:manage`. A viewer who only
-          reads is not offered a composer the server refuses. */}
-      {canManage && (
-        <AddSourceControl
-          isEnterprise={isEnterprise}
-          sourceCount={sourceCount}
-          onAdd={onAdd}
-        />
-      )}
     </HStack>
   );
 }
@@ -460,9 +440,7 @@ export function buildCreateInput({
     // draft holds: a type switched mid-compose would otherwise carry a
     // destination its adapter never reads, and a dead column is how a
     // customer comes to believe routing is on.
-    traceProjectId: routesConversations(composer.sourceType)
-      ? composer.traceProjectId
-      : null,
+    traceProjectId: routesConversations(composer.sourceType) ? composer.traceProjectId : null,
   };
 }
 
@@ -508,8 +486,7 @@ function useIngestionSourceMutations({
         sourceType: data.source.sourceType as SourceType,
       });
     },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't create the source" }),
+    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't create the source" }),
   });
 
   const rotate = api.ingestionSources.rotateSecret.useMutation({
@@ -523,8 +500,7 @@ function useIngestionSourceMutations({
         sourceType: data.source.sourceType as SourceType,
       });
     },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't rotate the secret" }),
+    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't rotate the secret" }),
   });
 
   const update = api.ingestionSources.update.useMutation({
@@ -533,8 +509,7 @@ function useIngestionSourceMutations({
       setEditingSourceId(null);
       toaster.create({ title: "Source updated", type: "success" });
     },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't update the source" }),
+    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't update the source" }),
   });
 
   const archive = api.ingestionSources.archive.useMutation({
@@ -730,11 +705,7 @@ function InventoryTabs({
  * The two tabs and everything under the sources one: the actions row an admin
  * only sees with the manage grant, and the list itself.
  */
-function InventorySourcesTab({
-  page,
-}: {
-  page: ReturnType<typeof useIngestionSourcesPage>;
-}) {
+function InventorySourcesTab({ page }: { page: ReturnType<typeof useIngestionSourcesPage> }) {
   const { orgId, sourcesQuery, mutations } = page;
   return (
     <InventoryTabs
@@ -758,12 +729,8 @@ function InventorySourcesTab({
         rotatingId={pendingId(mutations.rotate)}
         archivingId={pendingId(mutations.archive)}
         onEdit={page.setEditingSourceId}
-        onRotate={(id) =>
-          mutations.rotate.mutate({ organizationId: orgId, id })
-        }
-        onArchive={(id) =>
-          mutations.archive.mutate({ organizationId: orgId, id })
-        }
+        onRotate={(id) => mutations.rotate.mutate({ organizationId: orgId, id })}
+        onArchive={(id) => mutations.archive.mutate({ organizationId: orgId, id })}
       />
     </InventoryTabs>
   );
@@ -788,24 +755,10 @@ function InventoryPage() {
           onClose={page.closeComposer}
         />
 
-        <IngestionSourceList
-          canRead={canRead}
-          canManage={canManage}
-          isLoading={sourcesQuery.isLoading}
-          error={sourcesQuery.error}
-          grouped={grouped}
-          rotatingId={pendingId(mutations.rotate)}
-          archivingId={pendingId(mutations.archive)}
-          onEdit={setEditingSourceId}
-          onRotate={(id) => mutations.rotate.mutate({ organizationId: orgId, id })}
-          onArchive={(id) => mutations.archive.mutate({ organizationId: orgId, id })}
-        />
+        <InventorySourcesTab page={page} />
       </VStack>
 
-      <SecretModal
-        details={page.secretModal}
-        onClose={() => page.setSecretModal(null)}
-      />
+      <SecretModal details={page.secretModal} onClose={() => page.setSecretModal(null)} />
 
       <EditingSourceDrawer
         orgId={orgId}
@@ -840,9 +793,7 @@ function EditingSourceDrawer({
       organizationId={orgId}
       destinationCtx={destinationCtx}
       source={
-        editingSourceId
-          ? (sourcesQuery.data?.find((s) => s.id === editingSourceId) ?? null)
-          : null
+        editingSourceId ? (sourcesQuery.data?.find((s) => s.id === editingSourceId) ?? null) : null
       }
       onClose={() => setEditingSourceId(null)}
       onSubmit={(input) => update.mutate(input)}
@@ -868,11 +819,7 @@ function SourcesActionsRow({
   return (
     <HStack>
       <Spacer />
-      <AddSourceControl
-        isEnterprise={isEnterprise}
-        sourceCount={sourceCount}
-        onAdd={onAdd}
-      />
+      <AddSourceControl isEnterprise={isEnterprise} sourceCount={sourceCount} onAdd={onAdd} />
     </HStack>
   );
 }
@@ -892,9 +839,7 @@ function AddSourceControl({
     <AddIngestionSourceMenu
       isEnterprise={isEnterprise}
       disabledReason={
-        atCap
-          ? "Source limit reached. Upgrade to Enterprise for unlimited sources."
-          : undefined
+        atCap ? "Source limit reached. Upgrade to Enterprise for unlimited sources." : undefined
       }
       hint={
         !isEnterprise
@@ -932,16 +877,9 @@ function SourceRow({
 }) {
   const status = STATUS_META[source.status] ?? STATUS_META.awaiting_first_event!;
   const StatusIcon = status.icon;
-  const typeLabel =
-    SOURCE_TYPE_LABEL[source.sourceType as SourceType] ?? source.sourceType;
+  const typeLabel = SOURCE_TYPE_LABEL[source.sourceType as SourceType] ?? source.sourceType;
   return (
-    <HStack
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="sm"
-      padding={3}
-      gap={3}
-    >
+    <HStack borderWidth="1px" borderColor="border.muted" borderRadius="sm" padding={3} gap={3}>
       <VStack align="start" gap={0} flex={1} minWidth={0}>
         <HStack gap={2}>
           <Link
@@ -1080,9 +1018,7 @@ function SourceComposerDrawer({
                 size="sm"
                 rows={2}
                 value={composer.description}
-                onChange={(e) =>
-                  setComposer({ ...composer, description: e.target.value })
-                }
+                onChange={(e) => setComposer({ ...composer, description: e.target.value })}
                 placeholder="What this fleet covers + who owns it"
               />
             </VStack>
@@ -1110,9 +1046,7 @@ function SourceComposerDrawer({
             <TraceDestinationField
               sourceType={composer.sourceType}
               value={composer.traceProjectId}
-              onChange={(traceProjectId) =>
-                setComposer({ ...composer, traceProjectId })
-              }
+              onChange={(traceProjectId) => setComposer({ ...composer, traceProjectId })}
               mode="create"
               {...destinationCtx}
             />
@@ -1166,9 +1100,7 @@ function useSourceEditForm(source: Source | null) {
    * {@link buildEditSubmission} for why an untouched destination must not be
    * echoed back to a server that would re-validate it.
    */
-  const [destination, setDestination] = useState<string | null | undefined>(
-    undefined,
-  );
+  const [destination, setDestination] = useState<string | null | undefined>(undefined);
 
   // Keyed on `source?.id`, not `source`: a re-render that hands back an equal
   // row must not discard what the admin has typed since the drawer opened.
@@ -1179,9 +1111,7 @@ function useSourceEditForm(source: Source | null) {
     setDestination(undefined);
     const parser = (source.parserConfig as Record<string, unknown>) ?? {};
     const raw = parser.ottlStatements;
-    setStatements(
-      Array.isArray(raw) ? raw.filter((s): s is string => typeof s === "string") : [],
-    );
+    setStatements(Array.isArray(raw) ? raw.filter((s): s is string => typeof s === "string") : []);
     setParserConfig(
       seedComposerParserConfig({
         sourceType: source.sourceType as SourceType,
@@ -1233,11 +1163,7 @@ function SourceIdentityFields({
         <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
           Display name
         </Text>
-        <Input
-          size="sm"
-          value={name}
-          onChange={(e) => onNameChange(e.target.value)}
-        />
+        <Input size="sm" value={name} onChange={(e) => onNameChange(e.target.value)} />
       </VStack>
       <VStack align="stretch" gap={1}>
         <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
@@ -1343,22 +1269,22 @@ function PullConfigEditFields({
       />
       {isReportLocked && (
         <Text fontSize="xs" color="fg.muted">
-          The report is fixed once a source has pulled: usage and cost describe
-          the same spend, so recording both for one source would count it twice.
-          To switch, archive this source and create a new one.
+          The report is fixed once a source has pulled: usage and cost describe the same spend, so
+          recording both for one source would count it twice. To switch, archive this source and
+          create a new one.
         </Text>
       )}
       {isStartLocked && (
         <Text fontSize="xs" color="fg.muted">
-          The backfill start is fixed once a source has pulled: the cursor has
-          already moved past it and never rewinds. To re-read older data,
-          archive this source and create a new one with an earlier start.
+          The backfill start is fixed once a source has pulled: the cursor has already moved past it
+          and never rewinds. To re-read older data, archive this source and create a new one with an
+          earlier start.
         </Text>
       )}
       {hasPulled && parserConfig.report === "cost" && (
         <Text fontSize="xs" color="fg.muted">
-          Moving the backfill start re-reads cost history from the new date and
-          restates the figures already recorded for that window.
+          Moving the backfill start re-reads cost history from the new date and restates the figures
+          already recorded for that window.
         </Text>
       )}
       <PullCadenceField
@@ -1517,8 +1443,8 @@ export function SourceEditDrawer({
             />
 
             <Text fontSize="xs" color="fg.muted">
-              Source type and ingest secret are immutable after create. Use “Rotate
-              secret” for the secret; archive + recreate to change source type.
+              Source type and ingest secret are immutable after create. Use “Rotate secret” for the
+              secret; archive + recreate to change source type.
             </Text>
           </VStack>
         </Drawer.Body>
@@ -1613,16 +1539,11 @@ function SourceEditBody({
         // empty (`ScopeChipPicker.tsx:759` is fully controlled), so the admin
         // picks a project, sees nothing selected under an unchanged warning,
         // and concludes the control is dead.
-        value={
-          form.destination === undefined
-            ? (source.traceProjectId ?? null)
-            : form.destination
-        }
+        value={form.destination === undefined ? (source.traceProjectId ?? null) : form.destination}
         onChange={form.setDestination}
         mode="edit"
         destinationArchived={
-          form.destination === undefined &&
-          (source.traceProjectArchived ?? false)
+          form.destination === undefined && (source.traceProjectArchived ?? false)
         }
         {...destinationCtx}
       />
@@ -1805,9 +1726,7 @@ const ANTHROPIC_BUCKET_WIDTH_LABELS: Record<string, string> = {
  * `validBucketWidth` rejects any width on a cost source — offering one would
  * offer a value whose only effect is to fail the save.
  */
-function anthropicBucketWidthOptions(
-  values: Record<string, string>,
-): readonly FieldOption[] {
+function anthropicBucketWidthOptions(values: Record<string, string>): readonly FieldOption[] {
   const isUsage = (values.report ?? "").trim().toLowerCase() === "usage";
   const fallback: FieldOption = {
     value: "",
@@ -2238,8 +2157,7 @@ function buildHttpCustomPullConfig(c: ComposerState): Record<string, unknown> | 
     cursorJsonPath: cursorPath,
     cursorQueryParam: cursorParam,
     eventsJsonPath: eventsPath,
-    schedule:
-      c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.http_polling || "*/15 * * * *",
+    schedule: c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.http_polling || "*/15 * * * *",
     eventMapping,
     // Per HttpPollingPullerAdapter contract: caller-supplied secrets land
     // on `pullConfig.credentials.*` and the adapter substitutes them into
@@ -2268,11 +2186,44 @@ function buildHttpCustomPullConfig(c: ComposerState): Record<string, unknown> | 
  * is how the two paths would drift into disagreeing about what a valid bucket
  * width is.
  */
+/**
+ * The pullConfig for an OpenAI Admin source, or null when a required field is
+ * empty or a supplied backfill start is not a real instant.
+ *
+ * The composer's dispatch table has always named this builder and it was never
+ * written, so choosing "OpenAI Admin" threw `ReferenceError` before any
+ * validation could run.
+ *
+ * The shape is the puller's own (`openaiAdminPullConfigSchema`): one report,
+ * `cost`, because `/v1/organization/costs` is the only surface this adapter
+ * reads; `startingAt` as an ISO instant, which is why a bare calendar date is
+ * normalised rather than passed through; and the key under `credentials`, the
+ * one subtree the server encrypts at rest.
+ */
+export function buildOpenAiAdminPullConfig(
+  c: ComposerState,
+  { shouldRequireCredentials = true }: { shouldRequireCredentials?: boolean } = {},
+): Record<string, unknown> | null {
+  const token = trimmedField(c.parserConfig, "credentialsToken");
+  if (!token && shouldRequireCredentials) return null;
+
+  const startingAt = normalizeStartingAt(trimmedField(c.parserConfig, "startingAt"));
+  if (startingAt === null) return null;
+
+  return {
+    adapter: "openai_admin",
+    report: "cost",
+    ...(startingAt ? { startingAt } : {}),
+    schedule: c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.openai_admin || "0 * * * *",
+    // Omitted, not blanked: on the edit path a blank field means "keep the
+    // stored key", and `credentials: { token: "" }` would overwrite it.
+    ...(token ? { credentials: { token } } : {}),
+  };
+}
+
 export function buildAnthropicAdminPullConfig(
   c: ComposerState,
-  {
-    shouldRequireCredentials = true,
-  }: { shouldRequireCredentials?: boolean } = {},
+  { shouldRequireCredentials = true }: { shouldRequireCredentials?: boolean } = {},
 ): Record<string, unknown> | null {
   const p = c.parserConfig;
   const token = trimmedField(p, "credentialsToken");
@@ -2291,9 +2242,10 @@ export function buildAnthropicAdminPullConfig(
     report,
     ...(bucketWidth ? { bucketWidth } : {}),
     ...(startingAt ? { startingAt } : {}),
-    schedule:
-      c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.anthropic_admin || "0 * * * *",
-    credentials: { token },
+    schedule: c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.anthropic_admin || "0 * * * *",
+    // Omitted, not blanked: on the edit path a blank field means "keep the
+    // stored key", and `credentials: { token: "" }` would overwrite it.
+    ...(token ? { credentials: { token } } : {}),
   };
 }
 
@@ -2315,9 +2267,7 @@ function trimmedField(p: Record<string, string>, key: string): string {
 function validBucketWidth(raw: string, report: string): string | null | undefined {
   if (!raw) return undefined;
   if (report !== "usage") return null;
-  return (ANTHROPIC_BUCKET_WIDTHS as readonly string[]).includes(raw)
-    ? raw
-    : null;
+  return (ANTHROPIC_BUCKET_WIDTHS as readonly string[]).includes(raw) ? raw : null;
 }
 
 /** Whether y-m-d is a date that exists, rather than one Date would roll forward. */
@@ -2384,9 +2334,7 @@ function normalizeStartingAt(raw: string): string | null | undefined {
  * the source would save looking complete and fail every run for want of a
  * credential it did ask for.
  */
-function buildCopilotStudioDataversePullConfig(
-  c: ComposerState,
-): Record<string, unknown> | null {
+function buildCopilotStudioDataversePullConfig(c: ComposerState): Record<string, unknown> | null {
   const p = c.parserConfig;
   const environmentUrl = (p.environmentUrl ?? "").trim().replace(/\/+$/, "");
   const tenantId = (p.credentialsTenantId ?? "").trim();
@@ -2407,16 +2355,12 @@ function buildCopilotStudioDataversePullConfig(
       .map((s) => s.trim())
       .filter((s) => s.length > 0),
     schedule:
-      c.pullSchedule.trim() ||
-      PULL_SCHEDULE_DEFAULTS.copilot_studio_dataverse ||
-      "*/15 * * * *",
+      c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.copilot_studio_dataverse || "*/15 * * * *",
     credentials: { tenantId, clientId, clientSecret },
   };
 }
 
-function buildDatabricksGeniePullConfig(
-  c: ComposerState,
-): Record<string, unknown> | null {
+function buildDatabricksGeniePullConfig(c: ComposerState): Record<string, unknown> | null {
   const p = c.parserConfig;
   const workspaceUrl = (p.workspaceUrl ?? "").trim().replace(/\/+$/, "");
   const credentials = genieCredentialsFrom(p);
@@ -2432,8 +2376,7 @@ function buildDatabricksGeniePullConfig(
       .split(",")
       .map((s) => s.trim())
       .filter((s) => s.length > 0),
-    schedule:
-      c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.databricks_genie || "*/15 * * * *",
+    schedule: c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.databricks_genie || "*/15 * * * *",
     // Omitted rather than sent empty: the adapter reads "no warehouse named" as
     // "do not price these questions", and an empty string is a warehouse id it
     // would then ask the workspace about.
@@ -2561,10 +2504,7 @@ function ParserFieldInput({
     }
     return (
       <NativeSelect.Root size="sm">
-        <NativeSelect.Field
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        >
+        <NativeSelect.Field value={value} onChange={(e) => onChange(e.target.value)}>
           {control.options.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
@@ -2619,8 +2559,10 @@ function ParserConfigField({
   mode?: ParserConfigMode;
   readOnly?: boolean;
 }) {
-  const { isSecret, isMultiline, isRequired, hint, placeholder } =
-    parserFieldPresentation({ field, mode });
+  const { isSecret, isMultiline, isRequired, hint, placeholder } = parserFieldPresentation({
+    field,
+    mode,
+  });
   const control = fieldControl({ field, values });
   const shownHint = control.hint ?? hint;
 
@@ -2754,10 +2696,7 @@ const DROP_PARSER_FIELD = Symbol("drop");
 // The persisted value for one parserConfig entry, or DROP_PARSER_FIELD to omit
 // it. Pulling the per-key decision out of the loop keeps `buildParserConfig`
 // flat instead of a five-deep branch ladder.
-function parserFieldValue(
-  key: string,
-  value: unknown,
-): unknown | typeof DROP_PARSER_FIELD {
+function parserFieldValue(key: string, value: unknown): unknown | typeof DROP_PARSER_FIELD {
   if (value == null || value === "") return DROP_PARSER_FIELD;
   // Secrets travel in exactly one place: `pullConfig.credentials`, which is
   // the only subtree `encryptParserConfigCredentials` wraps before the row
@@ -2956,9 +2895,7 @@ export function buildEditedParserConfig({
  * the DTO's bare `sourceType` string gets a `SourceType` inside the guard
  * without a second cast.
  */
-export function isEditablePullSource(
-  sourceType: SourceType | undefined,
-): sourceType is SourceType {
+export function isEditablePullSource(sourceType: SourceType | undefined): sourceType is SourceType {
   return (
     !!sourceType &&
     !!PULL_ADAPTER_FOR_SOURCE[sourceType] &&
@@ -3062,8 +2999,7 @@ export function buildEditSubmission({
     description: description.trim() || null,
     parserConfig: buildEditedParserConfig({
       sourceType,
-      storedParserConfig:
-        (source.parserConfig as Record<string, unknown>) ?? {},
+      storedParserConfig: (source.parserConfig as Record<string, unknown>) ?? {},
       rebuiltPullConfig,
       ottlStatements,
     }),
@@ -3078,8 +3014,7 @@ export function buildEditSubmission({
     // rebuilt parser config, still showed it running on the default.
     ...(isPullMode
       ? {
-          pullSchedule:
-            pullSchedule.trim() || recommendedPullSchedule(sourceType),
+          pullSchedule: pullSchedule.trim() || recommendedPullSchedule(sourceType),
         }
       : {}),
     // Same guard as create: a type that routes nothing must never carry a
@@ -3233,13 +3168,7 @@ function IngestSecretPanel({
         Ingest secret (bearer token)
       </Text>
       <HStack gap={2}>
-        <Code
-          flex={1}
-          padding={2}
-          fontSize="xs"
-          whiteSpace="pre-wrap"
-          wordBreak="break-all"
-        >
+        <Code flex={1} padding={2} fontSize="xs" whiteSpace="pre-wrap" wordBreak="break-all">
           {secret}
         </Code>
         <Button size="sm" variant="outline" onClick={() => onCopy(secret)}>
@@ -3286,9 +3215,9 @@ function SecretGraceNotice() {
       borderRadius="sm"
     >
       <Text fontSize="xs" color="amber.900">
-        <strong>Important:</strong> the secret above will not be shown again. We retained
-        the prior secret&apos;s hash for a 24h grace window if you&apos;re rotating, so
-        you have time to roll the new value through every upstream client.
+        <strong>Important:</strong> the secret above will not be shown again. We retained the prior
+        secret&apos;s hash for a 24h grace window if you&apos;re rotating, so you have time to roll
+        the new value through every upstream client.
       </Text>
     </Box>
   );
@@ -3316,10 +3245,10 @@ function OtlpEndpointPanel({
         </Button>
       </HStack>
       <Text fontSize="xs" color="fg.muted">
-        Spans push into the LangWatch trace store with this source&apos;s origin tag and
-        become viewable in the trace viewer. If you are sending agent traces from your own
-        LangWatch SDK, use <Code fontSize="xs">/api/otel/v1/traces</Code> with your
-        project API key - different auth, same trace store. See{" "}
+        Spans push into the LangWatch trace store with this source&apos;s origin tag and become
+        viewable in the trace viewer. If you are sending agent traces from your own LangWatch SDK,
+        use <Code fontSize="xs">/api/otel/v1/traces</Code> with your project API key - different
+        auth, same trace store. See{" "}
         <Link
           href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
           color="blue.600"
@@ -3366,13 +3295,13 @@ function ClaudeCodeEnvBlockPanel({
         <Code fontSize="xs" backgroundColor="transparent">
           /v1/metrics
         </Code>{" "}
-        itself off the base endpoint. To attribute spend to a specific team or department,
-        also export{" "}
+        itself off the base endpoint. To attribute spend to a specific team or department, also
+        export{" "}
         <Code fontSize="xs" backgroundColor="transparent">
           OTEL_RESOURCE_ATTRIBUTES=team.id=…,department=…
         </Code>{" "}
-        - those land as resource attributes and slot into /governance&apos;s spendByTeam
-        without further config.
+        - those land as resource attributes and slot into /governance&apos;s spendByTeam without
+        further config.
       </Text>
     </VStack>
   );
@@ -3410,8 +3339,8 @@ function TestCurlPanel({
       </Box>
       <Text fontSize="xs" color="fg.muted">
         Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on success. If you get{" "}
-        <Code fontSize="xs">events: 0</Code> with a hint, the body shape didn&apos;t parse
-        - check the docs.
+        <Code fontSize="xs">events: 0</Code> with a hint, the body shape didn&apos;t parse - check
+        the docs.
       </Text>
     </VStack>
   );
@@ -3433,13 +3362,7 @@ function secretModalTargets(details: SecretDetails | null) {
   };
 }
 
-function SecretModal({
-  details,
-  onClose,
-}: {
-  details: SecretDetails | null;
-  onClose: () => void;
-}) {
+function SecretModal({ details, onClose }: { details: SecretDetails | null; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   const { otlpUrl, webhookUrl, usesPushUrl, usesWebhookUrl, isClaudeCode } =
     secretModalTargets(details);
@@ -3472,11 +3395,7 @@ function SecretModal({
   };
 
   return (
-    <DialogRoot
-      open
-      onOpenChange={(e) => !e.open && onClose()}
-      closeOnInteractOutside={false}
-    >
+    <DialogRoot open onOpenChange={(e) => !e.open && onClose()} closeOnInteractOutside={false}>
       <DialogContent maxWidth="2xl">
         <DialogHeader>
           <DialogTitle>
@@ -3490,9 +3409,8 @@ function SecretModal({
         <DialogBody>
           <VStack align="stretch" gap={4}>
             <Text fontSize="sm" color="fg.muted">
-              This is the only time we&apos;ll show this secret. Save it somewhere safe
-              and paste it into the upstream platform&apos;s admin console. We store only
-              its hash.
+              This is the only time we&apos;ll show this secret. Save it somewhere safe and paste it
+              into the upstream platform&apos;s admin console. We store only its hash.
             </Text>
             <VStack align="stretch" gap={1}>
               <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
@@ -3507,9 +3425,7 @@ function SecretModal({
             </VStack>
             <IngestSecretPanel secret={details.secret} copied={copied} onCopy={copy} />
             {usesPushUrl && <OtlpEndpointPanel otlpUrl={otlpUrl} onCopy={copy} />}
-            {usesWebhookUrl && (
-              <WebhookEndpointPanel webhookUrl={webhookUrl} onCopy={copy} />
-            )}
+            {usesWebhookUrl && <WebhookEndpointPanel webhookUrl={webhookUrl} onCopy={copy} />}
             {isClaudeCode && (
               <ClaudeCodeEnvBlockPanel envBlock={claudeCodeEnvBlock} onCopy={copy} />
             )}

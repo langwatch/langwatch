@@ -48,16 +48,51 @@ export abstract class GovernancePuller<Configuration = unknown> {
 }
 
 export const ANTHROPIC_ADMIN_ADAPTER_ID = "anthropic_admin" as const;
-export const anthropicAdminPullConfigSchema = z
-  .object({
-    adapter: z.literal(ANTHROPIC_ADMIN_ADAPTER_ID),
-    report: z.enum(["usage", "cost"]),
-    bucketWidth: z.enum(["1m", "1h", "1d"]).default("1d"),
-    startingAt: z.string().datetime().optional(),
-    schedule: z.string().default("0 * * * *"),
-  })
-  .strict();
+/**
+ * NOT `.strict()`, deliberately.
+ *
+ * `IngestionPullWorkerService` hands `source.parserConfig` straight to
+ * `validateConfig`, and that stored object carries the encrypted `credentials`
+ * subtree the worker decrypts on the very next line. A strict schema rejects
+ * it — every Anthropic Admin source would fail on every run with
+ * `unrecognized_keys: ["credentials"]`.
+ */
+export const anthropicAdminPullConfigSchema = z.object({
+  adapter: z.literal(ANTHROPIC_ADMIN_ADAPTER_ID),
+  /**
+   * Which report this source pulls. Deliberately not a set: pulling both
+   * would report the same spend twice under different bases, and nothing
+   * reconciles them yet.
+   */
+  report: z.enum(["usage", "cost"]),
+  /** Anthropic's bucket granularity. It is part of the restatement key. */
+  bucketWidth: z.enum(["1m", "1h", "1d"]).default("1d"),
+  /** ISO instant the very first run starts from. Later runs use the cursor. */
+  startingAt: z.string().datetime().optional(),
+  schedule: z.string().default("0 * * * *"),
+});
 export type AnthropicAdminPullConfig = z.infer<typeof anthropicAdminPullConfigSchema>;
+
+export const OPENAI_ADMIN_ADAPTER_ID = "openai_admin" as const;
+/**
+ * Beside its Anthropic sibling, and for the same reason: nothing validates a
+ * pullConfig at save time, so the composer that writes one and the puller that
+ * reads it have to agree, and a test can only check that if both can name the
+ * schema. Not `.strict()`, for the reason given above it.
+ */
+export const openaiAdminPullConfigSchema = z.object({
+  adapter: z.literal(OPENAI_ADMIN_ADAPTER_ID),
+  /**
+   * A single-value enum rather than a bare constant, so a second report could
+   * be added later without re-keying the rows this one wrote — `report` rides
+   * the restatement key.
+   */
+  report: z.enum(["cost"]).default("cost"),
+  /** ISO instant the very first run starts from. Later runs use the cursor. */
+  startingAt: z.string().datetime().optional(),
+  schedule: z.string().default("0 * * * *"),
+});
+export type OpenAiAdminPullConfig = z.infer<typeof openaiAdminPullConfigSchema>;
 
 export const PULLED_USAGE_HINT_KEY = "pulled_usage" as const;
 
@@ -82,10 +117,7 @@ export const pulledUsageHintSchema = z
   })
   .strict()
   .superRefine((hint, context) => {
-    if (
-      hint.costBasis === PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED &&
-      !hint.costStatus
-    ) {
+    if (hint.costBasis === PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED && !hint.costStatus) {
       context.addIssue({
         code: "custom",
         path: ["costStatus"],
@@ -104,6 +136,4 @@ export const pulledUsageSourceAttributionSchema = z
     teamId: z.string().min(1).nullable(),
   })
   .strict();
-export type PulledUsageSourceAttribution = z.infer<
-  typeof pulledUsageSourceAttributionSchema
->;
+export type PulledUsageSourceAttribution = z.infer<typeof pulledUsageSourceAttributionSchema>;

@@ -28,10 +28,8 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   createLogger: () => logged,
 }));
 
-import {
-  OPENAI_ADMIN_ADAPTER_ID,
-  OpenAiAdminPuller,
-} from "../openai-admin-puller.adapter";
+import { OPENAI_ADMIN_ADAPTER_ID } from "@langwatch/enterprise-governance-contract";
+import { OpenAiAdminPuller } from "../openai-admin-puller.adapter";
 import { PulledUsageRecordService } from "../../services/pulled-usage-record.service";
 
 class StubHttp extends GovernanceHttpPort {
