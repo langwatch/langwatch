@@ -7,11 +7,57 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
+import type { RunParameterValues } from "~/server/scenarios/parameters";
+import type { SuiteTarget } from "~/server/suites/types";
+import type { CompareRow } from "./compare-rows";
 import { formatStoredParameterLine } from "./parameter-line";
-import { rowsFromLine } from "./parameter-rows";
+import { type ParameterRow, rowsFromLine } from "./parameter-rows";
 import type { RunConfigurationEntry } from "./run-configuration";
 import type { RunDialogFields } from "./useRunDialogForm";
 import type { RunPlanFields } from "./useRunPlanFields";
+
+/**
+ * Whether a stored configuration is a comparison: several targets, every one
+ * an agent. The rows of a comparison hold agents alone.
+ */
+function isComparison(targets: readonly SuiteTarget[]): boolean {
+  return targets.length > 1 && targets.every((t) => t.type !== "prompt");
+}
+
+/**
+ * The rows a stored comparison comes back as, each with its own overrides.
+ *
+ * A configuration stored before targets carried their own overrides holds
+ * them at run level, copied onto every target, so a target without any reads
+ * the run-level ones.
+ */
+function compareRowsOf({
+  targets,
+  runParameters,
+}: {
+  targets: readonly SuiteTarget[];
+  runParameters: RunParameterValues;
+}): CompareRow[] {
+  return targets.map((target) => ({
+    target: { type: target.type, id: target.referenceId },
+    parameterLine: formatStoredParameterLine(
+      target.runParameters ?? runParameters,
+    ),
+  }));
+}
+
+/**
+ * The secret rows a configuration remembers. A run never writes a secret value
+ * down, so a remembered secret row comes back by its name alone and the next
+ * run asks for the value again.
+ */
+function secretRowsOf(primary: SuiteTarget | undefined): ParameterRow[] {
+  return (primary?.runSecretParameterNames ?? []).map((name) => ({
+    name,
+    value: "",
+    secret: true,
+  }));
+}
 
 /**
  * Puts a configuration back into the dialog, opening the blocks it used and
@@ -40,7 +86,8 @@ export function applyConfigurationTo({
   pinRunName?: (name: string) => void;
 }) {
   const { configuration, runParameters } = entry;
-  const [primary, second] = configuration.targets;
+  const [primary] = configuration.targets;
+  const comparison = isComparison(configuration.targets);
 
   pinRunName?.(entry.planName);
 
@@ -48,20 +95,17 @@ export function applyConfigurationTo({
     fields.setTarget({ type: primary.type, id: primary.referenceId });
     fields.setMode(primary.type === "prompt" ? "prompts" : "agents");
   }
-  planFields.setShowCompare(!!second);
-  planFields.setCompareTarget(
-    second ? { type: second.type, id: second.referenceId } : null,
+  planFields.setCompareRows(
+    comparison
+      ? compareRowsOf({ targets: configuration.targets, runParameters })
+      : [],
   );
 
-  const hasParameters = Object.keys(runParameters).length > 0;
+  // A comparison holds its plain values on the rows; only the secrets stay in
+  // the parameter block, which is shared by every target.
+  const hasParameters = !comparison && Object.keys(runParameters).length > 0;
   const line = hasParameters ? formatStoredParameterLine(runParameters) : "";
-  // A run never writes a secret value down, so a remembered secret row comes
-  // back by its name alone and the next run asks for the value again.
-  const secretRows = (primary?.runSecretParameterNames ?? []).map((name) => ({
-    name,
-    value: "",
-    secret: true,
-  }));
+  const secretRows = secretRowsOf(primary);
   fields.setShowParams(hasParameters || secretRows.length > 0);
   fields.setParameterLine(line);
   fields.setParameterRows(

@@ -6,6 +6,7 @@
  * or scenario starts from that subject's remembered target.
  *
  * @see specs/features/agent-testing/run-dialog.feature
+ * @see specs/features/agent-testing/comparison-mode.feature
  * @see specs/suites/run-notes.feature
  */
 
@@ -21,6 +22,7 @@ import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters"
 import { api } from "~/utils/api";
 import type { CustomizeChip } from "../shared/CustomizeChips";
 import { applyConfigurationTo } from "./apply-configuration";
+import { type CompareRow, compareRowParameters } from "./compare-rows";
 import type { PromptEntry } from "./PromptPicker";
 import {
   formatParameterLine,
@@ -39,7 +41,12 @@ import {
 } from "./parameter-rows";
 import { type ScopeScenario, scenariosInScope } from "./RunScopeSection";
 import { normaliseRunScope, type RunScope } from "./run-configuration";
-import type { RunDialogMode, RunDialogSubject } from "./run-dialog-types";
+import type {
+  RunDialogMode,
+  RunDialogSubject,
+  RunTarget,
+} from "./run-dialog-types";
+import { useCompareRows } from "./useCompareRows";
 import { useRunConfigurationHistory } from "./useRunConfigurationHistory";
 import { useRunHistorySeed } from "./useRunHistorySeed";
 import { buildTargetLabels, scopeLabelOf, useRunName } from "./useRunName";
@@ -252,15 +259,23 @@ function useRunDialogChoices(subject: RunDialogSubject | null) {
   };
 }
 
-/** The overrides the run can carry, and the fields that collect them. */
+/**
+ * The overrides the run can carry, and the fields that collect them.
+ *
+ * In a comparison the plain values ride on the rows of the targets, so the
+ * block here holds the secrets alone and they are what the run sends at run
+ * level.
+ */
 function useRunDialogParameters({
   subject,
   allScenarios,
   fields,
+  isCompare,
 }: {
   subject: RunDialogSubject | null;
   allScenarios: readonly { id: string; parameters: unknown }[] | undefined;
   fields: RunDialogFields;
+  isCompare: boolean;
 }) {
   const { showParams, parameterLine } = fields;
   const { secretValues, setSecretValues } = fields;
@@ -312,19 +327,21 @@ function useRunDialogParameters({
     !hasDeclaredSecrets && canCollapseRows(parameterRows);
 
   const values = resolveParameterValues({
-    showParams,
-    showParameterRows,
-    rows: parameterRows,
+    showParams: showParams || isCompare,
+    showParameterRows: showParameterRows || isCompare,
+    rows: isCompare ? parameterRows.filter((row) => row.secret) : parameterRows,
     line: parameterLine,
     secretValues,
+    storesPlainValues: !isCompare,
   });
 
   const hasMissingSecrets =
-    showParams &&
+    (showParams || isCompare) &&
     (secretDefinitions.some(
       (definition) => (secretValues[definition.name] ?? "") === "",
     ) ||
-      (showParameterRows && missingSecretRowNames(parameterRows).length > 0));
+      ((showParameterRows || isCompare) &&
+        missingSecretRowNames(parameterRows).length > 0));
 
   return {
     parameterDefinitions,
@@ -429,6 +446,11 @@ function useParameterRowActions({
     setParameterRows([...rows, { name: "", value: "", secret: false }]);
   }, [rows, setParameterRows]);
 
+  /** A comparison shares its secrets, so the block there adds a secret row. */
+  const addSecretParameterRow = useCallback(() => {
+    setParameterRows([...rows, { name: "", value: "", secret: true }]);
+  }, [rows, setParameterRows]);
+
   const removeParameterRow = useCallback(
     (index: number) => {
       setParameterRows(rows.filter((_, at) => at !== index));
@@ -441,6 +463,7 @@ function useParameterRowActions({
     setParameterRowsMode,
     updateParameterRow,
     addParameterRow,
+    addSecretParameterRow,
     removeParameterRow,
   };
 }
@@ -457,12 +480,18 @@ function resolveParameterValues({
   rows,
   line,
   secretValues,
+  storesPlainValues,
 }: {
   showParams: boolean;
   showParameterRows: boolean;
   rows: ParameterRow[];
   line: string;
   secretValues: Record<string, string>;
+  /**
+   * False in a comparison, where the plain values belong to the targets and
+   * the block remembers nothing of its own.
+   */
+  storesPlainValues: boolean;
 }) {
   if (!showParams) {
     return {
@@ -482,7 +511,9 @@ function resolveParameterValues({
 
   return {
     runParameters: toRowsRunParameters({ rows, secretValues }),
-    storableRunParameters: toStorableRowParameters(rows),
+    storableRunParameters: storesPlainValues
+      ? toStorableRowParameters(rows)
+      : undefined,
     storableSecretNames: storableSecretRowNames(rows),
   };
 }
@@ -534,30 +565,39 @@ function buildCustomizeRunChips({
   fields,
   planFields,
   hasParameterDefinitions,
+  hasAgents,
   hasPublishedPrompts,
   onAddParameters,
+  onCompareAgents,
   onRunAgainstPrompt,
 }: {
   fields: RunDialogFields;
   planFields: RunPlanFields;
   hasParameterDefinitions: boolean;
+  hasAgents: boolean;
   hasPublishedPrompts: boolean;
   onAddParameters: () => void;
+  onCompareAgents: () => void;
   onRunAgainstPrompt: () => void;
 }): CustomizeChip[] {
   const chips: CustomizeChip[] = [];
-  if (!fields.showParams && hasParameterDefinitions) {
+  // A comparison holds its parameters on its rows, so the block has no chip.
+  if (
+    !fields.showParams &&
+    !planFields.showCompare &&
+    hasParameterDefinitions
+  ) {
     chips.push({
       key: "params",
       label: "Add parameters",
       onAdd: onAddParameters,
     });
   }
-  if (!planFields.showCompare && fields.mode === "agents") {
+  if (!planFields.showCompare && fields.mode === "agents" && hasAgents) {
     chips.push({
       key: "compare",
       label: "Compare agents",
-      onAdd: () => planFields.setShowCompare(true),
+      onAdd: onCompareAgents,
     });
   }
   if (!fields.showNote) {
@@ -607,20 +647,24 @@ function caseCountOf(
   return allScenarios?.length ?? null;
 }
 
-/** The targets the run goes against: the agent, and the one it is compared to. */
+/**
+ * The targets the run goes against: the rows of a comparison, each with its
+ * own overrides, or the one agent.
+ */
 function runTargetsOf({
   target,
-  compareTarget,
-  showCompare,
+  compareRows,
 }: {
   target: TargetValue;
-  compareTarget: TargetValue;
-  showCompare: boolean;
-}): NonNullable<TargetValue>[] {
-  const targets: NonNullable<TargetValue>[] = [];
-  if (target) targets.push(target);
-  if (showCompare && compareTarget) targets.push(compareTarget);
-  return targets;
+  compareRows: readonly CompareRow[];
+}): RunTarget[] {
+  if (compareRows.length > 0) {
+    return compareRows.map((row) => {
+      const runParameters = compareRowParameters(row);
+      return { ...row.target, ...(runParameters ? { runParameters } : {}) };
+    });
+  }
+  return target ? [target] : [];
 }
 
 /**
@@ -644,7 +688,7 @@ function useRunDialogNaming({
   choices: ReturnType<typeof useRunDialogChoices>;
   fields: RunDialogFields;
   planFields: RunPlanFields;
-  runTargets: NonNullable<TargetValue>[];
+  runTargets: RunTarget[];
 }) {
   const targetLabels = useMemo(
     () =>
@@ -723,16 +767,21 @@ export function useRunDialogForm(subject: RunDialogSubject | null) {
     subject,
     allScenarios: choices.allScenarios,
     fields,
+    isCompare: planFields.showCompare,
   });
   const targeting = useRunDialogTargeting({
     fields,
     publishedPrompts: choices.publishedPrompts,
   });
+  const comparing = useCompareRows({
+    fields,
+    planFields,
+    agents: choices.scenarioAgents,
+  });
 
   const runTargets = runTargetsOf({
     target: fields.target,
-    compareTarget: planFields.compareTarget,
-    showCompare: planFields.showCompare,
+    compareRows: planFields.compareRows,
   });
   const naming = useRunDialogNaming({
     subject,
@@ -747,8 +796,10 @@ export function useRunDialogForm(subject: RunDialogSubject | null) {
     fields,
     planFields,
     hasParameterDefinitions: parameters.parameterDefinitions.length > 0,
+    hasAgents: choices.scenarioAgents.length > 0,
     hasPublishedPrompts: choices.publishedPrompts.length > 0,
     onAddParameters: parameters.showParameters,
+    onCompareAgents: comparing.enterCompare,
     onRunAgainstPrompt: targeting.selectPrompts,
   });
 
@@ -764,6 +815,7 @@ export function useRunDialogForm(subject: RunDialogSubject | null) {
     ...choices,
     ...parameters,
     ...targeting,
+    ...comparing,
     ...planFields,
     ...naming.name,
     applyConfiguration: naming.applyConfiguration,

@@ -7,7 +7,11 @@ import type { SuiteTarget } from "~/server/suites/types";
 import { api } from "~/utils/api";
 import type { toLineRunParameters } from "./parameter-line";
 import type { RunScope } from "./run-configuration";
-import type { RunDialogSubject, RunStartedInfo } from "./run-dialog-types";
+import type {
+  RunDialogSubject,
+  RunStartedInfo,
+  RunTarget,
+} from "./run-dialog-types";
 import { useBatchRun } from "./useRunDialogBatch";
 
 /** The overrides a queued run carries, when the dialog collected any. */
@@ -16,6 +20,9 @@ type RunParameters = ReturnType<typeof toLineRunParameters>;
 /**
  * The targets a suite run is written against: what was chosen, the overrides
  * it was chosen with, and the bindings the suite already held for it.
+ *
+ * A target of a comparison carries its own overrides. Outside a comparison
+ * the one target carries the overrides of the parameter block.
  *
  * The bindings only survive while the same prompt stays selected, because
  * they bind a scenario to that prompt's inputs and mean nothing for another
@@ -27,8 +34,8 @@ function toSuiteTargets({
   secretParameterNames,
   persistedTarget,
 }: {
-  /** The agent, and the one it is compared against when there is one. */
-  runTargets: readonly NonNullable<TargetValue>[];
+  /** The agent, or the targets of a comparison. */
+  runTargets: readonly RunTarget[];
   runParameters: RunParameters;
   /** The keys of the secret rows; their values are never written down. */
   secretParameterNames: string[] | undefined;
@@ -42,13 +49,14 @@ function toSuiteTargets({
       persistedTarget?.type === "prompt" &&
       persistedTarget.referenceId === target.id;
 
+    const ownParameters = target.runParameters ?? runParameters;
     return {
       type: target.type,
       referenceId: target.id,
       ...(keepsMappings && persistedTarget.scenarioMappings
         ? { scenarioMappings: persistedTarget.scenarioMappings }
         : {}),
-      ...(runParameters ? { runParameters } : {}),
+      ...(ownParameters ? { runParameters: ownParameters } : {}),
       ...(secretParameterNames
         ? { runSecretParameterNames: secretParameterNames }
         : {}),
@@ -74,8 +82,8 @@ export type RunDialogSubmitInput = {
    * replaces its config, and a name that matches none creates a plan.
    */
   runName: string;
-  /** The agent, and the one it is compared against when there is one. */
-  runTargets: readonly NonNullable<TargetValue>[];
+  /** The agent, or the targets of a comparison, each with its own overrides. */
+  runTargets: readonly RunTarget[];
   /** What the run covers, which only the New run plan entry point chooses. */
   scope: RunScope;
   /** The scenarios that scope holds right now. */

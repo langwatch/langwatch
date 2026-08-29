@@ -3,6 +3,7 @@
  * apart in the run name dropdown.
  *
  * @see specs/features/agent-testing/run-dialog.feature
+ * @see specs/features/agent-testing/comparison-mode.feature
  */
 
 import { describe, expect, it } from "vitest";
@@ -15,6 +16,8 @@ import {
   type RunConfiguration,
   type RunConfigurationEntry,
   scopeKeyOf,
+  sortedTargetLabels,
+  sortTargets,
 } from "../run/run-configuration";
 
 const TARGET_LABELS = new Map([
@@ -284,6 +287,132 @@ describe("configurationsForScope", () => {
       });
 
       expect(found.map((entry) => entry.planId)).toEqual(["plan_2", "plan_1"]);
+    });
+  });
+});
+
+describe("sortedTargetLabels", () => {
+  const byReferenceId = (target: { referenceId: string }) => target.referenceId;
+
+  describe("when a comparison holds two different agents", () => {
+    /** @scenario "A target of a comparison is named after its agent" */
+    it("names each after its agent", () => {
+      expect(
+        sortedTargetLabels({
+          targets: [
+            { type: "http", referenceId: "agent_dev" },
+            { type: "http", referenceId: "agent_prod" },
+          ],
+          targetLabels: TARGET_LABELS,
+          fallbackLabel: byReferenceId,
+        }),
+      ).toEqual(["dev-agent", "prod-agent"]);
+    });
+  });
+
+  describe("when the same agent appears twice with different parameters", () => {
+    /** @scenario "The same agent twice is named with its parameters" */
+    it("names each with its parameters", () => {
+      expect(
+        deriveRunName({
+          scopeLabel: "Refunds",
+          targetLabels: sortedTargetLabels({
+            targets: [
+              {
+                type: "http",
+                referenceId: "agent_dev",
+                runParameters: { model: "gpt-5" },
+              },
+              {
+                type: "http",
+                referenceId: "agent_dev",
+                runParameters: { model: "gpt-5-mini" },
+              },
+            ],
+            targetLabels: TARGET_LABELS,
+            fallbackLabel: byReferenceId,
+          }),
+        }),
+      ).toBe("Refunds dev-agent · model=gpt-5 vs dev-agent · model=gpt-5-mini");
+    });
+
+    it("sorts the keys inside a label", () => {
+      expect(
+        sortedTargetLabels({
+          targets: [
+            {
+              type: "http",
+              referenceId: "agent_dev",
+              runParameters: { plan: "pro", locale: "de" },
+            },
+            { type: "http", referenceId: "agent_dev" },
+          ],
+          targetLabels: TARGET_LABELS,
+          fallbackLabel: byReferenceId,
+        }),
+      ).toEqual(["dev-agent", "dev-agent · locale=de, plan=pro"]);
+    });
+  });
+
+  describe("when the targets were picked in another order", () => {
+    /** @scenario "Targets are sorted by agent and then by parameters" */
+    it("reads them by agent and then by parameters", () => {
+      expect(
+        sortedTargetLabels({
+          targets: [
+            { type: "http", referenceId: "agent_prod" },
+            {
+              type: "http",
+              referenceId: "agent_dev",
+              runParameters: { model: "b" },
+            },
+            {
+              type: "http",
+              referenceId: "agent_dev",
+              runParameters: { model: "a" },
+            },
+          ],
+          targetLabels: TARGET_LABELS,
+          fallbackLabel: byReferenceId,
+        }),
+      ).toEqual(["dev-agent · model=a", "dev-agent · model=b", "prod-agent"]);
+    });
+  });
+
+  describe("when the project no longer offers the agent", () => {
+    it("reads the fallback", () => {
+      expect(
+        sortedTargetLabels({
+          targets: [{ type: "http", referenceId: "agent_gone" }],
+          targetLabels: TARGET_LABELS,
+          fallbackLabel: () => "a removed agent",
+        }),
+      ).toEqual(["a removed agent"]);
+    });
+  });
+});
+
+describe("sortTargets", () => {
+  describe("when the same agent appears twice with different parameters", () => {
+    /** @scenario "Targets are sorted by agent and then by parameters" */
+    it("keeps both and orders them by their parameters", () => {
+      const sorted = sortTargets([
+        {
+          type: "http",
+          referenceId: "agent_dev",
+          runParameters: { model: "b" },
+        },
+        {
+          type: "http",
+          referenceId: "agent_dev",
+          runParameters: { model: "a" },
+        },
+      ]);
+
+      expect(sorted.map((target) => target.runParameters?.model)).toEqual([
+        "a",
+        "b",
+      ]);
     });
   });
 });

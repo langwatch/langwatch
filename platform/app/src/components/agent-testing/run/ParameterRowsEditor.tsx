@@ -32,6 +32,7 @@ export function ParameterRowsEditor({
   secretValues,
   onChangeSecretValue,
   disabled,
+  secretOnly = false,
 }: {
   /** The rows a person may edit: the plain values and the ad hoc secrets. */
   rows: ParameterRow[];
@@ -43,6 +44,12 @@ export function ParameterRowsEditor({
   secretValues: Record<string, string>;
   onChangeSecretValue: (name: string, value: string) => void;
   disabled: boolean;
+  /**
+   * True when every row is a secret and stays one: the lock is fixed and the
+   * add control adds a secret row. A comparison holds its plain values on the
+   * targets and only its secrets here.
+   */
+  secretOnly?: boolean;
 }) {
   return (
     <VStack align="stretch" gap={1.5} data-testid="run-dialog-parameter-rows">
@@ -56,6 +63,7 @@ export function ParameterRowsEditor({
           onChangeRow={onChangeRow}
           onRemoveRow={onRemoveRow}
           disabled={disabled}
+          lockFixed={secretOnly}
         />
       ))}
       {declaredSecrets.map((definition) => (
@@ -80,13 +88,13 @@ export function ParameterRowsEditor({
         cursor="pointer"
         boxShadow={QUIET_BUTTON_SHADOW}
         _hover={{ color: "fg" }}
-        aria-label="Add a parameter"
+        aria-label={secretOnly ? "Add a secret parameter" : "Add a parameter"}
         disabled={disabled}
         onClick={onAddRow}
         data-testid="run-dialog-parameter-add-row"
       >
         <Plus size={12} />
-        Add parameter
+        {secretOnly ? "Add secret parameter" : "Add parameter"}
       </chakra.button>
     </VStack>
   );
@@ -99,12 +107,15 @@ function EditableRow({
   onChangeRow,
   onRemoveRow,
   disabled,
+  lockFixed,
 }: {
   row: ParameterRow;
   index: number;
   onChangeRow: (index: number, patch: Partial<ParameterRow>) => void;
   onRemoveRow: (index: number) => void;
   disabled: boolean;
+  /** True when the row is a secret that cannot be made plain. */
+  lockFixed: boolean;
 }) {
   const isMissing = row.secret && row.name.trim() !== "" && row.value === "";
 
@@ -143,12 +154,14 @@ function EditableRow({
         />
         <LockToggle
           isSecret={row.secret}
-          disabled={disabled}
+          disabled={disabled || lockFixed}
           onToggle={() => onChangeRow(index, { secret: !row.secret })}
           label={
-            row.secret
-              ? `Stop hiding the value of parameter ${index + 1}`
-              : `Hide the value of parameter ${index + 1}`
+            lockFixed
+              ? `Parameter ${index + 1} is a secret shared by every target`
+              : row.secret
+                ? `Stop hiding the value of parameter ${index + 1}`
+                : `Hide the value of parameter ${index + 1}`
           }
           testId={`run-dialog-parameter-lock-${index}`}
         />

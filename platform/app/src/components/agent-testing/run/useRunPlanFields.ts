@@ -1,15 +1,16 @@
 /**
  * The fields of the run dialog that describe the run itself rather than the
- * agent: what it covers, the second agent it compares against, the simulation
- * models, and how many times it repeats.
+ * agent: what it covers, the targets it compares, the simulation models, and
+ * how many times it repeats.
  *
  * They reset once per subject, the same way the rest of the dialog does.
  *
  * @see specs/features/agent-testing/run-dialog.feature
+ * @see specs/features/agent-testing/comparison-mode.feature
  */
 
 import { useEffect, useState } from "react";
-import type { TargetValue } from "~/components/scenarios/TargetSelector";
+import type { CompareRow } from "./compare-rows";
 import type { RunScope } from "./run-configuration";
 import type { RunDialogSubject } from "./run-dialog-types";
 
@@ -44,8 +45,9 @@ export function useRunPlanFields({
   subjectKey: string;
 }) {
   const [scope, setScope] = useState<RunScope>(() => initialScopeOf(subject));
-  const [showCompare, setShowCompare] = useState(false);
-  const [compareTarget, setCompareTarget] = useState<TargetValue>(null);
+  // The targets of a comparison. Empty outside compare mode: the run then
+  // goes against the one agent the target section holds.
+  const [compareRows, setCompareRows] = useState<CompareRow[]>([]);
   const [showModels, setShowModels] = useState(false);
   const [simulatorModel, setSimulatorModel] = useState<string | null>(null);
   const [judgeModel, setJudgeModel] = useState<string | null>(null);
@@ -54,8 +56,7 @@ export function useRunPlanFields({
 
   useEffect(() => {
     setScope(initialScopeOf(subject));
-    setShowCompare(false);
-    setCompareTarget(null);
+    setCompareRows([]);
     setShowModels(false);
     setSimulatorModel(null);
     setJudgeModel(null);
@@ -68,10 +69,9 @@ export function useRunPlanFields({
     scope,
     setScope,
     isScopePicked: picksScope(subject),
-    showCompare,
-    setShowCompare,
-    compareTarget,
-    setCompareTarget,
+    compareRows,
+    setCompareRows,
+    showCompare: compareRows.length > 0,
     showModels,
     setShowModels,
     simulatorModel,
