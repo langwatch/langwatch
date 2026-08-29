@@ -1,13 +1,16 @@
 # The LangWatchQL workbench lost its granularity picker
 
-Found while repairing test files that could not load. Recorded rather than
-fixed, because the repair is a careful port of revision-keyed state logic and a
-half-correct one is worse than the gap.
+**Fixed.** Kept as the account of how it happened, because the shape recurs —
+see [package-move-capability-gaps.md](package-move-capability-gaps.md).
 
-## What a member sees
+Found while repairing test files that could not load, and recorded before it
+was repaired: the port is revision-keyed state logic, and a half-correct one
+would have been worse than the gap.
 
-A statement that declares `{period_granularity_seconds:UInt32}` cannot be run
-from the workbench at all.
+## What a member saw
+
+A statement that declares `{period_granularity_seconds:UInt32}` could not be
+run from the workbench at all.
 
 The first run is refused with `lwql_parameter_missing` naming
 `period_granularity_seconds` — that refusal is how the surface learns the
@@ -69,19 +72,45 @@ The server contract is untouched throughout: `timeWindow.ts` still declares the
 parameter and the admitted steps, the REST door still threads it, and dashboard
 widgets still set it. Only the authoring surface lost the ability.
 
-## What the repair is
+## What the repair was
 
+0. Move the vocabulary — the reserved names, the admitted steps, the
+   predicates — into `@langwatch/analytics-contract`. It had to come first:
+   the picker reads `LWQL_GRANULARITY_STEPS` as a value, and a packaged web
+   component cannot import `~/server/…`. That is also what forced the
+   package's duplicate `LangWatchQLGranularityStep` in the first place, so the
+   move deleted the second copy rather than adding a third.
 1. Port `LangWatchQLGranularityPicker` into
    `packages/features/analytics/web/src/components/`, reading the steps from
-   one shared definition rather than the package's local copy.
+   the one definition.
 2. Restore the `splitMissing` behaviour in `failureView`, so a reserved name
-   reveals the control instead of being offered as a value to type.
+   reveals the control instead of being offered as a value to type. On its own
+   this unblocks nothing — with nowhere to supply the step, the member gets the
+   same refusal, only clearer. It is necessary, not sufficient.
 3. Wire the picker to `controller.setGranularity`, porting
    `useWorkbenchGranularity` with its revision keying intact. Its comments name
    three traps worth reading before touching it: deriving "does it declare one"
    from the live outcome loops through the store; an answer from another
    revision resurrects the picker for a chart that never ran; and writing the
    shown step into the draft as the picker appears withdraws the very refusal
-   that revealed it.
+   that revealed it. That last is why every Run goes through `granularity.run`
+   rather than `query.runQuery`.
 4. Restore the granularity scenarios to the packaged `.feature`, which is what
-   the nine tests' `@scenario` annotations point at.
+   the tests' `@scenario` annotations point at. Two of the five were already
+   annotated by the packaged state-machine unit tests, aimed at scenarios the
+   move had left behind — so the file went from binding none to binding all
+   five.
+
+Result: 30/30, from 21/30.
+
+## One more thing the dark tests were hiding
+
+Three of the nine did not fail on the missing picker. They read the mutation
+mock's argument 1, which was the input while the harness stubbed an untyped
+tRPC client (`mutation(path, input)`) and became the abort options once it
+stubbed a typed one (`mutate(input, options)`). Other tests in the same file
+were updated for that change; these were not, because they were not running.
+
+That is the part that generalises. A dark test does not merely stop guarding —
+it stops being maintained, so it collects further reasons to fail, and the
+count you see on unskipping understates how long it has been broken.

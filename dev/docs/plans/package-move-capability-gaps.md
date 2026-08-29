@@ -18,17 +18,6 @@ runs, the only witness is already gone.
 
 ## Open
 
-### The LangWatchQL workbench lost its granularity picker
-
-Full write-up: [lwql-workbench-granularity-regression.md](lwql-workbench-granularity-regression.md).
-
-A statement declaring `period_granularity_seconds` cannot be run from the
-workbench: the surface asks the member to supply the value, and supplying it is
-refused. The picker that used to answer it was dropped when the workbench was
-re-authored into `@langwatch/analytics-web`, and its nine tests were dark
-because a `./testing` export still pointed into a directory the colocation
-commit had emptied.
-
 ### The run plan's folder grouping has no test, and its test names the wrong component
 
 `caseFiling.integration.test.tsx` asserts that `ScenarioPicker` groups test
@@ -48,6 +37,25 @@ Unskipping means driving `CaseChoices` through a `PlanEditorState`; it does not
 mean adding `folders` to the picker.
 
 ## Closed
+
+### The LangWatchQL workbench lost its granularity picker
+
+Full write-up: [lwql-workbench-granularity-regression.md](lwql-workbench-granularity-regression.md).
+
+The picker, the reserved-name split and the revision-keyed hook are restored,
+and the five spec scenarios with them. The suite goes 21/30 to 30/30.
+
+The vocabulary moved to `@langwatch/analytics-contract` first, which is what
+made the picker portable at all — and removed the package's second copy of
+`LangWatchQLGranularityStep` while it was there.
+
+Three of the nine dark tests carried a second, independent bug: they read the
+mutation mock's argument 1, which was the input while the harness stubbed an
+untyped tRPC client and became the abort options once it stubbed a typed one.
+Worth its own line, because it is the part that generalises — a dark test does
+not merely stop guarding, it stops being maintained, so it accumulates more
+than one reason to fail and the count you see on unskipping understates how
+long it has been broken.
 
 ### The Langy Prisma repositories were unreachable
 
