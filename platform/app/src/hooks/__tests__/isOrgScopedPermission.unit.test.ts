@@ -1,3 +1,4 @@
+import { ALL_PERMISSIONS, permissionGrantTiers } from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
 
 import { isOrgScopedPermission } from "../useOrganizationTeamProject";
@@ -46,6 +47,32 @@ describe("isOrgScopedPermission", () => {
     // screen to every org admin while the router allowed them.
     it("treats governanceCost:view as org-scoped so org admins can open Costs", () => {
       expect(isOrgScopedPermission("governanceCost:view")).toBe(true);
+    });
+  });
+
+  // The prefix list inside isOrgScopedPermission is hand-kept, and the
+  // registry is the only place that records which tiers a permission may be
+  // granted at. Every time the two disagree the client denies a screen the
+  // server allows — that is how governanceCost:view shipped broken, and
+  // aiTools:manage before it. This walks the whole registry so the next
+  // org-tier resource fails here instead of in front of an admin.
+  describe("given the authz registry", () => {
+    /** @scenario Every org-tier-only permission routes against the org role */
+    it("routes exactly the org-tier-only permissions against the org role", () => {
+      const registryOrgOnly: string[] = [];
+      const hookOrgScoped: string[] = [];
+
+      for (const permission of ALL_PERMISSIONS) {
+        const tiers = permissionGrantTiers(permission);
+        if (tiers.length === 1 && tiers[0] === "organization") {
+          registryOrgOnly.push(permission);
+        }
+        if (isOrgScopedPermission(permission)) {
+          hookOrgScoped.push(permission);
+        }
+      }
+
+      expect(hookOrgScoped.sort()).toEqual(registryOrgOnly.sort());
     });
   });
 
