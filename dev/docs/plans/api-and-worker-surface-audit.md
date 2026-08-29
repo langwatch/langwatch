@@ -293,6 +293,71 @@ written; false one commit later, when `f9fd8aeab5` added 157 lines to
   boots: storage stats, the scenario processor pool, ops workers, the
   spend-spike detector, the realtime voice poller, the metrics server.
 
+## What `platform/app`'s own typecheck is hiding
+
+`pnpm typecheck` runs `platform/app` and it reported **1018 errors**. That
+number reads as "the package being deleted is untidy", and most of it is —
+but not all, and the exceptions are the kind that only show up in production.
+
+Three were **unresolved imports in shipped code**, which is a module that does
+not load:
+
+- `platform/app/src/utils/api.tsx` value-imports `asFeatureApiClient` from
+  `@langwatch/platform-api-client`, and that package was not a dependency of
+  `@langwatch/web`. A `createRequire` probe from that exact file answered
+  MODULE_NOT_FOUND. It is the module every page's data fetching goes through.
+- `SsoConnectionsView` imported `EmptyCell` and `formatDateTime` from a module
+  that exports neither; `TerminalTab` imported `TERMINAL_TOKENS` from a package
+  that kept its palette private; the onboarding codegen imported
+  `getRegistryEntry` from `@langwatch/trace-server`, where it has never been.
+- the replay runtime named Experiment's store factory and its ClickHouse
+  repository, neither exported, and passed a bare `resolveClient` function
+  where the repository declares a port object — so even resolved, the first
+  read would have thrown.
+
+One was **a live tRPC surface that raised on every call**: `license.*` and
+`licenseEnforcement.*` read `ctx.app.licensing`, and nothing composed a
+`LicensingApp` (see above).
+
+And one was **the app's router type itself**. `SsoConnectionTrpcContext`
+demanded a whole `OpsService` for the single `isAdmin` it calls; the process
+supplies an `OpsApp`, which answers that one and not the other forty-eight.
+Because that context is intersected into `EnterpriseTrpcContext`, the app's
+tRPC root was unassignable to the Enterprise composition. `root.ts` is clean
+now, and with three sibling fixes — a context requiring a non-null session the
+process cannot promise, two ports that had moved onto an application, and an
+`IS_SAAS` declared optional that the runtime always computes — `AppRouter`
+carries real types again.
+
+### The dominant remaining class: ports typed `Promise<unknown>`
+
+172 of the errors were `does not exist on type '{}'` — a browser reading fields
+off a query result that inferred as nothing. It is not the router. It is
+feature ports declaring `Promise<unknown>`, and `unknown` is what a tRPC
+procedure publishes and `{}` is what the client reads back.
+
+Two are fixed, and the shape of the win is the argument for the rest:
+
+| port | what it said | what it always returned |
+| --- | --- | --- |
+| `OpsReplayRunner` (5 methods) | `Promise<unknown>` | `ReplayStatus`, `ReplayHistoryEntry[]` |
+| `OpsProcessExplorer` (20 methods) | `Promise<unknown>` | `ProcessFleetSummary[]`, `ProcessInstanceRow[]`, … |
+
+Neither type was missing — both implementations have always declared them.
+They lived in `platform/app`, where a feature package cannot name them, so the
+port shrugged. Moving the vocabulary into `@langwatch/ops-contract` is the same
+move the extraction wants anyway, and it is what makes the operator pages
+type-checked for the first time.
+
+```text
+1018 -> 902 errors, and 172 -> 103 of the `{}` reads
+```
+
+The remaining 103 are the same shape in other features. `OpsEventExplorer`'s
+four operations are the harder residue: unlike the manager explorer, its
+implementation declares no return types either, so naming them is a reading of
+the ClickHouse rows rather than a move.
+
 ## Verification
 
 ```text
