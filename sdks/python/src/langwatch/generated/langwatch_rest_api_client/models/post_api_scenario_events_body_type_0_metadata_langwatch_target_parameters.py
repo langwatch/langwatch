@@ -6,16 +6,12 @@ from typing import Any, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="RunTestSuiteBodyParameters")
+T = TypeVar("T", bound="PostApiScenarioEventsBodyType0MetadataLangwatchTargetParameters")
 
 
 @_attrs_define
-class RunTestSuiteBodyParameters:
-    """Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides
-    the scenario's own default for that name, and a target that names the same parameter in its runParameters overrides
-    it for that target.
-
-    """
+class PostApiScenarioEventsBodyType0MetadataLangwatchTargetParameters:
+    """ """
 
     additional_properties: dict[str, bool | float | str] = _attrs_field(init=False, factory=dict)
 
@@ -30,7 +26,7 @@ class RunTestSuiteBodyParameters:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        run_test_suite_body_parameters = cls()
+        post_api_scenario_events_body_type_0_metadata_langwatch_target_parameters = cls()
 
         additional_properties = {}
         for prop_name, prop_dict in d.items():
@@ -42,8 +38,10 @@ class RunTestSuiteBodyParameters:
 
             additional_properties[prop_name] = additional_property
 
-        run_test_suite_body_parameters.additional_properties = additional_properties
-        return run_test_suite_body_parameters
+        post_api_scenario_events_body_type_0_metadata_langwatch_target_parameters.additional_properties = (
+            additional_properties
+        )
+        return post_api_scenario_events_body_type_0_metadata_langwatch_target_parameters
 
     @property
     def additional_keys(self) -> list[str]:

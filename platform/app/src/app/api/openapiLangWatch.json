@@ -47290,6 +47290,26 @@
                                   "workflow"
                                 ]
                               },
+                              "targetKey": {
+                                "type": "string"
+                              },
+                              "targetParameters": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 4096
+                                    },
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "boolean"
+                                    }
+                                  ]
+                                }
+                              },
                               "simulationSuiteId": {
                                 "type": "string"
                               },
@@ -53894,6 +53914,24 @@
                             "referenceId": {
                               "type": "string",
                               "description": "The id of the prompt, agent or workflow to run against."
+                            },
+                            "runParameters": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 4096
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  }
+                                ]
+                              },
+                              "description": "Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target."
                             }
                           },
                           "required": [
@@ -54175,6 +54213,24 @@
                           "referenceId": {
                             "type": "string",
                             "description": "The id of the prompt, agent or workflow to run against."
+                          },
+                          "runParameters": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 4096
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            "description": "Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target."
                           }
                         },
                         "required": [
@@ -54420,6 +54476,24 @@
                         "referenceId": {
                           "type": "string",
                           "description": "The id of the prompt, agent or workflow to run against."
+                        },
+                        "runParameters": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 4096
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          },
+                          "description": "Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target."
                         }
                       },
                       "required": [
@@ -54587,6 +54661,24 @@
                           "referenceId": {
                             "type": "string",
                             "description": "The id of the prompt, agent or workflow to run against."
+                          },
+                          "runParameters": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 4096
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            "description": "Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target."
                           }
                         },
                         "required": [
@@ -54887,6 +54979,24 @@
                           "referenceId": {
                             "type": "string",
                             "description": "The id of the prompt, agent or workflow to run against."
+                          },
+                          "runParameters": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 4096
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            "description": "Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target."
                           }
                         },
                         "required": [
@@ -55151,6 +55261,24 @@
                         "referenceId": {
                           "type": "string",
                           "description": "The id of the prompt, agent or workflow to run against."
+                        },
+                        "runParameters": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 4096
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          },
+                          "description": "Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target."
                         }
                       },
                       "required": [
@@ -55476,6 +55604,24 @@
                           "referenceId": {
                             "type": "string",
                             "description": "The id of the prompt, agent or workflow to run against."
+                          },
+                          "runParameters": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 4096
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            "description": "Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target."
                           }
                         },
                         "required": [
@@ -55721,6 +55867,24 @@
                               "referenceId": {
                                 "type": "string",
                                 "description": "The id of the prompt, agent or workflow to run against."
+                              },
+                              "runParameters": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 4096
+                                    },
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "boolean"
+                                    }
+                                  ]
+                                },
+                                "description": "Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target."
                               }
                             },
                             "required": [
@@ -55900,6 +56064,24 @@
                         "referenceId": {
                           "type": "string",
                           "description": "The id of the prompt, agent or workflow to run against."
+                        },
+                        "runParameters": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 4096
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          },
+                          "description": "Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target."
                         }
                       },
                       "required": [
@@ -56091,6 +56273,24 @@
                             "referenceId": {
                               "type": "string",
                               "description": "The id of the prompt, agent or workflow to run against."
+                            },
+                            "runParameters": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 4096
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  }
+                                ]
+                              },
+                              "description": "Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target."
                             }
                           },
                           "required": [
@@ -56098,7 +56298,7 @@
                             "referenceId"
                           ]
                         },
-                        "description": "What the plan runs against, in the order the results show."
+                        "description": "What the plan runs against, in the order the results show. A target carrying runParameters runs with those values."
                       },
                       "repeatCount": {
                         "type": "number",
@@ -56270,6 +56470,24 @@
                               "referenceId": {
                                 "type": "string",
                                 "description": "The id of the prompt, agent or workflow to run against."
+                              },
+                              "runParameters": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 4096
+                                    },
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "boolean"
+                                    }
+                                  ]
+                                },
+                                "description": "Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target."
                               }
                             },
                             "required": [
@@ -56435,6 +56653,24 @@
                             "referenceId": {
                               "type": "string",
                               "description": "The id of the prompt, agent or workflow to run against."
+                            },
+                            "runParameters": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 4096
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  }
+                                ]
+                              },
+                              "description": "Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target."
                             }
                           },
                           "required": [
@@ -56442,7 +56678,7 @@
                             "referenceId"
                           ]
                         },
-                        "description": "The prompts, agents or workflows every scenario runs against."
+                        "description": "The prompts, agents or workflows every scenario runs against. Every target runs every scenario, so naming more than one compares them in the same run."
                       },
                       "repeatCount": {
                         "type": "integer",
@@ -56502,7 +56738,7 @@
                         }
                       ]
                     },
-                    "description": "Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name."
+                    "description": "Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name, and a target that names the same parameter in its runParameters overrides it for that target."
                   },
                   "note": {
                     "type": "string",
@@ -56639,6 +56875,24 @@
                           "referenceId": {
                             "type": "string",
                             "description": "The id of the prompt, agent or workflow to run against."
+                          },
+                          "runParameters": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 4096
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            "description": "Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target."
                           }
                         },
                         "required": [
@@ -56646,7 +56900,7 @@
                           "referenceId"
                         ]
                       },
-                      "description": "What the plan runs against, in the order the results show."
+                      "description": "What the plan runs against, in the order the results show. A target carrying runParameters runs with those values."
                     },
                     "repeatCount": {
                       "type": "number",
@@ -56869,6 +57123,24 @@
                               "referenceId": {
                                 "type": "string",
                                 "description": "The id of the prompt, agent or workflow to run against."
+                              },
+                              "runParameters": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 4096
+                                    },
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "boolean"
+                                    }
+                                  ]
+                                },
+                                "description": "Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target."
                               }
                             },
                             "required": [
@@ -56973,7 +57245,7 @@
                         }
                       ]
                     },
-                    "description": "Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name."
+                    "description": "Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name, and a target that names the same parameter in its runParameters overrides it for that target."
                   },
                   "note": {
                     "type": "string",
@@ -57550,6 +57822,24 @@
                               "referenceId": {
                                 "type": "string",
                                 "description": "The id of the prompt, agent or workflow to run against."
+                              },
+                              "runParameters": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 4096
+                                    },
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "boolean"
+                                    }
+                                  ]
+                                },
+                                "description": "Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target."
                               }
                             },
                             "required": [
@@ -57652,6 +57942,24 @@
                         "referenceId": {
                           "type": "string",
                           "description": "The id of the prompt, agent or workflow to run against."
+                        },
+                        "runParameters": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 4096
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          },
+                          "description": "Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target."
                         }
                       },
                       "required": [
@@ -57659,7 +57967,7 @@
                         "referenceId"
                       ]
                     },
-                    "description": "The prompts, agents or workflows the suite runs against. A test suite stores none of its own, so a run states them."
+                    "description": "The prompts, agents or workflows the suite runs against. A test suite stores none of its own, so a run states them. Every target runs every scenario, so naming more than one compares them in the same run."
                   },
                   "name": {
                     "type": "string",
@@ -57711,7 +58019,7 @@
                         }
                       ]
                     },
-                    "description": "Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name."
+                    "description": "Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name, and a target that names the same parameter in its runParameters overrides it for that target."
                   },
                   "note": {
                     "type": "string",

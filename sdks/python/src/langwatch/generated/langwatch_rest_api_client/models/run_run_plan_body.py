@@ -28,7 +28,8 @@ class RunRunPlanBody:
         idempotency_key (str | Unset): Repeat the same key to make a retry join the batch the first call started instead
             of running everything again. Defaults to a new key per call.
         parameters (RunRunPlanBodyParameters | Unset): Constant values applied to every scenario in the run, e.g. a
-            fixture id or a tenant. A value supplied here overrides the scenario's own default for that name.
+            fixture id or a tenant. A value supplied here overrides the scenario's own default for that name, and a target
+            that names the same parameter in its runParameters overrides it for that target.
         note (str | Unset): One short line describing why this batch was run, e.g. a commit hash or what you changed. It
             is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters.
     """

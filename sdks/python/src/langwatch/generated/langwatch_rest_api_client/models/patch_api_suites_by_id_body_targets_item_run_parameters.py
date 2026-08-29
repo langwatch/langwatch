@@ -6,14 +6,14 @@ from typing import Any, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="RunTestSuiteBodyParameters")
+T = TypeVar("T", bound="PatchApiSuitesByIdBodyTargetsItemRunParameters")
 
 
 @_attrs_define
-class RunTestSuiteBodyParameters:
-    """Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides
-    the scenario's own default for that name, and a target that names the same parameter in its runParameters overrides
-    it for that target.
+class PatchApiSuitesByIdBodyTargetsItemRunParameters:
+    """Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target
+    wins, so two targets may name the same agent with different values: that is how one run compares one agent on two
+    models, and the results show one column for each target.
 
     """
 
@@ -30,7 +30,7 @@ class RunTestSuiteBodyParameters:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        run_test_suite_body_parameters = cls()
+        patch_api_suites_by_id_body_targets_item_run_parameters = cls()
 
         additional_properties = {}
         for prop_name, prop_dict in d.items():
@@ -42,8 +42,8 @@ class RunTestSuiteBodyParameters:
 
             additional_properties[prop_name] = additional_property
 
-        run_test_suite_body_parameters.additional_properties = additional_properties
-        return run_test_suite_body_parameters
+        patch_api_suites_by_id_body_targets_item_run_parameters.additional_properties = additional_properties
+        return patch_api_suites_by_id_body_targets_item_run_parameters
 
     @property
     def additional_keys(self) -> list[str]:

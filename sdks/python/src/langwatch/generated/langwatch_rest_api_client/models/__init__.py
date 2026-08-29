@@ -1383,6 +1383,9 @@ from .get_api_suites_by_id_response_200_scope_type_1 import GetApiSuitesByIdResp
 from .get_api_suites_by_id_response_200_scope_type_2 import GetApiSuitesByIdResponse200ScopeType2
 from .get_api_suites_by_id_response_200_scope_type_3 import GetApiSuitesByIdResponse200ScopeType3
 from .get_api_suites_by_id_response_200_targets_item import GetApiSuitesByIdResponse200TargetsItem
+from .get_api_suites_by_id_response_200_targets_item_run_parameters import (
+    GetApiSuitesByIdResponse200TargetsItemRunParameters,
+)
 from .get_api_suites_by_id_response_200_targets_item_type import GetApiSuitesByIdResponse200TargetsItemType
 from .get_api_suites_by_id_response_400 import GetApiSuitesByIdResponse400
 from .get_api_suites_by_id_response_401 import GetApiSuitesByIdResponse401
@@ -1397,6 +1400,9 @@ from .get_api_suites_response_200_item_scope_type_1 import GetApiSuitesResponse2
 from .get_api_suites_response_200_item_scope_type_2 import GetApiSuitesResponse200ItemScopeType2
 from .get_api_suites_response_200_item_scope_type_3 import GetApiSuitesResponse200ItemScopeType3
 from .get_api_suites_response_200_item_targets_item import GetApiSuitesResponse200ItemTargetsItem
+from .get_api_suites_response_200_item_targets_item_run_parameters import (
+    GetApiSuitesResponse200ItemTargetsItemRunParameters,
+)
 from .get_api_suites_response_200_item_targets_item_type import GetApiSuitesResponse200ItemTargetsItemType
 from .get_api_suites_response_400 import GetApiSuitesResponse400
 from .get_api_suites_response_401 import GetApiSuitesResponse401
@@ -1924,6 +1930,7 @@ from .get_run_plan_response_200_scope_type_1 import GetRunPlanResponse200ScopeTy
 from .get_run_plan_response_200_scope_type_2 import GetRunPlanResponse200ScopeType2
 from .get_run_plan_response_200_scope_type_3 import GetRunPlanResponse200ScopeType3
 from .get_run_plan_response_200_targets_item import GetRunPlanResponse200TargetsItem
+from .get_run_plan_response_200_targets_item_run_parameters import GetRunPlanResponse200TargetsItemRunParameters
 from .get_run_plan_response_200_targets_item_type import GetRunPlanResponse200TargetsItemType
 from .get_test_suite_response_200 import GetTestSuiteResponse200
 from .get_test_suite_response_200_scenarios_item import GetTestSuiteResponse200ScenariosItem
@@ -1964,6 +1971,9 @@ from .list_run_plans_response_200_item_scope_type_1 import ListRunPlansResponse2
 from .list_run_plans_response_200_item_scope_type_2 import ListRunPlansResponse200ItemScopeType2
 from .list_run_plans_response_200_item_scope_type_3 import ListRunPlansResponse200ItemScopeType3
 from .list_run_plans_response_200_item_targets_item import ListRunPlansResponse200ItemTargetsItem
+from .list_run_plans_response_200_item_targets_item_run_parameters import (
+    ListRunPlansResponse200ItemTargetsItemRunParameters,
+)
 from .list_run_plans_response_200_item_targets_item_type import ListRunPlansResponse200ItemTargetsItemType
 from .list_scim_tokens_response_200 import ListScimTokensResponse200
 from .list_scim_tokens_response_200_tokens_item import ListScimTokensResponse200TokensItem
@@ -2253,6 +2263,7 @@ from .patch_api_suites_by_id_body_scope_type_1 import PatchApiSuitesByIdBodyScop
 from .patch_api_suites_by_id_body_scope_type_2 import PatchApiSuitesByIdBodyScopeType2
 from .patch_api_suites_by_id_body_scope_type_3 import PatchApiSuitesByIdBodyScopeType3
 from .patch_api_suites_by_id_body_targets_item import PatchApiSuitesByIdBodyTargetsItem
+from .patch_api_suites_by_id_body_targets_item_run_parameters import PatchApiSuitesByIdBodyTargetsItemRunParameters
 from .patch_api_suites_by_id_body_targets_item_type import PatchApiSuitesByIdBodyTargetsItemType
 from .patch_api_suites_by_id_response_200 import PatchApiSuitesByIdResponse200
 from .patch_api_suites_by_id_response_200_kind import PatchApiSuitesByIdResponse200Kind
@@ -2261,6 +2272,9 @@ from .patch_api_suites_by_id_response_200_scope_type_1 import PatchApiSuitesById
 from .patch_api_suites_by_id_response_200_scope_type_2 import PatchApiSuitesByIdResponse200ScopeType2
 from .patch_api_suites_by_id_response_200_scope_type_3 import PatchApiSuitesByIdResponse200ScopeType3
 from .patch_api_suites_by_id_response_200_targets_item import PatchApiSuitesByIdResponse200TargetsItem
+from .patch_api_suites_by_id_response_200_targets_item_run_parameters import (
+    PatchApiSuitesByIdResponse200TargetsItemRunParameters,
+)
 from .patch_api_suites_by_id_response_200_targets_item_type import PatchApiSuitesByIdResponse200TargetsItemType
 from .patch_api_suites_by_id_response_400 import PatchApiSuitesByIdResponse400
 from .patch_api_suites_by_id_response_401 import PatchApiSuitesByIdResponse401
@@ -4549,6 +4563,9 @@ from .post_api_scenario_events_body_type_0_metadata_langwatch import PostApiScen
 from .post_api_scenario_events_body_type_0_metadata_langwatch_actor_label import (
     PostApiScenarioEventsBodyType0MetadataLangwatchActorLabel,
 )
+from .post_api_scenario_events_body_type_0_metadata_langwatch_target_parameters import (
+    PostApiScenarioEventsBodyType0MetadataLangwatchTargetParameters,
+)
 from .post_api_scenario_events_body_type_0_metadata_langwatch_target_type import (
     PostApiScenarioEventsBodyType0MetadataLangwatchTargetType,
 )
@@ -4600,6 +4617,7 @@ from .post_api_suites_body_scope_type_1 import PostApiSuitesBodyScopeType1
 from .post_api_suites_body_scope_type_2 import PostApiSuitesBodyScopeType2
 from .post_api_suites_body_scope_type_3 import PostApiSuitesBodyScopeType3
 from .post_api_suites_body_targets_item import PostApiSuitesBodyTargetsItem
+from .post_api_suites_body_targets_item_run_parameters import PostApiSuitesBodyTargetsItemRunParameters
 from .post_api_suites_body_targets_item_type import PostApiSuitesBodyTargetsItemType
 from .post_api_suites_by_id_duplicate_response_201 import PostApiSuitesByIdDuplicateResponse201
 from .post_api_suites_by_id_duplicate_response_201_kind import PostApiSuitesByIdDuplicateResponse201Kind
@@ -4608,6 +4626,9 @@ from .post_api_suites_by_id_duplicate_response_201_scope_type_1 import PostApiSu
 from .post_api_suites_by_id_duplicate_response_201_scope_type_2 import PostApiSuitesByIdDuplicateResponse201ScopeType2
 from .post_api_suites_by_id_duplicate_response_201_scope_type_3 import PostApiSuitesByIdDuplicateResponse201ScopeType3
 from .post_api_suites_by_id_duplicate_response_201_targets_item import PostApiSuitesByIdDuplicateResponse201TargetsItem
+from .post_api_suites_by_id_duplicate_response_201_targets_item_run_parameters import (
+    PostApiSuitesByIdDuplicateResponse201TargetsItemRunParameters,
+)
 from .post_api_suites_by_id_duplicate_response_201_targets_item_type import (
     PostApiSuitesByIdDuplicateResponse201TargetsItemType,
 )
@@ -4619,10 +4640,14 @@ from .post_api_suites_by_id_duplicate_response_500 import PostApiSuitesByIdDupli
 from .post_api_suites_by_id_run_body import PostApiSuitesByIdRunBody
 from .post_api_suites_by_id_run_body_parameters import PostApiSuitesByIdRunBodyParameters
 from .post_api_suites_by_id_run_body_targets_item import PostApiSuitesByIdRunBodyTargetsItem
+from .post_api_suites_by_id_run_body_targets_item_run_parameters import PostApiSuitesByIdRunBodyTargetsItemRunParameters
 from .post_api_suites_by_id_run_body_targets_item_type import PostApiSuitesByIdRunBodyTargetsItemType
 from .post_api_suites_by_id_run_response_200 import PostApiSuitesByIdRunResponse200
 from .post_api_suites_by_id_run_response_200_items_item import PostApiSuitesByIdRunResponse200ItemsItem
 from .post_api_suites_by_id_run_response_200_items_item_target import PostApiSuitesByIdRunResponse200ItemsItemTarget
+from .post_api_suites_by_id_run_response_200_items_item_target_run_parameters import (
+    PostApiSuitesByIdRunResponse200ItemsItemTargetRunParameters,
+)
 from .post_api_suites_by_id_run_response_200_items_item_target_type import (
     PostApiSuitesByIdRunResponse200ItemsItemTargetType,
 )
@@ -4639,6 +4664,7 @@ from .post_api_suites_response_201_scope_type_1 import PostApiSuitesResponse201S
 from .post_api_suites_response_201_scope_type_2 import PostApiSuitesResponse201ScopeType2
 from .post_api_suites_response_201_scope_type_3 import PostApiSuitesResponse201ScopeType3
 from .post_api_suites_response_201_targets_item import PostApiSuitesResponse201TargetsItem
+from .post_api_suites_response_201_targets_item_run_parameters import PostApiSuitesResponse201TargetsItemRunParameters
 from .post_api_suites_response_201_targets_item_type import PostApiSuitesResponse201TargetsItemType
 from .post_api_suites_response_400 import PostApiSuitesResponse400
 from .post_api_suites_response_401 import PostApiSuitesResponse401
@@ -5747,6 +5773,9 @@ from .rerun_run_plan_body_parameters import RerunRunPlanBodyParameters
 from .rerun_run_plan_response_200 import RerunRunPlanResponse200
 from .rerun_run_plan_response_200_items_item import RerunRunPlanResponse200ItemsItem
 from .rerun_run_plan_response_200_items_item_target import RerunRunPlanResponse200ItemsItemTarget
+from .rerun_run_plan_response_200_items_item_target_run_parameters import (
+    RerunRunPlanResponse200ItemsItemTargetRunParameters,
+)
 from .rerun_run_plan_response_200_items_item_target_type import RerunRunPlanResponse200ItemsItemTargetType
 from .rerun_run_plan_response_200_skipped_archived import RerunRunPlanResponse200SkippedArchived
 from .revoke_api_key_response_200 import RevokeApiKeyResponse200
@@ -5759,20 +5788,28 @@ from .run_run_plan_body_config_scope_type_1 import RunRunPlanBodyConfigScopeType
 from .run_run_plan_body_config_scope_type_2 import RunRunPlanBodyConfigScopeType2
 from .run_run_plan_body_config_scope_type_3 import RunRunPlanBodyConfigScopeType3
 from .run_run_plan_body_config_targets_item import RunRunPlanBodyConfigTargetsItem
+from .run_run_plan_body_config_targets_item_run_parameters import RunRunPlanBodyConfigTargetsItemRunParameters
 from .run_run_plan_body_config_targets_item_type import RunRunPlanBodyConfigTargetsItemType
 from .run_run_plan_body_parameters import RunRunPlanBodyParameters
 from .run_run_plan_response_200 import RunRunPlanResponse200
 from .run_run_plan_response_200_items_item import RunRunPlanResponse200ItemsItem
 from .run_run_plan_response_200_items_item_target import RunRunPlanResponse200ItemsItemTarget
+from .run_run_plan_response_200_items_item_target_run_parameters import (
+    RunRunPlanResponse200ItemsItemTargetRunParameters,
+)
 from .run_run_plan_response_200_items_item_target_type import RunRunPlanResponse200ItemsItemTargetType
 from .run_run_plan_response_200_skipped_archived import RunRunPlanResponse200SkippedArchived
 from .run_test_suite_body import RunTestSuiteBody
 from .run_test_suite_body_parameters import RunTestSuiteBodyParameters
 from .run_test_suite_body_targets_item import RunTestSuiteBodyTargetsItem
+from .run_test_suite_body_targets_item_run_parameters import RunTestSuiteBodyTargetsItemRunParameters
 from .run_test_suite_body_targets_item_type import RunTestSuiteBodyTargetsItemType
 from .run_test_suite_response_200 import RunTestSuiteResponse200
 from .run_test_suite_response_200_items_item import RunTestSuiteResponse200ItemsItem
 from .run_test_suite_response_200_items_item_target import RunTestSuiteResponse200ItemsItemTarget
+from .run_test_suite_response_200_items_item_target_run_parameters import (
+    RunTestSuiteResponse200ItemsItemTargetRunParameters,
+)
 from .run_test_suite_response_200_items_item_target_type import RunTestSuiteResponse200ItemsItemTargetType
 from .run_test_suite_response_200_skipped_archived import RunTestSuiteResponse200SkippedArchived
 from .scim_create_group_response_201 import ScimCreateGroupResponse201
@@ -6771,6 +6808,7 @@ __all__ = (
     "GetApiSuitesByIdResponse200ScopeType2",
     "GetApiSuitesByIdResponse200ScopeType3",
     "GetApiSuitesByIdResponse200TargetsItem",
+    "GetApiSuitesByIdResponse200TargetsItemRunParameters",
     "GetApiSuitesByIdResponse200TargetsItemType",
     "GetApiSuitesByIdResponse400",
     "GetApiSuitesByIdResponse401",
@@ -6785,6 +6823,7 @@ __all__ = (
     "GetApiSuitesResponse200ItemScopeType2",
     "GetApiSuitesResponse200ItemScopeType3",
     "GetApiSuitesResponse200ItemTargetsItem",
+    "GetApiSuitesResponse200ItemTargetsItemRunParameters",
     "GetApiSuitesResponse200ItemTargetsItemType",
     "GetApiSuitesResponse400",
     "GetApiSuitesResponse401",
@@ -7080,6 +7119,7 @@ __all__ = (
     "GetRunPlanResponse200ScopeType2",
     "GetRunPlanResponse200ScopeType3",
     "GetRunPlanResponse200TargetsItem",
+    "GetRunPlanResponse200TargetsItemRunParameters",
     "GetRunPlanResponse200TargetsItemType",
     "GetTestSuiteResponse200",
     "GetTestSuiteResponse200ScenariosItem",
@@ -7116,6 +7156,7 @@ __all__ = (
     "ListRunPlansResponse200ItemScopeType2",
     "ListRunPlansResponse200ItemScopeType3",
     "ListRunPlansResponse200ItemTargetsItem",
+    "ListRunPlansResponse200ItemTargetsItemRunParameters",
     "ListRunPlansResponse200ItemTargetsItemType",
     "ListScimTokensResponse200",
     "ListScimTokensResponse200TokensItem",
@@ -7291,6 +7332,7 @@ __all__ = (
     "PatchApiSuitesByIdBodyScopeType2",
     "PatchApiSuitesByIdBodyScopeType3",
     "PatchApiSuitesByIdBodyTargetsItem",
+    "PatchApiSuitesByIdBodyTargetsItemRunParameters",
     "PatchApiSuitesByIdBodyTargetsItemType",
     "PatchApiSuitesByIdResponse200",
     "PatchApiSuitesByIdResponse200Kind",
@@ -7299,6 +7341,7 @@ __all__ = (
     "PatchApiSuitesByIdResponse200ScopeType2",
     "PatchApiSuitesByIdResponse200ScopeType3",
     "PatchApiSuitesByIdResponse200TargetsItem",
+    "PatchApiSuitesByIdResponse200TargetsItemRunParameters",
     "PatchApiSuitesByIdResponse200TargetsItemType",
     "PatchApiSuitesByIdResponse400",
     "PatchApiSuitesByIdResponse401",
@@ -8371,6 +8414,7 @@ __all__ = (
     "PostApiScenarioEventsBodyType0MetadataAgentsItemRole",
     "PostApiScenarioEventsBodyType0MetadataLangwatch",
     "PostApiScenarioEventsBodyType0MetadataLangwatchActorLabel",
+    "PostApiScenarioEventsBodyType0MetadataLangwatchTargetParameters",
     "PostApiScenarioEventsBodyType0MetadataLangwatchTargetType",
     "PostApiScenarioEventsBodyType1",
     "PostApiScenarioEventsBodyType1ResultsType0",
@@ -8418,6 +8462,7 @@ __all__ = (
     "PostApiSuitesBodyScopeType2",
     "PostApiSuitesBodyScopeType3",
     "PostApiSuitesBodyTargetsItem",
+    "PostApiSuitesBodyTargetsItemRunParameters",
     "PostApiSuitesBodyTargetsItemType",
     "PostApiSuitesByIdDuplicateResponse201",
     "PostApiSuitesByIdDuplicateResponse201Kind",
@@ -8426,6 +8471,7 @@ __all__ = (
     "PostApiSuitesByIdDuplicateResponse201ScopeType2",
     "PostApiSuitesByIdDuplicateResponse201ScopeType3",
     "PostApiSuitesByIdDuplicateResponse201TargetsItem",
+    "PostApiSuitesByIdDuplicateResponse201TargetsItemRunParameters",
     "PostApiSuitesByIdDuplicateResponse201TargetsItemType",
     "PostApiSuitesByIdDuplicateResponse400",
     "PostApiSuitesByIdDuplicateResponse401",
@@ -8435,10 +8481,12 @@ __all__ = (
     "PostApiSuitesByIdRunBody",
     "PostApiSuitesByIdRunBodyParameters",
     "PostApiSuitesByIdRunBodyTargetsItem",
+    "PostApiSuitesByIdRunBodyTargetsItemRunParameters",
     "PostApiSuitesByIdRunBodyTargetsItemType",
     "PostApiSuitesByIdRunResponse200",
     "PostApiSuitesByIdRunResponse200ItemsItem",
     "PostApiSuitesByIdRunResponse200ItemsItemTarget",
+    "PostApiSuitesByIdRunResponse200ItemsItemTargetRunParameters",
     "PostApiSuitesByIdRunResponse200ItemsItemTargetType",
     "PostApiSuitesByIdRunResponse200SkippedArchived",
     "PostApiSuitesByIdRunResponse400",
@@ -8453,6 +8501,7 @@ __all__ = (
     "PostApiSuitesResponse201ScopeType2",
     "PostApiSuitesResponse201ScopeType3",
     "PostApiSuitesResponse201TargetsItem",
+    "PostApiSuitesResponse201TargetsItemRunParameters",
     "PostApiSuitesResponse201TargetsItemType",
     "PostApiSuitesResponse400",
     "PostApiSuitesResponse401",
@@ -9013,6 +9062,7 @@ __all__ = (
     "RerunRunPlanResponse200",
     "RerunRunPlanResponse200ItemsItem",
     "RerunRunPlanResponse200ItemsItemTarget",
+    "RerunRunPlanResponse200ItemsItemTargetRunParameters",
     "RerunRunPlanResponse200ItemsItemTargetType",
     "RerunRunPlanResponse200SkippedArchived",
     "RevokeApiKeyResponse200",
@@ -9025,20 +9075,24 @@ __all__ = (
     "RunRunPlanBodyConfigScopeType2",
     "RunRunPlanBodyConfigScopeType3",
     "RunRunPlanBodyConfigTargetsItem",
+    "RunRunPlanBodyConfigTargetsItemRunParameters",
     "RunRunPlanBodyConfigTargetsItemType",
     "RunRunPlanBodyParameters",
     "RunRunPlanResponse200",
     "RunRunPlanResponse200ItemsItem",
     "RunRunPlanResponse200ItemsItemTarget",
+    "RunRunPlanResponse200ItemsItemTargetRunParameters",
     "RunRunPlanResponse200ItemsItemTargetType",
     "RunRunPlanResponse200SkippedArchived",
     "RunTestSuiteBody",
     "RunTestSuiteBodyParameters",
     "RunTestSuiteBodyTargetsItem",
+    "RunTestSuiteBodyTargetsItemRunParameters",
     "RunTestSuiteBodyTargetsItemType",
     "RunTestSuiteResponse200",
     "RunTestSuiteResponse200ItemsItem",
     "RunTestSuiteResponse200ItemsItemTarget",
+    "RunTestSuiteResponse200ItemsItemTargetRunParameters",
     "RunTestSuiteResponse200ItemsItemTargetType",
     "RunTestSuiteResponse200SkippedArchived",
     "ScimCreateGroupResponse201",

@@ -31,7 +31,7 @@ class ListRunPlansResponse200Item:
             resolved again at every run, so a scenario written later runs without editing the plan.
         scenario_ids (list[str]): The scenarios the last run of this plan covered.
         targets (list[ListRunPlansResponse200ItemTargetsItem]): What the plan runs against, in the order the results
-            show.
+            show. A target carrying runParameters runs with those values.
         repeat_count (float): How many times each scenario and target pairing runs.
         simulator_model (None | str): The model that plays the user, or null for the scenario or project default.
         judge_model (None | str): The model that judges the run, or null for the scenario or project default.
