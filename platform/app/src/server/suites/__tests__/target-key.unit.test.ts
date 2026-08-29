@@ -106,36 +106,42 @@ describe("targetKeyOf", () => {
 });
 
 describe("splitTargetKey", () => {
-  /** @scenario "A target key splits back into its reference id and its hash" */
-  it("reads the reference id and the hash back off a key with overrides", () => {
-    const key = targetKeyOf({
-      referenceId: "prod-agent",
-      runParameters: { model: "gpt-5-mini" },
-    });
+  describe("when the key was made from overrides", () => {
+    /** @scenario "A target key splits back into its reference id and its hash" */
+    it("reads the reference id and the hash back off it", () => {
+      const key = targetKeyOf({
+        referenceId: "prod-agent",
+        runParameters: { model: "gpt-5-mini" },
+      });
 
-    const split = splitTargetKey(key);
+      const split = splitTargetKey(key);
 
-    expect(split.referenceId).toBe("prod-agent");
-    expect(split.hash).toMatch(/^[0-9a-f]{8}$/);
-    expect(key).toBe(`prod-agent#${split.hash}`);
-  });
-
-  /** @scenario "A target key splits back into its reference id and its hash" */
-  it("reads no hash off a key with no overrides", () => {
-    expect(splitTargetKey("prod-agent")).toEqual({
-      referenceId: "prod-agent",
-      hash: null,
+      expect(split.referenceId).toBe("prod-agent");
+      expect(split.hash).toMatch(/^[0-9a-f]{8}$/);
+      expect(key).toBe(`prod-agent#${split.hash}`);
     });
   });
 
-  it("keeps a hash mark that is not followed by a hash inside the reference id", () => {
-    expect(splitTargetKey("odd#name")).toEqual({
-      referenceId: "odd#name",
-      hash: null,
+  describe("when the key carries no overrides", () => {
+    /** @scenario "A target key splits back into its reference id and its hash" */
+    it("reads no hash off it", () => {
+      expect(splitTargetKey("prod-agent")).toEqual({
+        referenceId: "prod-agent",
+        hash: null,
+      });
     });
-    expect(splitTargetKey("code:acme#1")).toEqual({
-      referenceId: "code:acme#1",
-      hash: null,
+  });
+
+  describe("when a hash mark is not followed by a hash", () => {
+    it("keeps the hash mark inside the reference id", () => {
+      expect(splitTargetKey("odd#name")).toEqual({
+        referenceId: "odd#name",
+        hash: null,
+      });
+      expect(splitTargetKey("code:acme#1")).toEqual({
+        referenceId: "code:acme#1",
+        hash: null,
+      });
     });
   });
 });
@@ -190,56 +196,64 @@ describe("targetIdentityKey", () => {
 });
 
 describe("targetParametersLabel", () => {
-  /** @scenario "A target's parameters read as a sorted list of pairs" */
-  it("lists the pairs sorted by name", () => {
-    expect(
-      targetParametersLabel({
-        runParameters: { seats: 12, model: "gpt-5-mini" },
-      }),
-    ).toBe("model=gpt-5-mini, seats=12");
+  describe("when the target carries overrides", () => {
+    /** @scenario "A target's parameters read as a sorted list of pairs" */
+    it("lists the pairs sorted by name", () => {
+      expect(
+        targetParametersLabel({
+          runParameters: { seats: 12, model: "gpt-5-mini" },
+        }),
+      ).toBe("model=gpt-5-mini, seats=12");
+    });
   });
 
-  it("reads empty when there are none", () => {
-    expect(targetParametersLabel({ runParameters: undefined })).toBe("");
-    expect(targetParametersLabel({ runParameters: {} })).toBe("");
+  describe("when the target carries none", () => {
+    it("reads empty", () => {
+      expect(targetParametersLabel({ runParameters: undefined })).toBe("");
+      expect(targetParametersLabel({ runParameters: {} })).toBe("");
+    });
   });
 });
 
 describe("targetSortKey", () => {
-  /** @scenario "The same agent twice with different parameters is two targets" */
-  it("reads type, reference id and the sorted overrides, with no spaces", () => {
-    expect(
-      targetSortKey({
+  describe("when the target carries overrides", () => {
+    /** @scenario "The same agent twice with different parameters is two targets" */
+    it("reads type, reference id and the sorted overrides, with no spaces", () => {
+      expect(
+        targetSortKey({
+          type: "http",
+          referenceId: "prod-agent",
+          runParameters: { seats: 12, model: "gpt-5-mini" },
+        }),
+      ).toBe("http:prod-agent|model=gpt-5-mini,seats=12");
+    });
+
+    it("never carries the hash", () => {
+      const target = {
         type: "http",
         referenceId: "prod-agent",
-        runParameters: { seats: 12, model: "gpt-5-mini" },
-      }),
-    ).toBe("http:prod-agent|model=gpt-5-mini,seats=12");
+        runParameters: { model: "gpt-5-mini" },
+      };
+
+      expect(targetSortKey(target)).not.toContain(
+        splitTargetKey(targetKeyOf(target)).hash,
+      );
+    });
   });
 
-  it("ends at the bar when there are no overrides", () => {
-    expect(targetSortKey({ type: "http", referenceId: "prod-agent" })).toBe(
-      "http:prod-agent|",
-    );
-    expect(
-      targetSortKey({
-        type: "http",
-        referenceId: "prod-agent",
-        runParameters: {},
-      }),
-    ).toBe("http:prod-agent|");
-  });
-
-  it("never carries the hash", () => {
-    const target = {
-      type: "http",
-      referenceId: "prod-agent",
-      runParameters: { model: "gpt-5-mini" },
-    };
-
-    expect(targetSortKey(target)).not.toContain(
-      splitTargetKey(targetKeyOf(target)).hash,
-    );
+  describe("when the target carries none", () => {
+    it("ends at the bar", () => {
+      expect(targetSortKey({ type: "http", referenceId: "prod-agent" })).toBe(
+        "http:prod-agent|",
+      );
+      expect(
+        targetSortKey({
+          type: "http",
+          referenceId: "prod-agent",
+          runParameters: {},
+        }),
+      ).toBe("http:prod-agent|");
+    });
   });
 });
 
@@ -334,36 +348,40 @@ describe("differingParameterNames", () => {
 });
 
 describe("targetLabels", () => {
-  /** @scenario "A target is labelled with the parameters that tell it from the other targets of its agent" */
-  it("labels every target in the order given, by the one rule", () => {
-    expect(
-      targetLabels({
-        targets: [
-          { referenceId: "a", runParameters: { locale: "de" } },
-          { referenceId: "a", runParameters: { locale: "de", plan: "pro" } },
-          { referenceId: "b", runParameters: { locale: "de" } },
-        ],
-        nameOf: (target) => `agent-${target.referenceId}`,
-      }),
-    ).toEqual(["agent-a", "agent-a · plan=pro", "agent-b"]);
+  describe("when one agent appears twice and another once", () => {
+    /** @scenario "A target is labelled with the parameters that tell it from the other targets of its agent" */
+    it("labels every target in the order given, by the one rule", () => {
+      expect(
+        targetLabels({
+          targets: [
+            { referenceId: "a", runParameters: { locale: "de" } },
+            { referenceId: "a", runParameters: { locale: "de", plan: "pro" } },
+            { referenceId: "b", runParameters: { locale: "de" } },
+          ],
+          nameOf: (target) => `agent-${target.referenceId}`,
+        }),
+      ).toEqual(["agent-a", "agent-a · plan=pro", "agent-b"]);
+    });
   });
 });
 
 describe("declaredDefaults", () => {
-  /** @scenario "A typed default is not an override" */
-  it("reads the first default of each plain parameter and no secret", () => {
-    const defaults = declaredDefaults([
-      { name: "model", defaultValue: "gpt-5" },
-      { name: "model", defaultValue: "gpt-5-mini" },
-      { name: "locale" },
-      { name: "locale", defaultValue: "en" },
-      { name: "api_token", secret: true },
-    ]);
+  describe("when a name is declared twice and one parameter is secret", () => {
+    /** @scenario "A typed default is not an override" */
+    it("reads the first default of each plain parameter and no secret", () => {
+      const defaults = declaredDefaults([
+        { name: "model", defaultValue: "gpt-5" },
+        { name: "model", defaultValue: "gpt-5-mini" },
+        { name: "locale" },
+        { name: "locale", defaultValue: "en" },
+        { name: "api_token", secret: true },
+      ]);
 
-    expect([...defaults]).toEqual([
-      ["model", "gpt-5"],
-      ["locale", "en"],
-    ]);
+      expect([...defaults]).toEqual([
+        ["model", "gpt-5"],
+        ["locale", "en"],
+      ]);
+    });
   });
 });
 
@@ -373,48 +391,56 @@ describe("canonicalOverrides", () => {
     ["seats", 12],
   ]);
 
-  /** @scenario "A typed default is not an override" */
-  it("keeps the values that differ from the declared default", () => {
-    expect(
-      canonicalOverrides({
-        runParameters: { locale: "en", model: "gpt-5", seats: 12 },
-        defaults,
-      }),
-    ).toEqual({ model: "gpt-5" });
+  describe("when some values differ from the declared default", () => {
+    /** @scenario "A typed default is not an override" */
+    it("keeps only those values", () => {
+      expect(
+        canonicalOverrides({
+          runParameters: { locale: "en", model: "gpt-5", seats: 12 },
+          defaults,
+        }),
+      ).toEqual({ model: "gpt-5" });
+    });
+
+    it("tells the string of a number from the number", () => {
+      expect(
+        canonicalOverrides({ runParameters: { seats: "12" }, defaults }),
+      ).toEqual({ seats: "12" });
+    });
   });
 
-  /** @scenario "A typed default is not an override" */
-  it("reads nothing when every value is its default", () => {
-    expect(
-      canonicalOverrides({ runParameters: { locale: "en" }, defaults }),
-    ).toBeUndefined();
-    expect(canonicalOverrides({ runParameters: {}, defaults })).toBeUndefined();
-    expect(canonicalOverrides({ defaults })).toBeUndefined();
-  });
-
-  it("tells the string of a number from the number", () => {
-    expect(
-      canonicalOverrides({ runParameters: { seats: "12" }, defaults }),
-    ).toEqual({ seats: "12" });
+  describe("when every value is its default", () => {
+    /** @scenario "A typed default is not an override" */
+    it("reads nothing", () => {
+      expect(
+        canonicalOverrides({ runParameters: { locale: "en" }, defaults }),
+      ).toBeUndefined();
+      expect(
+        canonicalOverrides({ runParameters: {}, defaults }),
+      ).toBeUndefined();
+      expect(canonicalOverrides({ defaults })).toBeUndefined();
+    });
   });
 });
 
 describe("withCanonicalOverrides", () => {
-  /** @scenario "Two rows that differ only by a typed default are one target" */
-  it("gives two targets that differ only by a typed default one key", () => {
-    const [plain, typed] = withCanonicalOverrides({
-      targets: [
-        { type: "http", referenceId: "agent_1" },
-        {
-          type: "http",
-          referenceId: "agent_1",
-          runParameters: { locale: "en" },
-        },
-      ],
-      defaults: new Map([["locale", "en"]]),
-    });
+  describe("when one target types the declared default and another leaves it out", () => {
+    /** @scenario "Two rows that differ only by a typed default are one target" */
+    it("gives the two targets one key", () => {
+      const [plain, typed] = withCanonicalOverrides({
+        targets: [
+          { type: "http", referenceId: "agent_1" },
+          {
+            type: "http",
+            referenceId: "agent_1",
+            runParameters: { locale: "en" },
+          },
+        ],
+        defaults: new Map([["locale", "en"]]),
+      });
 
-    expect(typed).toEqual({ type: "http", referenceId: "agent_1" });
-    expect(targetKeyOf(typed!)).toBe(targetKeyOf(plain!));
+      expect(typed).toEqual({ type: "http", referenceId: "agent_1" });
+      expect(targetKeyOf(typed!)).toBe(targetKeyOf(plain!));
+    });
   });
 });

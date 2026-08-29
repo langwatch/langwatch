@@ -17,6 +17,7 @@
 
 import type {
   RunParameterValues,
+  ScenarioParameterDefinition,
   ScenarioParameterValue,
 } from "../scenarios/parameters";
 
@@ -39,11 +40,10 @@ export function hasParameterOverrides(
 }
 
 /** What a declared parameter says about its default, as the rule reads it. */
-type DeclaredParameter = {
-  name: string;
-  defaultValue?: ScenarioParameterValue;
-  secret?: boolean;
-};
+type DeclaredParameter = Pick<
+  ScenarioParameterDefinition,
+  "name" | "defaultValue" | "secret"
+>;
 
 /**
  * The default of every plain parameter the scenarios of a run declare.

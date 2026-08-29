@@ -43,7 +43,6 @@ function agentOptionLabel(agent: RunDialogAgent): string {
   return agentHasDevTunnel(agent) ? `${agent.name} · Local tunnel` : agent.name;
 }
 
-/** The control that opens one more row. */
 function AddTargetButton({
   onAddRow,
   isBusy,
@@ -75,7 +74,6 @@ function AddTargetButton({
   );
 }
 
-/** What the rows read while two of them are one target. */
 function DuplicateTargetsError() {
   return (
     <Text fontSize="11px" color="red.fg" data-testid="run-dialog-compare-error">
@@ -84,7 +82,6 @@ function DuplicateTargetsError() {
   );
 }
 
-/** The line under the section, which stands whatever the rows hold. */
 function CompareHint() {
   return (
     <Text

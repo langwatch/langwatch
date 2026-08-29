@@ -363,40 +363,44 @@ describe("the test suites rail", () => {
     ]);
   });
 
-  /** @scenario "Open recent runs holds the runs that covered the suite" */
-  it("lists the runs that covered the suite and opens one under its plan", async () => {
-    setProjectRuns([
-      makeProjectRun(),
-      makeProjectRun({
-        batchRunId: "batch_elsewhere",
-        scenarioRunId: "run_elsewhere",
-        scenarioId: "case_elsewhere",
-      }),
-    ]);
-    renderRail();
-    const user = await openSuiteMenu("Refunds");
+  describe("given the project ran batches of this suite and of another", () => {
+    describe("when Open recent runs is chosen", () => {
+      /** @scenario "Open recent runs holds the runs that covered the suite" */
+      it("lists the runs that covered the suite and opens one under its plan", async () => {
+        setProjectRuns([
+          makeProjectRun(),
+          makeProjectRun({
+            batchRunId: "batch_elsewhere",
+            scenarioRunId: "run_elsewhere",
+            scenarioId: "case_elsewhere",
+          }),
+        ]);
+        renderRail();
+        const user = await openSuiteMenu("Refunds");
 
-    await user.click(
-      await screen.findByRole("menuitem", { name: /Open recent runs/ }),
-    );
+        await user.click(
+          await screen.findByRole("menuitem", { name: /Open recent runs/ }),
+        );
 
-    const list = await screen.findByTestId("recent-runs-submenu-list");
-    const rows = within(list).getAllByTestId(/^recent-run-/);
-    expect(rows.map((row) => row.getAttribute("data-testid"))).toEqual([
-      "recent-run-batch_refunds",
-    ]);
-    expect(rows[0]).toHaveTextContent("Refunds");
+        const list = await screen.findByTestId("recent-runs-submenu-list");
+        const rows = within(list).getAllByTestId(/^recent-run-/);
+        expect(rows.map((row) => row.getAttribute("data-testid"))).toEqual([
+          "recent-run-batch_refunds",
+        ]);
+        expect(rows[0]).toHaveTextContent("Refunds");
 
-    await user.click(rows[0]!);
+        await user.click(rows[0]!);
 
-    // The row opens the run under the plan that holds it, on the Results tab.
-    expect(routerPush).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathname: "/[project]/agent-testing/[[...path]]",
-      }),
-      expect.stringContaining("/results/refunds/batch_refunds"),
-      { shallow: true },
-    );
+        // The row opens the run under the plan that holds it, on the Results tab.
+        expect(routerPush).toHaveBeenCalledWith(
+          expect.objectContaining({
+            pathname: "/[project]/agent-testing/[[...path]]",
+          }),
+          expect.stringContaining("/results/refunds/batch_refunds"),
+          { shallow: true },
+        );
+      });
+    });
   });
 
   /** @scenario "Every action of the rail row menu carries its icon" */
@@ -417,17 +421,21 @@ describe("the test suites rail", () => {
     ]);
   });
 
-  /** @scenario "Open recent runs is not offered for a suite that never ran" */
-  it("does not offer Open recent runs for a suite that never ran", async () => {
-    renderRail({ lastRunBySuiteId: new Map<string, SuiteLastRun>() });
-    await openSuiteMenu("Refunds");
+  describe("given the suite never ran", () => {
+    describe("when the row menu is opened", () => {
+      /** @scenario "Open recent runs is not offered for a suite that never ran" */
+      it("does not offer Open recent runs", async () => {
+        renderRail({ lastRunBySuiteId: new Map<string, SuiteLastRun>() });
+        await openSuiteMenu("Refunds");
 
-    expect(
-      await screen.findByRole("menuitem", { name: "Run suite" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("menuitem", { name: /Open recent runs/ }),
-    ).not.toBeInTheDocument();
+        expect(
+          await screen.findByRole("menuitem", { name: "Run suite" }),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByRole("menuitem", { name: /Open recent runs/ }),
+        ).not.toBeInTheDocument();
+      });
+    });
   });
 
   /** @scenario "Archive suite opens the confirmation dialog" */
