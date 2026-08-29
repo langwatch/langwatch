@@ -129,6 +129,15 @@ namespaces those four families gained, plus `/api/agent-cache/*`,
 
    `pnpm --filter @langwatch/web check:openapi-route-coverage`
 
+One document is still out of step, and deliberately left alone: the working
+tree's `docs/api-reference/openapiLangWatch.json` carries an uncommitted
+regeneration from an earlier session and now disagrees with
+`platform/app/src/app/api/openapiLangWatch.json` — 181 paths against 196, with
+the unversioned management paths still in it. Nothing writes the `docs/` copy
+automatically; `docs/scripts/generate-api-reference-pages.ts` only reads it.
+Regenerating it is a one-line follow-up once the ADR 002 question is settled,
+because the answer decides which of the two shapes is right.
+
 The five `/api/secrets` operations reappeared in the document once the
 generator could run. Their request bodies came back too: both were declared
 with hono-openapi 0.4's `request` key, which 1.x ignores in favour of deriving
