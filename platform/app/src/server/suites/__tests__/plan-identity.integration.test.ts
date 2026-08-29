@@ -456,6 +456,63 @@ describe("resolving a run plan by name", () => {
       expect(await plansNamed(expected)).toHaveLength(1);
     });
 
+    /** @scenario "A run named by the server labels a repeated agent with its parameters" */
+    it("labels a repeated agent with its parameters when the run sends no name", async () => {
+      const refunds = await suiteService.createTestSuite({
+        projectId,
+        name: "Refunds",
+      });
+      await suiteService.createTestSuite({ projectId, name: "Checkout" });
+      await scenarioService.create({
+        projectId,
+        name: "One",
+        situation: "A customer asks for help",
+        criteria: ["The agent helps"],
+        labels: [],
+        testSuiteId: refunds.id,
+        parameters: [{ name: "model", defaultValue: "gpt-5" }],
+      });
+      const agent = await createHttpAgent();
+      const targets: SuiteTarget[] = [
+        {
+          type: "http",
+          referenceId: agent.id,
+          runParameters: { model: "gpt-5-mini" },
+        },
+        { type: "http", referenceId: agent.id },
+      ];
+      const scope: SuiteScope = {
+        mode: "test_suites",
+        testSuiteIds: [refunds.id],
+      };
+      const config = { scope, targets };
+
+      const result = await suiteService.runPlan({
+        projectId,
+        organizationId,
+        config,
+        idempotencyKey: `run-${nanoid(6)}`,
+      });
+
+      // The plain target sorts first, and only the variant carries its
+      // parameters in the label.
+      const expected = `Refunds ${agent.name} vs ${agent.name} · model=gpt-5-mini`;
+      expect(result.created).toBe(true);
+      expect(result.planName).toBe(expected);
+      expect(result.jobCount).toBe(2);
+
+      const again = await suiteService.runPlan({
+        projectId,
+        organizationId,
+        config,
+        idempotencyKey: `run-${nanoid(6)}`,
+      });
+
+      expect(again.created).toBe(false);
+      expect(again.suiteId).toBe(result.suiteId);
+      expect(await plansNamed(expected)).toHaveLength(1);
+    });
+
     /** @scenario "A test suite does not answer to a run plan name" */
     it("ignores a test suite of the same name", async () => {
       await createCase("One");
@@ -644,6 +701,31 @@ describe("resolving a run plan by name", () => {
       // Nothing was written at all, so the row was never even touched.
       expect(after.updatedAt).toEqual(before.updatedAt);
       expect(startSuiteRun).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "Two identical targets are refused" */
+    it("creates no plan when two targets share a key", async () => {
+      await createCase("One");
+      const agent = await createHttpAgent();
+      const twice: SuiteTarget = {
+        type: "http",
+        referenceId: agent.id,
+        runParameters: { model: "gpt-5-mini" },
+      };
+
+      await expect(
+        runUnderName({
+          name: "Twice",
+          scope: { mode: "all" },
+          targets: [twice, { ...twice }],
+        }),
+      ).rejects.toMatchObject({
+        code: "validation_error",
+        meta: { fieldErrors: { targets: [expect.any(String)] } },
+      });
+
+      expect(await plansNamed("Twice")).toHaveLength(0);
+      expect(startSuiteRun).not.toHaveBeenCalled();
     });
 
     /** @scenario "A run refused for naming no target creates no plan" */

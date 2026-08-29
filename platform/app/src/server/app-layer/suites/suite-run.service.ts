@@ -16,6 +16,7 @@ import { withNote } from "~/server/scenarios/run-note";
 import type { RunSecretCiphertext } from "~/server/scenarios/run-secret-values";
 import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
+import { hasParameterOverrides, targetKeyOf } from "~/server/suites/target-key";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { traced } from "../tracing";
 import { SuiteRunClickHouseRepository } from "./repositories/suite-run.clickhouse.repository";
@@ -51,7 +52,19 @@ export type SuiteRunResult = {
 export type SuiteRunTarget = {
   type: "http" | "prompt" | "code" | "workflow";
   referenceId: string;
+  /** The parameter overrides of this target alone. See `target-key.ts`. */
+  runParameters?: RunParameterValues;
 };
+
+/**
+ * The values each scenario resolved, per target, keyed by the target key and
+ * then by scenario id. A target's overrides win over the run's values, so two
+ * targets of one agent may resolve two different sets.
+ */
+export type ParametersByTargetKey = Map<
+  string,
+  Map<string, RunParameterValues>
+>;
 
 /**
  * The `parameters` entry for a queued run's metadata, or nothing at all when
@@ -62,6 +75,19 @@ function withParameters(
   parameters: RunParameterValues | undefined,
 ): { parameters: RunParameterValues } | Record<string, never> {
   return parameters && Object.keys(parameters).length > 0 ? { parameters } : {};
+}
+
+/**
+ * The `targetParameters` entry of the reserved langwatch namespace, or nothing
+ * at all. Only the target's own overrides: a target with none records the
+ * namespace it always did.
+ */
+function withTargetParameters(
+  runParameters: RunParameterValues | undefined,
+): { targetParameters: RunParameterValues } | Record<string, never> {
+  return hasParameterOverrides(runParameters)
+    ? { targetParameters: runParameters }
+    : {};
 }
 
 /**
@@ -211,12 +237,12 @@ export class SuiteRunService {
     idempotencyKey: string;
     batchRunId?: string;
     /**
-     * The values each scenario resolved for this run, keyed by scenario id.
-     * Recorded on the queued event so the run reads back with the values it
-     * actually ran against, and so the executor gets them without a second
-     * resolution pass reaching a different answer.
+     * The values each scenario resolved for this run, keyed by target key and
+     * then by scenario id. Recorded on the queued event so the run reads back
+     * with the values it actually ran against, and so the executor gets them
+     * without a second resolution pass reaching a different answer.
      */
-    parametersByScenarioId?: Map<string, RunParameterValues>;
+    parametersByTargetKey?: ParametersByTargetKey;
     /**
      * The secret values each scenario resolved, already encrypted, keyed by
      * scenario id. They ride the queued event beside the metadata so the run
@@ -257,7 +283,7 @@ export class SuiteRunService {
       repeatCount,
       skippedArchived,
       idempotencyKey,
-      parametersByScenarioId,
+      parametersByTargetKey,
       secretParametersByScenarioId,
       note,
       actor,
@@ -333,6 +359,7 @@ export class SuiteRunService {
         const secretParameters = secretParametersByScenarioId?.get(
           item.scenarioId,
         );
+        const targetKey = targetKeyOf(item.target);
         return this.deps.queueSimulationRun({
           tenantId: projectId,
           scenarioRunId: item.scenarioRunId,
@@ -344,6 +371,8 @@ export class SuiteRunService {
             langwatch: {
               targetReferenceId: item.target.referenceId,
               targetType: item.target.type,
+              targetKey,
+              ...withTargetParameters(item.target.runParameters),
               ...withScenarioVersion(scenarioVersionMap.get(item.scenarioId)),
               ...withActor(actor),
               ...simulationModels,
@@ -352,7 +381,9 @@ export class SuiteRunService {
               ),
             },
             ...withNote(note),
-            ...withParameters(parametersByScenarioId?.get(item.scenarioId)),
+            ...withParameters(
+              parametersByTargetKey?.get(targetKey)?.get(item.scenarioId),
+            ),
             ...withSecretParameterNames(secretParameters),
           },
           ...withSecretParameters(secretParameters),

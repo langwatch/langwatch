@@ -12,6 +12,7 @@ import {
 } from "../errors";
 import type { SuiteRepository } from "../suite.repository";
 import { SuiteService, type SuiteTarget } from "../suite.service";
+import { targetKeyOf } from "../target-key";
 
 function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
   return {
@@ -326,14 +327,162 @@ describe("SuiteService", () => {
             parameters: { account_tier: "platinum" },
           });
 
-          const { parametersByScenarioId } = suiteRunService.startRun.mock
+          const { parametersByTargetKey } = suiteRunService.startRun.mock
             .calls[0]?.[0] as {
-            parametersByScenarioId: Map<string, Record<string, unknown>>;
+            parametersByTargetKey: Map<
+              string,
+              Map<string, Record<string, unknown>>
+            >;
           };
-          expect(parametersByScenarioId.get("scen_1")).toEqual({
+          expect(parametersByTargetKey.get("agent_1")?.get("scen_1")).toEqual({
             account_tier: "platinum",
             region: "eu-central",
           });
+          expect(parametersByTargetKey.get("prompt_1")?.get("scen_1")).toEqual({
+            account_tier: "platinum",
+            region: "eu-central",
+          });
+        });
+      });
+
+      describe("when a target carries overrides of its own", () => {
+        const twoTargets = [
+          { type: "http", referenceId: "agent_1" },
+          {
+            type: "http",
+            referenceId: "agent_1",
+            runParameters: { account_tier: "silver" },
+          },
+        ] as SuiteTarget[];
+
+        /** @scenario "Each target receives its own parameters merged over the run parameters" */
+        it("merges them over the run's values, the target winning", async () => {
+          const { service, suiteRunService } = createService({
+            scenarioRepository: declaring([
+              { name: "account_tier", defaultValue: "gold" },
+              { name: "region", defaultValue: "eu-central" },
+            ]),
+          });
+
+          await service.run({
+            suite: makeSuite({ scenarioIds: ["scen_1"], targets: twoTargets }),
+            ...RUN_DEFAULTS,
+            parameters: { region: "us-east" },
+          });
+
+          const { parametersByTargetKey, activeTargets } = suiteRunService
+            .startRun.mock.calls[0]?.[0] as {
+            parametersByTargetKey: Map<
+              string,
+              Map<string, Record<string, unknown>>
+            >;
+            activeTargets: SuiteTarget[];
+          };
+          const variantKey = targetKeyOf(twoTargets[1]!);
+          expect(parametersByTargetKey.get("agent_1")?.get("scen_1")).toEqual({
+            account_tier: "gold",
+            region: "us-east",
+          });
+          expect(parametersByTargetKey.get(variantKey)?.get("scen_1")).toEqual({
+            account_tier: "silver",
+            region: "us-east",
+          });
+          // The overrides travel with the target, so the stamp can name them.
+          expect(activeTargets[1]?.runParameters).toEqual({
+            account_tier: "silver",
+          });
+        });
+
+        /** @scenario "A target override no scenario in the run declares is refused" */
+        it("rejects an override no scenario declares before anything is scheduled", async () => {
+          const { service, suiteRunService } = createService({
+            scenarioRepository: declaring([
+              { name: "account_tier", defaultValue: "gold" },
+            ]),
+          });
+
+          await expect(
+            service.run({
+              suite: makeSuite({
+                scenarioIds: ["scen_1"],
+                targets: [
+                  { type: "http", referenceId: "agent_1" },
+                  {
+                    type: "http",
+                    referenceId: "agent_1",
+                    runParameters: { seats: 12 },
+                  },
+                ] as SuiteTarget[],
+              }),
+              ...RUN_DEFAULTS,
+            }),
+          ).rejects.toMatchObject({ code: "scenario_parameter_unknown" });
+
+          expect(suiteRunService.startRun).not.toHaveBeenCalled();
+        });
+
+        /** @scenario "A target override naming a secret parameter is refused" */
+        it("rejects an override that names a secret parameter", async () => {
+          const { service, suiteRunService } = createService({
+            scenarioRepository: declaring([
+              { name: "account_tier", defaultValue: "gold" },
+              { name: "api_token", secret: true },
+            ]),
+          });
+
+          await expect(
+            service.run({
+              suite: makeSuite({
+                scenarioIds: ["scen_1"],
+                targets: [
+                  {
+                    type: "http",
+                    referenceId: "agent_1",
+                    runParameters: { api_token: "tok-live-1" },
+                  },
+                ] as SuiteTarget[],
+              }),
+              ...RUN_DEFAULTS,
+              parameters: { api_token: "tok-live-1" },
+            }),
+          ).rejects.toMatchObject({
+            code: "validation_error",
+            meta: { fieldErrors: { targets: [expect.any(String)] } },
+          });
+
+          expect(suiteRunService.startRun).not.toHaveBeenCalled();
+        });
+
+        /** @scenario "Two identical targets are refused" */
+        it("rejects two targets with one key before anything is read", async () => {
+          const { service, suiteRunService, scenarioRepo } = createService();
+
+          await expect(
+            service.run({
+              suite: makeSuite({
+                scenarioIds: ["scen_1"],
+                targets: [
+                  {
+                    type: "http",
+                    referenceId: "agent_1",
+                    runParameters: { account_tier: "silver" },
+                  },
+                  {
+                    type: "http",
+                    referenceId: "agent_1",
+                    runParameters: { account_tier: "silver" },
+                  },
+                ] as SuiteTarget[],
+              }),
+              ...RUN_DEFAULTS,
+            }),
+          ).rejects.toMatchObject({
+            code: "validation_error",
+            meta: { fieldErrors: { targets: [expect.any(String)] } },
+          });
+
+          expect(scenarioRepo.findManyIncludingArchived).not.toHaveBeenCalled();
+          expect(suiteRunService.startRun).not.toHaveBeenCalled();
         });
       });
 
@@ -388,13 +537,16 @@ describe("SuiteService", () => {
             parameters: { api_token: "tok-live-1" },
           });
 
-          const { parametersByScenarioId, secretParametersByScenarioId } =
+          const { parametersByTargetKey, secretParametersByScenarioId } =
             suiteRunService.startRun.mock.calls[0]?.[0] as {
-              parametersByScenarioId: Map<string, Record<string, unknown>>;
+              parametersByTargetKey: Map<
+                string,
+                Map<string, Record<string, unknown>>
+              >;
               secretParametersByScenarioId: Map<string, Record<string, string>>;
             };
 
-          expect(parametersByScenarioId.get("scen_1")).toEqual({
+          expect(parametersByTargetKey.get("agent_1")?.get("scen_1")).toEqual({
             account_tier: "gold",
           });
           const stamped = secretParametersByScenarioId.get("scen_1");

@@ -8,10 +8,13 @@ import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
   configurationKey,
+  duplicateSuiteTargets,
   normalizePlanScope,
   scopeKey,
   sortSuiteTargets,
+  suiteTargetSortKey,
 } from "../plan-config";
+import { targetKeyOf } from "../target-key";
 import type { SuiteTarget } from "../types";
 
 /** A Prisma stand-in that answers only the test suite read the normalise makes. */
@@ -108,6 +111,86 @@ describe("sortSuiteTargets", () => {
         sortSuiteTargets([dev, prod]),
       );
       expect(sortSuiteTargets([prod, dev])).toEqual([dev, prod]);
+    });
+  });
+
+  describe("when the same agent appears twice with different overrides", () => {
+    /** @scenario "The same agent twice with different parameters is two targets" */
+    it("keeps both, the plain one first, in one order every run", () => {
+      const plain: SuiteTarget = { type: "http", referenceId: "prod-agent" };
+      const mini: SuiteTarget = {
+        type: "http",
+        referenceId: "prod-agent",
+        runParameters: { model: "gpt-5-mini" },
+      };
+
+      expect(sortSuiteTargets([mini, plain])).toEqual([plain, mini]);
+      expect(sortSuiteTargets([plain, mini])).toEqual([plain, mini]);
+      expect(suiteTargetSortKey(mini)).toBe(`http:${targetKeyOf(mini)}`);
+    });
+  });
+});
+
+describe("duplicateSuiteTargets", () => {
+  describe("when two targets share a key", () => {
+    /** @scenario "Two identical targets are refused" */
+    it("names the repeated one", () => {
+      const twice: SuiteTarget = {
+        type: "http",
+        referenceId: "prod-agent",
+        runParameters: { model: "gpt-5-mini" },
+      };
+
+      expect(duplicateSuiteTargets([twice, { ...twice }])).toEqual([twice]);
+    });
+  });
+
+  describe("when the same agent appears with different overrides", () => {
+    /** @scenario "The same agent twice with different parameters is two targets" */
+    it("reports nothing", () => {
+      expect(
+        duplicateSuiteTargets([
+          { type: "http", referenceId: "prod-agent" },
+          {
+            type: "http",
+            referenceId: "prod-agent",
+            runParameters: { model: "gpt-5-mini" },
+          },
+        ]),
+      ).toEqual([]);
+    });
+  });
+});
+
+describe("configurationKey", () => {
+  describe("when a target carries overrides", () => {
+    it("keys the variant apart from the plain target", () => {
+      const config = {
+        scope: { mode: "all" } as const,
+        repeatCount: 1,
+        simulatorModel: null,
+        judgeModel: null,
+      };
+      const plain = configurationKey({
+        config: {
+          ...config,
+          targets: [{ type: "http", referenceId: "prod-agent" }],
+        },
+      });
+      const variant = configurationKey({
+        config: {
+          ...config,
+          targets: [
+            {
+              type: "http",
+              referenceId: "prod-agent",
+              runParameters: { model: "gpt-5-mini" },
+            },
+          ],
+        },
+      });
+
+      expect(variant).not.toBe(plain);
     });
   });
 });

@@ -9,6 +9,7 @@ import {
 } from "@ag-ui/core";
 import { z } from "zod";
 import { chatMessageSchema } from "~/server/tracer/types";
+import { runParameterValuesSchema } from "../parameters";
 import { runActorLabelSchema } from "../run-actor";
 import {
   ScenarioEventType,
@@ -65,6 +66,21 @@ const baseScenarioEventSchema = baseEventSchema.extend({
 export const langwatchMetadataSchema = z.object({
   targetReferenceId: z.string(),
   targetType: z.enum(["prompt", "http", "code", "workflow"]),
+  /**
+   * The key the target folds under: the reference id alone, or the reference
+   * id and a hash of the target's parameter overrides when it carries any.
+   * Stamped at queue time. Absent on runs recorded before targets carried
+   * parameters, which read as the reference id alone.
+   *
+   * @see specs/features/agent-testing/results-atoms.feature
+   */
+  targetKey: z.string().optional(),
+  /**
+   * The parameter overrides of this target alone, so a reader can name the
+   * variant. Absent when the target carries none. The merged values the run
+   * resolved sit beside the namespace under `parameters`, as they always did.
+   */
+  targetParameters: runParameterValuesSchema.optional(),
   simulationSuiteId: z.string().optional(),
   /**
    * The version of the scenario at the moment the run was queued. A later
