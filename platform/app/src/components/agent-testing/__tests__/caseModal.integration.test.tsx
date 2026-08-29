@@ -222,6 +222,29 @@ describe("the scenario dialog", () => {
       expect(dialog.textContent).not.toMatch(/with AI|Langy/i);
     });
 
+    /** @scenario "The situation and the criteria grow with what is written in them" */
+    it("lets the situation and the criteria grow, and caps them at three times their height", async () => {
+      openNew();
+      await screen.findByTestId("case-modal");
+
+      // Growing is the browser's job once the field asks for it, so what the
+      // dialog owns is the ask and the two heights: the height the field opens
+      // at, which a grown field would otherwise shrink under while it is empty,
+      // and the height it stops growing at.
+      for (const label of ["Situation", "Criteria"]) {
+        const field = screen.getByLabelText(label);
+        const style = window.getComputedStyle(field);
+
+        expect(field).toHaveAttribute("rows");
+        expect(style.resize).toBe("none");
+
+        const opensAt = Number.parseFloat(style.minHeight);
+        const stopsAt = Number.parseFloat(style.maxHeight);
+        expect(opensAt).toBeGreaterThan(0);
+        expect(stopsAt).toBeCloseTo(opensAt * 3, 0);
+      }
+    });
+
     /** @scenario "The scenario dialog footer holds the labels, Save and Save and Run" */
     it("holds the labels on the left and the two save buttons on the right", async () => {
       openNew();

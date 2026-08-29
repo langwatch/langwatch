@@ -192,6 +192,15 @@ Feature: The scenarios table
     And no step asks to write the scenario with a model first
 
   @integration
+  Scenario: The situation and the criteria grow with what is written in them
+    Given the scenario dialog is open
+    When more lines are written than the situation or the criteria field opens at
+    Then the field grows to hold them, the way the prompt editor grows
+    And it stops growing at three times the height it opened at
+    And it scrolls from there, so the footer of the drawer stays on the screen
+    And an empty field still opens at the height it always had
+
+  @integration
   Scenario: The scenario dialog footer holds the labels, Save and Save and Run
     Given the scenario dialog is open
     When its footer is read

@@ -35,6 +35,26 @@ import type { CaseDraft, CaseEditorState } from "./useCaseEditor";
 
 const CASE_MODAL_SUBTITLE = "Test your agent on a critical path or edge case";
 
+/**
+ * What a field that grows with its text carries.
+ *
+ * The two long fields of the dialog follow their own text rather than holding a
+ * fixed box, the way the prompt editor does. Growing stops at three times the
+ * height the field opens at, and the field scrolls from there, so one long
+ * scenario cannot push the footer of the drawer off the screen.
+ *
+ * A grown field writes its height inline, so each field states the height it
+ * opens at as well; without it the field would shrink under its own rows while
+ * it is empty.
+ */
+const GROWING_FIELD = { autoresize: true, resize: "none" } as const;
+
+/** The height the situation opens at, and the height it stops growing at. */
+const SITUATION_HEIGHT = { min: "52px", max: "156px" } as const;
+
+/** The same pair for the criteria, which opens two lines taller. */
+const CRITERIA_HEIGHT = { min: "92px", max: "276px" } as const;
+
 const PARAMETERS_HELP =
   "Parameters reach your agent as arguments of the function you annotated. Use them to run the same scenario as a free or a pro customer, in another locale, or on another model.";
 
@@ -140,8 +160,10 @@ function SituationAndCriteria({
         <FieldLabel>Situation · what is the user trying to do?</FieldLabel>
         <Textarea
           {...DIALOG_FIELD_STYLE}
+          {...GROWING_FIELD}
           rows={2}
-          resize="none"
+          minHeight={SITUATION_HEIGHT.min}
+          maxHeight={SITUATION_HEIGHT.max}
           aria-label="Situation"
           placeholder="The customer is on day three of waiting for a refund and threatens to charge back."
           value={draft.situation}
@@ -153,8 +175,10 @@ function SituationAndCriteria({
         <FieldLabel>Criteria · one per line</FieldLabel>
         <Textarea
           {...DIALOG_FIELD_STYLE}
+          {...GROWING_FIELD}
           rows={4}
-          resize="none"
+          minHeight={CRITERIA_HEIGHT.min}
+          maxHeight={CRITERIA_HEIGHT.max}
           aria-label="Criteria"
           placeholder={
             "Keeps a calm tone\nGives the refund status without being asked twice\nDoes not promise compensation we do not offer"
