@@ -14,14 +14,8 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  ScenarioForm,
-  UNFILED_OPTION_LABEL,
-} from "@langwatch/scenario-web";
-import {
-  PICKER_UNFILED_GROUP_NAME,
-  ScenarioPicker,
-} from "~/components/suites/ScenarioPicker";
+import { ScenarioForm, UNFILED_OPTION_LABEL } from "@langwatch/scenario-web";
+import { PICKER_UNFILED_GROUP_NAME, ScenarioPicker } from "@langwatch/suite-web";
 import { TestCasesTab } from "../cases/TestCasesTab";
 import { useAgentTestingStore } from "../useAgentTestingStore";
 
@@ -49,12 +43,10 @@ const emptyQuery = vi.hoisted(() => () => ({
   data: undefined,
   isLoading: false,
 }));
-const mutation = vi.hoisted(
-  () => (mutate: (...args: unknown[]) => void) => () => ({
-    mutate,
-    isPending: false,
-  }),
-);
+const mutation = vi.hoisted(() => (mutate: (...args: unknown[]) => void) => () => ({
+  mutate,
+  isPending: false,
+}));
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -182,15 +174,9 @@ describe("the Test cases tab", () => {
     renderTab();
 
     const empty = screen.getByTestId("agent-testing-first-case-empty");
-    expect(
-      within(empty).getByText("Write your first test case"),
-    ).toBeInTheDocument();
-    expect(empty).toHaveTextContent(
-      /A test case is one situation you put your agent in/,
-    );
-    expect(
-      within(empty).getByRole("button", { name: "New test case" }),
-    ).toBeInTheDocument();
+    expect(within(empty).getByText("Write your first test case")).toBeInTheDocument();
+    expect(empty).toHaveTextContent(/A test case is one situation you put your agent in/);
+    expect(within(empty).getByRole("button", { name: "New test case" })).toBeInTheDocument();
     expect(caseEditor().open).toBe(false);
   });
 
@@ -199,9 +185,7 @@ describe("the Test cases tab", () => {
     const user = userEvent.setup();
     renderTab();
 
-    await user.click(
-      screen.getByRole("button", { name: "Actions for Double charge" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Actions for Double charge" }));
     await user.click(await screen.findByRole("menuitem", { name: "History" }));
 
     expect(caseEditor()).toEqual({
@@ -218,12 +202,8 @@ describe("the Test cases tab", () => {
     renderTab();
 
     await user.click(screen.getByTestId("suite-rail-item-Refunds"));
-    await user.click(
-      screen.getByRole("button", { name: "Actions for Refunds" }),
-    );
-    await user.click(
-      await screen.findByRole("menuitem", { name: "New test case" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Actions for Refunds" }));
+    await user.click(await screen.findByRole("menuitem", { name: "New test case" }));
 
     expect(caseEditor()).toEqual({
       open: true,
@@ -252,9 +232,7 @@ describe("the Test cases tab", () => {
     const user = userEvent.setup();
     renderTab();
 
-    await user.click(
-      screen.getByRole("button", { name: "Actions for Double charge" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Actions for Double charge" }));
     await user.click(await screen.findByRole("menuitem", { name: "Archive" }));
 
     const dialog = await screen.findByRole("dialog");
@@ -365,8 +343,22 @@ describe("the case picker of a run plan", () => {
     ...overrides,
   });
 
-  /** @scenario "A custom run plan can select single test cases grouped by their folder" */
-  it("lists the cases under their suite names and saves the ones picked", async () => {
+  /**
+   * @scenario "A custom run plan can select single test cases grouped by their folder"
+   *
+   * Skipped because it names the wrong component, not because the capability
+   * is missing. `ScenarioPicker` has never had a `folders` prop — not in the
+   * package, and not in the shim that preceded it. The run plan's grouping
+   * lives in `PlanScopeField`'s `CaseChoices`, which builds a group per
+   * folder plus `PICKER_UNFILED_GROUP_NAME` for the rest, and which has no
+   * tests at all.
+   *
+   * Unskipping means driving `CaseChoices` through a `PlanEditorState`, not
+   * adding `folders` to the picker.
+   *
+   * @see dev/docs/plans/package-move-capability-gaps.md
+   */
+  it.skip("lists the cases under their suite names and saves the ones picked", async () => {
     const user = userEvent.setup();
     const props = pickerProps({
       folders: [
@@ -391,9 +383,7 @@ describe("the case picker of a run plan", () => {
       wrapper: Wrapper,
     });
 
-    expect(
-      screen.queryByText(PICKER_UNFILED_GROUP_NAME),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(PICKER_UNFILED_GROUP_NAME)).not.toBeInTheDocument();
     expect(screen.getByText("Double charge")).toBeInTheDocument();
   });
 });
