@@ -277,7 +277,7 @@ langwatch run-plan archive <id>
 
 | Flag | Effect |
 |---|---|
-| `--target <type:id>` | What to run against, repeatable. `http:`, `code:` and `workflow:` take an agent id, `prompt:` takes a prompt id. |
+| `--target <type:id>` | What to run against, repeatable. `http:`, `code:` and `workflow:` take an agent id, `prompt:` takes a prompt id. A `?key=value` suffix gives that target its own parameter values. |
 | `--all`, `--test-suite`, `--label`, `--scenario` | The scope. Exactly one kind per run; `--test-suite`, `--label` and `--scenario` repeat. |
 | `--name <text>` | The plan to run under. Left out, the platform names the plan itself. |
 | `--repeat <n>` | How many times to run each scenario, 1 to 5. |
@@ -292,6 +292,36 @@ Add `--format json` (or `-o json`) to any of the three run commands and they pri
 `langwatch test-suite run` and `langwatch scenario run` are shorter forms of the same thing: they run a plan named after the test suite or the scenario and the target, and take `--name`, `--repeat`, `--param`, `--note` and `--wait` the same way.
 
 The `/api/suites` endpoints the older CLI versions called still answer and are deprecated. The commands above use `/api/v1/run-plans` and `/api/v1/test-suites`.
+
+### Compare two agents, or one agent on two models
+
+`--target` is repeatable, and every target runs every scenario of the run. Two targets in one run is a comparison: the batch holds both, and the results page shows one column per target with its own pass rate, duration and cost.
+
+A target may also carry the parameter values it alone runs with, written as a query string after the reference id. The same agent named twice with different values compares that agent on two models.
+
+```bash
+langwatch run-plan run --test-suite "Checkout" \
+  --target 'http:agent_abc123?model=gpt-5' \
+  --target 'http:agent_abc123?model=gpt-5-mini' \
+  --name "Checkout model comparison" --wait
+
+langwatch run-plan run --all \
+  --target http:agent_candidate \
+  --target http:agent_production
+```
+
+Quote the value: the shell reads `?` and `&` itself. Both halves of a pair are percent-decoded, so a reference id or a value that holds `?` or `&` must be written as `%3F` or `%26`. A value is read as the type it looks like, the same rule `--param` uses.
+
+A target value wins over the same name given with `--param`, so `--param` carries what every target shares and the suffix carries what tells the targets apart:
+
+```bash
+langwatch test-suite run "Checkout" \
+  --param account_tier=platinum \
+  --target 'http:agent_abc123?model=gpt-5' \
+  --target 'http:agent_abc123?model=gpt-5-mini'
+```
+
+Both targets run with `account_tier=platinum`, and each one with its own `model`.
 
 ### Pass values into a run
 
