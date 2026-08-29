@@ -268,6 +268,41 @@ describe("EvaluatorApp", () => {
       expect(evaluators.createWithDefaults).not.toHaveBeenCalled();
     });
 
+    /**
+     * The tolerance is read off the type's own settings, so a type the
+     * catalogue does not describe at all — a custom or workflow evaluator —
+     * falls on the tolerant side rather than the refusing one. Getting this
+     * backwards would make every custom evaluator uncreatable in a project
+     * with no embeddings key, for a field it does not have.
+     */
+    it("creates a type the catalogue does not describe, rather than demanding embeddings for it", async () => {
+      const { app, evaluators } = harness({
+        modelProviders: {
+          resolveModelForFeature: vi.fn(async ({ featureKey }: { featureKey: string }) => {
+            if (featureKey === "analytics.topic_clustering_embeddings") {
+              throw new ModelNotConfiguredError(
+                featureKey,
+                "EMBEDDINGS",
+                "Topic clustering embeddings",
+                "project-1",
+              );
+            }
+            return { model: "anthropic/claude-sonnet-4-5" };
+          }),
+        },
+      });
+
+      await app.createWithResolvedDefaults({
+        projectId: "project-1",
+        name: "A workflow evaluator",
+        config: { evaluatorType: "custom/not-in-the-catalogue" },
+      });
+
+      expect(firstCall(evaluators.createWithDefaults)).toMatchObject({
+        resolved: { defaultModel: "anthropic/claude-sonnet-4-5", embeddingsModel: null },
+      });
+    });
+
     it("still refuses when the DEFAULT model itself is unconfigured", async () => {
       const { app, evaluators } = harness({
         modelProviders: {

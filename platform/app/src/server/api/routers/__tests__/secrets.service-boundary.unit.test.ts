@@ -19,7 +19,7 @@ vi.mock("../../rbac", () => ({
 
 vi.mock("~/runtime/app/features/audit-log", () => ({ auditLog: vi.fn() }));
 
-import { secretsRouter } from "../secrets";
+import { secretsRouter } from "~/runtime/app/internal-api/secrets.router";
 
 const secret: Secret = {
   id: "secret-1",
@@ -82,12 +82,13 @@ describe("secrets tRPC compatibility adapter", () => {
     ).resolves.toEqual(secret);
 
     expect(list).toHaveBeenCalledWith({ projectId: "project-1" });
-    expect(create).toHaveBeenCalledWith({
-      projectId: "project-1",
-      name: "MY_SECRET",
-      value: "value",
-      actorId: "user-1",
-    });
+    // The actor rides beside the input, not inside it: `createSecretInputSchema`
+    // omits `actorId` at the transport precisely so a caller cannot name a
+    // different one, and the transport supplies `ctx.actor()` itself.
+    expect(create).toHaveBeenCalledWith(
+      { projectId: "project-1", name: "MY_SECRET", value: "value" },
+      { id: "user-1" },
+    );
   });
 
   it("maps a canonical not-found error to the existing tRPC code", async () => {
