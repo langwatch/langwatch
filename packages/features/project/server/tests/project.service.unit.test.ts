@@ -562,6 +562,8 @@ describe("ProjectService", () => {
         slug: "first",
         teamId: "team_1",
         organizationId: "org",
+        isPersonal: false,
+        ownerUserId: null,
       },
       {
         id: "project_2",
@@ -569,6 +571,8 @@ describe("ProjectService", () => {
         slug: "second",
         teamId: "team_2",
         organizationId: "org",
+        isPersonal: false,
+        ownerUserId: null,
       },
     ]);
 
@@ -583,6 +587,8 @@ describe("ProjectService", () => {
         slug: "first",
         teamId: "team_1",
         organizationId: "org",
+        isPersonal: false,
+        ownerUserId: null,
       },
       {
         id: "project_2",
@@ -590,6 +596,8 @@ describe("ProjectService", () => {
         slug: "second",
         teamId: "team_2",
         organizationId: "org",
+        isPersonal: false,
+        ownerUserId: null,
       },
     ]);
     expect(repository.findNamesByIds).toHaveBeenCalledWith(["project_1", "project_2"]);

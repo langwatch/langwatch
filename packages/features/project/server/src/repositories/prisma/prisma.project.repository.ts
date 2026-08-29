@@ -26,6 +26,10 @@ import {
 } from "@langwatch/project-contract";
 import type { ProjectDatabase } from "../../ports/project.port";
 import {
+  mapProjectIdentityRow,
+  PROJECT_IDENTITY_SELECT,
+} from "./prisma.project.mapper";
+import {
   ProjectRepository,
   type ProjectWithOrgAdmin,
   type TouchCodingAgentActivityInput,
@@ -300,25 +304,10 @@ export class PrismaProjectRepository extends ProjectRepository {
   async tryFindIdentity(id: string): Promise<ProjectIdentity | null> {
     const project = await this.prisma.project.findUnique({
       where: { id },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        teamId: true,
-        team: { select: { organizationId: true } },
-      },
+      select: PROJECT_IDENTITY_SELECT,
     });
-    if (!project) {
-      return null;
-    }
 
-    return {
-      id: project.id,
-      name: project.name,
-      slug: project.slug,
-      teamId: project.teamId,
-      organizationId: project.team.organizationId,
-    };
+    return project ? mapProjectIdentityRow(project) : null;
   }
 
   async findNamesByIds(projectIds: string[]): Promise<ProjectIdentity[]> {
@@ -328,22 +317,10 @@ export class PrismaProjectRepository extends ProjectRepository {
 
     const projects = await this.prisma.project.findMany({
       where: { id: { in: projectIds } },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        teamId: true,
-        team: { select: { organizationId: true } },
-      },
+      select: PROJECT_IDENTITY_SELECT,
     });
 
-    return projects.map((project) => ({
-      id: project.id,
-      name: project.name,
-      slug: project.slug,
-      teamId: project.teamId,
-      organizationId: project.team.organizationId,
-    }));
+    return projects.map(mapProjectIdentityRow);
   }
 
   async findIdsByOrganization(organizationId: string): Promise<string[]> {

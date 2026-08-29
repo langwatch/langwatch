@@ -170,16 +170,13 @@ function registerProjectRoute(secured: SecuredApp<{ Variables: AppRestProjectVar
         },
       },
     }),
-    async (c) => {
-      const identity = c.get("project");
-      // The context carries who the project is, not how it is configured, so
-      // the personal-workspace flag comes from the service that owns it.
-      const project = await services.projects().tryGetById(identity.id);
+    (c) => {
+      const project = c.get("project");
       return c.json({
-        id: identity.id,
-        name: identity.name,
-        slug: identity.slug,
-        isPersonal: project?.isPersonal === true,
+        id: project.id,
+        name: project.name,
+        slug: project.slug,
+        isPersonal: project.isPersonal,
       });
     },
   );

@@ -190,6 +190,10 @@ export const projectIdentitySchema = z
     slug: z.string().min(1),
     teamId: z.string().min(1),
     organizationId: z.string().min(1),
+    /** Whether the workspace belongs to exactly one person. */
+    isPersonal: z.boolean(),
+    /** That person, when the workspace is personal. */
+    ownerUserId: z.string().min(1).nullable(),
   })
   .strict();
 export type ProjectIdentity = z.infer<typeof projectIdentitySchema>;
