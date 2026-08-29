@@ -49,6 +49,11 @@ const CONTRACT_ARTIFACT_SUFFIX = /\.(?:commands|errors|events|queries|service)\.
 const SERVER_PATTERNS = [
   /^index\.ts$/,
   /^testing\.ts$/,
+  // The feature's application: one class, composed from its own services and
+  // ports, that both transports call. It exists so a REST handler and a tRPC
+  // procedure invoke the same operation rather than each assembling their own,
+  // which is the only way the two doors cannot answer differently.
+  new RegExp(`^app/${NAME}\\.app\\.ts$`),
   new RegExp(`^fixtures/${NAME}\\.fixture\\.ts$`),
   new RegExp(`^services/${NAME}\\.service\\.ts$`),
   new RegExp(`^ports/${NAME}\\.port\\.ts$`),
