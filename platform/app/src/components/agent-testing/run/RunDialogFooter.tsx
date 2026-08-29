@@ -42,18 +42,9 @@ export function RunDialogFooter({
     <SmallButton
       variant="solid"
       colorPalette="blue"
-      background={undefined}
-      borderColor="transparent"
       disabled={isRunBlocked}
       loading={controller.isBusy}
       onClick={() => void controller.run()}
-      // A disabled solid button must not brighten on hover: pointer-events
-      // stay off so the hover state cannot fire at all.
-      _disabled={{
-        cursor: "not-allowed",
-        opacity: 0.5,
-        pointerEvents: "none",
-      }}
       data-testid="run-dialog-run"
     >
       <Play size={13} />

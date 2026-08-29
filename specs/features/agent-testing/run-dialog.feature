@@ -395,6 +395,14 @@ Feature: The run dialog
     the newest run plan of its scope, so the scenarios below are answered by
     that plan and never by the suite row.
 
+  @unit
+  Scenario: A solid button of the surface keeps the hover of its own variant
+    Given the small button every Agent Testing surface is drawn with
+    When a caller asks for the solid variant
+    Then the outlined border, the panel background and the quiet hover are left off
+    And the button keeps the hover its own variant gives it
+    And the label stays readable while the pointer is over it
+
   @integration
   Scenario: Confirming a run remembers the target for next time
     Given a test suite with no run plan yet
