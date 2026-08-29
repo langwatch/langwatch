@@ -342,6 +342,8 @@ Two are fixed, and the shape of the win is the argument for the rest:
 | --- | --- | --- |
 | `OpsReplayRunner` (5 methods) | `Promise<unknown>` | `ReplayStatus`, `ReplayHistoryEntry[]` |
 | `OpsProcessExplorer` (20 methods) | `Promise<unknown>` | `ProcessFleetSummary[]`, `ProcessInstanceRow[]`, … |
+| `OpsEventExplorer` (4 methods) | `Promise<unknown>` | `AggregateDiscovery`, `AggregateSearchResult[]`, … |
+| `LimitsTrpcPorts.getUsageStats` | `Promise<unknown>` | `UsageStats` |
 
 Neither type was missing — both implementations have always declared them.
 They lived in `platform/app`, where a feature package cannot name them, so the
@@ -350,13 +352,14 @@ move the extraction wants anyway, and it is what makes the operator pages
 type-checked for the first time.
 
 ```text
-1018 -> 902 errors, and 172 -> 103 of the `{}` reads
+1018 -> 852 errors, and 172 -> 70 of the `{}` reads
 ```
 
-The remaining 103 are the same shape in other features. `OpsEventExplorer`'s
-four operations are the harder residue: unlike the manager explorer, its
-implementation declares no return types either, so naming them is a reading of
-the ClickHouse rows rather than a move.
+The remaining 70 are the same shape in other features — `annotation.*`,
+`llmModelCost.previewMatchingSpans`, `ingestionSources.*` are the next
+clusters. Each is the same repair, and each is a step the extraction wants
+regardless: the vocabulary belongs in the contract, and the typed screen is
+what it buys on the way.
 
 ## Verification
 
