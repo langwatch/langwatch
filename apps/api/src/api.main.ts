@@ -10,9 +10,19 @@ import {
 } from "./platform/config/api.config";
 import { installApiSignalHandlers, type ApiSignalHandlerOptions } from "./api.signal-handlers";
 
+/** The address a started API process is listening on, when it binds one. */
+export type ApiListenerAddress = Readonly<{ host: string; port: number }>;
+
 /** The closed API process built by a runtime composition root. */
 export abstract class ApiRuntimeProcessPort {
-  abstract start(): Promise<unknown>;
+  /**
+   * The bound address, or nothing for a process composed without a listener.
+   *
+   * Declared rather than left as `unknown`: every implementation answers this
+   * shape, and a caller that has to reach for the port a test binds could not
+   * read it through the port at all.
+   */
+  abstract start(): Promise<ApiListenerAddress | undefined>;
 
   abstract close(): Promise<void>;
 }
@@ -95,7 +105,7 @@ export class ApiRuntimeBootstrap {
     private readonly logger: Pick<Logger, "error" | "info">,
   ) {}
 
-  start(): Promise<unknown> {
+  start(): Promise<ApiListenerAddress | undefined> {
     return this.process.start();
   }
 

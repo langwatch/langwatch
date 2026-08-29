@@ -1,0 +1,416 @@
+import { ApiKeyService, type ResolvedApiKeyToken } from "@langwatch/api-key-contract";
+import { AuthzService } from "@langwatch/authz-contract";
+import { describe, expect, it, vi } from "vitest";
+import {
+  ApiKeyRestSecurityAdapter,
+  ApiRestAuthenticationError,
+} from "../api-key-rest-security.adapter";
+import { ApiAuditPort } from "../../api-request.policy";
+
+const currentKey: ResolvedApiKeyToken = {
+  type: "apiKey",
+  apiKeyId: "key-1",
+  userId: "user-1",
+  organizationId: "org-1",
+  ingestSourceType: null,
+  ingestionTemplateId: null,
+  project: {
+    id: "project-1",
+    name: "Project one",
+    slug: "project-one",
+    teamId: "team-1",
+    organizationId: "org-1",
+    isPersonal: false,
+    ownerUserId: null,
+  },
+};
+
+describe("ApiKeyRestSecurityAdapter", () => {
+  it("passes the exact X-Project-Id target to canonical current-key resolution", async () => {
+    const apiKeys = new TestApiKeys();
+    apiKeys.tryResolveToken.mockResolvedValue(currentKey);
+    const security = ApiKeyRestSecurityAdapter.create({ apiKeys, authz: new TestAuthz() });
+
+    await expect(
+      security.authenticate(
+        new Request("http://api.test/api/secret", {
+          headers: {
+            authorization: "Bearer sk-lw-token",
+            "X-Project-Id": "project-1",
+          },
+        }),
+      ),
+    ).resolves.toEqual({
+      project: currentKey.project,
+      actor: { id: "user-1" },
+      apiKeyId: "key-1",
+      organizationId: "org-1",
+      isLangySessionKey: false,
+    });
+    expect(apiKeys.tryResolveToken).toHaveBeenCalledWith({
+      token: "sk-lw-token",
+      projectId: "project-1",
+    });
+  });
+
+  it("keeps Basic's encoded project target and falls back to X-Auth-Token for malformed Basic", async () => {
+    const apiKeys = new TestApiKeys();
+    apiKeys.tryResolveToken.mockResolvedValue(currentKey);
+    const security = ApiKeyRestSecurityAdapter.create({ apiKeys, authz: new TestAuthz() });
+
+    await security.authenticate(
+      new Request("http://api.test/api/secret", {
+        headers: {
+          authorization: `Basic ${Buffer.from("project-1:basic-token").toString("base64")}`,
+        },
+      }),
+    );
+    await security.authenticate(
+      new Request("http://api.test/api/secret", {
+        headers: { authorization: "Basic malformed", "X-Auth-Token": "fallback-token" },
+      }),
+    );
+
+    expect(apiKeys.tryResolveToken).toHaveBeenNthCalledWith(1, {
+      token: "basic-token",
+      projectId: "project-1",
+    });
+    expect(apiKeys.tryResolveToken).toHaveBeenNthCalledWith(2, {
+      token: "fallback-token",
+      projectId: null,
+    });
+  });
+
+  it("keeps legacy project keys actorless and outside the permission ceiling", async () => {
+    const apiKeys = new TestApiKeys();
+    apiKeys.tryResolveToken.mockResolvedValue({
+      type: "legacyProjectKey",
+      project: currentKey.project,
+    });
+    const authz = new TestAuthz();
+    const security = ApiKeyRestSecurityAdapter.create({ apiKeys, authz });
+
+    const request = await security.authenticate(
+      new Request("http://api.test/api/secret", {
+        headers: { "X-Auth-Token": "legacy-token", "X-Project-Id": "other-project" },
+      }),
+    );
+    await security.authorize({ request, permission: "secrets:manage" });
+
+    expect(request).toEqual({ project: currentKey.project, actor: null });
+    expect(authz.hasApiKeyPermission).not.toHaveBeenCalled();
+  });
+
+  it("delegates current key ceilings to canonical AuthZ with resolved project lineage", async () => {
+    const apiKeys = new TestApiKeys();
+    apiKeys.tryResolveToken.mockResolvedValue(currentKey);
+    const authz = new TestAuthz();
+    authz.hasApiKeyPermission.mockResolvedValue(false);
+    const security = ApiKeyRestSecurityAdapter.create({ apiKeys, authz });
+    const request = await security.authenticate(
+      new Request("http://api.test/api/secret", {
+        headers: { authorization: "Bearer current-token", "X-Project-Id": "project-1" },
+      }),
+    );
+
+    await expect(
+      security.authorize({ request, permission: "secrets:manage" }),
+    ).rejects.toMatchObject({
+      code: "api_key_permission_denied",
+      httpStatus: 403,
+    });
+    expect(authz.hasApiKeyPermission).toHaveBeenCalledWith({
+      apiKeyId: "key-1",
+      userId: "user-1",
+      organizationId: "org-1",
+      scope: { type: "project", id: "project-1", teamId: "team-1" },
+      permission: "secrets:manage",
+    });
+  });
+
+  it("keeps Langy's never-delegable ceiling refusal distinct", async () => {
+    const apiKeys = new TestApiKeys();
+    apiKeys.tryResolveToken.mockResolvedValue({ ...currentKey, isLangySessionKey: true });
+    const authz = new TestAuthz();
+    authz.hasApiKeyPermission.mockResolvedValue(false);
+    const security = ApiKeyRestSecurityAdapter.create({ apiKeys, authz });
+    const request = await security.authenticate(
+      new Request("http://api.test/api/secret", {
+        headers: { authorization: "Bearer current-token", "X-Project-Id": "project-1" },
+      }),
+    );
+
+    await expect(
+      security.authorize({ request, permission: "triggers:create" }),
+    ).rejects.toMatchObject({
+      code: "api_key_permission_not_delegable",
+      httpStatus: 403,
+    });
+  });
+
+  it("marks a current key as used and audits a successful attributed mutation", async () => {
+    const apiKeys = new TestApiKeys();
+    apiKeys.tryResolveToken.mockResolvedValue(currentKey);
+    const audit = new TestAudit();
+    const security = ApiKeyRestSecurityAdapter.create({
+      apiKeys,
+      authz: new TestAuthz(),
+      audit,
+    });
+    const request = await security.authenticate(
+      new Request("http://api.test/api/secret", {
+        headers: { authorization: "Bearer current-token", "X-Project-Id": "project-1" },
+      }),
+    );
+
+    await security.complete({ request, method: "POST", path: "/api/secret", status: 201 });
+
+    expect(apiKeys.markUsed).toHaveBeenCalledWith({ id: "key-1" });
+    expect(audit.record).toHaveBeenCalledWith({
+      actorId: "user-1",
+      path: "/api/secret",
+      input: { method: "POST", projectId: "project-1", status: 201 },
+      error: null,
+    });
+  });
+
+  it("does not mark or audit a legacy project key after a successful response", async () => {
+    const apiKeys = new TestApiKeys();
+    apiKeys.tryResolveToken.mockResolvedValue({
+      type: "legacyProjectKey",
+      project: currentKey.project,
+    });
+    const audit = new TestAudit();
+    const security = ApiKeyRestSecurityAdapter.create({
+      apiKeys,
+      authz: new TestAuthz(),
+      audit,
+    });
+    const request = await security.authenticate(
+      new Request("http://api.test/api/secret", { headers: { "X-Auth-Token": "legacy-token" } }),
+    );
+
+    await security.complete({ request, method: "DELETE", path: "/api/secret/1", status: 200 });
+
+    expect(apiKeys.markUsed).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
+  it("distinguishes missing from invalid credentials", async () => {
+    const apiKeys = new TestApiKeys();
+    const security = ApiKeyRestSecurityAdapter.create({ apiKeys, authz: new TestAuthz() });
+
+    await expect(
+      security.authenticate(new Request("http://api.test/api/secret")),
+    ).rejects.toBeInstanceOf(ApiRestAuthenticationError);
+    apiKeys.tryResolveToken.mockResolvedValue(null);
+    await expect(
+      security.authenticate(
+        new Request("http://api.test/api/secret", { headers: { "X-Auth-Token": "bad-token" } }),
+      ),
+    ).rejects.toMatchObject({ code: "invalid_credentials", httpStatus: 401 });
+  });
+});
+
+class TestApiKeys extends ApiKeyService {
+  readonly tryResolveToken = vi.fn<ApiKeyService["tryResolveToken"]>();
+  readonly markUsed = vi.fn();
+
+  private unavailable(): never {
+    throw new Error("Unexpected API-key service call");
+  }
+
+  create() {
+    return this.unavailable();
+  }
+  update() {
+    return this.unavailable();
+  }
+  tryVerify() {
+    return this.unavailable();
+  }
+  regenerateLegacyProjectKey() {
+    return this.unavailable();
+  }
+  resolveOrganizationToken() {
+    return this.unavailable();
+  }
+  resolveVisibleProjects() {
+    return this.unavailable();
+  }
+  list() {
+    return this.unavailable();
+  }
+  listAll() {
+    return this.unavailable();
+  }
+  revoke() {
+    return this.unavailable();
+  }
+  ensureCallerIsOrgMember() {
+    return this.unavailable();
+  }
+  assertSelectionWithinCeiling() {
+    return this.unavailable();
+  }
+  isOrgAdmin() {
+    return this.unavailable();
+  }
+  isOrgAdminApiKey() {
+    return this.unavailable();
+  }
+  tryGetById() {
+    return this.unavailable();
+  }
+  getByIdForCaller() {
+    return this.unavailable();
+  }
+  tryGetNameByIdInOrg() {
+    return this.unavailable();
+  }
+  getUserBindings() {
+    return this.unavailable();
+  }
+  getOrgProjects() {
+    return this.unavailable();
+  }
+  getOrgTeams() {
+    return this.unavailable();
+  }
+  getOrgMembers() {
+    return this.unavailable();
+  }
+  tryGetIngestionKey() {
+    return this.unavailable();
+  }
+  listIngestionKeysForProject() {
+    return this.unavailable();
+  }
+  validateCliSelection() {
+    return this.unavailable();
+  }
+  tryResolveDefaultCliSelection() {
+    return this.unavailable();
+  }
+  mintCliLoginKey() {
+    return this.unavailable();
+  }
+  revokeCliLoginKeysForDevice() {
+    return this.unavailable();
+  }
+  revokeCliLoginKeyForLogout() {
+    return this.unavailable();
+  }
+  enrichBindingsWithNames() {
+    return this.unavailable();
+  }
+  enrichApiKeyList() {
+    return this.unavailable();
+  }
+}
+
+class TestAudit extends ApiAuditPort {
+  readonly record = vi.fn(async () => undefined);
+}
+
+class TestAuthz extends AuthzService {
+  readonly hasApiKeyPermission = vi.fn<AuthzService["hasApiKeyPermission"]>();
+
+  private unavailable(): never {
+    throw new Error("Unexpected AuthZ service call");
+  }
+
+  check() {
+    return this.unavailable();
+  }
+  checkDetailed() {
+    return this.unavailable();
+  }
+  can() {
+    return this.unavailable();
+  }
+  authorize() {
+    return this.unavailable();
+  }
+  effectivePermissions() {
+    return this.unavailable();
+  }
+  checkByIds() {
+    return this.unavailable();
+  }
+  canAnyByIds() {
+    return this.unavailable();
+  }
+  canBatchByIds() {
+    return this.unavailable();
+  }
+  tryResolveScope() {
+    return this.unavailable();
+  }
+  checkScopeLineage() {
+    return this.unavailable();
+  }
+  explainDecision() {
+    return this.unavailable();
+  }
+  getDecision() {
+    return this.unavailable();
+  }
+  getProjectAnyDecision() {
+    return this.unavailable();
+  }
+  hasPermission() {
+    return this.unavailable();
+  }
+  authorizePermission() {
+    return this.unavailable();
+  }
+  authorizeProjectPermission() {
+    return this.unavailable();
+  }
+  getApiKeyProjectDecision() {
+    return this.unavailable();
+  }
+  listUserBindings() {
+    return this.unavailable();
+  }
+  listOrganizationBindings() {
+    return this.unavailable();
+  }
+  listUserAndGroupBindings() {
+    return this.unavailable();
+  }
+  listScopeBindings() {
+    return this.unavailable();
+  }
+  listGroupBindings() {
+    return this.unavailable();
+  }
+  listTeamMemberBindings() {
+    return this.unavailable();
+  }
+  listBindingsForSynthesis() {
+    return this.unavailable();
+  }
+  listUserCreatedRoles() {
+    return this.unavailable();
+  }
+  wouldFirstBindingDisableLegacyAccess() {
+    return this.unavailable();
+  }
+  listManagedBindingsForUser() {
+    return this.unavailable();
+  }
+  listManagedBindingsForOrganization() {
+    return this.unavailable();
+  }
+  getAccessBreakdown() {
+    return this.unavailable();
+  }
+  isOnEngine() {
+    return this.unavailable();
+  }
+  tryGetEngineCutoverAt() {
+    return this.unavailable();
+  }
+}
