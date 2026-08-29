@@ -93,18 +93,44 @@ const callerQueueItemsFilter = ({
   };
 };
 
+/**
+ * Only what the member list renders: the avatar and its tooltip.
+ *
+ * `include: { user: true }` selected every User column — `email`,
+ * `emailVerified`, `pendingSsoSetup`, `twoFactorEnabled`, `lastLoginAt`,
+ * `deactivatedAt`, `lastHomePath` and the per-user `userHashKey` that
+ * ADR-101 §4 mints for identity event hashing — and `getQueueBySlugOrId`
+ * returns this row unmodified with no output schema, so all of it reached
+ * the browser for every member of every queue a viewer could open.
+ *
+ * The sibling `getByTraceIds` read was corrected the same way, and its note
+ * says the same thing; this one was missed. The two screens that read a
+ * member use `id`, `name` and `image`.
+ */
 const queueMemberInclude = (organizationId: string) => ({
   where: {
     user: {
       orgMemberships: { some: { organizationId } },
     },
   },
-  include: { user: true },
+  select: {
+    user: { select: { id: true, name: true, image: true } },
+  },
 });
 
+/**
+ * A person on an item, as the item lists render them: an avatar and a name.
+ * Same reason as {@link queueMemberInclude} — a bare `user: true` publishes
+ * every User column to the browser.
+ */
+const reviewerSelect = { select: { id: true, name: true, image: true } };
+
+/** Only the score's identity and its label, which is all the picker shows. */
 const queueScoreInclude = (projectId: string) => ({
   where: { annotationScore: { projectId } },
-  include: { annotationScore: true },
+  select: {
+    annotationScore: { select: { id: true, name: true } },
+  },
 });
 
 /**
@@ -235,8 +261,8 @@ export function createPrismaAnnotationQueueStore(prisma: PrismaClient) {
       return prisma.annotationQueueItem.findMany({
         where: queueItemReferenceFilter({ projectId, organizationId }),
         include: {
-          user: true,
-          createdByUser: true,
+          user: reviewerSelect,
+          createdByUser: reviewerSelect,
           annotationQueue: {
             include: {
               members: {
@@ -429,8 +455,8 @@ export function createPrismaAnnotationQueueStore(prisma: PrismaClient) {
         take: allQueueItems ? void 0 : pageSize,
         skip: allQueueItems ? void 0 : pageOffset,
         include: {
-          user: true,
-          createdByUser: true,
+          user: reviewerSelect,
+          createdByUser: reviewerSelect,
           annotationQueue: {
             include: {
               members: queueMemberInclude(organizationId),
@@ -463,7 +489,7 @@ export function createPrismaAnnotationQueueStore(prisma: PrismaClient) {
               projectId,
               OR: [{ userId: null }, { user: { orgMemberships: { some: { organizationId } } } }],
             },
-            include: { user: true, annotationQueue: true },
+            include: { user: reviewerSelect, annotationQueue: true },
           },
         },
         orderBy: { createdAt: "desc" },
