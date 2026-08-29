@@ -34,7 +34,20 @@ export const runPlanScopeSchema = z.discriminatedUnion("mode", [
     .describe("The scenarios named in scenarioIds, picked by hand"),
 ]);
 
-/** One thing a plan runs its scenarios against. */
+/** The values a run supplies for the parameters its scenarios declare. */
+export const runParametersSchema = z.record(
+  z.string(),
+  z.union([z.string(), z.number(), z.boolean()]),
+);
+
+/**
+ * One thing a plan runs its scenarios against, and the values that target
+ * alone runs with.
+ *
+ * The parameters are what makes a comparison run: two targets may name the
+ * same agent with different values, and the platform runs and reports each one
+ * on its own.
+ */
 export const runPlanTargetSchema = z.object({
   type: z
     .enum(["prompt", "http", "code", "workflow"])
@@ -42,10 +55,34 @@ export const runPlanTargetSchema = z.object({
   referenceId: z
     .string()
     .describe("The ID of the prompt, agent or workflow to run against"),
+  parameters: runParametersSchema
+    .optional()
+    .describe(
+      "Parameter values this target alone runs with, by name. They override the run-level parameters for this target. Name the same agent twice with different values here to compare it on two models.",
+    ),
 });
 
-/** The values a run supplies for the parameters its scenarios declare. */
-export const runParametersSchema = z.record(
-  z.string(),
-  z.union([z.string(), z.number(), z.boolean()]),
-);
+/**
+ * One target as `/api/v1` carries it.
+ *
+ * The tool input spells the per-target values `parameters`, beside the
+ * run-level `parameters` an agent already knows. The REST body spells them
+ * `runParameters`, because a target holds the values it runs with rather than
+ * the values of a run.
+ */
+export interface RunPlanTargetWire {
+  type: z.infer<typeof runPlanTargetSchema>["type"];
+  referenceId: string;
+  runParameters?: z.infer<typeof runParametersSchema>;
+}
+
+/** The targets of a tool call, as the REST body carries them. */
+export function toWireTargets(
+  targets: z.infer<typeof runPlanTargetSchema>[],
+): RunPlanTargetWire[] {
+  return targets.map((target) => ({
+    type: target.type,
+    referenceId: target.referenceId,
+    ...(target.parameters ? { runParameters: target.parameters } : {}),
+  }));
+}

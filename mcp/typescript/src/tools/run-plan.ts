@@ -4,6 +4,7 @@ import {
   type RunPlanScope,
   type RunPlanTarget,
 } from "../langwatch-api-run-plans.js";
+import { toWireTargets } from "../schemas/run-plan.js";
 import { formatRunPlanRun } from "./format-run-plan.js";
 
 /**
@@ -25,7 +26,7 @@ export async function handleRunPlan(params: {
     name: params.name,
     config: {
       scope: params.scope,
-      targets: params.targets,
+      targets: toWireTargets(params.targets),
       repeatCount: params.repeatCount,
       simulatorModel: params.simulatorModel,
       judgeModel: params.judgeModel,

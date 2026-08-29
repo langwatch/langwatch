@@ -2,6 +2,7 @@ import type {
   RunParameters,
   RunPlanTarget,
 } from "../langwatch-api-run-plans.js";
+import { toWireTargets } from "../schemas/run-plan.js";
 import { runTestSuite as apiRunTestSuite } from "../langwatch-api-test-suites.js";
 import { formatRunPlanRun } from "./format-run-plan.js";
 
@@ -19,8 +20,11 @@ export async function handleRunTestSuite(params: {
   note?: string;
   idempotencyKey?: string;
 }): Promise<string> {
-  const { id, ...data } = params;
-  const result = await apiRunTestSuite(id, data);
+  const { id, targets, ...data } = params;
+  const result = await apiRunTestSuite(id, {
+    ...data,
+    targets: toWireTargets(targets),
+  });
 
   return formatRunPlanRun(result);
 }
