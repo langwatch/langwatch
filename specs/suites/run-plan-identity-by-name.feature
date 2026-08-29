@@ -242,7 +242,7 @@ Feature: A run plan is identified by its name
     Given a run against "prod-agent" and against "prod-agent" with the override "model=gpt-5-mini"
     When the targets are sorted for storage
     Then both are kept
-    And they are sorted by their target key, so the order is the same on every run
+    And they are sorted by type, reference id and parameters, read as "type:referenceId|k=v,k2=v2", so the order is the same on every run and the same one the run dialog shows
 
   @integration
   Scenario: Two identical targets are refused

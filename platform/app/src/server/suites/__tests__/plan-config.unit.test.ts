@@ -12,9 +12,8 @@ import {
   normalizePlanScope,
   scopeKey,
   sortSuiteTargets,
-  suiteTargetSortKey,
 } from "../plan-config";
-import { targetKeyOf } from "../target-key";
+import { targetSortKey } from "../target-key";
 import type { SuiteTarget } from "../types";
 
 /** A Prisma stand-in that answers only the test suite read the normalise makes. */
@@ -126,7 +125,10 @@ describe("sortSuiteTargets", () => {
 
       expect(sortSuiteTargets([mini, plain])).toEqual([plain, mini]);
       expect(sortSuiteTargets([plain, mini])).toEqual([plain, mini]);
-      expect(suiteTargetSortKey(mini)).toBe(`http:${targetKeyOf(mini)}`);
+      // The readable string, never the hash: the run dialog sorts by the same
+      // one, so the columns keep the order the dialog showed.
+      expect(targetSortKey(mini)).toBe("http:prod-agent|model=gpt-5-mini");
+      expect(targetSortKey(plain)).toBe("http:prod-agent|");
     });
   });
 });

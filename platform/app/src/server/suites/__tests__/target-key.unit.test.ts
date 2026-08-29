@@ -12,6 +12,7 @@ import {
   targetKeyOf,
   targetLabelOf,
   targetParametersLabel,
+  targetSortKey,
 } from "../target-key";
 
 /** The first eight hex characters of node's own SHA-1, the reference answer. */
@@ -145,6 +146,44 @@ describe("targetParametersLabel", () => {
   it("reads empty when there are none", () => {
     expect(targetParametersLabel(undefined)).toBe("");
     expect(targetParametersLabel({})).toBe("");
+  });
+});
+
+describe("targetSortKey", () => {
+  /** @scenario "The same agent twice with different parameters is two targets" */
+  it("reads type, reference id and the sorted overrides, with no spaces", () => {
+    expect(
+      targetSortKey({
+        type: "http",
+        referenceId: "prod-agent",
+        runParameters: { seats: 12, model: "gpt-5-mini" },
+      }),
+    ).toBe("http:prod-agent|model=gpt-5-mini,seats=12");
+  });
+
+  it("ends at the bar when there are no overrides", () => {
+    expect(targetSortKey({ type: "http", referenceId: "prod-agent" })).toBe(
+      "http:prod-agent|",
+    );
+    expect(
+      targetSortKey({
+        type: "http",
+        referenceId: "prod-agent",
+        runParameters: {},
+      }),
+    ).toBe("http:prod-agent|");
+  });
+
+  it("never carries the hash", () => {
+    const target = {
+      type: "http",
+      referenceId: "prod-agent",
+      runParameters: { model: "gpt-5-mini" },
+    };
+
+    expect(targetSortKey(target)).not.toContain(
+      splitTargetKey(targetKeyOf(target)).hash,
+    );
   });
 });
 

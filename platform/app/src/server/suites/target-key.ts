@@ -84,10 +84,37 @@ export function splitTargetKey(key: string): {
 export function targetParametersLabel(
   runParameters: RunParameterValues | undefined,
 ): string {
-  if (!hasParameterOverrides(runParameters)) return "";
-  return sortedEntries(runParameters)
-    .map(([name, value]) => `${name}=${value}`)
-    .join(", ");
+  return parameterPairs(runParameters).join(", ");
+}
+
+/**
+ * The string a target sorts under: `type:referenceId|k=v,k2=v2`, the
+ * overrides sorted by name, nothing after the `|` when there are none.
+ *
+ * Readable on purpose, and the one string the run dialog and the server both
+ * sort by, so the columns of a run keep the order the dialog showed them in.
+ * The hash lives in {@link targetKeyOf} alone.
+ */
+export function targetSortKey({
+  type,
+  referenceId,
+  runParameters,
+}: {
+  type: string;
+  referenceId: string;
+  runParameters?: RunParameterValues;
+}): string {
+  return `${type}:${referenceId}|${parameterPairs(runParameters).join(",")}`;
+}
+
+/** The overrides as `k=v` pairs, sorted by name. */
+function parameterPairs(
+  runParameters: RunParameterValues | undefined,
+): string[] {
+  if (!hasParameterOverrides(runParameters)) return [];
+  return sortedEntries(runParameters).map(
+    ([name, value]) => `${name}=${value}`,
+  );
 }
 
 /**
