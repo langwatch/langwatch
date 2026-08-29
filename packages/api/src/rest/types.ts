@@ -186,6 +186,19 @@ export interface EndpointDef {
   auth?: "default" | "none" | MiddlewareHandler;
   /** Permission enforced by the framework after authentication. */
   permission?: AuthzPermission;
+  /**
+   * The input field naming the scope the permission is about.
+   *
+   * Set when the endpoint's input carries a tenant id, which the type-state
+   * makes mandatory in that case. The framework then compares the id the
+   * REQUEST named against the scope the CREDENTIAL resolved to, and refuses
+   * when they differ — a caller holding `project:view` in their own project
+   * must not read a different one by naming it in the body.
+   *
+   * Absent means the credential's own scope is the whole answer, which is
+   * only reachable when the input names no scope at all.
+   */
+  permissionScope?: string;
   /** Written reason this endpoint deliberately has no permission check. */
   noPermission?: { reason: string };
   /** Resource limit type — requires `_legacy.resourceLimitMiddleware` on the service. */

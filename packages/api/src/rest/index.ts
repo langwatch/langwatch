@@ -11,7 +11,18 @@
 
 export { createRestService, createService, GroupRegistrar, ServiceBuilder } from "./builder.js";
 export type { RestService } from "./builder.js";
-export type { DefaultsChain, RestChain, RouteChain, SseChain } from "./definition.js";
+export type {
+  DefaultsChain,
+  PermissionScope,
+  RestChain,
+  RestEndpoint,
+  RestEndpointHandler,
+  RestHandlerResult,
+  RouteChain,
+  ScopeIdKey,
+  ScopeIdsIn,
+  SseChain,
+} from "./definition.js";
 export { loggerMiddleware, tracerMiddleware } from "./middleware.js";
 export {
   restVersionSelectorMiddleware,

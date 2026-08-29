@@ -416,6 +416,7 @@ describe("modern REST", () => {
         endpoint
           .withInput(z.object({ projectId: z.string() }))
           .withOutput(z.object({ ok: z.boolean() }))
+          .withPermissionScope("projectId")
           .handle(async () => {
             handlerCalls++;
             return { ok: true };

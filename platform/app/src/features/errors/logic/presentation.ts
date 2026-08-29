@@ -1365,6 +1365,18 @@ const presentations = {
     title: "That API key isn't in this organization",
     describe: () => "Pick an API key that belongs to this organization.",
   },
+  scope_input_mismatch: {
+    // Names the FIELD, never what the credential does cover: which team or
+    // organization this key can reach is the question the refusal withholds.
+    // Same rule as `scope_not_in_organization` below.
+    title: "That isn't the workspace this key can reach",
+    describe: (error) => {
+      const field = str(error, "field", "");
+      return field
+        ? `The ${field} in this request belongs to a different workspace than the API key. Use a key for that workspace, or remove the ${field}.`
+        : "This request names a different workspace than the API key can reach. Use a key for that workspace.";
+    },
+  },
   scope_not_in_organization: {
     // Names the KIND of scope, never the id: the id belongs to a record in
     // another organization, which is exactly what this guard refuses to

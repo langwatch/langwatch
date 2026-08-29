@@ -638,35 +638,35 @@ export interface RestService<
     version: DateVersion,
     define: (
       endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
-    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true, boolean>,
   ): this;
   post<TPath extends string>(
     path: TPath,
     version: DateVersion,
     define: (
       endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
-    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true, boolean>,
   ): this;
   put<TPath extends string>(
     path: TPath,
     version: DateVersion,
     define: (
       endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
-    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true, boolean>,
   ): this;
   patch<TPath extends string>(
     path: TPath,
     version: DateVersion,
     define: (
       endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
-    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true, boolean>,
   ): this;
   delete<TPath extends string>(
     path: TPath,
     version: DateVersion,
     define: (
       endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
-    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true, boolean>,
   ): this;
   withdraw(method: HttpMethod, path: string, version: DateVersion): this;
   build(): Hono;
@@ -746,7 +746,7 @@ class RestServiceBuilder<
     version: DateVersion,
     define: (
       endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
-    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true, boolean>,
   ): this {
     return this.register("get", path, version, define);
   }
@@ -756,7 +756,7 @@ class RestServiceBuilder<
     version: DateVersion,
     define: (
       endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
-    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true, boolean>,
   ): this {
     return this.register("post", path, version, define);
   }
@@ -766,7 +766,7 @@ class RestServiceBuilder<
     version: DateVersion,
     define: (
       endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
-    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true, boolean>,
   ): this {
     return this.register("put", path, version, define);
   }
@@ -776,7 +776,7 @@ class RestServiceBuilder<
     version: DateVersion,
     define: (
       endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
-    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true, boolean>,
   ): this {
     return this.register("patch", path, version, define);
   }
@@ -786,7 +786,7 @@ class RestServiceBuilder<
     version: DateVersion,
     define: (
       endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
-    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true, boolean>,
   ): this {
     return this.register("delete", path, version, define);
   }
@@ -806,7 +806,7 @@ class RestServiceBuilder<
     version: DateVersion,
     define: (
       endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
-    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true, boolean>,
   ): this {
     const endpoint = new RestEndpointBuilder();
     const authoring: RestEndpoint<

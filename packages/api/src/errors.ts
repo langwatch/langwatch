@@ -41,6 +41,26 @@ export class ProjectInputMismatchError extends HandledError {
   }
 }
 
+/**
+ * The request named a tenant its credential did not resolve to.
+ *
+ * Distinct from {@link ProjectInputMismatchError} only in which scope was
+ * named; that one keeps its own code because customers already see it. `meta`
+ * carries the field name so a client can mark the offending input, and
+ * nothing else: which organization or team the credential DOES cover is the
+ * question the refusal exists to withhold.
+ */
+export class ScopeInputMismatchError extends HandledError {
+  constructor(scope: string) {
+    super(
+      "scope_input_mismatch",
+      "The requested scope is not the scope authorized for this request",
+      { httpStatus: 403, meta: { field: scope } },
+    );
+    this.name = "ScopeInputMismatchError";
+  }
+}
+
 export class AuthenticatedActorRequiredError extends HandledError {
   constructor() {
     super("authenticated_actor_required", "This operation requires a credential bound to a user", {

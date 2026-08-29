@@ -15,6 +15,7 @@ import {
   ApiVersionConflictError,
   EndpointWithdrawnError,
   ProjectInputMismatchError,
+  ScopeInputMismatchError,
 } from "../errors.js";
 import {
   createApiSchemaError,
@@ -101,7 +102,7 @@ export function buildEndpointMiddlewareStack<TProject>(
         paramSource: options.paramSource ?? "route",
       }),
     );
-    stack.push(projectInputMiddleware(serviceConfig));
+    stack.push(projectInputMiddleware(serviceConfig, config));
   }
   appendPermissionMiddleware({ stack, config, serviceConfig });
   stack.push(
@@ -699,13 +700,26 @@ function handlerMiddleware<TProject>({
   };
 }
 
-function projectInputMiddleware(serviceConfig: ServiceConfig): MiddlewareHandler {
+function projectInputMiddleware(
+  serviceConfig: ServiceConfig,
+  config: EndpointDef,
+): MiddlewareHandler {
   return async (context, next) => {
-    assertAuthorizedProjectInput({
-      context,
-      input: context.get(ENDPOINT_INPUT),
-      required: serviceConfig.projectIdInput === true,
-    });
+    const input = context.get(ENDPOINT_INPUT);
+    // An endpoint that bound its permission to a scope says so itself, which
+    // is stronger than the service-wide flag: the flag cannot say WHICH field
+    // an endpoint's permission is about, it only knows `projectId`, and it is
+    // off by default — so every endpoint on a service that never opted in was
+    // authorized against the credential while its handler read the input.
+    if (config.permissionScope) {
+      assertAuthorizedScopeInput({ context, input, scope: config.permissionScope });
+    } else {
+      assertAuthorizedProjectInput({
+        context,
+        input,
+        required: serviceConfig.projectIdInput === true,
+      });
+    }
     await next();
   };
 }
@@ -728,5 +742,60 @@ function assertAuthorizedProjectInput({
     inputProject.data.projectId !== authorizedProject.data.id
   ) {
     throw new ProjectInputMismatchError();
+  }
+}
+
+/**
+ * Where the credential's own value for each scope lives on the request.
+ *
+ * `teamId` reads off the authenticated project rather than a context key of
+ * its own: a project credential resolves to exactly one team, and that team is
+ * the only one it may speak for.
+ */
+const SCOPE_SOURCES: Record<string, (context: Context) => unknown> = {
+  projectId: (context) => readField(context.get("project"), "id"),
+  teamId: (context) => readField(context.get("project"), "teamId"),
+  organizationId: (context) => readField(context.get("organization"), "id"),
+  userId: (context) => context.get("apiKeyUserId"),
+};
+
+function readField(value: unknown, field: string): unknown {
+  const parsed = z.object({ [field]: z.string() }).safeParse(value);
+  return parsed.success ? parsed.data[field] : undefined;
+}
+
+/**
+ * Refuses a request that names a scope its credential did not resolve to.
+ *
+ * The endpoint declared which input field its permission is about, so this
+ * compares that field against what authentication established. Holding
+ * `project:view` in one project is not permission to name a different one in
+ * the body — and until the endpoint could say which field it meant, nothing
+ * compared them unless the whole service had opted in.
+ *
+ * Fail-closed on purpose: a scope this cannot resolve a credential value for
+ * is refused rather than waved through, because the alternative is a check
+ * that silently does nothing.
+ */
+function assertAuthorizedScopeInput({
+  context,
+  input,
+  scope,
+}: {
+  context: Context;
+  input: unknown;
+  scope: string;
+}): void {
+  // projectId keeps its own refusal: it is the one scope with an established
+  // error code, and changing what a caller sees is not this change's business.
+  if (scope === "projectId") {
+    assertAuthorizedProjectInput({ context, input, required: true });
+    return;
+  }
+
+  const named = readField(input, scope);
+  const authorized = SCOPE_SOURCES[scope]?.(context);
+  if (named === undefined || authorized === undefined || named !== authorized) {
+    throw new ScopeInputMismatchError(scope);
   }
 }

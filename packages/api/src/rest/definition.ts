@@ -102,28 +102,101 @@ export interface RestEndpointDefaults extends Omit<
   withDocs(docs: RestEndpointDocs): this;
 }
 
+/**
+ * Whether an endpoint has declared everything the framework must know.
+ *
+ * Input and output are deliberately NOT required. What they gate is the shape
+ * of the handler (see {@link RestEndpointHandler}): declaring neither is a
+ * complete declaration for an endpoint that takes nothing and answers nothing,
+ * and it used to force a pair of schemas that said exactly that at length.
+ *
+ * What remains mandatory is every decision a reader would otherwise have to
+ * infer from the handler body: the access policy, the rate limit and the
+ * resource limit, each with an explicit opt-out that has to be justified in
+ * writing.
+ */
 type RestReady<
-  TInput extends z.ZodObject | undefined,
-  TOutput extends z.ZodType | undefined,
   TPermission extends boolean,
   TRateLimit extends boolean,
   TResourceLimit extends boolean,
-> = TInput extends z.ZodObject
-  ? TOutput extends z.ZodType
-    ? TPermission extends true
-      ? TRateLimit extends true
-        ? TResourceLimit extends true
-          ? true
-          : false
-        : false
+> = TPermission extends true
+  ? TRateLimit extends true
+    ? TResourceLimit extends true
+      ? true
       : false
     : false
   : false;
 
-export type RestEndpointHandler<TApp, TInput extends z.ZodObject, TOutput extends z.ZodType> = (
-  context: ServiceContext<Record<string, unknown>, TApp>,
-  input: z.output<TInput>,
-) => z.input<TOutput> | Promise<z.input<TOutput>>;
+/**
+ * Whether the permission is anchored to the scope the input names.
+ *
+ * True when the input declares no scope id — the credential's own scope is
+ * then the only thing the request is about — or when `.withPermission()` bound
+ * one explicitly. An endpoint that names a `projectId` and never says the
+ * permission is about THAT project is the cross-tenant case, and it does not
+ * compile.
+ */
+type ScopeBound<
+  TInput extends z.ZodObject | undefined,
+  TScopeBound extends boolean,
+> = [ScopeIdsIn<TInput>] extends [never] ? true : TScopeBound;
+
+/**
+ * What a handler may answer with.
+ *
+ * No declared output means the endpoint answers nothing, so returning a value
+ * is a compile error rather than a value silently dropped before
+ * serialization. Stated from the other side: returning something REQUIRES
+ * `.withOutput()`, because the schema is what validates and documents it.
+ */
+export type RestHandlerResult<TOutput extends z.ZodType | undefined> =
+  TOutput extends z.ZodType ? z.input<TOutput> | Promise<z.input<TOutput>> : void | Promise<void>;
+
+/**
+ * The handler an endpoint's declarations imply.
+ *
+ * A handler is given input only when input was declared, so it cannot read
+ * something that was never validated — and an endpoint that takes nothing
+ * stops needing a schema to say so. The result follows `.withOutput()` the
+ * same way.
+ */
+export type RestEndpointHandler<
+  TApp,
+  TInput extends z.ZodObject | undefined,
+  TOutput extends z.ZodType | undefined,
+> = TInput extends z.ZodObject
+  ? (
+      context: ServiceContext<Record<string, unknown>, TApp>,
+      input: z.output<TInput>,
+    ) => RestHandlerResult<TOutput>
+  : (context: ServiceContext<Record<string, unknown>, TApp>) => RestHandlerResult<TOutput>;
+
+/**
+ * The input fields that name a tenant scope.
+ *
+ * An endpoint carrying one of these is answering about a scope the REQUEST
+ * named, which is not necessarily the scope the CREDENTIAL resolved to. When
+ * they differ and nothing compares them, a caller reads another tenant's data
+ * holding a permission they genuinely have.
+ */
+export type ScopeIdKey = "projectId" | "teamId" | "organizationId" | "userId";
+
+/** The scope ids an endpoint's own input schema declares, if any. */
+export type ScopeIdsIn<TInput extends z.ZodObject | undefined> = TInput extends z.ZodObject
+  ? Extract<keyof TInput["shape"], ScopeIdKey>
+  : never;
+
+/**
+ * How an endpoint's permission is anchored.
+ *
+ * `scope` names the input field the check reads, and it must be a field the
+ * input schema actually declares — a typo is a compile error rather than a
+ * silently unchecked id. Omitting it is legal only when the input names no
+ * scope at all, in which case the credential's own scope is the answer.
+ */
+export type PermissionScope<TInput extends z.ZodObject | undefined> = {
+  scope: ScopeIdsIn<TInput>;
+};
 
 /**
  * The modern REST definition chain. Input and output schemas carry their
@@ -137,41 +210,119 @@ export interface RestEndpoint<
   TRateLimit extends boolean = false,
   TResourceLimit extends boolean = false,
   THandled extends boolean = false,
+  TScopeBound extends boolean = false,
 > extends RestEndpointDefaults {
   /** Complete path-plus-query/body input schema. */
   withInput<TSchema extends z.ZodObject>(
     schema: TSchema,
-  ): RestEndpoint<TApp, TSchema, TOutput, TPermission, TRateLimit, TResourceLimit, THandled>;
+  ): RestEndpoint<
+    TApp,
+    TSchema,
+    TOutput,
+    TPermission,
+    TRateLimit,
+    TResourceLimit,
+    THandled,
+    TScopeBound
+  >;
   /** Response body schema, validated before serialization. */
   withOutput<TSchema extends z.ZodType>(
     schema: TSchema,
-  ): RestEndpoint<TApp, TInput, TSchema, TPermission, TRateLimit, TResourceLimit, THandled>;
+  ): RestEndpoint<
+    TApp,
+    TInput,
+    TSchema,
+    TPermission,
+    TRateLimit,
+    TResourceLimit,
+    THandled,
+    TScopeBound
+  >;
   /** HTTP status code for successful responses (default: 200, or 204 with no body). */
   withStatus(status: ContentfulStatusCode): this;
+  /**
+   * The permission the framework enforces, and the scope it is about.
+   *
+   * When the input names a tenant scope (`projectId`, `teamId`,
+   * `organizationId`, `userId`), the second argument is REQUIRED and must name
+   * one of those fields: the check then reads the scope from validated input
+   * rather than assuming the credential's own. Endpoints whose input names no
+   * scope take the one-argument form and are checked against the credential.
+   */
   withPermission(
     permission: AuthzPermission,
-  ): RestEndpoint<TApp, TInput, TOutput, true, TRateLimit, TResourceLimit, THandled>;
+    ...anchor: [ScopeIdsIn<TInput>] extends [never] ? [] : [scope: PermissionScope<TInput>]
+  ): RestEndpoint<TApp, TInput, TOutput, true, TRateLimit, TResourceLimit, THandled, true>;
+  /**
+   * Anchors an INHERITED permission to the scope this endpoint's input names.
+   *
+   * A service may declare the permission once as a default, in which case the
+   * endpoint never calls `.withPermission()` and has nowhere to say which of
+   * its own input fields the check is about. This is that seam. An endpoint
+   * declaring its own permission binds the scope there instead.
+   */
+  withPermissionScope(
+    scope: ScopeIdsIn<TInput>,
+  ): RestEndpoint<TApp, TInput, TOutput, TPermission, TRateLimit, TResourceLimit, THandled, true>;
   withoutPermission(
     reason: string,
-  ): RestEndpoint<TApp, TInput, TOutput, true, TRateLimit, TResourceLimit, THandled>;
-  withRateLimit(): RestEndpoint<TApp, TInput, TOutput, TPermission, true, TResourceLimit, THandled>;
+  ): RestEndpoint<TApp, TInput, TOutput, true, TRateLimit, TResourceLimit, THandled, true>;
+  withRateLimit(): RestEndpoint<
+    TApp,
+    TInput,
+    TOutput,
+    TPermission,
+    true,
+    TResourceLimit,
+    THandled,
+    TScopeBound
+  >;
   withoutRateLimit(
     reason: string,
-  ): RestEndpoint<TApp, TInput, TOutput, TPermission, true, TResourceLimit, THandled>;
+  ): RestEndpoint<
+    TApp,
+    TInput,
+    TOutput,
+    TPermission,
+    true,
+    TResourceLimit,
+    THandled,
+    TScopeBound
+  >;
   withResourceLimit(
     limitType: string,
-  ): RestEndpoint<TApp, TInput, TOutput, TPermission, TRateLimit, true, THandled>;
+  ): RestEndpoint<TApp, TInput, TOutput, TPermission, TRateLimit, true, THandled, TScopeBound>;
   withoutResourceLimit(
     reason: string,
-  ): RestEndpoint<TApp, TInput, TOutput, TPermission, TRateLimit, true, THandled>;
+  ): RestEndpoint<TApp, TInput, TOutput, TPermission, TRateLimit, true, THandled, TScopeBound>;
   handle(
-    this: RestReady<TInput, TOutput, TPermission, TRateLimit, TResourceLimit> extends true
-      ? THandled extends false
-        ? RestEndpoint<TApp, TInput, TOutput, TPermission, TRateLimit, TResourceLimit, THandled>
+    this: RestReady<TPermission, TRateLimit, TResourceLimit> extends true
+      ? ScopeBound<TInput, TScopeBound> extends true
+        ? THandled extends false
+          ? RestEndpoint<
+              TApp,
+              TInput,
+              TOutput,
+              TPermission,
+              TRateLimit,
+              TResourceLimit,
+              THandled,
+              TScopeBound
+            >
+          : never
         : never
       : never,
-    handler: RestEndpointHandler<TApp, Extract<TInput, z.ZodObject>, Extract<TOutput, z.ZodType>>,
-  ): RestEndpoint<TApp, TInput, TOutput, TPermission, TRateLimit, TResourceLimit, true>;
+    handler: RestEndpointHandler<TApp, TInput, TOutput>,
+  ): RestEndpoint<
+    TApp,
+    TInput,
+    TOutput,
+    TPermission,
+    TRateLimit,
+    TResourceLimit,
+    true,
+    TScopeBound
+  >;
 }
 
 /** @deprecated Use RestEndpoint for modern REST definitions. */
@@ -210,15 +361,26 @@ export class ChainBuilder {
     return this;
   }
 
-  withPermission(permission: AuthzPermission): this {
+  withPermission(permission: AuthzPermission, anchor?: { scope: string }): this {
     this._def.permission = permission;
+    if (anchor) {
+      this._def.permissionScope = anchor.scope;
+    } else {
+      delete this._def.permissionScope;
+    }
     delete this._def.noPermission;
+    return this;
+  }
+
+  withPermissionScope(scope: string): this {
+    this._def.permissionScope = scope;
     return this;
   }
 
   withoutPermission(reason: string): this {
     this._def.noPermission = { reason };
     delete this._def.permission;
+    delete this._def.permissionScope;
     return this;
   }
 
