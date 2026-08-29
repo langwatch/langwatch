@@ -75,6 +75,35 @@ export class DatasetRepository {
 - Can include project-scoping guards at data level
 - Allocates user-facing ids via `generate(KSUID_RESOURCES.X).toString()` — see [ksuids.md](./ksuids.md). Don't rely on the Prisma column default for any entity that shows up in a URL, API response, or export.
 
+### Never `include` a related row a transport will return
+
+`include: { user: true }` selects **every** column of that table. If the row
+travels out of a tRPC procedure or a REST handler — and most rows a repository
+returns do — every one of those columns reaches the browser, because a
+procedure with no output schema publishes exactly what its handler returns.
+For `User` that is `email`, `emailVerified`, `pendingSsoSetup`,
+`twoFactorEnabled`, `lastLoginAt`, `deactivatedAt`, `lastHomePath` and
+`userHashKey`, the per-user HMAC key ADR-101 §4 mints for identity event
+hashing.
+
+Use `select` and name the columns the screen renders:
+
+```typescript
+// The avatar and its tooltip. Nothing else leaves the database.
+const reviewerSelect = { select: { id: true, name: true, image: true } };
+```
+
+This has been fixed twice for the same reason, in `annotation.getByTraceIds`
+and then in the annotation queue reads. A type annotation on the repository
+method does **not** protect you: TypeScript narrows what a caller may read, and
+the object still carries every column onto the wire. Either `select` narrowly,
+or map to a DTO before the transport returns it — which is what the SCIM
+provisioning service does with `toScimUser`, and why its wide include is
+harmless.
+
+A `Promise<unknown>` on the port makes this invisible: nobody can see what the
+endpoint publishes, and the browser reads the fields off `{}`. Type the port.
+
 ## Service Layer
 
 Business logic, orchestration, default resolution.
