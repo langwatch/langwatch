@@ -1,0 +1,67 @@
+---
+title: Local Development
+sidebarTitle: Local development
+keywords: langwatch, agent testing, agent simulations, local development, tunnel, langwatch agent dev, cloudflare tunnel, development loop
+description: Run platform test suites against the agent on your machine, edit the code, and run them again, with no deployment in between.
+---
+
+## Start the tunnel
+
+`langwatch agent dev` starts a tunnel in front of a local port, points the chosen registered HTTP agent's URL at the tunnel, and restores the previous URL when you stop it with Ctrl-C. While it runs, every scenario run against that agent calls straight into the process on your machine.
+
+```bash
+langwatch agent dev --port 8010
+```
+
+```text
+Tunnel up: https://lively-otter.trycloudflare.com -> localhost:8010
+Agent "bid-companion" now points at your machine (was https://staging.example.com/agent).
+Run your scenarios: https://app.langwatch.ai/my-project/agent-testing
+Ctrl-C restores the previous URL.
+```
+
+With no `--agent` flag, the command lists the project's HTTP agents to pick from, and remembers the choice per project directory in `~/.langwatch/config.json`. `langwatch agent tunnel` is an alias for the same command.
+
+If the agent is not registered yet, [Connect your agent](/agent-testing/connect-your-agent) covers the registration.
+
+## The loop
+
+1. Start the agent process on your machine, then start the tunnel: `langwatch agent dev --port 8010`.
+2. Run the test suite, from **Agent Testing > Scenarios** or with `langwatch test-suite run <test-suite-id> --target http:<agent-id> --wait`.
+3. Read the results, change your code, and run the test suite again. The tunnel keeps forwarding to the port, so a restarted or hot-reloaded server needs no new tunnel.
+4. Press Ctrl-C when you are done. The agent's previous URL comes back.
+
+## Flags
+
+| Flag | Effect |
+|---|---|
+| `--port <port>` | Tunnel `localhost:<port>`. |
+| `--url <url>` | Tunnel a full local URL, path included, for example `http://localhost:8010/agent/chat`. |
+| `--agent <id or name>` | Which registered HTTP agent to repoint. A picker opens when omitted. |
+| `--tunnel-url <url>` | Use a tunnel you already run, for example a named Cloudflare tunnel or ngrok, and skip provisioning one. This also skips the session secret proxy: the command prints a notice, and your tunnel endpoint must supply its own access control. |
+| `--no-update-url` | Print the tunnel URL and leave the agent configuration as it is. |
+| `--no-auth` | Skip the session secret protection described below. |
+
+## How the tunnel is protected
+
+A tunnel URL is public, and a local agent process usually has real model provider keys. `langwatch agent dev` therefore creates a per-session secret, puts a proxy in front of your local port that rejects any request without the `X-LangWatch-Dev-Secret` header, and adds that header to the agent's configuration for the session. Only the platform's scenario calls send the secret. On exit, the command removes both the proxy and the header row.
+
+`--no-auth` turns the proxy off, for a server that already authenticates every request. A bring-your-own tunnel (`--tunnel-url`) also runs without the proxy: your tunnel forwards directly to your server, so the tunnel endpoint must supply its own access control. The agent's own configured authentication headers pass through the tunnel unchanged either way.
+
+## While the tunnel is up
+
+The agents list and the run target selector show a **local tunnel** badge on the repointed agent, so the team sees that the agent currently points at a developer machine.
+
+## Limits
+
+The default transport is a Cloudflare quick tunnel on `trycloudflare.com`. The command shows Cloudflare's terms notice on the first run.
+
+- Quick tunnels have no availability guarantee. Use them for the development loop, and run the test suites you rely on against a deployed URL.
+- Quick tunnels buffer server-sent events. This does not affect scenario calls, which are plain JSON requests; it only affects a streaming endpoint served through the same tunnel.
+- Quick tunnels cap at around 200 concurrent requests.
+
+Use `--tunnel-url` with your own tunnel when you hit these limits.
+
+## When the process dies without cleanup
+
+A crash or a kill signal the process cannot catch skips the restore, and the agent keeps pointing at a dead tunnel. Calls to it then fail with an error saying the tunnel session probably ended and how to restart it, and the **local tunnel** badge stays visible. Run `langwatch agent dev` again to take the agent over with a fresh tunnel, or set the agent's URL back by hand in the agent editor.

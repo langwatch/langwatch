@@ -16,7 +16,7 @@ const manifest: Record<
 > = JSON.parse(fs.readFileSync(path.join(skillsPagesDir, "skills-pages-manifest.json"), "utf8"));
 
 // Manifest keys are docs-relative paths (e.g. "skills/directory.mdx",
-// "agent-simulations/connect-your-agent.mdx") since the skill card reached
+// "agent-testing/connect-your-agent.mdx") since the skill card reached
 // pages outside docs/skills/.
 const pageFiles = Object.keys(manifest).map((f) => {
   // A key carrying `../` still joins to a readable file, so the suite would

@@ -1,0 +1,227 @@
+---
+title: Run Parameters
+sidebarTitle: Run parameters
+keywords: langwatch, agent testing, agent simulations, scenario parameters, run parameters, params, test suite, run plan, tenant, fixture, test account
+description: Run the same scenario with different parameters, to set different setup conditions or fixtures for your agent.
+---
+
+## What are Run Parameters
+
+A run parameter is a named value that a scenario receives when a run starts. The scenario declares the parameter, with an optional default value. The scenario text and the target configuration read it as `{{ params.NAME }}`. You supply the values when you start the run, from the platform, the API, the CLI or an SDK.
+
+For example, a scenario that tests subscription cancellation can declare a `plan` parameter, so one scenario covers each plan's policy:
+
+```text title="Situation"
+A customer on the {{ params.plan }} plan asks to cancel their subscription.
+```
+
+```text title="Criterion"
+Agent follows the cancellation policy of the {{ params.plan }} plan
+```
+
+Start one run per plan:
+
+```bash
+langwatch test-suite run <test-suite-id> --target http:<agent-id> --param plan=free
+langwatch test-suite run <test-suite-id> --target http:<agent-id> --param plan=enterprise
+```
+
+Each run records the values it used, so every result shows which plan it tested. The run dialog in the platform, the API and the SDKs set values the same way; see [Set the values when you start a run](#set-the-values-when-you-start-a-run).
+
+## When to use parameters
+
+- **Plans and tiers.** One cancellation scenario, run for `free` and run for `enterprise`.
+- **Test accounts and fixtures.** Point the run at seeded data with `--param fixture=order-1042`. The agent under test answers from that account, and the criteria can name its facts.
+- **Regions, tenants and languages.** The same conversation against `eu-central` and `us-east`, or against two tenants of your product.
+- **Values your agent's API needs.** An HTTP target puts `{{ params.NAME }}` in its URL or request body, so your endpoint receives the value on every request.
+
+<Warning>
+  A plain parameter is not a place for a credential. The run records every value, and every user who can open the run can read it. For a credential, use a [secret parameter](#secret-parameters) or a project secret, and read it as `{{ secrets.NAME }}`.
+</Warning>
+
+## Declare the parameters on the scenario
+
+Open the scenario and press **Add parameters** under **Customize scenario**. The block takes one line of `name=default` pairs, separated by commas:
+
+```text title="Parameters"
+plan=free, locale=de
+```
+
+<img src="/images/agent-testing/scenario-parameters-editor.png" alt="The scenario editor with the parameters block open, declaring plan and locale with their defaults, and params.plan read in the situation" width="100%" />
+
+- **Name** is the `NAME` in `{{ params.NAME }}`. Letters, digits and underscores, and the first character is a letter or an underscore.
+- **Default value** applies when the run does not set the value. `42` is a number, `true` is a boolean, and everything else is text. Quote a value to force text: `"007"`. A name with an empty value after `=` has no default.
+
+A scenario can declare up to 20 parameters.
+
+The API accepts the same declarations with a description and the secret flag: `POST /api/scenarios` and `PATCH /api/scenarios/{id}` take a `parameters` array of `{ name, description, defaultValue, secret }` objects. A [secret parameter](#secret-parameters) is declared through the API, since the editor line takes plain values only.
+
+## Use the values in the scenario text
+
+The situation and the criteria read a value as `{{ params.NAME }}`, as in the example above. Both render before the run starts, so the simulated user acts on the value and the judge scores against the same value.
+
+A scenario with no declared parameters is not a template. Its text does not render, so `{{` or `{%` in prose stays exactly as written. Declaring a parameter turns the scenario text into a template.
+
+## Use the values in the target
+
+| Target | Reads a value as |
+|---|---|
+| **HTTP agent** | `{{ params.NAME }}` in the URL, the header values and the body template |
+| **Prompt** | `{{ params.NAME }}` in the prompt template |
+| **Code agent** | `params.NAME` in the Python code |
+| **Workflow** | One entry input per parameter |
+
+### HTTP agents
+
+The URL, the header values and the body template render against the run's values. Use a value to pick an endpoint, a query string, a header, or a field in the request body:
+
+```text title="URL"
+https://api.your-company.internal/{{ params.region }}/chat
+```
+
+```json title="Body template"
+{
+  "thread_id": "{{ threadId }}",
+  "messages": {{ messages }},
+  "plan": "{{ params.plan }}"
+}
+```
+
+<img src="/images/agent-testing/http-agent-body-template.png" alt="The HTTP agent body template with plan read from params.plan, and the variables hint listing params.NAME" width="100%" />
+
+Auth fields read project secrets, not parameters. See [Testing agents behind authentication](/agent-testing/authenticated-agents#referencing-project-secrets-from-an-http-target).
+
+Next to `params`, the same fields render `{{ messages }}`, `{{ input }}` and `{{ threadId }}` from the conversation, and `{{ traceId }}` and `{{ traceparent }}` from the turn's trace context. See [Linking your traces](/agent-testing/linking-your-traces) for what the trace variables contain.
+
+### Prompt targets
+
+A prompt target renders `{{ params.NAME }}` in its prompt template before the model call.
+
+### Code agents
+
+A code agent reads the injected `params` namespace, next to the `secrets` namespace. Values keep their type: a boolean arrives as a `bool` and a number as a number.
+
+```python
+import requests
+
+
+class Code:
+    def __call__(self, message: str):
+        response = requests.post(
+            f"https://api.your-company.internal/{params.region}/chat",
+            json={
+                "message": message,
+                "plan": params.plan,
+                "seed_fixtures": params.seed_fixtures,  # a real bool
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+        return {"output": response.json()["reply"]}
+```
+
+The sandbox injects `params` into the module globals. Do not import a module named `params`, and do not assign over it. When a run resolves no parameters, `params` is undefined and `params.plan` raises `NameError`, the same behavior as `secrets`.
+
+### Workflow targets
+
+A workflow target receives the values as entry inputs, one entry input per parameter name.
+
+<Note>
+  A parameter reaches a downstream node only when an edge connects the entry field to that node. Adding a parameter to the run does not add the edge. Open the workflow and connect the new entry field to the node that reads it.
+</Note>
+
+Entry inputs arrive as strings. A code node inside the workflow reads `params.NAME` with the original type.
+
+## Set the values when you start a run
+
+A value set at run time overrides the scenario's default. A parameter with no run-time value uses its default.
+
+### In the platform
+
+**Add parameters** in the run dialog opens the same kind of line, prefilled with the defaults the scenarios in scope declare. Edit a value to change it for this run; the scenario keeps its defaults. A name left with an empty value falls back to the default.
+
+<img src="/images/agent-testing/run-dialog-parameters.png" alt="The run dialog with the parameters line set to plan=pro and the Secret parameters switch" width="100%" />
+
+The **Secret parameters** switch turns the line into rows, one per parameter, with a lock on each secret one. The secret parameters the scenarios declare are in the list already, with an empty field for the value. Once a row has a secret value, the rows stay; a secret cannot be written on one line.
+
+**Save & Run** in the scenario editor opens the same dialog.
+
+## Secret parameters
+
+A secret parameter is a run parameter for a credential. The platform encrypts the value before it writes anything down, and keeps it out of the stored run, the APIs, the exports, the audit log and everything it displays. The target under test reads the value while the run executes, which is the purpose of the parameter. Use one for an API key, a bearer token, or a password that changes per run.
+
+Declare it in the same editor: add the row, then turn on the **Secret** switch. A secret parameter takes no default value, so the field for it is empty and disabled.
+
+Supply the value when the run starts, in the run dialog, the CLI, the API or an SDK. The run does not start without it.
+
+A target reads a secret as `{{ secrets.NAME }}` in HTTP configuration and as `secrets.NAME` in code. It never reads it as `params.NAME`. The situation and the criteria cannot read it at all, because the platform records the scenario text with the run.
+
+For example, a scenario that tests a tenant API declares `api_token` as secret, the HTTP target sends it as a header, and each run supplies the token of the tenant it targets:
+
+```text title="Header value"
+Bearer {{ secrets.api_token }}
+```
+
+```bash
+langwatch test-suite run <test-suite-id> --target http:<agent-id> --param api_token="$TENANT_API_TOKEN"
+```
+
+Read the value from a CI secret variable, as above. A value typed in full on the command line stays in the shell history and in the process list of the machine that runs it, which is outside what the platform can protect.
+
+The run records the name `api_token`. The value stays encrypted until the platform builds the request to the target, and it keeps no readable copy of it: the value is not in the stored run, the runs API, the CSV export or the audit log. The run detail drawer lists the name with a mask.
+
+A run value takes the place of a project secret of the same name, for that run only. The project secret keeps its value for every other run.
+
+<Warning>
+  A secret is hidden in the record of the run, not in the conversation. When the agent under test repeats the value in its own answer, that answer is conversation content and the run stores it.
+</Warning>
+
+Also check: [Testing agents behind authentication](/agent-testing/authenticated-agents), for a credential that stays the same across runs.
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Parameters declared on one scenario | 20 |
+| Names one run supplies values for | 50 |
+| All of a run's values together | 16 kilobytes |
+| One string value | 4096 characters |
+| Parameter name | 64 characters |
+| Parameter description | 500 characters |
+
+## When a run is rejected
+
+| Error | What happened | What to do |
+|---|---|---|
+| `scenario_parameter_unknown` | The run set a name that no scenario in the run declares, usually a spelling error. The message lists the rejected key and the accepted names. | Correct the spelling, or declare the parameter on the scenario that reads it. |
+| `scenario_parameter_missing` | The situation or a criterion reads a name with no value: the run set none and the scenario has no default. The message says which parameter and which field. | Set a value for the run, or give the parameter a default. |
+| `scenario_parameter_template_invalid` | A field references a parameter in a form that cannot be rendered. | Write the reference as `{{ params.name }}`. |
+| `scenario_secret_parameter_missing` | A scenario declares a secret parameter and the run set no value for it. A secret has no default, so the run cannot fall back. | Set the value when you start the run. |
+| `scenario_secret_parameter_in_text` | The situation or a criterion reads a secret parameter. Scenario text is recorded with the run, so it cannot contain a secret. | Read the value from the target instead, as `{{ secrets.NAME }}`. |
+| `scenario_secret_parameter_conflict` | One scenario in the run declares the name as secret and another declares it as plain. | Give the two parameters different names, or make both declarations agree. |
+
+The platform runs these checks before it schedules any jobs. A rejected run schedules no job at all.
+
+## Where the values are recorded
+
+- The conversation drawer shows the values under **Parameters**, one row per name. A secret parameter appears as its name with a masked value.
+- The CSV export writes them as one JSON object per run: the `parameters` column in a criteria export, the `run_parameters` column in a full export. Secret parameters are left out.
+
+<img src="/images/agent-testing/run-drawer-parameters.png" alt="The conversation drawer with the Parameters block showing the secret parameter session_token masked" width="100%" />
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Authenticated agents" icon="key" href="/agent-testing/authenticated-agents">
+    Reference project secrets from an HTTP target or a code agent
+  </Card>
+  <Card title="Compare agents" icon="code-compare" href="/agent-testing/compare-agents">
+    One agent on two parameter sets in one run, side by side
+  </Card>
+  <Card title="Command line interface" icon="terminal" href="/integration/cli">
+    Every run command and its flags
+  </Card>
+  <Card title="Run from CI" icon="code" href="/agent-testing/run-from-ci">
+    Start a test suite from a CI job and wait for the batch
+  </Card>
+</CardGroup>

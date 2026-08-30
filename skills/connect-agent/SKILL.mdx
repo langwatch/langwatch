@@ -1,7 +1,7 @@
 ---
 name: connect-agent
-user-prompt: "Connect my agent to LangWatch simulations"
-description: Connect the codebase's AI agent to LangWatch agent simulations over HTTP, so test suites run against it from the platform. Finds or adds the agent's chat endpoint, wires authentication for scenario traffic, makes the server adopt the W3C traceparent header so the judge reads the agent's own traces, registers the agent with the `langwatch` CLI, and runs the first test suite. Use when the user wants platform scenarios to test their real, deployed agent.
+user-prompt: "Connect my agent to LangWatch agent testing"
+description: Connect the codebase's AI agent to LangWatch agent testing over HTTP, so test suites run against it from the platform. Finds or adds the agent's chat endpoint, wires authentication for scenario traffic, makes the server adopt the W3C traceparent header so the judge reads the agent's own traces, registers the agent with the `langwatch` CLI, and runs the first test suite. Use when the user wants platform scenarios to test their real, deployed agent.
 license: MIT
 compatibility: Works with Claude Code and similar coding agents. The `langwatch` CLI is the only interface for platform operations.
 ---
@@ -10,9 +10,9 @@ import CliSetup from "../_shared/cli-setup.mdx";
 import ProjectsAndApiKeys from "../_shared/projects-and-api-keys.mdx";
 import PlanLimits from "../_shared/plan-limits.mdx";
 
-# Connect Your Agent to LangWatch Simulations
+# Connect Your Agent to LangWatch Agent Testing
 
-Register the user's agent as an HTTP simulation target. Scenario runs call the agent's endpoint from the LangWatch backend, one HTTP request per conversation turn, and the judge verifies behavior against the traces the agent itself reports: tool calls, database writes, retrievals. Work through the steps in order, then report what changed and the first run's result.
+Register the user's endpoint as an HTTP agent. Scenario runs call the agent's endpoint from the LangWatch backend, one HTTP request per conversation turn, and the judge verifies behavior against the traces the agent itself reports: tool calls, database writes, retrievals. Work through the steps in order, then report what changed and the first run's result.
 
 Do NOT skip the trace adoption step (Step 4). Without it the judge can only grade the reply text, and criteria about tool calls or lookups come back inconclusive.
 
