@@ -225,9 +225,7 @@ describe("AuthzGrantsService compatibility operations", () => {
         id: { in: ["binding_1"], not: "binding_2" },
       }).success,
     ).toBe(true);
-    expect(
-      authzBindingFilterSchema.safeParse({ organizationId: "org_other" }).success,
-    ).toBe(false);
+    expect(authzBindingFilterSchema.safeParse({ organizationId: "org_other" }).success).toBe(false);
     expect(
       authzBindingFilterSchema.safeParse({
         userId: "user_1",
@@ -249,10 +247,13 @@ describe("AuthzGrantsService compatibility operations", () => {
       actor,
       onDuplicate: "skip",
     };
+    // Not "migration": that joined GRANT_EVENT_SOURCES in 52980c4405 and the
+    // legacy-import migration emits it, so asserting its rejection here made
+    // this a test of a vocabulary that had already moved on.
     expect(
       authzAttachBindingsInputSchema.safeParse({
         ...base,
-        source: "migration",
+        source: "hand-typed",
       }).success,
     ).toBe(false);
     expect(

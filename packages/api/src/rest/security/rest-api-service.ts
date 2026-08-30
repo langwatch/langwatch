@@ -274,8 +274,17 @@ export class SecuredApp<E extends Env> {
         });
         // Prepend the enforcement chain, then the caller's handlers. The
         // verb method's STATIC type is Hono's own, so validator + context
-        // inference is unaffected by this runtime prepend. HEAD has no Hono
-        // shortcut, so it routes through `.on("HEAD", ...)`.
+        // inference is unaffected by this runtime prepend.
+        //
+        // HEAD has no Hono shortcut, and `.on("HEAD", …)` does not give it
+        // one: Hono answers HEAD BEFORE routing, by re-dispatching the same
+        // request as GET and returning `new Response(null, thatResponse)`
+        // (hono-base.js `#dispatch`). Nothing HEAD-shaped is ever matched, so
+        // the handler registered here CANNOT RUN — a path that also has a GET
+        // is served by that GET with the body dropped, and a path that does
+        // not 404s. The registration is kept because the policy it records is
+        // what `generateOpenAPISpec` reads; the handler is decoration.
+        // Asserted both ways in rest-api-service.unit.test.ts.
         if (method === "head") {
           const on = this.hono.on as unknown as (
             method: string,

@@ -320,15 +320,42 @@ describe("SecuredApp", () => {
     });
   });
 
-  describe("when a HEAD route is registered", () => {
-    it("records the method and answers the request", async () => {
+  describe("when a HEAD request arrives", () => {
+    /**
+     * Hono answers HEAD from the GET route, and does it BEFORE routing:
+     * `#dispatch` sees the method, re-runs itself as `"GET"`, and returns
+     * `new Response(null, thatResponse)`. So the status and headers are the
+     * GET route's and the body is dropped — which is what HEAD should do.
+     */
+    it("is answered by the GET route, with the body dropped", async () => {
       const { spine } = recordingSpine();
       const app = spine.createServiceApp({ basePath: "/api/__pkg_head" });
+      app.access(publicEndpoint("liveness probe")).get("/up", (c) => c.text("ok"));
+
+      const head = await app.hono.request("/api/__pkg_head/up", { method: "HEAD" });
+      expect(head.status).toBe(200);
+      expect(await head.text()).toBe("");
+
+      const get = await app.hono.request("/api/__pkg_head/up");
+      expect(await get.text()).toBe("ok");
+    });
+
+    /**
+     * The other half of the same fact, and the reason this is asserted rather
+     * than assumed: a route registered for HEAD is UNREACHABLE. The rewrite
+     * above happens before `router.match`, so nothing HEAD-shaped is ever
+     * looked up, and a path carrying only a HEAD handler 404s.
+     */
+    it("never reaches a route registered for HEAD alone", async () => {
+      const { spine } = recordingSpine();
+      const app = spine.createServiceApp({ basePath: "/api/__pkg_head_only" });
       app.access(publicEndpoint("liveness probe")).head("/up", (c) => c.body(null, 200));
 
-      expect(getRoutePolicy("HEAD", "/api/__pkg_head/up")).toBeDefined();
-      const res = await app.hono.request("/api/__pkg_head/up", { method: "HEAD" });
-      expect(res.status).toBe(200);
+      // The policy is still recorded — that is what `generateOpenAPISpec`
+      // reads, and it is why the spec lists HEAD routes that cannot answer.
+      expect(getRoutePolicy("HEAD", "/api/__pkg_head_only/up")).toBeDefined();
+      const res = await app.hono.request("/api/__pkg_head_only/up", { method: "HEAD" });
+      expect(res.status).toBe(404);
     });
   });
 
