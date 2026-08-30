@@ -48,6 +48,23 @@ Feature: Run Plan CLI Commands
     And the two scenario IDs travel with the configuration
 
   @unit
+  Scenario: Run against a connected agent by id
+    When I run "langwatch run-plan run --all --target connected:agent_abc"
+    Then the run is scheduled against the connected agent
+
+  @unit
+  Scenario: Run against a connected agent by name and environment
+    When I run "langwatch run-plan run --all --target connected:support-agent@production"
+    Then the target reference id is support-agent@production
+    And the platform resolves it to the agent row of that name and environment
+
+  @unit
+  Scenario: A connected target carries its own parameters
+    When I run "langwatch run-plan run --all --target 'connected:support-agent@production?model=gpt-5'"
+    Then the target reference id is support-agent@production
+    And the target carries the model value
+
+  @unit
   Scenario: Run against more than one target
     When I run "langwatch run-plan run --all --target http:agent_abc --target prompt:prompt_xyz"
     Then the run is scheduled against both targets

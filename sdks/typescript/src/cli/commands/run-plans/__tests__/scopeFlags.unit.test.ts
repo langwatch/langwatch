@@ -46,6 +46,20 @@ describe("parseTargets()", () => {
       ]);
     });
 
+    /** @scenario "Run against a connected agent by id" */
+    it("reads a connected target by agent id", () => {
+      expect(parseTargets(["connected:agent_abc"])).toEqual([
+        { type: "connected", referenceId: "agent_abc" },
+      ]);
+    });
+
+    /** @scenario "Run against a connected agent by name and environment" */
+    it("passes a connected name@environment through as the reference id", () => {
+      expect(parseTargets(["connected:support-agent@production"])).toEqual([
+        { type: "connected", referenceId: "support-agent@production" },
+      ]);
+    });
+
     it("keeps a colon inside the reference id", () => {
       expect(parseTargets(["prompt:prompt:xyz"])).toEqual([
         { type: "prompt", referenceId: "prompt:xyz" },
@@ -61,6 +75,17 @@ describe("parseTargets()", () => {
   });
 
   describe("when a target carries a query string", () => {
+    /** @scenario "A connected target carries its own parameters" */
+    it("keeps name@environment as the reference id and reads the parameters", () => {
+      expect(parseTargets(["connected:support-agent@production?model=gpt-5"])).toEqual([
+        {
+          type: "connected",
+          referenceId: "support-agent@production",
+          runParameters: { model: "gpt-5" },
+        },
+      ]);
+    });
+
     /** @scenario "A target carries its own parameters after a question mark" */
     it("splits the reference id from the parameters at the question mark", () => {
       expect(parseTargets(["http:agent_abc?model=gpt-5"])).toEqual([
