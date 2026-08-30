@@ -146,14 +146,13 @@ const payloadGuard = () =>
     },
   });
 
-/** Registers the three endpoints over one transport; tests pass their own. */
-export function registerConnectEndpoints({
-  v,
-  transport,
-}: {
+type ConnectEndpoint = {
   v: AgentsVersion;
   transport: () => LongPollTransport;
-}): void {
+};
+
+/** The register endpoint: one process announces the agents it serves. */
+function registerRegisterEndpoint({ v, transport }: ConnectEndpoint): void {
   v.post(
     "/connect/register",
     {
@@ -202,7 +201,10 @@ export function registerConnectEndpoints({
       return c.json(answer.body, answer.status as 200);
     },
   );
+}
 
+/** The poll endpoint: the instance waits for its next frames. */
+function registerPollEndpoint({ v, transport }: ConnectEndpoint): void {
   v.get(
     "/connect/poll",
     {
@@ -246,7 +248,10 @@ export function registerConnectEndpoints({
       }
     },
   );
+}
 
+/** The frames endpoint: the instance posts its answers back. */
+function registerFramesEndpoint({ v, transport }: ConnectEndpoint): void {
   v.post(
     "/connect/frames",
     {
@@ -301,4 +306,11 @@ export function registerConnectEndpoints({
       }
     },
   );
+}
+
+/** Registers the three endpoints over one transport; tests pass their own. */
+export function registerConnectEndpoints(endpoint: ConnectEndpoint): void {
+  registerRegisterEndpoint(endpoint);
+  registerPollEndpoint(endpoint);
+  registerFramesEndpoint(endpoint);
 }

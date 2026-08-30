@@ -8,6 +8,7 @@
  * or refuses with one of the handled errors the contract names.
  */
 
+import type { EndpointDocs } from "@langwatch/api";
 import { z } from "zod";
 import type { ConnectedComponentConfig } from "~/optimization_studio/types/dsl";
 import { agentTypeSchema } from "~/server/agents/agent.repository";
@@ -170,6 +171,60 @@ async function dispatchTurn({
   };
 }
 
+const CALL_DESCRIPTION =
+  "Send one conversation turn to a connected agent and get its answer. The agent must be online: a process running the decorated function must be connected.";
+
+const CALL_DOCS: EndpointDocs = {
+  operationId: "callConnectedAgent",
+  tags: ["Agents"],
+  responses: {
+    404: {
+      description: "No connected agent with that id in this project",
+    },
+    429: {
+      description: "Every instance is busy; Retry-After says when to try again",
+      headers: {
+        "Retry-After": {
+          description:
+            "How many seconds to wait before the turn is sent again. Rounded up from the wait the platform picked.",
+          schema: { type: "string" },
+        },
+      },
+    },
+    503: { description: "No instance of the agent is connected" },
+  },
+};
+
+/** The connected agent the id names, or the refusal the caller reads. */
+async function connectedAgentOf({ app, id }: { app: AgentsApp; id: string }) {
+  const agent = await app.agents.getById({ id, projectId: app.project.id });
+  if (!agent || agentTypeSchema.parse(agent.type) !== "connected") {
+    throw new AgentNotFoundError("Connected agent not found");
+  }
+  return agent;
+}
+
+/**
+ * A development agent registered with a personal key belongs to one person,
+ * so a personal key of someone else is refused. The project key names no
+ * person and passes: the scenario child calls with it after the owner gate
+ * ran when the run was scheduled.
+ */
+async function assertCallerMayRun({
+  apiKeyUserId,
+  agent,
+}: {
+  apiKeyUserId: string | undefined;
+  agent: Awaited<ReturnType<typeof connectedAgentOf>>;
+}): Promise<void> {
+  if (!apiKeyUserId) return;
+  await assertConnectedAgentsRunnable({
+    agents: [agent],
+    actor: { id: apiKeyUserId, label: "api" },
+    users: prisma,
+  });
+}
+
 export function registerCallEndpoint({
   v,
   guard,
@@ -197,29 +252,8 @@ export function registerCallEndpoint({
           },
         }),
       ],
-      description:
-        "Send one conversation turn to a connected agent and get its answer. The agent must be online: a process running the decorated function must be connected.",
-      docs: {
-        operationId: "callConnectedAgent",
-        tags: ["Agents"],
-        responses: {
-          404: {
-            description: "No connected agent with that id in this project",
-          },
-          429: {
-            description:
-              "Every instance is busy; Retry-After says when to try again",
-            headers: {
-              "Retry-After": {
-                description:
-                  "How many seconds to wait before the turn is sent again. Rounded up from the wait the platform picked.",
-                schema: { type: "string" },
-              },
-            },
-          },
-          503: { description: "No instance of the agent is connected" },
-        },
-      },
+      description: CALL_DESCRIPTION,
+      docs: CALL_DOCS,
     },
     async (
       c,
@@ -233,26 +267,11 @@ export function registerCallEndpoint({
         app: AgentsApp;
       },
     ) => {
-      const agent = await app.agents.getById({
-        id: params.id,
-        projectId: app.project.id,
+      const agent = await connectedAgentOf({ app, id: params.id });
+      await assertCallerMayRun({
+        apiKeyUserId: c.get("apiKeyUserId") as string | undefined,
+        agent,
       });
-      if (!agent || agentTypeSchema.parse(agent.type) !== "connected") {
-        throw new AgentNotFoundError("Connected agent not found");
-      }
-
-      // A development agent registered with a personal key belongs to one
-      // person, so a personal key of someone else is refused. The project key
-      // names no person and passes: the scenario child calls with it after the
-      // owner gate ran when the run was scheduled.
-      const apiKeyUserId = c.get("apiKeyUserId") as string | undefined;
-      if (apiKeyUserId) {
-        await assertConnectedAgentsRunnable({
-          agents: [agent],
-          actor: { id: apiKeyUserId, label: "api" },
-          users: prisma,
-        });
-      }
 
       const call = dispatchCallOf({
         body: input,
