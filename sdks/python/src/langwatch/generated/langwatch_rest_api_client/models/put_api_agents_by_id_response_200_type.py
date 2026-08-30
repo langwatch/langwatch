@@ -3,6 +3,7 @@ from enum import Enum
 
 class PutApiAgentsByIdResponse200Type(str, Enum):
     CODE = "code"
+    CONNECTED = "connected"
     HTTP = "http"
     SIGNATURE = "signature"
     WORKFLOW = "workflow"

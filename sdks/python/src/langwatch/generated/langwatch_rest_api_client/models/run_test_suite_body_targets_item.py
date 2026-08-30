@@ -20,8 +20,10 @@ T = TypeVar("T", bound="RunTestSuiteBodyTargetsItem")
 class RunTestSuiteBodyTargetsItem:
     """
     Attributes:
-        type_ (RunTestSuiteBodyTargetsItemType): What kind of thing the scenarios run against.
-        reference_id (str): The id of the prompt, agent or workflow to run against.
+        type_ (RunTestSuiteBodyTargetsItemType): What kind of thing the scenarios run against. A connected agent is one
+            registered from code with the SDK.
+        reference_id (str): The id of the prompt, agent or workflow to run against. A connected target may also say
+            <name>@<environment>, for example support-agent@production, which resolves to the agent id.
         run_parameters (RunTestSuiteBodyTargetsItemRunParameters | Unset): Parameter values this target alone runs with,
             by name. They are merged over the run-level parameters and the target wins, so two targets may name the same
             agent with different values: that is how one run compares one agent on two models, and the results show one

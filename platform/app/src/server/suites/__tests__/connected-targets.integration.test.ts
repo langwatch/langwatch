@@ -7,6 +7,7 @@
  * @see specs/agents/connected-agents.feature
  */
 import { nanoid } from "nanoid";
+import type { Mock } from "vitest";
 import {
   afterAll,
   beforeAll,
@@ -19,6 +20,7 @@ import {
 import type { ConnectedComponentConfig } from "~/optimization_studio/types/dsl";
 import { SuiteRunService } from "~/server/app-layer/suites/suite-run.service";
 import { prisma } from "~/server/db";
+import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestUser } from "~/utils/testUtils";
 import { AgentService } from "../../agents/agent.service";
@@ -40,7 +42,7 @@ const config: ConnectedComponentConfig = {
 let owner: { id: string; name: string | null };
 let teammate: { id: string; name: string | null };
 let scenarioId: string;
-let queueSimulationRun: ReturnType<typeof vi.fn>;
+let queueSimulationRun: Mock<(data: QueueRunCommandData) => Promise<void>>;
 let suiteService: SuiteService;
 
 async function registerAgent({

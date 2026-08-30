@@ -502,7 +502,7 @@ describe("buildCallEnvelope", () => {
         judgmentRequest: { criteria: ["never leaks"] },
         metadata: { langwatch: { targetType: "connected" } },
       } as const;
-      const envelope = buildCallEnvelope(body);
+      const envelope = buildCallEnvelope(body as never);
       expect(Object.keys(envelope).sort()).toEqual(
         [...CALL_ENVELOPE_KEYS].sort(),
       );

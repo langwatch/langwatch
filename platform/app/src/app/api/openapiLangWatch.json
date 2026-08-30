@@ -2377,7 +2377,8 @@
                       "signature",
                       "code",
                       "workflow",
-                      "http"
+                      "http",
+                      "connected"
                     ]
                   },
                   "config": {
@@ -2448,8 +2449,10 @@
                         "signature",
                         "code",
                         "workflow",
-                        "http"
-                      ]
+                        "http",
+                        "connected"
+                      ],
+                      "description": "The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API."
                     },
                     "config": {
                       "type": [
@@ -2457,6 +2460,198 @@
                         "null"
                       ],
                       "additionalProperties": {}
+                    },
+                    "environment": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The environment a connected agent registered with, for example production or development. Null for every other kind."
+                    },
+                    "ownerUserId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared."
+                    },
+                    "hostLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The machine a development agent registered from with a project or service key. Null when the agent is personal or shared."
+                    },
+                    "lastSeenAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "When an instance of a connected agent was last connected. Null for every other kind."
+                    },
+                    "parameters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 500
+                          },
+                          "defaultValue": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 4096
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          },
+                          "secret": {
+                            "type": "boolean"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "string",
+                              "number",
+                              "boolean"
+                            ]
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 4096
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            "maxItems": 50
+                          },
+                          "required": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ]
+                      },
+                      "description": "The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind."
+                    },
+                    "owner": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "userId": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "userId",
+                        "name"
+                      ],
+                      "description": "The person a personal development agent belongs to. Null when the agent is shared or host-scoped."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "online",
+                        "offline"
+                      ],
+                      "description": "online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind."
+                    },
+                    "instances": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "instanceId": {
+                            "type": "string"
+                          },
+                          "hostname": {
+                            "type": "string"
+                          },
+                          "username": {
+                            "type": "string"
+                          },
+                          "pid": {
+                            "type": "number"
+                          },
+                          "label": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "sdk": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "string"
+                              },
+                              "language": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "version",
+                              "language"
+                            ]
+                          },
+                          "connectedAt": {
+                            "type": "string"
+                          },
+                          "inflight": {
+                            "type": "number"
+                          },
+                          "maxConcurrency": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "instanceId",
+                          "hostname",
+                          "username",
+                          "pid",
+                          "label",
+                          "sdk",
+                          "connectedAt",
+                          "inflight",
+                          "maxConcurrency"
+                        ]
+                      },
+                      "description": "The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind."
                     },
                     "createdAt": {
                       "type": "string"
@@ -2474,6 +2669,14 @@
                     "name",
                     "type",
                     "config",
+                    "environment",
+                    "ownerUserId",
+                    "hostLabel",
+                    "lastSeenAt",
+                    "parameters",
+                    "owner",
+                    "status",
+                    "instances",
                     "createdAt",
                     "updatedAt",
                     "platformUrl"
@@ -2543,7 +2746,8 @@
                       "signature",
                       "code",
                       "workflow",
-                      "http"
+                      "http",
+                      "connected"
                     ]
                   },
                   "config": {
@@ -2600,8 +2804,10 @@
                         "signature",
                         "code",
                         "workflow",
-                        "http"
-                      ]
+                        "http",
+                        "connected"
+                      ],
+                      "description": "The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API."
                     },
                     "config": {
                       "type": [
@@ -2609,6 +2815,198 @@
                         "null"
                       ],
                       "additionalProperties": {}
+                    },
+                    "environment": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The environment a connected agent registered with, for example production or development. Null for every other kind."
+                    },
+                    "ownerUserId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared."
+                    },
+                    "hostLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The machine a development agent registered from with a project or service key. Null when the agent is personal or shared."
+                    },
+                    "lastSeenAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "When an instance of a connected agent was last connected. Null for every other kind."
+                    },
+                    "parameters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 500
+                          },
+                          "defaultValue": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 4096
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          },
+                          "secret": {
+                            "type": "boolean"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "string",
+                              "number",
+                              "boolean"
+                            ]
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 4096
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            "maxItems": 50
+                          },
+                          "required": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ]
+                      },
+                      "description": "The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind."
+                    },
+                    "owner": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "userId": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "userId",
+                        "name"
+                      ],
+                      "description": "The person a personal development agent belongs to. Null when the agent is shared or host-scoped."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "online",
+                        "offline"
+                      ],
+                      "description": "online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind."
+                    },
+                    "instances": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "instanceId": {
+                            "type": "string"
+                          },
+                          "hostname": {
+                            "type": "string"
+                          },
+                          "username": {
+                            "type": "string"
+                          },
+                          "pid": {
+                            "type": "number"
+                          },
+                          "label": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "sdk": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "string"
+                              },
+                              "language": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "version",
+                              "language"
+                            ]
+                          },
+                          "connectedAt": {
+                            "type": "string"
+                          },
+                          "inflight": {
+                            "type": "number"
+                          },
+                          "maxConcurrency": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "instanceId",
+                          "hostname",
+                          "username",
+                          "pid",
+                          "label",
+                          "sdk",
+                          "connectedAt",
+                          "inflight",
+                          "maxConcurrency"
+                        ]
+                      },
+                      "description": "The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind."
                     },
                     "createdAt": {
                       "type": "string"
@@ -2626,6 +3024,14 @@
                     "name",
                     "type",
                     "config",
+                    "environment",
+                    "ownerUserId",
+                    "hostLabel",
+                    "lastSeenAt",
+                    "parameters",
+                    "owner",
+                    "status",
+                    "instances",
                     "createdAt",
                     "updatedAt",
                     "platformUrl"
@@ -2695,7 +3101,8 @@
                       "signature",
                       "code",
                       "workflow",
-                      "http"
+                      "http",
+                      "connected"
                     ]
                   },
                   "config": {
@@ -47287,7 +47694,8 @@
                                   "prompt",
                                   "http",
                                   "code",
-                                  "workflow"
+                                  "workflow",
+                                  "connected"
                                 ]
                               },
                               "targetKey": {
@@ -49434,6 +49842,35 @@
                             },
                             "secret": {
                               "type": "boolean"
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "string",
+                                "number",
+                                "boolean"
+                              ]
+                            },
+                            "options": {
+                              "type": "array",
+                              "items": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 4096
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  }
+                                ]
+                              },
+                              "maxItems": 50
+                            },
+                            "required": {
+                              "type": "boolean"
                             }
                           },
                           "required": [
@@ -49649,6 +50086,35 @@
                           },
                           "secret": {
                             "type": "boolean"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "string",
+                              "number",
+                              "boolean"
+                            ]
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 4096
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            "maxItems": 50
+                          },
+                          "required": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
@@ -49853,6 +50319,35 @@
                         },
                         "secret": {
                           "type": "boolean"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "string",
+                            "number",
+                            "boolean"
+                          ]
+                        },
+                        "options": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 4096
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          },
+                          "maxItems": 50
+                        },
+                        "required": {
+                          "type": "boolean"
                         }
                       },
                       "required": [
@@ -49984,6 +50479,35 @@
                             ]
                           },
                           "secret": {
+                            "type": "boolean"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "string",
+                              "number",
+                              "boolean"
+                            ]
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 4096
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            "maxItems": 50
+                          },
+                          "required": {
                             "type": "boolean"
                           }
                         },
@@ -50230,364 +50754,34 @@
                           },
                           "secret": {
                             "type": "boolean"
-                          }
-                        },
-                        "required": [
-                          "name"
-                        ]
-                      }
-                    },
-                    "simulatorModel": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "description": "The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family."
-                    },
-                    "judgeModel": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "description": "The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family."
-                    },
-                    "maxTurns": {
-                      "type": [
-                        "integer",
-                        "null"
-                      ],
-                      "description": "The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family."
-                    },
-                    "minTurns": {
-                      "type": [
-                        "integer",
-                        "null"
-                      ],
-                      "description": "The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family."
-                    },
-                    "testSuiteId": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "description": "The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites."
-                    },
-                    "platformUrl": {
-                      "type": "string",
-                      "format": "uri"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "name",
-                    "situation",
-                    "criteria",
-                    "labels",
-                    "parameters",
-                    "platformUrl"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Scenario not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Unprocessable Entity",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "situation": {
-                    "type": "string"
-                  },
-                  "criteria": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "labels": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "parameters": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "name": {
-                          "type": "string",
-                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-                          "minLength": 1,
-                          "maxLength": 64
-                        },
-                        "description": {
-                          "type": "string",
-                          "maxLength": 500
-                        },
-                        "defaultValue": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "maxLength": 4096
-                            },
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "boolean"
-                            }
-                          ]
-                        },
-                        "secret": {
-                          "type": "boolean"
-                        }
-                      },
-                      "required": [
-                        "name"
-                      ]
-                    },
-                    "maxItems": 20,
-                    "description": "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text."
-                  },
-                  "simulatorModel": {
-                    "type": [
-                      "string",
-                      "null"
-                    ],
-                    "pattern": "^[a-zA-Z0-9_-]+(?:\\/[^\\s/]+)+$",
-                    "maxLength": 200,
-                    "description": "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default."
-                  },
-                  "judgeModel": {
-                    "type": [
-                      "string",
-                      "null"
-                    ],
-                    "pattern": "^[a-zA-Z0-9_-]+(?:\\/[^\\s/]+)+$",
-                    "maxLength": 200,
-                    "description": "Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default."
-                  },
-                  "maxTurns": {
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "minimum": 1,
-                    "maximum": 100,
-                    "description": "Maximum conversation turns for a run of this scenario. Null uses the default."
-                  },
-                  "minTurns": {
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "minimum": 0,
-                    "maximum": 100,
-                    "description": "Minimum conversation turns before the judge may end the run. Null uses the default."
-                  },
-                  "testSuiteId": {
-                    "type": [
-                      "string",
-                      "null"
-                    ],
-                    "description": "The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite."
-                  }
-                }
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "id",
-            "required": true
-          }
-        ],
-        "security": [
-          {
-            "project_api_key": []
-          }
-        ]
-      },
-      "patch": {
-        "operationId": "patchApiScenariosById",
-        "description": "Update an existing scenario",
-        "responses": {
-          "200": {
-            "description": "Scenario updated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "situation": {
-                      "type": "string"
-                    },
-                    "criteria": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "labels": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "parameters": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "name": {
-                            "type": "string",
-                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-                            "minLength": 1,
-                            "maxLength": 64
                           },
-                          "description": {
+                          "type": {
                             "type": "string",
-                            "maxLength": 500
-                          },
-                          "defaultValue": {
-                            "anyOf": [
-                              {
-                                "type": "string",
-                                "maxLength": 4096
-                              },
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "boolean"
-                              }
+                            "enum": [
+                              "string",
+                              "number",
+                              "boolean"
                             ]
                           },
-                          "secret": {
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 4096
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            "maxItems": 50
+                          },
+                          "required": {
                             "type": "boolean"
                           }
                         },
@@ -50811,6 +51005,452 @@
                           ]
                         },
                         "secret": {
+                          "type": "boolean"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "string",
+                            "number",
+                            "boolean"
+                          ]
+                        },
+                        "options": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 4096
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          },
+                          "maxItems": 50
+                        },
+                        "required": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    },
+                    "maxItems": 20,
+                    "description": "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text."
+                  },
+                  "simulatorModel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[a-zA-Z0-9_-]+(?:\\/[^\\s/]+)+$",
+                    "maxLength": 200,
+                    "description": "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default."
+                  },
+                  "judgeModel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[a-zA-Z0-9_-]+(?:\\/[^\\s/]+)+$",
+                    "maxLength": 200,
+                    "description": "Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default."
+                  },
+                  "maxTurns": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1,
+                    "maximum": 100,
+                    "description": "Maximum conversation turns for a run of this scenario. Null uses the default."
+                  },
+                  "minTurns": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Minimum conversation turns before the judge may end the run. Null uses the default."
+                  },
+                  "testSuiteId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "patchApiScenariosById",
+        "description": "Update an existing scenario",
+        "responses": {
+          "200": {
+            "description": "Scenario updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "situation": {
+                      "type": "string"
+                    },
+                    "criteria": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "parameters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 500
+                          },
+                          "defaultValue": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 4096
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          },
+                          "secret": {
+                            "type": "boolean"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "string",
+                              "number",
+                              "boolean"
+                            ]
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 4096
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            "maxItems": 50
+                          },
+                          "required": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ]
+                      }
+                    },
+                    "simulatorModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family."
+                    },
+                    "judgeModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family."
+                    },
+                    "maxTurns": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family."
+                    },
+                    "minTurns": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family."
+                    },
+                    "testSuiteId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites."
+                    },
+                    "platformUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "situation",
+                    "criteria",
+                    "labels",
+                    "parameters",
+                    "platformUrl"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Scenario not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "situation": {
+                    "type": "string"
+                  },
+                  "criteria": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "parameters": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "description": {
+                          "type": "string",
+                          "maxLength": 500
+                        },
+                        "defaultValue": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 4096
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "boolean"
+                            }
+                          ]
+                        },
+                        "secret": {
+                          "type": "boolean"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "string",
+                            "number",
+                            "boolean"
+                          ]
+                        },
+                        "options": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 4096
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          },
+                          "maxItems": 50
+                        },
+                        "required": {
                           "type": "boolean"
                         }
                       },
@@ -51365,6 +52005,35 @@
                                 ]
                               },
                               "secret": {
+                                "type": "boolean"
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "string",
+                                  "number",
+                                  "boolean"
+                                ]
+                              },
+                              "options": {
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 4096
+                                    },
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "boolean"
+                                    }
+                                  ]
+                                },
+                                "maxItems": 50
+                              },
+                              "required": {
                                 "type": "boolean"
                               }
                             },
@@ -53907,13 +54576,14 @@
                                 "prompt",
                                 "http",
                                 "code",
-                                "workflow"
+                                "workflow",
+                                "connected"
                               ],
-                              "description": "What kind of thing the scenarios run against."
+                              "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                             },
                             "referenceId": {
                               "type": "string",
-                              "description": "The id of the prompt, agent or workflow to run against."
+                              "description": "The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id."
                             },
                             "runParameters": {
                               "type": "object",
@@ -54206,13 +54876,14 @@
                               "prompt",
                               "http",
                               "code",
-                              "workflow"
+                              "workflow",
+                              "connected"
                             ],
-                            "description": "What kind of thing the scenarios run against."
+                            "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                           },
                           "referenceId": {
                             "type": "string",
-                            "description": "The id of the prompt, agent or workflow to run against."
+                            "description": "The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id."
                           },
                           "runParameters": {
                             "type": "object",
@@ -54469,13 +55140,14 @@
                             "prompt",
                             "http",
                             "code",
-                            "workflow"
+                            "workflow",
+                            "connected"
                           ],
-                          "description": "What kind of thing the scenarios run against."
+                          "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                         },
                         "referenceId": {
                           "type": "string",
-                          "description": "The id of the prompt, agent or workflow to run against."
+                          "description": "The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id."
                         },
                         "runParameters": {
                           "type": "object",
@@ -54654,13 +55326,14 @@
                               "prompt",
                               "http",
                               "code",
-                              "workflow"
+                              "workflow",
+                              "connected"
                             ],
-                            "description": "What kind of thing the scenarios run against."
+                            "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                           },
                           "referenceId": {
                             "type": "string",
-                            "description": "The id of the prompt, agent or workflow to run against."
+                            "description": "The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id."
                           },
                           "runParameters": {
                             "type": "object",
@@ -54972,13 +55645,14 @@
                               "prompt",
                               "http",
                               "code",
-                              "workflow"
+                              "workflow",
+                              "connected"
                             ],
-                            "description": "What kind of thing the scenarios run against."
+                            "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                           },
                           "referenceId": {
                             "type": "string",
-                            "description": "The id of the prompt, agent or workflow to run against."
+                            "description": "The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id."
                           },
                           "runParameters": {
                             "type": "object",
@@ -55254,13 +55928,14 @@
                             "prompt",
                             "http",
                             "code",
-                            "workflow"
+                            "workflow",
+                            "connected"
                           ],
-                          "description": "What kind of thing the scenarios run against."
+                          "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                         },
                         "referenceId": {
                           "type": "string",
-                          "description": "The id of the prompt, agent or workflow to run against."
+                          "description": "The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id."
                         },
                         "runParameters": {
                           "type": "object",
@@ -55597,13 +56272,14 @@
                               "prompt",
                               "http",
                               "code",
-                              "workflow"
+                              "workflow",
+                              "connected"
                             ],
-                            "description": "What kind of thing the scenarios run against."
+                            "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                           },
                           "referenceId": {
                             "type": "string",
-                            "description": "The id of the prompt, agent or workflow to run against."
+                            "description": "The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id."
                           },
                           "runParameters": {
                             "type": "object",
@@ -55860,13 +56536,14 @@
                                   "prompt",
                                   "http",
                                   "code",
-                                  "workflow"
+                                  "workflow",
+                                  "connected"
                                 ],
-                                "description": "What kind of thing the scenarios run against."
+                                "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                               },
                               "referenceId": {
                                 "type": "string",
-                                "description": "The id of the prompt, agent or workflow to run against."
+                                "description": "The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id."
                               },
                               "runParameters": {
                                 "type": "object",
@@ -56057,13 +56734,14 @@
                             "prompt",
                             "http",
                             "code",
-                            "workflow"
+                            "workflow",
+                            "connected"
                           ],
-                          "description": "What kind of thing the scenarios run against."
+                          "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                         },
                         "referenceId": {
                           "type": "string",
-                          "description": "The id of the prompt, agent or workflow to run against."
+                          "description": "The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id."
                         },
                         "runParameters": {
                           "type": "object",
@@ -56266,13 +56944,14 @@
                                 "prompt",
                                 "http",
                                 "code",
-                                "workflow"
+                                "workflow",
+                                "connected"
                               ],
-                              "description": "What kind of thing the scenarios run against."
+                              "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                             },
                             "referenceId": {
                               "type": "string",
-                              "description": "The id of the prompt, agent or workflow to run against."
+                              "description": "The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id."
                             },
                             "runParameters": {
                               "type": "object",
@@ -56463,13 +57142,14 @@
                                   "prompt",
                                   "http",
                                   "code",
-                                  "workflow"
+                                  "workflow",
+                                  "connected"
                                 ],
-                                "description": "What kind of thing the scenarios run against."
+                                "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                               },
                               "referenceId": {
                                 "type": "string",
-                                "description": "The id of the prompt, agent or workflow to run against."
+                                "description": "The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id."
                               },
                               "runParameters": {
                                 "type": "object",
@@ -56646,13 +57326,14 @@
                                 "prompt",
                                 "http",
                                 "code",
-                                "workflow"
+                                "workflow",
+                                "connected"
                               ],
-                              "description": "What kind of thing the scenarios run against."
+                              "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                             },
                             "referenceId": {
                               "type": "string",
-                              "description": "The id of the prompt, agent or workflow to run against."
+                              "description": "The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id."
                             },
                             "runParameters": {
                               "type": "object",
@@ -56868,13 +57549,14 @@
                               "prompt",
                               "http",
                               "code",
-                              "workflow"
+                              "workflow",
+                              "connected"
                             ],
-                            "description": "What kind of thing the scenarios run against."
+                            "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                           },
                           "referenceId": {
                             "type": "string",
-                            "description": "The id of the prompt, agent or workflow to run against."
+                            "description": "The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id."
                           },
                           "runParameters": {
                             "type": "object",
@@ -57116,13 +57798,14 @@
                                   "prompt",
                                   "http",
                                   "code",
-                                  "workflow"
+                                  "workflow",
+                                  "connected"
                                 ],
-                                "description": "What kind of thing the scenarios run against."
+                                "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                               },
                               "referenceId": {
                                 "type": "string",
-                                "description": "The id of the prompt, agent or workflow to run against."
+                                "description": "The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id."
                               },
                               "runParameters": {
                                 "type": "object",
@@ -57815,13 +58498,14 @@
                                   "prompt",
                                   "http",
                                   "code",
-                                  "workflow"
+                                  "workflow",
+                                  "connected"
                                 ],
-                                "description": "What kind of thing the scenarios run against."
+                                "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                               },
                               "referenceId": {
                                 "type": "string",
-                                "description": "The id of the prompt, agent or workflow to run against."
+                                "description": "The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id."
                               },
                               "runParameters": {
                                 "type": "object",
@@ -57935,13 +58619,14 @@
                             "prompt",
                             "http",
                             "code",
-                            "workflow"
+                            "workflow",
+                            "connected"
                           ],
-                          "description": "What kind of thing the scenarios run against."
+                          "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                         },
                         "referenceId": {
                           "type": "string",
-                          "description": "The id of the prompt, agent or workflow to run against."
+                          "description": "The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id."
                         },
                         "runParameters": {
                           "type": "object",

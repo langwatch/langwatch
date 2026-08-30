@@ -4952,7 +4952,7 @@ export interface operations {
                 "application/json": {
                     name: string;
                     /** @enum {string} */
-                    type: "signature" | "code" | "workflow" | "http";
+                    type: "signature" | "code" | "workflow" | "http" | "connected";
                     config: {
                         [key: string]: unknown;
                     };
@@ -4988,7 +4988,7 @@ export interface operations {
                 "application/json": {
                     name?: string;
                     /** @enum {string} */
-                    type?: "signature" | "code" | "workflow" | "http";
+                    type?: "signature" | "code" | "workflow" | "http" | "connected";
                     config?: {
                         [key: string]: unknown;
                     };
@@ -5006,11 +5006,59 @@ export interface operations {
                     "application/json": {
                         id: string;
                         name: string;
-                        /** @enum {string} */
-                        type: "signature" | "code" | "workflow" | "http";
+                        /**
+                         * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
+                         * @enum {string}
+                         */
+                        type: "signature" | "code" | "workflow" | "http" | "connected";
                         config: {
                             [key: string]: unknown;
                         } | null;
+                        /** @description The environment a connected agent registered with, for example production or development. Null for every other kind. */
+                        environment: string | null;
+                        /** @description The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared. */
+                        ownerUserId: string | null;
+                        /** @description The machine a development agent registered from with a project or service key. Null when the agent is personal or shared. */
+                        hostLabel: string | null;
+                        /** @description When an instance of a connected agent was last connected. Null for every other kind. */
+                        lastSeenAt: string | null;
+                        /** @description The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind. */
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                            secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
+                        }[];
+                        /** @description The person a personal development agent belongs to. Null when the agent is shared or host-scoped. */
+                        owner: {
+                            userId: string;
+                            name: string | null;
+                        } | null;
+                        /**
+                         * @description online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind.
+                         * @enum {string}
+                         */
+                        status: "online" | "offline";
+                        /** @description The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind. */
+                        instances: {
+                            instanceId: string;
+                            hostname: string;
+                            username: string;
+                            pid: number;
+                            label: string | null;
+                            sdk: {
+                                name: string;
+                                version: string;
+                                language: string;
+                            };
+                            connectedAt: string;
+                            inflight: number;
+                            maxConcurrency: number;
+                        }[];
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -5070,7 +5118,7 @@ export interface operations {
                 "application/json": {
                     name?: string;
                     /** @enum {string} */
-                    type?: "signature" | "code" | "workflow" | "http";
+                    type?: "signature" | "code" | "workflow" | "http" | "connected";
                     config?: {
                         [key: string]: unknown;
                     };
@@ -5088,11 +5136,59 @@ export interface operations {
                     "application/json": {
                         id: string;
                         name: string;
-                        /** @enum {string} */
-                        type: "signature" | "code" | "workflow" | "http";
+                        /**
+                         * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
+                         * @enum {string}
+                         */
+                        type: "signature" | "code" | "workflow" | "http" | "connected";
                         config: {
                             [key: string]: unknown;
                         } | null;
+                        /** @description The environment a connected agent registered with, for example production or development. Null for every other kind. */
+                        environment: string | null;
+                        /** @description The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared. */
+                        ownerUserId: string | null;
+                        /** @description The machine a development agent registered from with a project or service key. Null when the agent is personal or shared. */
+                        hostLabel: string | null;
+                        /** @description When an instance of a connected agent was last connected. Null for every other kind. */
+                        lastSeenAt: string | null;
+                        /** @description The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind. */
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                            secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
+                        }[];
+                        /** @description The person a personal development agent belongs to. Null when the agent is shared or host-scoped. */
+                        owner: {
+                            userId: string;
+                            name: string | null;
+                        } | null;
+                        /**
+                         * @description online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind.
+                         * @enum {string}
+                         */
+                        status: "online" | "offline";
+                        /** @description The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind. */
+                        instances: {
+                            instanceId: string;
+                            hostname: string;
+                            username: string;
+                            pid: number;
+                            label: string | null;
+                            sdk: {
+                                name: string;
+                                version: string;
+                                language: string;
+                            };
+                            connectedAt: string;
+                            inflight: number;
+                            maxConcurrency: number;
+                        }[];
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -22470,7 +22566,7 @@ export interface operations {
                         langwatch?: {
                             targetReferenceId: string;
                             /** @enum {string} */
-                            targetType: "prompt" | "http" | "code" | "workflow";
+                            targetType: "prompt" | "http" | "code" | "workflow" | "connected";
                             targetKey?: string;
                             targetParameters?: {
                                 [key: string]: string | number | boolean;
@@ -23173,6 +23269,10 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
                         }[];
                         /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
                         simulatorModel?: string | null;
@@ -23261,6 +23361,10 @@ export interface operations {
                         description?: string;
                         defaultValue?: string | number | boolean;
                         secret?: boolean;
+                        /** @enum {string} */
+                        type?: "string" | "number" | "boolean";
+                        options?: (string | number | boolean)[];
+                        required?: boolean;
                     }[];
                     /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
                     simulatorModel?: string | null;
@@ -23293,6 +23397,10 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
                         }[];
                         /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
                         simulatorModel?: string | null;
@@ -23387,6 +23495,10 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
                         }[];
                         /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
                         simulatorModel?: string | null;
@@ -23487,6 +23599,10 @@ export interface operations {
                         description?: string;
                         defaultValue?: string | number | boolean;
                         secret?: boolean;
+                        /** @enum {string} */
+                        type?: "string" | "number" | "boolean";
+                        options?: (string | number | boolean)[];
+                        required?: boolean;
                     }[];
                     /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
                     simulatorModel?: string | null;
@@ -23519,6 +23635,10 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
                         }[];
                         /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
                         simulatorModel?: string | null;
@@ -23704,6 +23824,10 @@ export interface operations {
                         description?: string;
                         defaultValue?: string | number | boolean;
                         secret?: boolean;
+                        /** @enum {string} */
+                        type?: "string" | "number" | "boolean";
+                        options?: (string | number | boolean)[];
+                        required?: boolean;
                     }[];
                     /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
                     simulatorModel?: string | null;
@@ -23736,6 +23860,10 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
                         }[];
                         /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
                         simulatorModel?: string | null;
@@ -23963,6 +24091,10 @@ export interface operations {
                                 description?: string;
                                 defaultValue?: string | number | boolean;
                                 secret?: boolean;
+                                /** @enum {string} */
+                                type?: "string" | "number" | "boolean";
+                                options?: (string | number | boolean)[];
+                                required?: boolean;
                             }[];
                             simulatorModel: string | null;
                             judgeModel: string | null;
@@ -25290,11 +25422,11 @@ export interface operations {
                         } | null;
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -25399,11 +25531,11 @@ export interface operations {
                     /** @default [] */
                     targets?: {
                         /**
-                         * @description What kind of thing the scenarios run against.
+                         * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                          * @enum {string}
                          */
-                        type: "prompt" | "http" | "code" | "workflow";
-                        /** @description The id of the prompt, agent or workflow to run against. */
+                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
                         /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                         runParameters?: {
@@ -25453,11 +25585,11 @@ export interface operations {
                         } | null;
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -25569,11 +25701,11 @@ export interface operations {
                         } | null;
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -25773,11 +25905,11 @@ export interface operations {
                     scenarioIds?: string[];
                     targets?: {
                         /**
-                         * @description What kind of thing the scenarios run against.
+                         * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                          * @enum {string}
                          */
-                        type: "prompt" | "http" | "code" | "workflow";
-                        /** @description The id of the prompt, agent or workflow to run against. */
+                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
                         /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                         runParameters?: {
@@ -25825,11 +25957,11 @@ export interface operations {
                         } | null;
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -25955,11 +26087,11 @@ export interface operations {
                         } | null;
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -26057,11 +26189,11 @@ export interface operations {
                     /** @description The prompts, agents or workflows the run goes against. Used only when the id names a test suite, which stores no target of its own. */
                     targets?: {
                         /**
-                         * @description What kind of thing the scenarios run against.
+                         * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                          * @enum {string}
                          */
-                        type: "prompt" | "http" | "code" | "workflow";
-                        /** @description The id of the prompt, agent or workflow to run against. */
+                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
                         /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                         runParameters?: {
@@ -26104,11 +26236,11 @@ export interface operations {
                             scenarioId: string;
                             target: {
                                 /**
-                                 * @description What kind of thing the scenarios run against.
+                                 * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                                  * @enum {string}
                                  */
-                                type: "prompt" | "http" | "code" | "workflow";
-                                /** @description The id of the prompt, agent or workflow to run against. */
+                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                                 referenceId: string;
                                 /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                                 runParameters?: {
@@ -26230,11 +26362,11 @@ export interface operations {
                         /** @description What the plan runs against, in the order the results show. A target carrying runParameters runs with those values. */
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -26298,11 +26430,11 @@ export interface operations {
                         /** @description The prompts, agents or workflows every scenario runs against. Every target runs every scenario, so naming more than one compares them in the same run. */
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -26361,11 +26493,11 @@ export interface operations {
                             /** @description What it was run against. */
                             target: {
                                 /**
-                                 * @description What kind of thing the scenarios run against.
+                                 * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                                  * @enum {string}
                                  */
-                                type: "prompt" | "http" | "code" | "workflow";
-                                /** @description The id of the prompt, agent or workflow to run against. */
+                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                                 referenceId: string;
                                 /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                                 runParameters?: {
@@ -26437,11 +26569,11 @@ export interface operations {
                         /** @description What the plan runs against, in the order the results show. A target carrying runParameters runs with those values. */
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -26559,11 +26691,11 @@ export interface operations {
                             /** @description What it was run against. */
                             target: {
                                 /**
-                                 * @description What kind of thing the scenarios run against.
+                                 * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                                  * @enum {string}
                                  */
-                                type: "prompt" | "http" | "code" | "workflow";
-                                /** @description The id of the prompt, agent or workflow to run against. */
+                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                                 referenceId: string;
                                 /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                                 runParameters?: {
@@ -26834,11 +26966,11 @@ export interface operations {
                     /** @description The prompts, agents or workflows the suite runs against. A test suite stores none of its own, so a run states them. Every target runs every scenario, so naming more than one compares them in the same run. */
                     targets: {
                         /**
-                         * @description What kind of thing the scenarios run against.
+                         * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                          * @enum {string}
                          */
-                        type: "prompt" | "http" | "code" | "workflow";
-                        /** @description The id of the prompt, agent or workflow to run against. */
+                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
                         /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                         runParameters?: {
@@ -26896,11 +27028,11 @@ export interface operations {
                             /** @description What it was run against. */
                             target: {
                                 /**
-                                 * @description What kind of thing the scenarios run against.
+                                 * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                                  * @enum {string}
                                  */
-                                type: "prompt" | "http" | "code" | "workflow";
-                                /** @description The id of the prompt, agent or workflow to run against. */
+                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                                 referenceId: string;
                                 /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                                 runParameters?: {

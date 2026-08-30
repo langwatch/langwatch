@@ -26,6 +26,7 @@ import { createAdapter } from "../serialized-adapter.registry";
 import {
   ConnectedAgentCallError,
   SerializedConnectedAgentAdapter,
+  type ServedInstance,
 } from "../serialized-adapters/connected-agent.adapter";
 import type { ConnectedAgentData, ExecutionContext } from "../types";
 
@@ -114,14 +115,14 @@ function turn(threadId: string, text: string) {
     messages: [message],
     newMessages: [message],
     requestedRole: "Agent" as never,
-    judgmentRequest: false,
     scenarioState: {} as never,
     scenarioConfig: {} as never,
   };
 }
 
-const okReply = (instance = { hostname: "laptop", label: null }) =>
-  relayReply({ output: "hi", instance });
+const okReply = (
+  instance: ServedInstance = { hostname: "laptop", label: null },
+) => relayReply({ output: "hi", instance });
 
 describe("SerializedConnectedAgentAdapter", () => {
   describe("when the agent answers a turn with a session", () => {

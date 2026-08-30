@@ -1283,6 +1283,7 @@ from .get_api_prompts_tags_response_422 import GetApiPromptsTagsResponse422
 from .get_api_prompts_tags_response_500 import GetApiPromptsTagsResponse500
 from .get_api_scenarios_by_id_response_200 import GetApiScenariosByIdResponse200
 from .get_api_scenarios_by_id_response_200_parameters_item import GetApiScenariosByIdResponse200ParametersItem
+from .get_api_scenarios_by_id_response_200_parameters_item_type import GetApiScenariosByIdResponse200ParametersItemType
 from .get_api_scenarios_by_id_response_400 import GetApiScenariosByIdResponse400
 from .get_api_scenarios_by_id_response_401 import GetApiScenariosByIdResponse401
 from .get_api_scenarios_by_id_response_404 import GetApiScenariosByIdResponse404
@@ -1294,6 +1295,9 @@ from .get_api_scenarios_by_id_versions_by_version_response_200_snapshot import (
 )
 from .get_api_scenarios_by_id_versions_by_version_response_200_snapshot_parameters_item import (
     GetApiScenariosByIdVersionsByVersionResponse200SnapshotParametersItem,
+)
+from .get_api_scenarios_by_id_versions_by_version_response_200_snapshot_parameters_item_type import (
+    GetApiScenariosByIdVersionsByVersionResponse200SnapshotParametersItemType,
 )
 from .get_api_scenarios_by_id_versions_by_version_response_400 import GetApiScenariosByIdVersionsByVersionResponse400
 from .get_api_scenarios_by_id_versions_by_version_response_401 import GetApiScenariosByIdVersionsByVersionResponse401
@@ -1311,6 +1315,7 @@ from .get_api_scenarios_by_id_versions_response_422 import GetApiScenariosByIdVe
 from .get_api_scenarios_by_id_versions_response_500 import GetApiScenariosByIdVersionsResponse500
 from .get_api_scenarios_response_200_item import GetApiScenariosResponse200Item
 from .get_api_scenarios_response_200_item_parameters_item import GetApiScenariosResponse200ItemParametersItem
+from .get_api_scenarios_response_200_item_parameters_item_type import GetApiScenariosResponse200ItemParametersItemType
 from .get_api_scenarios_response_400 import GetApiScenariosResponse400
 from .get_api_scenarios_response_401 import GetApiScenariosResponse401
 from .get_api_scenarios_response_422 import GetApiScenariosResponse422
@@ -1987,6 +1992,12 @@ from .patch_api_agents_by_id_body_config import PatchApiAgentsByIdBodyConfig
 from .patch_api_agents_by_id_body_type import PatchApiAgentsByIdBodyType
 from .patch_api_agents_by_id_response_200 import PatchApiAgentsByIdResponse200
 from .patch_api_agents_by_id_response_200_config_type_0 import PatchApiAgentsByIdResponse200ConfigType0
+from .patch_api_agents_by_id_response_200_instances_item import PatchApiAgentsByIdResponse200InstancesItem
+from .patch_api_agents_by_id_response_200_instances_item_sdk import PatchApiAgentsByIdResponse200InstancesItemSdk
+from .patch_api_agents_by_id_response_200_owner_type_0 import PatchApiAgentsByIdResponse200OwnerType0
+from .patch_api_agents_by_id_response_200_parameters_item import PatchApiAgentsByIdResponse200ParametersItem
+from .patch_api_agents_by_id_response_200_parameters_item_type import PatchApiAgentsByIdResponse200ParametersItemType
+from .patch_api_agents_by_id_response_200_status import PatchApiAgentsByIdResponse200Status
 from .patch_api_agents_by_id_response_200_type import PatchApiAgentsByIdResponse200Type
 from .patch_api_agents_by_id_response_404 import PatchApiAgentsByIdResponse404
 from .patch_api_agents_by_id_response_422 import PatchApiAgentsByIdResponse422
@@ -2250,8 +2261,12 @@ from .patch_api_monitors_by_id_response_422 import PatchApiMonitorsByIdResponse4
 from .patch_api_monitors_by_id_response_500 import PatchApiMonitorsByIdResponse500
 from .patch_api_scenarios_by_id_body import PatchApiScenariosByIdBody
 from .patch_api_scenarios_by_id_body_parameters_item import PatchApiScenariosByIdBodyParametersItem
+from .patch_api_scenarios_by_id_body_parameters_item_type import PatchApiScenariosByIdBodyParametersItemType
 from .patch_api_scenarios_by_id_response_200 import PatchApiScenariosByIdResponse200
 from .patch_api_scenarios_by_id_response_200_parameters_item import PatchApiScenariosByIdResponse200ParametersItem
+from .patch_api_scenarios_by_id_response_200_parameters_item_type import (
+    PatchApiScenariosByIdResponse200ParametersItemType,
+)
 from .patch_api_scenarios_by_id_response_400 import PatchApiScenariosByIdResponse400
 from .patch_api_scenarios_by_id_response_401 import PatchApiScenariosByIdResponse401
 from .patch_api_scenarios_by_id_response_404 import PatchApiScenariosByIdResponse404
@@ -4597,8 +4612,10 @@ from .post_api_scenario_events_response_422 import PostApiScenarioEventsResponse
 from .post_api_scenario_events_response_500 import PostApiScenarioEventsResponse500
 from .post_api_scenarios_body import PostApiScenariosBody
 from .post_api_scenarios_body_parameters_item import PostApiScenariosBodyParametersItem
+from .post_api_scenarios_body_parameters_item_type import PostApiScenariosBodyParametersItemType
 from .post_api_scenarios_response_201 import PostApiScenariosResponse201
 from .post_api_scenarios_response_201_parameters_item import PostApiScenariosResponse201ParametersItem
+from .post_api_scenarios_response_201_parameters_item_type import PostApiScenariosResponse201ParametersItemType
 from .post_api_scenarios_response_400 import PostApiScenariosResponse400
 from .post_api_scenarios_response_401 import PostApiScenariosResponse401
 from .post_api_scenarios_response_422 import PostApiScenariosResponse422
@@ -5516,6 +5533,12 @@ from .put_api_agents_by_id_body_config import PutApiAgentsByIdBodyConfig
 from .put_api_agents_by_id_body_type import PutApiAgentsByIdBodyType
 from .put_api_agents_by_id_response_200 import PutApiAgentsByIdResponse200
 from .put_api_agents_by_id_response_200_config_type_0 import PutApiAgentsByIdResponse200ConfigType0
+from .put_api_agents_by_id_response_200_instances_item import PutApiAgentsByIdResponse200InstancesItem
+from .put_api_agents_by_id_response_200_instances_item_sdk import PutApiAgentsByIdResponse200InstancesItemSdk
+from .put_api_agents_by_id_response_200_owner_type_0 import PutApiAgentsByIdResponse200OwnerType0
+from .put_api_agents_by_id_response_200_parameters_item import PutApiAgentsByIdResponse200ParametersItem
+from .put_api_agents_by_id_response_200_parameters_item_type import PutApiAgentsByIdResponse200ParametersItemType
+from .put_api_agents_by_id_response_200_status import PutApiAgentsByIdResponse200Status
 from .put_api_agents_by_id_response_200_type import PutApiAgentsByIdResponse200Type
 from .put_api_agents_by_id_response_404 import PutApiAgentsByIdResponse404
 from .put_api_agents_by_id_response_422 import PutApiAgentsByIdResponse422
@@ -5690,8 +5713,10 @@ from .put_api_prompts_tags_by_tag_response_422 import PutApiPromptsTagsByTagResp
 from .put_api_prompts_tags_by_tag_response_500 import PutApiPromptsTagsByTagResponse500
 from .put_api_scenarios_by_id_body import PutApiScenariosByIdBody
 from .put_api_scenarios_by_id_body_parameters_item import PutApiScenariosByIdBodyParametersItem
+from .put_api_scenarios_by_id_body_parameters_item_type import PutApiScenariosByIdBodyParametersItemType
 from .put_api_scenarios_by_id_response_200 import PutApiScenariosByIdResponse200
 from .put_api_scenarios_by_id_response_200_parameters_item import PutApiScenariosByIdResponse200ParametersItem
+from .put_api_scenarios_by_id_response_200_parameters_item_type import PutApiScenariosByIdResponse200ParametersItemType
 from .put_api_scenarios_by_id_response_400 import PutApiScenariosByIdResponse400
 from .put_api_scenarios_by_id_response_401 import PutApiScenariosByIdResponse401
 from .put_api_scenarios_by_id_response_404 import PutApiScenariosByIdResponse404
@@ -6736,6 +6761,7 @@ __all__ = (
     "GetApiPromptsTagsResponse500",
     "GetApiScenariosByIdResponse200",
     "GetApiScenariosByIdResponse200ParametersItem",
+    "GetApiScenariosByIdResponse200ParametersItemType",
     "GetApiScenariosByIdResponse400",
     "GetApiScenariosByIdResponse401",
     "GetApiScenariosByIdResponse404",
@@ -6744,6 +6770,7 @@ __all__ = (
     "GetApiScenariosByIdVersionsByVersionResponse200",
     "GetApiScenariosByIdVersionsByVersionResponse200Snapshot",
     "GetApiScenariosByIdVersionsByVersionResponse200SnapshotParametersItem",
+    "GetApiScenariosByIdVersionsByVersionResponse200SnapshotParametersItemType",
     "GetApiScenariosByIdVersionsByVersionResponse400",
     "GetApiScenariosByIdVersionsByVersionResponse401",
     "GetApiScenariosByIdVersionsByVersionResponse404",
@@ -6758,6 +6785,7 @@ __all__ = (
     "GetApiScenariosByIdVersionsResponse500",
     "GetApiScenariosResponse200Item",
     "GetApiScenariosResponse200ItemParametersItem",
+    "GetApiScenariosResponse200ItemParametersItemType",
     "GetApiScenariosResponse400",
     "GetApiScenariosResponse401",
     "GetApiScenariosResponse422",
@@ -7170,6 +7198,12 @@ __all__ = (
     "PatchApiAgentsByIdBodyType",
     "PatchApiAgentsByIdResponse200",
     "PatchApiAgentsByIdResponse200ConfigType0",
+    "PatchApiAgentsByIdResponse200InstancesItem",
+    "PatchApiAgentsByIdResponse200InstancesItemSdk",
+    "PatchApiAgentsByIdResponse200OwnerType0",
+    "PatchApiAgentsByIdResponse200ParametersItem",
+    "PatchApiAgentsByIdResponse200ParametersItemType",
+    "PatchApiAgentsByIdResponse200Status",
     "PatchApiAgentsByIdResponse200Type",
     "PatchApiAgentsByIdResponse404",
     "PatchApiAgentsByIdResponse422",
@@ -7319,8 +7353,10 @@ __all__ = (
     "PatchApiMonitorsByIdResponse500",
     "PatchApiScenariosByIdBody",
     "PatchApiScenariosByIdBodyParametersItem",
+    "PatchApiScenariosByIdBodyParametersItemType",
     "PatchApiScenariosByIdResponse200",
     "PatchApiScenariosByIdResponse200ParametersItem",
+    "PatchApiScenariosByIdResponse200ParametersItemType",
     "PatchApiScenariosByIdResponse400",
     "PatchApiScenariosByIdResponse401",
     "PatchApiScenariosByIdResponse404",
@@ -8442,8 +8478,10 @@ __all__ = (
     "PostApiScenarioEventsResponse500",
     "PostApiScenariosBody",
     "PostApiScenariosBodyParametersItem",
+    "PostApiScenariosBodyParametersItemType",
     "PostApiScenariosResponse201",
     "PostApiScenariosResponse201ParametersItem",
+    "PostApiScenariosResponse201ParametersItemType",
     "PostApiScenariosResponse400",
     "PostApiScenariosResponse401",
     "PostApiScenariosResponse422",
@@ -8905,6 +8943,12 @@ __all__ = (
     "PutApiAgentsByIdBodyType",
     "PutApiAgentsByIdResponse200",
     "PutApiAgentsByIdResponse200ConfigType0",
+    "PutApiAgentsByIdResponse200InstancesItem",
+    "PutApiAgentsByIdResponse200InstancesItemSdk",
+    "PutApiAgentsByIdResponse200OwnerType0",
+    "PutApiAgentsByIdResponse200ParametersItem",
+    "PutApiAgentsByIdResponse200ParametersItemType",
+    "PutApiAgentsByIdResponse200Status",
     "PutApiAgentsByIdResponse200Type",
     "PutApiAgentsByIdResponse404",
     "PutApiAgentsByIdResponse422",
@@ -9019,8 +9063,10 @@ __all__ = (
     "PutApiPromptsTagsByTagResponse500",
     "PutApiScenariosByIdBody",
     "PutApiScenariosByIdBodyParametersItem",
+    "PutApiScenariosByIdBodyParametersItemType",
     "PutApiScenariosByIdResponse200",
     "PutApiScenariosByIdResponse200ParametersItem",
+    "PutApiScenariosByIdResponse200ParametersItemType",
     "PutApiScenariosByIdResponse400",
     "PutApiScenariosByIdResponse401",
     "PutApiScenariosByIdResponse404",
