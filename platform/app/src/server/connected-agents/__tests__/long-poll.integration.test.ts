@@ -137,8 +137,20 @@ async function register(
   return { status: response.status, body: (await response.json()) as Json };
 }
 
+/**
+ * Registers an agent of its own for the test: one identity per test keeps
+ * the presence sets apart, so a dispatch can only pick this instance.
+ */
 async function registered(pod: Pod) {
-  const { status, body } = await register(pod, projectApiKey);
+  const { status, body } = await register(pod, projectApiKey, {
+    agents: [
+      {
+        name: `support-agent-${nanoid(6)}`,
+        environment: "production",
+        parameters: {},
+      },
+    ],
+  });
   if (status !== 200) {
     throw new Error(`register answered ${status}: ${JSON.stringify(body)}`);
   }
