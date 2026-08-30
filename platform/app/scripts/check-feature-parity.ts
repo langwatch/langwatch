@@ -540,7 +540,6 @@ const LEGACY_INERT: string[] = [
   "specs/prompts/unified-defaults.feature",
   "specs/python-sdk/async-experiment-parallelism.feature",
   "specs/python-sdk/experiment-print-summary.feature",
-  "specs/rbac/fetch-org-role-permission-resolution.feature",
   "specs/scenarios/ai-create-modal.feature",
   "specs/scenarios/internal-scenario-namespace.feature",
   "specs/scenarios/internal-set-namespace.feature",
