@@ -226,7 +226,13 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
   ) {
     outputResult.agentInstance = adapter.servedInstance;
   }
-  process.stdout.write(JSON.stringify(outputResult) + "\n");
+  // The result line is the last thing the child says. Exit once it is
+  // written rather than wait for the event loop to drain: the run's adapters
+  // and the SDK can leave handles open after the run, and a child that stays
+  // up keeps the parent from reading the result until its timeout.
+  process.stdout.write(JSON.stringify(outputResult) + "\n", () => {
+    process.exit(0);
+  });
 }
 
 /**

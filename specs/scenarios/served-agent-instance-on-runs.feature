@@ -45,3 +45,10 @@ Feature: Served agent instance on runs
     When the run is stored and read back
     Then its metadata carries the instance under the reserved langwatch namespace
     And the metadata still parses as the platform's reserved namespace
+
+  @integration
+  Scenario: The processor records the instance off the child's result line
+    Given a scenario child that writes log lines and then a result line naming the instance "worker-1"
+    When the processor runs the job and the child exits
+    Then the run records the agent instance "worker-1"
+    And a child whose result line names no instance records nothing
