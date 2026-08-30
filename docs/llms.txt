@@ -8,7 +8,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Get Started
 
-- [LangWatch: The Complete LLMOps Platform](https://langwatch.ai/docs/introduction.md): Accelerate your agent development lifecycle with comprehensive observability, evaluations and agent simulations. Open-source platform, with over 3k stars on GitHub.
+- [LangWatch: The Complete LLMOps Platform](https://langwatch.ai/docs/introduction.md): Accelerate your agent development lifecycle with comprehensive observability, evaluations and agent testing. Open-source platform, with over 3k stars on GitHub.
 
 ### LangWatch Skills
 

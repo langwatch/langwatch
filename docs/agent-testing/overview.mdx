@@ -63,14 +63,14 @@ A scenario describes the whole conversation and checks the steps between the tur
 script=[
   scenario.user("hey I have a problem with my order"),
   scenario.agent(),
-  expect_ticket_created()
-  expect_ticket_label("ecommerce")
+  expect_ticket_created(),
+  expect_ticket_label("ecommerce"),
   scenario.user("i want a refund!"),
-  scenario.agent()
-  expect_tool_call("search_policy")
-  scenario.user("this is ridiculous! let me talk to a human being")
-  scenario.agent()
-  expect_tool_call("escalate_to_human")
+  scenario.agent(),
+  expect_tool_call("search_policy"),
+  scenario.user("this is ridiculous! let me talk to a human being"),
+  scenario.agent(),
+  expect_tool_call("escalate_to_human"),
 ]
 ```
 

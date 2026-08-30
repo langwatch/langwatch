@@ -32,7 +32,7 @@
         "promptFile": "scenarios.docs.txt"
       },
       {
-        "title": "Connect my agent to LangWatch simulations",
+        "title": "Connect my agent to LangWatch agent testing",
         "skill": "langwatch/skills/connect-agent",
         "slashCommand": "/connect-agent",
         "promptFile": "connect-agent.docs.txt"
@@ -164,7 +164,7 @@
   "agent-testing/connect-your-agent.mdx": {
     "connect-agent": [
       {
-        "title": "Connect my agent to LangWatch simulations",
+        "title": "Connect my agent to LangWatch agent testing",
         "skill": "langwatch/skills/connect-agent",
         "slashCommand": "/connect-agent",
         "promptFile": "connect-agent.docs.txt",

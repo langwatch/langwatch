@@ -23,7 +23,7 @@
 	{
 		"id": "connect-agent",
 		"label": "Connect agent",
-		"description": "Connect the codebase's AI agent to LangWatch agent simulations over HTTP, so scenario suites run against it from the platform. Finds or adds the agent's chat endpoint, wires authentication for scenario traffic, makes the server adopt the W3C traceparent header so the judge reads the agent's own traces, registers the agent with the `langwatch` CLI, and runs the first suite. Use when the user wants platform scenarios to test their real, deployed agent.",
+		"description": "Connect the codebase's AI agent to LangWatch agent simulations over HTTP, so test suites run against it from the platform. Finds or adds the agent's chat endpoint, wires authentication for scenario traffic, makes the server adopt the W3C traceparent header so the judge reads the agent's own traces, registers the agent with the `langwatch` CLI, and runs the first test suite. Use when the user wants platform scenarios to test their real, deployed agent.",
 		"category": "skill",
 		"userPrompt": "Connect my agent to LangWatch simulations"
 	},
