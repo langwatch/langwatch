@@ -14,6 +14,27 @@ import { resolveScenarioChildParentEnvironment } from "~/runtime/worker/scenario
 import { resolveLangevalsRuntimeConfig } from "~/runtime/langevals.config";
 import { resolveStripeRuntimeConfig } from "~/runtime/app/stripe.runtime";
 
+/**
+ * `initializeEnvironmentConfig` installs once and ignores later calls — it is
+ * `??=`, because a process has one environment and a second boot must not
+ * silently replace it. A test that installs its own therefore has to clear the
+ * previous one first, or it reads whichever case ran before it.
+ *
+ * Two describes did this for themselves and the rest did not, so the file's
+ * answers depended on execution order: a case asserting
+ * `GLOBAL_QUEUE_CONCURRENCY: "64"` was reading 200 from an environment
+ * installed several describes earlier. Done once here so a new describe cannot
+ * forget.
+ */
+beforeEach(() => {
+  resetEnvironmentConfigForTests();
+});
+
+afterEach(() => {
+  resetEnvironmentConfigForTests();
+  initializeEnvironmentConfig(process.env);
+});
+
 describe("Stripe process configuration", () => {
   it("keeps the established SDK policy with the validated secret key", () => {
     expect(resolveStripeRuntimeConfig({ STRIPE_SECRET_KEY: "sk_test_process" })).toEqual({
@@ -40,6 +61,7 @@ describe("Gateway virtual-key process configuration", () => {
       NODE_ENV: "test",
       BUILD_TIME: "1",
       SKIP_ENV_VALIDATION: "1",
+      BASE_HOST: "http://localhost:5560",
       LW_VIRTUAL_KEY_PEPPER: "configured-virtual-key-pepper-32-bytes",
       CREDENTIALS_SECRET: "must-not-be-used-as-a-virtual-key-pepper",
       NEXTAUTH_SECRET: "must-not-be-used-as-a-virtual-key-pepper",
@@ -117,6 +139,12 @@ describe("Evaluation execution process configuration", () => {
       process.env.EVAL_V3_CONCURRENCY = "17";
 
       try {
+        // `createAppConfigFromEnv` reads the INSTALLED environment, not
+        // `process.env`, so the install has to happen after the mutation
+        // above. This used to work only because some earlier describe had
+        // installed one and the ordering happened to favour it.
+        initializeEnvironmentConfig(process.env);
+
         expect(createAppConfigFromEnv({ processRole }).evaluationExecution).toEqual({
           defaultConcurrency: 17,
         });
@@ -139,6 +167,17 @@ describe("Langevals process configuration", () => {
       endpoint: "http://langevals.internal:8000",
       maxRetries: 1,
       timeoutMs: 120_000,
+      // The payload ceilings travel with the transport for the same reason the
+      // timeout does: a caller that can reach langevals still has to know what
+      // it may send. `stagingThresholdBytes` has no default on purpose —
+      // unset means "never stage", and a number here would turn staging on for
+      // every deployment that never asked for it.
+      payload: {
+        stagingThresholdBytes: undefined,
+        stagingTtlSeconds: 600,
+        evaluationMaxPayloadBytes: 16_000_000,
+        topicClusteringMaxPayloadBytes: 180_000_000,
+      },
     });
   });
 
@@ -247,9 +286,7 @@ describe("Group Queue process configuration", () => {
 
 describe("resolveLangyWorkerConfig", () => {
   it("returns no worker config when both values are absent", () => {
-    expect(
-      resolveLangyWorkerConfig({ agentUrl: void 0, internalSecret: void 0 }),
-    ).toBeUndefined();
+    expect(resolveLangyWorkerConfig({ agentUrl: void 0, internalSecret: void 0 })).toBeUndefined();
   });
 
   it("returns complete semantic worker config", () => {
@@ -321,9 +358,7 @@ describe("roleSatisfiesRunIn", () => {
 
   describe("given the process role is undefined", () => {
     it("does not exclude the subscriber (backwards-compatible run-everywhere)", () => {
-      expect(roleSatisfiesRunIn({ runIn: ["worker"], processRole: undefined })).toBe(
-        true,
-      );
+      expect(roleSatisfiesRunIn({ runIn: ["worker"], processRole: undefined })).toBe(true);
     });
   });
 
@@ -336,9 +371,7 @@ describe("roleSatisfiesRunIn", () => {
     });
 
     it("satisfies a web+worker runIn filter", () => {
-      expect(roleSatisfiesRunIn({ runIn: ["web", "worker"], processRole: "all" })).toBe(
-        true,
-      );
+      expect(roleSatisfiesRunIn({ runIn: ["web", "worker"], processRole: "all" })).toBe(true);
     });
 
     it("satisfies even a web-only runIn filter (all plays every role)", () => {
@@ -352,9 +385,7 @@ describe("roleSatisfiesRunIn", () => {
     });
 
     it("runs a web+worker subscriber under the web role", () => {
-      expect(roleSatisfiesRunIn({ runIn: ["web", "worker"], processRole: "web" })).toBe(
-        true,
-      );
+      expect(roleSatisfiesRunIn({ runIn: ["web", "worker"], processRole: "web" })).toBe(true);
     });
   });
 
@@ -368,9 +399,7 @@ describe("roleSatisfiesRunIn", () => {
     });
 
     it("excludes a worker-only subscriber under the migration role", () => {
-      expect(roleSatisfiesRunIn({ runIn: ["worker"], processRole: "migration" })).toBe(
-        false,
-      );
+      expect(roleSatisfiesRunIn({ runIn: ["worker"], processRole: "migration" })).toBe(false);
     });
   });
 });

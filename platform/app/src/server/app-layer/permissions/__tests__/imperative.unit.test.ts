@@ -29,7 +29,10 @@ function appDeciding(permitted: boolean): App {
         permitted,
         organizationRole: null,
       }),
-      resolveScope: vi.fn().mockImplementation((ids) => {
+      // `tryResolveScope`, not `resolveScope`: the contract's method returns
+      // null for ids that name no scope rather than throwing, which is what
+      // the fallthrough below already does — only the name was stale.
+      tryResolveScope: vi.fn().mockImplementation((ids) => {
         if (ids.projectId) {
           return {
             type: "project",
@@ -45,9 +48,7 @@ function appDeciding(permitted: boolean): App {
             organizationId: "org_1",
           };
         }
-        return ids.organizationId
-          ? { type: "organization", id: ids.organizationId }
-          : null;
+        return ids.organizationId ? { type: "organization", id: ids.organizationId } : null;
       }),
       authorize: vi.fn().mockImplementation(({ permission, scope }) => {
         if (!permitted) {
