@@ -125,11 +125,14 @@ export class ConnectGateway {
     }
 
     // The SDK sends its register frame the moment the socket opens, which
-    // is before the credential lookup below has answered. Frames are held
-    // until then, so the first one is never lost to an unattached listener.
-    const held: WebSocket.RawData[] = [];
+    // is before the credential lookup below has answered. The first frame is
+    // held until then, so it is never lost to an unattached listener. Later
+    // frames are dropped: only the register frame is read here, and a peer
+    // that is not authenticated yet must not be able to fill the memory of
+    // the process with the frames after it.
+    let held: WebSocket.RawData | undefined;
     const hold = (raw: WebSocket.RawData) => {
-      held.push(raw);
+      held ??= raw;
     };
     ws.on("message", hold);
 
@@ -149,9 +152,8 @@ export class ConnectGateway {
     }
 
     ws.off("message", hold);
-    const first = held.shift();
-    if (first !== undefined) {
-      void this.register(ws, resolved, first);
+    if (held !== undefined) {
+      void this.register(ws, resolved, held);
       return;
     }
     ws.once("message", (raw: WebSocket.RawData) => {
