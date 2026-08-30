@@ -1,33 +1,39 @@
 /**
- * The connected agents of a project, grouped by the name they registered
- * under (ADR-128).
+ * The connected agents of a project, as cards of the agents page (ADR-128).
  *
- * One name is one agent to a person and several rows to the platform: the
- * process in production, the one on a shared staging box, and one for every
- * developer who runs it on their laptop. The group carries the name, and
- * each row says which environment it is, whether a process holds it right
- * now, who it belongs to, and what it can be called with.
+ * One card is one name in one environment: the process in production, the
+ * one on a shared staging box, and one for every developer who runs it on
+ * their laptop. The card carries the presence mark, the name with its
+ * environment, the SDK that registered it, who it belongs to and what it can
+ * be called with. It is the same card the HTTP and the code agents are drawn
+ * in, so one page reads as one list.
  *
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
-import { Laptop, MoreVertical, User } from "lucide-react";
+import { Box, HStack, Text } from "@chakra-ui/react";
+import { ExternalLink, Laptop, User } from "lucide-react";
 import { LuTrash2 } from "react-icons/lu";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
+import { AgentCardMenuTrigger, AgentCardShell } from "../AgentCard";
 import {
   type ConnectedAgentView,
-  groupConnectedAgents,
+  environmentTone,
+  instanceCountLabel,
   parameterTooltip,
   presenceLabel,
   scopeOf,
   sdkLabel,
+  sortConnectedAgents,
 } from "./connected-agent-rows";
 
-/** The columns of one row: presence, environment, who, SDK, parameters. */
-const ROW_COLUMNS = "210px 140px 150px 1fr 32px";
-
+/**
+ * The connected agents as cards.
+ *
+ * The cards are drawn straight into the grid of the agents page, so they sit
+ * beside the agents of every other kind at the same size.
+ */
 export function ConnectedAgentsSection({
   agents,
   onOpen,
@@ -37,55 +43,86 @@ export function ConnectedAgentsSection({
   onOpen: (agent: ConnectedAgentView) => void;
   onDelete?: (agent: ConnectedAgentView) => void;
 }) {
-  const groups = groupConnectedAgents(agents);
   return (
-    <VStack
-      align="stretch"
-      gap={4}
-      width="full"
-      data-testid="connected-agents-section"
-    >
-      {groups.map((group) => (
-        <VStack
-          key={group.name}
-          align="stretch"
-          gap={0}
-          borderWidth="1px"
-          borderColor="border"
-          borderRadius="md"
-          data-testid={`connected-agent-group-${group.name}`}
-        >
-          <HStack
-            paddingX={4}
-            paddingY={2.5}
-            borderBottomWidth="1px"
-            borderColor="border"
-            background="bg.subtle"
-          >
-            <Text fontWeight="medium" fontSize="sm">
-              {group.name}
-            </Text>
-            <Text fontSize="xs" color="fg.muted">
-              {group.rows.length === 1
-                ? "1 environment"
-                : `${group.rows.length} environments`}
-            </Text>
-          </HStack>
-          {group.rows.map((agent) => (
-            <ConnectedAgentRow
-              key={agent.id}
-              agent={agent}
-              onOpen={() => onOpen(agent)}
-              onDelete={onDelete ? () => onDelete(agent) : undefined}
-            />
-          ))}
-        </VStack>
+    <>
+      {sortConnectedAgents(agents).map((agent) => (
+        <ConnectedAgentCard
+          key={agent.id}
+          agent={agent}
+          onOpen={() => onOpen(agent)}
+          onDelete={onDelete ? () => onDelete(agent) : undefined}
+        />
       ))}
-    </VStack>
+    </>
   );
 }
 
-function ConnectedAgentRow({
+/** The filled circle that says whether a process holds the agent. */
+function PresenceMark({ agent }: { agent: ConnectedAgentView }) {
+  const label = presenceLabel({
+    status: agent.status,
+    instanceCount: agent.instances.length,
+    lastSeenAt: agent.lastSeenAt,
+  });
+  return (
+    <Tooltip content={label}>
+      <Box
+        boxSize="12px"
+        borderRadius="full"
+        marginLeft="3px"
+        aria-label={label}
+        background={agent.status === "online" ? "green.500" : "fg.subtle"}
+        data-testid={`connected-agent-status-${agent.status}`}
+      />
+    </Tooltip>
+  );
+}
+
+/** The environment beside the name, in the colour of that environment. */
+function EnvironmentLabel({ environment }: { environment: string }) {
+  const tone = environmentTone(environment);
+  return (
+    <Text
+      fontSize="11px"
+      fontWeight={500}
+      paddingX={1.5}
+      paddingY={0.5}
+      borderRadius="sm"
+      flexShrink={0}
+      background={`${tone}.subtle`}
+      color={`${tone}.fg`}
+    >
+      {environment}
+    </Text>
+  );
+}
+
+/** The chip that names the person or the machine a card belongs to. */
+function ScopeChip({ agent }: { agent: ConnectedAgentView }) {
+  const scope = scopeOf(agent);
+  if (!scope) return null;
+  return (
+    <HStack
+      gap={1}
+      display="inline-flex"
+      paddingX={1.5}
+      paddingY={0.5}
+      borderRadius="full"
+      background="bg.muted"
+      minWidth={0}
+      flexShrink={0}
+      maxWidth="50%"
+    >
+      {scope.kind === "owner" ? <User size={10} /> : <Laptop size={10} />}
+      <Text fontSize="11px" truncate>
+        {scope.label}
+      </Text>
+    </HStack>
+  );
+}
+
+/** The actions of one card: open the agent, or delete it. */
+function ConnectedAgentMenu({
   agent,
   onOpen,
   onDelete,
@@ -94,119 +131,115 @@ function ConnectedAgentRow({
   onOpen: () => void;
   onDelete?: () => void;
 }) {
-  const scope = scopeOf(agent);
+  return (
+    <Menu.Root>
+      <AgentCardMenuTrigger agentName={agent.name} />
+      <Menu.Content>
+        <Menu.Item
+          value="open"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpen();
+          }}
+        >
+          <ExternalLink size={14} />
+          Open
+        </Menu.Item>
+        {onDelete && (
+          <Menu.Item
+            value="delete"
+            color="red.500"
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete();
+            }}
+          >
+            <LuTrash2 size={14} />
+            Delete
+          </Menu.Item>
+        )}
+      </Menu.Content>
+    </Menu.Root>
+  );
+}
+
+export function ConnectedAgentCard({
+  agent,
+  onOpen,
+  onDelete,
+}: {
+  agent: ConnectedAgentView;
+  onOpen: () => void;
+  onDelete?: () => void;
+}) {
   const sdk = sdkLabel(agent);
+  const instances = instanceCountLabel(agent);
+  const facts = [sdk, instances].filter((fact) => fact !== null);
 
   return (
-    <Grid
-      templateColumns={ROW_COLUMNS}
-      gap={3}
-      alignItems="center"
-      paddingX={4}
-      paddingY={3}
-      cursor="pointer"
-      _hover={{ background: "bg.muted/50" }}
-      borderBottomWidth="1px"
-      borderColor="border.muted"
-      _last={{ borderBottomWidth: 0 }}
+    <AgentCardShell
+      agentId={agent.id}
+      agentName={agent.name}
       onClick={onOpen}
-      data-testid={`connected-agent-row-${agent.id}`}
-    >
-      <HStack gap={2} minWidth={0}>
-        <Box
-          boxSize="8px"
-          borderRadius="full"
-          flexShrink={0}
-          background={agent.status === "online" ? "green.500" : "fg.subtle"}
-          data-testid={`connected-agent-status-${agent.status}`}
-        />
-        <Text fontSize="12px" color="fg.muted" truncate>
-          {presenceLabel({
-            status: agent.status,
-            instanceCount: agent.instances.length,
-            lastSeenAt: agent.lastSeenAt,
-          })}
-        </Text>
-      </HStack>
-
-      <Text fontSize="13px" fontWeight="medium" truncate>
-        {agent.environment ?? "unknown"}
-      </Text>
-
-      <Box minWidth={0}>
-        {scope ? (
-          <HStack
-            gap={1}
-            display="inline-flex"
-            paddingX={2}
-            paddingY={0.5}
-            borderRadius="full"
-            background="bg.muted"
-            maxWidth="full"
-          >
-            {scope.kind === "owner" ? <User size={11} /> : <Laptop size={11} />}
-            <Text fontSize="11px" truncate>
-              {scope.label}
-            </Text>
-          </HStack>
-        ) : null}
-      </Box>
-
-      <HStack gap={3} minWidth={0}>
-        {sdk ? (
-          <Text fontSize="11.5px" color="fg.muted" flexShrink={0}>
-            {sdk}
+      testId={`connected-agent-card-${agent.id}`}
+      leading={<PresenceMark agent={agent} />}
+      menu={
+        <ConnectedAgentMenu agent={agent} onOpen={onOpen} onDelete={onDelete} />
+      }
+      title={
+        <HStack gap={2} width="full" minWidth={0}>
+          <Text color="fg.muted" fontSize="sm" fontWeight={500} truncate>
+            {agent.name}
           </Text>
-        ) : null}
-        <HStack gap={1.5} flexWrap="wrap" minWidth={0}>
-          {agent.parameters.map((parameter) => (
-            <Tooltip key={parameter.name} content={parameterTooltip(parameter)}>
-              <Text
-                as="code"
-                fontFamily="mono"
-                fontSize="11px"
-                background="bg.muted"
-                borderRadius="sm"
-                paddingX={1.5}
-              >
-                {parameter.name}
-              </Text>
-            </Tooltip>
-          ))}
+          {agent.environment && (
+            <EnvironmentLabel environment={agent.environment} />
+          )}
         </HStack>
-      </HStack>
+      }
+      info={
+        <>
+          <HStack
+            gap={2}
+            width="full"
+            minWidth={0}
+            overflow="hidden"
+            color="fg.subtle"
+            fontSize="12px"
+          >
+            {facts.length > 0 && <Text truncate>{facts.join(" · ")}</Text>}
+            <ScopeChip agent={agent} />
+          </HStack>
 
-      <Box textAlign="right">
-        {onDelete ? (
-          <Menu.Root>
-            <Menu.Trigger asChild>
-              <Box
-                as="button"
-                aria-label={`Actions for ${agent.name}`}
-                padding={1}
-                borderRadius="sm"
-                _hover={{ background: "bg.muted" }}
-                onClick={(event: React.MouseEvent) => event.stopPropagation()}
-              >
-                <MoreVertical size={14} />
-              </Box>
-            </Menu.Trigger>
-            <Menu.Content>
-              <Menu.Item
-                value="delete"
-                color="red.500"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onDelete();
-                }}
-              >
-                <LuTrash2 size={14} />
-                Delete
-              </Menu.Item>
-            </Menu.Content>
-          </Menu.Root>
-        ) : null}
-      </Box>
-    </Grid>
+          {agent.parameters.length > 0 && (
+            <HStack
+              gap={1.5}
+              width="full"
+              minWidth={0}
+              overflow="hidden"
+              height="18px"
+            >
+              {agent.parameters.map((parameter) => (
+                <Tooltip
+                  key={parameter.name}
+                  content={parameterTooltip(parameter)}
+                >
+                  <Text
+                    as="code"
+                    fontFamily="mono"
+                    fontSize="11px"
+                    background="bg.muted"
+                    borderRadius="sm"
+                    paddingX={1.5}
+                    flexShrink={0}
+                  >
+                    {parameter.name}
+                  </Text>
+                </Tooltip>
+              ))}
+            </HStack>
+          )}
+        </>
+      }
+    />
   );
 }

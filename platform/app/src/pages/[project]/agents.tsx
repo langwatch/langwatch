@@ -166,8 +166,7 @@ function Page() {
   const otherAgents = (agentsQuery.data ?? []).filter(
     (agent) => agent.type !== "connected",
   );
-  const showOtherAgentsEmptyState =
-    !agentsQuery.isLoading && otherAgents.length === 0;
+  const hasAgents = connectedAgents.length + otherAgents.length > 0;
 
   return (
     <DashboardLayout>
@@ -182,29 +181,13 @@ function Page() {
       </PageLayout.Header>
 
       <VStack gap={6} width="full" align="stretch" padding={6}>
-        {connectedAgents.length > 0 ? (
-          <ConnectedAgentsSection
-            agents={connectedAgents}
-            onOpen={(agent) =>
-              openDrawer("agentConnectedDetail", {
-                urlParams: { agentId: agent.id },
-              })
-            }
-            onDelete={(agent) =>
-              setAgentToDelete(
-                agentsQuery.data?.find((row) => row.id === agent.id) ?? null,
-              )
-            }
+        {connectedAgents.length === 0 && !agentsQuery.isLoading && (
+          <ConnectAgentPanel
+            onCreateOtherAgent={() => openDrawer("agentTypeSelector")}
           />
-        ) : (
-          !agentsQuery.isLoading && (
-            <ConnectAgentPanel
-              onCreateOtherAgent={() => openDrawer("agentTypeSelector")}
-            />
-          )
         )}
 
-        {showOtherAgentsEmptyState ? null : (
+        {!hasAgents && !agentsQuery.isLoading ? null : (
           <Grid
             templateColumns="repeat(auto-fill, minmax(300px, 1fr))"
             gap={4}
@@ -212,8 +195,21 @@ function Page() {
           >
             {agentsQuery.isLoading &&
               Array.from({ length: 3 }).map((_, index) => (
-                <Skeleton key={index} height="100px" borderRadius="md" />
+                <Skeleton key={index} height="142px" borderRadius="md" />
               ))}
+            <ConnectedAgentsSection
+              agents={connectedAgents}
+              onOpen={(agent) =>
+                openDrawer("agentConnectedDetail", {
+                  urlParams: { agentId: agent.id },
+                })
+              }
+              onDelete={(agent) =>
+                setAgentToDelete(
+                  agentsQuery.data?.find((row) => row.id === agent.id) ?? null,
+                )
+              }
+            />
             {otherAgents.map((agent) => (
               <AgentCard
                 key={agent.id}

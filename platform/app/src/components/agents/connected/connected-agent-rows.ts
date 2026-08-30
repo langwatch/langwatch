@@ -2,9 +2,9 @@
  * What the agents page reads off a connected agent (ADR-128).
  *
  * One name can be several agents: the same function connected from
- * production, from a staging box and from every developer's laptop. The page
- * groups the rows by name and each row says which environment it is, whether
- * a process holds it right now, and who or what machine it belongs to.
+ * production, from a staging box and from every developer's laptop. Each one
+ * is a card of its own, and the card says which environment it is, whether a
+ * process holds it right now, and who or what machine it belongs to.
  *
  * Framework-free on purpose, so the rules are read by a plain test and the
  * component only draws them.
@@ -15,7 +15,7 @@
 import { formatDistanceStrict } from "date-fns";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 
-/** The SDK that registered an agent, as the row prints it. */
+/** The SDK that registered an agent, as the card prints it. */
 export interface ConnectedAgentSdk {
   name: string;
   version: string;
@@ -52,13 +52,7 @@ export interface ConnectedAgentView {
   >;
 }
 
-/** Every row of one agent name, newest environment order kept stable. */
-export interface ConnectedAgentGroup {
-  name: string;
-  rows: ConnectedAgentView[];
-}
-
-/** The scope a development row belongs to: a person, or a machine. */
+/** The scope a development card belongs to: a person, or a machine. */
 export type ConnectedAgentScope =
   | { kind: "owner"; label: string }
   | { kind: "host"; label: string }
@@ -70,26 +64,24 @@ export function isConnectedAgent(agent: { type: string }): boolean {
 }
 
 /**
- * The agents grouped by name.
+ * The cards in the order the page draws them.
  *
- * The groups keep the order the list arrived in, and so do the rows inside
- * one group, so a refresh never reshuffles the page. An online row sorts
- * before an offline one, because a running process is what the reader came
- * for.
+ * The names keep the order the list arrived in, so a refresh never
+ * reshuffles the page. Inside one name an online agent sorts before an
+ * offline one, because a running process is what the reader came for.
  */
-export function groupConnectedAgents(
+export function sortConnectedAgents(
   agents: readonly ConnectedAgentView[],
-): ConnectedAgentGroup[] {
-  const groups = new Map<string, ConnectedAgentView[]>();
+): ConnectedAgentView[] {
+  const order = new Map<string, number>();
   for (const agent of agents) {
-    const rows = groups.get(agent.name) ?? [];
-    rows.push(agent);
-    groups.set(agent.name, rows);
+    if (!order.has(agent.name)) order.set(agent.name, order.size);
   }
-  return [...groups].map(([name, rows]) => ({
-    name,
-    rows: [...rows].sort(byPresenceThenEnvironment),
-  }));
+  return [...agents].sort((left, right) => {
+    const byName = (order.get(left.name) ?? 0) - (order.get(right.name) ?? 0);
+    if (byName !== 0) return byName;
+    return byPresenceThenEnvironment(left, right);
+  });
 }
 
 function byPresenceThenEnvironment(
@@ -100,7 +92,7 @@ function byPresenceThenEnvironment(
   return (left.environment ?? "").localeCompare(right.environment ?? "");
 }
 
-/** What a row says about presence: online with a count, or when it was last seen. */
+/** What a card says about presence: online with a count, or when it was last seen. */
 export function presenceLabel({
   status,
   instanceCount,
@@ -126,8 +118,15 @@ export function presenceLabel({
   return `Offline · last seen ${ago}`;
 }
 
+/** How many instances hold the agent, as the card prints it beside the SDK. */
+export function instanceCountLabel(agent: ConnectedAgentView): string | null {
+  if (agent.status !== "online") return null;
+  const count = Math.max(agent.instances.length, 1);
+  return `${count} ${count === 1 ? "instance" : "instances"}`;
+}
+
 /**
- * Who the row belongs to.
+ * Who the card belongs to.
  *
  * A development agent registered with a personal key belongs to that person,
  * and one registered with a project key belongs to the machine it runs on.
@@ -139,14 +138,27 @@ export function scopeOf(agent: ConnectedAgentView): ConnectedAgentScope {
   return null;
 }
 
-/** The SDK line of a row, or nothing when the agent recorded none. */
+/** The SDK line of a card, or nothing when the agent recorded none. */
 export function sdkLabel(agent: ConnectedAgentView): string | null {
   const sdk = agent.config.sdk ?? agent.instances[0]?.sdk;
   if (!sdk?.name) return null;
   return sdk.version ? `${sdk.name} ${sdk.version}` : sdk.name;
 }
 
-/** The parameter names a row prints, in declaration order. */
+/**
+ * The colour family of the environment label beside the name.
+ *
+ * Production and development read in a colour of their own, and every other
+ * environment reads in the neutral one, so a card is placed at a glance
+ * without learning a palette.
+ */
+export function environmentTone(environment: string | null): string {
+  if (environment === "production") return "green";
+  if (environment === "development") return "purple";
+  return "gray";
+}
+
+/** The parameter names a card prints, in declaration order. */
 export function parameterNames(agent: ConnectedAgentView): string[] {
   return agent.parameters.map((parameter) => parameter.name);
 }

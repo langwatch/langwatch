@@ -19,49 +19,72 @@ Feature: Connected agents in the product
   # ---------------------------------------------------------------------------
 
   @integration
-  Scenario: Connected agents of one name group under that name
+  Scenario: Every connected agent is a card of the agents page
     Given "support-agent" is registered in "production" and in "development"
     When the agents page reads the project
-    Then one group named "support-agent" holds both rows
-    And each row names its own environment
+    Then one card is drawn for each of them
+    And each card names the agent and its own environment
+
+  @integration
+  Scenario: The environment reads in a colour of its own
+    Given "support-agent" in "production", in "development" and in "staging"
+    When the cards are drawn
+    Then "production" and "development" read in two different colours
+    And "staging" reads in the neutral colour
 
   @integration
   Scenario: An online agent reads how many instances hold it
     Given "support-agent" in "production" has three connected instances
-    When the row is drawn
-    Then it reads "Online · 3 instances"
+    When the card is drawn
+    Then its presence mark is the online one
+    And the mark carries "Online · 3 instances"
+    And the card reads "3 instances"
 
   @integration
   Scenario: An agent with one instance reads it in the singular
     Given "support-agent" in "production" has one connected instance
-    When the row is drawn
-    Then it reads "Online · 1 instance"
+    When the card is drawn
+    Then the mark carries "Online · 1 instance"
 
   @integration
   Scenario: An offline agent reads when it was last seen
     Given "support-agent" in "production" has no connected instance
     And it was last seen two hours ago
-    When the row is drawn
-    Then it reads "Offline · last seen 2 hours ago"
+    When the card is drawn
+    Then its presence mark is the offline one
+    And the mark carries "Offline · last seen 2 hours ago"
 
   @integration
   Scenario: A personal development agent reads its owner
     Given "support-agent" in "development" belongs to a person
-    When the row is drawn
+    When the card is drawn
     Then it carries a chip with the owner's name
 
   @integration
   Scenario: A shared development agent reads the machine that holds it
     Given "support-agent" in "development" belongs to no person and names a machine
-    When the row is drawn
+    When the card is drawn
     Then it carries a chip with the machine name
 
   @integration
-  Scenario: A row names the SDK and the parameters the agent declares
+  Scenario: A card names the SDK and the parameters the agent declares
     Given "support-agent" registered from the Python SDK with a "model" parameter
-    When the row is drawn
+    When the card is drawn
     Then it names the SDK and its version
     And it names the "model" parameter
+
+  @integration
+  Scenario: A click on the card opens the connected agent
+    Given a connected agent on the agents page
+    When its card is clicked
+    Then the connected agent drawer is opened for that agent
+
+  @integration
+  Scenario: The card menu opens the agent and deletes it
+    Given a connected agent on the agents page
+    When the menu of the card is opened
+    Then it offers to open the agent and to delete it
+    And the menu is drawn above the cards, never cut by the card
 
   @integration
   Scenario: The page offers the connect snippets when no agent is connected

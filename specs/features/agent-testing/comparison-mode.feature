@@ -176,6 +176,13 @@ Feature: Comparison mode
     And no row carries a menu
 
   @integration
+  Scenario: A long target name keeps its own column
+    Given a run against two targets whose names carry their environment and parameters
+    When the run is opened
+    Then every column header reads its whole label
+    And no label runs over the column beside it
+
+  @integration
   Scenario: Each target column carries its own summary
     Given a run against "dev-agent" and "prod-agent" where "dev-agent" passed one of two and "prod-agent" passed two of two
     When the run is opened
