@@ -1,157 +1,71 @@
-import { describe, expect, it, vi } from "vitest";
-import { LangyService } from "../../services/langy.service";
-import {
-  ConversationRepository,
-  CredentialRepository,
-  MessageRepository,
-  RelayRepository,
-  TurnRepository,
-} from "../langy.repository";
+/**
+ * @vitest-environment node
+ *
+ * What is left of `LangyService`'s own behaviour once the composed services own
+ * the rest: the feedback cadence.
+ *
+ * This suite used to carry four more cases over the repository-backed head —
+ * conversation identity, relay delegation, "turns repository absence into the
+ * contract error", and visibility-before-messages. That head had no production
+ * construction (`createComposed` passed `null` for it) and no caller, so those
+ * cases proved only that the abstractions they defined were self-consistent.
+ * They went with it.
+ */
+import { describe, expect, it } from "vitest";
 import { LangyFeedbackPromptPolicy } from "../../ports/langy-feedback-prompt.port";
-
-const conversation = {
-  id: "conversation_1",
-  projectId: "project_1",
-  userId: "user_1",
-  title: null,
-  isShared: false,
-  status: "active",
-  currentTurnId: null,
-  lastError: null,
-  lastModel: null,
-  messageCount: 0,
-  lastActivityAt: 0,
-};
-
-class Conversations extends ConversationRepository {
-  readonly tryGet = vi.fn(async (): Promise<typeof conversation | null> => conversation);
-  list = vi.fn(async () => ({ items: [conversation], nextCursor: null }));
-  create = vi.fn(async () => conversation);
-  archive = vi.fn(async () => undefined);
-}
-class Turns extends TurnRepository {
-  start = vi.fn(async () => ({ conversation, turnId: "turn_1" }));
-  stop = vi.fn(async () => undefined);
-}
-class Messages extends MessageRepository {
-  list = vi.fn(async () => []);
-}
-class Credentials extends CredentialRepository {
-  resolve = vi.fn(async () => ({
-    token: "token",
-    expiresAt: 1,
-    scope: "turn" as const,
-  }));
-  tryGetEgressAllowlist = vi.fn(async () => null);
-  trySetEgressAllowlist = vi.fn(async () => null);
-}
-class Relay extends RelayRepository {
-  publish = vi.fn(async () => undefined);
-}
-
-function service() {
-  const repositories = {
-    conversations: new Conversations(),
-    turns: new Turns(),
-    messages: new Messages(),
-    credentials: new Credentials(),
-    relay: new Relay(),
-  };
-  return {
-    service: LangyService.create(
-      repositories,
-      LangyFeedbackPromptPolicy.create({ redis: null }),
-    ),
-    repositories,
-  };
-}
+import { LangyService } from "../../services/langy.service";
+import type { LangyConversationService } from "../../services/langy-conversation.service";
+import type { LangyCredentialService } from "../../services/langy-credential.service";
+import type { LangyMessageService } from "../../services/langy-message.service";
+import type { LangyTurnService } from "../../services/langy-turn.service";
 
 function feedbackPrompt() {
   const values = new Map<string, string>();
   return {
     service: LangyFeedbackPromptPolicy.create({
       redis: {
-        get: async (key) => values.get(key) ?? null,
-        set: async (key, value) => {
+        get: async (key: string) => values.get(key) ?? null,
+        set: async (key: string, value: string) => {
           values.set(key, value);
-          return "OK";
+          return "OK" as const;
         },
-      },
+      } as never,
     }),
     values,
   };
 }
 
+/** Composed the way production composes it; feedback reaches no collaborator. */
+function service(prompt: LangyFeedbackPromptPolicy) {
+  return LangyService.createComposed(
+    {} as unknown as LangyConversationService,
+    {} as unknown as LangyTurnService,
+    {} as unknown as LangyMessageService,
+    {} as unknown as LangyCredentialService,
+    prompt,
+  );
+}
+
 describe("LangyService", () => {
-  it("leaves conversation identity and creation semantics with the repository", async () => {
-    const { service: langy, repositories } = service();
-    const input = { projectId: "project_1", userId: "user_1" };
+  describe("when a conversation has enough assistant answers to ask", () => {
+    it("owns the feedback cadence on the flat service boundary", async () => {
+      const prompt = feedbackPrompt();
+      const langy = service(prompt.service);
 
-    await langy.createConversation(input);
+      await expect(
+        langy.shouldAskFeedback({
+          userId: "user_1",
+          conversationId: "conversation_1",
+          assistantAnswerCount: 2,
+        }),
+      ).resolves.toBe(true);
 
-    expect(repositories.conversations.create).toHaveBeenCalledWith(input);
-  });
-
-  it("delegates a relay frame to the one relay repository", async () => {
-    const { service: langy, repositories } = service();
-    const frame = {
-      conversationId: "conversation_1",
-      turnId: "turn_1",
-      type: "delta",
-      payload: { text: "hi" },
-    };
-    await langy.relay(frame);
-    expect(repositories.relay.publish).toHaveBeenCalledWith(frame);
-  });
-
-  it("turns repository absence into the contract error", async () => {
-    const { service: langy, repositories } = service();
-    repositories.conversations.tryGet.mockResolvedValueOnce(null);
-    await expect(
-      langy.getConversation({
-        projectId: "project_1",
-        userId: "user_1",
-        conversationId: "missing",
-      }),
-    ).rejects.toMatchObject({ code: "langy_conversation_not_found" });
-  });
-
-  it("checks conversation visibility before reading messages", async () => {
-    const { service: langy, repositories } = service();
-    repositories.conversations.tryGet.mockResolvedValueOnce(null);
-
-    await expect(
-      langy.listMessages({
-        projectId: "project_1",
-        userId: "user_1",
-        conversationId: "missing",
-      }),
-    ).rejects.toMatchObject({ code: "langy_conversation_not_found" });
-    expect(repositories.messages.list).not.toHaveBeenCalled();
-  });
-
-  it("owns feedback cadence on the flat service boundary", async () => {
-    const repositories = {
-      conversations: new Conversations(),
-      turns: new Turns(),
-      messages: new Messages(),
-      credentials: new Credentials(),
-      relay: new Relay(),
-    };
-    const prompt = feedbackPrompt();
-    const langy = LangyService.create(repositories, prompt.service);
-
-    await expect(
-      langy.shouldAskFeedback({
+      await langy.markFeedbackShown({
         userId: "user_1",
         conversationId: "conversation_1",
-        assistantAnswerCount: 2,
-      }),
-    ).resolves.toBe(true);
-    await langy.markFeedbackShown({
-      userId: "user_1",
-      conversationId: "conversation_1",
+      });
+
+      expect(prompt.values.get("langy:feedback:last-asked:user_1")).toBeDefined();
     });
-    expect(prompt.values.get("langy:feedback:last-asked:user_1")).toBeDefined();
   });
 });

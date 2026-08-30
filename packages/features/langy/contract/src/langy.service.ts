@@ -112,10 +112,7 @@ export type LangyConversationTurnCapability = {
     projectId: string;
     conversationId: string;
   }): Promise<{ token: string; turnId: string } | null>;
-  tryGetRunToken(input: {
-    projectId: string;
-    conversationId: string;
-  }): Promise<string | null>;
+  tryGetRunToken(input: { projectId: string; conversationId: string }): Promise<string | null>;
   acceptTurn(input: {
     projectId: string;
     conversationId: string;
@@ -215,36 +212,20 @@ export type LangyTurnAdmissionCapability = {
     conversationId: string;
     turnId: string;
   }): Promise<void>;
-  release(input: {
-    projectId: string;
-    conversationId: string;
-    turnId?: string;
-  }): Promise<void>;
+  release(input: { projectId: string; conversationId: string; turnId?: string }): Promise<void>;
 };
 
-/** The one cross-feature Langy capability. Transports must delegate to this. */
+/**
+ * The one cross-feature Langy capability. Transports must delegate to this.
+ *
+ * Eight members were removed here — listConversations, getConversation,
+ * createConversation, archiveConversation, startTurn, listMessages,
+ * resolveCredential and relay. They were the older repository-backed head of
+ * the implementation, `createComposed` never supplied the repositories they
+ * read, and no caller anywhere reached them.
+ */
 export abstract class LangyService {
-  abstract listConversations(
-    input: LangyConversationListInput,
-  ): Promise<LangyConversationPage>;
-
-  abstract getConversation(input: LangyConversationInput): Promise<LangyConversation>;
-
-  abstract createConversation(
-    input: LangyCreateConversationInput,
-  ): Promise<LangyConversation>;
-
-  abstract archiveConversation(input: LangyConversationInput): Promise<void>;
-
-  abstract startTurn(
-    input: LangyTurnInput,
-  ): Promise<{ conversation: LangyConversation; turnId: string }>;
-
   abstract stopTurn(input: LangyStopTurnInput & { userId: string }): Promise<void>;
-
-  abstract listMessages(input: LangyConversationInput): Promise<readonly unknown[]>;
-
-  abstract resolveCredential(input: LangyCredentialInput): Promise<LangyCredential>;
 
   abstract tryGetEgressAllowlist(
     input: LangyEgressProjectInput,
@@ -253,8 +234,6 @@ export abstract class LangyService {
   abstract trySetEgressAllowlist(
     input: LangyEgressProjectInput & { allowlist: LangyEgressAllowlist },
   ): Promise<LangyEgressAllowlist | null>;
-
-  abstract relay(frame: LangyRelayFrame): Promise<void>;
 
   /** Opens one per-worker-connection relay session over this process-owned service. */
   abstract openRelayConnection(): LangyRelayConnection;
@@ -287,11 +266,7 @@ export abstract class LangyService {
     projectId: string;
     userId: string;
   }): Promise<LangyMessageRow[]>;
-  abstract deleteById(input: {
-    id: string;
-    projectId: string;
-    userId: string;
-  }): Promise<boolean>;
+  abstract deleteById(input: { id: string; projectId: string; userId: string }): Promise<boolean>;
   abstract updateById(input: {
     id: string;
     projectId: string;
@@ -323,10 +298,7 @@ export abstract class LangyService {
     conversationId: string;
     assistantAnswerCount: number;
   }): Promise<boolean>;
-  abstract markFeedbackShown(input: {
-    userId: string;
-    conversationId: string;
-  }): Promise<void>;
+  abstract markFeedbackShown(input: { userId: string; conversationId: string }): Promise<void>;
   abstract turnExists(input: {
     projectId: string;
     conversationId: string;
