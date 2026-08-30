@@ -16,6 +16,7 @@ import { mapChRowToNormalized, serializeAttributes } from "@langwatch/trace-serv
 import { SpanNormalizationPipelineService } from "@langwatch/trace-server";
 import {
   makeSpanReferencedPayload,
+  type SpanReferencedPayload,
   type NormalizedSpan,
   type OtlpInstrumentationScope,
   type OtlpResource,
@@ -97,6 +98,19 @@ function rawSpanEvent({
       instrumentationScope: { name: scopeName },
     },
   } as unknown as TraceProcessingEvent;
+}
+
+/**
+ * A staged claim-check as the framework hands it to the subscriber.
+ *
+ * `span_referenced` is a real wire shape — `dedupIdentity` reads it, `handle`
+ * parses it, and `staticBuilder` casts `payload.event as E` on the way in — but
+ * `TraceProcessingEvent` does not have a member for it, so it does not overlap
+ * and a single assertion will not compile. Stating that once here beats ten
+ * assertions that each look like a mistake.
+ */
+function asDispatched(payload: SpanReferencedPayload): TraceProcessingEvent {
+  return payload as unknown as TraceProcessingEvent;
 }
 
 /** The same normalization the platform runs — builds expected store rows. */
@@ -647,7 +661,7 @@ describe("codingAgentSpanFactsDispatch", () => {
           throw new Error("expected a custom deduplication config");
         }
 
-        expect(dedup.makeId(makeSpanReferencedPayload(event) as TraceProcessingEvent)).toBe(
+        expect(dedup.makeId(asDispatched(makeSpanReferencedPayload(event)))).toBe(
           dedup.makeId(event),
         );
       });
@@ -686,9 +700,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         // the source event's id, so an id-less span keys identically whichever
         // shape the seam happened to stage.
         expect(
-          dedup.makeId(
-            makeSpanReferencedPayload(first as SpanReceivedEvent) as TraceProcessingEvent,
-          ),
+          dedup.makeId(asDispatched(makeSpanReferencedPayload(first as SpanReceivedEvent))),
         ).toBe(dedup.makeId(first));
       });
     });
@@ -712,10 +724,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         await fullPath.subscriber.handle(event, context);
 
         const refPath = makeSubscriber(async () => storeReadBackFrom(event));
-        await refPath.subscriber.handle(
-          makeSpanReferencedPayload(event) as TraceProcessingEvent,
-          context,
-        );
+        await refPath.subscriber.handle(asDispatched(makeSpanReferencedPayload(event)), context);
 
         expect(refPath.dispatched).toHaveLength(1);
         expect(refPath.dispatched[0]).toEqual(fullPath.dispatched[0]);
@@ -747,7 +756,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         const event = { ...base, tenantId: createTenantId("tenant-other") };
 
         const { subscriber, reads } = makeSubscriber(async () => normalizedFrom(event));
-        await subscriber.handle(makeSpanReferencedPayload(event) as TraceProcessingEvent, context);
+        await subscriber.handle(asDispatched(makeSpanReferencedPayload(event)), context);
 
         expect(reads[0]?.tenantId).toBe("tenant-other");
       });
@@ -771,10 +780,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         await fullPath.subscriber.handle(event, context);
 
         const refPath = makeSubscriber(async () => storeReadBackFrom(event));
-        await refPath.subscriber.handle(
-          makeSpanReferencedPayload(event) as TraceProcessingEvent,
-          context,
-        );
+        await refPath.subscriber.handle(asDispatched(makeSpanReferencedPayload(event)), context);
 
         // The session key — the field that decides which aggregate the facts
         // land on — is identical across paths.
@@ -806,7 +812,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         const event = { ...base, occurredAt: startMs + threeDays };
 
         const { subscriber, reads } = makeSubscriber(async () => normalizedFrom(event));
-        await subscriber.handle(makeSpanReferencedPayload(event) as TraceProcessingEvent, context);
+        await subscriber.handle(asDispatched(makeSpanReferencedPayload(event)), context);
 
         expect(reads).toEqual([
           {
@@ -840,7 +846,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         const event = { ...base, occurredAt: startMs + threeDays };
 
         const { subscriber, reads } = makeSubscriber(async () => normalizedFrom(event));
-        await subscriber.handle(makeSpanReferencedPayload(event) as TraceProcessingEvent, context);
+        await subscriber.handle(asDispatched(makeSpanReferencedPayload(event)), context);
 
         expect(reads[0]?.occurredAtMs).toBe(startMs);
       });
@@ -883,7 +889,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         const { subscriber, dispatched } = makeSubscriber(async () => null);
 
         await expect(
-          subscriber.handle(makeSpanReferencedPayload(event) as TraceProcessingEvent, context),
+          subscriber.handle(asDispatched(makeSpanReferencedPayload(event)), context),
         ).rejects.toThrow(/not readable in the span store/);
         expect(dispatched).toHaveLength(0);
       });
@@ -904,7 +910,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         const { subscriber } = makeSubscriber(async () => null);
 
         const failure: unknown = await subscriber
-          .handle(makeSpanReferencedPayload(event) as TraceProcessingEvent, context)
+          .handle(asDispatched(makeSpanReferencedPayload(event)), context)
           .then(
             () => null,
             (error: unknown) => error,
@@ -1110,9 +1116,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         }
 
         const fromFull = makeId.makeId(event);
-        const fromReference = makeId.makeId(
-          makeSpanReferencedPayload(event) as TraceProcessingEvent,
-        );
+        const fromReference = makeId.makeId(asDispatched(makeSpanReferencedPayload(event)));
         const fromLifted = makeId.makeId(staged(liftedPayload({ spanId: "tool-key" })));
 
         expect(fromReference).toBe(fromFull);
