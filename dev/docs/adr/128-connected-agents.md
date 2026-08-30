@@ -44,7 +44,7 @@ The scenario child calls `POST /api/agents/:id/call` with the project key (the c
 
 Dispatch is durable and at most once. The dispatcher writes the envelope to Redis (`agent_call:v1:<callId>`, EX = deadline + slack) and to the instance's pending set before it publishes a nudge on the instance channel; the pod that holds the socket reads the key, never the message body, and rescans the pending set when an instance re-registers. The SDK sends `ack` when the function starts; the dispatcher retries on another instance only before `ack`. The result lands in `agent_result:v1:<callId>` (EX 60 s) plus a nudge on one reply channel per pod; the dispatcher polls the result key as the fallback. A pod that loses a socket publishes the instance as gone, and the dispatcher fails that instance's calls with `agent_disconnected` at once. Scenario cancellation rides the HTTP request: the child's socket dies with the child, the route sees the abort and sends `cancel`.
 
-Presence: ZSET `agent_instance:v1:<projectId>:<agentId>` (member instanceId, score last seen, TTL 30 s, refreshed on pong every 10 s) plus a per-instance hash (hostname, username, pid, sdk, label, pod, connectedAt, maxConcurrency). Online means at least one live member. `Agent.lastSeenAt` is written at most once a minute; a daily sweep archives connected agents unseen for 30 days. Without Redis the registry is in memory and `connect` is refused on a deployment with more than one app replica.
+Presence: ZSET `agent_instance:v1:<projectId>:<agentId>` (member instanceId, score last seen, TTL 30 s, refreshed on pong every 10 s) plus a per-instance hash (hostname, username, pid, sdk, label, pod, connectedAt, maxConcurrency). Online means at least one live member. `Agent.lastSeenAt` is written at most once a minute; a daily sweep archives connected agents unseen for 30 days. Without Redis the registry is in memory and `connect` is refused on a deployment with more than one app replica (`LANGWATCH_APP_REPLICAS`, default 1).
 
 Concurrency: each instance advertises `maxConcurrency` (default 1 in development, 4 elsewhere); the platform counts in-flight calls per instance in Redis under the call TTL, picks the instance with the most free slots, and answers 429 with `Retry-After` when every instance is full; the adapter waits with jitter up to a bounded budget. Thread affinity is a rendezvous-hash hint; `sticky=True` pins a thread to an instance and fails it with `agent_instance_lost` when that instance is gone.
 
@@ -88,14 +88,14 @@ Frames are JSON text over the socket, every frame `{ "type": ..., "protocol": 1,
 |---|---|---|
 | SDK to platform | `register` | `sdk { name, version, language }`, `instance { id, hostname, username, pid, startedAt, label?, inFlightCallIds[] }`, `agents[] { name, environment, description?, parameters (JSON Schema object), concurrency?, timeoutMs?, sticky? }` |
 | platform to SDK | `registered` | `agents[] { name, environment, id, url, parameterNotes[] }`, `heartbeatIntervalMs`, `instanceId` |
-| platform to SDK | `refused` | `{ code, message }` then close |
+| platform to SDK | `refused` | `{ code, message, meta? }` then close; codes `api_key_invalid`, `project_required` (`meta.projects[] { id, name }`), `permission_denied`, `key_type_not_allowed`, `replica_count_unsupported`, `parameters_invalid`, `environment_invalid`, `protocol_invalid` |
 | platform to SDK | `call` | `{ callId, agentId, threadId, messages, newMessages, params, session, traceparent, deadlineAt, run { scenarioRunId?, scenarioName?, batchRunId? } }` |
 | SDK to platform | `ack` | `{ callId }` when the function starts |
 | SDK to platform | `result` | `{ callId, output, session? }` or `{ callId, error { code, message } }` |
 | platform to SDK | `cancel` | `{ callId }` |
 | SDK to platform | `deregister` | graceful shutdown |
 
-Error codes (`HandledError`, presentation entries in `features/errors/logic/presentation.ts`): `agent_offline`, `agent_owner_only`, `agent_call_timeout`, `agent_call_failed`, `agent_disconnected`, `agent_instance_lost`, `agent_busy`, `agent_parameter_invalid`, `agent_register_refused`, `agent_payload_too_large`, `scenario_parameter_option_invalid`.
+Error codes (`HandledError`, presentation entries in `features/errors/logic/presentation.ts`): `agent_offline`, `agent_owner_only`, `agent_call_timeout`, `agent_call_failed`, `agent_disconnected`, `agent_instance_lost`, `agent_busy`, `agent_parameter_invalid`, `agent_register_refused`, `agent_register_only` (REST create or update of a `connected` agent), `agent_payload_too_large`, `scenario_parameter_option_invalid`.
 
 Redis keys (`server/connected-agents/keys.ts`): `agent_instance:v1:<projectId>:<agentId>` (ZSET), `agent_instance_meta:v1:<instanceId>` (hash), `agent_inflight:v1:<instanceId>` (counter), `agent_call:v1:<callId>` (envelope), `agent_pending:v1:<instanceId>` (ZSET of call ids), `agent_result:v1:<callId>`, `agent_thread:v1:<agentId>:<threadId>` (sticky pin); channels `agent_call:v1:<instanceId>`, `agent_reply:v1:<podId>`, `agent_instance_gone:v1`.
 
