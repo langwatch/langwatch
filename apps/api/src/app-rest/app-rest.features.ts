@@ -1,15 +1,6 @@
-import type { LegacyAgentsRestApi } from "@langwatch/agent-server/legacy-rest";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
-import type { AutomationService } from "@langwatch/automation-contract";
 import type { AuthzGrantsService, AuthzPermission, AuthzService } from "@langwatch/authz-contract";
-import type { DashboardService } from "@langwatch/dashboard-contract";
-import type { DatasetService } from "@langwatch/dataset-contract";
-import type { GovernanceService } from "@langwatch/enterprise-api";
 import type { EnterpriseFeature } from "@langwatch/enterprise-plan-gate";
-import type { ScimService } from "@langwatch/enterprise-api";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
-import type { ExperimentService } from "@langwatch/experiment-contract";
-import type { MonitorService } from "@langwatch/monitor-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type {
   OrganizationLedgerActor,
@@ -22,14 +13,9 @@ import type {
   ScenarioTabRegistry,
   SimulationService,
 } from "@langwatch/scenario-contract";
-import type {
-  StoredObjectOwnerResolver,
-  StoredObjectService,
-} from "@langwatch/stored-object-contract";
-import type { SecretService } from "@langwatch/secret-contract";
-import type { SuiteService } from "@langwatch/suite-contract";
+import type { StoredObjectOwnerResolver } from "@langwatch/stored-object-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
-import type { Context, Hono, MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import { z, type ZodType } from "zod";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
