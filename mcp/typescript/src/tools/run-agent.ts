@@ -1,30 +1,41 @@
-import { runAgent as apiRunAgent } from "../langwatch-api-agents.js";
+import {
+  runAgent as apiRunAgent,
+  type AgentCallParams,
+} from "../langwatch-api-agents.js";
 
 /**
  * Handles the platform_run_agent MCP tool invocation.
  *
  * @see specs/mcp-server/agent-tools.feature
  */
-export async function handleRunAgent(params: {
+export async function handleRunAgent({
+  id,
+  input,
+  message,
+  parameters,
+  threadId,
+}: {
   id: string;
   input?: string;
   message?: string;
-  parameters?: Record<string, string | number | boolean>;
+  parameters?: AgentCallParams;
   threadId?: string;
 }): Promise<string> {
   let parsedInput: Record<string, unknown> = {};
-  if (params.input) {
+  if (input) {
     try {
-      parsedInput = JSON.parse(params.input) as Record<string, unknown>;
+      parsedInput = JSON.parse(input) as Record<string, unknown>;
     } catch {
       return "Error: `input` must be a valid JSON object.";
     }
   }
 
-  const { agentType, result } = await apiRunAgent(params.id, parsedInput, {
-    message: params.message,
-    parameters: params.parameters,
-    threadId: params.threadId,
+  const { agentType, result } = await apiRunAgent({
+    id,
+    input: parsedInput,
+    message,
+    parameters,
+    threadId,
   });
 
   const lines: string[] = [];

@@ -23,6 +23,11 @@ Feature: Agent tools expose connected agents and run them through the relay
       Then the parameters read their type, options, default and required
       And each instance reads its hostname, label and connection time
 
+    Scenario: A secret parameter is marked secret
+      Given a connected agent that declares a secret parameter
+      When the agent calls platform_get_agent
+      Then the parameter line reads secret
+
     Scenario: The listing keeps the HTTP agent entry unchanged
       Given an HTTP agent
       When the agent calls platform_list_agents
@@ -43,6 +48,10 @@ Feature: Agent tools expose connected agents and run them through the relay
     Scenario: A connected agent needs a conversation
       When the agent calls platform_run_agent with an input that carries no messages and no message
       Then the tool says to give a message or an input with messages
+
+    Scenario: A nested params object is refused before the relay
+      When the agent calls platform_run_agent with an input whose params carry a nested object
+      Then the tool says params takes a flat object of string, number or boolean values
 
     Scenario: An HTTP agent is still called at its URL
       Given an HTTP agent

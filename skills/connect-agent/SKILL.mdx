@@ -56,7 +56,6 @@ import { connectAgent } from "langwatch/agent";
 export const supportAgent = connectAgent(
   {
     name: "support-agent",
-    environment: process.env.APP_ENV ?? "development",
     parameters: z.object({
       model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),
       plan: z.string().default("free").describe("Customer plan"),
@@ -80,7 +79,7 @@ Rules for the decorated function:
 
 ### Run parameters
 
-A Python parameter with a default that is not a turn field is a run parameter. The platform offers it in the run dialog and in `--param`.
+A Python parameter that is not a turn field is a run parameter. The platform offers it in the run dialog and in `--param`. A parameter with a default is optional, and the run dialog prefills that default. A parameter with no default is required, and a run that does not supply a value for it is refused before the function is called.
 
 ```python
 from typing import Literal
@@ -131,7 +130,7 @@ The SDK reads the environment from the `environment` argument, then `LANGWATCH_A
 
 `development` makes the agent personal: only its owner can run it when the key is personal, and only that machine registers it when the key is a project key. Name the environment `dev-shared` for a development box the whole team runs against.
 
-Do not set the environment by hand when the service already sets `APP_ENV` or `NODE_ENV`. Read those first.
+Leave `environment` out when the service already sets `LANGWATCH_AGENT_ENVIRONMENT`, `APP_ENV`, `ENVIRONMENT` or `NODE_ENV`. The SDK reads them on its own.
 
 ## Step 4: Start the process and confirm the agent is Online
 
@@ -303,7 +302,7 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 
 - Do NOT write a second wrapper function for LangWatch to call. Decorate the function the product already runs, so the simulation exercises the real code path.
 - Do NOT add a `traceparent` middleware for a decorated agent. The SDK adopts the trace context itself; the middleware belongs to the HTTP fallback only.
-- Do NOT hardcode an environment string when the service already reads `APP_ENV` or `NODE_ENV`. Pass the value the service uses.
+- Do NOT hardcode an environment string, and do NOT write a fallback such as `process.env.APP_ENV ?? "development"`. It overrides `LANGWATCH_AGENT_ENVIRONMENT` and registers a production process under `development`. Let the SDK resolve the environment.
 - Do NOT declare a run parameter for a value the tests never vary. Every declared parameter appears in the run dialog.
 - Do NOT use a turn field name (`messages`, `new_messages`, `thread_id`, `session`, `trace_id`) as a run parameter name.
 - Do NOT invent an agent id or pass a URL as the run target. Read the identity from `langwatch agent list --format json`.

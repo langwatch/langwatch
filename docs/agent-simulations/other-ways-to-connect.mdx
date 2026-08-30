@@ -74,6 +74,15 @@ If the endpoint answers `{"reply": "...", "conversation_id": "conv_8f2"}`, set `
 
 The first turn of a conversation renders `{{ session }}` as an empty string. A response with nothing at the path keeps the value from the previous turn. Any JSON value works: a string renders as text, an object or a list renders as raw JSON. The value is capped at 64 KB; a larger one fails the turn with `agent_payload_too_large`.
 
+An object or a list goes in the body without quotes. Give it a JSON value for the first turn with the `default` filter, or the body is not valid JSON before the endpoint has answered once:
+
+```json title="Body template with an object session"
+{
+  "session": {{ session | default: "null" }},
+  "message": "{{ input }}"
+}
+```
+
 ### 4. Adopt the trace context
 
 The platform sends a W3C `traceparent` header on every call, one trace per conversation turn. When your server adopts it, the spans your agent produces land in that same trace, and the judge reads them before its verdict: tool calls, database writes, retrievals.

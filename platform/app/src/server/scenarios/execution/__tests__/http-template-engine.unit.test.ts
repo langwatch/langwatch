@@ -517,6 +517,26 @@ describe("buildTemplateContext session", () => {
       expect(JSON.parse(body)).toEqual({ state: { step: 2, seen: ["a"] } });
     });
 
+    /** @scenario "A body template gives an object session a JSON value for the first turn" */
+    it("renders the default filter's value on the first turn and raw JSON after it", () => {
+      const template = '{"state": {{ session | default: "null" }}}';
+
+      const first = renderBodyTemplate({
+        template,
+        context: buildTemplateContext({ input: inputWith("hi") }),
+      });
+      const later = renderBodyTemplate({
+        template,
+        context: buildTemplateContext({
+          input: inputWith("hi"),
+          session: { step: 2 },
+        }),
+      });
+
+      expect(JSON.parse(first)).toEqual({ state: null });
+      expect(JSON.parse(later)).toEqual({ state: { step: 2 } });
+    });
+
     it("renders a data mapping of the session the same way", () => {
       const context = buildTemplateContext({
         input: inputWith("hi"),

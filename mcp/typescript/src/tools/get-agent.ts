@@ -1,13 +1,22 @@
 import { getAgent as apiGetAgent, type AgentParameterSpec } from "../langwatch-api-agents.js";
 
-/** One parameter on one line: name, type, options, default and whether it is required. */
-export const describeParameter = (parameter: AgentParameterSpec): string => {
-  const parts: string[] = [parameter.type];
-  if (parameter.options?.length) parts.push(`one of ${parameter.options.join(", ")}`);
-  if (parameter.default !== undefined) parts.push(`default ${JSON.stringify(parameter.default)}`);
-  if (parameter.required) parts.push("required");
-  const description = parameter.description ? `: ${parameter.description}` : "";
-  return `- **${parameter.name}** (${parts.join(", ")})${description}`;
+/** One parameter on one line: name, type, options, default, required and secret. */
+export const describeParameter = ({
+  name,
+  type,
+  options,
+  default: defaultValue,
+  description,
+  required,
+  secret,
+}: AgentParameterSpec): string => {
+  const parts: string[] = [type];
+  if (options?.length) parts.push(`one of ${options.join(", ")}`);
+  if (defaultValue !== undefined) parts.push(`default ${JSON.stringify(defaultValue)}`);
+  if (required) parts.push("required");
+  if (secret) parts.push("secret");
+  const suffix = description ? `: ${description}` : "";
+  return `- **${name}** (${parts.join(", ")})${suffix}`;
 };
 
 /**
@@ -15,8 +24,8 @@ export const describeParameter = (parameter: AgentParameterSpec): string => {
  *
  * @see specs/mcp-server/agent-tools.feature
  */
-export async function handleGetAgent(params: { id: string }): Promise<string> {
-  const agent = await apiGetAgent(params.id);
+export async function handleGetAgent({ id }: { id: string }): Promise<string> {
+  const agent = await apiGetAgent(id);
 
   const lines: string[] = [];
   lines.push(`# ${agent.name}\n`);

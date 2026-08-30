@@ -1762,7 +1762,7 @@
     },
     {
       "source": "/agent-simulations/local-development",
-      "destination": "/agent-simulations/environments"
+      "destination": "/agent-simulations/other-ways-to-connect"
     },
     {
       "source": "/agent-simulations/overview",

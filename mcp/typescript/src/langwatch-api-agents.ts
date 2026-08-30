@@ -1,5 +1,19 @@
+import { z } from "zod";
+
 import { makeRequest } from "./langwatch-api.js";
 import { requestPublicJson } from "./public-http-request.js";
+
+/**
+ * The run parameters a call carries: a flat record of scalars. The platform
+ * declares run parameters as `string`, `number` or `boolean`, so a nested
+ * object or an array is outside the contract and is refused here.
+ */
+export const agentCallParamsSchema = z.record(
+  z.string(),
+  z.union([z.string(), z.number(), z.boolean()]),
+);
+
+export type AgentCallParams = z.infer<typeof agentCallParamsSchema>;
 
 /** One run parameter an agent declares, as the platform lists it. */
 export interface AgentParameterSpec {
@@ -60,7 +74,7 @@ export interface AgentCallBody {
   messages: AgentCallMessage[];
   newMessages?: AgentCallMessage[];
   threadId?: string;
-  params?: Record<string, string | number | boolean>;
+  params?: AgentCallParams;
   session?: unknown;
   traceparent?: string;
 }
@@ -117,10 +131,13 @@ export async function updateAgent(params: {
  * Runs one turn of a connected agent through the relay: the platform
  * dispatches it to a live instance and answers with the function's output.
  */
-export async function callAgent(
-  id: string,
-  body: AgentCallBody,
-): Promise<AgentCallResponse> {
+export async function callAgent({
+  id,
+  body,
+}: {
+  id: string;
+  body: AgentCallBody;
+}): Promise<AgentCallResponse> {
   return makeRequest(
     "POST",
     `/api/agents/${encodeURIComponent(id)}/call`,
@@ -169,7 +186,7 @@ export function buildRelayBody({
 }: {
   input: Record<string, unknown>;
   message?: string;
-  parameters?: Record<string, string | number | boolean>;
+  parameters?: AgentCallParams;
   threadId?: string;
 }): AgentCallBody | string {
   let messages: AgentCallMessage[];
@@ -185,10 +202,14 @@ export function buildRelayBody({
   if (thread) body.threadId = thread;
   if (isMessageList(input.newMessages)) body.newMessages = input.newMessages;
   if (input.session !== undefined) body.session = input.session;
-  const inputParams =
-    typeof input.params === "object" && input.params !== null
-      ? (input.params as Record<string, string | number | boolean>)
-      : undefined;
+  let inputParams: AgentCallParams | undefined;
+  if (input.params !== undefined) {
+    const parsed = agentCallParamsSchema.safeParse(input.params);
+    if (!parsed.success) {
+      return "`params` takes one flat object of string, number or boolean values. Nested objects and arrays are not run parameters.";
+    }
+    inputParams = parsed.data;
+  }
   if (inputParams || parameters) body.params = { ...(inputParams ?? {}), ...(parameters ?? {}) };
   return body;
 }
@@ -198,27 +219,31 @@ export function buildRelayBody({
  * agent is called at its URL; a workflow-linked agent runs on the workflow
  * engine.
  */
-export async function runAgent(
-  id: string,
-  input?: Record<string, unknown>,
-  options: {
-    message?: string;
-    parameters?: Record<string, string | number | boolean>;
-    threadId?: string;
-  } = {},
-): Promise<{ agentType: string; result: Record<string, unknown> }> {
+export async function runAgent({
+  id,
+  input,
+  message,
+  parameters,
+  threadId,
+}: {
+  id: string;
+  input?: Record<string, unknown>;
+  message?: string;
+  parameters?: AgentCallParams;
+  threadId?: string;
+}): Promise<{ agentType: string; result: Record<string, unknown> }> {
   const agent = await getAgent(id);
   const config = agent.config ?? {};
 
   if (agent.type === "connected") {
-    const body = buildRelayBody({ input: input ?? {}, ...options });
+    const body = buildRelayBody({ input: input ?? {}, message, parameters, threadId });
     if (typeof body === "string") throw new Error(body);
     if (agent.status === "offline") {
       throw new Error(
         `Agent "${agent.name}" is offline. Start the process that calls connectAgent (or connect_agent) and try again.`,
       );
     }
-    const result = await callAgent(agent.id, body);
+    const result = await callAgent({ id: agent.id, body });
     return { agentType: "connected", result: result as unknown as Record<string, unknown> };
   }
 

@@ -101,7 +101,7 @@ A [connected agent](/agent-simulations/connect-your-agent) declares its paramete
   </Tab>
 </Tabs>
 
-An agent declaration carries the same fields a scenario declaration does, plus two the code makes available:
+An agent declaration and a scenario declaration share the name, the description and the default value. Only a scenario declares a `secret` parameter. An agent declaration adds two fields the code makes available:
 
 - **`type`**, one of `string`, `number` or `boolean`. It comes from the annotation in Python and from the schema property in TypeScript. The value reaches the run with that type, so a string parameter keeps `007` as text instead of turning it into the number 7.
 - **`options`**, a closed list of allowed values, up to 50. It comes from `Literal` or an `Enum` in Python and from `z.enum` in TypeScript.
@@ -147,7 +147,7 @@ A scenario with no declared parameters is not a template. Its text does not rend
 
 ### Connected agents
 
-The function receives the values the run supplied, with the type it declared. A parameter the run did not supply arrives as its default, so the function signature is complete on its own and a plain call from a unit test needs no parameters at all.
+The function receives the values the run supplied, with the type it declared. A parameter the run did not supply arrives as its default, so the function signature is complete on its own. A direct call from a unit test passes no run parameter arguments when every run parameter has a default. The turn fields, such as `messages`, are still required.
 
 ```python
 @langwatch.connect_agent(name="support-agent")

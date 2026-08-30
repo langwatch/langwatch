@@ -77,7 +77,7 @@ async def support_agent(call: langwatch.AgentCall) -> str:
 
 ### Run parameters
 
-Every parameter with a default that is not a turn field is a run parameter.
+Every parameter that is not a turn field is a run parameter. A parameter with a default is optional, and the run dialog prefills that default. A parameter with no default is required, and the run must supply a value for it.
 
 | Read from | Gives |
 |---|---|

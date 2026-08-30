@@ -53,7 +53,7 @@ The process on your machine reaches out to LangWatch, so there is no tunnel, no 
 3. Read the results, change your code, restart the process, and run again. The agent reconnects under the same row and the run history stays together.
 4. Stop the process when you are done. The row reads **Offline** with the time it was last seen.
 
-The row stays after the process stops, with its parameters and its history, so the next run of the same suite joins the same run plan.
+The row stays after the process stops. It keeps the agent identity, the declared parameters and the run history, so the next process that connects under the same name and environment continues the same row.
 
 <Note>
   An HTTP agent that runs on your machine is a different case: the platform calls it, so it needs a reachable URL. `langwatch agent dev` covers that, see [Other ways to connect](/agent-simulations/other-ways-to-connect).

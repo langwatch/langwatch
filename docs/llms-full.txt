@@ -36129,7 +36129,6 @@ import { connectAgent } from "langwatch/agent";
 export const supportAgent = connectAgent(
   {
     name: "support-agent",
-    environment: process.env.APP_ENV ?? "development",
     parameters: z.object({
       model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),
       plan: z.string().default("free").describe("Customer plan"),
@@ -36153,7 +36152,7 @@ Rules for the decorated function:
 
 ### Run parameters
 
-A Python parameter with a default that is not a turn field is a run parameter. The platform offers it in the run dialog and in `--param`.
+A Python parameter that is not a turn field is a run parameter. The platform offers it in the run dialog and in `--param`. A parameter with a default is optional, and the run dialog prefills that default. A parameter with no default is required, and a run that does not supply a value for it is refused before the function is called.
 
 ```python
 from typing import Literal
@@ -36204,7 +36203,7 @@ The SDK reads the environment from the `environment` argument, then `LANGWATCH_A
 
 `development` makes the agent personal: only its owner can run it when the key is personal, and only that machine registers it when the key is a project key. Name the environment `dev-shared` for a development box the whole team runs against.
 
-Do not set the environment by hand when the service already sets `APP_ENV` or `NODE_ENV`. Read those first.
+Leave `environment` out when the service already sets `LANGWATCH_AGENT_ENVIRONMENT`, `APP_ENV`, `ENVIRONMENT` or `NODE_ENV`. The SDK reads them on its own.
 
 ## Step 4: Start the process and confirm the agent is Online
 
@@ -36372,7 +36371,7 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 | Symptom | Cause | Fix |
 |---|---|---|
 | `langwatch agent list` shows no row for the agent | The process started without an API key, so the SDK opened no connection. | Set `LANGWATCH_API_KEY` in the process environment and restart the process. |
-| The row reads `Offline` | The process stopped, or its outbound WSS connection is blocked. | Restart the process. On a network that blocks WebSockets, set `LANGWATCH_AGENT_TRANSPORT=http` so the SDK uses HTTP long polling. |
+| The row reads `Offline` | The process stopped, or its outbound WSS connection is blocked. | Restart the process. On a network that blocks WebSockets, use the HTTP fallback. |
 | The run is refused with `agent_offline` | No instance was connected when the run started. | Start the agent process and run again. |
 | The run is refused with `agent_owner_only` | The agent registered under `development` with a personal key, so only its owner can run it. | Run it as the owner, or register it under a shared environment name such as `dev-shared`. |
 | The run is refused with `scenario_parameter_option_invalid` | A value is outside the closed option list the agent declares. | Use one of the listed options, or widen the `Literal` (Python) or `z.enum` (TypeScript) list in the code. |
@@ -36383,7 +36382,7 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 
 - Do NOT write a second wrapper function for LangWatch to call. Decorate the function the product already runs, so the simulation exercises the real code path.
 - Do NOT add a `traceparent` middleware for a decorated agent. The SDK adopts the trace context itself; the middleware belongs to the HTTP fallback only.
-- Do NOT hardcode an environment string when the service already reads `APP_ENV` or `NODE_ENV`. Pass the value the service uses.
+- Do NOT hardcode an environment string, and do NOT write a fallback such as `process.env.APP_ENV ?? "development"`. It overrides `LANGWATCH_AGENT_ENVIRONMENT` and registers a production process under `development`. Let the SDK resolve the environment.
 - Do NOT declare a run parameter for a value the tests never vary. Every declared parameter appears in the run dialog.
 - Do NOT use a turn field name (`messages`, `new_messages`, `thread_id`, `session`, `trace_id`) as a run parameter name.
 - Do NOT invent an agent id or pass a URL as the run target. Read the identity from `langwatch agent list --format json`.
@@ -36863,7 +36862,7 @@ The run settings also record which instance served each run, so a result from a 
 | The run is refused with `agent_owner_only` | The agent registered under `development` with a personal key, so it belongs to one person. | Run it as its owner, or register it under a shared environment name. |
 | A turn fails with `agent_call_timeout` | The function took longer than the agent's timeout. | Raise `timeout`, up to 300 seconds, or make the agent answer faster. |
 | A turn fails with `agent_busy` | Every instance was already running as many calls as it accepts. | Raise `concurrency`, or start more instances. |
-| Trace-dependent criteria come back inconclusive | The agent reports its traces to a different project, or reports none. | Point the agent's tracing at the project that runs the scenarios. |
+| Trace-dependent criteria come back inconclusive | The agent reports its traces to a different project, or it reports none at all. | Point the agent's tracing at the project that runs the scenarios. |
 
 ## Next steps
 
@@ -36941,7 +36940,7 @@ The process on your machine reaches out to LangWatch, so there is no tunnel, no 
 3. Read the results, change your code, restart the process, and run again. The agent reconnects under the same row and the run history stays together.
 4. Stop the process when you are done. The row reads **Offline** with the time it was last seen.
 
-The row stays after the process stops, with its parameters and its history, so the next run of the same suite joins the same run plan.
+The row stays after the process stops. It keeps the agent identity, the declared parameters and the run history, so the next process that connects under the same name and environment continues the same row.
 
 <Note>
   An HTTP agent that runs on your machine is a different case: the platform calls it, so it needs a reachable URL. `langwatch agent dev` covers that, see [Other ways to connect](/agent-simulations/other-ways-to-connect).
@@ -37514,6 +37513,15 @@ If the endpoint answers `{"reply": "...", "conversation_id": "conv_8f2"}`, set `
 ```
 
 The first turn of a conversation renders `{{ session }}` as an empty string. A response with nothing at the path keeps the value from the previous turn. Any JSON value works: a string renders as text, an object or a list renders as raw JSON. The value is capped at 64 KB; a larger one fails the turn with `agent_payload_too_large`.
+
+An object or a list goes in the body without quotes. Give it a JSON value for the first turn with the `default` filter, or the body is not valid JSON before the endpoint has answered once:
+
+```json title="Body template with an object session"
+{
+  "session": {{ session | default: "null" }},
+  "message": "{{ input }}"
+}
+```
 
 ### 4. Adopt the trace context
 
@@ -38382,7 +38390,7 @@ A [connected agent](/agent-simulations/connect-your-agent) declares its paramete
 
 
 
-An agent declaration carries the same fields a scenario declaration does, plus two the code makes available:
+An agent declaration and a scenario declaration share the name, the description and the default value. Only a scenario declares a `secret` parameter. An agent declaration adds two fields the code makes available:
 
 - **`type`**, one of `string`, `number` or `boolean`. It comes from the annotation in Python and from the schema property in TypeScript. The value reaches the run with that type, so a string parameter keeps `007` as text instead of turning it into the number 7.
 - **`options`**, a closed list of allowed values, up to 50. It comes from `Literal` or an `Enum` in Python and from `z.enum` in TypeScript.
@@ -38428,7 +38436,7 @@ A scenario with no declared parameters is not a template. Its text does not rend
 
 ### Connected agents
 
-The function receives the values the run supplied, with the type it declared. A parameter the run did not supply arrives as its default, so the function signature is complete on its own and a plain call from a unit test needs no parameters at all.
+The function receives the values the run supplied, with the type it declared. A parameter the run did not supply arrives as its default, so the function signature is complete on its own. A direct call from a unit test passes no run parameter arguments when every run parameter has a default. The turn fields, such as `messages`, are still required.
 
 ```python
 @langwatch.connect_agent(name="support-agent")
@@ -53737,7 +53745,6 @@ import { connectAgent } from "langwatch/agent";
 export const supportAgent = connectAgent(
   {
     name: "support-agent",
-    environment: process.env.APP_ENV ?? "development",
     parameters: z.object({
       model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),
       plan: z.string().default("free").describe("Customer plan"),
@@ -53761,7 +53768,7 @@ Rules for the decorated function:
 
 ### Run parameters
 
-A Python parameter with a default that is not a turn field is a run parameter. The platform offers it in the run dialog and in `--param`.
+A Python parameter that is not a turn field is a run parameter. The platform offers it in the run dialog and in `--param`. A parameter with a default is optional, and the run dialog prefills that default. A parameter with no default is required, and a run that does not supply a value for it is refused before the function is called.
 
 ```python
 from typing import Literal
@@ -53812,7 +53819,7 @@ The SDK reads the environment from the `environment` argument, then `LANGWATCH_A
 
 `development` makes the agent personal: only its owner can run it when the key is personal, and only that machine registers it when the key is a project key. Name the environment `dev-shared` for a development box the whole team runs against.
 
-Do not set the environment by hand when the service already sets `APP_ENV` or `NODE_ENV`. Read those first.
+Leave `environment` out when the service already sets `LANGWATCH_AGENT_ENVIRONMENT`, `APP_ENV`, `ENVIRONMENT` or `NODE_ENV`. The SDK reads them on its own.
 
 ## Step 4: Start the process and confirm the agent is Online
 
@@ -53991,7 +53998,7 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 
 - Do NOT write a second wrapper function for LangWatch to call. Decorate the function the product already runs, so the simulation exercises the real code path.
 - Do NOT add a `traceparent` middleware for a decorated agent. The SDK adopts the trace context itself; the middleware belongs to the HTTP fallback only.
-- Do NOT hardcode an environment string when the service already reads `APP_ENV` or `NODE_ENV`. Pass the value the service uses.
+- Do NOT hardcode an environment string, and do NOT write a fallback such as `process.env.APP_ENV ?? "development"`. It overrides `LANGWATCH_AGENT_ENVIRONMENT` and registers a production process under `development`. Let the SDK resolve the environment.
 - Do NOT declare a run parameter for a value the tests never vary. Every declared parameter appears in the run dialog.
 - Do NOT use a turn field name (`messages`, `new_messages`, `thread_id`, `session`, `trace_id`) as a run parameter name.
 - Do NOT invent an agent id or pass a URL as the run target. Read the identity from `langwatch agent list --format json`.
@@ -64357,7 +64364,7 @@ A [connected agent](/agent-simulations/connect-your-agent) is the customer's own
 - **Outbound WSS from the customer's side.** The process that runs the agent opens `wss://` to your App's public hostname. The customer's side opens no listening port and needs no inbound rule.
 - **HTTP long polling for a network that blocks WebSockets.** The same frames also travel over `POST /api/agents/connect/register`, `GET /api/agents/connect/poll` and `POST /api/agents/connect/frames`. A poll is held open for up to 25 seconds, so the ingress read timeout must be above that; the `proxy-read-timeout: 120` above covers it. The SDK switches to this path on its own when a proxy answers the upgrade with an HTTP status, or from the start with `LANGWATCH_AGENT_TRANSPORT=http`.
 
-Redis is required for more than one App replica. Instance presence and call dispatch live in Redis; without it the registry is in memory, correct for one replica only, and the App refuses a connection when `replicaCount` is above 1.
+Redis is required for more than one App replica. Instance presence and call dispatch live in Redis; without it the registry is in memory, correct for one replica only, and the App refuses a connection when `LANGWATCH_APP_REPLICAS` is above 1. That variable defaults to `1`, and Helm scales the App with `app.replicaCount` on its own, so a Helm deployment must set `LANGWATCH_APP_REPLICAS` to the same value as `app.replicaCount`. If the two values differ, several replicas run the in-memory registry with no Redis, and an agent connected to one pod reads as Offline on the others.
 
 ## Docker Images
 

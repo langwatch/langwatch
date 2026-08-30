@@ -105,6 +105,13 @@ Feature: An agent keeps a session value for one conversation
       Then the body renders "session" as an empty string
 
     @unit
+    Scenario: A body template gives an object session a JSON value for the first turn
+      Given an HTTP agent whose body template reads "session" with the default filter set to "null"
+      When the first turn of a thread runs
+      Then the body renders "session" as JSON null
+      And a later turn with a held object renders it as raw JSON
+
+    @unit
     Scenario: A response with no match at the session path leaves the held value unchanged
       Given an HTTP agent that holds a session for a thread
       When a response of that thread has nothing at the session path

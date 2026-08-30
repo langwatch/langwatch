@@ -99,6 +99,21 @@ describe("handleGetAgent()", () => {
       expect(output).toContain("**Owner**: Ada");
     });
   });
+
+  describe("when the agent declares a secret parameter", () => {
+    /** @scenario "A secret parameter is marked secret" */
+    it("marks the parameter secret", async () => {
+      mockRequest.mockResolvedValueOnce(
+        connectedAgent({
+          parameters: [{ name: "api_key", type: "string", required: true, secret: true }],
+        }),
+      );
+
+      const output = await handleGetAgent({ id: "agent_conn" });
+
+      expect(output).toContain("- **api_key** (string, required, secret)");
+    });
+  });
 });
 
 describe("handleTestAgent()", () => {
@@ -168,14 +183,27 @@ describe("handleRunAgent()", () => {
     it("refuses an input with no messages and no message", async () => {
       mockRequest.mockResolvedValueOnce(connectedAgent());
 
-      await expect(runAgent("agent_conn", { question: "hi" })).rejects.toThrow(/give `message`, or `input` with a `messages` list/);
+      await expect(runAgent({ id: "agent_conn", input: { question: "hi" } })).rejects.toThrow(/give `message`, or `input` with a `messages` list/);
       expect(mockRequest).toHaveBeenCalledTimes(1);
     });
 
     it("refuses an offline agent before the relay is called", async () => {
       mockRequest.mockResolvedValueOnce(connectedAgent({ status: "offline", instances: [] }));
 
-      await expect(runAgent("agent_conn", {}, { message: "hi" })).rejects.toThrow(/is offline/);
+      await expect(runAgent({ id: "agent_conn", message: "hi" })).rejects.toThrow(/is offline/);
+      expect(mockRequest).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A nested params object is refused before the relay" */
+    it("refuses an input whose params carry a nested object", async () => {
+      mockRequest.mockResolvedValueOnce(connectedAgent());
+
+      await expect(
+        runAgent({
+          id: "agent_conn",
+          input: { messages: [{ role: "user", content: "hi" }], params: { model: { name: "gpt-5" } } },
+        }),
+      ).rejects.toThrow(/flat object of string, number or boolean values/);
       expect(mockRequest).toHaveBeenCalledTimes(1);
     });
   });
