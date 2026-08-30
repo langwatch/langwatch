@@ -370,7 +370,7 @@ In the platform, create the agent on the **Agents** page: type **HTTP**, then th
 <img className="block" src="/images/agent-testing/register-http-agent.png" alt="The HTTP agent editor with the endpoint URL, request body template and output path" />
 </Frame>
 
-The **Test** tab of the agent editor sends one real request to your endpoint with the current configuration. Use it to confirm the endpoint answers and the output path extracts the reply text before you run any scenario:
+The **Test** tab of the agent editor sends one real request to your endpoint with the current configuration. Use it to confirm the endpoint answers and the output path extracts the reply text before you run any scenario. The Test tab supplies no run parameters, so a template that reads `{{ params.NAME }}` shows `Some variables had no value` above the response; a scenario run fills them in.
 
 <Frame>
 <img className="block" src="/images/agent-testing/agent-test-request.png" alt="The Test tab showing a 200 response from the agent endpoint and the extracted reply" />

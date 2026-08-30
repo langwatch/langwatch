@@ -36013,7 +36013,7 @@ A target is an agent or a prompt together with the parameters it runs with. A co
 
 The run name is prefilled after the targets, for example `Refunds checkout-prod vs checkout-staging`. Every run under that name joins the same comparison history.
 
-Secret parameters stay at the run level and are shared by every target.
+Secret parameters stay at the run level and are shared by every target: the dialog shows them as one **Secret parameters** block under the rows, with **Add secret parameter**.
 
 ## Read the results
 
@@ -36426,7 +36426,7 @@ In the platform, create the agent on the **Agents** page: type **HTTP**, then th
 <img className="block" src="/images/agent-testing/register-http-agent.png" alt="The HTTP agent editor with the endpoint URL, request body template and output path" />
 </Frame>
 
-The **Test** tab of the agent editor sends one real request to your endpoint with the current configuration. Use it to confirm the endpoint answers and the output path extracts the reply text before you run any scenario:
+The **Test** tab of the agent editor sends one real request to your endpoint with the current configuration. Use it to confirm the endpoint answers and the output path extracts the reply text before you run any scenario. The Test tab supplies no run parameters, so a template that reads `{{ params.NAME }}` shows `Some variables had no value` above the response; a scenario run fills them in.
 
 <Frame>
 <img className="block" src="/images/agent-testing/agent-test-request.png" alt="The Test tab showing a 200 response from the agent endpoint and the extracted reply" />
@@ -37036,7 +37036,7 @@ Press a run plan. The sidebar lists its runs as **Run #n** with the note, the ti
 
 **Show run settings** opens the configuration the run used: **Started**, **Targets**, **Parameters**, **Repeat**, **Simulator model** and **Judge model**.
 
-The **Table** view has one row per scenario execution: **Result**, **Scenario**, **Evaluators** and **Time · cost**. The row menu offers **Open the conversation**, **Rerun this scenario** and **Edit scenario**. The **Grid** view shows the same executions as cards, one colour per result.
+The **Table** view has one row per scenario execution: **Result**, **Scenario**, **Evaluators** and **Time · cost**. The row menu offers **Open the conversation**, **Rerun this scenario** and **Edit scenario**. The **Grid** view shows the same executions as cards, one colour per result, each ending in `Completed` or `Failed`.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-detail-grid.png" alt="The Grid view of a run, one card per scenario execution" />
@@ -37058,10 +37058,11 @@ While the run is going, the drawer shows `The conversation is running…` and th
 
 ## What a status means
 
+The **Result** column of the table reads `Passed`, `Failed` or `Running`. The **Status** chip of the drawer is more precise:
+
 | Status | Meaning | What to do |
 |---|---|---|
-| `Passed` | Every criterion passed. | |
-| `Failed` | At least one criterion failed. | Read **JUDGE REASONING**, then the transcript. |
+| `completed` | The judge delivered a verdict. The verdict itself is `PASSED` or `FAILED`. | On a fail, read **JUDGE REASONING**, then the transcript. |
 | `running`, `queued`, `pending` | The conversation, or the verdict, is not done. | Wait, or **Stop**. |
 | `failed` with an error in the drawer | The target did not answer: the URL is wrong, the agent is down, the authentication was refused, or a local tunnel ended. The drawer shows the error the target returned. | Fix the agent, then **Rerun this scenario**. |
 | `cancelled` | Stopped with **Stop** or **Stop all**. | **Rerun this scenario** when needed. |
@@ -37524,10 +37525,10 @@ The platform runs these checks before it schedules any jobs. A rejected run sche
 
 ## Where the values are recorded
 
-- The run detail drawer shows the values under **Parameters**, one row per name. A secret parameter appears as its name with a masked value.
+- The conversation drawer shows the values under **Parameters**, one row per name. A secret parameter appears as its name with a masked value.
 - The CSV export writes them as one JSON object per run: the `parameters` column in a criteria export, the `run_parameters` column in a full export. Secret parameters are left out.
 
-<img src="/images/agent-testing/run-drawer-parameters.png" alt="The conversation drawer with the Parameters block showing the value the run used and a masked secret" width="100%" />
+<img src="/images/agent-testing/run-drawer-parameters.png" alt="The conversation drawer with the Parameters block showing the secret parameter session_token masked" width="100%" />
 
 ## Next steps
 
@@ -37588,10 +37589,10 @@ The chips, in the order the dialog shows them:
 |---|---|
 | **Add parameters** | One line of `name=value` pairs for the run parameters the scenarios declare, for example `plan=pro`. The **Secret parameters** switch turns the line into rows with a lock on each, for a credential. See [Run parameters](/agent-testing/run-parameters). |
 | **Compare agents** | One row per target, up to four. See [Compare agents](/agent-testing/compare-agents). |
-| **Add a note** | Up to 200 characters about this run: what changed, why it ran. The note belongs to the run, never to the plan. |
+| **Add a note** | Opens **Note for the run**: up to 200 characters about this run, what changed or why it ran. The note belongs to the run, never to the plan. |
 | **Run against a prompt** | Replaces the agent with a prompt from the project as the target. See [Targets](/agent-testing/targets). |
-| **Custom simulation models** | The **User simulator** and the **Judge** for this run. Without them, the project default model plays both. A scenario's own **Override models** wins over both. |
-| **Run multiple times** | The repeat count, 1 to 5. Every scenario runs that many times, and the result of each repetition is its own row. |
+| **Custom simulation models** | Opens **Simulation models**: the **User simulator** and the **Judge** for this run. Without them, the project default model plays both. A scenario's own **Override models** wins over both. |
+| **Run multiple times** | The repeat count, `times per scenario and target`, 1 to 5. Every scenario runs that many times, and the result of each repetition is its own row. |
 
 <Note>
 The dialog shows **No model provider is set up** when the project has no model provider for the simulator and the judge. Add one under the project settings before the first run.
@@ -37615,7 +37616,7 @@ A scope by labels is dynamic: a scenario that gets the label later is in the nex
 
 ## While it runs
 
-The run opens as soon as it starts. Each row shows `running` until the judge is done, then `Passed` or `Failed`. **Stop all** cancels every conversation that is still running; a conversation drawer has its own **Stop**. A cancelled run keeps the results that were already in.
+The run opens as soon as it starts. Each row reads `Running` until the judge is done, then `Passed` or `Failed`. **Stop all** cancels every conversation that is still running, and every running row has its own **Stop**. A cancelled run keeps the results that were already in.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-detail-running.png" alt="A run in progress, with rows still running and the Stop all button" />
@@ -38105,10 +38106,10 @@ Write criteria about outcomes, not wording. "The agent looks up the order before
 
 ## Your first visit
 
-Open **Agent Testing** in the sidebar. A project with no agent, no test suite and no scenario shows three steps, one after the other: **Setup agent**, **Name your first test suite** and **Write your first scenario**. The first step is the developer's; the other two are the next sections of this guide.
+Open **Agent Testing** in the sidebar. A new project shows one step at a time: **Setup agent** until an agent is registered, then **Name your first test suite**, then **Write your first scenario**. The first step is the developer's; the other two are the next sections of this guide.
 
 <Frame>
-<img className="block" src="/images/agent-testing/first-run-empty-states.png" alt="The Scenarios tab of a new project, with the Setup agent, Name your first test suite and Write your first scenario steps" />
+<img className="block" src="/images/agent-testing/first-run-empty-states.png" alt="The three first-visit steps of a new project, one after the other: Setup agent, Name your first test suite, Write your first scenario" />
 </Frame>
 
 ## Where your scenarios live
@@ -38176,7 +38177,7 @@ The run opens as soon as it starts. Every row is one conversation with your agen
 <img className="block" src="/images/agent-testing/run-detail-running.png" alt="A run in progress, with scenarios still running and the first results in" />
 </Frame>
 
-A full run of a few scenarios usually takes a few minutes. You can leave the page; the results are there when you come back. **Open recent run** on a scenario row or in the editor takes you back to its latest run.
+A full run of a few scenarios usually takes a few minutes. You can leave the page; the results are there when you come back. **Open recent run** at the top of the table, **Open recent runs** in a scenario's row menu, or **Open recent run** in the editor take you back to the latest run.
 
 ## Read the results
 
@@ -38247,10 +38248,10 @@ Every project has a **Default** test suite. A scenario saved with **No test suit
 
 ## Move scenarios between test suites
 
-**Move to suite...** in the row menu of a scenario moves one. Select several rows and press **Move to suite** in the bar that appears to move them together. A scenario belongs to exactly one test suite.
+**Move to suite...** in the row menu of a scenario opens **Move to test suite**, which lists the test suites of the project. Select several rows and press **Move to suite** in the bar that appears to move them together. A scenario belongs to exactly one test suite.
 
 <Frame>
-<img className="block" src="/images/agent-testing/move-to-test-suite.png" alt="The Move to suite dialog with the test suites of the project" />
+<img className="block" src="/images/agent-testing/move-to-test-suite.png" alt="The Move to test suite dialog with the test suites of the project" />
 </Frame>
 
 ## Test suites and labels

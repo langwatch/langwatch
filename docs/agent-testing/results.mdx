@@ -42,7 +42,7 @@ Press a run plan. The sidebar lists its runs as **Run #n** with the note, the ti
 
 **Show run settings** opens the configuration the run used: **Started**, **Targets**, **Parameters**, **Repeat**, **Simulator model** and **Judge model**.
 
-The **Table** view has one row per scenario execution: **Result**, **Scenario**, **Evaluators** and **Time · cost**. The row menu offers **Open the conversation**, **Rerun this scenario** and **Edit scenario**. The **Grid** view shows the same executions as cards, one colour per result.
+The **Table** view has one row per scenario execution: **Result**, **Scenario**, **Evaluators** and **Time · cost**. The row menu offers **Open the conversation**, **Rerun this scenario** and **Edit scenario**. The **Grid** view shows the same executions as cards, one colour per result, each ending in `Completed` or `Failed`.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-detail-grid.png" alt="The Grid view of a run, one card per scenario execution" />
@@ -64,10 +64,11 @@ While the run is going, the drawer shows `The conversation is running…` and th
 
 ## What a status means
 
+The **Result** column of the table reads `Passed`, `Failed` or `Running`. The **Status** chip of the drawer is more precise:
+
 | Status | Meaning | What to do |
 |---|---|---|
-| `Passed` | Every criterion passed. | |
-| `Failed` | At least one criterion failed. | Read **JUDGE REASONING**, then the transcript. |
+| `completed` | The judge delivered a verdict. The verdict itself is `PASSED` or `FAILED`. | On a fail, read **JUDGE REASONING**, then the transcript. |
 | `running`, `queued`, `pending` | The conversation, or the verdict, is not done. | Wait, or **Stop**. |
 | `failed` with an error in the drawer | The target did not answer: the URL is wrong, the agent is down, the authentication was refused, or a local tunnel ended. The drawer shows the error the target returned. | Fix the agent, then **Rerun this scenario**. |
 | `cancelled` | Stopped with **Stop** or **Stop all**. | **Rerun this scenario** when needed. |

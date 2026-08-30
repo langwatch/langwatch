@@ -36,10 +36,10 @@ The chips, in the order the dialog shows them:
 |---|---|
 | **Add parameters** | One line of `name=value` pairs for the run parameters the scenarios declare, for example `plan=pro`. The **Secret parameters** switch turns the line into rows with a lock on each, for a credential. See [Run parameters](/agent-testing/run-parameters). |
 | **Compare agents** | One row per target, up to four. See [Compare agents](/agent-testing/compare-agents). |
-| **Add a note** | Up to 200 characters about this run: what changed, why it ran. The note belongs to the run, never to the plan. |
+| **Add a note** | Opens **Note for the run**: up to 200 characters about this run, what changed or why it ran. The note belongs to the run, never to the plan. |
 | **Run against a prompt** | Replaces the agent with a prompt from the project as the target. See [Targets](/agent-testing/targets). |
-| **Custom simulation models** | The **User simulator** and the **Judge** for this run. Without them, the project default model plays both. A scenario's own **Override models** wins over both. |
-| **Run multiple times** | The repeat count, 1 to 5. Every scenario runs that many times, and the result of each repetition is its own row. |
+| **Custom simulation models** | Opens **Simulation models**: the **User simulator** and the **Judge** for this run. Without them, the project default model plays both. A scenario's own **Override models** wins over both. |
+| **Run multiple times** | The repeat count, `times per scenario and target`, 1 to 5. Every scenario runs that many times, and the result of each repetition is its own row. |
 
 <Note>
 The dialog shows **No model provider is set up** when the project has no model provider for the simulator and the judge. Add one under the project settings before the first run.
@@ -63,7 +63,7 @@ A scope by labels is dynamic: a scenario that gets the label later is in the nex
 
 ## While it runs
 
-The run opens as soon as it starts. Each row shows `running` until the judge is done, then `Passed` or `Failed`. **Stop all** cancels every conversation that is still running; a conversation drawer has its own **Stop**. A cancelled run keeps the results that were already in.
+The run opens as soon as it starts. Each row reads `Running` until the judge is done, then `Passed` or `Failed`. **Stop all** cancels every conversation that is still running, and every running row has its own **Stop**. A cancelled run keeps the results that were already in.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-detail-running.png" alt="A run in progress, with rows still running and the Stop all button" />

@@ -204,10 +204,10 @@ The platform runs these checks before it schedules any jobs. A rejected run sche
 
 ## Where the values are recorded
 
-- The run detail drawer shows the values under **Parameters**, one row per name. A secret parameter appears as its name with a masked value.
+- The conversation drawer shows the values under **Parameters**, one row per name. A secret parameter appears as its name with a masked value.
 - The CSV export writes them as one JSON object per run: the `parameters` column in a criteria export, the `run_parameters` column in a full export. Secret parameters are left out.
 
-<img src="/images/agent-testing/run-drawer-parameters.png" alt="The conversation drawer with the Parameters block showing the value the run used and a masked secret" width="100%" />
+<img src="/images/agent-testing/run-drawer-parameters.png" alt="The conversation drawer with the Parameters block showing the secret parameter session_token masked" width="100%" />
 
 ## Next steps
 
