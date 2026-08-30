@@ -2,9 +2,7 @@ import { describe, expect, it } from "vitest";
 import { migrationRunsOnThisInstallation, organizationMigrates } from "../cohort";
 
 /** The cohort question for a migration enrollment still paces. */
-function paced(
-  args: Partial<Parameters<typeof organizationMigrates>[0]>,
-): boolean {
+function paced(args: Partial<Parameters<typeof organizationMigrates>[0]>): boolean {
   return organizationMigrates({
     isSaaS: true,
     enrolledAutomatically: false,
@@ -17,16 +15,25 @@ describe("organizationMigrates", () => {
   describe("when the installation is self-hosted", () => {
     /** @scenario "A self-hosted installation migrates every organization" */
     it("includes every organization, enrolled or not", () => {
-      expect(organizationMigrates({ isSaaS: false, enrolled: false })).toBe(true);
-      expect(organizationMigrates({ isSaaS: false, enrolled: true })).toBe(true);
+      // `enrolledAutomatically` is supplied although self-hosted returns before
+      // reading it: it is a required argument, and omitting it type-checked
+      // only because nothing type-checks this file.
+      const selfHosted = { isSaaS: false, enrolledAutomatically: false };
+      expect(organizationMigrates({ ...selfHosted, enrolled: false })).toBe(true);
+      expect(organizationMigrates({ ...selfHosted, enrolled: true })).toBe(true);
     });
   });
 
   describe("when the installation is cloud and the migration is paced by enrollment", () => {
     /** @scenario "Cloud rollout processes only enrolled organizations" */
     it("includes exactly the enrolled organizations", () => {
-      expect(organizationMigrates({ isSaaS: true, enrolled: true })).toBe(true);
-      expect(organizationMigrates({ isSaaS: true, enrolled: false })).toBe(false);
+      // Through `paced`, which supplies `enrolledAutomatically: false` — the
+      // premise of this describe. Calling `organizationMigrates` directly
+      // omitted it, and `enrolled || enrolledAutomatically` then answered
+      // `undefined` rather than `false`: the cloud branch reads the flag,
+      // where the self-hosted case above returns before ever looking at it.
+      expect(paced({ enrolled: true })).toBe(true);
+      expect(paced({ enrolled: false })).toBe(false);
     });
   });
 });
