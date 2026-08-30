@@ -19,6 +19,7 @@ import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
 import { bodyLimit } from "~/server/routes/_lib/body-limit";
+import { assertConnectedAgentsRunnable } from "~/server/suites/connected-targets";
 import {
   DEFAULT_CALL_TIMEOUT_MS,
   MAX_CALL_TIMEOUT_MS,
@@ -133,6 +134,17 @@ secured.access(requires("scenarios:create")).post(
     if (!agent || agentTypeSchema.parse(agent.type) !== "connected") {
       throw new NotFoundError("Connected agent not found");
     }
+
+    // A development agent registered with a personal key belongs to one
+    // person. Project membership is not enough to call it, and a legacy
+    // project key names no person at all, so it is refused too.
+    const apiKeyUserId = c.get("apiKeyUserId");
+    await assertConnectedAgentsRunnable({
+      agents: [agent],
+      actor: apiKeyUserId ? { id: apiKeyUserId, label: "api" } : undefined,
+      users: prisma,
+    });
+
     const config = agent.config as ConnectedComponentConfig;
     const runtime = getConnectedAgentRuntime();
 

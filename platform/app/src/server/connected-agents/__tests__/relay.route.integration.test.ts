@@ -185,4 +185,32 @@ describe("POST /api/agents/:id/call", () => {
       expect(response.status).toBe(404);
     });
   });
+
+  describe("when the agent is a personal development agent of someone else", () => {
+    /** @scenario "The relay route refuses a personal agent of another person" */
+    it("refuses with agent_owner_only and dispatches nothing", async () => {
+      const ownedAgentId = await connectedAgent(projectId);
+      await prisma.agent.update({
+        where: { id: ownedAgentId },
+        data: { ownerUserId: userId },
+      });
+
+      // The project key names no person, so it never matches the owner.
+      const response = await app.request(`/api/agents/${ownedAgentId}/call`, {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": projectApiKey,
+          "Content-Type": "application/json",
+        },
+        body,
+      });
+
+      // No instance is connected, so a call that reached the dispatcher would
+      // answer 503. A 403 is what proves the guard ran in front of it.
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({
+        error: "agent_owner_only",
+      });
+    });
+  });
 });

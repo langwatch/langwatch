@@ -107,7 +107,10 @@ export async function assertConnectedAgentsRunnable({
   actor,
   users,
 }: {
-  agents: readonly AgentIdentityRow[];
+  agents: readonly Pick<
+    AgentIdentityRow,
+    "id" | "name" | "type" | "ownerUserId"
+  >[];
   actor: RunActor | undefined;
   users: OwnerNameReads;
 }): Promise<void> {
