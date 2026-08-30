@@ -4,9 +4,9 @@ import type { AutomationService } from "@langwatch/automation-contract";
 import type { AuthzGrantsService, AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 import type { DashboardService } from "@langwatch/dashboard-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
-import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import type { GovernanceService } from "@langwatch/enterprise-api";
 import type { EnterpriseFeature } from "@langwatch/enterprise-plan-gate";
-import type { ScimService } from "@langwatch/enterprise-scim-contract";
+import type { ScimService } from "@langwatch/enterprise-api";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { ExperimentService } from "@langwatch/experiment-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
@@ -60,7 +60,7 @@ import {
   DatasetApp,
   type DatasetDirectUploadAuthorizer,
 } from "@langwatch/dataset-server";
-import { createScimTokensRestApp, ScimApp } from "@langwatch/enterprise-scim-server";
+import { createScimTokensRestApp, ScimApp } from "@langwatch/enterprise-api";
 import { createEvaluatorsRestApp, EvaluatorApp } from "@langwatch/evaluator-server";
 import { createExperimentsRestApp, ExperimentApp } from "@langwatch/experiment-server";
 import { createGovernanceRestApp, GovernanceApp } from "@langwatch/enterprise-api";
@@ -101,7 +101,7 @@ import {
 import type { SecretApp } from "@langwatch/secret-server";
 import { createSecretLegacyRestApp } from "../features/secret/secret-legacy-rest";
 import { createSuiteRestApp, SuiteApp } from "@langwatch/suite-server";
-import { createWebhookRestApp, WebhookApp } from "@langwatch/enterprise-webhook-server";
+import { createWebhookRestApp, WebhookApp } from "@langwatch/enterprise-api";
 import type {
   ApiErrorBody,
   AppRestBroadcast,

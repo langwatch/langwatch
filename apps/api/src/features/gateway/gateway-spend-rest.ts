@@ -11,14 +11,14 @@
  * Every refusal leaves as the canonical envelope, so a reconciliation client
  * reads one shape here, on the platform routes, and from the Go data plane.
  */
-import { eventMatches } from "@langwatch/enterprise-webhook-contract";
+import { eventMatches } from "@langwatch/enterprise-api";
 import {
   type SendBatchPayload,
   WebhookEnvelopeService,
   type WebhookDeliveryService,
   type WebhookEndpointView,
   type WebhookEventsService,
-} from "@langwatch/enterprise-webhook-server";
+} from "@langwatch/enterprise-api";
 import { createLogger } from "@langwatch/observability";
 import type { Context, ErrorHandler, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";

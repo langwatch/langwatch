@@ -18,7 +18,7 @@ import type {
   WebhookDeliveryService,
   WebhookEndpointRuntime,
   WebhookEventsService,
-} from "@langwatch/enterprise-webhook-server";
+} from "@langwatch/enterprise-api";
 
 export type GatewaySpendRestPorts = Readonly<{
   /**

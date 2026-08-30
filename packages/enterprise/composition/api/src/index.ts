@@ -56,3 +56,28 @@ export class EnterpriseApiComposition {
     );
   }
 }
+
+/**
+ * The Enterprise surfaces the API application mounts.
+ *
+ * `apps/api` may depend on this composition and on nothing enterprise below it
+ * — `enterprise-direction` is what says so, and it was reporting five direct
+ * dependencies on SCIM, webhook and governance packages. Re-exported here
+ * rather than repaired at each call site because being that seam is what this
+ * package is FOR: an API-role Enterprise composition, named as such, and the
+ * only enterprise thing an api-role application is allowed to see.
+ */
+export type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+export type { ScimService } from "@langwatch/enterprise-scim-contract";
+export { createScimTokensRestApp, ScimApp } from "@langwatch/enterprise-scim-server";
+export { eventMatches } from "@langwatch/enterprise-webhook-contract";
+export {
+  createWebhookRestApp,
+  WebhookApp,
+  WebhookEnvelopeService,
+  type SendBatchPayload,
+  type WebhookDeliveryService,
+  type WebhookEndpointRuntime,
+  type WebhookEndpointView,
+  type WebhookEventsService,
+} from "@langwatch/enterprise-webhook-server";

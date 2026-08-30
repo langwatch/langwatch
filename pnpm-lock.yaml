@@ -182,24 +182,9 @@ importers:
       '@langwatch/enterprise-api':
         specifier: workspace:*
         version: link:../../packages/enterprise/composition/api
-      '@langwatch/enterprise-governance-contract':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/governance/contract
       '@langwatch/enterprise-plan-gate':
         specifier: workspace:*
         version: link:../../packages/enterprise/plan-gate
-      '@langwatch/enterprise-scim-contract':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/scim/contract
-      '@langwatch/enterprise-scim-server':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/scim/server
-      '@langwatch/enterprise-webhook-contract':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/webhook/contract
-      '@langwatch/enterprise-webhook-server':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/webhook/server
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../packages/features/entitlement/contract
@@ -28577,7 +28562,7 @@ snapshots:
       isstream: 0.1.2
       jsonwebtoken: 9.0.3
       mime-types: 2.1.35
-      retry-axios: 2.6.0(axios@1.19.0(debug@4.4.3))
+      retry-axios: 2.6.0(axios@1.19.0)
       tough-cookie: 4.1.4
     transitivePeerDependencies:
       - supports-color
@@ -31758,7 +31743,7 @@ snapshots:
 
   ret@0.5.0: {}
 
-  retry-axios@2.6.0(axios@1.19.0(debug@4.4.3)):
+  retry-axios@2.6.0(axios@1.19.0):
     dependencies:
       axios: 1.19.0(debug@4.4.3)
 

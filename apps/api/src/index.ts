@@ -164,7 +164,7 @@ export {
 } from "./features/copilotkit/copilotkit-rest";
 export { createMonitorRestApp } from "@langwatch/monitor-server";
 export { createSecretLegacyRestApp } from "./features/secret/secret-legacy-rest";
-export { createWebhookRestApp } from "@langwatch/enterprise-webhook-server";
+export { createWebhookRestApp } from "@langwatch/enterprise-api";
 export { createEventsRestApp, type TrackedEventPorts } from "@langwatch/trace-server";
 export {
   createExportTracesRestApp,
@@ -185,7 +185,7 @@ export {
 export { createProjectRestApp } from "@langwatch/project-server";
 export { createRoleBindingsRestApp } from "@langwatch/authz-server";
 export { createRolesRestApp } from "@langwatch/role-server";
-export { createScimTokensRestApp } from "@langwatch/enterprise-scim-server";
+export { createScimTokensRestApp } from "@langwatch/enterprise-api";
 export { createTeamsRestApp } from "@langwatch/organization-server";
 export {
   createUserAvatarRestApp,
