@@ -14,13 +14,13 @@ import {
   Box,
   chakra,
   HStack,
-  Input,
   NativeSelect,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { Plus, X } from "lucide-react";
 import { agentHasDevTunnel } from "~/components/agents/LocalTunnelBadge";
+import type { DeclaredParameter } from "~/components/suites/useRunSuite";
 import { DIALOG_FIELD_STYLE, FieldLabel } from "../shared/DialogFields";
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 import { RemoveBlockButton } from "../shared/RemoveBlockButton";
@@ -31,9 +31,13 @@ import {
   DUPLICATE_TARGETS_MESSAGE,
   type ParameterDefaults,
 } from "./compare-rows";
+import { ParameterLineField } from "./ParameterLineField";
+import {
+  errorOnLine,
+  type ParameterFieldError,
+  parameterPlaceholder,
+} from "./parameter-suggestions";
 import type { RunDialogAgent } from "./RunTargetPicker";
-
-export const COMPARE_PARAMETERS_PLACEHOLDER = "model=gpt-5-mini";
 
 export const COMPARE_HINT =
   "The same agent twice with different parameters works: one connection, two models.";
@@ -104,12 +108,21 @@ export function CompareAgentsSection({
   onRemove,
   hasDuplicates,
   defaults,
+  definitions,
+  declaredParametersOf,
+  parameterError = null,
   isBusy,
 }: {
   rows: CompareRow[];
   agents: RunDialogAgent[];
   /** The declared defaults, which a typed value equal to does not override. */
   defaults: ParameterDefaults;
+  /** The declarations in scope across every row. */
+  definitions: readonly DeclaredParameter[];
+  /** The declarations in scope for one agent, which its row offers. */
+  declaredParametersOf: (agentId: string) => DeclaredParameter[];
+  /** A refusal the server addressed to one parameter, read under its row. */
+  parameterError?: ParameterFieldError | null;
   onChangeRow: (index: number, patch: Partial<CompareRow>) => void;
   onAddRow: () => void;
   /** False once the section holds as many rows as a run compares. */
@@ -120,7 +133,7 @@ export function CompareAgentsSection({
   hasDuplicates: boolean;
   isBusy: boolean;
 }) {
-  const colorIndexes = compareRowColorIndexes({ rows, defaults });
+  const colorIndexes = compareRowColorIndexes({ rows, defaults, definitions });
 
   return (
     <VStack align="stretch" gap={1.5} data-testid="run-dialog-compare">
@@ -137,6 +150,11 @@ export function CompareAgentsSection({
           index={index}
           colorIndex={colorIndexes[index] ?? index}
           agents={agents}
+          definitions={declaredParametersOf(row.target.id)}
+          error={errorOnLine({
+            line: row.parameterLine,
+            error: parameterError,
+          })}
           onChangeRow={onChangeRow}
           onRemoveRow={onRemoveRow}
           isBusy={isBusy}
@@ -155,6 +173,8 @@ function CompareTargetRow({
   index,
   colorIndex,
   agents,
+  definitions,
+  error,
   onChangeRow,
   onRemoveRow,
   isBusy,
@@ -164,6 +184,10 @@ function CompareTargetRow({
   /** The place of the row in the sorted target list, which is its colour. */
   colorIndex: number;
   agents: RunDialogAgent[];
+  /** The parameters this row's agent and the scenarios declare. */
+  definitions: readonly DeclaredParameter[];
+  /** What the server refused about this row's line, read under it. */
+  error: string | undefined;
   onChangeRow: (index: number, patch: Partial<CompareRow>) => void;
   onRemoveRow: (index: number) => void;
   isBusy: boolean;
@@ -173,6 +197,7 @@ function CompareTargetRow({
   return (
     <HStack
       gap={2}
+      alignItems="flex-start"
       borderWidth="1px"
       borderColor="border"
       borderRadius="lg"
@@ -184,6 +209,7 @@ function CompareTargetRow({
         boxSize="8px"
         borderRadius="full"
         flexShrink={0}
+        marginTop="7px"
         background={targetColor(colorIndex)}
         data-testid={`run-dialog-compare-dot-${index}`}
         data-color={targetColor(colorIndex)}
@@ -212,25 +238,23 @@ function CompareTargetRow({
         </NativeSelect.Field>
         <NativeSelect.Indicator />
       </NativeSelect.Root>
-      <Input
-        {...DIALOG_FIELD_STYLE}
+      <ParameterLineField
         flex={1}
         minWidth={0}
-        fontFamily="mono"
-        fontSize="12px"
-        aria-label={`Parameters of target ${position}`}
-        placeholder={COMPARE_PARAMETERS_PLACEHOLDER}
+        ariaLabel={`Parameters of target ${position}`}
+        placeholder={parameterPlaceholder(definitions)}
         value={row.parameterLine}
+        onChange={(parameterLine) => onChangeRow(index, { parameterLine })}
+        definitions={definitions}
+        error={error}
         disabled={isBusy}
-        onChange={(event) =>
-          onChangeRow(index, { parameterLine: event.target.value })
-        }
-        data-testid={`run-dialog-compare-parameters-${index}`}
+        testId={`run-dialog-compare-parameters-${index}`}
       />
       <chakra.button
         type="button"
         display="flex"
         alignItems="center"
+        marginTop="6px"
         color={FG_MUTED}
         cursor="pointer"
         boxShadow={QUIET_BUTTON_SHADOW}

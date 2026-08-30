@@ -24,6 +24,7 @@ import { NO_RUN_YET_HINT } from "../cases/CaseRecentRunsButton";
 const mockCreate = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
 const mockGetById = vi.hoisted(() => vi.fn());
+const mockAgentsGetAll = vi.hoisted(() => vi.fn());
 const mockTestSuitesGetAll = vi.hoisted(() => vi.fn());
 const mockListVersions = vi.hoisted(() => vi.fn());
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
@@ -94,7 +95,7 @@ vi.mock("~/utils/api", () => ({
       run: { useMutation: () => ({ mutateAsync: vi.fn() }) },
       runPlan: { useMutation: () => ({ mutateAsync: vi.fn() }) },
     },
-    agents: { getAll: { useQuery: () => ({ data: [] }) } },
+    agents: { getAll: { useQuery: mockAgentsGetAll } },
     prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
     modelProvider: {
       listAllForProjectForFrontend: { useQuery: emptyQuery },
@@ -203,6 +204,7 @@ describe("the scenario dialog", () => {
       refetch: vi.fn(),
     });
     mockLastResults.mockReturnValue({ data: [], isLoading: false });
+    mockAgentsGetAll.mockReturnValue({ data: [] });
   });
 
   afterEach(cleanup);
@@ -416,6 +418,64 @@ describe("the scenario dialog", () => {
       expect(
         screen.getByTestId("customize-chip-case-turns"),
       ).toBeInTheDocument();
+    });
+
+    /** @scenario "The case editor offers the parameters the agents declare" */
+    it("offers the parameters the agents of the project declare", async () => {
+      const user = userEvent.setup();
+      mockAgentsGetAll.mockReturnValue({
+        data: [
+          {
+            id: "agent_connected",
+            name: "support-agent",
+            type: "connected",
+            config: {},
+            environment: "production",
+            owner: null,
+            parameters: [
+              {
+                name: "model",
+                type: "string",
+                options: ["gpt-5-mini", "gpt-5"],
+                defaultValue: "gpt-5-mini",
+              },
+            ],
+          },
+        ],
+      });
+      mockGetById.mockReturnValue({
+        data: storedCase({
+          parameters: [{ name: "customer_plan", defaultValue: "free" }],
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      openDrawerAs({ scenarioId: "case_1" });
+      render(
+        <>
+          <AgentTestingCaseEditor />
+          <AgentTestingCaseEditorDrawer />
+        </>,
+        { wrapper: Wrapper },
+      );
+
+      const line = await screen.findByLabelText("Parameters");
+      await user.click(line);
+      await user.type(line, ", mo");
+      const list = await screen.findByTestId(
+        "case-parameters-line-suggestions",
+      );
+      expect(
+        within(list).getByTestId("parameter-suggestion-key-model"),
+      ).toHaveTextContent("support-agent · production");
+
+      await user.keyboard("{Enter}");
+      expect(line).toHaveValue("customer_plan=free, model=");
+      expect(
+        within(await screen.findByTestId("case-parameters-line-suggestions"))
+          .getAllByRole("option")
+          .map((option) => option.textContent),
+      ).toEqual(["gpt-5-mini", "gpt-5"]);
     });
 
     /** @scenario "The editor turns the recent runs off on a scenario that never ran" */

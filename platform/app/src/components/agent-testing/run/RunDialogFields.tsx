@@ -108,6 +108,9 @@ function ComparisonBlocks({
         onRemove={form.removeComparison}
         hasDuplicates={form.hasDuplicateCompareRows}
         defaults={form.parameterDefaults}
+        definitions={form.parameterDefinitions}
+        declaredParametersOf={form.declaredParametersOf}
+        parameterError={form.parameterError}
         isBusy={isBusy}
       />
       <VStack align="stretch" gap={0} data-testid="run-dialog-compare-secrets">
@@ -120,6 +123,7 @@ function ComparisonBlocks({
           declaredSecrets={form.secretDefinitions}
           secretValues={form.secretValues}
           onChangeSecretValue={form.setSecretValue}
+          definitions={form.parameterDefinitions}
           disabled={isBusy}
           secretOnly
         />

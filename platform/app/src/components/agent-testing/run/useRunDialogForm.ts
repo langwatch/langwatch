@@ -13,12 +13,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import { useFilteredAgents } from "~/components/scenarios/useFilteredScenarioTargets";
-import { unionParameterDefinitions } from "~/components/suites/useRunSuite";
+import {
+  type DeclaredParameter,
+  unionParameterDefinitions,
+} from "~/components/suites/useRunSuite";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
-import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import { declaredDefaults } from "~/server/suites/target-key";
 import { api } from "~/utils/api";
 import type { CustomizeChip } from "../shared/CustomizeChips";
@@ -44,7 +46,9 @@ import {
   toRowsRunParameters,
   toStorableRowParameters,
 } from "./parameter-rows";
+import type { ParameterFieldError } from "./parameter-suggestions";
 import { type ScopeScenario, scenariosInScope } from "./RunScopeSection";
+import type { RunDialogAgent } from "./RunTargetPicker";
 import { normaliseRunScope, type RunScope } from "./run-configuration";
 import type {
   RunDialogMode,
@@ -149,6 +153,9 @@ function useRunDialogFields(subject: RunDialogSubject | null) {
   const [rowsRequested, setRowsRequested] = useState(false);
   const [secretValues, setSecretValues] = useState<Record<string, string>>({});
   const [inlineError, setInlineError] = useState<unknown>(null);
+  // A refusal that names one parameter reads under the field that holds it.
+  const [parameterError, setParameterError] =
+    useState<ParameterFieldError | null>(null);
   const [missingProvider, setMissingProvider] = useState(false);
   // The subject the fields below already hold the opening values of. Anything
   // that reads the fields waits for this, because the reset runs in an effect
@@ -172,6 +179,7 @@ function useRunDialogFields(subject: RunDialogSubject | null) {
     setParameterRows(remembered.rows);
     setSecretValues({});
     setInlineError(null);
+    setParameterError(null);
     setMissingProvider(false);
     setResetFor(subjectKey);
     agentTargetBeforePrompt.current = null;
@@ -200,6 +208,8 @@ function useRunDialogFields(subject: RunDialogSubject | null) {
     setSecretValues,
     inlineError,
     setInlineError,
+    parameterError,
+    setParameterError,
     missingProvider,
     setMissingProvider,
     resetFor,
@@ -271,39 +281,82 @@ function useRunDialogChoices(subject: RunDialogSubject | null) {
  * and names a target the way the server does, without it.
  */
 function useParameterDefaults(
-  definitions: readonly ScenarioParameterDefinition[],
+  definitions: readonly DeclaredParameter[],
 ): ParameterDefaults {
   return useMemo(() => declaredDefaults(definitions), [definitions]);
 }
 
 /**
+ * The agents the run goes against right now: the one chosen, or the agents
+ * of the comparison rows. A prompt declares no parameter and is left out.
+ */
+function targetAgentIdsOf({
+  target,
+  compareRows,
+}: {
+  target: TargetValue;
+  compareRows: readonly CompareRow[];
+}): string[] {
+  const targets =
+    compareRows.length > 0 ? compareRows.map((row) => row.target) : [target];
+  const ids = targets.flatMap((entry) =>
+    entry && entry.type !== "prompt" ? [entry.id] : [],
+  );
+  return [...new Set(ids)].sort();
+}
+
+/**
  * The overrides the run can carry, and the fields that collect them.
  *
- * In a comparison the plain values ride on the rows of the targets, so the
- * block here holds the secrets alone and they are what the run sends at run
- * level.
+ * The declared parameters are what the scenarios of the run declare plus
+ * what the agents it goes against declare, so the line can offer an agent's
+ * options. In a comparison the plain values ride on the rows of the targets,
+ * so the block here holds the secrets alone and they are what the run sends
+ * at run level.
  */
 function useRunDialogParameters({
   subject,
   allScenarios,
+  agents,
+  targetAgentIds,
   fields,
   isCompare,
 }: {
   subject: RunDialogSubject | null;
   allScenarios: readonly { id: string; parameters: unknown }[] | undefined;
+  agents: readonly RunDialogAgent[];
+  /** The ids of the agents the run goes against, sorted. */
+  targetAgentIds: readonly string[];
   fields: RunDialogFields;
   isCompare: boolean;
 }) {
   const { showParams, parameterLine } = fields;
   const { secretValues, setSecretValues } = fields;
 
-  const parameterDefinitions = useMemo(
-    () =>
-      unionParameterDefinitions({
-        scenarioIds: scenarioIdsOfSubject(subject, allScenarios ?? []),
-        scenarios: allScenarios ?? [],
-      }),
+  const scenarioIds = useMemo(
+    () => scenarioIdsOfSubject(subject, allScenarios ?? []),
     [subject, allScenarios],
+  );
+
+  const targetAgentKey = targetAgentIds.join(",");
+  const parameterDefinitions = useMemo(() => {
+    const inRun = new Set(targetAgentKey.split(","));
+    return unionParameterDefinitions({
+      scenarioIds,
+      scenarios: allScenarios ?? [],
+      agents: agents.filter((agent) => inRun.has(agent.id)),
+    });
+  }, [scenarioIds, allScenarios, agents, targetAgentKey]);
+
+  /** The declared parameters of the run against one agent alone. */
+  const declaredParametersOf = useCallback(
+    (agentId: string): DeclaredParameter[] =>
+      unionParameterDefinitions({
+        scenarioIds,
+        scenarios: allScenarios ?? [],
+        agents: agents.filter((agent) => agent.id === agentId),
+      }),
+    [scenarioIds, allScenarios, agents],
   );
 
   // The line a single input can carry, and the secrets that cannot ride on it.
@@ -350,6 +403,7 @@ function useRunDialogParameters({
     line: parameterLine,
     secretValues,
     storesPlainValues: !isCompare,
+    definitions: parameterDefinitions,
   });
 
   const hasMissingSecrets =
@@ -364,6 +418,7 @@ function useRunDialogParameters({
 
   return {
     parameterDefinitions,
+    declaredParametersOf,
     parameterDefaults,
     secretDefinitions,
     parameterRows,
@@ -384,7 +439,7 @@ function useParameterBlockToggle({
   parameterDefinitions,
 }: {
   fields: RunDialogFields;
-  parameterDefinitions: ScenarioParameterDefinition[];
+  parameterDefinitions: DeclaredParameter[];
 }) {
   const { setShowParams, setParameterLine } = fields;
   const { setParameterRows, setRowsRequested, setSecretValues } = fields;
@@ -429,14 +484,16 @@ function useParameterRowActions({
   rows: ParameterRow[];
 }) {
   const { setParameterLine, setParameterRows, setRowsRequested } = fields;
+  const { setParameterError } = fields;
 
   /** Typing on the line makes the line what the rows are read from again. */
   const editParameterLine = useCallback(
     (line: string) => {
       setParameterLine(line);
       setParameterRows(null);
+      setParameterError(null);
     },
-    [setParameterLine, setParameterRows],
+    [setParameterLine, setParameterRows, setParameterError],
   );
 
   const setParameterRowsMode = useCallback(
@@ -458,8 +515,9 @@ function useParameterRowActions({
       setParameterRows(
         rows.map((row, at) => (at === index ? { ...row, ...patch } : row)),
       );
+      setParameterError(null);
     },
-    [rows, setParameterRows],
+    [rows, setParameterRows, setParameterError],
   );
 
   const addParameterRow = useCallback(() => {
@@ -501,6 +559,7 @@ function resolveParameterValues({
   line,
   secretValues,
   storesPlainValues,
+  definitions,
 }: {
   showParams: boolean;
   showParameterRows: boolean;
@@ -512,6 +571,8 @@ function resolveParameterValues({
    * the block remembers nothing of its own.
    */
   storesPlainValues: boolean;
+  /** The declarations in scope, for the type each value is read as. */
+  definitions: readonly DeclaredParameter[];
 }) {
   if (!showParams) {
     return {
@@ -523,16 +584,20 @@ function resolveParameterValues({
 
   if (!showParameterRows) {
     return {
-      runParameters: toLineRunParameters({ line, secretValues }),
-      storableRunParameters: toLineRunParameters({ line, secretValues: {} }),
+      runParameters: toLineRunParameters({ line, secretValues, definitions }),
+      storableRunParameters: toLineRunParameters({
+        line,
+        secretValues: {},
+        definitions,
+      }),
       storableSecretNames: undefined,
     };
   }
 
   return {
-    runParameters: toRowsRunParameters({ rows, secretValues }),
+    runParameters: toRowsRunParameters({ rows, secretValues, definitions }),
     storableRunParameters: storesPlainValues
-      ? toStorableRowParameters(rows)
+      ? toStorableRowParameters({ rows, definitions })
       : undefined,
     storableSecretNames: storableSecretRowNames(rows),
   };
@@ -679,14 +744,20 @@ function runTargetsOf({
   target,
   compareRows,
   defaults,
+  definitions,
 }: {
   target: TargetValue;
   compareRows: readonly CompareRow[];
   defaults: ParameterDefaults;
+  definitions: readonly DeclaredParameter[];
 }): RunTarget[] {
   if (compareRows.length > 0) {
     return compareRows.map((row) => {
-      const runParameters = compareRowParameters({ row, defaults });
+      const runParameters = compareRowParameters({
+        row,
+        defaults,
+        definitions,
+      });
       return { ...row.target, ...(runParameters ? { runParameters } : {}) };
     });
   }
@@ -789,9 +860,15 @@ export function useRunDialogForm(subject: RunDialogSubject | null) {
   const choices = useRunDialogChoices(subject);
   const fields = useRunDialogFields(subject);
   const planFields = useRunPlanFields({ subject, subjectKey });
+  const targetAgentIds = targetAgentIdsOf({
+    target: fields.target,
+    compareRows: planFields.compareRows,
+  });
   const parameters = useRunDialogParameters({
     subject,
     allScenarios: choices.allScenarios,
+    agents: choices.scenarioAgents,
+    targetAgentIds,
     fields,
     isCompare: planFields.showCompare,
   });
@@ -804,12 +881,14 @@ export function useRunDialogForm(subject: RunDialogSubject | null) {
     planFields,
     agents: choices.scenarioAgents,
     defaults: parameters.parameterDefaults,
+    definitions: parameters.parameterDefinitions,
   });
 
   const runTargets = runTargetsOf({
     target: fields.target,
     compareRows: planFields.compareRows,
     defaults: parameters.parameterDefaults,
+    definitions: parameters.parameterDefinitions,
   });
   const naming = useRunDialogNaming({
     subject,

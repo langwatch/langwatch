@@ -47,80 +47,103 @@ export const SuggestionDropdown: React.FC<SuggestionDropdownProps> = ({
   const { state } = ui;
 
   return (
-    <Box
-      position="absolute"
-      top="calc(100% + 6px)"
-      left={anchorX !== undefined ? `${Math.max(0, anchorX)}px` : 0}
-      borderRadius="lg"
-      zIndex={2050}
-      minWidth="320px"
-      bg="bg.panel"
-      borderWidth="1px"
-      borderColor="border"
-      // Match the standard Chakra popover shadow (no blue accent ring,
-      // no extra outer halo) — previously a custom double-ring made the
-      // dropdown read as a distinct visual primitive instead of "a
-      // popover anchored to the search bar". Lifts off the page with a
-      // soft layered shadow exactly like the other popovers in the app.
-      boxShadow="md"
-      animation="suggestion-dropdown-fade 120ms ease-out"
-      css={{
-        "@keyframes suggestion-dropdown-fade": {
-          from: { opacity: 0 },
-          to: { opacity: 1 },
-        },
-      }}
-    >
-      <Box
-        borderRadius="lg"
-        overflow="hidden"
-        display="flex"
-        flexDirection="column"
-        bg="bg.panel"
-        position="relative"
-      >
-        <VStack gap={0} align="stretch" maxHeight="320px" overflowY="auto">
-          <GroupedItems ui={ui} state={state} onSelect={onSelect} />
-        </VStack>
-        <DropdownFooter />
-      </Box>
-    </Box>
+    <SuggestionPanel anchorX={anchorX} footerAction={<SyntaxDocsButton />}>
+      <GroupedItems ui={ui} state={state} onSelect={onSelect} />
+    </SuggestionPanel>
   );
 };
 
-const DropdownFooter: React.FC = () => {
+/**
+ * The panel every suggestion list sits in: anchored under its input, lifted
+ * like the other popovers of the app, with the key hints in its foot. The
+ * search bar puts its grouped fields in it; a parameter line puts its names
+ * and values in it.
+ */
+export const SuggestionPanel: React.FC<{
+  children: React.ReactNode;
+  /** A control beside the key hints, when the list has one. */
+  footerAction?: React.ReactNode;
+  anchorX?: number;
+  testId?: string;
+}> = ({ children, footerAction, anchorX, testId }) => (
+  <Box
+    position="absolute"
+    top="calc(100% + 6px)"
+    left={anchorX !== undefined ? `${Math.max(0, anchorX)}px` : 0}
+    borderRadius="lg"
+    zIndex={2050}
+    minWidth="320px"
+    bg="bg.panel"
+    borderWidth="1px"
+    borderColor="border"
+    // Match the standard Chakra popover shadow (no blue accent ring,
+    // no extra outer halo) — previously a custom double-ring made the
+    // dropdown read as a distinct visual primitive instead of "a
+    // popover anchored to the search bar". Lifts off the page with a
+    // soft layered shadow exactly like the other popovers in the app.
+    boxShadow="md"
+    animation="suggestion-dropdown-fade 120ms ease-out"
+    css={{
+      "@keyframes suggestion-dropdown-fade": {
+        from: { opacity: 0 },
+        to: { opacity: 1 },
+      },
+    }}
+    data-testid={testId}
+  >
+    <Box
+      borderRadius="lg"
+      overflow="hidden"
+      display="flex"
+      flexDirection="column"
+      bg="bg.panel"
+      position="relative"
+    >
+      <VStack gap={0} align="stretch" maxHeight="320px" overflowY="auto">
+        {children}
+      </VStack>
+      <DropdownFooter action={footerAction} />
+    </Box>
+  </Box>
+);
+
+const DropdownFooter: React.FC<{ action?: React.ReactNode }> = ({ action }) => (
+  <HStack
+    gap={2}
+    paddingX={3}
+    paddingY={2}
+    borderTopWidth="1px"
+    borderColor="border"
+    bg="bg.subtle"
+    justify="space-between"
+  >
+    {/* ⏎ and ⇥ both accept the highlighted suggestion (see handleKey) —
+        advertise Tab too so the documented affordance is discoverable
+        from the dropdown itself, not just the syntax docs. */}
+    <Text textStyle="2xs" color="fg.subtle">
+      ↑↓ navigate · ⏎ ⇥ select · esc close
+    </Text>
+    {action}
+  </HStack>
+);
+
+const SyntaxDocsButton: React.FC = () => {
   const setSyntaxHelpOpen = useUIStore((s) => s.setSyntaxHelpOpen);
   return (
-    <HStack
-      gap={2}
-      paddingX={3}
-      paddingY={2}
-      borderTopWidth="1px"
-      borderColor="border"
-      bg="bg.subtle"
-      justify="space-between"
+    <Button
+      size="2xs"
+      variant="ghost"
+      color="blue.fg"
+      onMouseDown={(event) => {
+        // mouseDown so the editor's onBlur doesn't race with the click —
+        // openning the drawer needs to win even though the search loses focus.
+        event.preventDefault();
+        setSyntaxHelpOpen(true);
+      }}
     >
-      {/* ⏎ and ⇥ both accept the highlighted suggestion (see handleKey) —
-          advertise Tab too so the documented affordance is discoverable
-          from the dropdown itself, not just the syntax docs. */}
-      <Text textStyle="2xs" color="fg.subtle">
-        ↑↓ navigate · ⏎ ⇥ select · esc close
-      </Text>
-      <Button
-        size="2xs"
-        variant="ghost"
-        color="blue.fg"
-        onMouseDown={(event) => {
-          // mouseDown so the editor's onBlur doesn't race with the click —
-          // openning the drawer needs to win even though the search loses focus.
-          event.preventDefault();
-          setSyntaxHelpOpen(true);
-        }}
-      >
-        <BookOpen size={11} />
-        <Text textStyle="2xs">Syntax docs</Text>
-      </Button>
-    </HStack>
+      <BookOpen size={11} />
+      <Text textStyle="2xs">Syntax docs</Text>
+    </Button>
   );
 };
 

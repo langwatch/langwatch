@@ -11,6 +11,7 @@
  */
 
 import { useCallback } from "react";
+import type { DeclaredParameter } from "~/components/suites/useRunSuite";
 import {
   addCompareRow,
   type CompareRow,
@@ -99,15 +100,18 @@ export function useCompareRows({
   planFields,
   agents,
   defaults,
+  definitions,
 }: {
   fields: RunDialogFields;
   planFields: RunPlanFields;
   agents: readonly RunDialogAgent[];
   /** The declared defaults, which a typed value equal to does not override. */
   defaults: ParameterDefaults;
+  /** The declarations in scope, for the type each value is read as. */
+  definitions: readonly DeclaredParameter[];
 }) {
   const { compareRows, setCompareRows } = planFields;
-  const { setTarget } = fields;
+  const { setTarget, setParameterError } = fields;
   const { enterCompare, leaveCompare } = useCompareTransitions({
     fields,
     planFields,
@@ -126,10 +130,11 @@ export function useCompareRows({
           at === index ? { ...row, ...patch } : row,
         ),
       );
+      setParameterError(null);
       // The first row is the agent the run is remembered under.
       if (index === 0 && patch.target) setTarget(patch.target);
     },
-    [compareRows, setCompareRows, setTarget],
+    [compareRows, setCompareRows, setTarget, setParameterError],
   );
 
   const addRow = useCallback(() => {
@@ -159,6 +164,7 @@ export function useCompareRows({
     hasDuplicateCompareRows: hasDuplicateCompareRows({
       rows: compareRows,
       defaults,
+      definitions,
     }),
   };
 }

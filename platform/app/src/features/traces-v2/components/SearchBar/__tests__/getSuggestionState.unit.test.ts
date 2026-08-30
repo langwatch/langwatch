@@ -1,5 +1,91 @@
 import { describe, expect, it } from "vitest";
-import { getSuggestionState } from "../getSuggestionState";
+import {
+  getSuggestionState,
+  PARAMETER_LINE_GRAMMAR,
+  SEARCH_GRAMMAR,
+} from "../getSuggestionState";
+
+describe("getSuggestionState with the parameter line grammar", () => {
+  const read = (text: string, cursor: number) =>
+    getSuggestionState(text, cursor, PARAMETER_LINE_GRAMMAR);
+
+  describe("given a line with one pair and a second name in progress", () => {
+    /** @scenario "The equals sign and the comma separate the tokens of a parameter line" */
+    it("opens key mode on the token after the comma, spaces skipped", () => {
+      expect(read("model=gpt-5, loc", 16)).toEqual({
+        open: true,
+        mode: "field",
+        query: "loc",
+        tokenStart: 13,
+      });
+    });
+
+    it("opens value mode for the name before the equals sign", () => {
+      expect(read("model=gpt-5, loc", 6)).toEqual({
+        open: true,
+        mode: "value",
+        field: "model",
+        query: "",
+        tokenStart: 0,
+      });
+      expect(read("model=gpt-5, loc", 11)).toMatchObject({
+        mode: "value",
+        field: "model",
+        query: "gpt-5",
+      });
+    });
+
+    it("keeps a value holding a colon or a space in value mode", () => {
+      expect(read("greeting=hello there", 20)).toMatchObject({
+        mode: "value",
+        field: "greeting",
+        query: "hello there",
+      });
+      expect(read("url=http://a", 12)).toMatchObject({
+        mode: "value",
+        field: "url",
+        query: "http://a",
+      });
+    });
+  });
+
+  describe("given the cursor right after a comma", () => {
+    it("opens key mode with an empty query, so the list shows at once", () => {
+      expect(read("model=gpt-5,", 12)).toEqual({
+        open: true,
+        mode: "field",
+        query: "",
+        tokenStart: 12,
+      });
+      expect(read("model=gpt-5, ", 13)).toEqual({
+        open: true,
+        mode: "field",
+        query: "",
+        tokenStart: 13,
+      });
+    });
+  });
+
+  describe("given a name that starts with an underscore", () => {
+    it("opens key mode, since the parameter grammar allows it", () => {
+      expect(read("_region", 7)).toMatchObject({
+        mode: "field",
+        query: "_region",
+      });
+    });
+  });
+
+  describe("given the traces search grammar", () => {
+    it("keeps the colon as its separator and stays closed on an empty token", () => {
+      expect(getSuggestionState("model=gpt", 9, SEARCH_GRAMMAR)).toEqual({
+        open: false,
+      });
+      expect(getSuggestionState("status:error ", 13, SEARCH_GRAMMAR)).toEqual({
+        open: false,
+      });
+    });
+  });
+});
 
 describe("getSuggestionState", () => {
   describe("given an empty editor", () => {

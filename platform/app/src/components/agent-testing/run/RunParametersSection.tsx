@@ -9,17 +9,17 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Box, chakra, Input, Text, VStack } from "@chakra-ui/react";
+import { Box, chakra, Text, VStack } from "@chakra-ui/react";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
-import { DIALOG_FIELD_STYLE, FieldLabel } from "../shared/DialogFields";
+import { FieldLabel } from "../shared/DialogFields";
 import { FG_MUTED } from "../shared/design";
 import { RemoveBlockButton } from "../shared/RemoveBlockButton";
+import { ParameterLineField } from "./ParameterLineField";
 import { ParameterRowsEditor } from "./ParameterRowsEditor";
+import { errorOnLine, parameterPlaceholder } from "./parameter-suggestions";
 import type { RunDialogForm } from "./useRunDialogForm";
-
-export const PARAMETER_LINE_PLACEHOLDER = "plan=free, locale=de";
 
 const PARAMETERS_HELP =
   "Parameters reach your agent as arguments of the function you annotated. Use them to run the same scenario as a free or a pro customer, in another locale, or on another model.";
@@ -30,6 +30,8 @@ export const LOCKED_IN_ROWS_MESSAGE =
 
 type RunParametersFields = Pick<
   RunDialogForm,
+  | "parameterDefinitions"
+  | "parameterError"
   | "parameterLine"
   | "editParameterLine"
   | "parameterRows"
@@ -117,19 +119,23 @@ export function RunParametersSection({
             declaredSecrets={form.secretDefinitions}
             secretValues={form.secretValues}
             onChangeSecretValue={form.setSecretValue}
+            definitions={form.parameterDefinitions}
+            error={form.parameterError}
             disabled={isBusy}
           />
         ) : (
-          <Input
-            {...DIALOG_FIELD_STYLE}
-            fontFamily="mono"
-            fontSize="12px"
-            aria-label="Parameter overrides"
-            placeholder={PARAMETER_LINE_PLACEHOLDER}
+          <ParameterLineField
+            ariaLabel="Parameter overrides"
+            placeholder={parameterPlaceholder(form.parameterDefinitions)}
             value={form.parameterLine}
-            onChange={(event) => form.editParameterLine(event.target.value)}
+            onChange={form.editParameterLine}
+            definitions={form.parameterDefinitions}
+            error={errorOnLine({
+              line: form.parameterLine,
+              error: form.parameterError,
+            })}
             disabled={isBusy}
-            data-testid="run-dialog-parameter-line"
+            testId="run-dialog-parameter-line"
           />
         )}
       </Box>
