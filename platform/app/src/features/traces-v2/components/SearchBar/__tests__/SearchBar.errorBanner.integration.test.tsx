@@ -65,8 +65,7 @@ vi.mock("@langwatch/langy-web", async (importOriginal) => {
     openPanel: () => undefined,
     attachContext: () => undefined,
   });
-  const useLangyStore = (selector: (s: ReturnType<typeof state>) => unknown) =>
-    selector(state());
+  const useLangyStore = (selector: (s: ReturnType<typeof state>) => unknown) => selector(state());
   useLangyStore.getState = state;
   return { ...actual, useLangyStore };
 });
@@ -142,19 +141,13 @@ describe("<SearchBar /> unified error banner", () => {
     });
 
     describe("when the user clicks the dismiss X", () => {
+      // Asserted on the store rather than on the banner leaving the DOM:
+      // AnimatePresence runs its exit animation asynchronously under jsdom, so
+      // the element outlives the click and a DOM assertion would be timing, not
+      // behaviour.
       it("clears the parse error from the store", async () => {
         renderSearchBar();
         const user = userEvent.setup();
-        await user.click(screen.getByLabelText(/dismiss error/i));
-        expect(useFilterStore.getState().parseError).toBeNull();
-      });
-
-      it("clears parse error in store after dismiss (banner exit animation fires async)", async () => {
-        renderSearchBar();
-        const user = userEvent.setup();
-        // Clicking dismiss clears the store state — the meaningful assertion.
-        // AnimatePresence exit animations run async in jsdom so we verify
-        // store state rather than DOM removal.
         await user.click(screen.getByLabelText(/dismiss error/i));
         expect(useFilterStore.getState().parseError).toBeNull();
       });

@@ -169,9 +169,7 @@ const createTabData = (
       configId: overrides?.configId,
       handle: overrides?.handle ?? null,
       scope: "PROJECT",
-      versionMetadata: overrides?.versionId
-        ? { versionId: overrides.versionId }
-        : undefined,
+      versionMetadata: overrides?.versionId ? { versionId: overrides.versionId } : undefined,
       version: {
         configData: {
           messages: [{ role: "system", content: "You are helpful" }],
@@ -243,9 +241,7 @@ describe("ExperimentFromPlaygroundButton", () => {
       await user.click(screen.getByRole("button", { name: /experiment/i }));
 
       await waitFor(() => {
-        expect(
-          screen.getByText(/create new experiment with this prompt/i),
-        ).toBeInTheDocument();
+        expect(screen.getByText(/create new experiment with this prompt/i)).toBeInTheDocument();
       });
     });
 
@@ -263,9 +259,7 @@ describe("ExperimentFromPlaygroundButton", () => {
       await user.click(screen.getByRole("button", { name: /experiment/i }));
 
       await waitFor(() => {
-        expect(
-          screen.getByText(/create new experiment with these prompts/i),
-        ).toBeInTheDocument();
+        expect(screen.getByText(/create new experiment with these prompts/i)).toBeInTheDocument();
       });
     });
 
@@ -282,11 +276,12 @@ describe("ExperimentFromPlaygroundButton", () => {
 
       await user.click(screen.getByRole("button", { name: /experiment/i }));
 
-      // After split, we have 2 tabs (original + duplicated)
+      // After the split there are two tabs, the original and its duplicate, so
+      // the dialog has to say two. Asserting the number is the whole point of
+      // this case — the sibling above already covers the plural wording, and
+      // matching the prose alone left the count itself unchecked anywhere.
       await waitFor(() => {
-        expect(
-          screen.getByText(/create new experiment with these prompts/i),
-        ).toBeInTheDocument();
+        expect(screen.getByText(/with these prompts\? \(2 prompts\)/i)).toBeInTheDocument();
       });
     });
   });
