@@ -43,7 +43,7 @@ class AgentCall:
     parameters: dict[str, Any] = field(default_factory=dict)
     call_id: str | None = None
     run: dict[str, Any] = field(default_factory=dict)
-    deadline_at: str | None = None
+    deadline_at: str | int | float | None = None
 
     def turn_fields(self) -> dict[str, Any]:
         return {

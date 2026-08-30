@@ -752,3 +752,17 @@ async def test_connect_agent_starts_the_default_client_when_a_key_is_present(
             assert agent([]) == "ok"
         finally:
             await asyncio.to_thread(client_module._reset_default_client_for_tests)
+
+
+# @scenario "The deadline of a call is read as epoch milliseconds"
+def test_seconds_until_reads_epoch_milliseconds_and_iso_strings():
+    now_ms = datetime.now(timezone.utc).timestamp() * 1000
+    epoch_left = client_module._seconds_until(now_ms + 30_000)
+    assert epoch_left is not None and 29 < epoch_left <= 30
+
+    iso = (datetime.now(timezone.utc) + timedelta(seconds=30)).isoformat()
+    iso_left = client_module._seconds_until(iso)
+    assert iso_left is not None and 29 < iso_left <= 30
+
+    assert client_module._seconds_until(None) is None
+    assert client_module._seconds_until("not a date") is None

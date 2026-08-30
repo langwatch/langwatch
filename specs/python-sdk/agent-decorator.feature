@@ -295,6 +295,13 @@ Feature: Python SDK connect_agent decorator
     And the connection stays open
 
   @unit
+  @unit
+  Scenario: The deadline of a call is read as epoch milliseconds
+    Given a call frame whose deadlineAt is an epoch in milliseconds
+    When the SDK computes the seconds left
+    Then the remaining time is measured from now
+    And an ISO 8601 deadline is still accepted
+
   Scenario: A call past its deadline answers agent_call_timeout
     Given a function that runs longer than the deadline
     Then a result frame with error code agent_call_timeout is sent

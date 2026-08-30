@@ -105,7 +105,7 @@ class CallFrame(TypedDict):
     params: dict[str, Any]
     session: Any
     traceparent: str | None
-    deadlineAt: str
+    deadlineAt: int | float | str
     run: CallRun
 
 

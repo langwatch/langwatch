@@ -120,9 +120,15 @@ def connection_headers(*, api_key: str, project_id: str | None) -> dict[str, str
     return headers
 
 
-def _seconds_until(deadline_at: str | None) -> float | None:
-    if not deadline_at:
+def _seconds_until(deadline_at: str | int | float | None) -> float | None:
+    """Seconds left until a deadline the platform sends as epoch milliseconds.
+
+    An ISO 8601 string is accepted as well, so an older platform keeps working.
+    """
+    if deadline_at is None or deadline_at == "":
         return None
+    if isinstance(deadline_at, (int, float)):
+        return deadline_at / 1000 - datetime.now(timezone.utc).timestamp()
     try:
         deadline = datetime.fromisoformat(deadline_at.replace("Z", "+00:00"))
     except ValueError:
