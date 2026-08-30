@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { AuthService } from "@langwatch/auth-contract";
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import { EntitlementService } from "@langwatch/entitlement-contract";
@@ -12,32 +11,11 @@ import { ScimDirectoryService } from "../scim-directory.service";
 import { ScimGrantsService } from "../scim-grants.service";
 import { ScimService } from "../scim.service";
 import { QuietScimSyncLifecycle } from "../../ports/__tests__/support/quiet-scim-sync-lifecycle";
+import { GrantsFake } from "../../__tests__/support/grants-fake";
 
 const patchSchema = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 const parse = (operations: unknown[]) =>
   scimPatchRequestSchema.parse({ schemas: [patchSchema], Operations: operations });
-
-class GrantsFake extends AuthzGrantsService {
-  attach = vi.fn();
-  update = vi.fn();
-  revoke = vi.fn();
-  replace = vi.fn();
-  offboard = vi.fn();
-  attachBindings = vi.fn(async () => []);
-  attachResourceGrant = vi.fn();
-  revokeResourceGrants = vi.fn();
-  changeBindingRole = vi.fn();
-  revokeBindings = vi.fn(async () => []);
-  revokeBindingsWhere = vi.fn();
-  offboardMember = vi.fn();
-  defineRole = vi.fn();
-  deleteRole = vi.fn();
-  createBinding = vi.fn();
-  updateBinding = vi.fn();
-  deleteBinding = vi.fn();
-  applyMemberBindings = vi.fn();
-  invalidateOrganization = vi.fn();
-}
 
 class EnterpriseEntitlements extends EntitlementService {
   async getActivePlan() {

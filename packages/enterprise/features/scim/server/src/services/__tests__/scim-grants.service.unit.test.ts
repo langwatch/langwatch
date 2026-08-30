@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { AuthzGrantsService } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ScimGrantRepositoryPort,
@@ -8,6 +7,7 @@ import {
   type ScimRoleBindingRecord,
 } from "../../ports/scim-repository.port";
 import { type DesiredScimGrant, ScimGrantsService } from "../scim-grants.service";
+import { GrantsFake } from "../../__tests__/support/grants-fake";
 
 const organizationId = "org_1";
 const userId = "user_1";
@@ -16,28 +16,6 @@ class GrantRepositoryFake extends ScimGrantRepositoryPort {
   readonly listRoleBindings = vi.fn<
     (scope: ScimGrantBindingScope) => Promise<ScimRoleBindingRecord[]>
   >(async () => []);
-}
-
-class GrantsFake extends AuthzGrantsService {
-  readonly attach = vi.fn();
-  readonly update = vi.fn();
-  readonly revoke = vi.fn();
-  readonly replace = vi.fn();
-  readonly offboard = vi.fn();
-  readonly attachBindings = vi.fn(async () => []);
-  readonly attachResourceGrant = vi.fn();
-  readonly revokeResourceGrants = vi.fn();
-  readonly changeBindingRole = vi.fn();
-  readonly revokeBindings = vi.fn(async () => []);
-  readonly revokeBindingsWhere = vi.fn();
-  readonly offboardMember = vi.fn();
-  readonly defineRole = vi.fn();
-  readonly deleteRole = vi.fn();
-  readonly createBinding = vi.fn();
-  readonly updateBinding = vi.fn();
-  readonly deleteBinding = vi.fn();
-  readonly applyMemberBindings = vi.fn();
-  readonly invalidateOrganization = vi.fn();
 }
 
 const memberGrant: DesiredScimGrant = {

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { createHash } from "node:crypto";
-import { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { AuthService } from "@langwatch/auth-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { UserService } from "@langwatch/user-contract";
@@ -11,6 +10,7 @@ import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
 import type { ScimRepositoryPort } from "../../ports/scim-repository.port";
 import { QuietScimSyncLifecycle } from "../../ports/__tests__/support/quiet-scim-sync-lifecycle";
 import type { ScimSyncLifecyclePort } from "../../ports/scim-sync-lifecycle.port";
+import { GrantsFake } from "../../__tests__/support/grants-fake";
 
 const now = new Date("2026-08-25T12:00:00.000Z");
 
@@ -47,28 +47,6 @@ function repository(overrides: Record<string, unknown> = {}): ScimRepositoryPort
     listRoleBindings: vi.fn(async () => []),
     ...overrides,
   } as ScimRepositoryPort;
-}
-
-class GrantsFake extends AuthzGrantsService {
-  readonly attach = vi.fn();
-  readonly update = vi.fn();
-  readonly revoke = vi.fn();
-  readonly replace = vi.fn();
-  readonly offboard = vi.fn();
-  readonly attachBindings = vi.fn(async () => []);
-  readonly attachResourceGrant = vi.fn();
-  readonly revokeResourceGrants = vi.fn();
-  readonly changeBindingRole = vi.fn();
-  readonly revokeBindings = vi.fn(async () => []);
-  readonly revokeBindingsWhere = vi.fn();
-  readonly offboardMember = vi.fn();
-  readonly defineRole = vi.fn();
-  readonly deleteRole = vi.fn();
-  readonly createBinding = vi.fn();
-  readonly updateBinding = vi.fn();
-  readonly deleteBinding = vi.fn();
-  readonly applyMemberBindings = vi.fn();
-  readonly invalidateOrganization = vi.fn();
 }
 
 class FixedEntitlementService extends EntitlementService {

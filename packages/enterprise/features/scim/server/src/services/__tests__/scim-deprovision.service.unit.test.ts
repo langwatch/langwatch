@@ -1,40 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { AuthzGrantsService, OffboardIncompleteError } from "@langwatch/authz-contract";
+import { OffboardIncompleteError } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 import { ScimSyncLifecyclePort } from "../../ports/scim-sync-lifecycle.port";
 import { ScimDeprovisionService } from "../scim-deprovision.service";
-
-class GrantsFake extends AuthzGrantsService {
-  readonly attach = vi.fn();
-  readonly update = vi.fn();
-  readonly revoke = vi.fn();
-  readonly replace = vi.fn();
-  readonly offboard = vi.fn(async () => ({
-    removed: {
-      bindings: 0,
-      groupMemberships: 0,
-      legacyTeamMemberships: 0,
-      pendingInvites: 0,
-      organizationMembership: true,
-    },
-    needsHumanDecision: { ownedApiKeys: [], personalTeams: [] },
-  }));
-  readonly attachBindings = vi.fn();
-  readonly attachResourceGrant = vi.fn();
-  readonly revokeResourceGrants = vi.fn();
-  readonly changeBindingRole = vi.fn();
-  readonly revokeBindings = vi.fn();
-  readonly revokeBindingsWhere = vi.fn();
-  readonly offboardMember = vi.fn();
-  readonly defineRole = vi.fn();
-  readonly deleteRole = vi.fn();
-  readonly createBinding = vi.fn();
-  readonly updateBinding = vi.fn();
-  readonly deleteBinding = vi.fn();
-  readonly applyMemberBindings = vi.fn();
-  readonly invalidateOrganization = vi.fn();
-}
+import { GrantsFake } from "../../__tests__/support/grants-fake";
 
 class LifecycleFake extends ScimSyncLifecyclePort {
   readonly tokenIssued = vi.fn(async () => undefined);

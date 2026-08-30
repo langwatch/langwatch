@@ -9,9 +9,7 @@ import {
 
 describe("SCIM transport characterization", () => {
   it("keeps discovery public and carries the documented page-size cap", () => {
-    expect(
-      SCIM_SPEC_OPTIONS.documentation.components?.securitySchemes?.scim_bearer,
-    ).toBeDefined();
+    expect(SCIM_SPEC_OPTIONS.documentation.components?.securitySchemes?.scim_bearer).toBeDefined();
     expect(GET_SERVICE_PROVIDER_CONFIG.security).toEqual([]);
     expect(JSON.stringify(GET_SERVICE_PROVIDER_CONFIG)).toContain("maxResults");
   });

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { AuthzGrantsService } from "@langwatch/authz-contract";
 import { scimPatchRequestSchema } from "@langwatch/enterprise-scim-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScimRepositoryPort } from "../../ports/scim-repository.port";
 import { ScimDirectoryService } from "../scim-directory.service";
 import { ScimGrantsService } from "../scim-grants.service";
+import { GrantsFake } from "../../__tests__/support/grants-fake";
 
 const schema = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 const group = {
@@ -18,28 +18,6 @@ const group = {
   createdAt: new Date("2024-01-01T00:00:00Z"),
   updatedAt: new Date("2024-01-02T00:00:00Z"),
 };
-
-class GrantsFake extends AuthzGrantsService {
-  attach = vi.fn();
-  update = vi.fn();
-  revoke = vi.fn();
-  replace = vi.fn();
-  offboard = vi.fn();
-  attachBindings = vi.fn(async () => []);
-  attachResourceGrant = vi.fn();
-  revokeResourceGrants = vi.fn();
-  changeBindingRole = vi.fn();
-  revokeBindings = vi.fn(async () => []);
-  revokeBindingsWhere = vi.fn();
-  offboardMember = vi.fn();
-  defineRole = vi.fn();
-  deleteRole = vi.fn();
-  createBinding = vi.fn();
-  updateBinding = vi.fn();
-  deleteBinding = vi.fn();
-  applyMemberBindings = vi.fn();
-  invalidateOrganization = vi.fn();
-}
 
 function repository(): ScimRepositoryPort {
   return {
