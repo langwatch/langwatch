@@ -12,6 +12,7 @@ import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { AICreateModal, type ExampleTemplate } from "../shared/AICreateModal";
 import { ModelProviderRequiredModal } from "./ModelProviderRequiredModal";
+import type { ScenarioEditorVariant } from "./ScenarioFormDrawer";
 import { ResolvedModelCaption } from "./ResolvedModelCaption";
 import { getDefaultModelState } from "./utils/defaultModelState";
 
@@ -36,8 +37,7 @@ export interface ScenarioCreateModalProps {
 const MODAL_TITLE = "Create new scenario";
 /** What Agent Testing calls the same modal. */
 const AGENT_TESTING_MODAL_TITLE = "New test case";
-const MODAL_PLACEHOLDER =
-  "Explain your agent, its goals and what behavior you want to test.";
+const MODAL_PLACEHOLDER = "Explain your agent, its goals and what behavior you want to test.";
 const GENERATING_TEXT = "Drafting your scenario…";
 const AGENT_TESTING_GENERATING_TEXT = "Drafting your test case…";
 const PROMPT_LABEL = "What should this simulation prove?";
@@ -68,7 +68,12 @@ const EXAMPLE_TEMPLATES: ExampleTemplate[] = [
  * Opens the ScenarioFormDrawer with initial data via complexProps.
  * No DB record is created until the user clicks "Save" in the drawer.
  */
-export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps) {
+export function ScenarioCreateModal({
+  open,
+  onClose,
+  folderId,
+  variant,
+}: ScenarioCreateModalProps) {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
 
@@ -136,11 +141,7 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
 
   if (!defaultModelState.ok) {
     return (
-      <ModelProviderRequiredModal
-        open={open}
-        onClose={onClose}
-        onProceedAnyway={handleSkip}
-      />
+      <ModelProviderRequiredModal open={open} onClose={onClose} onProceedAnyway={handleSkip} />
     );
   }
 
@@ -155,9 +156,7 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
       exampleTemplates={EXAMPLE_TEMPLATES}
       onGenerate={(desc) => handleGenerate(desc)}
       onSkip={handleSkip}
-      generatingText={
-        isAgentTesting ? AGENT_TESTING_GENERATING_TEXT : GENERATING_TEXT
-      }
+      generatingText={isAgentTesting ? AGENT_TESTING_GENERATING_TEXT : GENERATING_TEXT}
       footerHint={<ResolvedModelCaption model={resolvedDefault.data?.model} />}
       assistant={{
         name: "AI",
