@@ -35,10 +35,7 @@ import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_CATEGORIES,
 } from "~/server/data-retention/retentionPolicy.schema";
-import {
-  BillingPriceCatalogue,
-  SubscriptionStatus,
-} from "@langwatch/enterprise-billing-contract";
+import { BillingPriceCatalogue, SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
 import { EEWebhookService } from "../webhook.service";
 import { ANNUAL_EVENTS_BILLING_THRESHOLD } from "~/runtime/app/features/billing";
 const prices = BillingPriceCatalogue.create("test").prices;
@@ -74,38 +71,14 @@ const createMockOrganizationRepository = () => ({
 
 const createMockItemCalculator = () => ({
   calculateQuantityForPrice: vi.fn().mockReturnValue(0),
-  prices: {
-    PRO: "price_pro",
-    GROWTH: "price_growth",
-    LAUNCH: "price_launch",
-    LAUNCH_ANNUAL: "price_launch_annual",
-    ACCELERATE: "price_accelerate",
-    ACCELERATE_ANNUAL: "price_acc_annual",
-    LAUNCH_USERS: "price_launch_users",
-    ACCELERATE_USERS: "price_acc_users",
-    LAUNCH_ANNUAL_USERS: "price_launch_annual_users",
-    ACCELERATE_ANNUAL_USERS: "price_acc_annual_users",
-    LAUNCH_TRACES_10K: "price_launch_traces",
-    ACCELERATE_TRACES_100K: "price_acc_traces",
-    LAUNCH_ANNUAL_TRACES_10K: "price_launch_annual_traces",
-    ACCELERATE_ANNUAL_TRACES_100K: "price_acc_annual_traces",
-    GROWTH_SEAT_EUR_MONTHLY: "price_growth_seat_eur_monthly",
-    GROWTH_SEAT_EUR_ANNUAL: "price_growth_seat_eur_annual",
-    GROWTH_SEAT_USD_MONTHLY: "price_growth_seat_usd_monthly",
-    GROWTH_SEAT_USD_ANNUAL: "price_growth_seat_usd_annual",
-    GROWTH_EVENTS_EUR_MONTHLY: "price_growth_events_eur_monthly",
-    GROWTH_EVENTS_EUR_ANNUAL: "price_growth_events_eur_annual",
-    GROWTH_EVENTS_USD_MONTHLY: "price_growth_events_usd_monthly",
-    GROWTH_EVENTS_USD_ANNUAL: "price_growth_events_usd_annual",
-    GROWTH_EVENTS_EUR_MONTHLY_UNTIL_MAR_2026:
-      "price_growth_events_eur_monthly_until_mar_2026",
-    GROWTH_EVENTS_EUR_ANNUAL_UNTIL_MAR_2026:
-      "price_growth_events_eur_annual_until_mar_2026",
-    GROWTH_EVENTS_USD_MONTHLY_UNTIL_MAR_2026:
-      "price_growth_events_usd_monthly_until_mar_2026",
-    GROWTH_EVENTS_USD_ANNUAL_UNTIL_MAR_2026:
-      "price_growth_events_usd_annual_until_mar_2026",
-  },
+  // The real catalogue, not a hand-written copy of it. This map is how the
+  // service decides what a price id MEANS —
+  // `AnnualEventsBillingThresholdService` is built from
+  // `itemCalculator.prices` and asks whether any subscription item is an
+  // annual growth-events price. The copy that stood here listed all 26 of the
+  // catalogue's keys against invented ids, so a fixture naming a real one
+  // resolved to "not annual events" and the threshold was never applied.
+  prices,
 });
 
 const makeSubscription = (overrides: Record<string, unknown> = {}) => ({
@@ -122,9 +95,7 @@ const makeSubscription = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-const makeSubscriptionWithOrg = (
-  overrides: Record<string, unknown> = {},
-): SubscriptionWithOrg => {
+const makeSubscriptionWithOrg = (overrides: Record<string, unknown> = {}): SubscriptionWithOrg => {
   const { organization, ...subscriptionOverrides } = overrides;
   return {
     ...makeSubscription(subscriptionOverrides),
@@ -331,9 +302,7 @@ describe("webhookService", () => {
       /** @scenario Checkout succeeds even when invite approval fails */
       it("continues when invite approval fails", async () => {
         const mockInviteApprover = {
-          approvePaymentPendingInvites: vi
-            .fn()
-            .mockRejectedValue(new Error("invite error")),
+          approvePaymentPendingInvites: vi.fn().mockRejectedValue(new Error("invite error")),
         };
         service = EEWebhookService.createWithDependencies({
           subscriptionRepository: subRepo as unknown as SubscriptionRepository,
@@ -412,9 +381,7 @@ describe("webhookService", () => {
       /** @scenario An annual subscription gets a billing threshold after checkout completes */
       it("sets the billing threshold on the Stripe subscription", async () => {
         setupLinkedCheckout();
-        mockStripeInstance.subscriptions.retrieve.mockResolvedValue(
-          annualStripeSubscription,
-        );
+        mockStripeInstance.subscriptions.retrieve.mockResolvedValue(annualStripeSubscription);
 
         const promise = service.handleCheckoutCompleted({
           subscriptionId: "sub_stripe_1",
@@ -424,26 +391,19 @@ describe("webhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(mockStripeInstance.subscriptions.update).toHaveBeenCalledWith(
-          "sub_stripe_1",
-          {
-            billing_thresholds: {
-              amount_gte: ANNUAL_EVENTS_BILLING_THRESHOLD,
-              reset_billing_cycle_anchor: false,
-            },
+        expect(mockStripeInstance.subscriptions.update).toHaveBeenCalledWith("sub_stripe_1", {
+          billing_thresholds: {
+            amount_gte: ANNUAL_EVENTS_BILLING_THRESHOLD,
+            reset_billing_cycle_anchor: false,
           },
-        );
+        });
       });
 
       /** @scenario A failure setting the threshold never fails the checkout */
       it("still links and activates when the threshold update fails", async () => {
         setupLinkedCheckout();
-        mockStripeInstance.subscriptions.retrieve.mockResolvedValue(
-          annualStripeSubscription,
-        );
-        mockStripeInstance.subscriptions.update.mockRejectedValue(
-          new Error("stripe down"),
-        );
+        mockStripeInstance.subscriptions.retrieve.mockResolvedValue(annualStripeSubscription);
+        mockStripeInstance.subscriptions.update.mockRejectedValue(new Error("stripe down"));
 
         const promise = service.handleCheckoutCompleted({
           subscriptionId: "sub_stripe_1",
@@ -461,12 +421,8 @@ describe("webhookService", () => {
       /** @scenario A threshold failure raises an alert for manual follow-up */
       it("alerts on Slack when the threshold update fails", async () => {
         setupLinkedCheckout();
-        mockStripeInstance.subscriptions.retrieve.mockResolvedValue(
-          annualStripeSubscription,
-        );
-        mockStripeInstance.subscriptions.update.mockRejectedValue(
-          new Error("stripe down"),
-        );
+        mockStripeInstance.subscriptions.retrieve.mockResolvedValue(annualStripeSubscription);
+        mockStripeInstance.subscriptions.update.mockRejectedValue(new Error("stripe down"));
 
         const promise = service.handleCheckoutCompleted({
           subscriptionId: "sub_stripe_1",
@@ -485,9 +441,7 @@ describe("webhookService", () => {
       /** @scenario An annual subscription gets a billing threshold after checkout completes */
       it("does not alert when the threshold is applied successfully", async () => {
         setupLinkedCheckout();
-        mockStripeInstance.subscriptions.retrieve.mockResolvedValue(
-          annualStripeSubscription,
-        );
+        mockStripeInstance.subscriptions.retrieve.mockResolvedValue(annualStripeSubscription);
 
         const promise = service.handleCheckoutCompleted({
           subscriptionId: "sub_stripe_1",
@@ -503,15 +457,9 @@ describe("webhookService", () => {
       /** @scenario A threshold failure raises an alert for manual follow-up */
       it("still completes checkout when the alert itself fails", async () => {
         setupLinkedCheckout();
-        mockStripeInstance.subscriptions.retrieve.mockResolvedValue(
-          annualStripeSubscription,
-        );
-        mockStripeInstance.subscriptions.update.mockRejectedValue(
-          new Error("stripe down"),
-        );
-        mockSendSlackBillingThresholdFailureAlert.mockRejectedValueOnce(
-          new Error("slack down"),
-        );
+        mockStripeInstance.subscriptions.retrieve.mockResolvedValue(annualStripeSubscription);
+        mockStripeInstance.subscriptions.update.mockRejectedValue(new Error("stripe down"));
+        mockSendSlackBillingThresholdFailureAlert.mockRejectedValueOnce(new Error("slack down"));
 
         const promise = service.handleCheckoutCompleted({
           subscriptionId: "sub_stripe_1",
@@ -705,9 +653,7 @@ describe("webhookService", () => {
             plan: "GROWTH_SEAT_EUR_MONTHLY",
           }),
         );
-        subRepo.migrateToSeatEvent.mockResolvedValue([
-          { stripeSubscriptionId: "sub_old_1" },
-        ]);
+        subRepo.migrateToSeatEvent.mockResolvedValue([{ stripeSubscriptionId: "sub_old_1" }]);
 
         const promise = service.handleInvoicePaymentSucceeded({
           subscriptionId: "sub_stripe_1",
@@ -1391,8 +1337,8 @@ describe("webhookService", () => {
             ended_at: null,
             items: {
               data: [
-                { price: { id: "price_launch_users" }, quantity: 2 },
-                { price: { id: "price_launch_traces" }, quantity: 1 },
+                { price: { id: prices.LAUNCH_USERS }, quantity: 2 },
+                { price: { id: prices.LAUNCH_TRACES_10K }, quantity: 1 },
               ],
             },
           } as any,
