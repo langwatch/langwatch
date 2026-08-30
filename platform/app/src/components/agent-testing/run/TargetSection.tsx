@@ -4,22 +4,18 @@
  *
  * The label line carries Configure, which opens the agents page in another
  * tab so the dialog and whatever it was about to run are still here on the
- * way back. It also carries the switch that reveals other people's
- * development agents, when the project holds any.
+ * way back.
+ *
+ * A development agent of another person is one of the cards, drawn disabled
+ * with the reason on hover, so the list reads the same for everyone on the
+ * project.
  *
  * @see specs/features/agent-testing/run-dialog.feature
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import { chakra, HStack, Text, VStack } from "@chakra-ui/react";
-import { useState } from "react";
+import { chakra, VStack } from "@chakra-ui/react";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
-import {
-  hasTeammateAgents,
-  offeredAgents,
-  TEAMMATES_TOGGLE_LABEL,
-} from "~/components/scenarios/useFilteredScenarioTargets";
-import { Switch } from "~/components/ui/switch";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { getRoutePath } from "~/utils/routes";
 import { FieldLabel } from "../shared/DialogFields";
@@ -68,40 +64,9 @@ function ConfigureAgentsLink() {
   );
 }
 
-/**
- * The switch that reveals other people's development agents.
- *
- * Off by default: a team where each developer runs the same agent on their
- * own machine would otherwise fill the picker with cards the person in front
- * of it cannot run.
- */
-function TeammatesToggle({
-  checked,
-  onChange,
-}: {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <HStack gap={2} marginLeft="auto">
-      <Text fontSize="11.5px" fontWeight="medium" color={FG_MUTED}>
-        {TEAMMATES_TOGGLE_LABEL}
-      </Text>
-      <Switch
-        size="sm"
-        checked={checked}
-        onCheckedChange={(event) => onChange(event.checked)}
-        data-testid="run-dialog-show-teammates"
-      />
-    </HStack>
-  );
-}
-
 /** The agent cards, the prompt picker, or the setup box. */
 export function TargetSection(props: TargetSectionProps) {
   const { mode, agents, prompts, target, onSelect } = props;
-  const [showTeammates, setShowTeammates] = useState(false);
-  const offered = offeredAgents({ agents, showTeammates });
 
   return (
     <VStack align="stretch" gap={0} data-testid="run-dialog-target-section">
@@ -113,21 +78,13 @@ export function TargetSection(props: TargetSectionProps) {
             onClick={props.onRemovePromptPicker}
           />
         ) : (
-          <>
-            {hasTeammateAgents(agents) && (
-              <TeammatesToggle
-                checked={showTeammates}
-                onChange={setShowTeammates}
-              />
-            )}
-            <ConfigureAgentsLink />
-          </>
+          <ConfigureAgentsLink />
         )}
       </FieldLabel>
       {mode === "prompts" ? (
         <PromptPicker prompts={prompts} selected={target} onSelect={onSelect} />
-      ) : offered.length > 0 ? (
-        <AgentBlocks agents={offered} selected={target} onSelect={onSelect} />
+      ) : agents.length > 0 ? (
+        <AgentBlocks agents={agents} selected={target} onSelect={onSelect} />
       ) : (
         <SetupAgentBox onSetup={props.onSetupAgent} />
       )}

@@ -3,9 +3,8 @@
  *
  * A connected agent is one of them (ADR-128): it carries an environment, a
  * presence and, in a development environment, an owner. A development agent
- * that belongs to another person can only be run by that person, so it is
- * kept out of the picker until the reader asks for it and is never
- * selectable.
+ * that belongs to another person can only be run by that person, so the
+ * picker draws it disabled and says why on hover.
  *
  * @see specs/features/agents/connected-agents-ui.feature
  */
@@ -14,9 +13,6 @@ import { useMemo } from "react";
 import { explainHandledError } from "~/features/errors";
 import { targetLabelOf } from "~/server/suites/target-key";
 import type { TargetValue } from "./TargetSelector";
-
-/** What the switch that reveals other people's development agents reads. */
-export const TEAMMATES_TOGGLE_LABEL = "Show teammates' development agents";
 
 /** Agent types that can be used as scenario targets */
 const SCENARIO_AGENT_TYPES: ReadonlySet<string> = new Set([
@@ -106,31 +102,6 @@ export function scenarioAgentsOf<T extends AgentLike>({
   if (!searchValue) return sorted;
   const needle = searchValue.toLowerCase();
   return sorted.filter((agent) => agent.label.toLowerCase().includes(needle));
-}
-
-/**
- * The agents the picker draws.
- *
- * A teammate's development agent is out until the toggle asks for it, and it
- * is drawn disabled when it is in, because only its owner can run it.
- */
-export function offeredAgents<T extends { isTeammateOwned?: boolean }>({
-  agents,
-  showTeammates,
-}: {
-  agents: readonly T[];
-  showTeammates: boolean;
-}): T[] {
-  return showTeammates
-    ? [...agents]
-    : agents.filter((agent) => !agent.isTeammateOwned);
-}
-
-/** True when the project holds a development agent of another person. */
-export function hasTeammateAgents(
-  agents: readonly { isTeammateOwned?: boolean }[],
-): boolean {
-  return agents.some((agent) => agent.isTeammateOwned === true);
 }
 
 /** Filter and sort agents to only valid scenario target types. */

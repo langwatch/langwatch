@@ -36,7 +36,7 @@ An environment name holds lower-case letters, digits, dashes and underscores, up
 
 A run against a teammate's personal agent is refused with `agent_owner_only`, and the message names the owner. The rule applies at every door: the run dialog, the CLI, the REST API and the MCP server.
 
-The run dialog hides teammates' personal agents behind a **Show teammates' development agents** toggle and renders them disabled, so a picker on a team of ten does not fill with rows the reader cannot run.
+The run dialog shows teammates' personal agents disabled. A tooltip on the card names the owner and says only they can run it.
 
 For a development machine the whole team runs suites against, give it its own environment name and it is shared like any other:
 

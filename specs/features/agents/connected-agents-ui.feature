@@ -167,17 +167,17 @@ Feature: Connected agents in the product
     Then the card reads "support-agent · production"
 
   @integration
-  Scenario: Teammates' development agents are hidden until the toggle is on
+  Scenario: A teammate's development agent is drawn disabled
     Given a development agent that belongs to another person
     When the run dialog is open
-    Then that agent is not offered
-    And it is offered after "Show teammates' development agents" is turned on
+    Then that agent is drawn beside the others
+    And it cannot be chosen
 
   @integration
-  Scenario: A teammate's development agent cannot be chosen
-    Given the teammates toggle is on
-    When a development agent of another person is drawn
-    Then it is disabled and says only its owner can run it
+  Scenario: A teammate's development agent says why on hover
+    Given a development agent that belongs to another person
+    When the pointer rests on its card
+    Then it says only its owner can run it, naming the owner
 
   @integration
   Scenario: The dialog warns when the chosen agent is offline

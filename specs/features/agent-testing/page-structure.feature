@@ -97,6 +97,14 @@ Feature: The Agent Testing page
     Then "Agent Testing" is on the far left again
 
   @integration
+  Scenario: A long run plan name stays on one line
+    Given the Agent Testing page is open on a run plan with a long name
+    When the header is read
+    Then the name is cut with an ellipsis rather than wrapped
+    And the full name reads on hover
+    And what the plan is still reads in full beside it
+
+  @integration
   Scenario: Each tab name carries how many rows it holds
     Given the Agent Testing page is open
     When the header is read

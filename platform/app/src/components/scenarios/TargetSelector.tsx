@@ -9,7 +9,6 @@ import {
   Workflow,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useSession } from "~/utils/auth-client";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -21,12 +20,9 @@ import {
 } from "../agents/LocalTunnelBadge";
 import {
   agentTargetLabel,
-  hasTeammateAgents,
   isAgentTarget,
-  offeredAgents,
   ownerOnlyCopy,
   type ScenarioAgent,
-  TEAMMATES_TOGGLE_LABEL,
   useFilteredAgents,
 } from "./useFilteredScenarioTargets";
 
@@ -64,7 +60,6 @@ export function TargetSelector({
 
   const { data: session } = useSession();
   const [searchValue, setSearchValue] = useState("");
-  const [showTeammates, setShowTeammates] = useState(false);
   const [open, setOpen] = useState(false);
   const [maxDropdownHeight, setMaxDropdownHeight] = useState(400);
   const [dropUp, setDropUp] = useState(false);
@@ -102,14 +97,10 @@ export function TargetSelector({
     );
   }, [prompts, searchValue]);
 
-  const allAgents = useFilteredAgents({
+  const filteredAgents = useFilteredAgents({
     agents,
     searchValue,
     viewerUserId: session?.user?.id ?? null,
-  });
-  const filteredAgents = offeredAgents({
-    agents: allAgents,
-    showTeammates,
   });
 
   // Get the selected item's label for display
@@ -260,26 +251,6 @@ export function TargetSelector({
                   />
                 ))
               )}
-              {hasTeammateAgents(allAgents) && (
-                <HStack
-                  paddingX={3}
-                  paddingY={2}
-                  borderTopWidth="1px"
-                  borderColor="border.muted"
-                  justifyContent="space-between"
-                >
-                  <Text fontSize="xs" color="fg.muted">
-                    {TEAMMATES_TOGGLE_LABEL}
-                  </Text>
-                  <Switch
-                    size="sm"
-                    checked={showTeammates}
-                    onCheckedChange={(event) => setShowTeammates(event.checked)}
-                    data-testid="target-selector-show-teammates"
-                  />
-                </HStack>
-              )}
-
               {/* Add New Agent Button */}
               <HStack
                 paddingX={3}

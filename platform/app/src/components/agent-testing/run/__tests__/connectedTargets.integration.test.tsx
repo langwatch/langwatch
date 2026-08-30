@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * Connected agents in the run dialog: the presence mark, the environment in
- * the label, the switch that reveals other people's development agents, and
+ * the label, the disabled card of another person's development agent, and
  * the warning about an agent no process is holding.
  *
  * @see specs/features/agents/connected-agents-ui.feature
@@ -112,9 +112,8 @@ describe("connected agents in the run dialog", () => {
   });
 
   describe("given a development agent that belongs to another person", () => {
-    /** @scenario "Teammates' development agents are hidden until the toggle is on" */
-    it("offers it only after the switch is turned on", async () => {
-      const user = userEvent.setup();
+    /** @scenario "A teammate's development agent is drawn disabled" */
+    it("draws it beside the others, disabled", () => {
       renderSection(
         agentsFor([
           connectedRow({ id: "agent_mine", environment: "production" }),
@@ -126,34 +125,31 @@ describe("connected agents in the run dialog", () => {
         ]),
       );
 
-      expect(screen.queryByTestId("run-dialog-agent-agent_theirs")).toBeNull();
-
-      await user.click(screen.getByTestId("run-dialog-show-teammates"));
-
-      expect(
-        screen.getByTestId("run-dialog-agent-agent_theirs"),
-      ).toBeInTheDocument();
-    });
-
-    /** @scenario "A teammate's development agent cannot be chosen" */
-    it("draws it disabled once it is offered", async () => {
-      const user = userEvent.setup();
-      renderSection(
-        agentsFor([
-          connectedRow({ id: "agent_mine", environment: "production" }),
-          connectedRow({
-            id: "agent_theirs",
-            environment: "development",
-            owner: { userId: "user_other", name: "Ana" },
-          }),
-        ]),
+      expect(screen.getByTestId("run-dialog-agent-agent_mine")).toHaveAttribute(
+        "aria-disabled",
+        "false",
       );
-
-      await user.click(screen.getByTestId("run-dialog-show-teammates"));
-
       expect(
         screen.getByTestId("run-dialog-agent-agent_theirs"),
       ).toHaveAttribute("aria-disabled", "true");
+    });
+
+    /** @scenario "A teammate's development agent says why on hover" */
+    it("says only its owner can run it on hover", async () => {
+      const user = userEvent.setup();
+      renderSection(
+        agentsFor([
+          connectedRow({
+            id: "agent_theirs",
+            environment: "development",
+            owner: { userId: "user_other", name: "Ana" },
+          }),
+        ]),
+      );
+
+      await user.hover(screen.getByTestId("run-dialog-agent-agent_theirs"));
+
+      expect(await screen.findByRole("tooltip")).toHaveTextContent("Ana");
     });
   });
 
