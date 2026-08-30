@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import type { OpsMigrationEnrollmentRecord, OpsMigrationOverview } from "@langwatch/ops-contract";
 import type {
   MigrationPassSummary,
   TenantMigrationRecord,
@@ -45,21 +46,14 @@ const logger = createLogger("langwatch:ops:system-migrations");
  * only human-driven edge) and, on cloud, the enrollment rows that pace the
  * migrations still asking to be paced.
  */
-/** One enrollment row as the ops page lists it. */
-export type MigrationEnrollmentRecord = {
-  organizationId: string;
-  /** Null when the organization has since been deleted. */
-  organizationName: string | null;
-  /** The stable name of the migration this row enrolls the organization in. */
-  migrationName: string;
-  enrolledByUserId: string;
-  /** The enroller's display name; null when it no longer resolves (the user
-   *  id above still identifies them). Never the email - the name is the one
-   *  piece of personal data the listing carries, and the read is audited
-   *  for exactly that reason. */
-  enrolledByLabel: string | null;
-  createdAt: Date;
-};
+/**
+ * One enrollment row as the ops page lists it.
+ *
+ * The shape lives in `@langwatch/ops-contract` because the transport port has
+ * to name it — declaring it only here is what left that port saying
+ * `Promise<unknown>` and the page reading fields off `unknown`.
+ */
+export type MigrationEnrollmentRecord = OpsMigrationEnrollmentRecord;
 
 /**
  * The enrollment store the ops actions write through. Uniqueness refusals
@@ -119,46 +113,14 @@ export interface SystemMigrationStateReader {
 /** How many attention rows one migration lists before the page truncates. */
 const ATTENTION_LIMIT = 50;
 
-export type MigrationOverview = {
-  name: string;
-  /** The name operators read; presentation over the stable `name`. */
-  title: string;
-  /** What the migration does for an organization, in the operator's language. */
-  description: string;
-  /**
-   * Whether acting on this migration takes the typed destructive
-   * confirmation, so the page asks for it exactly where the server requires
-   * it rather than deciding for itself which migration is dangerous.
-   */
-  requiresOperatorConfirmation: boolean;
-  /**
-   * False only on self-hosted, for a migration whose
-   * `runsAutomaticallyOnSelfHosted` declaration has not been released yet:
-   * the runner never drives it here, so its empty counts are a normal
-   * waiting state rather than something needing attention. Cloud runs every
-   * registered migration, so this is always true there.
-   */
-  availableOnThisInstallation: boolean;
-  /**
-   * Whether every organization is in this migration's cohort with no
-   * operator action. The page says so instead of offering enrollment it
-   * would be lying about.
-   */
-  enrolledAutomatically: boolean;
-  counts: Record<TenantMigrationStatus, number>;
-  /**
-   * The rollout gauge: how many organizations are enrolled for this
-   * migration, and how many are not. Null when there is nothing to enroll -
-   * off cloud, where enrollment does not exist, and for a migration that
-   * admits every organization automatically, where the count would describe
-   * rows that decide nothing. Enrollment only - an organization counts as
-   * not enrolled whether or not its prerequisites have finalized, because
-   * enrolling early is legitimate (the migration waits), so this must never
-   * be read as "ready to run".
-   */
-  enrollment: { enrolledCount: number; notEnrolledCount: number } | null;
-  attention: Array<TenantMigrationRecord & { updatedAt: Date }>;
-};
+/**
+ * One migration as the operator dashboard lists it.
+ *
+ * Declared in `@langwatch/ops-contract` for the same reason as
+ * {@link MigrationEnrollmentRecord}: the transport port returns it, and a port
+ * that cannot name its answer publishes `unknown` to the browser.
+ */
+export type MigrationOverview = OpsMigrationOverview;
 
 /**
  * A uniform sample without replacement: Fisher-Yates over a copy, first

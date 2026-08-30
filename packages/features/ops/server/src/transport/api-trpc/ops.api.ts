@@ -64,6 +64,11 @@ import {
   opsRunSystemMigrationForOrganizationInputSchema,
   opsScheduleIdInputSchema,
   opsSearchAggregatesInputSchema,
+  type OpsMigrationCohortResult,
+  type OpsMigrationEnrollmentListing,
+  type OpsMigrationOrganizationMatch,
+  type OpsMigrationOverview,
+  type OpsMigrationTargetedRunResult,
   opsSearchMigrationOrganizationsInputSchema,
   opsSearchTenantsInputSchema,
   opsSetFeatureFlagInputSchema,
@@ -156,32 +161,36 @@ export type OpsTrpcPorts = Readonly<{
   } | null;
   /** The in-place system-migrations runner and its read model. */
   systemMigrations: {
-    getOverview(): Promise<unknown>;
-    getEnrollments(input: { requestedBy: string }): Promise<unknown>;
-    searchOrganizations(input: { query: string }): Promise<unknown>;
+    // Named types, not `unknown`. A tRPC procedure publishes what its handler
+    // returns, so an `unknown` here is what the browser gets: the migrations
+    // page was reading `data?.isSaaS` off `{}` and every row field off
+    // `unknown`. The process's service has always answered these shapes.
+    getOverview(): Promise<OpsMigrationOverview[]>;
+    getEnrollments(input: { requestedBy: string }): Promise<OpsMigrationEnrollmentListing>;
+    searchOrganizations(input: { query: string }): Promise<OpsMigrationOrganizationMatch[]>;
     requiresOperatorConfirmation(input: { migrationName: string }): boolean;
     enroll(input: {
       organizationId: string;
       migrationName: string;
       actorUserId: string;
-    }): Promise<unknown>;
+    }): Promise<void>;
     enrollCohort(input: {
       migrationName: string;
       sampleSize: number;
       actorUserId: string;
       includeEnterprise: boolean;
       includePrivateDataplane: boolean;
-    }): Promise<unknown>;
+    }): Promise<OpsMigrationCohortResult>;
     withdraw(input: {
       organizationId: string;
       migrationName: string;
       actorUserId: string;
-    }): Promise<unknown>;
+    }): Promise<void>;
     runForOrganization(input: {
       organizationId: string;
       migrationName: string;
       actorUserId: string;
-    }): Promise<unknown>;
+    }): Promise<OpsMigrationTargetedRunResult>;
     startPass(): void;
     assertLegacyWritersDrained(input: {
       migrationName: string;
@@ -205,10 +214,7 @@ export type OpsTrpcPorts = Readonly<{
  * the transport reading its caller. A confirmation dialog in the ops UI is not
  * the guard — every one of these procedures is callable directly.
  */
-function requireDestructiveOpsAuth(
-  ctx: OpsTrpcContext,
-  confirm: string | undefined,
-): void {
+function requireDestructiveOpsAuth(ctx: OpsTrpcContext, confirm: string | undefined): void {
   ctx.app.ops.requireDestructiveOperator(ctx.session?.user ?? null, confirm);
 }
 
