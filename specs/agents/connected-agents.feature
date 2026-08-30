@@ -37,6 +37,14 @@ Feature: Connected agents
     When a process registers the same identity again
     Then the row is listed again
 
+  # An agent has no manual way back, so a delete means "hidden until the
+  # process connects again" rather than gone.
+  @integration
+  Scenario: A reconnect of an archived identity restores the row
+    Given a connected agent row that was archived by hand
+    When a process registers the same identity again
+    Then the same row is active again
+
   @unit
   Scenario: The environment is sanitized before it becomes part of the identity
     Given a register frame naming the environment "Prod-EU 1"

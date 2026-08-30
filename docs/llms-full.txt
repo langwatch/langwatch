@@ -36969,7 +36969,7 @@ Every target of the run must be online when the run starts. A run naming an offl
 
 A connected process holds one outbound connection and answers a keepalive. It receives work only while a run is executing, so an environment that runs no suites costs one idle connection.
 
-An agent not seen for 30 days no longer appears in the list. It comes back when the process connects again, with the same row and its history.
+An agent not seen for 30 days no longer appears in the list. It comes back when the process connects again, with the same row and its history. Deleting an agent also hides it only until the process connects again.
 
 ## Turning the connection off
 

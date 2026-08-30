@@ -128,6 +128,38 @@ describe("connected agent rows", () => {
     });
   });
 
+  describe("when an identity archived by hand registers again", () => {
+    /** @scenario "A reconnect of an archived identity restores the row" */
+    it("restores the same row", async () => {
+      const archivedIdentity = {
+        ...identity,
+        identityKey: `archived-agent@staging-${nanoid(4)}`,
+        environment: "staging",
+      };
+      const created = await service.registerConnected({
+        id: `agent_${nanoid()}`,
+        projectId,
+        name: "archived-agent",
+        config,
+        identity: archivedIdentity,
+      });
+      await service.archiveAgent({ id: created.id, projectId });
+
+      const restored = await service.registerConnected({
+        id: `agent_${nanoid()}`,
+        projectId,
+        name: "archived-agent",
+        config,
+        identity: archivedIdentity,
+      });
+
+      expect(restored.id).toBe(created.id);
+      expect(restored.archivedAt).toBeNull();
+      const listed = await service.getAll({ projectId });
+      expect(listed.map((agent) => agent.id)).toContain(created.id);
+    });
+  });
+
   describe("when one agent was seen thirty one days ago and one yesterday", () => {
     /** @scenario "A connected agent unseen for thirty days is not listed" */
     it("lists only the agent seen yesterday", async () => {

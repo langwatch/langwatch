@@ -347,8 +347,9 @@ export class AgentRepository {
   /**
    * Re-registers a connected agent on its existing row: the name and the
    * config the SDK sent now, and the presence projection fresh. A row unseen
-   * for too long is listed again because `lastSeenAt` moved, not because a
-   * flag was cleared.
+   * for too long is listed again because `lastSeenAt` moved. A row archived
+   * by hand is restored, because an agent has no manual way back and a
+   * delete means "hidden until the process connects again".
    */
   async reregisterConnected(input: {
     id: string;
@@ -362,6 +363,7 @@ export class AgentRepository {
       data: {
         name: input.name,
         config: validatedConfig as unknown as Prisma.InputJsonValue,
+        archivedAt: null,
         lastSeenAt: new Date(),
       },
     });

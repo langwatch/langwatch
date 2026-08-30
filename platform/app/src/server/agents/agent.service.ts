@@ -222,7 +222,8 @@ export class AgentService {
   /**
    * Creates or re-registers a connected agent on the row its identity key
    * names. The re-register writes `lastSeenAt`, so a row unseen for too long
-   * is listed again.
+   * is listed again, and it clears `archivedAt`, so a row deleted by hand
+   * comes back when the process connects again.
    */
   async registerConnected(input: {
     id: string;
