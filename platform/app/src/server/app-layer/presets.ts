@@ -36,6 +36,7 @@ import {
 } from "@langwatch/enterprise-licensing-contract";
 import { EntitlementService } from "@langwatch/entitlement-server";
 import { resolveGatewayBaseUrl } from "@langwatch/ui/public-config/projection";
+import { PostgresNotificationAdapter } from "@langwatch/notification-server";
 import {
   BillableEventsQueryService,
   ClickHouseBillableEventsMeterAdapter,
@@ -2741,7 +2742,12 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     errorReporter: billingErrorReporter,
     usageLimitEmail: AppUsageLimitEmailAdapter.create(mailer),
   });
-  const notificationRecords = billingPersistence.notifications;
+  // Composed here rather than taken off billing's persistence: notification
+  // records belong to the Notification feature, and one feature building
+  // another's Postgres adapter is what `cross-feature` refuses.
+  const notificationRecords = PostgresNotificationAdapter.create({
+    database: prisma,
+  }).build();
   const usageLimits = UsageLimitService.create({
     notificationRecords,
     organizationService: organizations,

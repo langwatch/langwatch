@@ -187,6 +187,7 @@
     "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/monitor-server": "workspace:*",
     "@langwatch/notification-contract": "workspace:*",
+    "@langwatch/notification-server": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/ops-server": "workspace:*",
