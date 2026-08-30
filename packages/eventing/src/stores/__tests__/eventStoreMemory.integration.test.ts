@@ -37,7 +37,12 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
         aggregateId,
       });
 
-      expect(loaded).toEqual(event);
+      // Not `toEqual(event)`: the store does not promise an identical
+      // round-trip. `eventStoreUtils` writes `IdempotencyKey: event
+      // .idempotencyKey || event.id`, so an event stored without one comes
+      // back carrying its own id as the key — which is what makes every
+      // event dedupable by a single field rather than only the legacy ones.
+      expect(loaded).toEqual({ ...event, idempotencyKey: event.id });
     });
 
     it("does not load an event from another tenant with the same immutable id", async () => {

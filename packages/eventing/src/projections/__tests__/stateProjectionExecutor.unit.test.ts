@@ -6,11 +6,7 @@ import type {
   StateProjectionStore,
   StoredProjection,
 } from "../stateProjection.types";
-import {
-  compareCursors,
-  orderEvents,
-  StateProjectionExecutor,
-} from "../stateProjectionExecutor";
+import { compareCursors, orderEvents, StateProjectionExecutor } from "../stateProjectionExecutor";
 
 interface CounterState {
   count: number;
@@ -43,7 +39,7 @@ function event({
 function setup(initial: StoredProjection<CounterState> | null = null) {
   let stored = initial;
   const store: StateProjectionStore<CounterState> = {
-    load: vi.fn(async () => stored),
+    tryLoad: vi.fn(async () => stored),
     store: vi.fn(async (projection) => {
       stored = projection;
     }),
@@ -126,21 +122,13 @@ describe("StateProjectionExecutor", () => {
     // ICU collation ("Z".localeCompare("a") > 0) inverts that at the Z -> a
     // step, so cursor comparison must stay ordinal — it also has to agree
     // with ClickHouse, which orders String columns by bytes.
-    const boundaryIds = [
-      "event_0001aaaY",
-      "event_0001aaaZ",
-      "event_0001aaaa",
-      "event_0001aaab",
-    ];
+    const boundaryIds = ["event_0001aaaY", "event_0001aaaZ", "event_0001aaaa", "event_0001aaab"];
 
     describe("when the batch is ordered", () => {
       it("keeps byte order across the boundary", () => {
-        const shuffled = [
-          boundaryIds[2]!,
-          boundaryIds[0]!,
-          boundaryIds[3]!,
-          boundaryIds[1]!,
-        ].map((id) => event({ id, acceptedAt: 200, occurredAt: 100 }));
+        const shuffled = [boundaryIds[2]!, boundaryIds[0]!, boundaryIds[3]!, boundaryIds[1]!].map(
+          (id) => event({ id, acceptedAt: 200, occurredAt: 100 }),
+        );
 
         expect(orderEvents(shuffled).map((entry) => entry.id)).toEqual(boundaryIds);
       });
@@ -182,10 +170,7 @@ describe("StateProjectionExecutor", () => {
           context,
         });
 
-        expect(apply.mock.calls.map((call) => call[1].id)).toEqual([
-          "event-a",
-          "event-b",
-        ]);
+        expect(apply.mock.calls.map((call) => call[1].id)).toEqual(["event-a", "event-b"]);
         expect(store.store).toHaveBeenCalledWith(
           expect.objectContaining({
             state: { count: 3 },

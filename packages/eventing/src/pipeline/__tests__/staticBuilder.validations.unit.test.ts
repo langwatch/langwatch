@@ -29,7 +29,7 @@ function createMockStateProjectionDefinition<E extends Event>(
     init: () => ({}),
     apply: (state) => state,
     store: {
-      load: vi.fn().mockResolvedValue(null),
+      tryLoad: vi.fn().mockResolvedValue(null),
       store: vi.fn().mockResolvedValue(undefined),
     },
   };

@@ -90,15 +90,19 @@ export interface EventSourcingServiceOptions<
   }>;
   /**
    * Subscribers (post-fold side-effect handlers) for this pipeline.
+   *
+   * `ReadonlyArray` because the service only reads it — `length` and one
+   * `for…of` — and a caller assembling its list with `as const` should not
+   * have to widen it back to satisfy a parameter nothing writes to.
    */
-  foldSubscribers?: Array<{
+  foldSubscribers?: ReadonlyArray<{
     foldName: string;
     definition: SubscriberDispatchDefinition<EventType>;
   }>;
   /**
    * Subscribers (post-map side-effect handlers) for this pipeline.
    */
-  mapSubscribers?: Array<{
+  mapSubscribers?: ReadonlyArray<{
     mapName: string;
     definition: SubscriberDispatchDefinition<EventType>;
   }>;

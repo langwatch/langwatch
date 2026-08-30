@@ -34,7 +34,7 @@ function stateProjectionOf({
     init: () => ({ count: 0 }),
     apply: (state) => state,
     store: {
-      load: async () => null,
+      tryLoad: async () => null,
       store: async () => undefined,
     },
     ...(coalesceMaxBatch === undefined ? {} : { options: { coalesceMaxBatch } }),
@@ -52,9 +52,7 @@ describe("state projection coalescing wiring", () => {
         TEST_CONSTANTS.PIPELINE_NAME,
         queueManager as never,
       );
-      router.registerStateProjection(
-        stateProjectionOf({ name: "batched", coalesceMaxBatch: 500 }),
-      );
+      router.registerStateProjection(stateProjectionOf({ name: "batched", coalesceMaxBatch: 500 }));
 
       router.initializeStateProjectionQueues();
 
@@ -73,9 +71,7 @@ describe("state projection coalescing wiring", () => {
         TEST_CONSTANTS.PIPELINE_NAME,
         queueManager as never,
       );
-      router.registerStateProjection(
-        stateProjectionOf({ name: "batched", coalesceMaxBatch: 500 }),
-      );
+      router.registerStateProjection(stateProjectionOf({ name: "batched", coalesceMaxBatch: 500 }));
 
       router.initializeStateProjectionQueues();
 
@@ -110,15 +106,11 @@ describe("state projection coalescing wiring", () => {
         async () => undefined,
       );
 
-      const batched = registry.get(
-        `${TEST_CONSTANTS.PIPELINE_NAME}:stateProjection:batched`,
-      );
+      const batched = registry.get(`${TEST_CONSTANTS.PIPELINE_NAME}:stateProjection:batched`);
       expect(batched?.coalesceMaxBatch).toBe(500);
       expect(batched?.processBatch).toBeDefined();
 
-      const single = registry.get(
-        `${TEST_CONSTANTS.PIPELINE_NAME}:stateProjection:oneAtATime`,
-      );
+      const single = registry.get(`${TEST_CONSTANTS.PIPELINE_NAME}:stateProjection:oneAtATime`);
       expect(single?.processBatch).toBeUndefined();
     });
   });

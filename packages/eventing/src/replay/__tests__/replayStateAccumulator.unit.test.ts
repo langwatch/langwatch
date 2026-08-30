@@ -39,7 +39,7 @@ function spyStore(seed?: StoredProjection<CounterState>) {
     context: ProjectionStoreContext;
   }> = [];
   const store: StateProjectionStore<CounterState> = {
-    load: vi.fn(async () => seed ?? null),
+    tryLoad: vi.fn(async () => seed ?? null),
     store: vi.fn(async (projection, context) => {
       writes.push({ projection, context });
     }),
@@ -50,10 +50,7 @@ function spyStore(seed?: StoredProjection<CounterState>) {
 function projection(
   store: StateProjectionStore<CounterState>,
   overrides?: Partial<
-    Pick<
-      StateProjectionDefinition<CounterState, CounterEvent>,
-      "eventTypes" | "key" | "version"
-    >
+    Pick<StateProjectionDefinition<CounterState, CounterEvent>, "eventTypes" | "key" | "version">
   >,
 ): StateProjectionDefinition<CounterState, CounterEvent> {
   return {
@@ -94,7 +91,7 @@ function makeEvent(overrides: CounterEventOverrides = {}): CounterEvent {
 
 describe("StateAccumulator", () => {
   describe("given a rebuild from the canonical log", () => {
-    it("never calls store.load — it rebuilds from init(), it does not merge", async () => {
+    it("never calls store.tryLoad — it rebuilds from init(), it does not merge", async () => {
       const { store, writes } = spyStore({
         // A pre-existing row that MUST be ignored by a rebuild.
         state: { count: 999, amounts: [999] },
@@ -110,7 +107,7 @@ describe("StateAccumulator", () => {
       acc.apply(makeEvent({ data: { amount: 3 } }));
       await acc.flush();
 
-      expect(store.load).not.toHaveBeenCalled();
+      expect(store.tryLoad).not.toHaveBeenCalled();
       expect(writes).toHaveLength(1);
       // From init(), not merged onto the seed's 999.
       expect(writes[0]!.projection.state).toEqual({
@@ -257,9 +254,7 @@ describe("StateAccumulator", () => {
   describe("given events the projection does not declare or has already seen", () => {
     it("skips non-matching event types without folding them", async () => {
       const { store, writes } = spyStore();
-      const acc = new StateAccumulator(
-        projection(store, { eventTypes: [MATCHING_EVENT_TYPE] }),
-      );
+      const acc = new StateAccumulator(projection(store, { eventTypes: [MATCHING_EVENT_TYPE] }));
 
       acc.apply(makeEvent({ type: MATCHING_EVENT_TYPE, data: { amount: 1 } }));
       acc.apply(makeEvent({ type: OTHER_EVENT_TYPE, data: { amount: 100 } }));
@@ -327,9 +322,7 @@ describe("StateAccumulator", () => {
   describe("given no matching events", () => {
     it("writes nothing", async () => {
       const { store, writes } = spyStore();
-      const acc = new StateAccumulator(
-        projection(store, { eventTypes: [MATCHING_EVENT_TYPE] }),
-      );
+      const acc = new StateAccumulator(projection(store, { eventTypes: [MATCHING_EVENT_TYPE] }));
       acc.apply(makeEvent({ type: OTHER_EVENT_TYPE }));
       await acc.flush();
 

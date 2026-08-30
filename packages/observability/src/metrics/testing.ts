@@ -43,6 +43,12 @@ export interface RecordingMeterProvider {
   valueOf(instrument: string, attributes?: Attributes): number;
   /** Every value written to `instrument`, in order. */
   valuesOf(instrument: string, attributes?: Attributes): number[];
+  /**
+   * The description the instrument was declared with, or `undefined` if it
+   * was never created. Some descriptions carry operational instructions —
+   * how to aggregate a per-pod global, say — and those are worth pinning.
+   */
+  descriptionOf(instrument: string): string | undefined;
 }
 
 function matches(recorded: Attributes, expected: Attributes | undefined): boolean {
@@ -52,20 +58,25 @@ function matches(recorded: Attributes, expected: Attributes | undefined): boolea
 
 export function createRecordingMeterProvider(): RecordingMeterProvider {
   const recorded: RecordedMetric[] = [];
+  const descriptions = new Map<string, string | undefined>();
   const observables: Array<{
     instrument: string;
     callback: (result: { observe: (value: number, attributes?: Attributes) => void }) => unknown;
   }> = [];
 
-  const writer = (instrument: string) => {
+  const writer = (instrument: string, options?: { description?: string }) => {
+    descriptions.set(instrument, options?.description);
     const push = (value: number, attributes?: Attributes) => {
       recorded.push({ instrument, value, attributes: attributes ?? {} });
     };
     return { add: push, record: push };
   };
 
-  const observable = (instrument: string) => ({
-    addCallback: (callback: (result: { observe: (v: number, a?: Attributes) => void }) => unknown) => {
+  const observable = (instrument: string, options?: { description?: string }) => ({
+    addCallback: (
+      callback: (result: { observe: (v: number, a?: Attributes) => void }) => unknown,
+    ) => {
+      descriptions.set(instrument, options?.description);
       observables.push({ instrument, callback });
     },
     removeCallback: () => void 0,
@@ -117,6 +128,9 @@ export function createRecordingMeterProvider(): RecordingMeterProvider {
     },
     valuesOf(instrument, attributes) {
       return select(instrument, attributes).map((r) => r.value);
+    },
+    descriptionOf(instrument) {
+      return descriptions.get(instrument);
     },
   };
 }
