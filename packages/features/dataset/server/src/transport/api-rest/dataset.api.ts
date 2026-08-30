@@ -35,9 +35,12 @@ import {
   datasetConfirmColumnsSchema,
   type DatasetColumns,
   type DatasetConfirmColumns,
-  type DatasetNotReadyError,
-  UploadValidationError,
 } from "@langwatch/dataset-contract";
+// The server's class, not the contract's same-named one: the upload adapter
+// throws this one, and `instanceof` against the contract's is always false —
+// which sent every column-mismatch and over-size upload to the customer as a
+// 500 instead of the 400 the branches below build.
+import { type DatasetNotReadyError, UploadValidationError } from "../../services/errors";
 import type { Context } from "hono";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
@@ -685,16 +688,14 @@ export function createDatasetRestApp(options: {
       "json",
       z
         .object({
-          entries: z
-            .array(z.record(z.string(), z.any()))
-            .meta({
-              example: [
-                {
-                  input: "hi",
-                  output: "Hello, how can I help you today?",
-                },
-              ],
-            }),
+          entries: z.array(z.record(z.string(), z.any())).meta({
+            example: [
+              {
+                input: "hi",
+                output: "Hello, how can I help you today?",
+              },
+            ],
+          }),
         })
         .meta({ id: "DatasetPostEntries" }),
     ),

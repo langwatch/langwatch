@@ -18,14 +18,19 @@
  * Spec: packages/features/dataset/specs/dataset-service.feature.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import { newDatasetEntriesSchema } from "@langwatch/dataset-contract";
+// From the server's own error module, not the contract's. Both declare classes
+// with these names; only these are ever thrown — the storage adapters raise
+// `ChunkTooLargeError({ byteSize, maxBytes })`, and `instanceof` against the
+// contract's same-named class is always false, so every one of these mappings
+// used to fall through to a 500.
 import {
   ChunkTooLargeError,
   DatasetNotFoundError,
   DatasetNotReadyError,
   DatasetTooLargeToExportError,
   DuplicateRecordIdError,
-  newDatasetEntriesSchema,
-} from "@langwatch/dataset-contract";
+} from "../../services/errors";
 import {
   TRPCError,
   type AnyTRPCRootTypes,

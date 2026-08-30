@@ -13,17 +13,22 @@
  * file injects, and a policy composed ahead of `.input()` receives
  * `input === undefined` while all three still report green.
  */
+import type { DatasetService } from "@langwatch/dataset-contract";
 import {
   ChunkTooLargeError,
   DatasetNotFoundError,
   DatasetNotReadyError,
   DatasetTooLargeToExportError,
   DuplicateRecordIdError,
-  type DatasetService,
-} from "@langwatch/dataset-contract";
+} from "../../services/errors";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  ChunkTooLargeError as ServerChunkTooLargeError,
+  DatasetNotReadyError as ServerDatasetNotReadyError,
+  DuplicateRecordIdError as ServerDuplicateRecordIdError,
+} from "../../services/errors";
 import { DatasetRecordTrpcApi } from "../../transport/api-trpc/dataset-record.api";
 import { DatasetApp } from "../dataset.app";
 
@@ -169,7 +174,7 @@ describe("DatasetRecordTrpcApi", () => {
     it("maps an over-cap export to PAYLOAD_TOO_LARGE", async () => {
       const { caller } = harness({
         getDatasetWithRecords: () => {
-          throw new DatasetTooLargeToExportError("too large");
+          throw new DatasetTooLargeToExportError({ sizeBytes: 2, maxBytes: 1 });
         },
       });
 
@@ -181,7 +186,7 @@ describe("DatasetRecordTrpcApi", () => {
     it("maps an over-cap cell edit to BAD_REQUEST", async () => {
       const { caller } = harness({
         upsertRecord: () => {
-          throw new ChunkTooLargeError("chunk too large");
+          throw new ChunkTooLargeError({ byteSize: 2, maxBytes: 1 });
         },
       });
 
@@ -193,7 +198,7 @@ describe("DatasetRecordTrpcApi", () => {
     it("maps a duplicate caller-supplied row id to CONFLICT", async () => {
       const { caller } = harness({
         batchCreateRecords: () => {
-          throw new DuplicateRecordIdError("duplicate id");
+          throw new DuplicateRecordIdError("record-1");
         },
       });
 

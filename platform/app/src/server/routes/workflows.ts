@@ -24,7 +24,9 @@ import { createServiceApp } from "~/server/api/security";
 import { handlerManagedAuth, validator as zValidator } from "@langwatch/platform-api/app-rest";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
-import { DatasetNotReadyError } from "@langwatch/dataset-contract";
+// The server's class: every dataset read path throws that one, and the
+// contract declares a same-named class an `instanceof` here can never match.
+import { DatasetNotReadyError } from "@langwatch/dataset-server";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 

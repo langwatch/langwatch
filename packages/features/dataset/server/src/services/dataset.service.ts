@@ -1,8 +1,5 @@
 import { nanoid } from "nanoid";
 import {
-  DatasetConflictError,
-  DatasetNotFoundError,
-  DatasetNotReadyError,
   DatasetRecordNotFoundError,
   DatasetService as DatasetServiceContract,
   copyDatasetInputSchema,
@@ -47,6 +44,7 @@ import type {
   DatasetUploadPort,
   DatasetContentPort,
 } from "../ports/dataset.port";
+import { DatasetConflictError, DatasetNotFoundError, DatasetNotReadyError } from "./errors";
 import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
 import type { DatasetRepository, DatasetUpdateInput } from "../repositories/dataset.repository";
 import type { DatasetRecordRepository } from "../repositories/dataset-record.repository";
@@ -606,7 +604,7 @@ export class DatasetService extends DatasetServiceContract {
 
   private assertReady(dataset: Dataset): void {
     if (dataset.status !== "ready") {
-      throw new DatasetNotReadyError();
+      throw new DatasetNotReadyError({ status: dataset.status });
     }
   }
 
