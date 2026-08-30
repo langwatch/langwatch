@@ -70,6 +70,8 @@ export const CommandBarResults = forwardRef<HTMLDivElement, CommandBarResultsPro
     },
     ref,
   ) {
+    const topLevelNavigation = useTopLevelNavigationCommands();
+
     // Build group configurations for empty query state
     const emptyQueryGroups = useMemo<GroupConfig[]>(
       () => [
@@ -82,13 +84,13 @@ export const CommandBarResults = forwardRef<HTMLDivElement, CommandBarResultsPro
         },
         {
           label: "Navigation",
-          items: topLevelNavigationCommands.map((d) => ({
+          items: topLevelNavigation.map((d) => ({
             type: "command" as const,
             data: d,
           })),
         },
       ],
-      [recentItemsLimited],
+      [recentItemsLimited, topLevelNavigation],
     );
 
     // Build group configurations for query state
@@ -253,9 +255,7 @@ export const CommandBarResults = forwardRef<HTMLDivElement, CommandBarResultsPro
         maxHeight={COMMAND_BAR_MAX_HEIGHT}
         overflowY="auto"
         paddingBottom={2.5}
-        {...(showTopDivider
-          ? { borderTop: "1px solid", borderColor: "border.subtle" }
-          : {})}
+        {...(showTopDivider ? { borderTop: "1px solid", borderColor: "border.subtle" } : {})}
       >
         <VStack align="stretch" gap={0}>
           {renderGroups()}
