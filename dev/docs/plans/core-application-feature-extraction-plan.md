@@ -555,6 +555,37 @@ sweep hangs on them. Note also that both suites drive real Claude Code agents
 through `it.skipIf(isCI)` scenarios with a one-hour `testTimeout`: they are
 meant to be run deliberately, not swept.
 
+`F-LAYOUT-01` — **`feature-source-layout`'s 213 violations are three different
+problems, and none of the three is mechanical cleanup.** The count is the second
+largest in the lint and had been carried as one undifferentiated number, which
+makes it look like a rename sweep. Measured 2026-08-30:
+
+- **110 use a role the grammar does not have.** `SERVER_PATTERNS` admits
+  `service`, `port`, `repository`, `store`, `projection`, `subscriber`,
+  `process`, `intent`, `adapter`, `api`, `mapper`, `migration`, `app` and
+  `fixture` — and nothing else. The code uses more: `rules` (50, Trace's
+  canonicalisation predicates), `canonicaliser` (16, one per SDK vendor), then a
+  long tail of 44 one-offs (`schemas`, `bag`, `openapi`, `trpc-context`,
+  `codec`, `registry`, `policy`…). Renaming a per-vendor canonicaliser to
+  `.service.ts` would satisfy the rule and lose the distinction that makes the
+  directory readable, so this is a question about the grammar, not about the
+  files: either it grows the two roles that are clearly vocabularies, or the
+  code gives them up deliberately.
+- **72 carry no role at all**, sitting in ad-hoc subdirectories —
+  `identity/server/src/better-auth/`, `crypto/`, `analytics` (17), `langy` (12),
+  `dataset` (8). This is genuine mid-move debt and belongs to whichever wave
+  finishes each package; identity's 29 sit under its own ADR-115 restructure.
+- **31 have the right role in the wrong place**, which looks mechanical and is
+  not. Moving `stored-object/server/src/api/public/stored-object.api.ts` to
+  `transport/` collides with an existing `transport/api-rest/stored-object.api.ts`
+  — different files, same name, because `api/public/` holds a public API class
+  (122 lines) and `transport/api-rest/` holds route definitions (441). The
+  grammar has one `api` role for both. `specs/stored-objects.feature:23` also
+  pins the current path by name, so the move is a spec change too.
+
+Do not sweep this cluster. The 31 are the only ones worth attempting file by
+file, and each needs its collision checked first.
+
 `F-TRPC-01` — **a moved vertical needs `@trpc/server` in its own manifest.**
 `packages/features/model-provider/server` could not resolve it, which produces
 around forty `TS7031 implicitly any` errors downstream rather than one honest
