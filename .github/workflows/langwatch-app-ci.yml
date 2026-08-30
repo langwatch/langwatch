@@ -628,6 +628,29 @@ jobs:
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/enterprise-webhook-server run test
 
+      # The six enterprise contract packages whose suites `vitest` could not
+      # even discover until `packages/enterprise/vitest.config.ts` learned the
+      # `src/__tests__/` layout their tests moved to. 155 tests, all green the
+      # first time they ran; naming them keeps them that way.
+      - name: Run @langwatch/enterprise-billing-contract tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/enterprise-billing-contract run test
+      - name: Run @langwatch/enterprise-licensing-contract tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/enterprise-licensing-contract run test
+      - name: Run @langwatch/enterprise-managed-provider-contract tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/enterprise-managed-provider-contract run test
+      - name: Run @langwatch/enterprise-saas-contract tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/enterprise-saas-contract run test
+      - name: Run @langwatch/enterprise-scim-contract tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/enterprise-scim-contract run test
+      - name: Run @langwatch/enterprise-sso-contract tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/enterprise-sso-contract run test
+
       # @langwatch/langyworker is the langy-worker pi-harness wrapper
       # (services/langyworker) the langyagent image compiles into the worker
       # binary. It sits outside platform/app, so the root typecheck and the
