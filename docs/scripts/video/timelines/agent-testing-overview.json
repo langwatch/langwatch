@@ -1,0 +1,45 @@
+{
+  "input": "../../../../.claude/tmp/video/raw3/page@cebffb4956154281fff14ad371fcba5a.webm",
+  "output": "../../../media/videos/agent-testing-overview.webm",
+  "fps": 30,
+  "page": { "width": 1440, "height": 900 },
+  "quality": { "crf": 38, "cpuUsed": 2 },
+
+  "cut": {
+    "speed": 2,
+    "segments": [
+      [17.2, 29.6],
+      [31.6, 39.2],
+      [152.5, 156.2],
+      [158.8, 164.0],
+      [168.5, 174.0],
+      [417.2, 425.0],
+      [427.5, 434.0],
+      [498.5, 506.3],
+      [508.2, 517.4]
+    ]
+  },
+
+  "cursor": {
+    "size": 64,
+    "start": { "x": 308, "y": 264 }
+  },
+  "zoom": { "default": 1.45, "lead": 0.16, "in": 0.62, "out": 0.8, "hold": 0.8 },
+
+  "beats": [
+    { "t": 0.945, "x": 308, "y": 196, "zoom": 1, "note": "open the Refunds suite" },
+    { "t": 2.095, "x": 598, "y": 272, "zoom": 1.45, "hold": 0.35, "note": "open the scenario" },
+    { "t": 5.615, "x": 1407, "y": 33, "zoom": 1, "note": "close the editor" },
+    { "t": 6.265, "x": 1361, "y": 137, "zoom": 1, "note": "Run suite" },
+    { "t": 6.9, "x": 909, "y": 439, "zoomAt": { "x": 720, "y": 445 }, "zoom": 1.5, "hold": 1.35, "note": "pick the target" },
+    { "t": 9.88, "x": 932, "y": 650, "zoom": 1, "note": "Run 3 scenarios" },
+    { "t": 11.045, "x": 790, "y": 219, "zoomAt": { "x": 960, "y": 280 }, "zoom": 1.55, "hold": 0.7, "note": "open the first run" },
+    { "t": 13.2, "x": 640, "y": 600, "zoom": 1, "click": false, "note": "follow the conversation" },
+    { "t": 18.05, "x": 1160, "y": 200, "zoomAt": { "x": 1190, "y": 366 }, "zoom": 1.4, "hold": 1.15, "click": false, "note": "the verdict" },
+    { "t": 20.05, "x": 1407, "y": 33, "zoom": 1, "note": "close the drawer" },
+    { "t": 24.15, "x": 883, "y": 81, "zoom": 1, "note": "Results" },
+    { "t": 28.15, "x": 396, "y": 490, "zoom": 1.4, "hold": 0.4, "note": "open the comparison" },
+    { "t": 30.6, "x": 760, "y": 620, "zoom": 1, "click": false, "note": "read the table" },
+    { "t": 32.2, "hide": true }
+  ]
+}
