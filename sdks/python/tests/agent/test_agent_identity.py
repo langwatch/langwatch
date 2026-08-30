@@ -169,6 +169,23 @@ def test_a_loopback_endpoint_stays_allowed():
     assert http_url("http://app.langwatch.localhost").startswith(
         "http://app.langwatch.localhost"
     )
+    # Userinfo and a port belong to the netloc, not to the host, so the parsed
+    # hostname is what decides. A loopback host with userinfo stays allowed.
+    assert socket_url("http://user@localhost:5560").startswith("ws://")
+
+
+# @scenario "The API key never travels over a cleartext connection"
+def test_a_host_that_only_looks_like_loopback_is_refused():
+    # `localhost` in the userinfo, the path or the query does not make the
+    # connection local, and a substring test would have read all three as one.
+    for endpoint in (
+        "http://localhost@evil.example",
+        "http://evil.example/localhost",
+        "http://evil.example/?host=localhost",
+        "http://notlocalhost",
+    ):
+        with pytest.raises(ValueError, match="https"):
+            http_url(endpoint)
 
 
 # @scenario "The connection carries the API key and the SDK version"

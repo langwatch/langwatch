@@ -105,9 +105,15 @@ def resolve_transport(explicit: str | None = None) -> str:
 _LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]"})
 
 
-def _is_loopback(host: str) -> bool:
-    """Whether a host never leaves the machine the process runs on."""
-    name = host.split(":")[0].strip().lower()
+def _is_loopback(hostname: str) -> bool:
+    """Whether a host never leaves the machine the process runs on.
+
+    Takes the parsed hostname, never the raw URL or `netloc`: those carry the
+    userinfo and the port, so a substring test on them reads
+    `evil.com@localhost` and `localhost@evil.com` the same way.
+    `.localhost` is reserved to loopback by RFC 6761.
+    """
+    name = hostname.strip().lower()
     return name in _LOOPBACK_HOSTS or name.endswith(".localhost")
 
 
@@ -126,7 +132,7 @@ def assert_endpoint_is_encrypted(endpoint: str) -> None:
     scheme = parts.scheme.lower()
     if scheme in ("https", "wss"):
         return
-    if _is_loopback(parts.netloc):
+    if _is_loopback(parts.hostname or ""):
         return
     raise ValueError(
         f"connect_agent needs an https endpoint to send its API key, got {scheme or 'no'} scheme"
