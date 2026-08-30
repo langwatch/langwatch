@@ -51,7 +51,7 @@ import {
  *
  * Org-exclusive permissions are handled by their own pin below rather than
  * here: `classifyForLangy` calls them `unreachable`, not `granted`, because
- * `bindingScopeCanGrant` (rbac.ts:190-196) refuses them on the PROJECT-scoped
+ * `bindingScopeCanGrantPermission` (@langwatch/authz) refuses them on the PROJECT-scoped
  * binding the session key is minted with — adding them to the candidate list
  * would change nothing except the length of the list.
  */
@@ -149,7 +149,7 @@ describe("Langy permission coverage", () => {
         // as on growth — both deliberate. Growth means a new route was put
         // behind an org-tier permission, which silently costs Langy a
         // capability the policy believes it has; shrink means a resource left
-        // `ORG_EXCLUSIVE_RESOURCES` and its family's classification must be
+        // the registry's org-exclusive tier and its family's classification must be
         // re-decided (see the FULL_ACCESS_FAMILIES tripwire note).
         const unreachable = reachableOnlyWithAnOrgScopedBinding();
         expect(unreachable.permissions, unreachable.rendered).toEqual([

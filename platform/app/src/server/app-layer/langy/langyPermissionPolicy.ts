@@ -1,4 +1,5 @@
-import { isOrgExclusivePermission, type Permission } from "~/server/api/rbac";
+import { isOrgExclusivePermission } from "@langwatch/authz";
+import type { Permission } from "~/server/api/rbac";
 // #7358 moved the vocabulary consts out of rbac.ts into their own module.
 import { Actions, Resources } from "~/utils/rbacVocabulary";
 
@@ -57,7 +58,7 @@ import { Actions, Resources } from "~/utils/rbacVocabulary";
  * Verdict for a single permission. Non-granted verdicts always carry their
  * reason. `excluded` means the POLICY refuses it; `unreachable` means the
  * policy would grant it but the grain cannot exist on a project-scoped
- * binding (`bindingScopeCanGrant` refuses org-exclusive permissions below
+ * binding (`bindingScopeCanGrantPermission` refuses org-exclusive permissions below
  * the org tier), so the minted key never carries it. The distinction matters
  * to the customer-facing denial: "widen your own role" is useless advice for
  * either, and the reason string says which wall was hit.
@@ -222,7 +223,7 @@ const AUTH_SCOPE_FAMILIES: Record<string, string> = {
  * classification, not an access grant: `governance`, `anomalyRules`,
  * `aiTools`, `activityMonitor`, `gatewaySpend`, `governanceCost`, and
  * `ingestionSources` are in
- * `ORG_EXCLUSIVE_RESOURCES` (rbac.ts), so `langyCandidatePermissions` drops
+ * org-exclusive in the authz registry, so `langyCandidatePermissions` drops
  * every grain of them and the minted key holds nothing. The org-exclusive
  * filter was built for ADR-021 scope escalation, not for Langy — several of
  * these families were previously excluded here with their own reasons
@@ -350,7 +351,7 @@ const READ_ACTION: string = Actions.VIEW;
  *
  * PROJECT SCOPE IS THE SECOND FILTER, and it is not cosmetic. The session key
  * is minted with a single PROJECT-scoped binding (`mintLangySessionApiKey`),
- * and `bindingScopeCanGrant` (rbac.ts:190-196) refuses org-exclusive
+ * and `bindingScopeCanGrantPermission` (@langwatch/authz) refuses org-exclusive
  * permissions on any binding below the org tier. Listing `governance:manage`
  * here would therefore not widen Langy by one capability — it would just put
  * nine families of dead entries in front of `batchProjectPermissions` on every
@@ -470,7 +471,7 @@ export function classifyForLangy(
   }
 
   // The policy would grant it, but the session key is minted with a single
-  // PROJECT-scoped binding and `bindingScopeCanGrant` (rbac.ts:190-196)
+  // PROJECT-scoped binding and `bindingScopeCanGrantPermission` (@langwatch/authz)
   // refuses org-exclusive permissions below the org tier. Listing it as a
   // candidate would put dead rows in front of `batchProjectPermissions` on
   // every turn and invite a reader to conclude Langy has access it has

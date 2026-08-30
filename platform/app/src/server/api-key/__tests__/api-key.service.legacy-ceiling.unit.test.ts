@@ -81,7 +81,7 @@ vi.mock("~/server/api/rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/server/api/rbac")>();
   return {
     ...actual,
-    // Real `bindingScopeCanGrant` — that is the code under test.
+    // Real scope fence (`bindingScopeCanGrantPermission`) — that is the code under test.
     teamRoleHasPermission: (...args: unknown[]) =>
       forceTeamRoleGrantsEverything.mock.calls.length ||
       forceTeamRoleGrantsEverything.getMockImplementation()

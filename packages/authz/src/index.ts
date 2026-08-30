@@ -50,6 +50,7 @@ export type {
 } from "./registry";
 export {
   declaredScopeId,
+  isOrgExclusivePermission,
   isPlatformTierPermission,
   permissionGrantTiers,
   resolveDeclaredScope,

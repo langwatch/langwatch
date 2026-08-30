@@ -205,6 +205,21 @@ export function isPlatformTierPermission(permission: AuthzPermission): boolean {
   return scopesOf(permission).includes("platform");
 }
 
+/**
+ * True when `permission` is grantable ONLY by an ORGANIZATION-scoped binding —
+ * the registry-derived answer to what the hand-kept `ORG_EXCLUSIVE_RESOURCES`
+ * set in rbac.ts used to say (ADR-021). Derived, so a new org-only resource
+ * is fenced the moment it is registered instead of when someone remembers to
+ * copy it into a second list.
+ *
+ * Unregistered permissions (legacy custom-role strings) and platform-tier
+ * permissions are NOT exclusive, matching the legacy set they replace.
+ */
+export function isOrgExclusivePermission(permission: AuthzPermission): boolean {
+  const tiers = permissionGrantTiers(permission);
+  return tiers.length === 1 && tiers[0] === "organization";
+}
+
 function scopesOf(permission: AuthzPermission): readonly string[] {
   const resource = permission.split(":")[0] as AuthzResource;
   return AUTHZ_RESOURCES[resource]?.scopes ?? [];

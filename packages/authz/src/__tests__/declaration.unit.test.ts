@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   declaredScopeId,
+  isOrgExclusivePermission,
   isPlatformTierPermission,
   permissionGrantTiers,
   resolveDeclaredScope,
@@ -31,6 +32,31 @@ describe("permissionGrantTiers", () => {
       expect(permissionGrantTiers("ops:view")).toEqual([]);
       expect(isPlatformTierPermission("ops:view")).toBe(true);
       expect(isPlatformTierPermission("traces:view")).toBe(false);
+    });
+  });
+});
+
+describe("isOrgExclusivePermission", () => {
+  describe("given a permission grantable only at the organization tier", () => {
+    it("is exclusive", () => {
+      expect(isOrgExclusivePermission("governance:view")).toBe(true);
+      expect(isOrgExclusivePermission("organization:manage")).toBe(true);
+      expect(isOrgExclusivePermission("governanceCost:view")).toBe(true);
+    });
+  });
+
+  describe("given a permission grantable below the organization tier", () => {
+    it("is not exclusive", () => {
+      expect(isOrgExclusivePermission("traces:view")).toBe(false);
+      expect(isOrgExclusivePermission("datasets:manage")).toBe(false);
+    });
+  });
+
+  describe("given a platform-tier permission", () => {
+    it("is not exclusive, matching the legacy fence it replaces", () => {
+      // LEGACY-QUIRK(C): ops:* was never in the hand-kept org-exclusive set,
+      // so the derived predicate must not suddenly fence it either.
+      expect(isOrgExclusivePermission("ops:view")).toBe(false);
     });
   });
 });

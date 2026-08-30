@@ -25,7 +25,7 @@ vi.mock("~/utils/encryption", () => ({
 
 const batchProjectPermissions = vi.fn();
 // Partial mock: only the permission resolver is stubbed. The REAL
-// `Resources`/`Actions`/`isOrgExclusivePermission` must come through, because
+// `Resources`/`Actions` must come through, because
 // `langyPermissionPolicy.ts` derives the candidate list from them at import
 // time — a stub there would silently shrink the very list this file tests.
 vi.mock("~/server/api/rbac", async (importOriginal) => ({

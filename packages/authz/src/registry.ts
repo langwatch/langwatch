@@ -203,7 +203,8 @@ export const AUTHZ_RESOURCES = {
     //
     // Org-tier only: the screen aggregates every lane of the organization's
     // spend across every team, so a team- or project-scoped binding must
-    // never grant it (ORG_EXCLUSIVE_RESOURCES in rbac.ts).
+    // never grant it — `scopes` here is what enforces that, through
+    // `bindingScopeCanGrantPermission` below.
     actions: ["view"],
     scopes: ["organization"],
   },

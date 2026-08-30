@@ -31,7 +31,10 @@ import type {
   AuthzPermission,
   EnforcedScopeFields,
 } from "@langwatch/authz";
-import { declareAuthzMiddleware } from "@langwatch/authz";
+import {
+  bindingScopeCanGrantPermission,
+  declareAuthzMiddleware,
+} from "@langwatch/authz";
 import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
 import {
@@ -48,7 +51,7 @@ import {
   ProjectPermissionDeniedError,
 } from "~/server/app-layer/permissions/errors";
 import type { Session } from "~/server/auth";
-import { type Resource, Resources } from "~/utils/rbacVocabulary";
+import type { Resource } from "~/utils/rbacVocabulary";
 import { isAdmin } from "../../../ee/admin/isAdmin";
 import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 
@@ -68,63 +71,12 @@ import { CUSTOM_ROLE_KIND } from "../role/role-kind";
  */
 export type Permission = AuthzPermission;
 
-/**
- * Resources that only exist at the organization tier — there is no team- or
- * project-scoped meaning for them (the AI Governance family plus the
- * organization resource itself). Org-tier authority comes only from an
- * ORGANIZATION-scoped RoleBinding; a TEAM- or PROJECT-scoped binding must
- * never grant a permission on one of these, even via a custom role that lists
- * it. This is the defense the scope-chain resolvers apply so a custom role
- * misconfigured below the org tier can't escalate to organization:manage,
- * governance:manage, anomalyRules:manage, and so on (ADR-021).
- *
- * Gateway + core resources (virtualKeys, gatewayBudgets, datasets, workflows,
- * …) are deliberately NOT here: they are legitimately accessible at team and
- * project scope, so team/project bindings may grant them.
- */
-const ORG_EXCLUSIVE_RESOURCES: ReadonlySet<Resource> = new Set<Resource>([
-  Resources.ORGANIZATION,
-  Resources.GOVERNANCE,
-  Resources.INGESTION_SOURCES,
-  Resources.ANOMALY_RULES,
-  Resources.COMPLIANCE_EXPORT,
-  Resources.ACTIVITY_MONITOR,
-  Resources.AI_TOOLS,
-  Resources.WEBHOOK_ENDPOINTS,
-  Resources.GATEWAY_SPEND,
-  Resources.GOVERNANCE_COST,
-]);
-
-/**
- * True when the permission targets an organization-tier-only resource.
- *
- * @deprecated Use `permissionGrantTiers` from `@langwatch/authz` instead —
- * the registry records which tiers each permission is grantable at, so it
- * cannot fall behind a new resource the way this hand-kept set can.
- */
-export function isOrgExclusivePermission(permission: Permission): boolean {
-  const resource = permission.split(":")[0] as Resource;
-  return ORG_EXCLUSIVE_RESOURCES.has(resource);
-}
-
-/**
- * Whether a binding at `scopeType` may grant `permission`. Org-exclusive
- * permissions require an ORGANIZATION-scoped binding; everything else is
- * grantable at any scope. Both the tRPC resolver (`checkPermissionFromBindings`)
- * and the gateway resolver (`checkRoleBindingPermission`) gate on this so the
- * rule holds no matter which path evaluates the binding.
- *
- * @deprecated Use `bindingScopeCanGrantPermission` from `@langwatch/authz`
- * instead — the ADR-021 fence is the engine's, and this is a second copy of
- * it standing in front of the legacy walk.
- */
-export function bindingScopeCanGrant(
-  scopeType: RoleBindingScopeType,
-  permission: Permission,
-): boolean {
-  if (scopeType === RoleBindingScopeType.ORGANIZATION) return true;
-  return !isOrgExclusivePermission(permission);
-}
+// The org-exclusive fence (ADR-021) is registry data now: each resource in
+// `AUTHZ_RESOURCES` records the tiers it is grantable at, and
+// `bindingScopeCanGrantPermission` / `isOrgExclusivePermission` from
+// `@langwatch/authz` derive the answer. The hand-kept ORG_EXCLUSIVE_RESOURCES
+// set that used to live here drifted from the registry four separate times;
+// there is deliberately no local copy to drift any more.
 
 // ============================================================================
 // ROLE DEFINITIONS
@@ -898,47 +850,13 @@ async function checkPermissionFromBindings({
   });
 
   if (bindings.length === 0) {
-    // Fall back to legacy TeamUser for users not yet migrated to RoleBindings.
-    // The fallback stays live for EVERY organization — backfilled, cut over,
-    // or untouched — until contract deletes the rows: stage B's finalization
-    // proves the promoted bindings answer identically at the scopes they
-    // replace, and the engine keeps inferring from the same rows on both
-    // heads (the dormant-fact principle), so switching this off early made
-    // the readers disagree instead of making the rows dead.
-    const teamScope = scopes.find(
-      (s) => s.scopeType === RoleBindingScopeType.TEAM,
-    );
-    if (!teamScope) return false;
-
-    const teamUser = await prisma.teamUser.findFirst({
-      // Gate the legacy fallback on org membership too: a stale cross-org
-      // TeamUser row must not confer access any more than a stale RoleBinding,
-      // and neither does a seat an admin disabled.
-      where: {
-        userId,
-        teamId: teamScope.scopeId,
-        team: {
-          organization: { members: { some: { userId, disabledAt: null } } },
-        },
-      },
-      select: { role: true, assignedRoleId: true },
-    });
-
-    if (!teamUser) return false;
-    // Legacy team membership is a TEAM-scoped grant, so it can't confer an
-    // org-exclusive permission even through a custom role (ADR-021).
-    if (!bindingScopeCanGrant(RoleBindingScopeType.TEAM, permission)) {
-      return false;
-    }
-    return resolveBindingPermission({
-      binding: {
-        role: teamUser.role,
-        customRoleId: teamUser.assignedRoleId ?? null,
-      },
+    return checkPermissionFromLegacyTeamUser({
+      prisma,
+      userId,
       organizationId,
+      scopes,
       organizationRole,
       permission,
-      prisma,
     });
   }
 
@@ -946,7 +864,14 @@ async function checkPermissionFromBindings({
   for (const binding of bindings) {
     // A team/project binding can never grant an org-exclusive permission,
     // even via a custom role that lists it (ADR-021).
-    if (!bindingScopeCanGrant(binding.scopeType, permission)) continue;
+    if (
+      !bindingScopeCanGrantPermission({
+        scopeType: binding.scopeType,
+        permission,
+      })
+    ) {
+      continue;
+    }
 
     // Org-scoped bindings: ADMIN grants everything; MEMBER grants org-level permissions only.
     // ORG-scoped MEMBER bindings do NOT imply any team- or project-level access — team/project
@@ -978,6 +903,68 @@ async function checkPermissionFromBindings({
   }
 
   return false;
+}
+
+/**
+ * Legacy fallback for users not yet migrated to RoleBindings: answers the
+ * permission question from the TeamUser table instead. The fallback stays
+ * live for EVERY organization — backfilled, cut over, or untouched — until
+ * contract deletes the rows: stage B's finalization proves the promoted
+ * bindings answer identically at the scopes they replace, and the engine
+ * keeps inferring from the same rows on both heads (the dormant-fact
+ * principle), so switching this off early made the readers disagree instead
+ * of making the rows dead.
+ */
+async function checkPermissionFromLegacyTeamUser({
+  prisma,
+  userId,
+  organizationId,
+  scopes,
+  organizationRole,
+  permission,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  organizationId: string;
+  scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
+  organizationRole: OrganizationUserRole | null;
+  permission: Permission;
+}): Promise<boolean> {
+  const teamScope = scopes.find(
+    (s) => s.scopeType === RoleBindingScopeType.TEAM,
+  );
+  if (!teamScope) return false;
+
+  const teamUser = await prisma.teamUser.findFirst({
+    // Gate the legacy fallback on org membership too: a stale cross-org
+    // TeamUser row must not confer access any more than a stale RoleBinding,
+    // and neither does a seat an admin disabled.
+    where: {
+      userId,
+      teamId: teamScope.scopeId,
+      team: {
+        organization: { members: { some: { userId, disabledAt: null } } },
+      },
+    },
+    select: { role: true, assignedRoleId: true },
+  });
+
+  if (!teamUser) return false;
+  // Legacy team membership is a TEAM-scoped grant, so it can't confer an
+  // org-exclusive permission even through a custom role (ADR-021).
+  if (!bindingScopeCanGrantPermission({ scopeType: "TEAM", permission })) {
+    return false;
+  }
+  return resolveBindingPermission({
+    binding: {
+      role: teamUser.role,
+      customRoleId: teamUser.assignedRoleId ?? null,
+    },
+    organizationId,
+    organizationRole,
+    permission,
+    prisma,
+  });
 }
 
 /**
@@ -1619,7 +1606,7 @@ async function hasOrganizationPermissionLegacy(
   // org-level check; org-exclusive permissions (organization:* / governance
   // family) are never conferred through it — only an ORGANIZATION-scoped
   // binding can (ADR-021). Gateway/audit resources stay grantable here.
-  if (!bindingScopeCanGrant(RoleBindingScopeType.TEAM, permission)) {
+  if (!bindingScopeCanGrantPermission({ scopeType: "TEAM", permission })) {
     return false;
   }
   const teamMemberships = await ctx.prisma.teamUser.findMany({
@@ -1830,7 +1817,14 @@ function bindingGrants(
 ): boolean {
   // A team/project binding can never grant an org-exclusive permission, even via
   // a custom role that lists it (ADR-021).
-  if (!bindingScopeCanGrant(binding.scopeType, permission)) return false;
+  if (
+    !bindingScopeCanGrantPermission({
+      scopeType: binding.scopeType,
+      permission,
+    })
+  ) {
+    return false;
+  }
 
   if (binding.customRoleId) {
     const custom = resolution.customRoleById.get(binding.customRoleId);

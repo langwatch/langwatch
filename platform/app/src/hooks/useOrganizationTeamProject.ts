@@ -25,8 +25,8 @@ import {
  * the RBAC catalog).
  *
  * The members are exactly the resources the authz registry declares grantable
- * at the organization tier and no other — `ORG_EXCLUSIVE_RESOURCES` in rbac.ts,
- * `permissionGrantTiers` in @langwatch/authz. Deliberately not enumerated here:
+ * at the organization tier and no other — `permissionGrantTiers` /
+ * `isOrgExclusivePermission` in @langwatch/authz. Deliberately not enumerated here:
  * this list has fallen behind the registry three times, and a docblock naming
  * the members goes stale the same way. The unit test walks the registry and
  * fails when the two disagree, so that check lives in CI rather than in prose.
@@ -47,8 +47,8 @@ export function isOrgScopedPermission(permission: Permission): boolean {
     // org admins client-side while the server correctly allows them.
     permission.startsWith("webhookEndpoints:") ||
     permission.startsWith("gatewaySpend:") ||
-    // The cost screen is org-exclusive on the server (rbac.ts
-    // ORG_EXCLUSIVE_RESOURCES). Omitting it here sent the check down the
+    // The cost screen is org-exclusive on the server (the authz registry
+    // declares it organization-only). Omitting it here sent the check down the
     // team-role path, where no bag carries it, so the screen refused every
     // org admin while the router allowed them.
     permission.startsWith("governanceCost:")

@@ -42,7 +42,7 @@ describe("isOrgScopedPermission", () => {
 
     // Regression: the governance Costs screen gates on
     // withPermissionGuard("governanceCost:view"). The resource is
-    // org-exclusive on the server (rbac.ts ORG_EXCLUSIVE_RESOURCES) and is
+    // org-exclusive on the server (the authz registry declares it) and is
     // granted only in the org ADMIN bags, so team-routing it denied the
     // screen to every org admin while the router allowed them.
     it("treats governanceCost:view as org-scoped so org admins can open Costs", () => {

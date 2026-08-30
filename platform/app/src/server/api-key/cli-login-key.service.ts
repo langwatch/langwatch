@@ -1,13 +1,12 @@
-import { isRegistryPermission } from "@langwatch/authz";
+import {
+  isOrgExclusivePermission,
+  isRegistryPermission,
+} from "@langwatch/authz";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { RoleBindingScopeType } from "~/generated/prisma/client";
-import {
-  batchTeamsPermissions,
-  isOrgExclusivePermission,
-  type Permission,
-} from "~/server/api/rbac";
+import { batchTeamsPermissions, type Permission } from "~/server/api/rbac";
 import { ApiKeyService, type CustomRoleBindingInput } from "./api-key.service";
 import { defaultCliKeyPermissions } from "./cli-key-defaults";
 import { ApiKeyAlreadyRevokedError, ApiKeyNotFoundError } from "./errors";

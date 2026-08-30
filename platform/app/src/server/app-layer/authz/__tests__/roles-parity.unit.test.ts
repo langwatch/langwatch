@@ -7,7 +7,6 @@
 
 import {
   ALL_PERMISSIONS,
-  bindingScopeCanGrantPermission,
   builtinRoleGrants,
   builtinRolePermissions,
   permissionSatisfiedBy,
@@ -16,7 +15,6 @@ import {
 import { afterEach, describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import {
-  bindingScopeCanGrant,
   EXTERNAL_MEMBER_PERMISSIONS,
   hasPermissionWithHierarchy,
   isDemoProject,
@@ -113,19 +111,8 @@ describe("hierarchy rule parity", () => {
   });
 });
 
-describe("scope fence parity (ADR-021)", () => {
-  describe.each([
-    "ORGANIZATION",
-    "TEAM",
-    "PROJECT",
-  ] as const)("given a binding at %s scope", (scopeType) => {
-    it("fences exactly the permissions the legacy fence fences", () => {
-      const mismatches = ALL_PERMISSIONS.filter(
-        (permission) =>
-          bindingScopeCanGrantPermission({ scopeType, permission }) !==
-          bindingScopeCanGrant(scopeType, permission as Permission),
-      );
-      expect(mismatches).toEqual([]);
-    });
-  });
-});
+// The scope-fence parity block that used to close this suite is gone with the
+// legacy fence itself: `bindingScopeCanGrant` and the hand-kept
+// ORG_EXCLUSIVE_RESOURCES set were deleted from rbac.ts, and every caller now
+// asks `bindingScopeCanGrantPermission` (registry data) directly — there is no
+// second fence left to compare against.

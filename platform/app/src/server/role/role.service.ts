@@ -1,10 +1,11 @@
 import type { LedgerActor } from "@langwatch/actor";
+import { isOrgExclusivePermission } from "@langwatch/authz";
 import {
   type Prisma,
   type PrismaClient,
   RoleBindingScopeType,
 } from "~/generated/prisma/client";
-import { isOrgExclusivePermission, type Permission } from "~/server/api/rbac";
+import type { Permission } from "~/server/api/rbac";
 import { OrgExclusivePermissionScopeError } from "~/server/role-bindings/errors";
 import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
 import {

@@ -10,6 +10,8 @@
  * ADR-092 §9 owner ceiling (`effective(key) = grants(key) ∩ grants(owner)`)
  * without depending on this fork surviving.
  */
+
+import { bindingScopeCanGrantPermission } from "@langwatch/authz";
 import { createLogger } from "@langwatch/observability";
 import {
   OrganizationUserRole,
@@ -18,7 +20,6 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import {
-  bindingScopeCanGrant,
   EXTERNAL_MEMBER_PERMISSIONS,
   hasPermissionWithHierarchy,
   organizationRoleHasPermission,
@@ -388,7 +389,14 @@ async function checkRoleBindingPermissionInner({
     // A team/project binding can never grant an org-exclusive permission,
     // even via a custom role that lists it (ADR-021). Stays in sync with
     // checkPermissionFromBindings() in rbac.ts.
-    if (!bindingScopeCanGrant(binding.scopeType, permission)) continue;
+    if (
+      !bindingScopeCanGrantPermission({
+        scopeType: binding.scopeType,
+        permission,
+      })
+    ) {
+      continue;
+    }
 
     // Custom role: look up its permissions. Defense in depth on two axes:
     // the lookup is scoped to the organization being checked, so a poisoned
@@ -589,7 +597,7 @@ export async function resolveLegacyCeiling({
       // ADR-021: a team-scoped grant can never confer an org-exclusive
       // permission. `rbac.ts` applies this to legacy roles via `bindingGrants`,
       // which opens with the same check.
-      bindingScopeCanGrant(RoleBindingScopeType.TEAM, permission) &&
+      bindingScopeCanGrantPermission({ scopeType: "TEAM", permission }) &&
       // EXTERNAL members are capped by their ORG role before the team role is
       // read at all (`bindingGrants`, same order). A ceiling that skipped this
       // accepted permissions the tRPC path refuses.
