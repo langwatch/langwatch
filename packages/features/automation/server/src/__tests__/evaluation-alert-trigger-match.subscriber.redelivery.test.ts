@@ -78,6 +78,17 @@ function evaluationEvent(occurredAt: number): EvaluationProcessingEvent {
 }
 
 class TestTraceService extends TraceService {
+  // `TraceService` grew these and the fakes did not follow. A member left
+  // off a double is a method the real service has that no test here would
+  // notice going wrong.
+  getFullRecord(): Promise<never> {
+    return Promise.reject(new Error("not used by this subscriber"));
+  }
+
+  getFullThread(): Promise<never> {
+    return Promise.reject(new Error("not used by this subscriber"));
+  }
+
   classifyQuery() {
     return { evaluations: true, events: false, spans: false };
   }

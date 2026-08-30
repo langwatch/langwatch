@@ -324,6 +324,15 @@ class SettlementAutomationService extends AutomationService {
 }
 
 export class SettlementProjectService extends ProjectService {
+  // `ProjectService` grew these and this fixture did not follow.
+  tryGetIdentity(): never {
+    return unavailable();
+  }
+
+  tryGetOrganizationId(): never {
+    return unavailable();
+  }
+
   reads = 0;
   readonly project: Project = {
     id: "project-1",
@@ -439,6 +448,17 @@ export class SettlementProjectService extends ProjectService {
 }
 
 class SettlementTraceService extends TraceService {
+  // `TraceService` grew these and the fakes did not follow. A member left
+  // off a double is a method the real service has that no test here would
+  // notice going wrong.
+  getFullRecord(): never {
+    return unavailable();
+  }
+
+  getFullThread(): never {
+    return unavailable();
+  }
+
   readonly summaries = new Map<string, TraceSummaryData>();
   readonly records = new Map<string, TraceRecord>();
   readonly recordErrors = new Map<string, unknown>();

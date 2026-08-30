@@ -55,6 +55,17 @@ class TestEvaluations extends EvaluationService {
 }
 
 class TestTraces extends TraceService {
+  // `TraceService` grew these and the fakes did not follow. A member left
+  // off a double is a method the real service has that no test here would
+  // notice going wrong.
+  getFullRecord(): Promise<never> {
+    return Promise.reject(new Error("not used by this test"));
+  }
+
+  getFullThread(): Promise<never> {
+    return Promise.reject(new Error("not used by this test"));
+  }
+
   classification = { evaluations: false, events: false, spans: false };
   readonly classifications: string[] = [];
   readonly eventRequests: Array<{
