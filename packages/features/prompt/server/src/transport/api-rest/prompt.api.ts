@@ -30,7 +30,6 @@ import {
   validator as zValidator,
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
-import { PromptScope } from "@langwatch/prisma-client/generated";
 import {
   commitMessageSchema,
   getLatestConfigVersionSchema,
@@ -47,6 +46,7 @@ import {
   runtimeParametersSchema,
   schemaVersionSchema,
   scopeSchema,
+  type PromptScope,
   ShorthandParseError,
   SystemPromptConflictError,
   SystemPromptRequiredError,
@@ -72,7 +72,7 @@ export const versionInputSchema = getLatestConfigVersionSchema();
  */
 export const createPromptInputSchema = z.strictObject({
   handle: handleSchema,
-  scope: scopeSchema.optional().default(PromptScope.PROJECT),
+  scope: scopeSchema.optional().default("PROJECT"),
   // Version data
   model: modelNameSchema.optional(),
   temperature: z.number().optional(),
@@ -117,7 +117,7 @@ const configDataSchema = getLatestConfigVersionSchema().shape.configData;
 const apiResponsePromptSchemaBase = z.object({
   id: z.string(),
   handle: z.string().nullable(),
-  scope: z.nativeEnum(PromptScope),
+  scope: scopeSchema,
   name: z.string(),
   updatedAt: z.date(),
   projectId: z.string(),
@@ -211,7 +211,6 @@ export interface PromptRestPorts {
 
 // ── OpenAPI + refusal helpers ────────────────────────────────────────────────
 
-
 /**
  * Builds a standard success response object for OpenAPI route definitions.
  *
@@ -238,7 +237,6 @@ export const buildStandardSuccessResponse = (zodSchema: ZodSchema): RouteRespons
   };
 };
 
-
 /**
  * Handles a conflict error by throwing a 409 error with a message
  * indicating that the prompt handle already exists for the given scope.
@@ -251,7 +249,7 @@ export const buildStandardSuccessResponse = (zodSchema: ZodSchema): RouteRespons
 export const handlePossibleConflictError = (
   ports: PromptRestPorts,
   error: unknown,
-  scope: PromptScope = PromptScope.PROJECT,
+  scope: PromptScope = "PROJECT",
 ) => {
   if (ports.uniqueConstraintTargets(error).some((t) => t.includes("handle"))) {
     throw new HTTPException(409, {
@@ -396,14 +394,12 @@ export function registerPromptRoutes(
     "/:id{.+?}/tags/:tag",
     ports.organizationMiddleware,
     describeRoute({
-      description:
-        'Assign a tag (e.g. "production", "staging") to a specific prompt version',
+      description: 'Assign a tag (e.g. "production", "staging") to a specific prompt version',
       parameters: [
         {
           name: "tag",
           in: "path",
-          description:
-            'The tag to assign (e.g., "production", "staging", or a custom tag)',
+          description: 'The tag to assign (e.g., "production", "staging", or a custom tag)',
           required: true,
           schema: { type: "string" },
         },
@@ -687,9 +683,7 @@ export function registerPromptRoutes(
         "Get all versions for a prompt. Does not include base prompt data, only versioned data.",
       responses: {
         ...baseResponses,
-        200: buildStandardSuccessResponse(
-          z.array(apiResponsePromptWithVersionDataSchema),
-        ),
+        200: buildStandardSuccessResponse(z.array(apiResponsePromptWithVersionDataSchema)),
         404: {
           description: "Prompt not found",
           content: {
@@ -757,10 +751,7 @@ export function registerPromptRoutes(
       const organization = c.get("organization");
       const { id, versionId } = c.req.param();
 
-      logger.info(
-        { projectId: project.id, promptId: id, versionId },
-        "Restoring prompt version",
-      );
+      logger.info({ projectId: project.id, promptId: id, versionId }, "Restoring prompt version");
 
       // A missing prompt/version arrives as a `NotFoundError`, which is a
       // `HandledError` — the app's `onError` serialises it into the standard
@@ -869,10 +860,7 @@ export function registerPromptRoutes(
         const version = shorthand.version ?? queryVersion;
         const tag = shorthand.tag ?? queryTag;
 
-        logger.info(
-          { projectId: project.id, id: shorthand.slug, version, tag },
-          "Getting prompt",
-        );
+        logger.info({ projectId: project.id, id: shorthand.slug, version, tag }, "Getting prompt");
 
         const config = await service.tryGetPromptByIdOrHandle({
           idOrHandle: shorthand.slug,
@@ -957,10 +945,7 @@ export function registerPromptRoutes(
           ...data,
         });
 
-        logger.info(
-          { promptId: newConfig.id },
-          "Successfully created prompt with initial version",
-        );
+        logger.info({ promptId: newConfig.id }, "Successfully created prompt with initial version");
 
         let responseConfig: ApiResponsePrompt = newConfig;
 
@@ -977,10 +962,7 @@ export function registerPromptRoutes(
             ),
           );
 
-          logger.info(
-            { promptId: newConfig.id, tags },
-            "Assigned tags to initial version",
-          );
+          logger.info({ promptId: newConfig.id, tags }, "Assigned tags to initial version");
 
           const refetched = await service.tryGetPromptByIdOrHandle({
             idOrHandle: newConfig.id,
@@ -1064,10 +1046,7 @@ export function registerPromptRoutes(
       const { id } = c.req.param();
       const data = c.req.valid("json");
 
-      logger.info(
-        { projectId: project.id, promptId: id },
-        "Syncing prompt with local content",
-      );
+      logger.info({ projectId: project.id, promptId: id }, "Syncing prompt with local content");
 
       try {
         const syncResult = await service.syncPrompt({
@@ -1107,10 +1086,7 @@ export function registerPromptRoutes(
 
         return c.json(response);
       } catch (error: any) {
-        logger.error(
-          { projectId: project.id, promptId: id, error },
-          "Error syncing prompt",
-        );
+        logger.error({ projectId: project.id, promptId: id, error }, "Error syncing prompt");
 
         if (error.message.includes("No permission")) {
           throw new HTTPException(403, {
