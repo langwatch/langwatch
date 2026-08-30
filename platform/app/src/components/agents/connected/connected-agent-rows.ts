@@ -157,23 +157,3 @@ export function environmentTone(environment: string | null): string {
   if (environment === "development") return "purple";
   return "gray";
 }
-
-/** The parameter names a card prints, in declaration order. */
-export function parameterNames(agent: ConnectedAgentView): string[] {
-  return agent.parameters.map((parameter) => parameter.name);
-}
-
-/** The full text of one parameter, for the tooltip beside the names. */
-export function parameterTooltip(
-  parameter: ScenarioParameterDefinition,
-): string {
-  const parts: string[] = [`${parameter.name} (${parameter.type ?? "string"})`];
-  if (parameter.options?.length) {
-    parts.push(`one of ${parameter.options.map(String).join(", ")}`);
-  }
-  if (parameter.defaultValue !== undefined) {
-    parts.push(`default ${String(parameter.defaultValue)}`);
-  }
-  if (parameter.description) parts.push(parameter.description);
-  return parts.join(" · ");
-}

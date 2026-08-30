@@ -113,16 +113,26 @@ describe("<ConnectedAgentsSection />", () => {
     });
   });
 
+  describe("given a connected agent on the page", () => {
+    /** @scenario "A connected agent card carries the robot icon" */
+    it("draws the robot icon at the top left of the card", () => {
+      renderSection([agent()]);
+
+      const card = screen.getByTestId("connected-agent-card-agent_1");
+      expect(card.querySelector("svg.lucide-bot")).not.toBeNull();
+    });
+  });
+
   describe("given three processes hold one agent", () => {
     /** @scenario "An online agent reads how many instances hold it" */
-    it("marks the card online and reads the instance count", () => {
+    it("reads Online in the header and names the instance count", () => {
       renderSection([
         agent({ instances: [instance(), instance(), instance()] }),
       ]);
 
-      expect(
-        screen.getByTestId("connected-agent-status-online"),
-      ).toHaveAttribute("aria-label", "Online · 3 instances");
+      const presence = screen.getByTestId("connected-agent-status-online");
+      expect(presence).toHaveAttribute("aria-label", "Online · 3 instances");
+      expect(within(presence).getByText("Online")).toBeInTheDocument();
       expect(
         screen.getByText("langwatch-python 1.2.3 · 3 instances"),
       ).toBeInTheDocument();
@@ -142,15 +152,18 @@ describe("<ConnectedAgentsSection />", () => {
 
   describe("given no process holds the agent", () => {
     /** @scenario "An offline agent reads when it was last seen" */
-    it("marks the card offline and reads when it was last seen", () => {
+    it("reads Offline in the header and when it was last seen", () => {
       const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
       renderSection([
         agent({ status: "offline", instances: [], lastSeenAt: twoHoursAgo }),
       ]);
 
-      expect(
-        screen.getByTestId("connected-agent-status-offline"),
-      ).toHaveAttribute("aria-label", "Offline · last seen 2 hours ago");
+      const presence = screen.getByTestId("connected-agent-status-offline");
+      expect(presence).toHaveAttribute(
+        "aria-label",
+        "Offline · last seen 2 hours ago",
+      );
+      expect(within(presence).getByText("Offline")).toBeInTheDocument();
     });
   });
 
@@ -180,8 +193,8 @@ describe("<ConnectedAgentsSection />", () => {
   });
 
   describe("given the agent declares a parameter", () => {
-    /** @scenario "A card names the SDK and the parameters the agent declares" */
-    it("names the SDK, its version and the parameter", () => {
+    /** @scenario "A card names the SDK and leaves the parameters to the drawer" */
+    it("names the SDK and its version, and never the parameter", () => {
       renderSection([
         agent({
           parameters: [
@@ -193,7 +206,7 @@ describe("<ConnectedAgentsSection />", () => {
       expect(
         screen.getByText("langwatch-python 1.2.3 · 1 instance"),
       ).toBeInTheDocument();
-      expect(screen.getByText("model")).toBeInTheDocument();
+      expect(screen.queryByText("model")).toBeNull();
     });
   });
 

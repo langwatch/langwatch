@@ -33,26 +33,32 @@ Feature: Connected agents in the product
     And "staging" reads in the neutral colour
 
   @integration
+  Scenario: A connected agent card carries the robot icon
+    Given a connected agent on the agents page
+    When the card is drawn
+    Then the icon at the top left of the card is the robot one
+
+  @integration
   Scenario: An online agent reads how many instances hold it
     Given "support-agent" in "production" has three connected instances
     When the card is drawn
-    Then its presence mark is the online one
-    And the mark carries "Online · 3 instances"
+    Then the header of the card reads "Online" beside a green dot
+    And the presence carries "Online · 3 instances"
     And the card reads "3 instances"
 
   @integration
   Scenario: An agent with one instance reads it in the singular
     Given "support-agent" in "production" has one connected instance
     When the card is drawn
-    Then the mark carries "Online · 1 instance"
+    Then the presence carries "Online · 1 instance"
 
   @integration
   Scenario: An offline agent reads when it was last seen
     Given "support-agent" in "production" has no connected instance
     And it was last seen two hours ago
     When the card is drawn
-    Then its presence mark is the offline one
-    And the mark carries "Offline · last seen 2 hours ago"
+    Then the header of the card reads "Offline" beside a grey dot
+    And the presence carries "Offline · last seen 2 hours ago"
 
   @integration
   Scenario: A personal development agent reads its owner
@@ -67,11 +73,11 @@ Feature: Connected agents in the product
     Then it carries a chip with the machine name
 
   @integration
-  Scenario: A card names the SDK and the parameters the agent declares
+  Scenario: A card names the SDK and leaves the parameters to the drawer
     Given "support-agent" registered from the Python SDK with a "model" parameter
     When the card is drawn
     Then it names the SDK and its version
-    And it names the "model" parameter
+    And it does not name the "model" parameter
 
   @integration
   Scenario: A click on the card opens the connected agent

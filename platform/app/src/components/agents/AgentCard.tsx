@@ -14,6 +14,7 @@ import {
   Copy,
   ExternalLink,
   Globe,
+  type LucideIcon,
   MessageSquare,
   MoreVertical,
   Play,
@@ -29,7 +30,7 @@ import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { Menu } from "../ui/menu";
 import { agentHasDevTunnel, LocalTunnelBadge } from "./LocalTunnelBadge";
 
-const agentTypeIcons: Record<string, typeof MessageSquare> = {
+const agentTypeIcons: Record<string, LucideIcon> = {
   signature: MessageSquare,
   code: Code,
   http: Globe,
@@ -50,8 +51,10 @@ export type AgentCardShellProps = {
   /** The agent the card stands for, so Langy can be handed the card. */
   agentId: string;
   agentName: string;
-  /** The mark at the top left: the type icon, or the presence mark. */
+  /** The mark at the top left: the icon of the kind of agent. */
   leading: ReactNode;
+  /** What sits on the top right beside the menu, such as the presence. */
+  trailing?: ReactNode;
   /** The three-dot menu at the top right, when the card offers actions. */
   menu?: ReactNode;
   /** The name line, with whatever sits beside the name. */
@@ -73,6 +76,7 @@ export function AgentCardShell({
   agentId,
   agentName,
   leading,
+  trailing,
   menu,
   title,
   info,
@@ -99,10 +103,11 @@ export function AgentCardShell({
       >
         <Card.Body padding={4}>
           <VStack align="start" gap={2} height="full" width="full" minWidth={0}>
-            {/* Top row: mark and menu */}
-            <HStack width="full">
+            {/* Top row: mark, then what the card says about itself, then the menu */}
+            <HStack width="full" gap={2}>
               {leading}
               <Spacer />
+              {trailing}
               {menu}
             </HStack>
 
@@ -140,14 +145,18 @@ export function AgentCardMenuTrigger({ agentName }: { agentName: string }) {
   );
 }
 
-/** The square with the icon of the agent kind. */
-function AgentTypeIcon({ type }: { type: string }) {
-  const Icon = agentTypeIcons[type] ?? Bot;
+/** The square at the top left of a card, with one icon in it. */
+export function AgentCardIcon({ icon: Icon }: { icon: LucideIcon }) {
   return (
     <Box bg="blue.subtle" padding={1} borderRadius="md">
       <Icon size={18} color="var(--chakra-colors-blue-fg)" />
     </Box>
   );
+}
+
+/** The square with the icon of the agent kind. */
+function AgentTypeIcon({ type }: { type: string }) {
+  return <AgentCardIcon icon={agentTypeIcons[type] ?? Bot} />;
 }
 
 export type AgentCardProps = {

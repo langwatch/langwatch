@@ -3,25 +3,28 @@
  *
  * One card is one name in one environment: the process in production, the
  * one on a shared staging box, and one for every developer who runs it on
- * their laptop. The card carries the presence mark, the name with its
- * environment, the SDK that registered it, who it belongs to and what it can
- * be called with. It is the same card the HTTP and the code agents are drawn
- * in, so one page reads as one list.
+ * their laptop. The card carries the presence, the name with its
+ * environment, the SDK that registered it and who it belongs to. It is the
+ * same card the HTTP and the code agents are drawn in, so one page reads as
+ * one list. The run parameters it declares are read in its drawer.
  *
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { ExternalLink, Laptop, Play, User } from "lucide-react";
+import { Box, HStack, Text } from "@chakra-ui/react";
+import { Bot, ExternalLink, Laptop, Play, User } from "lucide-react";
 import { LuTrash2 } from "react-icons/lu";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
-import { AgentCardMenuTrigger, AgentCardShell } from "../AgentCard";
+import {
+  AgentCardIcon,
+  AgentCardMenuTrigger,
+  AgentCardShell,
+} from "../AgentCard";
 import {
   type ConnectedAgentView,
   environmentTone,
   instanceCountLabel,
-  parameterTooltip,
   presenceLabel,
   scopeOf,
   sdkLabel,
@@ -61,23 +64,36 @@ export function ConnectedAgentsSection({
   );
 }
 
-/** The filled circle that says whether a process holds the agent. */
+/**
+ * The dot and the word that say whether a process holds the agent.
+ *
+ * The header carries the word alone, and the tooltip carries the rest: how
+ * many instances hold it, or when it was last seen.
+ */
 function PresenceMark({ agent }: { agent: ConnectedAgentView }) {
   const label = presenceLabel({
     status: agent.status,
     instanceCount: agent.instances.length,
     lastSeenAt: agent.lastSeenAt,
   });
+  const isOnline = agent.status === "online";
   return (
     <Tooltip content={label}>
-      <Box
-        boxSize="12px"
-        borderRadius="full"
-        marginLeft="3px"
+      <HStack
+        gap={1.5}
+        flexShrink={0}
         aria-label={label}
-        background={agent.status === "online" ? "green.500" : "fg.subtle"}
         data-testid={`connected-agent-status-${agent.status}`}
-      />
+      >
+        <Box
+          boxSize="8px"
+          borderRadius="full"
+          background={isOnline ? "green.500" : "gray.400"}
+        />
+        <Text fontSize="12px" color="fg.muted">
+          {isOnline ? "Online" : "Offline"}
+        </Text>
+      </HStack>
     </Tooltip>
   );
 }
@@ -203,7 +219,8 @@ export function ConnectedAgentCard({
       agentName={agent.name}
       onClick={onOpen}
       testId={`connected-agent-card-${agent.id}`}
-      leading={<PresenceMark agent={agent} />}
+      leading={<AgentCardIcon icon={Bot} />}
+      trailing={<PresenceMark agent={agent} />}
       menu={
         <ConnectedAgentMenu
           agent={agent}
@@ -223,48 +240,17 @@ export function ConnectedAgentCard({
         </HStack>
       }
       info={
-        <VStack align="stretch" gap={1} width="full" minWidth={0}>
-          <HStack
-            gap={2}
-            width="full"
-            minWidth={0}
-            overflow="hidden"
-            color="fg.subtle"
-            fontSize="12px"
-          >
-            {facts.length > 0 && <Text truncate>{facts.join(" · ")}</Text>}
-            <ScopeChip agent={agent} />
-          </HStack>
-
-          {agent.parameters.length > 0 && (
-            <HStack
-              gap={1.5}
-              width="full"
-              minWidth={0}
-              overflow="hidden"
-              height="18px"
-            >
-              {agent.parameters.map((parameter) => (
-                <Tooltip
-                  key={parameter.name}
-                  content={parameterTooltip(parameter)}
-                >
-                  <Text
-                    as="code"
-                    fontFamily="mono"
-                    fontSize="11px"
-                    background="bg.muted"
-                    borderRadius="sm"
-                    paddingX={1.5}
-                    flexShrink={0}
-                  >
-                    {parameter.name}
-                  </Text>
-                </Tooltip>
-              ))}
-            </HStack>
-          )}
-        </VStack>
+        <HStack
+          gap={2}
+          width="full"
+          minWidth={0}
+          overflow="hidden"
+          color="fg.subtle"
+          fontSize="12px"
+        >
+          {facts.length > 0 && <Text truncate>{facts.join(" · ")}</Text>}
+          <ScopeChip agent={agent} />
+        </HStack>
       }
     />
   );
