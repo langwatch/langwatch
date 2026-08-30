@@ -196,6 +196,7 @@ export {
 } from "./services/trace-span-storage-group.rules";
 export { trimAttributesForAnalytics } from "./services/analytics-attribute-trim.rules";
 export { TraceAttributeAccumulationService } from "./services/trace-attribute-accumulation.service";
+export { TraceAttributeExtractionService } from "./services/trace-attribute-extraction.service";
 export { TraceOriginService } from "./services/trace-origin.service";
 export {
   shouldOverrideOutput,

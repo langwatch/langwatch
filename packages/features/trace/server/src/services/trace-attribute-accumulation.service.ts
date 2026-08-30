@@ -7,178 +7,7 @@ import {
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { parseJsonStringArray, stringAttr } from "./trace-summary-attributes.rules";
 import { TraceOriginService } from "./trace-origin.service";
-
-/**
- * The prefix the Vercel AI SDK writes `experimental_telemetry.metadata` under.
- * It flattens the object one attribute per entry, so a `{ labels, user_id }`
- * metadata object arrives as two separate span attributes.
- */
-const VERCEL_METADATA_PREFIX = "ai.telemetry.metadata.";
-
-/**
- * Metadata names that identify a trace rather than describe it, and the
- * trace-summary key each one fills. Both spellings are accepted because the
- * REST collector accepts both and callers copy whichever they already use.
- */
-const VERCEL_RESERVED_METADATA: Readonly<Record<string, string>> = {
-  thread_id: "gen_ai.conversation.id",
-  threadId: "gen_ai.conversation.id",
-  user_id: "langwatch.user_id",
-  userId: "langwatch.user_id",
-  customer_id: "langwatch.customer_id",
-  customerId: "langwatch.customer_id",
-};
-
-/** The metadata name behind a Vercel telemetry key, or null for any other key. */
-const vercelMetadataName = (key: string): string | null =>
-  key.startsWith(VERCEL_METADATA_PREFIX) ? key.slice(VERCEL_METADATA_PREFIX.length) || null : null;
-
-/** Labels as an array, whether they arrive as one or as a JSON string. */
-const labelList = (value: unknown): string[] =>
-  Array.isArray(value)
-    ? value.filter((label): label is string => typeof label === "string")
-    : parseJsonStringArray(typeof value === "string" ? value : void 0);
-
-const unionLabelsInto = (result: Record<string, string>, labels: string[]): void => {
-  if (labels.length === 0) {
-    return;
-  }
-  const existing = parseJsonStringArray(result[ATTR_KEYS.LANGWATCH_LABELS]);
-  result[ATTR_KEYS.LANGWATCH_LABELS] = JSON.stringify([...new Set([...existing, ...labels])]);
-};
-
-/** Writes the value only when the key has no value yet, so an explicit one wins. */
-const fillIfEmpty = (result: Record<string, string>, key: string, value: unknown): void => {
-  if (result[key]) {
-    return;
-  }
-  if (typeof value === "string" && value.length > 0) {
-    result[key] = value;
-  }
-};
-
-const attributeText = (value: unknown): string =>
-  typeof value === "string"
-    ? value
-    : typeof value === "object"
-      ? JSON.stringify(value)
-      : String(value);
-
-export const RESOURCE_ATTR_MAPPINGS = [
-  ["telemetry.sdk.name", "sdk.name"],
-  ["telemetry.sdk.version", "sdk.version"],
-  ["telemetry.sdk.language", "sdk.language"],
-  ["service.name", "service.name"],
-] as const;
-
-export const SPAN_ATTR_MAPPINGS = [
-  [ATTR_KEYS.GEN_AI_CONVERSATION_ID, "gen_ai.conversation.id"],
-  [ATTR_KEYS.LANGWATCH_USER_ID, "langwatch.user_id"],
-  [ATTR_KEYS.LANGWATCH_CUSTOMER_ID, "langwatch.customer_id"],
-  [ATTR_KEYS.GEN_AI_AGENT_NAME, "gen_ai.agent.name"],
-  [ATTR_KEYS.GEN_AI_AGENT_ID, "gen_ai.agent.id"],
-  [ATTR_KEYS.GEN_AI_PROVIDER_NAME, "gen_ai.provider.name"],
-  // The model's reasoning effort SETTING (low/medium/high/...), distinct
-  // from the reasoning TOKEN count. Hoisted to the trace attribute map so
-  // the drawer header can show it next to the model — the same lift that
-  // surfaces the conversation id. First non-empty span value wins.
-  [ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT, "gen_ai.request.reasoning_effort"],
-  [ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID, "langgraph.thread_id"],
-  // AI Gateway markers — stamped on every gateway-emitted customer span by
-  // services/aigateway/adapters/customertracebridge/emitter.go. They are
-  // what joins a trace back to the key and the request that produced it,
-  // which is the read the gateway usage views and per-key spend serve.
-  // Budget debits do not come from here: they ride the gateway's own spend
-  // commands, which carry attribution the trace never sees.
-  ["langwatch.virtual_key_id", "langwatch.virtual_key_id"],
-  ["langwatch.gateway_request_id", "langwatch.gateway_request_id"],
-  // The provider the request was actually dispatched to (a ModelProvider
-  // row id), so usage views can break spend down by the vendor that served
-  // the call.
-  ["langwatch.model_provider_id", "langwatch.model_provider_id"],
-  // The model name the client sent, present only when a routing policy
-  // rewrote it. gen_ai.request.model holds the model that was dispatched,
-  // so this is what answers which tier or which legacy name a caller uses.
-  ["langwatch.requested_model", "langwatch.requested_model"],
-  // Governance ingest markers — stamped on every span by the
-  // /api/ingest/otel/:sourceId receiver (platform/app/src/server/routes/ingest/ingestionRoutes.ts).
-  // Hoisted into trace_summaries so the ActivityMonitorService dashboard
-  // queries can roll up spend / users / events by ingestion source without
-  // having to scan stored_spans. The receiver is the only emitter of
-  // these keys; non-governance traces never carry them.
-  ["langwatch.origin.kind", "langwatch.origin.kind"],
-  ["langwatch.ingestion_source.id", "langwatch.ingestion_source.id"],
-  ["langwatch.ingestion_source.organization_id", "langwatch.ingestion_source.organization_id"],
-  ["langwatch.ingestion_source.source_type", "langwatch.ingestion_source.source_type"],
-] as const;
-
-/**
- * Resource attributes that carry trace identity (thread_id, user_id,
- * customer_id) need to be promoted to their canonical trace-summary
- * forms. The REST collector (`/api/collector`) writes the
- * `metadata.thread_id` field as a RESOURCE attribute (see
- * `collectorSpan.utils.ts#buildResource`), but the canonicalisation
- * extractor that maps to `gen_ai.conversation.id` only runs on
- * per-SPAN attributes. Without this hoist a trace posted via the docs
- * `metadata: { thread_id: "..." }` example never picks up a
- * conversationId and conversation grouping silently breaks.
- *
- * Each entry: list of resource keys to look at (priority order) → the
- * canonical trace-summary key we want to populate.
- */
-export const RESOURCE_ATTR_CANONICAL_MAPPINGS = [
-  {
-    sources: [
-      ATTR_KEYS.LANGWATCH_THREAD_ID, // langwatch.thread.id (new dotted form)
-      ATTR_KEYS.LANGWATCH_THREAD_ID_LEGACY, // langwatch.thread_id
-      ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID,
-      "metadata.thread_id",
-    ],
-    dest: "gen_ai.conversation.id",
-  },
-  {
-    sources: [
-      ATTR_KEYS.LANGWATCH_USER_ID, // langwatch.user.id (new dotted form)
-      ATTR_KEYS.LANGWATCH_USER_ID_LEGACY, // langwatch.user_id
-      "metadata.user_id",
-    ],
-    dest: "langwatch.user_id",
-  },
-  {
-    sources: [
-      ATTR_KEYS.LANGWATCH_CUSTOMER_ID, // langwatch.customer.id
-      ATTR_KEYS.LANGWATCH_CUSTOMER_ID_LEGACY, // langwatch.customer_id
-      "metadata.customer_id",
-    ],
-    dest: "langwatch.customer_id",
-  },
-] as const;
-
-/**
- * Resource attributes that carry a cost-classification signal rather than
- * trace identity. They are consumed per span at fold time (the bundled
- * portion is rolled into NonBilledCost) and must NOT be hoisted onto the
- * trace's attribute map — a trace's cost split is two real amounts, not a
- * single trace-level boolean. Existing rows that still carry the key keep it;
- * the read layer treats the column as authoritative and the key as a
- * fallback only.
- */
-const NON_HOISTED_RESOURCE_KEYS: ReadonlySet<string> = new Set(["langwatch.cost.non_billable"]);
-
-export const STANDARD_RESOURCE_PREFIXES = [
-  "host.",
-  "process.",
-  "telemetry.",
-  "service.",
-  "os.",
-  "container.",
-  "k8s.",
-  "cloud.",
-  "deployment.",
-  "device.",
-  "faas.",
-  "webengine.",
-] as const;
+import { TraceAttributeExtractionService } from "./trace-attribute-extraction.service";
 
 /**
  * Trace-level model metadata stamped by the fold from the models its spans
@@ -208,175 +37,18 @@ export const MODEL_METADATA_STAMPED_MARKER = "langwatch.reserved.model_metadata_
  * origin hoisting, and PII redaction tracking.
  */
 export class TraceAttributeAccumulationService {
-  private constructor(private readonly traceOriginService: TraceOriginService) {}
+  private constructor(
+    private readonly traceOriginService: TraceOriginService,
+    private readonly extraction: TraceAttributeExtractionService,
+  ) {}
 
   static create(traceOriginService: TraceOriginService): TraceAttributeAccumulationService {
-    return new TraceAttributeAccumulationService(traceOriginService);
-  }
-
-  extractAttributes(span: NormalizedSpan): Record<string, string> {
-    const result: Record<string, string> = {};
-    const spanAttrs = span.spanAttributes;
-    const resourceAttrs = span.resourceAttributes;
-
-    for (const [source, dest] of RESOURCE_ATTR_MAPPINGS) {
-      const v = resourceAttrs[source];
-      if (typeof v === "string") {
-        result[dest] = v;
-      }
-    }
-
-    for (const [key, value] of Object.entries(resourceAttrs)) {
-      if (STANDARD_RESOURCE_PREFIXES.some((p) => key.startsWith(p))) {
-        continue;
-      }
-      if (NON_HOISTED_RESOURCE_KEYS.has(key)) {
-        continue;
-      }
-      // Normalize langwatch.metadata.* resource attributes to metadata.* canonical form
-      const normalizedKey = key.startsWith("langwatch.metadata.")
-        ? key.replace("langwatch.metadata.", "metadata.")
-        : key;
-      if (typeof value === "string") {
-        result[normalizedKey] = value;
-      } else if (typeof value === "number" || typeof value === "boolean") {
-        result[normalizedKey] = String(value);
-      }
-    }
-
-    // Promote resource-level identity attrs (thread/user/customer) to
-    // their canonical trace-summary keys. Runs BEFORE SPAN_ATTR_MAPPINGS
-    // so a span-level value still wins when both are present.
-    for (const { sources, dest } of RESOURCE_ATTR_CANONICAL_MAPPINGS) {
-      if (result[dest]) {
-        continue;
-      }
-      for (const source of sources) {
-        const v = resourceAttrs[source] ?? result[source];
-        if (typeof v === "string" && v.length > 0) {
-          result[dest] = v;
-          break;
-        }
-      }
-    }
-
-    for (const [source, dest] of SPAN_ATTR_MAPPINGS) {
-      const v = spanAttrs[source];
-      if (typeof v === "string") {
-        result[dest] = v;
-      }
-    }
-
-    const origin = stringAttr(spanAttrs, "langwatch.origin");
-    if (origin) {
-      result["langwatch.origin"] = origin;
-    }
-
-    const scenarioRunId = stringAttr(spanAttrs, "scenario.run_id");
-    if (scenarioRunId) {
-      result["scenario.run_id"] = scenarioRunId;
-    }
-
-    const evaluationRunId = stringAttr(spanAttrs, "evaluation.run_id");
-    if (evaluationRunId) {
-      result["evaluation.run_id"] = evaluationRunId;
-    }
-
-    // Labels may arrive on span attrs (OTLP-direct path, where
-    // otelAttributesToNestedAttributes JSON-parses the string to an array)
-    // or on resource attrs (POST /api/collector and
-    // PATCH /api/traces/{id}/metadata, where buildResource writes
-    // JSON.stringify(labels) and parseJsonStringValues later converts it
-    // back to an array). Honor both sources so labels sent via the
-    // documented REST endpoints actually reach the trace's attribute map
-    // and the labels facet SQL. Mirrors the tag.tags handling below.
-    const labels =
-      spanAttrs[ATTR_KEYS.LANGWATCH_LABELS] ?? resourceAttrs[ATTR_KEYS.LANGWATCH_LABELS];
-    if (typeof labels === "string") {
-      result["langwatch.labels"] = labels;
-    } else if (Array.isArray(labels)) {
-      result["langwatch.labels"] = JSON.stringify(labels);
-    }
-
-    // `tag.tags` is the reserved labels key of the legacy OTLP path
-    // (otel.traces.ts maps it to reservedTraceMetadata.labels) and what the
-    // Langy worker emits via OPENCODE_RESOURCE_ATTRIBUTES (tag.tags=langy).
-    // Honor the same contract here: fold span- or resource-level tag.tags
-    // (comma-separated string or array) into langwatch.labels so the trace
-    // actually carries the tag in the UI/filters. langwatch.labels wins on
-    // conflict; tag.tags values are unioned in.
-    const tagTags = spanAttrs["tag.tags"] ?? resourceAttrs["tag.tags"];
-    const tagList = Array.isArray(tagTags)
-      ? tagTags.filter((t): t is string => typeof t === "string")
-      : typeof tagTags === "string"
-        ? tagTags
-            .split(",")
-            .map((t) => t.trim())
-            .filter(Boolean)
-        : [];
-    if (tagList.length > 0) {
-      const existing = parseJsonStringArray(result["langwatch.labels"]);
-      result["langwatch.labels"] = JSON.stringify([...new Set([...existing, ...tagList])]);
-    }
-
-    this.applyVercelTelemetryMetadata(spanAttrs, result);
-
-    const promptId = stringAttr(spanAttrs, "langwatch.prompt.id");
-    if (promptId?.includes(":")) {
-      result["langwatch.prompt.id"] = promptId;
-    }
-
-    for (const [key, value] of Object.entries(spanAttrs)) {
-      if (!key.startsWith("metadata.")) {
-        continue;
-      }
-      if (typeof value === "string") {
-        result[key] = value;
-      } else if (value !== null && value !== undefined) {
-        result[key] = typeof value === "object" ? JSON.stringify(value) : String(value);
-      }
-    }
-
-    return result;
-  }
-
-  /**
-   * Folds the Vercel AI SDK's metadata channel into the keys the trace
-   * summary already reads.
-   *
-   * `experimental_telemetry: { metadata: {...} }` is flattened by the AI SDK
-   * onto every span it emits, one `ai.telemetry.metadata.<key>` attribute per
-   * entry. It is the only metadata channel the AI SDK gives a caller, so the
-   * reserved names below get the same treatment they get on every other
-   * channel, and anything else becomes custom trace metadata.
-   *
-   * A value the caller set explicitly through `langwatch.*` (or through a
-   * resource attribute) always wins: this only fills a key that is still
-   * empty.
-   */
-  private applyVercelTelemetryMetadata(
-    spanAttrs: NormalizedSpan["spanAttributes"],
-    result: Record<string, string>,
-  ): void {
-    for (const [key, value] of Object.entries(spanAttrs)) {
-      const name = vercelMetadataName(key);
-      if (!name || value === null || value === undefined) {
-        continue;
-      }
-
-      if (name === "labels" || name === "tags") {
-        unionLabelsInto(result, labelList(value));
-        continue;
-      }
-
-      const reserved = VERCEL_RESERVED_METADATA[name];
-      if (reserved) {
-        fillIfEmpty(result, reserved, value);
-        continue;
-      }
-
-      result[`metadata.${name}`] = attributeText(value);
-    }
+    // Extraction takes no dependencies, so it is built here rather than made a
+    // parameter every caller would have to thread through unchanged.
+    return new TraceAttributeAccumulationService(
+      traceOriginService,
+      TraceAttributeExtractionService.create(),
+    );
   }
 
   accumulateAttributes({
@@ -397,9 +69,36 @@ export class TraceAttributeAccumulationService {
     inputMediaRefs: string | null;
     outputMediaRefs: string | null;
   }): Record<string, string> {
-    const spanAttrs = this.extractAttributes(span);
+    const spanAttrs = this.extraction.extractAttributes(span);
+    // State wins on a plain key: the first span to set one keeps it. The steps
+    // below are the exceptions, each for its own reason.
     const merged = { ...spanAttrs, ...state.attributes };
 
+    this.unionLabels({ merged, spanAttrs, state });
+    this.unionPromptIds({ merged, spanAttrs, state });
+    this.mergeMetadataObjects({ merged, spanAttrs, state });
+    this.preferUserModelMetadata({ merged, spanAttrs });
+
+    this.traceOriginService.stripLegacyMarkers(merged);
+    this.traceOriginService.hoistOrigin({ state, span, mergedAttributes: merged });
+    this.traceOriginService.hoistSource({ state, span, mergedAttributes: merged });
+
+    this.applyReservedFlags({ merged, outputSource, inputIsFallback, outputIsFallback });
+    this.recordMediaAndRedaction({ merged, span, inputMediaRefs, outputMediaRefs });
+
+    return merged;
+  }
+
+  /** Labels are a set across the whole trace, not the last span's list. */
+  private unionLabels({
+    merged,
+    spanAttrs,
+    state,
+  }: {
+    merged: Record<string, string>;
+    spanAttrs: Record<string, string>;
+    state: TraceSummaryData;
+  }): void {
     // Labels: union across spans
     const existingLabels = state.attributes["langwatch.labels"];
     const newLabels = spanAttrs["langwatch.labels"];
@@ -411,7 +110,21 @@ export class TraceAttributeAccumulationService {
         merged["langwatch.labels"] = JSON.stringify(union);
       }
     }
+  }
 
+  /**
+   * Prompt ids likewise, gathered under a plural key. The per-span key is
+   * dropped so it cannot leak out as a trace-level attribute.
+   */
+  private unionPromptIds({
+    merged,
+    spanAttrs,
+    state,
+  }: {
+    merged: Record<string, string>;
+    spanAttrs: Record<string, string>;
+    state: TraceSummaryData;
+  }): void {
     // Prompt IDs: union across spans
     const existingPromptIds = state.attributes["langwatch.prompt_ids"];
     const newPromptId = spanAttrs["langwatch.prompt.id"];
@@ -429,7 +142,22 @@ export class TraceAttributeAccumulationService {
 
     // Remove the per-span key so it doesn't leak into trace-level attributes
     delete merged["langwatch.prompt.id"];
+  }
 
+  /**
+   * Two spans may each carry part of one `metadata.*` object. Deep-merge those,
+   * with the earlier span winning per key; anything that is not JSON keeps the
+   * plain first-wins result.
+   */
+  private mergeMetadataObjects({
+    merged,
+    spanAttrs,
+    state,
+  }: {
+    merged: Record<string, string>;
+    spanAttrs: Record<string, string>;
+    state: TraceSummaryData;
+  }): void {
     // Metadata: deep-merge JSON objects, first-wins for primitives
     for (const key of Object.keys(merged)) {
       if (!key.startsWith("metadata.")) {
@@ -457,7 +185,23 @@ export class TraceAttributeAccumulationService {
         /* not JSON - keep first-wins */
       }
     }
+  }
 
+  /**
+   * A user's own `metadata.model` beats a stamp an earlier fold applied.
+   *
+   * First-wins would otherwise keep OUR stamped value and silently discard
+   * what the caller sent, so the incoming keys are applied and the marker
+   * cleared for good. The stamp never reaches here through `spanAttrs`: it
+   * lives on state, and `extractAttributes` reads the span.
+   */
+  private preferUserModelMetadata({
+    merged,
+    spanAttrs,
+  }: {
+    merged: Record<string, string>;
+    spanAttrs: Record<string, string>;
+  }): void {
     // User-provided model metadata wins over an earlier fold's stamp. The
     // existing-wins merge above keeps the STAMPED values when a later span
     // carries user `metadata.model` / `metadata.models`, which would silently
@@ -482,19 +226,20 @@ export class TraceAttributeAccumulationService {
         }
       }
     }
+  }
 
-    this.traceOriginService.stripLegacyMarkers(merged);
-    this.traceOriginService.hoistOrigin({
-      state,
-      span,
-      mergedAttributes: merged,
-    });
-    this.traceOriginService.hoistSource({
-      state,
-      span,
-      mergedAttributes: merged,
-    });
-
+  /** Reserved flags are set or removed, never left stale from an earlier span. */
+  private applyReservedFlags({
+    merged,
+    outputSource,
+    inputIsFallback,
+    outputIsFallback,
+  }: {
+    merged: Record<string, string>;
+    outputSource: string;
+    inputIsFallback: boolean;
+    outputIsFallback: boolean;
+  }): void {
     merged["langwatch.reserved.output_source"] = outputSource;
     if (inputIsFallback) {
       merged["langwatch.reserved.input_is_fallback"] = "true";
@@ -507,7 +252,24 @@ export class TraceAttributeAccumulationService {
     } else {
       delete merged["langwatch.reserved.output_is_fallback"];
     }
+  }
 
+  /**
+   * Media refs ride the summary so the trace list and drawer can render
+   * thumbnails without reloading span payloads, following the same winner as
+   * the computed text. Redaction status accumulates span ids by severity.
+   */
+  private recordMediaAndRedaction({
+    merged,
+    span,
+    inputMediaRefs,
+    outputMediaRefs,
+  }: {
+    merged: Record<string, string>;
+    span: NormalizedSpan;
+    inputMediaRefs: string | null;
+    outputMediaRefs: string | null;
+  }): void {
     // Media refs ride the summary so the trace list and drawer summary can
     // render thumbnails/players without reloading span payloads. They follow
     // the same winner as ComputedInput/Output (see TraceIOAccumulationService).
@@ -534,8 +296,6 @@ export class TraceAttributeAccumulationService {
       ids.push(span.spanId);
       merged[key] = JSON.stringify(ids);
     }
-
-    return merged;
   }
 
   /**

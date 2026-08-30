@@ -17,14 +17,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { NormalizedSpan } from "@langwatch/trace-contract";
-import { TraceAttributeAccumulationService } from "@langwatch/trace-server";
-import type { TraceOriginService } from "@langwatch/trace-server";
+import { TraceAttributeExtractionService } from "@langwatch/trace-server";
 
+// Reading one span is its own service now — it takes no dependencies, which is
+// what the old comment here ("extractAttributes never touches the origin
+// service") was working around.
 function makeService() {
-  return TraceAttributeAccumulationService.create(
-    // extractAttributes never touches the origin service.
-    {} as TraceOriginService,
-  );
+  return TraceAttributeExtractionService.create();
 }
 
 function makeSpan(
@@ -37,7 +36,7 @@ function makeSpan(
   } as NormalizedSpan;
 }
 
-describe("TraceAttributeAccumulationService.extractAttributes", () => {
+describe("TraceAttributeExtractionService.extractAttributes", () => {
   describe("when the resource carries tag.tags (Langy worker shape)", () => {
     it("folds it into langwatch.labels", () => {
       const result = makeService().extractAttributes(
@@ -153,7 +152,7 @@ describe("TraceAttributeAccumulationService.extractAttributes", () => {
  * through the SDK's own metadata channel reached the product with no labels,
  * no user, no conversation and no custom keys.
  */
-describe("TraceAttributeAccumulationService and the Vercel AI SDK metadata channel", () => {
+describe("TraceAttributeExtractionService and the Vercel AI SDK metadata channel", () => {
   describe("when a span carries ai.telemetry.metadata.labels", () => {
     /** @scenario "Labels passed to experimental_telemetry reach the trace" */
     it("folds them into langwatch.labels", () => {
