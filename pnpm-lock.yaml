@@ -1640,6 +1640,9 @@ importers:
       '@langwatch/enterprise-sso-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../../../features/entitlement/contract
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:../../../../features/ops/contract
@@ -5872,6 +5875,9 @@ importers:
       '@testing-library/user-event':
         specifier: ^14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
+      '@types/lodash-es':
+        specifier: ^4.17.12
+        version: 4.17.12
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.18

@@ -43,6 +43,11 @@ class Users extends UserService {
   async createPasskeyUser(): Promise<never> {
     throw new Error("not used");
   }
+  // `UserService` grew this and the fake did not follow.
+  async hasPassword(): Promise<never> {
+    throw new Error("not used by these tests");
+  }
+
   async setFirstPassword(): Promise<never> {
     throw new Error("not used");
   }
