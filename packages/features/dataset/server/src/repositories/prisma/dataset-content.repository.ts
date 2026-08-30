@@ -1,7 +1,5 @@
 import type { Dataset, Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { attachDatasetRecordCounts } from "../../services/dataset-record-counts";
-
 /**
  * Input types derived from Prisma for type safety
  */
@@ -40,6 +38,20 @@ export const DATASET_MUTATION_TXN_MAX_WAIT_MS = 10_000;
 
 /** A `PrismaClient`, or the transaction-scoped client `$transaction` hands back. */
 type DatasetContentClient = PrismaClient | Prisma.TransactionClient;
+
+type CountableDataset = {
+  id: string;
+  contentLayout?: string | null;
+  useS3?: boolean | null;
+};
+
+/**
+ * Whether a dataset's entries still live in the `DatasetRecord` table. Mirrors
+ * the fallback branch of `datasetDisplayRecordCount` — the two must agree, or
+ * a dataset gets counted and then has its count discarded, or vice versa.
+ */
+const storesRowsInRecordsTable = (dataset: CountableDataset): boolean =>
+  dataset.contentLayout !== "s3_jsonl" && !dataset.useS3;
 
 export class DatasetContentRepository {
   private constructor(
@@ -368,12 +380,51 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
       this.prisma.dataset.count({ where }),
     ]);
 
-    const datasets = await attachDatasetRecordCounts({
-      prisma: this.prisma,
-      projectId: input.projectId,
-      datasets: page,
-    });
+    const datasets = await this.attachRecordCounts(input.projectId, page);
 
     return { datasets, total };
+  }
+
+  /**
+   * Attaches the `_count.datasetRecords` shape that dataset lists render,
+   * without Prisma's relation-count `include`.
+   *
+   * Prisma compiles `include: { _count: { select: { datasetRecords: true } } }`
+   * into a subquery with no tenancy predicate at all:
+   *
+   *   LEFT JOIN (SELECT "datasetId", COUNT(*) FROM "DatasetRecord"
+   *              WHERE 1=1 GROUP BY "datasetId") ...
+   *
+   * so every dataset list aggregates the whole `DatasetRecord` table across
+   * every tenant, and one customer's list costs more as the others grow.
+   *
+   * Counting here keeps the read inside the project and inside the datasets
+   * that actually store rows in that table: `s3_jsonl` and legacy `useS3`
+   * datasets keep their content in object storage, so their row count is
+   * already a column on `Dataset` and their `DatasetRecord` count is a
+   * guaranteed zero nobody reads. A project fully on object storage issues no
+   * count query at all.
+   */
+  private async attachRecordCounts<T extends CountableDataset>(
+    projectId: string,
+    datasets: T[],
+  ): Promise<Array<T & { _count: { datasetRecords: number } }>> {
+    const datasetIds = datasets.filter(storesRowsInRecordsTable).map((dataset) => dataset.id);
+
+    const grouped =
+      datasetIds.length > 0
+        ? await this.prisma.datasetRecord.groupBy({
+            by: ["datasetId"],
+            where: { projectId, datasetId: { in: datasetIds } },
+            _count: { _all: true },
+          })
+        : [];
+
+    const countByDatasetId = new Map(grouped.map((row) => [row.datasetId, row._count._all]));
+
+    return datasets.map((dataset) => ({
+      ...dataset,
+      _count: { datasetRecords: countByDatasetId.get(dataset.id) ?? 0 },
+    }));
   }
 }
