@@ -3,7 +3,14 @@
     "target": "es2022",
     "module": "preserve",
     "moduleResolution": "bundler",
-    "lib": ["es2022"],
+    // The catalogue imports a feature id from each of the nine enterprise
+    // contracts, which pulls those packages' sources into this program. They
+    // declare `dom` themselves and use the web-standard globals it supplies
+    // (`URL` in the SSO path gate, `AbortSignal` on the governance puller), so
+    // checking them under a narrower lib than they were written against
+    // reported errors their own typecheck does not have. Still no "types":
+    // nothing here may reach for `node:*`.
+    "lib": ["es2022", "dom"],
     "types": [],
     "strict": true,
     "noUncheckedIndexedAccess": true,

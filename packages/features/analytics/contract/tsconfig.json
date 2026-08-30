@@ -10,7 +10,13 @@
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
+    // No "node". The contract is loaded by the browser — the schema browser,
+    // the time-window editor and the granularity picker all read the
+    // vocabulary from it — so a `node:*` import or a `Buffer` reference must
+    // not compile here. Tests are checked by tsconfig.test.json, which
+    // supplies the node types the import-free guard needs to read its subject.
     "types": ["vitest/globals"]
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/__tests__/**"]
 }
