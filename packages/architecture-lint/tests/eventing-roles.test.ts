@@ -106,10 +106,36 @@ describe("Eventing role lint", () => {
 
     expect(policies([pkg])).toContain("eventing-subscriber-idempotency");
 
+    // The package's old test root. It satisfied this rule until tests moved
+    // beside their subjects, and asserting it does NOT satisfy it is what keeps
+    // the rule from drifting back to reading two locations.
     write(
       "packages/features/agent/server/tests/subscribers/agent.subscriber.redelivery.test.ts",
       "export {};",
     );
+    expect(policies([pkg])).toContain("eventing-subscriber-idempotency");
+
+    write(
+      "packages/features/agent/server/src/subscribers/__tests__/agent.subscriber.redelivery.test.ts",
+      "export {};",
+    );
     expect(policies([pkg])).not.toContain("eventing-subscriber-idempotency");
+  });
+
+  it("does not accept a redelivery test that is not beside its subscriber", () => {
+    const pkg = strictServer();
+    write(
+      "packages/features/agent/server/src/subscribers/agent.subscriber.ts",
+      "export class AgentSubscriber {}",
+    );
+    // Right name, wrong directory: the pairing has to be visible from the
+    // subscriber's own folder, or the next person to move one takes its test
+    // out of range without noticing.
+    write(
+      "packages/features/agent/server/src/__tests__/agent.subscriber.redelivery.test.ts",
+      "export {};",
+    );
+
+    expect(policies([pkg])).toContain("eventing-subscriber-idempotency");
   });
 });

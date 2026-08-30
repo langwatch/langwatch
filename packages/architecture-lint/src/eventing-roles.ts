@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import { basename, join, relative, sep } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { basename, dirname, join, relative, sep } from "node:path";
 import ts from "typescript";
 import { walkFiles } from "./files";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types";
@@ -25,13 +25,7 @@ const IO_MODULES = new Set([
   "node:worker_threads",
   "undici",
 ]);
-const IO_MODULE_PREFIXES = [
-  "@anthropic-ai/",
-  "@aws-sdk/",
-  "node:fs/",
-  "node:dns/",
-  "openai/",
-];
+const IO_MODULE_PREFIXES = ["@anthropic-ai/", "@aws-sdk/", "node:fs/", "node:dns/", "openai/"];
 const SIDE_EFFECT_CALLS = new Set([
   "fetch",
   "queueMicrotask",
@@ -74,8 +68,7 @@ function callName(expression: ts.LeftHandSideExpression): string | null {
 
 function isIoModule(specifier: string): boolean {
   return (
-    IO_MODULES.has(specifier) ||
-    IO_MODULE_PREFIXES.some((prefix) => specifier.startsWith(prefix))
+    IO_MODULES.has(specifier) || IO_MODULE_PREFIXES.some((prefix) => specifier.startsWith(prefix))
   );
 }
 
@@ -127,10 +120,8 @@ function lintRoleFile(file: string, role: EventingRole): ArchitectureViolation[]
       );
     }
 
-    const isFunctionDeclaration =
-      ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node);
-    const isCallableDeclaration =
-      ts.isArrowFunction(node) || ts.isMethodDeclaration(node);
+    const isFunctionDeclaration = ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node);
+    const isCallableDeclaration = ts.isArrowFunction(node) || ts.isMethodDeclaration(node);
     const isAsyncDeclaration =
       (isFunctionDeclaration || isCallableDeclaration) &&
       node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword);
@@ -186,25 +177,30 @@ function lintRoleFile(file: string, role: EventingRole): ArchitectureViolation[]
   return violations;
 }
 
-function subscriberRedeliveryTest(file: string, pkg: ClassifiedPackage): string {
-  const subject = basename(file, ".subscriber.ts");
-  return join(
-    pkg.root,
-    "tests",
-    "subscribers",
-    `${subject}.subscriber.redelivery.test.ts`,
-  );
+/**
+ * Beside the subscriber, in its `__tests__` directory.
+ *
+ * This used to look in `<pkg>/tests/subscribers/`, and went on looking there
+ * after `5f9acf2b79` moved every feature package's tests next to the code they
+ * cover. Twenty of the twenty-two subscribers it reported had a redelivery test
+ * the whole time, in `src/subscribers/__tests__/` — the location
+ * `feature-layout.ts` names as the one a test may occupy. A rule that reports a
+ * test as missing while reading it is worse than no rule: it costs the reader
+ * the same attention as a real finding and teaches them the policy is noise.
+ *
+ * No package uses the old path any more, so this checks one location rather
+ * than accepting both. A redelivery test somewhere else in the package still
+ * counts as absent, which is the point — the pairing has to be visible from the
+ * subscriber's own directory.
+ */
+function subscriberRedeliveryTest(file: string): string {
+  const subject = basename(file, ".ts");
+  return join(dirname(file), "__tests__", `${subject}.redelivery.test.ts`);
 }
 
-function lintStrictSubscriberTest(
-  file: string,
-  pkg: ClassifiedPackage,
-): ArchitectureViolation[] {
-  const expected = subscriberRedeliveryTest(file, pkg);
-  const tests = walkFiles(join(pkg.root, "tests"), (candidate) =>
-    candidate.endsWith(".test.ts"),
-  );
-  if (tests.includes(expected)) return [];
+function lintStrictSubscriberTest(file: string, pkg: ClassifiedPackage): ArchitectureViolation[] {
+  const expected = subscriberRedeliveryTest(file);
+  if (existsSync(expected)) return [];
   return [
     {
       policy: "eventing-subscriber-idempotency",
@@ -241,8 +237,7 @@ export function lintEventingRoles(
       violations.push(...lintRoleFile(file, role));
       if (role !== "subscriber") continue;
       const pkg = packageByFile.find(
-        (candidate) =>
-          file === candidate.root || file.startsWith(`${candidate.root}${sep}`),
+        (candidate) => file === candidate.root || file.startsWith(`${candidate.root}${sep}`),
       );
       if (pkg?.layoutVersion === 0) {
         violations.push(...lintStrictSubscriberTest(file, pkg));
