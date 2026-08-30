@@ -39,10 +39,7 @@ import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integ
 import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 import { GatewayBudgetClickHouseRepository } from "@langwatch/gateway-server";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import {
-  clearClickHouseTestApp,
-  installClickHouseTestApp,
-} from "~/test-utils/clickhouseTestApp";
+import { clearClickHouseTestApp, installClickHouseTestApp } from "~/test-utils/clickhouseTestApp";
 import {
   DATABRICKS_GENIE_ADAPTER_ID,
   type DatabricksGeniePullConfig,
@@ -224,10 +221,7 @@ function extensionOf(row: { RawOcsfJson: string }): Record<string, unknown> {
   return parsed.metadata.extension;
 }
 
-async function seedSource(params: {
-  slug: string;
-  pullConfig: Prisma.InputJsonObject;
-}): Promise<{
+async function seedSource(params: { slug: string; pullConfig: Prisma.InputJsonObject }): Promise<{
   organizationId: string;
   teamId: string;
   sourceId: string;
@@ -255,7 +249,7 @@ async function seedSource(params: {
       parserConfig: params.pullConfig,
     },
   });
-  const govProject = await testApp.projects.ensureInternal({
+  const govProject = await testApp.projects.projectService.ensureInternal({
     organizationId: organization.id,
     kind: "internal_governance",
   });
@@ -595,10 +589,7 @@ async function startFixtureServer(params: {
     });
   });
 
-  async function handle(
-    req: http.IncomingMessage,
-    res: http.ServerResponse,
-  ): Promise<void> {
+  async function handle(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     const url = new URL(req.url ?? "/", "http://localhost");
     const token = url.searchParams.get("page_token");
     requestCounts.set(url.pathname, (requestCounts.get(url.pathname) ?? 0) + 1);
@@ -654,9 +645,7 @@ async function startFixtureServer(params: {
       return;
     }
 
-    const conversations = /^\/api\/2\.0\/genie\/spaces\/([^/]+)\/conversations$/.exec(
-      url.pathname,
-    );
+    const conversations = /^\/api\/2\.0\/genie\/spaces\/([^/]+)\/conversations$/.exec(url.pathname);
     if (conversations) {
       const spaceId = conversations[1]!;
       params.onBeforeSpace?.(spaceId);
@@ -701,10 +690,9 @@ async function startFixtureServer(params: {
       return;
     }
 
-    const messages =
-      /^\/api\/2\.0\/genie\/spaces\/[^/]+\/conversations\/([^/]+)\/messages$/.exec(
-        url.pathname,
-      );
+    const messages = /^\/api\/2\.0\/genie\/spaces\/[^/]+\/conversations\/([^/]+)\/messages$/.exec(
+      url.pathname,
+    );
     if (messages) {
       const forcedMessages = params.messagesStatus?.(messages[1]!);
       if (forcedMessages !== undefined) {
@@ -853,9 +841,7 @@ describe("given a Genie workspace the credential can fully read", () => {
     /** @scenario "Identity resolves to the directory's object id when it has one" */
     it("keys a record on the IdP object id when the directory has one", async () => {
       const rows = await ocsfRowsFor(seeded.govProjectId);
-      const withObjectId = extensionOf(
-        rows.find((r) => r.EventId.endsWith("msg-alpha-1"))!,
-      );
+      const withObjectId = extensionOf(rows.find((r) => r.EventId.endsWith("msg-alpha-1"))!);
 
       expect(withObjectId.actorKey).toBe("11111111-2222-3333-4444-555555555555");
       expect(withObjectId.actorEmail).toBe("dana.hoffman@acme.test");
@@ -1119,9 +1105,7 @@ describe("given a list endpoint whose page token never advances", () => {
       // The space is isolated, so the run itself survives — but it is
       // incomplete, and the watermark says so.
       expect(outcome.eventCount).toBe(0);
-      expect(decodeCursor(outcome.nextCursor).sinceMs).toBe(
-        Date.parse("2020-01-01T00:00:00.000Z"),
-      );
+      expect(decodeCursor(outcome.nextCursor).sinceMs).toBe(Date.parse("2020-01-01T00:00:00.000Z"));
     }, 60_000);
   });
 });
@@ -1160,8 +1144,7 @@ describe("given messages by an author the directory no longer has", () => {
       // A deleted account 404s every time, so a lookup per message would turn
       // one departed analyst into a lookup per question they ever asked.
       const lookups =
-        fixture.requestCounts.get(`/api/2.0/preview/scim/v2/Users/${DELETED_USER_ID}`) ??
-        0;
+        fixture.requestCounts.get(`/api/2.0/preview/scim/v2/Users/${DELETED_USER_ID}`) ?? 0;
       expect(lookups).toBe(1);
 
       // The questions still land. A missing author must cost the attribution,
@@ -1304,15 +1287,10 @@ describe("given a sweep too large for one run's budget", () => {
 
         // Run two, no deadline: resumes at space-alpha, re-reads its tail, and
         // drains the rest.
-        const second = await adapter.runOnce(
-          { cursor: first.cursor, credentials },
-          config,
-        );
+        const second = await adapter.runOnce({ cursor: first.cursor, credentials }, config);
         const secondCursor = decodeCursor(second.cursor);
 
-        const emitted = new Set(
-          [...first.events, ...second.events].map((e) => e.source_event_id),
-        );
+        const emitted = new Set([...first.events, ...second.events].map((e) => e.source_event_id));
         // The whole workspace, with nothing dropped at the cut. msg-alpha-2 and
         // msg-alpha-3 are the tail of the cut space that used to vanish.
         for (const id of ["msg-alpha-1", "msg-alpha-2", "msg-alpha-3", "msg-beta-1"]) {
@@ -1369,9 +1347,7 @@ describe("given the directory fails while the sweep is running", () => {
           config,
         );
 
-        const byId = new Map(
-          result.events.map((event) => [event.source_event_id, event]),
-        );
+        const byId = new Map(result.events.map((event) => [event.source_event_id, event]));
         const duringOutage = byId.get("msg-alpha-1");
         const afterOutage = byId.get("msg-alpha-2");
         expect(duringOutage).toBeDefined();
@@ -1386,9 +1362,7 @@ describe("given the directory fails while the sweep is running", () => {
         expect(String(duringOutage?.extra?.actorEmail ?? "")).toBe("");
         // And the next message by the SAME author is attributed properly,
         // which is the half a cached failure would have destroyed.
-        expect(String(afterOutage?.extra?.actorEmail ?? "")).toBe(
-          "dana.hoffman@acme.test",
-        );
+        expect(String(afterOutage?.extra?.actorEmail ?? "")).toBe("dana.hoffman@acme.test");
       } finally {
         await fixture.close();
       }
@@ -1662,10 +1636,7 @@ describe("given the workspace lists its spaces in a different order each run", (
           schedule: "*/15 * * * *",
         });
 
-        await adapter.runOnce(
-          { cursor: null, credentials: { token: "fixture-token" } },
-          config,
-        );
+        await adapter.runOnce({ cursor: null, credentials: { token: "fixture-token" } }, config);
 
         // The assertion that bites: the walk order is OURS. Take the server's
         // order and a resume point means a different thing on every run, so a
@@ -1935,9 +1906,7 @@ describe("given a message still being answered when the sweep reads it", () => {
       // Databricks finishes the answer between the two runs.
       const settled = workspace.messages["conv-beta-1"]![0]!;
       settled.status = "COMPLETED";
-      settled.attachments = [
-        sqlAttachment("late-beta-1", "SELECT `pickup_zip` FROM `trips`", 9),
-      ];
+      settled.attachments = [sqlAttachment("late-beta-1", "SELECT `pickup_zip` FROM `trips`", 9)];
 
       const second = await adapter.runOnce({ cursor: first.cursor, credentials }, config);
 
@@ -2002,10 +1971,7 @@ describe("given a message still being answered when the sweep reads it", () => {
           attachments: [],
         });
 
-        const second = await adapter.runOnce(
-          { cursor: first.cursor, credentials },
-          config,
-        );
+        const second = await adapter.runOnce({ cursor: first.cursor, credentials }, config);
         const after = decodeCursor(second.cursor);
 
         // The assertion that bites. A boolean hold leaves this at the

@@ -76,16 +76,13 @@ export function afterPromptCreated({
       let organizationId: string | undefined;
 
       if (!resolvedUserId) {
-        const resolution = await getApp().projects.resolveOrgAdmin(projectId);
+        const resolution = await getApp().projects.projectService.resolveOrgAdmin(projectId);
         resolvedUserId = resolution.userId;
         organizationId = resolution.organizationId ?? undefined;
       }
 
       if (!resolvedUserId) {
-        logger.warn(
-          { projectId },
-          "No user ID available for prompt creation nurturing — skipping",
-        );
+        logger.warn({ projectId }, "No user ID available for prompt creation nurturing — skipping");
         return;
       }
 
@@ -99,10 +96,7 @@ export function afterPromptCreated({
       }
 
       if (!organizationId) {
-        logger.warn(
-          { projectId },
-          "Could not resolve organizationId for prompt count — skipping",
-        );
+        logger.warn({ projectId }, "Could not resolve organizationId for prompt count — skipping");
         return;
       }
 
@@ -121,10 +115,7 @@ export function afterPromptCreated({
         orgPromptCount,
       });
     } catch (error) {
-      logger.error(
-        { projectId, error },
-        "Failed to fire prompt creation nurturing — non-fatal",
-      );
+      logger.error({ projectId, error }, "Failed to fire prompt creation nurturing — non-fatal");
       captureException(toError(error));
     }
   })();

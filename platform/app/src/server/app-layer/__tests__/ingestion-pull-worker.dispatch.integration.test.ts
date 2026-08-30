@@ -34,10 +34,7 @@ import { AppAwsClientConfiguration } from "~/runtime/app/aws-client.composition"
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import {
-  clearClickHouseTestApp,
-  installClickHouseTestApp,
-} from "~/test-utils/clickhouseTestApp";
+import { clearClickHouseTestApp, installClickHouseTestApp } from "~/test-utils/clickhouseTestApp";
 
 const ns = `puller-e2e-${nanoid(8)}`;
 
@@ -211,7 +208,7 @@ describe("PullerAdapter framework — end-to-end with real CH + real fetch", () 
       cursor: null,
     });
 
-    const govProject = await testApp.projects.ensureInternal({
+    const govProject = await testApp.projects.projectService.ensureInternal({
       organizationId,
       kind: "internal_governance",
     });

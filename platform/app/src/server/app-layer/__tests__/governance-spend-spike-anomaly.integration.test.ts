@@ -15,10 +15,7 @@ import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import {
-  clearClickHouseTestApp,
-  installClickHouseTestApp,
-} from "~/test-utils/clickhouseTestApp";
+import { clearClickHouseTestApp, installClickHouseTestApp } from "~/test-utils/clickhouseTestApp";
 import { PROJECT_KIND, type InternalProject } from "@langwatch/project-contract";
 import type { App } from "~/server/app-layer/app";
 
@@ -101,7 +98,7 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
         organizationId: org.id,
       },
     });
-    govProject = await app.projects.ensureInternal({
+    govProject = await app.projects.projectService.ensureInternal({
       organizationId: org.id,
       kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
     });
@@ -144,15 +141,9 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
     await prisma.anomalyRule
       .deleteMany({ where: { organizationId: org.id } })
       .catch(() => undefined);
-    await prisma.project
-      .deleteMany({ where: { id: govProject.id } })
-      .catch(() => undefined);
-    await prisma.team
-      .deleteMany({ where: { organizationId: org.id } })
-      .catch(() => undefined);
-    await prisma.organization
-      .deleteMany({ where: { id: org.id } })
-      .catch(() => undefined);
+    await prisma.project.deleteMany({ where: { id: govProject.id } }).catch(() => undefined);
+    await prisma.team.deleteMany({ where: { organizationId: org.id } }).catch(() => undefined);
+    await prisma.organization.deleteMany({ where: { id: org.id } }).catch(() => undefined);
     // governance_kpis is not in cleanupTestData's truncate set; clean it
     // manually for the tenants this test seeded.
     await ch

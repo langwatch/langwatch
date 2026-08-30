@@ -38,7 +38,11 @@ vi.mock("~/server/app-layer/app", () => ({
     get nurturing() {
       return currentNurturing;
     },
-    projects: mockProjects,
+    // `App.projects` is a ProjectApp, and it reaches the service through this
+    // getter. Mocking it flat — `projects: mockProjects` — is what let this
+    // suite stay green while the real call threw "not a function", because the
+    // shape it asserted against had stopped being the shape production has.
+    projects: { projectService: mockProjects },
   }),
 }));
 
