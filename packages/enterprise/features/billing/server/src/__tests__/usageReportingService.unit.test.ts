@@ -279,14 +279,11 @@ describe("usageReportingService", () => {
           startTime: 1708300800,
           endTime: 1708387200,
         });
-        expect(stripe.billing.meters.listEventSummaries).toHaveBeenCalledWith(
-          "mtr_test_abc123",
-          {
-            customer: "cus_abc123",
-            start_time: 1708300800,
-            end_time: 1708387200,
-          },
-        );
+        expect(stripe.billing.meters.listEventSummaries).toHaveBeenCalledWith("mtr_test_abc123", {
+          customer: "cus_abc123",
+          start_time: 1708300800,
+          end_time: 1708387200,
+        });
       });
     });
 
@@ -335,7 +332,10 @@ describe("usageReportingService", () => {
         // The provider's own sentence must not survive into the payload a
         // client reads — an unhandled reason serialises as "unknown".
         expect((raised as HandledError).serialize().reasons).toEqual([
-          { code: "unknown", kind: "unknown" },
+          // The shape `@langwatch/handled-error` gives an unhandled reason,
+          // asserted whole on purpose: a provider sentence leaking in would
+          // arrive as a new field, and only exact equality would notice.
+          { code: "unknown", kind: "unknown", retryable: false },
         ]);
         expect((raised as Error).message).not.toContain("No such meter");
       });

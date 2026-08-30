@@ -229,7 +229,17 @@ describe("WebhookEndpointTrpcApi", () => {
           url: "https://example.com/hook",
           enabledEvents: ["nonsense.event"],
         }),
-      ).rejects.toMatchObject({ code: "webhook_endpoint_invalid", httpStatus: 400 });
+        // On the `cause`, not on the TRPCError itself. tRPC wraps whatever a
+        // procedure throws, and turning that wrapper into a 400 carrying the
+        // code is `createTrpcErrorFormatter`'s job — it reads exactly this
+        // `cause` through `HandledError.isHandled`. What this surface is
+        // responsible for is that the domain error REACHES the boundary
+        // intact, which is what is asserted here; the bare `initTRPC` above
+        // has no formatter, so asserting the client shape here would be
+        // asserting a collaborator this test does not build.
+      ).rejects.toMatchObject({
+        cause: { code: "webhook_endpoint_invalid", httpStatus: 400 },
+      });
     });
   });
 });
