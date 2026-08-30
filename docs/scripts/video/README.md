@@ -72,7 +72,7 @@ Paths are relative to the timeline file, except `cursors/*` and
   "cut": { "speed": 2, "segments": [[17.2, 29.6], [31.6, 39.2]] },
 
   "frame": {
-    "background": "backgrounds/dark.webp",   // or backgrounds/light.webp
+    "background": "backgrounds/default.webp",
     "fit": "native",                  // 1 output px per source px at 1x
     "radius": 13,                     // window corner radius
     "follow": 1,                      // how far the camera follows the target
@@ -84,6 +84,8 @@ Paths are relative to the timeline file, except `cursors/*` and
     "size": 128,                      // arrow height in output pixels
     "start": { "x": 308, "y": 264 },  // where it waits at t=0
     "speed": 850,                     // page px per second, sets the travel time
+    // it arrives `settle` before a plain click, and `settle + pause.before`
+    // before a click the timeline asked to hold on
     "minTravel": 0.45,
     "maxTravel": 1.5,
     "settle": 0.14,                   // it arrives this long before the click
@@ -108,8 +110,8 @@ Paths are relative to the timeline file, except `cursors/*` and
   "zoom": {
     "default": 1.9,    // used by a beat that names no zoom
     "lead": 0.5,       // the zoom completes this long before the click
-    "in": 0.62,        // ease in
-    "out": 0.8,        // ease out
+    "in": 0.62,        // ease in, at `default`; a weaker zoom takes less
+    "out": 0.8,        // ease out, same rule
     "hold": 0.8        // default seconds to stay zoomed after the click
   },
 
@@ -126,8 +128,10 @@ resolution at 1x, which is the sharpest it can be, and only a zoom resamples
 it. A number instead of `"native"` scales the window to that fraction of the
 output width.
 
-Background images live in `backgrounds/` at their original resolution. Do not
-downscale them: a zoom past 1x samples the background too.
+`backgrounds/default.webp` is the one background in the repo, kept at its
+original resolution. Do not downscale it, and do not downscale a replacement:
+a zoom past 1x samples the background too. Try a candidate with
+`--background <path>` before it goes anywhere near `backgrounds/`.
 
 ### `follow`
 
@@ -154,13 +158,38 @@ A beat asks for one of its own:
 ```
 
 `before` holds the frame before the click, so the camera arrives and the
-viewer sees what is about to be pressed. `after` holds it once the result is
-on screen, which is what buys a long camera pan its time. `"pause": 0.9` is
-shorthand for `before` alone.
+viewer sees what is about to be pressed. The cursor arrives at the start of
+that hold rather than the end of it, since a pause has to read as "about to
+press this" and cannot while the cursor is somewhere else. `after` holds the
+frame once the result is on screen, which is what buys a long camera pan its
+time. `"pause": 0.9` is shorthand for `before` alone.
 
-Every beat after a freeze moves later by that much, and the script reports the
-total when it runs. Beat times in the timeline are always source seconds, so
-adding a pause never means retiming the beats that follow.
+Do not reach for `pause` on a click that needs no explanation. Every hold you
+add is a beat the viewer waits through, and a video that pauses before all of
+them reads as lag rather than emphasis.
+
+`skip` is the same machinery with the sign flipped. `"skip": 1.25` on a beat
+drops the 1.25 seconds of source right before it, which is how dead air in the
+take is removed without re-cutting. Confirm the take really is still over that
+stretch first, or the drop becomes a jump cut:
+
+```bash
+ffmpeg -v error -i cut.webm -vf \
+  "trim=6.8:10.2,setpts=PTS-STARTPTS,select='gte(scene,0)',metadata=print:file=-" \
+  -f null -
+```
+
+A run of `lavfi.scene_score=0.000000` is a stretch nobody will miss.
+
+Every beat after a freeze moves by that much, and the script prints each one
+when it runs, so the timing is auditable:
+
+```
+pacing: 32.83s -> 34.46s  [5.96+0.08 6.26+0.90 6.61+1.00 8.63-1.25 ...]
+```
+
+Beat times in the timeline are always source seconds, so a pause or a skip
+never means retiming the beats that follow.
 
 ### Beats
 
@@ -181,6 +210,7 @@ Coordinates are page pixels, the same numbers a `boundingBox()` returns.
 | `travel` | override the travel time into this beat |
 | `arc` | how much the path into this beat bows, `0` for a ruled line |
 | `pause` | `{ before, after }` seconds to freeze the source around the click |
+| `skip` | seconds of source to drop immediately before this beat |
 | `click` | `false` moves the cursor without a click, and it stays an arrow |
 | `cursor` | `false` zooms without moving the cursor |
 | `hide` / `show` | fade the cursor out or back in at `t` |
@@ -210,7 +240,9 @@ The full rules are on the Nexus guide. In short:
   on screen.
 - **If a move looks rushed, pause it, do not shorten the path.** `pace.auto`
   catches most of them. Add `pause` by hand where the viewer has to read
-  something before the click.
+  something before the click, and nowhere else.
+- **Every zoom in a video moves at one rate.** Do not hand-tune `in` and `out`
+  per beat to fit a gap. If a zoom has no room, give it room with `pause`.
 - **Two zooms back to back are tiring.** When the next target is close in time,
   pan the camera to it at the same zoom instead of easing out and back in.
 - **A close X never earns a zoom.** Nothing is being read there.

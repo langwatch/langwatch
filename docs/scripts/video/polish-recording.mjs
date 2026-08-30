@@ -520,14 +520,17 @@ function buildCameraTrack(beats, cfg, duration, midX, midY) {
     const z = b.zoom == null ? cfg.default : b.zoom;
     if (!(z > 1.0001)) continue;
     const lead = b.lead == null ? cfg.lead : b.lead;
-    const rampIn = b.in == null ? cfg.in : b.in;
+    // Every zoom travels at the same rate: the ease lasts as long as the zoom
+    // is deep. A 1.4x and a 1.9x on the same video then read as one camera.
+    const rate = Math.log(z) / Math.log(Math.max(1.0001, cfg.default));
+    const rampIn = (b.in == null ? cfg.in : b.in) * rate;
     const peak = b.t - lead;
     const holdEnd = b.t + (b.hold == null ? cfg.hold : b.hold);
     groups.push({
       rampIn: peak - rampIn,
       peak,
       holdEnd,
-      rampOut: holdEnd + (b.out == null ? cfg.out : b.out),
+      rampOut: holdEnd + (b.out == null ? cfg.out : b.out) * rate,
       z,
       cx: b.zoomAt ? b.zoomAt.x : b.x,
       cy: b.zoomAt ? b.zoomAt.y : b.y,
@@ -581,6 +584,10 @@ function buildCameraTrack(beats, cfg, duration, midX, midY) {
  * Turns the beats into the cursor's path, its arrow-or-hand state, the click
  * dip, the click ripples and its visibility.
  */
+/** Seconds the source is held before this beat's click, 0 for most beats. */
+const pauseBefore = (b) =>
+  typeof b.pause === "number" ? b.pause : (b.pause?.before ?? 0);
+
 function buildCursorTrack(beats, cfg) {
   const moves = [];
   const clicks = [];
@@ -600,15 +607,21 @@ function buildCursorTrack(beats, cfg) {
     }
     if (b.x == null || b.y == null || b.cursor === false) continue;
 
-    const arrive = b.t - cfg.settle;
     // Travel time comes from the distance, so the cursor keeps one speed
     // across the whole video instead of racing over a long move.
     const dist = Math.hypot(b.x - at.x, b.y - at.y);
-    const want =
+    const travel =
       b.travel != null
         ? b.travel
         : clamp(dist / cfg.speed, cfg.minTravel, cfg.maxTravel);
-    let depart = arrive - want;
+    // A beat that asks for a `pause` before its click is asking the viewer to
+    // look at the target, so the cursor has to be on it for the whole pause.
+    // Every other beat arrives `settle` early and no earlier: waiting on a
+    // target nobody was told to look at just reads as lag.
+    const latest = b.t - cfg.settle;
+    const wanted = latest - pauseBefore(b);
+    const arrive = clamp(wanted, Math.min(freeFrom + travel, latest), latest);
+    let depart = arrive - travel;
     if (depart < freeFrom) depart = freeFrom;
     if (depart > arrive) depart = arrive;
     // The hand only appears where there is something to click.
@@ -718,11 +731,21 @@ function buildCursorTrack(beats, cfg) {
  * two targets that need the most room are usually the two the take runs
  * through fastest. A beat asks for a freeze of its own with
  * `pause: { before, after }`, or `pause: 0.6` for a wait before the click.
+ *
+ * `skip: 1.2` on a beat is the same machinery in reverse: it drops the 1.2
+ * seconds of source that come right before that beat, which is how a stretch
+ * of dead air in the take is removed without re-cutting it. Check the source
+ * really is still over that stretch first:
+ *
+ *   ffmpeg -v error -i cut.webm -vf \
+ *     "trim=6.8:10.2,setpts=PTS-STARTPTS,select='gte(scene,0)',metadata=print:file=-" \
+ *     -f null -
  */
 function buildPacing(beats, pace, cursorCfg) {
   const freezes = [];
   const insert = (c, d) => {
-    if (!(d > 0.005)) return;
+    // Negative is a skip, so the guard is on the magnitude, not the sign.
+    if (!(Math.abs(d) > 0.005)) return;
     const hit = freezes.find((f) => Math.abs(f.c - c) < 1e-6);
     if (hit) {
       hit.d += d;
@@ -739,10 +762,10 @@ function buildPacing(beats, pace, cursorCfg) {
     }
     return c + acc;
   };
-  const pauseOf = (b) =>
-    typeof b.pause === "number"
-      ? { before: b.pause, after: 0 }
-      : { before: b.pause?.before ?? 0, after: b.pause?.after ?? 0 };
+  const pauseOf = (b) => ({
+    before: pauseBefore(b),
+    after: typeof b.pause === "number" ? 0 : (b.pause?.after ?? 0),
+  });
   // The click lands at the end of its own `before` freeze, so the frame the
   // viewer waits on is the one before anything happened.
   const timeOf = (b) => outOf(b.t) + (b.x == null ? 0 : pauseOf(b).before);
@@ -750,6 +773,9 @@ function buildPacing(beats, pace, cursorCfg) {
   for (const b of beats) {
     if (b.x == null) continue;
     const { before, after } = pauseOf(b);
+    // A skip is a freeze of negative length: the source jumps forward instead
+    // of standing still, and every clock below already handles the sign.
+    if (b.skip > 0) insert(b.t - b.skip, -b.skip);
     insert(b.t, before);
     insert(b.t + pace.afterDelay, after);
   }
@@ -762,6 +788,7 @@ function buildPacing(beats, pace, cursorCfg) {
       const need =
         Math.hypot(b.x - a.x, b.y - a.y) / pace.speed +
         cursorCfg.settle +
+        pauseBefore(b) +
         (a.click === false ? 0 : cursorCfg.press.duration) +
         pace.dwell;
       const short = need - (timeOf(b) - timeOf(a));
@@ -775,7 +802,7 @@ function buildPacing(beats, pace, cursorCfg) {
     for (const f of freezes) {
       const start = f.c + acc;
       if (o < start) return o - acc;
-      if (o < start + f.d) return f.c;
+      if (f.d > 0 && o < start + f.d) return f.c;
       acc += f.d;
     }
     return o - acc;
@@ -845,7 +872,7 @@ function parseArgs(argv) {
 const DEFAULTS = {
   fps: 30,
   frame: {
-    background: "backgrounds/dark.webp",
+    background: "backgrounds/default.webp",
     // "native" draws the recording at one output pixel per source pixel at 1x,
     // which is the sharpest the take can be. A number is a fraction of the
     // output width instead.
@@ -887,6 +914,8 @@ const DEFAULTS = {
     color: [86, 86, 86],
   },
   // `lead` puts the camera at full zoom before the click, never during it.
+  // `in` and `out` are the ease durations at `default`; a weaker zoom takes
+  // proportionally less time, so every zoom in a video moves at one speed.
   zoom: { default: 1.9, lead: 0.5, in: 0.62, out: 0.8, hold: 0.8 },
   // Freezes the source frame so the camera and the cursor have time to move.
   // `auto` inserts a freeze wherever the cursor would have to travel faster
@@ -978,10 +1007,12 @@ async function main() {
   const pacing = buildPacing(beats, cfg.pace, cursorCfg);
   for (const b of beats) b.t = pacing.timeOf(b);
   const duration = srcDuration + pacing.total;
-  if (pacing.total > 0.005) {
+  if (pacing.freezes.length) {
+    const list = pacing.freezes
+      .map((f) => `${f.c.toFixed(2)}${f.d > 0 ? "+" : ""}${f.d.toFixed(2)}`)
+      .join(" ");
     console.log(
-      `  pacing: ${pacing.freezes.length} freezes, ` +
-        `+${pacing.total.toFixed(2)}s (${srcDuration.toFixed(2)}s -> ${duration.toFixed(2)}s)`,
+      `  pacing: ${srcDuration.toFixed(2)}s -> ${duration.toFixed(2)}s  [${list}]`,
     );
   }
 

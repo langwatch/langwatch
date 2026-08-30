@@ -11,7 +11,7 @@
     "height": 1040
   },
   "frame": {
-    "background": "backgrounds/dark.webp",
+    "background": "backgrounds/default.webp",
     "fit": "native"
   },
   "quality": {
@@ -94,13 +94,11 @@
       "y": 137,
       "zoom": 1.9,
       "hold": 0.15,
-      "lead": 0.2,
-      "in": 0.45,
       "pause": {
         "before": 0.9,
         "after": 1.0
       },
-      "note": "Run suite, a corner, so it earns the zoom. The pause holds the frame while the camera arrives, then again while it pans onto the dialog"
+      "note": "Run suite, a corner, so it earns the zoom. The pause holds the frame while the camera zooms and the cursor settles on the button, then again while the camera pans onto the dialog"
     },
     {
       "t": 6.9,
@@ -112,8 +110,6 @@
       },
       "zoom": 1.9,
       "hold": 1.35,
-      "lead": 0.15,
-      "in": 0.55,
       "note": "pick the target, the camera pans onto the dialog instead of zooming out"
     },
     {
@@ -126,7 +122,8 @@
       },
       "zoom": 1.9,
       "hold": 0.2,
-      "note": "Run 3 scenarios, the camera holds on the dialog"
+      "note": "Run 3 scenarios, the camera holds on the dialog. The take stands still for 1.4s before this click, so 1.25s of it is dropped",
+      "skip": 1.25
     },
     {
       "t": 11.045,
@@ -209,10 +206,10 @@
     },
     {
       "t": 24.15,
-      "x": 883,
-      "y": 81,
+      "x": 267,
+      "y": 135,
       "zoom": 1,
-      "note": "Results"
+      "note": "back to Results, the tab beside it is already the open one"
     },
     {
       "t": 28.15,
