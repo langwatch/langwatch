@@ -113,6 +113,12 @@ export const HttpAgentDataSchema = z.object({
   auth: AuthConfigSchema.optional(),
   bodyTemplate: z.string().optional(),
   outputPath: z.string().optional(),
+  /**
+   * JSONPath of the value the endpoint returns for the conversation. What it
+   * matches is held per thread and rendered as `{{ session }}` on the next
+   * turn of the same thread.
+   */
+  sessionPath: z.string().optional(),
   /** Maps agent input field identifiers to scenario data sources or static values. */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   /**

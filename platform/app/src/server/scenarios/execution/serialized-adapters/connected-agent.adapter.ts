@@ -3,20 +3,21 @@
  *
  * The child process has no Redis and no database, so it reaches a connected
  * agent the way every other caller does: one POST per turn to the relay
- * route with the project key. The adapter holds the agent's `session` per
- * thread and echoes it on the next turn, adopts the turn's trace context so
- * the judge can read the agent's own spans, and turns the relay's handled
- * errors into typed errors the failure classifier names.
+ * route with the project key. The adapter sends the thread's held `session`
+ * on every turn and keeps what the agent returned, adopts the turn's trace
+ * context so the judge can read the agent's own spans, and turns the relay's
+ * handled errors into typed errors the failure classifier names.
  */
 
 import type { Logger } from "@langwatch/observability";
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
-import { AgentAdapter, AgentRole } from "@langwatch/scenario";
+import { AgentRole } from "@langwatch/scenario";
 import { BUSY_RETRY_AFTER_MS } from "~/server/connected-agents/constants";
 import type { RunParameterValues } from "../../parameters";
 import { createChildProcessLogger } from "../child-logger";
 import type { ConnectedAgentData } from "../types";
+import { SerializedAgentAdapter } from "./serialized-agent.adapter";
 
 /** How long the adapter keeps retrying a busy agent before it gives up. */
 export const BUSY_RETRY_BUDGET_MS = 60_000;
@@ -74,7 +75,7 @@ export interface ServedInstance {
   label: string | null;
 }
 
-export class SerializedConnectedAgentAdapter extends AgentAdapter {
+export class SerializedConnectedAgentAdapter extends SerializedAgentAdapter {
   role = AgentRole.AGENT;
 
   private readonly config: ConnectedAgentData;
@@ -83,7 +84,6 @@ export class SerializedConnectedAgentAdapter extends AgentAdapter {
   private readonly logger: Logger;
   private readonly fetchImpl: FetchLike;
   private readonly sleep: (ms: number) => Promise<void>;
-  private readonly sessions = new Map<string, unknown>();
   private served: ServedInstance | null = null;
 
   constructor({
@@ -131,7 +131,7 @@ export class SerializedConnectedAgentAdapter extends AgentAdapter {
       newMessages: input.newMessages,
       threadId: input.threadId,
       params: this.parameters,
-      session: this.sessions.get(input.threadId),
+      session: this.sessionOf(input.threadId),
       traceparent,
     });
     const url = `${this.config.endpoint.replace(/\/$/, "")}/api/agents/${this.config.agentId}/call`;
@@ -170,9 +170,10 @@ export class SerializedConnectedAgentAdapter extends AgentAdapter {
         session?: unknown;
         instance: ServedInstance;
       };
-      if (payload.session !== undefined) {
-        this.sessions.set(input.threadId, payload.session);
-      }
+      this.storeSession({
+        threadId: input.threadId,
+        session: payload.session,
+      });
       this.served = payload.instance;
       this.logger.info(
         {

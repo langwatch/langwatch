@@ -735,6 +735,39 @@ describe("explainHandledError", () => {
   });
 });
 
+describe("agent_payload_too_large", () => {
+  describe("when the session is what broke the cap", () => {
+    /** @scenario "A session above the cap is refused with a typed error" */
+    it("tells the reader to return a small session value", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "agent_payload_too_large",
+          httpStatus: 413,
+          meta: { what: "session", sizeBytes: 70002, limitBytes: 65536 },
+        }),
+      );
+
+      expect(description).toContain("session");
+      expect(description).toContain("conversation id");
+      expect(description).not.toContain("attachments");
+    });
+  });
+
+  describe("when the result is what broke the cap", () => {
+    it("names the result and keeps the trimming advice", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "agent_payload_too_large",
+          httpStatus: 413,
+          meta: { what: "result" },
+        }),
+      );
+
+      expect(description).toContain("The result is above the size limit");
+    });
+  });
+});
+
 describe("UNKNOWN_ERROR_PRESENTATION", () => {
   /** @scenario "An unhandled failure says nothing, but stays traceable" */
   it("says nothing about what actually failed", () => {

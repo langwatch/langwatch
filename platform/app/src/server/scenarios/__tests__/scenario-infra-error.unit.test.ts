@@ -601,6 +601,34 @@ describe("resolveScenarioError", () => {
   });
 });
 
+describe("classifyScenarioInfraError session cap", () => {
+  describe("when an adapter refused a session above the cap", () => {
+    /** @scenario "A refused session reads as a named run error" */
+    it("names the payload code with the sizes, a hint and a title", () => {
+      const result = classifyScenarioInfraError(
+        "Child process exited with code 1: Agent session too large (agent_payload_too_large): the agent returned a session of 70002 bytes, above the limit of 65536 bytes.",
+      );
+
+      expect(result.code).toBe(ScenarioInfraErrorCode.AgentPayloadTooLarge);
+      expect(result.message).toContain("70002 bytes");
+      expect(result.message).toContain("65536 bytes");
+      expect(result.hint).toBeTruthy();
+      expect(scenarioErrorTitle(result.code)).toBe("Agent answer too large");
+    });
+  });
+
+  describe("when the relay refused a connected agent's answer", () => {
+    it("classifies agent_payload_too_large under the same code", () => {
+      const result = classifyScenarioInfraError(
+        "Connected agent call failed (agent_payload_too_large): The result is 20000000 bytes, above the limit of 16777216 bytes.",
+      );
+
+      expect(result.code).toBe(ScenarioInfraErrorCode.AgentPayloadTooLarge);
+      expect(result.hint).toBeTruthy();
+    });
+  });
+});
+
 describe("scenarioErrorTitle", () => {
   it("returns a distinct human title per code", () => {
     const titles = Object.values(ScenarioInfraErrorCode).map(

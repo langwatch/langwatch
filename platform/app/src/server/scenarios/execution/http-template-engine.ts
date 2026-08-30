@@ -18,7 +18,11 @@ import type { AgentInput } from "@langwatch/scenario";
 import { Liquid } from "liquidjs";
 import type { FieldMapping } from "../field-mapping";
 import type { RunParameterValues } from "../parameters";
-import { resolveFieldMappings, sourceFieldOf } from "./resolve-field-mappings";
+import {
+  resolveFieldMappings,
+  sessionAsText,
+  sourceFieldOf,
+} from "./resolve-field-mappings";
 
 /**
  * Marks a context value as already-serialized JSON that must be interpolated
@@ -115,6 +119,21 @@ bodyLiquid.registerFilter("raw", { handler: identity, raw: true });
 const headerLiquid = new Liquid();
 headerLiquid.registerFilter("raw", { handler: identity, raw: true });
 
+/** An object or an array: a value a body template injects as raw JSON. */
+function isStructured(value: unknown): boolean {
+  return typeof value === "object" && value !== null;
+}
+
+/**
+ * The session as a template value: raw JSON when structured, text otherwise,
+ * and an empty string before the thread's first answer.
+ */
+function sessionContextValue(session: unknown): RawJson | string {
+  return isStructured(session)
+    ? new RawJson(JSON.stringify(session))
+    : sessionAsText(session);
+}
+
 /**
  * Build the Liquid context shared by `url` and `bodyTemplate` rendering.
  *
@@ -129,6 +148,9 @@ headerLiquid.registerFilter("raw", { handler: identity, raw: true });
  *     captured one. Plain scalar strings bound beside `threadId`: a data
  *     mapping with the same identifier still wins, and `params` (a single
  *     namespace key) can never shadow them.
+ *   - `session` — what the agent returned for the thread on its last turn.
+ *     A string stays a scalar, an object or array is wrapped in `RawJson`,
+ *     and the first turn of a thread renders it as an empty string.
  *
  * The run's resolved parameters are bound as `params`, so a url or body reads
  * `{{ params.account_tier }}`. It sits between the base names and the mappings
@@ -144,16 +166,20 @@ export function buildTemplateContext({
   scenarioMappings,
   parameters,
   traceContext,
+  session,
 }: {
   input: AgentInput;
   scenarioMappings?: Record<string, FieldMapping>;
   parameters?: RunParameterValues;
   traceContext?: { traceId?: string; traceparent?: string };
+  /** The session held for the thread; absent or null renders as empty. */
+  session?: unknown;
 }): Record<string, unknown> {
   const lastUserMessage = input.messages.findLast((m) => m.role === "user");
   const inputIsStructured =
     lastUserMessage !== undefined &&
     typeof lastUserMessage.content !== "string";
+  const sessionIsStructured = isStructured(session);
   const base: Record<string, unknown> = {
     messages: new RawJson(JSON.stringify(input.messages)),
     threadId: input.threadId ?? DEFAULT_SCENARIO_THREAD_ID,
@@ -163,6 +189,7 @@ export function buildTemplateContext({
         : inputIsStructured
           ? new RawJson(JSON.stringify(lastUserMessage.content))
           : (lastUserMessage.content as string),
+    session: sessionContextValue(session),
   };
   if (traceContext?.traceId !== undefined) {
     base.traceId = traceContext.traceId;
@@ -176,13 +203,16 @@ export function buildTemplateContext({
     const resolved = resolveFieldMappings({
       fieldMappings: scenarioMappings,
       agentInput: input,
+      session,
     });
     for (const [identifier, mapping] of Object.entries(scenarioMappings)) {
       const value = resolved[identifier];
       if (value === undefined) continue;
       const field = sourceFieldOf(mapping);
       const isRawJson =
-        field === "messages" || (field === "input" && inputIsStructured);
+        field === "messages" ||
+        (field === "input" && inputIsStructured) ||
+        (field === "session" && sessionIsStructured);
       mapped[identifier] = isRawJson ? new RawJson(value) : value;
     }
   }
