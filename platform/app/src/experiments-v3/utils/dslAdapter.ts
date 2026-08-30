@@ -21,7 +21,7 @@ import {
   type HttpComponentConfig,
   LATEST_SPEC_VERSION,
   type Signature,
-  type Workflow,
+  type StudioWorkflow,
 } from "@langwatch/workflow-contract";
 import type {
   DatasetColumn,
@@ -48,7 +48,7 @@ import type {
 export const stateToWorkflow = (
   state: EvaluationsV3State,
   datasetIdOverride?: string,
-): Workflow => {
+): StudioWorkflow => {
   const datasetId = datasetIdOverride ?? state.activeDatasetId;
   const activeDataset = state.datasets.find((d) => d.id === datasetId);
 
@@ -98,7 +98,7 @@ export const stateToWorkflow = (
     version: "1.0",
     template_adapter: "default",
     enable_tracing: true,
-    nodes: [entryNode, ...targetNodes, ...evaluatorNodes] as Workflow["nodes"],
+    nodes: [entryNode, ...targetNodes, ...evaluatorNodes] as StudioWorkflow["nodes"],
     edges: [...targetEdges, ...evaluatorEdges],
     state: {},
   };
