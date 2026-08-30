@@ -36738,7 +36738,9 @@ description: Test your agents through multi-turn conversations with a simulated 
 
 ## What agent testing is for
 
-Write a scenario: the situation the user is in, and the criteria the agent must meet. For example, a customer asks for a refund on an order from last year; the agent must look up the order and must not promise the refund. LangWatch plays the scenario against your agent with a simulated user, and a judge gives a pass or fail for each criterion with its reasoning and the full conversation.
+Agent testing ensures your agent handles real conversations correctly before they reach production. You describe a situation and the criteria the agent must meet, and LangWatch runs a simulated user through the conversation, then a judge gives a pass or fail for each criterion with its reasoning.
+
+For example, a customer asks for a refund on an order from last year. The criteria: the agent must look up the order and must not promise the refund. The simulated user plays the customer with different words on every run, and the judge checks each criterion against the conversation and the agent's own traces.
 
 Use it to:
 
