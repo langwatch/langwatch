@@ -42,13 +42,22 @@ describe("userRouter", () => {
         expires: "2099-01-01",
       },
       app: {
-        users: { deactivate, reactivate },
-        auth: { revokeAllBrowserSessions },
+        // The router talks to `app.users` and nothing else. `UserApp` is the
+        // one surface: it owns `isAdmin` and `revokeAllBrowserSessions` and
+        // delegates them inward to the ops and auth services. This stub used
+        // to model those inner services instead — `ops.isAdmin`,
+        // `auth.revokeAllBrowserSessions` — which is where they lived before
+        // the facade, and the router found neither on `users`.
+        users: {
+          deactivate,
+          reactivate,
+          revokeAllBrowserSessions,
+          isAdmin: ({ email }: { email: string }) => email === "admin@example.com",
+        },
         governance: { cliTokenRevokeForUser },
         permissions: {
           checkScopeLineage: vi.fn().mockResolvedValue({ kind: "consistent" }),
         },
-        ops: { isAdmin: ({ email }: { email: string }) => email === "admin@example.com" },
       } as never,
     });
     return userRouter.createCaller(ctx);
