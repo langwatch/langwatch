@@ -16,6 +16,7 @@
  * are semantically equivalent to EXISTS.
  */
 
+import type { FilterField } from "@langwatch/analytics-contract";
 import { type CHTable, tableAliases } from "./field-mappings";
 
 /**
@@ -72,7 +73,11 @@ function genParamName(prefix: string): string {
  * eliminating the need for a large switch statement. Each handler knows
  * how to translate its specific filter type to ClickHouse SQL.
  */
-const filterHandlers: Record<string, FilterHandler | null> = {
+// Exhaustive on purpose: a field added to `filterFieldsEnum` without a handler
+// here fails to compile. The platform copy of this file had that guarantee and
+// this one lost it when the type went out of reach — a `Record<string, …>`
+// accepts a filter the translator then silently ignores.
+const filterHandlers: Record<FilterField, FilterHandler | null> = {
   // Topic Filters
   "topics.topics": (values) => translateTopicFilter(values),
   "topics.subtopics": (values) => translateSubtopicFilter(values),
@@ -141,7 +146,7 @@ const noOpFilter: FilterTranslation = {
  * Uses registry lookup instead of switch statement for better extensibility.
  */
 export function translateFilter(
-  field: string,
+  field: FilterField,
   values: string[],
   key?: string,
   subkey?: string,
@@ -768,21 +773,21 @@ export function translateAllFilters(
     if (Array.isArray(value)) {
       // Simple array filter
       translations.push(
-        translateFilter(field as string, value, undefined, undefined, spanTimePredicate),
+        translateFilter(field as FilterField, value, undefined, undefined, spanTimePredicate),
       );
     } else if (typeof value === "object") {
       // Nested filter with key
       for (const [key, subValue] of Object.entries(value)) {
         if (Array.isArray(subValue)) {
           translations.push(
-            translateFilter(field as string, subValue, key, undefined, spanTimePredicate),
+            translateFilter(field as FilterField, subValue, key, undefined, spanTimePredicate),
           );
         } else if (typeof subValue === "object") {
           // Double nested with key and subkey
           for (const [subkey, subSubValue] of Object.entries(subValue)) {
             if (Array.isArray(subSubValue)) {
               translations.push(
-                translateFilter(field as string, subSubValue, key, subkey, spanTimePredicate),
+                translateFilter(field as FilterField, subSubValue, key, subkey, spanTimePredicate),
               );
             }
           }
