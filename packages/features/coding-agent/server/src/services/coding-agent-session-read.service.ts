@@ -1,17 +1,19 @@
 import {
-  MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE,
-  codingAgentRecentSessionsInputSchema,
-  codingAgentSessionEventsInputSchema,
-  codingAgentSessionLookupInputSchema,
-  codingAgentTraceSessionLookupInputSchema,
-  codingAgentUsageTotalsInputSchema,
-  codingAgentUsageTotalsSchema,
   type CodingAgentRecentSessionsInput,
+  codingAgentRecentSessionsInputSchema,
   type CodingAgentSession,
   type CodingAgentSessionCursor,
   type CodingAgentSessionEvent,
+  codingAgentSessionEventsInputSchema,
+  codingAgentSessionLookupInputSchema,
+  codingAgentTraceSessionLookupInputSchema,
   type CodingAgentUsageTotals,
   type CodingAgentUsageTotalsInput,
+  codingAgentUsageTotalsInputSchema,
+  codingAgentUsageTotalsSchema,
+  MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE,
+  normalizeMetricName,
+  normalizeTokenType,
 } from "@langwatch/coding-agent-contract";
 import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port";
 import { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository";
@@ -149,9 +151,7 @@ export class CodingAgentSessionReadService {
     return this.withMetricTotals(parsed.projectId, rows, parsed);
   }
 
-  async getUsageTotals(
-    input: CodingAgentUsageTotalsInput,
-  ): Promise<CodingAgentUsageTotals> {
+  async getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals> {
     const parsed = codingAgentUsageTotalsInputSchema.parse(input);
     const rows = await this.listRecent({ ...parsed, limit: 1000 });
     return codingAgentUsageTotalsSchema.parse(
@@ -165,8 +165,7 @@ export class CodingAgentSessionReadService {
             row.outputTokens +
             row.cacheReadTokens +
             row.cacheCreationTokens,
-          activeTimeSec:
-            totals.activeTimeSec + row.activeTimeUserSec + row.activeTimeCliSec,
+          activeTimeSec: totals.activeTimeSec + row.activeTimeUserSec + row.activeTimeCliSec,
           linesAdded: totals.linesAdded + row.linesAdded,
           linesRemoved: totals.linesRemoved + row.linesRemoved,
           commits: totals.commits + row.commits,
@@ -209,15 +208,11 @@ export class CodingAgentSessionReadService {
     const startedAts = needy.map((row) => row.startedAtMs).filter((ms) => ms > 0);
     const fromMs =
       (range?.fromMs ??
-        (startedAts.length > 0
-          ? Math.min(...startedAts)
-          : this.dependencies.clock.nowMs())) -
+        (startedAts.length > 0 ? Math.min(...startedAts) : this.dependencies.clock.nowMs())) -
       60 * 60 * 1000;
     const toMs =
       (range?.toMs ??
-        (startedAts.length > 0
-          ? Math.max(...startedAts)
-          : this.dependencies.clock.nowMs())) +
+        (startedAts.length > 0 ? Math.max(...startedAts) : this.dependencies.clock.nowMs())) +
       7 * 24 * 60 * 60 * 1000;
     let totals: SessionMetricTotal[];
     try {
@@ -262,10 +257,7 @@ function readWindowAround(anchorMs: number): { fromMs: number; toMs: number } {
 
 function clampSessionEventsLimit(limit: number): number {
   if (!Number.isFinite(limit)) return MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE;
-  return Math.min(
-    Math.max(Math.trunc(limit), 1),
-    MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE,
-  );
+  return Math.min(Math.max(Math.trunc(limit), 1), MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE);
 }
 
 function foldTokenAndCostTotals(totals: SessionMetricTotal[]) {
@@ -299,39 +291,4 @@ function foldTokenAndCostTotals(totals: SessionMetricTotal[]) {
     }
   }
   return folded;
-}
-
-function normalizeMetricName(raw: string): "token_usage" | "cost_usage" | null {
-  const name = raw.replace(
-    /^(claude_code|claude_cowork|cowork|opencode|codex|gemini_cli|github\.copilot|copilot)\./,
-    "",
-  );
-  if (name === "token.usage" || name === "turn.token_usage") return "token_usage";
-  if (name === "cost.usage") return "cost_usage";
-  return null;
-}
-
-function normalizeTokenType(
-  raw: string,
-): "input" | "output" | "cache_read" | "cache_creation" | null {
-  switch (raw.replace(/[_-]/g, "").toLowerCase()) {
-    case "input":
-    case "prompt":
-    case "noncachedinput":
-      return "input";
-    case "output":
-    case "completion":
-      return "output";
-    case "cacheread":
-    case "cachedinput":
-    case "cachereadinput":
-    case "cache":
-      return "cache_read";
-    case "cachecreation":
-    case "cachewrite":
-    case "cachecreationinput":
-      return "cache_creation";
-    default:
-      return null;
-  }
 }
