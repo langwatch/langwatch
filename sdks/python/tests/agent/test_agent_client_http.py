@@ -152,7 +152,11 @@ class FakeHttpPlatform:
             }
         if request.path.startswith("/api/agents/connect/poll"):
             if self.poll_status != 200:
-                return self.poll_status, {"error": "agent_session_unknown"}
+                # One refusal only. A second one would make the client register
+                # a third time, and which register the next request carries the
+                # token of would then depend on how fast the runner is.
+                status, self.poll_status = self.poll_status, 200
+                return status, {"error": "agent_session_unknown"}
             if self._queued:
                 frames, self._queued = self._queued, []
                 return 200, {"frames": frames}
@@ -328,7 +332,6 @@ async def test_session_unknown_registers_again_with_in_flight_ids():
             again = await platform.expect("/api/agents/connect/register")
             assert again.json is not None
             assert again.json["instance"]["inFlightCallIds"] == ["call-slow"]
-            platform.poll_status = 200
             release.set()
             result = await platform.expect_frame("result")
             assert result.headers["x-agent-instance-token"] == "ait_2"
