@@ -36,11 +36,11 @@ export { NoopSchedulerAuditSink, SchedulerAuditSink } from "./ports/scheduler-au
 export {
   type SchedulerOpsRepository,
   type ScheduledJobRecord,
-} from "./ports/scheduler-ops.repository";
+} from "./ports/scheduler-ops.port";
 export {
   NoopSchedulerWakeService,
   SchedulerWakeService,
-} from "./ports/scheduler-wake.service";
+} from "./ports/scheduler-wake.port";
 export {
   type AdminAccess,
   AdminAccessService,

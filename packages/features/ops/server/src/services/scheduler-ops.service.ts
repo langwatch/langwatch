@@ -17,8 +17,8 @@ import { SchedulerAuditSink } from "../ports/scheduler-audit.sink";
 import type {
   SchedulerOpsRepository,
   ScheduledJobRecord,
-} from "../ports/scheduler-ops.repository";
-import { SchedulerWakeService } from "../ports/scheduler-wake.service";
+} from "../ports/scheduler-ops.port";
+import { SchedulerWakeService } from "../ports/scheduler-wake.port";
 
 const logger = createLogger("langwatch:ops:scheduler");
 

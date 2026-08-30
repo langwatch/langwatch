@@ -7,7 +7,7 @@ import { StoredObjectOwnerLookupTelemetryPort } from "../ports/stored-object-own
 import {
   StoredObjectOwnerRepository,
   type StoredObjectOwnerLookupResult,
-} from "../ports/stored-object-owner.repository";
+} from "../ports/stored-object-owner.port";
 
 /**
  * The legacy id-only file URL crosses tenant boundaries solely to identify an

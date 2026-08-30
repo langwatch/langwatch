@@ -6,7 +6,7 @@ import {
   StoredObjectOwnerRepository,
   type StoredObjectOwnerHit,
   type StoredObjectOwnerLookupResult,
-} from "../../ports/stored-object-owner.repository";
+} from "../../ports/stored-object-owner.port";
 
 type StoredObjectOwnerRow = Readonly<{
   project_id: string;
