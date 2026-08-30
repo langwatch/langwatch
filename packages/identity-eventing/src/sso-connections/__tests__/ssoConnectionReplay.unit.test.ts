@@ -37,11 +37,7 @@ const IDP = {
 
 let sequence = 0;
 
-function event(
-  type: string,
-  data: Record<string, unknown>,
-  offsetMs: number,
-): SsoConnectionEvent {
+function event(type: string, data: Record<string, unknown>, offsetMs: number): SsoConnectionEvent {
   sequence += 1;
   return {
     id: `evt_${String(sequence).padStart(4, "0")}`,
@@ -71,11 +67,7 @@ function lifecycle(): SsoConnectionEvent[] {
       },
       0,
     ),
-    event(
-      DOMAIN_CLAIMED_EVENT_TYPE,
-      { connectionId: CONNECTION, domain: "acme.com" },
-      1_000,
-    ),
+    event(DOMAIN_CLAIMED_EVENT_TYPE, { connectionId: CONNECTION, domain: "acme.com" }, 1_000),
     event(
       DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
       { connectionId: CONNECTION, domain: "acme.com" },
@@ -114,12 +106,10 @@ function lifecycle(): SsoConnectionEvent[] {
  * test has one: replay parity is a property of what LANDS, so both legs have
  * to go through a store rather than being compared as loose state.
  */
-class InMemoryProjectionStore
-  implements StateProjectionStore<SsoConnectionFoldState>
-{
+class InMemoryProjectionStore implements StateProjectionStore<SsoConnectionFoldState> {
   stored: StoredProjection<SsoConnectionFoldState> | null = null;
 
-  async load(): Promise<StoredProjection<SsoConnectionFoldState> | null> {
+  async tryLoad(): Promise<StoredProjection<SsoConnectionFoldState> | null> {
     return this.stored;
   }
 

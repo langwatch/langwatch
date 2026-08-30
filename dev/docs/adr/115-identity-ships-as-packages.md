@@ -554,12 +554,28 @@ here because this ADR is where someone will look for it. The layout has three
 roles — contract, server, web — and event-sourcing code normally belongs in
 `server`; the strict layout has `projections/`, `processes/`, `intents/`,
 `stores/` and `subscribers/` for exactly that. But `identity-contract` and
-`identity-server` are on `zod@^3.25.76` while `identity-eventing` is on
+`identity-server` were on `zod@^3.25.76` while `identity-eventing` is on
 `zod@^4.4.3`, and one package cannot hold both majors: schemas built on one
 side stop satisfying `instanceof` on the other, which surfaces as a 500 rather
 than as a type error. Folding it in would also contradict this ADR's own rule
 that the server runtime never imports the event-sourcing framework — the reason
-the package was split out. So it stays at the root until the zod versions align.
+the package was split out. So it stayed at the root until the zod versions
+aligned.
+
+**Amendment — the versions now align.** `identity-contract` and
+`identity-server` are on `zod@^4.4.3`, alongside the other 117 first-party
+packages. The migration cost almost nothing: neither package used `ZodEffects`,
+`.innerType()`, `invalid_type_error`, `required_error` or an `errorMap`, and
+the only adjustment was the four generic `commandDataSchema` helpers, where
+zod 4 widens `.extend()`'s output under a generic shape. What it removed was
+substantial — the dual-major boundary alone accounted for 37 `ZodEffects`
+type errors across `identity-eventing`.
+
+The FIRST reason above is therefore discharged; the SECOND is not. This ADR's
+rule that the server runtime never imports the event-sourcing framework still
+holds, and it is the reason the package was split out in the first place. So
+`identity-eventing` stays at the root on that ground alone, which is the
+stronger one — and now the only one.
 
 The feature's own record is
 [`packages/features/identity/adrs/001-identity-ships-as-a-feature.md`](../../../packages/features/identity/adrs/001-identity-ships-as-a-feature.md),

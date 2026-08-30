@@ -1,10 +1,7 @@
 import { emptyIdentityHeads } from "@langwatch/identity-contract";
 import { IdentityGuards, type IdentityHeadsRepository } from "@langwatch/identity-server";
 import { describe, expect, it } from "vitest";
-import {
-  inMemoryIdentityReservations,
-  inMemoryIdentityUsers,
-} from "../../testing";
+import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing";
 import {
   createTenantId,
   EventSourcing,
@@ -24,7 +21,7 @@ const T0 = 1_690_000_000_000;
 class InMemoryStateStore implements StateProjectionStore<IdentityFoldState> {
   readonly stored = new Map<string, StoredProjection<IdentityFoldState>>();
 
-  async load(
+  async tryLoad(
     key: string,
     _context: ProjectionStoreContext,
   ): Promise<StoredProjection<IdentityFoldState> | null> {

@@ -15,23 +15,16 @@
  * See specs/identity/scim-connection-sync.feature.
  */
 import { z } from "zod";
-import {
-  scimApplyOpSchema,
-  scimRevokeCauseSchema,
-  scimUserOpSchema,
-} from "./scim-sync";
+import { scimApplyOpSchema, scimRevokeCauseSchema, scimUserOpSchema } from "./scim-sync";
 import { identityActorSchema } from "./vocabulary";
 
-export const ISSUE_SCIM_TOKEN_COMMAND_TYPE =
-  "lw.identity.issue_scim_token" as const;
-export const RECORD_SCIM_USER_PUSH_COMMAND_TYPE =
-  "lw.identity.record_scim_user_push" as const;
+export const ISSUE_SCIM_TOKEN_COMMAND_TYPE = "lw.identity.issue_scim_token" as const;
+export const RECORD_SCIM_USER_PUSH_COMMAND_TYPE = "lw.identity.record_scim_user_push" as const;
 export const RECORD_SCIM_GROUP_MAPPING_COMMAND_TYPE =
   "lw.identity.record_scim_group_mapping" as const;
 export const RECORD_SCIM_APPLY_FAILURE_COMMAND_TYPE =
   "lw.identity.record_scim_apply_failure" as const;
-export const REVOKE_SCIM_SYNC_COMMAND_TYPE =
-  "lw.identity.revoke_scim_sync" as const;
+export const REVOKE_SCIM_SYNC_COMMAND_TYPE = "lw.identity.revoke_scim_sync" as const;
 
 export const SCIM_SYNC_COMMAND_TYPES = [
   ISSUE_SCIM_TOKEN_COMMAND_TYPE,
@@ -65,30 +58,33 @@ const commandIdentitySchema = z.object({
  * can detect. Refused at the wire boundary instead.
  */
 function commandDataSchema<Shape extends z.ZodRawShape>(shape: Shape) {
-  return commandIdentitySchema
-    .extend(shape)
-    .refine((data) => data.tenantId === data.organizationId, {
-      message:
-        "tenantId must equal organizationId: one directory-sync history per organization",
+  return commandIdentitySchema.extend(shape).refine(
+    (data) => {
+      // zod 4 widens `.extend()`'s output under a generic shape to a union that
+      // no longer names the base's own keys, so the fields this reads are named
+      // here rather than inferred. They come from `commandIdentitySchema`, never
+      // from `shape`, so they are always present whatever a caller extends with.
+      const { tenantId, organizationId } = data as z.infer<typeof commandIdentitySchema>;
+      return tenantId === organizationId;
+    },
+    {
+      message: "tenantId must equal organizationId: one directory-sync history per organization",
       path: ["tenantId"],
-    });
+    },
+  );
 }
 
 export const issueScimTokenCommandDataSchema = commandDataSchema({
   tokenId: z.string().min(1),
 });
-export type IssueScimTokenCommandData = z.infer<
-  typeof issueScimTokenCommandDataSchema
->;
+export type IssueScimTokenCommandData = z.infer<typeof issueScimTokenCommandDataSchema>;
 
 export const recordScimUserPushCommandDataSchema = commandDataSchema({
   userId: z.string().min(1),
   externalId: z.string().min(1),
   op: scimUserOpSchema,
 });
-export type RecordScimUserPushCommandData = z.infer<
-  typeof recordScimUserPushCommandDataSchema
->;
+export type RecordScimUserPushCommandData = z.infer<typeof recordScimUserPushCommandDataSchema>;
 
 export const recordScimGroupMappingCommandDataSchema = commandDataSchema({
   groupId: z.string().min(1),
@@ -114,9 +110,7 @@ export const revokeScimSyncCommandDataSchema = commandDataSchema({
   tokenId: z.string().min(1).nullable(),
   cause: scimRevokeCauseSchema,
 });
-export type RevokeScimSyncCommandData = z.infer<
-  typeof revokeScimSyncCommandDataSchema
->;
+export type RevokeScimSyncCommandData = z.infer<typeof revokeScimSyncCommandDataSchema>;
 
 export type ScimSyncCommand =
   | { type: typeof ISSUE_SCIM_TOKEN_COMMAND_TYPE; data: IssueScimTokenCommandData }

@@ -27,16 +27,11 @@ import {
  * erased history on replay. `domain` is an org-level fact and survives.
  */
 
-export const IDENTIFIER_ATTACHED_EVENT_TYPE =
-  "lw.identity.identifier_attached" as const;
-export const IDENTIFIER_VERIFIED_EVENT_TYPE =
-  "lw.identity.identifier_verified" as const;
-export const IDENTIFIER_DEAD_ENDED_EVENT_TYPE =
-  "lw.identity.identifier_dead_ended" as const;
-export const PRIMARY_CHANGED_EVENT_TYPE =
-  "lw.identity.primary_changed" as const;
-export const IDENTIFIER_DETACHED_EVENT_TYPE =
-  "lw.identity.identifier_detached" as const;
+export const IDENTIFIER_ATTACHED_EVENT_TYPE = "lw.identity.identifier_attached" as const;
+export const IDENTIFIER_VERIFIED_EVENT_TYPE = "lw.identity.identifier_verified" as const;
+export const IDENTIFIER_DEAD_ENDED_EVENT_TYPE = "lw.identity.identifier_dead_ended" as const;
+export const PRIMARY_CHANGED_EVENT_TYPE = "lw.identity.primary_changed" as const;
+export const IDENTIFIER_DETACHED_EVENT_TYPE = "lw.identity.identifier_detached" as const;
 export const USER_ERASED_EVENT_TYPE = "lw.identity.user_erased" as const;
 export const LINK_PROPOSED_EVENT_TYPE = "lw.identity.link_proposed" as const;
 
@@ -232,10 +227,7 @@ export type IdentityFactInput = z.infer<typeof identifierFactInputSchema>;
  *  identity event is structurally one of these. */
 export type IdentityFact = IdentityFactInput & { occurredAt: number };
 
-export type IdentityFactOf<T extends IdentityEventType> = Extract<
-  IdentityFact,
-  { type: T }
->;
+export type IdentityFactOf<T extends IdentityEventType> = Extract<IdentityFact, { type: T }>;
 
 /** The same narrowing on a fact a command has decided but nobody has stamped
  *  yet — what a guard returns when it states exactly one kind of fact. */
@@ -278,11 +270,7 @@ export interface IdentityHeads {
   identifiers: Record<string, IdentifierFact>;
 }
 
-export function emptyIdentityHeads({
-  userId,
-}: {
-  userId: string;
-}): IdentityHeads {
+export function emptyIdentityHeads({ userId }: { userId: string }): IdentityHeads {
   return { userId, identifiers: {} };
 }
 
@@ -301,13 +289,10 @@ export function emptyIdentityHeads({
  * the guard normalizes it, and only the normalized form ever reaches a fact.
  */
 
-export const ATTACH_IDENTIFIER_COMMAND_TYPE =
-  "lw.identity.attach_identifier" as const;
-export const VERIFY_IDENTIFIER_COMMAND_TYPE =
-  "lw.identity.verify_identifier" as const;
+export const ATTACH_IDENTIFIER_COMMAND_TYPE = "lw.identity.attach_identifier" as const;
+export const VERIFY_IDENTIFIER_COMMAND_TYPE = "lw.identity.verify_identifier" as const;
 export const MARK_PRIMARY_COMMAND_TYPE = "lw.identity.mark_primary" as const;
-export const DETACH_IDENTIFIER_COMMAND_TYPE =
-  "lw.identity.detach_identifier" as const;
+export const DETACH_IDENTIFIER_COMMAND_TYPE = "lw.identity.detach_identifier" as const;
 export const ERASE_USER_COMMAND_TYPE = "lw.identity.erase_user" as const;
 export const PROPOSE_LINK_COMMAND_TYPE = "lw.identity.propose_link" as const;
 
@@ -341,15 +326,21 @@ const commandIdentitySchema = z.object({
  * person, the person as the tenant — and the invariant has to hold there for
  * the same reason. Two copies of a refinement is two ways for it to drift.
  */
-export function userTenantedCommandSchema<Shape extends z.ZodRawShape>(
-  shape: Shape,
-) {
-  return commandIdentitySchema
-    .extend(shape)
-    .refine((data) => data.tenantId === data.userId, {
+export function userTenantedCommandSchema<Shape extends z.ZodRawShape>(shape: Shape) {
+  return commandIdentitySchema.extend(shape).refine(
+    (data) => {
+      // zod 4 widens `.extend()`'s output under a generic shape to a union that
+      // no longer names the base's own keys, so the fields this reads are named
+      // here rather than inferred. They come from `commandIdentitySchema`, never
+      // from `shape`, so they are always present whatever a caller extends with.
+      const { tenantId, userId } = data as z.infer<typeof commandIdentitySchema>;
+      return tenantId === userId;
+    },
+    {
       message: "tenantId must equal userId: one identity history per user",
       path: ["tenantId"],
-    });
+    },
+  );
 }
 
 export const attachIdentifierCommandDataSchema = userTenantedCommandSchema({
@@ -379,9 +370,7 @@ export const attachIdentifierCommandDataSchema = userTenantedCommandSchema({
   }),
   actor: identityActorSchema,
 });
-export type AttachIdentifierCommandData = z.infer<
-  typeof attachIdentifierCommandDataSchema
->;
+export type AttachIdentifierCommandData = z.infer<typeof attachIdentifierCommandDataSchema>;
 
 export const verifyIdentifierCommandDataSchema = userTenantedCommandSchema({
   identifierId: z.string().min(1),
@@ -391,27 +380,21 @@ export const verifyIdentifierCommandDataSchema = userTenantedCommandSchema({
   occurredAtMs: z.number().int().nonnegative(),
   actor: identityActorSchema,
 });
-export type VerifyIdentifierCommandData = z.infer<
-  typeof verifyIdentifierCommandDataSchema
->;
+export type VerifyIdentifierCommandData = z.infer<typeof verifyIdentifierCommandDataSchema>;
 
 export const markPrimaryCommandDataSchema = userTenantedCommandSchema({
   identifierId: z.string().min(1),
   occurredAtMs: z.number().int().nonnegative(),
   actor: identityActorSchema,
 });
-export type MarkPrimaryCommandData = z.infer<
-  typeof markPrimaryCommandDataSchema
->;
+export type MarkPrimaryCommandData = z.infer<typeof markPrimaryCommandDataSchema>;
 
 export const detachIdentifierCommandDataSchema = userTenantedCommandSchema({
   identifierId: z.string().min(1),
   occurredAtMs: z.number().int().nonnegative(),
   actor: identityActorSchema,
 });
-export type DetachIdentifierCommandData = z.infer<
-  typeof detachIdentifierCommandDataSchema
->;
+export type DetachIdentifierCommandData = z.infer<typeof detachIdentifierCommandDataSchema>;
 
 export const eraseUserCommandDataSchema = userTenantedCommandSchema({
   occurredAtMs: z.number().int().nonnegative(),
@@ -430,9 +413,7 @@ export const proposeLinkCommandDataSchema = userTenantedCommandSchema({
   occurredAtMs: z.number().int().nonnegative(),
   actor: identityActorSchema,
 });
-export type ProposeLinkCommandData = z.infer<
-  typeof proposeLinkCommandDataSchema
->;
+export type ProposeLinkCommandData = z.infer<typeof proposeLinkCommandDataSchema>;
 
 /** One identity command, typed on its verb — what the ledger stages. */
 export type IdentityCommand =

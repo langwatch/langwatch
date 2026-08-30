@@ -1,9 +1,5 @@
 import { z } from "zod";
-import {
-  joinMatchKindSchema,
-  joinResolverSchema,
-  joinWithdrawalCauseSchema,
-} from "./join-request";
+import { joinMatchKindSchema, joinResolverSchema, joinWithdrawalCauseSchema } from "./join-request";
 import { identityActorSchema } from "./vocabulary";
 
 /**
@@ -35,8 +31,7 @@ export const JOIN_REQUEST_COMMAND_TYPES = [
   WITHDRAW_JOIN_COMMAND_TYPE,
   EXPIRE_JOIN_COMMAND_TYPE,
 ] as const;
-export type JoinRequestCommandType =
-  (typeof JOIN_REQUEST_COMMAND_TYPES)[number];
+export type JoinRequestCommandType = (typeof JOIN_REQUEST_COMMAND_TYPES)[number];
 
 const commandIdentitySchema = z.object({
   /** The ORGANIZATION is the tenant of its join requests' history — the
@@ -59,13 +54,20 @@ const commandIdentitySchema = z.object({
  * downstream can detect. Refused at the wire boundary instead.
  */
 function commandDataSchema<Shape extends z.ZodRawShape>(shape: Shape) {
-  return commandIdentitySchema
-    .extend(shape)
-    .refine((data) => data.tenantId === data.organizationId, {
-      message:
-        "tenantId must equal organizationId: one join-request history per organization",
+  return commandIdentitySchema.extend(shape).refine(
+    (data) => {
+      // zod 4 widens `.extend()`'s output under a generic shape to a union that
+      // no longer names the base's own keys, so the fields this reads are named
+      // here rather than inferred. They come from `commandIdentitySchema`, never
+      // from `shape`, so they are always present whatever a caller extends with.
+      const { tenantId, organizationId } = data as z.infer<typeof commandIdentitySchema>;
+      return tenantId === organizationId;
+    },
+    {
+      message: "tenantId must equal organizationId: one join-request history per organization",
       path: ["tenantId"],
-    });
+    },
+  );
 }
 
 export const requestJoinCommandDataSchema = commandDataSchema({
@@ -76,16 +78,12 @@ export const requestJoinCommandDataSchema = commandDataSchema({
   matchedVia: joinMatchKindSchema,
   expiresAtMs: z.number().int().nonnegative(),
 });
-export type RequestJoinCommandData = z.infer<
-  typeof requestJoinCommandDataSchema
->;
+export type RequestJoinCommandData = z.infer<typeof requestJoinCommandDataSchema>;
 
 export const approveJoinCommandDataSchema = commandDataSchema({
   resolvedBy: joinResolverSchema,
 });
-export type ApproveJoinCommandData = z.infer<
-  typeof approveJoinCommandDataSchema
->;
+export type ApproveJoinCommandData = z.infer<typeof approveJoinCommandDataSchema>;
 
 export const rejectJoinCommandDataSchema = commandDataSchema({
   resolvedBy: joinResolverSchema,
@@ -95,9 +93,7 @@ export type RejectJoinCommandData = z.infer<typeof rejectJoinCommandDataSchema>;
 export const withdrawJoinCommandDataSchema = commandDataSchema({
   cause: joinWithdrawalCauseSchema,
 });
-export type WithdrawJoinCommandData = z.infer<
-  typeof withdrawJoinCommandDataSchema
->;
+export type WithdrawJoinCommandData = z.infer<typeof withdrawJoinCommandDataSchema>;
 
 export const expireJoinCommandDataSchema = commandDataSchema({
   /** The slot the wake was scheduled for — business time for the command, so

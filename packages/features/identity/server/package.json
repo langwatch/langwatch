@@ -30,7 +30,7 @@
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/observability": "workspace:*",
     "nanoid": "^6.0.0",
-    "zod": "^3.25.76"
+    "zod": "^4.4.3"
   },
   "peerDependencies": {
     "better-auth": "^1.7.1"
