@@ -19,7 +19,10 @@ const PRINCIPAL_FENCE = {
       userId: { not: null },
       user: { orgMemberships: { some: { organizationId: "org-1" } } },
     },
-    { groupId: { not: null }, group: { organizationId: "org-1" } },
+    {
+      groupId: { not: null },
+      group: { organizationId: "org-1", deletedAt: null },
+    },
     { apiKeyId: { not: null }, apiKey: { organizationId: "org-1" } },
   ],
 };
@@ -231,7 +234,15 @@ describe("PrismaAccessListingRepository", () => {
             organizationId: { in: ["org-1", "org-2"] },
             OR: [
               { userId: "alice" },
-              { group: { members: { some: { userId: "alice" } } } },
+              // `removedAt: null` is one fence — a group alice LEFT must not
+              // synthesize its bindings onto her — and `deletedAt: null` is
+              // the other, for a group that was deleted out from under her.
+              {
+                group: {
+                  deletedAt: null,
+                  members: { some: { userId: "alice", removedAt: null } },
+                },
+              },
             ],
             scopeType: { in: ["TEAM", "ORGANIZATION", "PROJECT"] },
           },

@@ -131,7 +131,10 @@ describe("RoleBindingService tenant references", () => {
             },
             {
               groupId: { not: null },
-              group: { organizationId: "org_1" },
+              // And still a live group: a deleted one is kept as a row so its
+              // memberships survive it, so a listing without the fence would
+              // report access nobody holds.
+              group: { organizationId: "org_1", deletedAt: null },
             },
             {
               apiKeyId: { not: null },

@@ -419,6 +419,52 @@ Feature: Unified authorization engine
     Then every read is granted through trace "t1"'s single grant
     And a span belonging to a different trace in "chatbot" is not readable
 
+  # The tier stopped being a design and became the live path: opening a shared
+  # trace resolves its token HERE. What the share domain kept is what the
+  # engine does not decide - the sharing kill switch (a project setting, not a
+  # grant), the view accounting, and which words a refused viewer reads.
+
+  @unit
+  Scenario: A share link decides through the engine's resource tier
+    Given trace "t1" in project "chatbot" is shared with anyone via a share link
+    When a visitor presents the link to open t1
+    Then the read is granted through the resource tier
+    And no other step of the walk is what granted it
+
+  @unit
+  Scenario: A member's own access never redeems a dead share link
+    Given trace "t1" in project "chatbot" has a share link that expired
+    And a member of "chatbot" holds "traces:view" there through their team
+    When that member presents the expired link
+    Then the request is denied
+    # A dead link is filtered out before the walk sees it, so the tier has
+    # nothing to answer with and the member's own binding on the trace's
+    # lineage answers instead. Honouring that would hand a member a link its
+    # own expiry had killed, and spend a view against a token that granted
+    # nothing. Reading the trace in-app is a different question, asked at the
+    # project scope.
+
+  @unit
+  Scenario: A share link grants only what it says it grants
+    Given trace "t1" in project "chatbot" has a share link conferring "datasets:view"
+    When a visitor presents that link to read the trace
+    Then the request is denied
+
+  @unit
+  Scenario: An annotate link reads the trace it may comment on
+    Given trace "t1" in project "chatbot" has a share link conferring "annotations:create"
+    When a visitor presents that link to read the trace
+    Then the request is granted
+    # "annotations:create" carries "traces:view" with it, so no second link is
+    # needed to read what its holder may comment on.
+
+  @unit
+  Scenario: A share link covers the trace it names and no other
+    Given trace "t1" in project "chatbot" is shared with anyone via a share link
+    And trace "t2" lives in the same project
+    When a visitor presents t1's link to read "t2"
+    Then the request is denied
+
   @unit
   Scenario: A share link that is not presented grants nothing
     Given trace "t1" in project "chatbot" is shared with anyone via a share link
@@ -447,6 +493,63 @@ Feature: Unified authorization engine
       | members of team client-a | a member of team "client-b" | denied  |
       | members of org acme      | any member of "acme"        | granted |
       | anyone                   | a visitor presenting the link | granted |
+
+  # A membership audience names a SET OF PEOPLE, not a binding scope. "Members
+  # of project chatbot" is therefore a reachability question, and the engine
+  # answers it off the same scope chain an ordinary permission check walks -
+  # which matters because project access almost never arrives as a binding on
+  # the project. It arrives on the team that owns it.
+
+  @unit
+  Scenario Outline: A project audience reaches everyone who reaches the project
+    Given trace "t1" in project "chatbot" is shared with the members of "chatbot"
+    And "chatbot" belongs to team "client-a" in organization "acme"
+    When a member of "acme" whose access arrives <how> presents the link
+    Then the request is granted through the resource tier
+
+    Examples:
+      | how                                  |
+      | as a binding on "chatbot" itself     |
+      | as a binding on team "client-a"      |
+      | as a binding on organization "acme"  |
+      | as a pre-migration team membership   |
+
+  @unit
+  Scenario Outline: A project audience stops at the project's own lineage
+    Given trace "t1" in project "chatbot" is shared with the members of "chatbot"
+    And "chatbot" belongs to team "client-a" in organization "acme"
+    When <caller> presents the link
+    Then the request is denied
+
+    Examples:
+      | caller                                                     |
+      | a member of "acme" bound only to team "client-b"           |
+      | a member of "acme" holding no binding on chatbot's lineage |
+      | a former member whose team binding outlived their seat     |
+      | a member of a different organization entirely              |
+    # An organization member is not automatically in a project's audience:
+    # the floor legacy applies is an ORGANIZATION-scope rule, and reading it
+    # as project reach would open every link in acme to everyone in acme.
+
+  @unit
+  Scenario: An organization audience is every member and nobody else
+    Given trace "t1" in project "chatbot" is shared with the members of "acme"
+    When any member of "acme" presents the link
+    Then the request is granted through the resource tier
+    And a member holding no binding anywhere is granted just the same
+    But somebody signed in to another organization is denied
+    And an anonymous holder of the leaked link is denied
+
+  @unit
+  Scenario: Presenting a token is answered by the resource tier, not by a binding
+    Given trace "t1" in project "chatbot" has a live share link
+    And the caller is a member who could read "t1" in-app anyway
+    When that member presents the link
+    Then the resource tier is what granted the read
+    # The tier can only answer at all when a token was presented, so it is
+    # asked before the binding steps: a caller who asked with a token gets
+    # the token's answer. Reading "t1" in-app presents nothing, collects no
+    # resource grant, and stays on the binding path.
 
   @unit
   Scenario: Resource grants are anchored to their project

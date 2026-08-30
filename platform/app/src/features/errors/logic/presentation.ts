@@ -77,6 +77,29 @@ const strList = (error: HandledErrorShape, key: string): string[] => {
 };
 
 /**
+ * Reads one of the two role lists the authorization engine attaches to a
+ * denial (ADR-092 section 6, `meta.explanation`).
+ *
+ * Nested under one key because the two lists are halves of a single fact -
+ * what you hold, and what would grant - and either on its own renders half a
+ * sentence. Bounded exactly like {@link strList}: these are role labels, and
+ * anything longer than one is not a label.
+ */
+const explanationRoles = (
+  error: HandledErrorShape,
+  key: "heldRoles" | "wouldGrantRoles",
+): string[] => {
+  const explanation = error.meta.explanation;
+  if (typeof explanation !== "object" || explanation === null) return [];
+  const value = (explanation as Record<string, unknown>)[key];
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((entry): entry is string => typeof entry === "string")
+    .filter((entry) => entry.length > 0 && entry.length <= 64)
+    .slice(0, 10);
+};
+
+/**
  * Names the piece of a scenario a parameter failure came from, so the copy can
  * point at it instead of asking the reader to search their own text.
  * `meta.field` is written by the renderer as `situation` or `criteria[N]`,
@@ -1359,9 +1382,23 @@ const presentations = {
     describe: () =>
       "It may have been deleted, or the id may belong to another organization.",
   },
+  group_already_deleted: {
+    // A deleted group is still in the record, so "not found" would be wrong
+    // twice over: the row is there, and it is there on purpose.
+    title: "That group is already deleted",
+    describe: () =>
+      "It stopped granting access when it was deleted. Its record still shows who was in it and when their membership ended.",
+  },
   group_member_already_added: {
     title: "They're already in this group",
     describe: () => "Nothing to do: the group already grants them its access.",
+  },
+  group_member_not_in_group: {
+    // A membership that ended is still in the record, so "not found" would be
+    // wrong twice over: the row is there, and it is there on purpose.
+    title: "They're not in this group",
+    describe: () =>
+      "Their membership already ended, or they were never added. The group's history still shows when they left.",
   },
   schedule_not_found: {
     title: "That schedule no longer exists",
@@ -1512,13 +1549,47 @@ const presentations = {
     // `project_permission_denied`: the exact grant can be forwarded as-is.
     // Lite-member denials carry their own client modal via the middleware's
     // cause; this copy is what everyone else reads.
+    //
+    // Where the engine could explain itself (ADR-092 section 6), the answer
+    // arrives as two lists of role labels rather than as a finished sentence,
+    // so the words stay here and the engine's own walk - which names scope
+    // ids and filtered-out bindings - never reaches a customer. Without them
+    // this reads exactly as it always has.
     title: "You don't have permission to do this",
     describe: (error) => {
       const permission = str(error, "permission", "");
-      return permission
+      const held = explanationRoles(error, "heldRoles");
+      const wouldGrant = explanationRoles(error, "wouldGrantRoles");
+      const ask = permission
         ? `Ask an organization admin to grant you "${permission}".`
         : "Ask an organization admin for access.";
+      if (held.length === 0 && wouldGrant.length === 0) return ask;
+      const named = permission ? `"${permission}"` : "this";
+      const current =
+        held.length > 0
+          ? `Your ${listLabels(held)} ${held.length > 1 ? "roles don't" : "role doesn't"} include ${named}.`
+          : `You hold no role here that includes ${named}.`;
+      if (wouldGrant.length === 0) return `${current} ${ask}`;
+      const plural = wouldGrant.length > 1;
+      return `${current} The ${listLabels(wouldGrant)} ${plural ? "roles do" : "role does"}. Ask an organization admin to give you ${plural ? "one of them" : "that role"}.`;
     },
+  },
+  grant_expiry_in_past: {
+    // The write surface refuses an expiry that is already behind us: the
+    // grant would have ended the instant it was created, which is never what
+    // the admin meant. Their own date is the fix, so the copy points at it.
+    title: "That expiry date has already passed",
+    describe: () =>
+      "Access can only be set to end at a future date. Pick a later one and try again.",
+  },
+  grant_expiry_not_supported: {
+    // The organization's access records are still on the older store, which
+    // has nowhere to keep an end date. Naming that would be a leak; what the
+    // customer can act on is the choice between granting it open-ended or
+    // waiting, so the copy offers exactly that.
+    title: "Access with an end date isn't available here yet",
+    describe: () =>
+      "Grant the access without an end date and remove it when it is no longer needed, or contact support to have it enabled.",
   },
   grant_validation_failed: {
     // The engine's grant write surface (attach/update/revoke/replace) rejects
@@ -2082,6 +2153,15 @@ const presentations = {
     title: "This shared trace is busy right now",
     describe: () =>
       "It's being opened a lot at the moment. Wait a few seconds, then refresh.",
+  },
+  // Sharer-facing, and reachable only from the mint: a share link may confer
+  // one of a small, fixed set of things, and this one was not in it. The copy
+  // names no permission string - the reader picked an option in a dialog, or
+  // sent an API request whose `meta.allowed` lists the values verbatim.
+  share_permission_not_allowed: {
+    title: "A share link can't grant that",
+    describe: () =>
+      "Choose what the link should allow from the options offered, then create it again.",
   },
   // The one sharer-facing code here: raised when someone tries to mint a trace
   // link while the project has sharing switched off.

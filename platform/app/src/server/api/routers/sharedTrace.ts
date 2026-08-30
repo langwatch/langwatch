@@ -101,10 +101,13 @@ async function enforceShareReadLimit({
 export const sharedTraceRouter = createTRPCRouter({
   /**
    * Resolve a share token and return the complete read-only trace payload.
-   * Every resolve consumes one view and enforces expiry, view cap, audience
-   * and the sharing kill switch — all in `resolveForViewer`. A page load still
-   * counts once because every client caller shares this query's React Query
-   * key, deduping onto a single request.
+   * Possession of the token, its expiry, its view budget, its audience, its
+   * project anchor and what it confers are all decided by the authorization
+   * engine's resource tier (ADR-092 §8); `resolveForViewer` presents the token
+   * to it, keeps the sharing kill switch and the view accounting, and turns a
+   * refusal into a customer-safe error. A page load still counts once because
+   * every client caller shares this query's React Query key, deduping onto a
+   * single request.
    */
   get: publicProcedure
     .input(z.object({ token: z.string() }))
@@ -146,8 +149,17 @@ export const sharedTraceRouter = createTRPCRouter({
       // Throws typed share HandledErrors on any failure — handledErrorMiddleware
       // maps them to wire codes (not_found/kill-switch → 404, expired and
       // exhausted → 403, out-of-audience → 401).
+      //
+      // The decision itself is the authorization engine's: `resolveForViewer`
+      // presents this token at a resource scope and the resource tier answers
+      // (ADR-092 §8). The principal is what the engine matches an audience
+      // against — a request with no session is genuinely anonymous, and only
+      // an `anyone` grant can reach it.
       const share = await getApp().share.resolveForViewer({
         token: input.token,
+        principal: ctx.session?.user
+          ? { type: "user", id: ctx.session.user.id }
+          : { type: "anonymous" },
         viewer,
         viewerKey,
       });

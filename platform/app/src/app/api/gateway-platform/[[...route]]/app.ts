@@ -36,6 +36,10 @@ import {
 import { apiKeyPermission, createProjectApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
+import {
+  LIVE_MEMBERSHIP,
+  liveGroups,
+} from "~/server/app-layer/authz/repositories/live-rows";
 import { prisma } from "~/server/db";
 import { toBudgetDto } from "~/server/gateway/budget.dto";
 import {
@@ -2328,11 +2332,51 @@ async function groupMemberCounts(
     ),
   );
   if (groupIds.length === 0) return new Map();
-  const groups = await prisma.group.findMany({
+  const groups = await liveGroups(prisma).findMany({
     where: { id: { in: groupIds } },
-    select: { id: true, _count: { select: { members: true } } },
+    select: { id: true, organizationId: true },
   });
-  return new Map(groups.map((g) => [g.id, g._count.members]));
+
+  // The organization comes from the GROUP rather than from the request: a
+  // group belongs to exactly one, so this cannot be told the wrong one.
+  const idsByOrganization = new Map<string, string[]>();
+  for (const group of groups) {
+    const ids = idsByOrganization.get(group.organizationId) ?? [];
+    ids.push(group.id);
+    idsByOrganization.set(group.organizationId, ids);
+  }
+
+  const counts = new Map<string, number>();
+  for (const [organizationId, ids] of idsByOrganization) {
+    // Two conditions, because a live membership is not the same thing as a
+    // live member. `removedAt` says the person is still IN the group; a
+    // disabled organization membership says they cannot reach the
+    // organization at all, and the schema already excludes those from seat
+    // counting. A budget divided per member must not be divided by people
+    // whose seat was freed -- it would under-report everybody's share.
+    //
+    // `groupBy` rather than a `_count` include: Prisma builds `_count` as an
+    // uncorrelated join the planner may re-run per listed row.
+    const rows = await prisma.groupMembership.groupBy({
+      by: ["groupId"],
+      where: {
+        groupId: { in: ids },
+        ...LIVE_MEMBERSHIP,
+        user: {
+          orgMemberships: { some: { organizationId, disabledAt: null } },
+        },
+      },
+      _count: { _all: true },
+    });
+    for (const row of rows) counts.set(row.groupId, row._count._all);
+  }
+
+  // A group every one of whose members has left, or been disabled, produces
+  // no row at all. It still has to answer zero rather than go missing.
+  for (const group of groups) {
+    if (!counts.has(group.id)) counts.set(group.id, 0);
+  }
+  return counts;
 }
 
 function scopeFromWire(

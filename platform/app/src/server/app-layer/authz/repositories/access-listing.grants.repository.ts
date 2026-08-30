@@ -50,7 +50,13 @@ import {
   ACCESS_LISTING_GROUP_SELECT,
   ACCESS_LISTING_USER_SELECT,
 } from "./access-listing.repository";
-import { liveGrants, liveRoles } from "./live-rows";
+import {
+  LIVE_GROUP,
+  liveGrants,
+  liveGroupMemberships,
+  liveGroups,
+  liveRoles,
+} from "./live-rows";
 
 /** The three scope tiers a listed binding can carry - RESOURCE rows are the
  *  share tier and PLATFORM rows are dormant facts; neither is a binding the
@@ -80,6 +86,7 @@ const GRANT_ROW_SELECT = {
   legacyRole: true,
   scopeType: true,
   scopeId: true,
+  expiresAt: true,
   occurredAt: true,
   updatedAt: true,
 } as const satisfies Prisma.GrantSelect;
@@ -402,8 +409,11 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
     groupIdsByOrg: Map<string, Set<string>>;
     allGroupIds: string[];
   }> {
-    const memberships = await this.prisma.groupMembership.findMany({
-      where: { userId, group: { organizationId: { in: [...orgIds] } } },
+    const memberships = await liveGroupMemberships(this.prisma).findMany({
+      where: {
+        userId,
+        group: { organizationId: { in: [...orgIds] }, ...LIVE_GROUP },
+      },
       select: { groupId: true, group: { select: { organizationId: true } } },
     });
     const groupIdsByOrg = new Map<string, Set<string>>();
@@ -557,7 +567,7 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
           })
         : [],
       ids.group.size > 0
-        ? this.prisma.group.findMany({
+        ? liveGroups(this.prisma).findMany({
             where: { id: { in: [...ids.group] }, organizationId },
             select: ACCESS_LISTING_GROUP_SELECT,
           })
@@ -667,6 +677,12 @@ function toListedRow({
     scopeType: grant.scopeType,
     scopeId: row.scopeId,
     createdAt: row.occurredAt,
+    // `?? null` rather than a bare read: the two heads are compared row for
+    // row by the listing-parity test, and the legacy one answers null for
+    // every binding. A row that reached here without the column would
+    // otherwise report `undefined` and read as a different answer to the
+    // same question.
+    expiresAt: row.expiresAt ?? null,
     user,
     group,
     apiKey,

@@ -489,6 +489,69 @@ describe("Feature: Role bindings REST API", () => {
       ).toBe(0);
     });
 
+    // ADR-092's expiring grants, on the surface an operator drives. The
+    // refusal below happens before any write, so it reads the same whichever
+    // head the organization is on.
+    // @see specs/rbac/expiring-grants.feature
+    describe("when the create states the date its access ends", () => {
+      /** @scenario "Binding a role with an end date that has passed is refused" */
+      it("answers 422 grant_expiry_in_past and creates nothing", async () => {
+        const member = await seedOrgMember({
+          prisma,
+          ns,
+          organizationId: seeded.organization.id,
+          role: OrganizationUserRole.MEMBER,
+          label: "expired-date",
+          hasOrgBinding: true,
+        });
+
+        const response = await postBinding({
+          userId: member.userId,
+          role: "MEMBER",
+          scopeType: "TEAM",
+          scopeId: teamAId,
+          expiresAt: "2000-01-01T00:00:00.000Z",
+        });
+
+        expect(response.status).toBe(422);
+        expect((await response.json()).code).toBe("grant_expiry_in_past");
+        expect(
+          await prisma.roleBinding.count({
+            where: {
+              organizationId: seeded.organization.id,
+              userId: member.userId,
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: teamAId,
+            },
+          }),
+        ).toBe(0);
+      });
+
+      /** @scenario "A binding with no end date reports none" */
+      it("reports no end date on a binding created without one", async () => {
+        const member = await seedOrgMember({
+          prisma,
+          ns,
+          organizationId: seeded.organization.id,
+          role: OrganizationUserRole.MEMBER,
+          label: "no-end-date",
+          hasOrgBinding: true,
+        });
+
+        const response = await postBinding({
+          userId: member.userId,
+          role: "MEMBER",
+          scopeType: "TEAM",
+          scopeId: teamBId,
+        });
+
+        expect(response.status).toBe(201);
+        // Null rather than absent: the field is part of every binding the
+        // surface reports, so a caller reads one shape either way.
+        expect((await response.json()).expiresAt).toBeNull();
+      });
+    });
+
     /** @scenario A duplicate binding is reported as already existing */
     it("answers 409 for an identical declaration and keeps one row", async () => {
       const member = await seedOrgMember({

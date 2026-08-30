@@ -21,6 +21,7 @@ import type { TenantMigrationStatus } from "@langwatch/system-migrations";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 
 import { queryOrganizationOnAuthzEngine } from "../engine-gate";
+import { LIVE_GROUP, liveGroupMemberships } from "./live-rows";
 
 /** Seeds per budget statement. Four binds a row, so this sits well under
  *  Postgres' 65535-parameter ceiling. */
@@ -239,16 +240,20 @@ export class PrismaAuthzMigrationRepository
     }));
   }
 
-  /** Every (userId, groupId) membership in the organization — what lets the
-   *  migration mirror the legacy fallback's suppression predicate, which
-   *  counts bindings held THROUGH a group as bindings the user holds. */
+  /** Every LIVE (userId, groupId) membership in the organization — what lets
+   *  the migration mirror the legacy fallback's suppression predicate, which
+   *  counts bindings held THROUGH a group as bindings the user holds.
+   *
+   *  Live, not every row: the inventory states what the organization's access
+   *  IS at the moment of the import, and a membership that ended suppresses
+   *  nothing. The ENDED ones are history the ledger already holds. */
   async findGroupMemberships({
     organizationId,
   }: {
     organizationId: string;
   }): Promise<Array<{ userId: string; groupId: string }>> {
-    return this.prisma.groupMembership.findMany({
-      where: { group: { organizationId } },
+    return liveGroupMemberships(this.prisma).findMany({
+      where: { group: { organizationId, ...LIVE_GROUP } },
       select: { userId: true, groupId: true },
     });
   }
@@ -364,6 +369,7 @@ export class PrismaAuthzMigrationRepository
         projectId: true,
         userId: true,
         visibility: true,
+        permission: true,
         expiresAt: true,
         maxViews: true,
         viewCount: true,
@@ -378,6 +384,7 @@ export class PrismaAuthzMigrationRepository
       projectId: row.projectId,
       userId: row.userId,
       visibility: row.visibility,
+      permission: row.permission,
       expiresAtMs: row.expiresAt?.getTime() ?? null,
       maxViews: row.maxViews,
       viewCount: row.viewCount,

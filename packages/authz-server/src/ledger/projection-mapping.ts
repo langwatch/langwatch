@@ -1,4 +1,5 @@
 import {
+  DEFAULT_SHARE_LINK_PERMISSION,
   PRINCIPAL_KIND_FROM_STORED,
   STORED_PRINCIPAL_KIND,
 } from "@langwatch/authz";
@@ -10,6 +11,7 @@ import type {
 import type {
   GrantEventSource,
   GrantFact,
+  GroupMembershipFact,
   LedgerPrincipalType,
   LedgerScopeType,
   LegacyBindingRole,
@@ -17,11 +19,15 @@ import type {
   RoleFact,
 } from "./facts";
 
-/** The single permission a share link has ever conferred (ADR-057) - the one
- *  spelling every minter and every importer of a share-link grant uses
- *  (`cutover.migration.ts`'s import and the platform's `LedgerShareRepository`
- *  mint, both). */
-export const SHARE_LINK_PERMISSION = "traces:view";
+/** The permission a share link confers when its minter named none (ADR-057's
+ *  original, and still the only thing an existing link says) - the one
+ *  spelling every minter and every importer of a share-link grant falls back
+ *  to (`cutover.migration.ts`'s import and the platform's
+ *  `LedgerShareRepository` mint, both). A link that DOES name one carries it
+ *  on the fact; the closed set it may name is `SHARE_LINK_PERMISSIONS` in
+ *  `@langwatch/authz`, which this is re-exported from so the default has one
+ *  spelling across both packages. */
+export const SHARE_LINK_PERMISSION = DEFAULT_SHARE_LINK_PERMISSION;
 
 /**
  * Pure row mapping for the grants ledger's Postgres projection: reducer
@@ -140,17 +146,30 @@ export function grantFactToRow({
       grant.resource != null ? RESOURCE_KIND_TO_DB[grant.resource.kind] : null,
     projectId: grant.resource?.projectId ?? null,
     createdByUserId: grant.resource?.createdByUserId ?? null,
-    expiresAt:
-      grant.resource?.expiresAtMs != null
-        ? new Date(grant.resource.expiresAtMs)
-        : null,
+    // ONE column, two tiers. A resource fact states its expiry inside its
+    // terms (it always did); every other tier states it on the fact itself.
+    // The two are mutually exclusive by the shape refinement - a fact
+    // carrying terms is a RESOURCE fact - so `??` picks whichever is there
+    // rather than choosing between two live candidates.
+    expiresAt: expiryDate(grant.resource?.expiresAtMs ?? grant.expiresAtMs),
     maxViews: grant.resource?.maxViews ?? null,
     occurredAt: new Date(grant.occurredAtMs),
   };
 }
 
+/** A stored expiry as the column holds it. Written once so the two
+ *  directions of the mapping cannot disagree about what "no expiry" is. */
+function expiryDate(expiresAtMs: number | undefined): Date | null {
+  return expiresAtMs != null ? new Date(expiresAtMs) : null;
+}
+
 export function grantRowToFact(row: GrantRowShape): GrantFact {
   const resourceKind = resourceKindFromDb(row.resourceKind);
+  const isResourceRow =
+    row.token != null &&
+    row.permission != null &&
+    resourceKind !== undefined &&
+    row.projectId != null;
   return {
     grantId: row.id,
     principal: { type: PRINCIPAL_FROM_DB[row.principalType], id: row.principalId },
@@ -159,20 +178,23 @@ export function grantRowToFact(row: GrantRowShape): GrantFact {
     ...(row.legacyRole != null
       ? { legacyRole: row.legacyRole as LegacyBindingRole }
       : {}),
+    // The stored expiry belongs to whichever tier the row is. On a resource
+    // row it is part of the terms below and is NOT restated here, so a fact
+    // read back out of the projection is the fact that went in.
+    ...(!isResourceRow && row.expiresAt != null
+      ? { expiresAtMs: row.expiresAt.getTime() }
+      : {}),
     // All four identity columns or none, and the kind has to PARSE as one of
     // the two the tier has: a row missing one of them cannot describe a
     // resource grant, and inventing a default would put a fact in front of
     // the engine that names the wrong thing.
-    ...(row.token != null &&
-    row.permission != null &&
-    resourceKind !== undefined &&
-    row.projectId != null
+    ...(isResourceRow
       ? {
           resource: {
-            kind: resourceKind,
-            projectId: row.projectId,
-            token: row.token,
-            permission: row.permission,
+            kind: resourceKind as ResourceGrantTerms["kind"],
+            projectId: row.projectId as string,
+            token: row.token as string,
+            permission: row.permission as string,
             ...(row.createdByUserId != null
               ? { createdByUserId: row.createdByUserId }
               : {}),
@@ -184,6 +206,52 @@ export function grantRowToFact(row: GrantRowShape): GrantFact {
         }
       : {}),
     source: row.source as GrantEventSource,
+    occurredAtMs: row.occurredAt.getTime(),
+  };
+}
+
+/**
+ * The `GroupMembership` table as the fold writes it.
+ *
+ * `removedAt` is absent from the shape rather than merely unset, for the
+ * reason `viewCount` is absent from `CompatShareLinkRowShape`: a full-row
+ * write must never be able to state it. The mark has its own event and its
+ * own guarded statement, and an `added` redelivered after a `removed` would
+ * otherwise un-remove the membership — which is the fail-open direction.
+ */
+export interface GroupMembershipRowShape {
+  id: string;
+  groupId: string;
+  userId: string;
+  occurredAt: Date;
+}
+
+export function groupMembershipFactToRow({
+  membership,
+}: {
+  membership: GroupMembershipFact;
+}): GroupMembershipRowShape {
+  return {
+    id: membership.membershipId,
+    groupId: membership.groupId,
+    userId: membership.userId,
+    occurredAt: new Date(membership.occurredAtMs),
+  };
+}
+
+/**
+ * The inverse. `source` is not on the row — the table has no column for it
+ * and adding one would say nothing a reader uses — so a fact read back out of
+ * the projection names the writer it can prove: the ledger itself.
+ */
+export function groupMembershipRowToFact(
+  row: GroupMembershipRowShape,
+): GroupMembershipFact {
+  return {
+    membershipId: row.id,
+    groupId: row.groupId,
+    userId: row.userId,
+    source: "grants-service",
     occurredAtMs: row.occurredAt.getTime(),
   };
 }
@@ -334,6 +402,10 @@ export interface CompatShareLinkRowShape {
   projectId: string;
   userId: string | null;
   visibility: "PUBLIC" | "ORGANIZATION" | "PROJECT";
+  /** What the link confers. `null` where the fact names the default, so the
+   *  compat row an ordinary link folds to is byte-identical to the one the
+   *  legacy mint wrote before the column existed. */
+  permission: string | null;
   expiresAt: Date | null;
   maxViews: number | null;
 }
@@ -447,6 +519,12 @@ export function grantFactToCompatShareLink({
     projectId: resource.projectId,
     userId: resource.createdByUserId ?? null,
     visibility,
+    // The DEFAULT folds to null, not to its own name: the compat column's
+    // absence is what "an ordinary link" has always looked like on this
+    // table, and writing the string instead would make every pre-existing
+    // row differ from every re-folded one for no change in meaning.
+    permission:
+      resource.permission === SHARE_LINK_PERMISSION ? null : resource.permission,
     expiresAt:
       resource.expiresAtMs != null ? new Date(resource.expiresAtMs) : null,
     maxViews: resource.maxViews ?? null,

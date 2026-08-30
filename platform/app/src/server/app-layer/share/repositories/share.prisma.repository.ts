@@ -89,6 +89,7 @@ export class PrismaShareRepository implements ShareRepository {
     expiresAt,
     maxViews,
     userId,
+    permission,
   }: CreateShareLinkParams): Promise<ShareLink> {
     return this.prisma.shareLink.create({
       data: {
@@ -100,6 +101,9 @@ export class PrismaShareRepository implements ShareRepository {
         expiresAt: expiresAt ?? null,
         maxViews: maxViews ?? null,
         userId: userId ?? null,
+        // Null, not the default spelled out: the column's absence IS the
+        // default, so an ordinary link is stored exactly as it always was.
+        permission: permission ?? null,
       },
     });
   }

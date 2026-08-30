@@ -24,8 +24,8 @@ const organizationUserFindFirst = vi.fn();
 const organizationUserFindMany = vi.fn();
 const groupFindFirst = vi.fn();
 const groupUpdate = vi.fn();
-const groupMembershipDeleteMany = vi.fn();
-const groupMembershipCreateMany = vi.fn();
+const addGroupMembers = vi.fn();
+const removeGroupMembersWhere = vi.fn();
 const apiKeyFindFirst = vi.fn();
 const attachBindings = vi.fn();
 const changeBindingRole = vi.fn();
@@ -44,10 +44,9 @@ const prisma = {
     findMany: organizationUserFindMany,
   },
   group: { findFirst: groupFindFirst, update: groupUpdate },
-  groupMembership: {
-    deleteMany: groupMembershipDeleteMany,
-    createMany: groupMembershipCreateMany,
-  },
+  // No `groupMembership` delegate at all: a membership is a grant fact now,
+  // so the service reaches it only through the writer. A regression that
+  // writes the table directly reads as a missing mock rather than passing.
   apiKey: { findFirst: apiKeyFindFirst },
   // The personal-team guard runs on every binding write; a shared team here.
   team: { findFirst: vi.fn().mockResolvedValue(null) },
@@ -76,6 +75,8 @@ const writer = {
   attachBindings,
   changeBindingRole,
   revokeBindings,
+  addGroupMembers,
+  removeGroupMembersWhere,
 } as unknown as GrantsLedgerWriter;
 
 const repository = {
@@ -101,8 +102,8 @@ beforeEach(() => {
   customRoleFindMany.mockResolvedValue([]);
   organizationUserFindMany.mockResolvedValue([]);
   groupUpdate.mockResolvedValue(undefined);
-  groupMembershipDeleteMany.mockResolvedValue(undefined);
-  groupMembershipCreateMany.mockResolvedValue(undefined);
+  addGroupMembers.mockResolvedValue({ added: [], duplicates: [] });
+  removeGroupMembersWhere.mockResolvedValue(["groupmember_1"]);
   transaction.mockImplementation(async (cb: (tx: PrismaClient) => unknown) =>
     cb(prisma),
   );
@@ -188,6 +189,53 @@ describe("RoleBindingService create", () => {
           onDuplicate: "reject",
         }),
       );
+    });
+  });
+
+  // ADR-092's expiring grants, from the surface an operator actually uses:
+  // the create takes the date the access ends and hands it to the one writer.
+  describe("when the request carries the date its access ends", () => {
+    const FRIDAY = new Date("2099-12-31T23:59:59.000Z");
+
+    /** @scenario "Binding a role with an end date through the API" */
+    it("hands the end date to the writer alongside the rest of the fact", async () => {
+      await service.create({
+        ...bindingInput,
+        userId: "user_1",
+        expiresAt: FRIDAY,
+      });
+
+      expect(attachBindings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          bindings: [
+            expect.objectContaining({ expiresAtMs: FRIDAY.getTime() }),
+          ],
+        }),
+      );
+    });
+
+    it("leaves the term off entirely when no end date is given", async () => {
+      await service.create({ ...bindingInput, userId: "user_1" });
+
+      const call = attachBindings.mock.calls[0] as [
+        { bindings: Array<Record<string, unknown>> },
+      ];
+      expect("expiresAtMs" in (call[0].bindings[0] ?? {})).toBe(false);
+    });
+
+    it("refuses an end date that has already passed, before any write", async () => {
+      await expect(
+        service.create({
+          ...bindingInput,
+          userId: "user_1",
+          expiresAt: new Date("2000-01-01T00:00:00.000Z"),
+        }),
+      ).rejects.toMatchObject({
+        code: "grant_expiry_in_past",
+        httpStatus: 422,
+      });
+
+      expect(attachBindings).not.toHaveBeenCalled();
     });
   });
 
@@ -376,16 +424,20 @@ describe("RoleBindingService applyGroupEdits", () => {
           actor,
         }),
       );
-      expect(groupMembershipDeleteMany).toHaveBeenCalledWith(
+      // One call carrying the whole set, not one call per user: the removal
+      // is a single read and a single epoch bump however many people it names.
+      expect(removeGroupMembersWhere).toHaveBeenCalledTimes(1);
+      expect(removeGroupMembersWhere).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { groupId: "group_1", userId: { in: ["user_removed"] } },
+          organizationId: "org_1",
+          where: { groupId: "group_1", userId: ["user_removed"] },
         }),
       );
       // The mock call orders are process-wide monotonic counters, so a lower
-      // number on the revoke than on the membership delete is proof the
+      // number on the revoke than on the membership removal is proof the
       // ledger command really ran first, not just that both ran.
       expect(revokeBindings.mock.invocationCallOrder[0]!).toBeLessThan(
-        groupMembershipDeleteMany.mock.invocationCallOrder[0]!,
+        removeGroupMembersWhere.mock.invocationCallOrder[0]!,
       );
     });
 
@@ -407,9 +459,9 @@ describe("RoleBindingService applyGroupEdits", () => {
       ).rejects.toThrow("ledger unavailable");
 
       // A crash between the two commands must leave less access, never more:
-      // the member removal (and any rename) must not have committed.
-      expect(transaction).not.toHaveBeenCalled();
-      expect(groupMembershipDeleteMany).not.toHaveBeenCalled();
+      // the member removal (and any rename) must not have happened.
+      expect(removeGroupMembersWhere).not.toHaveBeenCalled();
+      expect(groupUpdate).not.toHaveBeenCalled();
     });
   });
 
@@ -423,7 +475,7 @@ describe("RoleBindingService applyGroupEdits", () => {
       });
 
       expect(revokeBindings).not.toHaveBeenCalled();
-      expect(groupMembershipDeleteMany).toHaveBeenCalled();
+      expect(removeGroupMembersWhere).toHaveBeenCalled();
     });
   });
 
@@ -461,7 +513,7 @@ describe("RoleBindingService applyGroupEdits", () => {
         }),
       ).rejects.toMatchObject({ code: "scim_managed_group", httpStatus: 409 });
 
-      expect(groupMembershipDeleteMany).not.toHaveBeenCalled();
+      expect(removeGroupMembersWhere).not.toHaveBeenCalled();
     });
 
     it("refuses a member addition with scim_managed_group", async () => {
@@ -474,7 +526,7 @@ describe("RoleBindingService applyGroupEdits", () => {
         }),
       ).rejects.toMatchObject({ code: "scim_managed_group", httpStatus: 409 });
 
-      expect(groupMembershipCreateMany).not.toHaveBeenCalled();
+      expect(addGroupMembers).not.toHaveBeenCalled();
     });
   });
 });

@@ -83,6 +83,11 @@ Feature: Share a trace behind a secret, scoped, expiring link
       Then they can view the trace
       When a member of the organization outside the project opens the link
       Then access is denied
+      # "Member of the project" is whoever can reach the project, which is
+      # nearly always through the team that owns it rather than through
+      # anything naming the project. The engine resolves the audience over
+      # that whole chain - see "A project audience reaches everyone who
+      # reaches the project" in specs/rbac/unified-authorization-engine.feature.
 
   Rule: Links expire by time or by view count
 
@@ -176,6 +181,18 @@ Feature: Share a trace behind a secret, scoped, expiring link
       Given an active share link for a trace
       When the sharer revokes the link
       Then opening the link afterwards is denied
+
+    # The decision itself is the authorization engine's (see
+    # specs/rbac/unified-authorization-engine.feature, the resource tier). What
+    # this pins is the half a customer can see: a refusal the engine hands back
+    # is one boolean, and turning it into words must not turn it into a probe.
+    @unit
+    Scenario: A refused share link never says which refusal it was
+      Given a token that matches no link
+      And a link behind a project whose sharing was switched off
+      And a live link the engine refuses on its own terms
+      When each is opened
+      Then all three answer with the identical refusal, to the character
 
   Rule: The plan visibility window and content redaction still apply to shared views
 

@@ -658,6 +658,18 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     // Role bindings first: RoleBinding.apiKeyId restricts api-key deletion.
     await this.prisma.$transaction([
       this.prisma.roleBinding.deleteMany({ where: { organizationId } }),
+      // Group memberships, named rather than cascaded. A membership row is
+      // kept when it ENDS - that is what makes "who could reach this in June"
+      // answerable - and `GroupMembership.group` is `onDelete: Restrict` for
+      // exactly that reason: deleting a group must never take its history
+      // quietly with it. A purge is the one deliberate erasure where taking it
+      // IS the intent, so the purge says so out loud and the restrict stands
+      // everywhere else. Without this line the organization delete below now
+      // fails on the group cascade rather than silently erasing an audit
+      // trail, which is the trade this restrict was chosen for.
+      this.prisma.groupMembership.deleteMany({
+        where: { group: { organizationId } },
+      }),
       // The authorization read model. It carries organizationId as a plain
       // column and never a relation - facts derived from the log must not
       // presume the row they describe still exists - so nothing cascades

@@ -254,6 +254,14 @@ const registry = {
     docsPath: "/api-reference/api-keys/create-api-key",
   },
 
+  // ---- shared trace links (ADR-057 / ADR-092 section 8) ----
+  share_permission_not_allowed: {
+    tips: [
+      "`meta.allowed` lists every value a share link may be created with; send one of those",
+      "Omit `permission` entirely for the ordinary read-only link",
+    ],
+  },
+
   // ---- management API (organization, members, roles, role bindings) ----
   enterprise_plan_required: {
     tips: [
@@ -266,6 +274,35 @@ const registry = {
     tips: [
       "The credential lacks the permission named in meta.required_permission",
       "Ask an organization admin to grant that permission, or use an API key whose bindings include it",
+    ],
+    docsPath: "/platform/rbac",
+  },
+  grant_expiry_in_past: {
+    tips: [
+      "expiresAt must be strictly in the future at the moment of the write; an instant equal to now is already over",
+      "Send an ISO-8601 timestamp, e.g. 2026-12-31T23:59:59Z; meta.expiresAtMs carries the value that was rejected",
+    ],
+    docsPath: "/platform/rbac",
+  },
+  grant_expiry_not_supported: {
+    tips: [
+      "This organization's access records cannot hold an end date yet; retry the same request without expiresAt",
+      "Delete the binding when the access is no longer needed, or ask support to enable expiring access for the organization",
+    ],
+    docsPath: "/platform/rbac",
+  },
+  group_already_deleted: {
+    tips: [
+      "The group was already deleted; a deleted group is kept as a record and cannot be deleted twice",
+      "List the organization's groups to see which ones are live, and treat this as already done if you meant to delete it",
+      "To use the name again, create a new group with it — deleting frees the name for re-use",
+    ],
+    docsPath: "/platform/rbac",
+  },
+  group_member_not_in_group: {
+    tips: [
+      "The user holds no LIVE membership of this group; a membership that ended is kept as a record and cannot be ended twice",
+      "List the group's members to see who is in it now, and treat this as already done if you meant to remove them",
     ],
     docsPath: "/platform/rbac",
   },

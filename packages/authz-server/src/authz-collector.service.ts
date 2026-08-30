@@ -2,13 +2,15 @@
  * ADR-092 §2 — COLLECT: the policy half of reading authorization data. The
  * queries live behind AuthzReadRepository (the app's Prisma implementation);
  * this service owns what the rows MEAN: group expansion, the lenient
- * custom-role parse, share-link liveness, audience mapping, and scope
- * resolution. One snapshot per (principal, organization) feeds any number
- * of pure decide() calls.
+ * custom-role parse, binding and share-link liveness, audience mapping, and
+ * scope resolution. One snapshot per (principal, organization) feeds any
+ * number of pure decide() calls.
  */
+import { shareLinkPermissionsGranted } from "@langwatch/authz";
 import type {
   AuthzPrincipalRef,
   AuthzScopeRef,
+  CollectedBinding,
   CollectedGrants,
   GrantAudience,
   ResourceGrant,
@@ -21,7 +23,8 @@ import type {
 } from "./authz-read.repository";
 
 export type AuthzCollectorOptions = {
-  /** Injected so share-link liveness is testable at its exact boundary. */
+  /** Injected so binding and share-link liveness are testable at their exact
+   *  boundary. */
   now?: () => Date;
 };
 
@@ -191,15 +194,15 @@ export class AuthzCollectorService {
    * ADR-092 §8 / stage A5 — resource-tier grants for a resource scope's
    * links (the resource itself plus shareable ancestors).
    *
-   * SHIM: storage is the ADR-057 `ShareLink` table, read as grants of
-   * `traces:view` with the audience its visibility implies. Two ADR-057
-   * invariants are preserved here: possession of the token — not row
-   * existence — is what activates a grant (no presented tokens, no reads,
-   * no grants), and liveness (expiry, view budget) is filtered before the
-   * engine ever sees a row. View CONSUMPTION stays in ShareService: this
-   * reader is pure. The C5 migration extends ShareLink into full
-   * ResourceGrant storage (per-row permission, principal audiences) rather
-   * than adding a parallel table.
+   * SHIM: storage is the ADR-057 `ShareLink` table, read as grants of the
+   * permission the row itself names — `traces:view` for every row that names
+   * none — with the audience its visibility implies. Two ADR-057 invariants
+   * are preserved here: possession of the token — not row existence — is what
+   * activates a grant (no presented tokens, no reads, no grants), and liveness
+   * (expiry, view budget) is filtered before the engine ever sees a row. View
+   * CONSUMPTION stays in ShareService: this reader is pure. The C5 migration
+   * extends ShareLink into full ResourceGrant storage (principal audiences)
+   * rather than adding a parallel table.
    */
   async collectResourceGrants({
     scope,
@@ -224,23 +227,30 @@ export class AuthzCollectorService {
       links,
     });
     const now = this.now();
-    return rows
-      .filter((row) => isLiveShareLink(row, now))
-      .map((row) => ({
+    return rows.filter((row) => isLiveShareLink(row, now)).flatMap((row) => {
+      // The row's own project anchors both the grant and its audience: a
+      // row can only be reached through a query already scoped to this
+      // project, and taking the audience from anywhere else would let a
+      // grant name a project it does not sit in.
+      const audience = audienceForVisibility({
+        visibility: row.visibility,
+        organizationId: scope.organizationId,
+        projectId: row.projectId,
+      });
+      // ONE stored permission, expanded into one ResourceGrant per permission
+      // it confers - which is how "annotate implies view" is represented
+      // without the engine learning a cross-resource implication it does not
+      // have. `matchResourceGrant` already scans the LIST and tests each
+      // entry, so nothing downstream changes. A null column (every link
+      // minted before the column existed) expands to `traces:view` alone.
+      return shareLinkPermissionsGranted(row.permission).map((permission) => ({
         kind: kindForResourceType(row.resourceType),
         id: row.resourceId,
         projectId: row.projectId,
-        permission: "traces:view",
-        // The row's own project anchors both the grant and its audience: a
-        // row can only be reached through a query already scoped to this
-        // project, and taking the audience from anywhere else would let a
-        // grant name a project it does not sit in.
-        audience: audienceForVisibility({
-          visibility: row.visibility,
-          organizationId: scope.organizationId,
-          projectId: row.projectId,
-        }),
+        permission,
+        audience,
       }));
+    });
   }
 
   /** The reader for ONE snapshot: the routing decision behind it is taken
@@ -260,10 +270,13 @@ export class AuthzCollectorService {
     organizationId: string;
     reader: AuthzReadRepository;
   }): Promise<CollectedGrants> {
-    const bindings = await reader.findApiKeyBindings({
-      apiKeyId: principal.id,
-      organizationId,
-    });
+    const bindings = liveBindings(
+      await reader.findApiKeyBindings({
+        apiKeyId: principal.id,
+        organizationId,
+      }),
+      this.now(),
+    );
     return {
       principal,
       organizationId,
@@ -318,7 +331,14 @@ export class AuthzCollectorService {
         }),
       ]);
 
-    const bindings = [...directBindings, ...groupBindings];
+    // Expired rows are dropped HERE, once, for both heads: the compat head
+    // has no expiry column to filter on and the grants head would need the
+    // predicate written a second time in SQL. One filter over the collected
+    // list is what makes the two answer identically.
+    const bindings = liveBindings(
+      [...directBindings, ...groupBindings],
+      this.now(),
+    );
     // A seat-disabled membership is NOT a membership: the person keeps their
     // row, their role and everything they did, and holds no access until an
     // admin re-enables them (seat-reconciliation.feature). Reporting it as a
@@ -394,6 +414,35 @@ function parseCustomRolePermissions(
   return map;
 }
 
+/**
+ * The bindings still granting at `now`.
+ *
+ * An elapsed binding is treated as ABSENT, not as revoked, and the
+ * difference is the whole design: nothing is written when the moment passes,
+ * so `revokedAt` stays null, the organization's authz epoch is not bumped,
+ * and the row remains readable as the audit record of access that once
+ * existed. The cost of not bumping is that a snapshot cached BEFORE the
+ * expiry keeps answering from it - bounded by the cache's absolute age
+ * ceiling (30s, `DEFAULT_CACHE_MAX_AGE_MS` in authz.service.ts) and accepted
+ * (`specs/rbac/expiring-grants.feature`). An admin who needs access to stop
+ * this instant revokes, which does bump.
+ *
+ * `<=` rather than `<`: a binding whose expiry is exactly now is over. The
+ * write surface refuses to create one on the same boundary
+ * (`assertExpiryInFuture`), so the two halves cannot disagree.
+ */
+function liveBindings(
+  bindings: CollectedBinding[],
+  now: Date,
+): CollectedBinding[] {
+  // The overwhelmingly common case is that nothing expires at all, and a
+  // filter that allocates a second array for it would run on every check.
+  if (!bindings.some((binding) => binding.expiresAt != null)) return bindings;
+  return bindings.filter(
+    (binding) => binding.expiresAt == null || binding.expiresAt > now,
+  );
+}
+
 function isLiveShareLink(row: ShareLinkRow, now: Date): boolean {
   if (row.expiresAt != null && row.expiresAt <= now) return false;
   if (row.maxViews != null && row.viewCount >= row.maxViews) return false;
@@ -424,13 +473,18 @@ function kindForResourceType(
  * The ADR-057 visibility a link was created with, as the ADR-092 audience
  * it means.
  *
- * KNOWN NARROWING (C5): the PROJECT audience resolves through
- * project-scoped bindings only (see audienceMatches in the engine), while
- * legacy's project-visibility check probes actual project membership - so a
- * caller who reaches the project through a team or organization binding
- * matches legacy and not this. The membership probe lands with the C5
- * storage pass; until then this is narrower than legacy, which fails
- * closed.
+ * Each of these names a membership set, and the engine resolves it as the
+ * REACHABILITY question it is (`audienceMatches`): a PROJECT audience
+ * includes everyone who can reach the project - through a binding on it, on
+ * the team that owns it, or on the organization above it - and an
+ * ORGANIZATION audience includes every member of the organization. That is
+ * the same set legacy's visibility checks probed, so a caller whose project
+ * access arrives as a TEAM binding (which is how it nearly always arrives)
+ * matches here exactly as they did there.
+ *
+ * The lineage those sets are read from is the SCOPE's, which this collector
+ * resolved off the project row - never off the request - so an audience can
+ * only ever name the project and organization the row itself sits in.
  */
 function audienceForVisibility({
   visibility,

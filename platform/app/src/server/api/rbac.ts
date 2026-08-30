@@ -43,6 +43,10 @@ import {
 import { authzChecksFor } from "~/server/app-layer/authz/checks";
 import { organizationOnAuthzEngine } from "~/server/app-layer/authz/engine-gate";
 import {
+  LIVE_GROUP,
+  liveGroupMemberships,
+} from "~/server/app-layer/authz/repositories/live-rows";
+import {
   LiteMemberRestrictedError,
   MembershipDisabledError,
   ProjectPermissionDeniedError,
@@ -863,8 +867,10 @@ async function checkPermissionFromBindings({
   const scopeIds = scopes.map((s) => s.scopeId);
 
   // Fetch groups the user belongs to in this org
-  const groupMemberships = await prisma.groupMembership.findMany({
-    where: { userId, group: { organizationId } },
+  const groupMemberships = await liveGroupMemberships(prisma).findMany({
+    // LIVE_GROUP too: a group whose deletion is being processed must not put
+    // its id into the binding query below, or it grants after it was deleted.
+    where: { userId, group: { organizationId, ...LIVE_GROUP } },
     select: { groupId: true },
   });
   const groupIds = groupMemberships.map((m) => m.groupId);
@@ -1712,8 +1718,11 @@ async function loadScopeResolution(
   // stale cross-org binding names them at one of these scopes.
   if (organizationRole === null) return null;
 
-  const groupMemberships = await ctx.prisma.groupMembership.findMany({
-    where: { userId, group: { organizationId: args.organizationId } },
+  const groupMemberships = await liveGroupMemberships(ctx.prisma).findMany({
+    where: {
+      userId,
+      group: { organizationId: args.organizationId, ...LIVE_GROUP },
+    },
     select: { groupId: true },
   });
   const groupIds = groupMemberships.map((m) => m.groupId);

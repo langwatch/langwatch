@@ -9,6 +9,7 @@ import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/serv
 import { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
+import { AuthzCollectorService, AuthzService } from "@langwatch/authz-server";
 import { createLogger } from "@langwatch/observability";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { env } from "~/env.mjs";
@@ -143,10 +144,13 @@ import { runEvaluationWorkflow } from "../workflows/runWorkflow";
 import { createAnalyticsService } from "./analytics";
 import { LegacyAnalyticsBackendClickHouseRepository } from "./analytics/repositories/legacy-analytics-backend.clickhouse.repository";
 import { App, getApp, globalForApp, initializeApp } from "./app";
+import { demoProjectId } from "./authz/demo-project";
 import { installAuthzEngineGateReporting } from "./authz/engine-gate-reporting";
 import { GrantsLedgerWriter, grantsLedgerWriter } from "./authz/ledger";
 import { PrismaAuthzAuditTrailRepository } from "./authz/repositories/authz-audit-trail.prisma.repository";
 import { PrismaAuthzGrantsWriteRepository } from "./authz/repositories/authz-grants-write.prisma.repository";
+import { CutoverAwareAuthzReadRepository } from "./authz/repositories/authz-read.cutover.repository";
+import { authz, authzCollector } from "./authz/runtime";
 import { EmailSuppressionService } from "./automations/emailSuppression.service";
 import { REPORT_SCHEDULER_TARGET_TYPE } from "./automations/report.builder";
 import {
@@ -321,6 +325,7 @@ import { SchedulerService } from "./scheduler/scheduler.service";
 import { LedgerShareRepository } from "./share/repositories/share.ledger.repository";
 import { PrismaShareRepository } from "./share/repositories/share.prisma.repository";
 import { ShareService } from "./share/share.service";
+import { engineShareAccessDecider } from "./share/share-access";
 import { createShareViewDedupeService } from "./share/share-view-dedupe.service";
 import { createSharedTracePayloadCache } from "./share/shared-trace-cache.service";
 import { ResultAtomsClickHouseRepository } from "./simulations/result-atoms/result-atoms.clickhouse.repository";
@@ -814,6 +819,14 @@ export function initializeDefaultApp(options?: {
         const config = await projects.getTraceSharingConfig(projectId);
         return !!config && config.orgEnabled && config.projectEnabled;
       },
+      // ADR-092 §8 — the resource tier decides whether a presented token
+      // authorizes the read. The composition root's own instances, so a share
+      // resolve answers from the same collector, the same per-organization
+      // read routing and the same epoch cache as every other check.
+      shareAccess: engineShareAccessDecider({
+        authz,
+        scopes: authzCollector,
+      }),
       // Makes `maxViews` count viewings rather than requests, so a recipient
       // refreshing a single-view link doesn't lock themselves out. ADR-057.
       viewDedupe: createShareViewDedupeService(redis),
@@ -1966,6 +1979,13 @@ export function createTestApp(overrides?: TestAppOverrides): App {
   const testPinnedTraceService = new PinnedTraceService(
     new PinnedTraceRepository(testPrisma),
   );
+  // The engine, composed over `testPrisma` the same way the composition root
+  // composes it over the app's client — no epoch cache, so every check
+  // collects fresh, which is always correct and only slower.
+  const testAuthzCollector = new AuthzCollectorService(
+    new CutoverAwareAuthzReadRepository(testPrisma),
+  );
+  const testAuthz = new AuthzService(testAuthzCollector, { demoProjectId });
   // Hoisted so the export shares the null repository with `runs`, matching how
   // the production preset wires the pair.
   const testSimulationReads = SimulationRunService.create(null);
@@ -2473,6 +2493,14 @@ export function createTestApp(overrides?: TestAppOverrides): App {
       }),
       testPinnedTraceService,
       {
+        // The engine over the same client, for the same reason as the
+        // repository above: a test share resolve must take the real decision
+        // path (resource scope, presented token, resource tier) rather than a
+        // stand-in only tests see.
+        shareAccess: engineShareAccessDecider({
+          authz: testAuthz,
+          scopes: testAuthzCollector,
+        }),
         isTraceSharingEnabled: async (projectId) => {
           // Effective sharing = org AND project (ADR-057).
           const project = await testPrisma.project.findUnique({

@@ -128,6 +128,11 @@ export function legacyTeamFallbackGrants({
  * (kind, id, projectId) plus audience. The ONLY path an anonymous
  * principal can take.
  *
+ * The scope is what a membership audience is resolved against: it carries
+ * the resource's stored project/team/organization lineage, so "members of
+ * this project" can be answered as the reachability question it is
+ * (`audienceMatches`) without the engine acquiring storage of its own.
+ *
  * When several grants match, the least-redacting audience wins: any
  * membership audience beats `anyone`, so a signed-in member who follows a
  * public link still gets the member view. Picking the first row instead
@@ -153,7 +158,7 @@ export function matchResourceGrant({
         granted: new Set([grant.permission]),
         requested: permission,
       }) &&
-      audienceMatches({ audience: grant.audience, grants }),
+      audienceMatches({ audience: grant.audience, grants, scope }),
   );
   return (
     matched.find((grant) => grant.audience.kind !== "anyone") ?? matched[0]

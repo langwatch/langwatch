@@ -68,7 +68,13 @@ describe("resource-tier grants (ADR-092 §8)", () => {
       expect(decision.allowed).toBe(false);
     });
 
-    it("keeps a project member on the binding path, audience member", () => {
+    /** @scenario "Presenting a token is answered by the resource tier, not by a binding" */
+    it("answers a project member through the tier they presented a token to", () => {
+      // A resource grant only exists here because the caller PRESENTED the
+      // token that reads it, so the tier is the step that was asked — even
+      // for a member whose own binding would have answered too. Their in-app
+      // read is a different question, asked at the project scope, where no
+      // resource grant is collected at all.
       const decision = engine.decide({
         grants: makeGrants({
           principal: { type: "user", id: "user-1" },
@@ -78,6 +84,21 @@ describe("resource-tier grants (ADR-092 §8)", () => {
         permission: "traces:view",
         scope: traceScope(),
         resourceGrants,
+      });
+      expect(decision.allowed).toBe(true);
+      expect(decision.via).toBe("resource-grant");
+    });
+
+    /** @scenario "Presenting a token is answered by the resource tier, not by a binding" */
+    it("keeps a project member on the binding path when they presented nothing", () => {
+      const decision = engine.decide({
+        grants: makeGrants({
+          principal: { type: "user", id: "user-1" },
+          organizationRole: "MEMBER",
+          bindings: [binding({ scopeType: "PROJECT", scopeId: PROJECT })],
+        }),
+        permission: "traces:view",
+        scope: traceScope(),
       });
       expect(decision.allowed).toBe(true);
       expect(decision.via).toBe("binding");
@@ -151,10 +172,12 @@ describe("resource-tier grants (ADR-092 §8)", () => {
       const audience = { kind: "team", id: TEAM } as const;
       const viaBinding = makeGrants({
         principal: { type: "user", id: "user-1" },
+        organizationRole: "MEMBER",
         bindings: [binding({ scopeType: "TEAM", scopeId: TEAM })],
       });
       const viaLegacy = makeGrants({
         principal: { type: "user", id: "user-1" },
+        organizationRole: "MEMBER",
         legacyTeamMemberships: [
           {
             teamId: TEAM,
@@ -166,20 +189,51 @@ describe("resource-tier grants (ADR-092 §8)", () => {
       });
       const otherTeam = makeGrants({
         principal: { type: "user", id: "user-2" },
+        organizationRole: "MEMBER",
         bindings: [binding({ scopeType: "TEAM", scopeId: "team-other" })],
+      });
+      // The membership set is the set of people who can reach the team, and a
+      // user with no live OrganizationUser row reaches nothing here whatever
+      // binding outlived them.
+      const removed = makeGrants({
+        principal: { type: "user", id: "user-1" },
+        bindings: [binding({ scopeType: "TEAM", scopeId: TEAM })],
       });
       expect(checkWith({ audience, grants: viaBinding }).allowed).toBe(true);
       expect(checkWith({ audience, grants: viaLegacy }).allowed).toBe(true);
       expect(checkWith({ audience, grants: otherTeam }).allowed).toBe(false);
+      expect(checkWith({ audience, grants: removed }).allowed).toBe(false);
     });
 
-    it("project: matches a caller with a binding on that project", () => {
+    /** @scenario "A project audience reaches everyone who reaches the project" */
+    it("project: matches everyone who reaches it, however their access arrives", () => {
       const audience = { kind: "project", id: PROJECT } as const;
-      const member = makeGrants({
-        principal: { type: "user", id: "user-1" },
-        bindings: [binding({ scopeType: "PROJECT", scopeId: PROJECT })],
-      });
-      expect(checkWith({ audience, grants: member }).allowed).toBe(true);
+      const boundAt = (scopeType: "PROJECT" | "TEAM" | "ORGANIZATION", scopeId: string) =>
+        makeGrants({
+          principal: { type: "user", id: "user-1" },
+          organizationRole: "MEMBER",
+          bindings: [binding({ scopeType, scopeId })],
+        });
+      for (const grants of [
+        boundAt("PROJECT", PROJECT),
+        boundAt("TEAM", TEAM),
+        boundAt("ORGANIZATION", ORG),
+      ]) {
+        expect(checkWith({ audience, grants }).allowed).toBe(true);
+      }
+      // Not everyone in the organization, and not a neighbouring team.
+      expect(
+        checkWith({
+          audience,
+          grants: makeGrants({
+            principal: { type: "user", id: "user-2" },
+            organizationRole: "MEMBER",
+          }),
+        }).allowed,
+      ).toBe(false);
+      expect(
+        checkWith({ audience, grants: boundAt("TEAM", "team-other") }).allowed,
+      ).toBe(false);
       expect(checkWith({ audience, grants: makeGrants() }).allowed).toBe(false);
     });
 
@@ -201,6 +255,7 @@ describe("resource-tier grants (ADR-092 §8)", () => {
       const audience = { kind: "group", id: "group-1" } as const;
       const member = makeGrants({
         principal: { type: "user", id: "user-1" },
+        organizationRole: "MEMBER",
         bindings: [
           binding({
             scopeType: "PROJECT",

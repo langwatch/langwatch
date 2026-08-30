@@ -25,6 +25,7 @@ import type { AuthzReadRepository } from "./authz-read.repository";
 import type { GrantEventSource } from "./ledger/facts";
 import {
   assertBindingInOrganization,
+  assertExpiryInFuture,
   assertRoleUsable,
   assertScopeBelongsToOrganization,
   type GrantableScope,
@@ -92,6 +93,10 @@ export type GrantsServiceDeps = {
   newBindingId: () => string;
   bumpEpoch: AuthzEpochBumper;
   collectorFor: (reader: AuthzReadRepository) => AuthzCollectorService;
+  /** The clock an expiring attach is validated against. Injected for the
+   *  same reason the collector's is: the boundary between "future" and
+   *  "already over" is the one thing that has to be testable exactly. */
+  now?: () => number;
 };
 
 export class GrantsService {
@@ -127,6 +132,14 @@ export class GrantsService {
    * and only the source separates "the directory says so" from "an admin
    * approved a request". It defaults to this service, which is what a
    * hand-made grant through the settings UI or the REST API is.
+   *
+   * `expiresAtMs` time-boxes the grant (ADR-092, "what falls out for free"):
+   * contractor access that ends on its own, break-glass elevation that
+   * revokes itself. It is a read-side term - nothing runs at the moment it
+   * passes, no epoch is bumped, and the row stays for audit with `revokedAt`
+   * still null. Expiry is therefore visible on the NEXT collect rather than
+   * instantly: a snapshot cached before it elapsed keeps answering until it
+   * ages out, which the absolute cache bound holds to 30 seconds.
    */
   async attach({
     actor,
@@ -134,12 +147,14 @@ export class GrantsService {
     role,
     where,
     source = "grants-service",
+    expiresAtMs,
   }: {
     actor: GrantActor;
     who: GrantPrincipal;
     role: GrantRole;
     where: AuthzScopeRef;
     source?: GrantEventSource;
+    expiresAtMs?: number;
   }): Promise<{ bindingId: string }> {
     if (where.type === "resource") {
       throw new GrantValidationError(RESOURCE_SCOPE_REJECTION, {
@@ -148,6 +163,13 @@ export class GrantsService {
       });
     }
     const organizationId = scopeOrganizationId(where);
+    // Cheapest refusal first, and the only one that needs no storage: a date
+    // already behind us cannot become valid by checking the scope.
+    assertExpiryInFuture({
+      expiresAtMs,
+      now: this.now(),
+      meta: { scopeType: where.type, scopeId: where.id },
+    });
     const { repository } = this;
     await assertScopeBelongsToOrganization({
       repository,
@@ -156,7 +178,13 @@ export class GrantsService {
     });
     await assertRoleUsable({ repository, role, organizationId });
 
-    const row = this.bindingRow({ who, role, where, organizationId });
+    const row = this.bindingRow({
+      who,
+      role,
+      where,
+      organizationId,
+      expiresAtMs,
+    });
     try {
       await repository.createBinding({ row, actor: writeActor(actor), source });
     } catch (error) {
@@ -237,6 +265,13 @@ export class GrantsService {
    * The REDUCE verb (ADR-092 §3): atomically replace a broad grant with a
    * narrower one — never a second binding fighting the first. The
    * repository runs the delete and the create as one transaction.
+   *
+   * `expiresAtMs` is NOT inferred from the binding being replaced, and the
+   * omission is the dangerous direction: narrowing a grant that ends on
+   * Friday must not hand back one that never ends. The caller states the
+   * replacement's own end date, exactly as `attach` does, and a reduction of
+   * a time-boxed grant has to pass the date through or it is a widening in
+   * the one dimension nobody was looking at.
    */
   async replace({
     actor,
@@ -244,16 +279,27 @@ export class GrantsService {
     from,
     to,
     role,
+    expiresAtMs,
   }: {
     actor: GrantActor;
     who: GrantPrincipal;
     from: AuthzScopeRef;
     to: AuthzScopeRef;
     role: GrantRole;
+    expiresAtMs?: number;
   }): Promise<{ bindingId: string }> {
     if (from.type === "resource" || to.type === "resource") {
       throw new GrantValidationError(RESOURCE_SCOPE_REJECTION);
     }
+    // Same refusal `attach` makes, and for the same reason: a date already
+    // behind us cannot become valid further down. Without it a "successful"
+    // narrowing would revoke the source binding and write a replacement that
+    // is expired on arrival -- an access removal wearing the shape of an edit.
+    assertExpiryInFuture({
+      expiresAtMs,
+      now: this.now(),
+      meta: { scopeType: to.type, scopeId: to.id },
+    });
     const organizationId = scopeOrganizationId(from);
     if (scopeOrganizationId(to) !== organizationId) {
       throw new GrantValidationError(
@@ -267,7 +313,13 @@ export class GrantsService {
       organizationId,
     });
     await assertRoleUsable({ repository, role, organizationId });
-    const row = this.bindingRow({ who, role, where: to, organizationId });
+    const row = this.bindingRow({
+      who,
+      role,
+      where: to,
+      organizationId,
+      ...(expiresAtMs !== undefined ? { expiresAtMs } : {}),
+    });
     try {
       await repository.replaceBinding({
         deleteWhere: {
@@ -327,11 +379,13 @@ export class GrantsService {
     role,
     where,
     organizationId,
+    expiresAtMs,
   }: {
     who: GrantPrincipal;
     role: GrantRole;
     where: GrantableScope;
     organizationId: string;
+    expiresAtMs?: number;
   }): RoleBindingWrite {
     return {
       bindingId: this.deps.newBindingId(),
@@ -341,9 +395,16 @@ export class GrantsService {
       role: "customRoleId" in role ? "CUSTOM" : role.builtin,
       customRoleId: "customRoleId" in role ? role.customRoleId : null,
       principal: principalWhere(who),
+      // Spread, not `expiresAtMs: undefined`: the row is compared and
+      // serialized by call sites that would see a declared-but-undefined key
+      // as a different shape from the one they have always been handed.
+      ...(expiresAtMs !== undefined ? { expiresAtMs } : {}),
     };
   }
 
+  private now(): number {
+    return this.deps.now?.() ?? Date.now();
+  }
 }
 
 /**

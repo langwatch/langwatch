@@ -137,6 +137,9 @@ export type ShareLinkFactRow = {
   /** Whoever minted the link; null for rows nobody minted by hand. */
   userId: string | null;
   visibility: "PUBLIC" | "ORGANIZATION" | "PROJECT";
+  /** What the link confers. Optional and nullable both mean "the default",
+   *  so a reader that never sets it imports the fact it always imported. */
+  permission?: string | null;
   expiresAtMs: number | null;
   maxViews: number | null;
   /** Views already spent on this link. Carried because the cutover has to

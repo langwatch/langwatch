@@ -18,6 +18,10 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import {
+  LIVE_GROUP,
+  LIVE_MEMBERSHIP,
+} from "~/server/app-layer/authz/repositories/live-rows";
+import {
   bindingScopeCanGrant,
   EXTERNAL_MEMBER_PERMISSIONS,
   hasPermissionWithHierarchy,
@@ -167,13 +171,20 @@ async function collectBindingsForUser({
       // Group-derived bindings carry the same current-membership gate as the
       // direct bindings above. A GroupMembership row outlives removal from the
       // organization, so without this an offboarded user keeps whatever their
-      // groups granted.
+      // groups granted - and it outlives the MEMBERSHIP too, since a removal
+      // marks the row rather than deleting it, which is what LIVE_MEMBERSHIP
+      // fences on.
       where: {
         organizationId,
         group: {
+          // And the group itself must still exist. A deleted group is kept as
+          // a row so its memberships survive, so without LIVE_GROUP its
+          // bindings keep resolving here.
+          ...LIVE_GROUP,
           members: {
             some: {
               userId,
+              ...LIVE_MEMBERSHIP,
               user: {
                 orgMemberships: { some: { organizationId, disabledAt: null } },
               },
@@ -533,7 +544,14 @@ export async function resolveLegacyCeiling({
         select: { role: true },
       },
       groupMemberships: {
-        where: { group: { organizationId } },
+        // The legacy ceiling's suppression test counts bindings held THROUGH a
+        // group, so a membership that ended must not feed it: it would
+        // suppress the fallback on the strength of access the user no longer
+        // has.
+        where: {
+          group: { organizationId, ...LIVE_GROUP },
+          ...LIVE_MEMBERSHIP,
+        },
         select: { groupId: true },
       },
     },

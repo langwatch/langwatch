@@ -47,6 +47,7 @@ import {
   type BindingPrincipalWhere,
   DuplicateBindingError,
   type GrantEventSource,
+  GrantExpiryUnsupportedError,
   type LedgerScopeType,
   type RoleBindingWrite,
 } from "@langwatch/authz-server";
@@ -60,11 +61,13 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import type {
+  AddGroupMemberCommandData,
   AttachGrantCommandData,
   ChangeGrantRoleCommandData,
   ChangeRolePermissionsCommandData,
   DefineRoleCommandData,
   DeleteRoleCommandData,
+  RemoveGroupMemberCommandData,
   RevokeGrantCommandData,
 } from "~/server/event-sourcing/pipelines/authz-grants/schemas/commands";
 import {
@@ -73,13 +76,15 @@ import {
   type AuthzAuditVerb,
 } from "~/server/event-sourcing/pipelines/authz-grants/schemas/constants";
 import { NON_AUDITABLE_SOURCES } from "~/server/event-sourcing/pipelines/authz-grants/subscribers/authzAuditTrail.subscriber";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { prisma as appPrisma } from "../../db";
 import { RoleDuplicateNameError } from "../../role/errors/role-duplicate-name.error";
 import { tryGetApp } from "../app";
+import { DuplicateMemberError } from "../groups/errors";
 import { organizationOnAuthzEngine } from "./engine-gate";
 import { bumpAuthzEpoch } from "./epoch";
 import { PrismaAuthzRevocationRepository } from "./repositories/authz-revocation.prisma.repository";
-import { liveGrants } from "./repositories/live-rows";
+import { liveGrants, liveGroupMemberships } from "./repositories/live-rows";
 
 const logger = createLogger("langwatch:authz:ledger");
 
@@ -102,6 +107,8 @@ export type AuthzGrantsCommandSenders = {
   defineRole: Sender<DefineRoleCommandData>;
   changeRolePermissions: Sender<ChangeRolePermissionsCommandData>;
   deleteRole: Sender<DeleteRoleCommandData>;
+  addGroupMember: Sender<AddGroupMemberCommandData>;
+  removeGroupMember: Sender<RemoveGroupMemberCommandData>;
 };
 
 /**
@@ -269,6 +276,50 @@ export type AttachOutcome = {
   duplicates: string[];
 };
 
+/** One membership fact a caller wants recorded. The id is minted by the
+ *  caller, once, per fact (see `addGroupMembers`). */
+export type LedgerGroupMemberAdd = {
+  membershipId: string;
+  groupId: string;
+  userId: string;
+};
+
+/** One membership a caller wants ended. The pair travels with the row id
+ *  because it is the command's aggregate — see `groupMembershipAggregateId`. */
+export type LedgerGroupMemberRemove = LedgerGroupMemberAdd;
+
+/**
+ * A membership id, minted once per FACT.
+ *
+ * Never derived from the pair, and that is the whole re-add story: somebody
+ * added back to a group they left gets a NEW id, so the ledger holds two
+ * memberships with two beginnings and one ending, instead of one row whose
+ * history has been overwritten.
+ */
+export function newGroupMembershipId(): string {
+  return generate(KSUID_RESOURCES.GROUP_MEMBERSHIP).toString();
+}
+
+export type AddGroupMembersOutcome = {
+  /** Membership ids actually emitted (duplicates skipped when asked to). */
+  added: string[];
+  /** Membership ids of the LIVE memberships the write skipped. */
+  duplicates: string[];
+};
+
+/** The pair a membership's uniqueness is keyed on, joined on the ASCII unit
+ *  separator so no id can smuggle a boundary character — the same choice
+ *  `deriveGrantId` and `bindingIdentityKey` make. */
+function membershipPairKey({
+  userId,
+  groupId,
+}: {
+  userId: string;
+  groupId: string;
+}): string {
+  return `${userId}\u001f${groupId}`;
+}
+
 /**
  * The writer itself. Composed per call (`grantsLedgerWriter()`), holds no
  * state. Every verb bumps the org's authz epoch after its write lands
@@ -283,7 +334,7 @@ export class GrantsLedgerWriter {
    */
   private readonly enforcement: Pick<
     PrismaAuthzRevocationRepository,
-    "enforceGrantRevocation"
+    "enforceGrantRevocation" | "enforceGroupMembershipRemoval"
   >;
 
   constructor(
@@ -453,6 +504,12 @@ export class GrantsLedgerWriter {
             principal: principalForWhere(binding.principal),
             roleKey: roleKeyFor(binding),
             scope: { type: binding.scopeType, id: binding.scopeId },
+            // Omitted when there is none, never sent as undefined: an
+            // absent key is what every event before expiring bindings
+            // carries, and the two have to serialize identically.
+            ...(binding.expiresAtMs !== undefined
+              ? { expiresAtMs: binding.expiresAtMs }
+              : {}),
             source,
             actor,
             occurredAtMs,
@@ -595,6 +652,18 @@ export class GrantsLedgerWriter {
     onDuplicate: "reject" | "skip";
     occurredAtMs: number;
   }): Promise<AttachOutcome> {
+    // `RoleBinding` has no expiry column, so an expiring attach on this side
+    // of the fork would land a row that grants FOREVER while the admin
+    // believes it ends on Friday. Refusing is the only honest answer: the
+    // caller can re-send without the expiry and revoke by hand.
+    const expiring = fresh.find((binding) => binding.expiresAtMs !== undefined);
+    if (expiring) {
+      throw new GrantExpiryUnsupportedError({
+        scopeType: expiring.scopeType,
+        scopeId: expiring.scopeId,
+      });
+    }
+
     const rows = fresh.map((binding) =>
       legacyBindingRow({ organizationId, binding }),
     );
@@ -1498,6 +1567,384 @@ export class GrantsLedgerWriter {
       });
     }
     await bumpAuthzEpoch({ organizationId });
+  }
+
+  /**
+   * Add people to a group, as facts (ADR-125's named prerequisite).
+   *
+   * A membership is not a grant and confers nothing on its own — what it does
+   * is make every grant the GROUP holds reach the user, because COLLECT unions
+   * `{user} ∪ groups`. That is why it belongs on this writer and not beside
+   * the group's name and slug: it changes who can do what, so it moves the
+   * epoch and it earns an audit row, exactly like an attach.
+   *
+   * `membershipId` is caller-minted, the same house pattern a runtime grant's
+   * id follows. It is minted per FACT, never derived from the pair: adding
+   * somebody back to a group they left is a NEW membership with its own
+   * beginning and its own end, and deriving the id from the pair would make
+   * the re-add fold as a redelivery of the original and change nothing.
+   */
+  async addGroupMembers({
+    organizationId,
+    memberships,
+    actor,
+    source = "grants-service",
+    onDuplicate,
+    commandId,
+    occurredAtMs: occurredAtOverrideMs,
+    awaitProjection = true,
+  }: {
+    organizationId: string;
+    memberships: LedgerGroupMemberAdd[];
+    actor: LedgerActor;
+    source?: GrantEventSource;
+    /** `"reject"` raises on a pair that is already live (the single-add
+     *  surfaces' 409); `"skip"` filters it out — re-asserting a membership the
+     *  user already holds leaves exactly the state the caller asked for. */
+    onDuplicate: "reject" | "skip";
+    commandId?: string;
+    occurredAtMs?: number;
+    awaitProjection?: boolean;
+  }): Promise<AddGroupMembersOutcome> {
+    if (memberships.length === 0) return { added: [], duplicates: [] };
+
+    const { fresh, duplicates } = await this.partitionByLiveMembership({
+      organizationId,
+      memberships,
+      onDuplicate,
+    });
+    if (fresh.length === 0) return { added: [], duplicates };
+
+    const occurredAtMs = occurredAtOverrideMs ?? this.now();
+    if (!(await this.onLedger(organizationId))) {
+      return await this.addGroupMembersImperatively({
+        organizationId,
+        fresh,
+        duplicates,
+        actor,
+        source,
+        occurredAtMs,
+      });
+    }
+
+    const batchId = commandId ?? newLedgerCommandId();
+    const senders = (await this.commands()).commands;
+    await Promise.all(
+      fresh.map((membership) =>
+        senders.addGroupMember.send({
+          tenantId: organizationId,
+          organizationId,
+          commandId: `${batchId}:${membership.membershipId}`,
+          membershipId: membership.membershipId,
+          groupId: membership.groupId,
+          userId: membership.userId,
+          source,
+          actor,
+          occurredAtMs,
+        }),
+      ),
+    );
+
+    const wanted = fresh.map((membership) => membership.membershipId);
+    if (awaitProjection) {
+      await this.awaitProjection({
+        what: `add of ${wanted.length} group membership(s)`,
+        organizationId,
+        check: async () => {
+          const present = await liveGroupMemberships(this.prisma).count({
+            where: { id: { in: wanted }, group: { organizationId } },
+          });
+          return present === wanted.length;
+        },
+      });
+    }
+    await bumpAuthzEpoch({ organizationId });
+    return { added: wanted, duplicates };
+  }
+
+  /**
+   * Which of these pairs are genuinely new, and which already have a live
+   * membership — the identity pre-check BOTH sides of the fork run, so an
+   * organization's outcome does not change when it migrates.
+   *
+   * The fence is the point: a pair whose only membership ENDED is fresh, not a
+   * duplicate. Reading the marked row as "already a member" would make a
+   * re-add a silent no-op and leave the person outside the group they were
+   * just put back into.
+   */
+  private async partitionByLiveMembership({
+    organizationId,
+    memberships,
+    onDuplicate,
+  }: {
+    organizationId: string;
+    memberships: LedgerGroupMemberAdd[];
+    onDuplicate: "reject" | "skip";
+  }): Promise<{ fresh: LedgerGroupMemberAdd[]; duplicates: string[] }> {
+    // ONE query for the whole batch, keyed by the pairs: a findFirst per
+    // member made a SCIM sync of 200 seats 200 round trips.
+    const existing = await liveGroupMemberships(this.prisma).findMany({
+      where: {
+        group: { organizationId },
+        OR: memberships.map(({ userId, groupId }) => ({ userId, groupId })),
+      },
+      select: { id: true, userId: true, groupId: true },
+    });
+    const existingByPair = new Map(
+      existing.map((row) => [membershipPairKey(row), row.id]),
+    );
+
+    const fresh: LedgerGroupMemberAdd[] = [];
+    const duplicates: string[] = [];
+    const seen = new Set<string>();
+    for (const membership of memberships) {
+      const key = membershipPairKey(membership);
+      // A repeat inside the same batch counts as a duplicate of itself, and
+      // answers with the id the batch itself minted — the row is not in
+      // storage yet, so there is none to name.
+      const existingId = seen.has(key)
+        ? membership.membershipId
+        : existingByPair.get(key);
+      if (existingId !== undefined) {
+        if (onDuplicate === "reject") throw new DuplicateMemberError();
+        duplicates.push(existingId);
+        continue;
+      }
+      seen.add(key);
+      fresh.push(membership);
+    }
+    return { fresh, duplicates };
+  }
+
+  /**
+   * The pre-ledger add. It writes the SAME row the fold would, because
+   * `GroupMembership` is the only head a membership has ever had — there is no
+   * compat table beside it and nothing to roll back to. The only difference is
+   * that this side writes its own audit row, since it has no event to
+   * subscribe to.
+   */
+  private async addGroupMembersImperatively({
+    organizationId,
+    fresh,
+    duplicates,
+    actor,
+    source,
+    occurredAtMs,
+  }: {
+    organizationId: string;
+    fresh: LedgerGroupMemberAdd[];
+    duplicates: string[];
+    actor: LedgerActor;
+    source: GrantEventSource;
+    occurredAtMs: number;
+  }): Promise<AddGroupMembersOutcome> {
+    const occurredAt = new Date(occurredAtMs);
+    await this.prisma.groupMembership.createMany({
+      data: fresh.map((membership) => ({
+        id: membership.membershipId,
+        userId: membership.userId,
+        groupId: membership.groupId,
+        occurredAt,
+      })),
+      // The partial unique refuses a second LIVE row for a pair; the
+      // pre-check above already filtered those, so this only absorbs a race.
+      skipDuplicates: true,
+    });
+    await this.recordLegacyAudit({
+      organizationId,
+      actor,
+      verb: "group_member_added",
+      createdAt: occurredAt,
+      facts: auditableSource(source)
+        ? fresh.map((membership) => ({
+            membershipId: membership.membershipId,
+            groupId: membership.groupId,
+            userId: membership.userId,
+            source,
+          }))
+        : [],
+    });
+    await bumpAuthzEpoch({ organizationId });
+    return {
+      added: fresh.map((membership) => membership.membershipId),
+      duplicates,
+    };
+  }
+
+  /**
+   * End memberships by id. The mark is applied to the projection SYNCHRONOUSLY
+   * before the event is queued — decision 7's deny effect, which a membership
+   * needs for the same reason a revocation does: an admin told somebody is out
+   * of `sec-eng` must not find them still holding what `sec-eng` grants
+   * because the queue is slow.
+   *
+   * Both writes state the same instant and the same reason, so whichever lands
+   * second changes nothing.
+   */
+  async removeGroupMembers({
+    organizationId,
+    memberships,
+    actor,
+    reason,
+    bypass = "revocation",
+  }: {
+    organizationId: string;
+    /** Each removal names the row AND its pair: the pair is what routes the
+     *  command into the same FIFO lane its `add` rode in. */
+    memberships: LedgerGroupMemberRemove[];
+    actor: LedgerActor;
+    reason?: string;
+    /** Why the queue is being bypassed — telemetry only, never row data. */
+    bypass?: "revocation" | "offboard";
+  }): Promise<void> {
+    if (memberships.length === 0) return;
+    const membershipIds = memberships.map(
+      (membership) => membership.membershipId,
+    );
+    const occurredAtMs = this.now();
+    const removedAt = new Date(occurredAtMs);
+
+    if (!(await this.onLedger(organizationId))) {
+      // The pre-ledger removal. It is the identical MARK, not a delete: the
+      // row's survival is a schema fact now, not a ledger one, so both sides
+      // of the fork keep the record of when the membership ended.
+      await this.prisma.groupMembership.updateMany({
+        where: {
+          id: { in: membershipIds },
+          removedAt: null,
+          group: { organizationId },
+        },
+        data: { removedAt, removedReason: reason ?? null },
+      });
+      await this.recordLegacyAudit({
+        organizationId,
+        actor,
+        verb: "group_member_removed",
+        createdAt: removedAt,
+        facts: memberships.map((membership) => ({
+          membershipId: membership.membershipId,
+          groupId: membership.groupId,
+          userId: membership.userId,
+          ...(reason ? { reason } : {}),
+        })),
+      });
+      await bumpAuthzEpoch({ organizationId });
+      return;
+    }
+
+    await this.enforcement.enforceGroupMembershipRemoval({
+      organizationId,
+      membershipIds,
+      reason: bypass,
+      removedAt,
+      removedReason: reason ?? null,
+    });
+
+    const senders = (await this.commands()).commands;
+    const batchId = newLedgerCommandId();
+    await Promise.all(
+      memberships.map((membership) =>
+        senders.removeGroupMember.send({
+          tenantId: organizationId,
+          organizationId,
+          commandId: `${batchId}:${membership.membershipId}`,
+          membershipId: membership.membershipId,
+          groupId: membership.groupId,
+          userId: membership.userId,
+          ...(reason ? { reason } : {}),
+          actor,
+          occurredAtMs,
+        }),
+      ),
+    );
+    // No `awaitProjection`: enforcement already marked the rows, so the read
+    // that follows this call already answers the way the caller expects.
+    await bumpAuthzEpoch({ organizationId });
+  }
+
+  /**
+   * End every LIVE membership matching a filter, and answer with the ids it
+   * ended.
+   *
+   * The two callers are the ones that cannot name ids: deleting a group (every
+   * member of it) and offboarding a person (every group they are in). Both
+   * resolve to ids here — a removal names its membership and only its
+   * membership, since a selector cannot address an aggregate — and the count
+   * is exact on both sides of the fork, because the rows it reads are the
+   * rows it marks.
+   */
+  async removeGroupMembersWhere({
+    organizationId,
+    where,
+    actor,
+    reason,
+    bypass = "revocation",
+  }: {
+    organizationId: string;
+    /** `userId` takes a list so one admin action is one removal: a group edit
+     *  dropping fifty people would otherwise be fifty findMany/updateMany
+     *  round-trips and fifty epoch bumps. An empty list matches nothing, which
+     *  is what it should mean -- it does NOT widen to the whole group. */
+    where: { groupId?: string; userId?: string | string[] };
+    actor: LedgerActor;
+    reason?: string;
+    bypass?: "revocation" | "offboard";
+  }): Promise<string[]> {
+    if (where.groupId === undefined && where.userId === undefined) {
+      throw new Error(
+        "removeGroupMembersWhere refused a filter naming neither a group nor a user: it would end every membership in the organization",
+      );
+    }
+    // A blank id is not a filter, it is a missing one, and it has to be
+    // refused HERE rather than left to the clause below. `z.string()` accepts
+    // "", so a blank reaches this far as a well-typed value; a truthiness test
+    // when building the filter would then DROP the predicate rather than
+    // narrow on it, and `{ groupId, userId: "" }` would widen from one member
+    // to every live member of the group. The predicate that disappears is the
+    // one doing the limiting, so the failure is silent and total.
+    const blank = (id: string | undefined) => id !== undefined && id === "";
+    const userIds = Array.isArray(where.userId)
+      ? where.userId
+      : [where.userId].filter((id): id is string => id !== undefined);
+    if (blank(where.groupId) || userIds.some((id) => id === "")) {
+      throw new Error(
+        "removeGroupMembersWhere refused a filter carrying a blank id: a blank narrows nothing, and dropping it would end every membership the remaining predicate matches",
+      );
+    }
+    // Deliberately NOT fenced on `Group.deletedAt`, unlike every READ of live
+    // access. This is the write that ENDS memberships, and one of its two
+    // callers is a group deletion: the memberships are ended first and the
+    // group marked afterwards, so fencing here would be a no-op today and a
+    // silent one the moment that order changed — the removals would match
+    // nothing and everybody would keep the group's access with no membership
+    // to end. The tenancy bound is what this filter is for.
+    const live = await liveGroupMemberships(this.prisma).findMany({
+      where: {
+        ...(where.groupId === undefined ? {} : { groupId: where.groupId }),
+        ...(where.userId === undefined
+          ? {}
+          : {
+              userId: Array.isArray(where.userId)
+                ? { in: where.userId }
+                : where.userId,
+            }),
+        group: { organizationId },
+      },
+      select: { id: true, groupId: true, userId: true },
+    });
+    const memberships = live.map((row) => ({
+      membershipId: row.id,
+      groupId: row.groupId,
+      userId: row.userId,
+    }));
+    await this.removeGroupMembers({
+      organizationId,
+      memberships,
+      actor,
+      ...(reason ? { reason } : {}),
+      bypass,
+    });
+    return memberships.map((membership) => membership.membershipId);
   }
 
   /**
