@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CanonicalAttributes } from "@langwatch/trace-contract";
 import { SpanDataBag } from "../../../stores/canonical-span.bag";
-import { toAttrValue } from "../../canonical-value.rules";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import type { ExtractorContext } from "../../../ports/canonical-attributes.port";
 import { StrandsCanonicaliser } from "../strands.canonicaliser";
@@ -25,18 +24,17 @@ function createStrandsContext(
   const bag = new SpanDataBag(attrs as CanonicalAttributes, normalizedEvents);
   const out: CanonicalAttributes = {};
 
+  // Mirrors `TraceCanonicalisationService`: production guards null/undefined and
+  // stores the value as it was given. This double used to coerce through
+  // `toAttrValue`, JSON-stringifying objects — a step production has never had.
   const setAttr = vi.fn((key: string, value: unknown) => {
-    const av = toAttrValue(value);
-    if (av === null) return;
-    out[key] = av;
+    if (value === null || value === undefined) return;
+    out[key] = value as CanonicalAttributes[string];
   });
 
   const setAttrIfAbsent = vi.fn((key: string, value: unknown) => {
-    if (!(key in out)) {
-      const av = toAttrValue(value);
-      if (av === null) return;
-      out[key] = av;
-    }
+    if (key in out) return;
+    setAttr(key, value);
   });
 
   const recordRule = vi.fn();
@@ -119,9 +117,9 @@ describe("StrandsCanonicaliser", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual(
-        JSON.stringify([{ role: "user", content: "Hello from user" }]),
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual([
+        { role: "user", content: "Hello from user" },
+      ]);
     });
 
     it("promotes gen_ai.system.message to system_instruction and strips from input", () => {
@@ -165,7 +163,7 @@ describe("StrandsCanonicaliser", () => {
 
       extractor.apply(ctx);
 
-      const messages = JSON.parse(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as string) as Array<{
+      const messages = ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as Array<{
         role: string;
         content: string;
       }>;
@@ -198,7 +196,7 @@ describe("StrandsCanonicaliser", () => {
 
       expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe("Be helpful");
 
-      const messages = JSON.parse(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as string) as Array<{
+      const messages = ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as Array<{
         role: string;
       }>;
       expect(messages).toEqual([
@@ -225,7 +223,7 @@ describe("StrandsCanonicaliser", () => {
       expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe("Be helpful");
 
       // Only user messages remain in input
-      const messages = JSON.parse(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as string) as unknown[];
+      const messages = ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as unknown[];
       expect(messages).toHaveLength(1);
       expect(messages[0]).toEqual({ role: "user", content: "Hi" });
     });
@@ -242,9 +240,9 @@ describe("StrandsCanonicaliser", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual(
-        JSON.stringify([{ role: "assistant", content: "Response text" }]),
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual([
+        { role: "assistant", content: "Response text" },
+      ]);
     });
   });
 
