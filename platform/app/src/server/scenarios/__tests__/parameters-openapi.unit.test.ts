@@ -108,27 +108,35 @@ main().catch((error) => {
 }
 
 describe("scenario parameter OpenAPI descriptions", () => {
-  /** @scenario "Loading zod-openapi before the schema keeps the descriptions" */
-  it("keeps both descriptions when the patch loads first", () => {
-    const result = runProbe("extend-first");
-    expect(result.status).toBe(0);
-    expect(result.stderr).toBe("");
-    expect(result.stdout).not.toBe("");
-    expect(result.schema?.defaultValue?.description).toBe(
-      DEFAULT_VALUE_DESCRIPTION,
-    );
-    expect(result.schema?.secret?.description).toBe(SECRET_DESCRIPTION);
+  describe("given zod-openapi loads before the schema", () => {
+    describe("when the schema is converted to OpenAPI", () => {
+      /** @scenario "Loading zod-openapi before the schema keeps the descriptions" */
+      it("keeps both descriptions", () => {
+        const result = runProbe("extend-first");
+        expect(result.status).toBe(0);
+        expect(result.stderr).toBe("");
+        expect(result.stdout).not.toBe("");
+        expect(result.schema?.defaultValue?.description).toBe(
+          DEFAULT_VALUE_DESCRIPTION,
+        );
+        expect(result.schema?.secret?.description).toBe(SECRET_DESCRIPTION);
+      });
+    });
   });
 
-  /** @scenario "Another module may import the schema before the patch and the descriptions still survive" */
-  it("keeps both descriptions even when another module loads the schema first", () => {
-    const result = runProbe("schema-first");
-    expect(result.status).toBe(0);
-    expect(result.stderr).toBe("");
-    expect(result.stdout).not.toBe("");
-    expect(result.schema?.defaultValue?.description).toBe(
-      DEFAULT_VALUE_DESCRIPTION,
-    );
-    expect(result.schema?.secret?.description).toBe(SECRET_DESCRIPTION);
+  describe("given another module loads the schema before zod-openapi", () => {
+    describe("when the schema is later converted to OpenAPI", () => {
+      /** @scenario "Another module may import the schema before the patch and the descriptions still survive" */
+      it("keeps both descriptions", () => {
+        const result = runProbe("schema-first");
+        expect(result.status).toBe(0);
+        expect(result.stderr).toBe("");
+        expect(result.stdout).not.toBe("");
+        expect(result.schema?.defaultValue?.description).toBe(
+          DEFAULT_VALUE_DESCRIPTION,
+        );
+        expect(result.schema?.secret?.description).toBe(SECRET_DESCRIPTION);
+      });
+    });
   });
 });
