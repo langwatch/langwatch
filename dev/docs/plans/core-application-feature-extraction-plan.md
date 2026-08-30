@@ -586,6 +586,23 @@ makes it look like a rename sweep. Measured 2026-08-30:
 Do not sweep this cluster. The 31 are the only ones worth attempting file by
 file, and each needs its collision checked first.
 
+**A worked example of that, because it was tried and reverted** (`5663c4b9fa`,
+undone by `208310c6e5`). Four modules in `ports/` are named for what they
+abstract — `data-privacy.repository.ts`, `scheduler-ops.repository.ts`,
+`scheduler-wake.service.ts`, `stored-object-owner.repository.ts` — and all four
+really are ports, so `<subject>.port.ts` is the truthful name. Renaming the
+files alone moves `feature-source-layout` 213 to 209 and `strict-port-module` 0
+to 4: that rule requires a `.port.ts` module to export an abstract class whose
+NAME ends in `Port`. The file rename and the class rename are one change or
+neither.
+
+And the class rename is not uniform. Three of the four already export abstract
+classes, so they need their names and about nineteen references changed.
+`SchedulerOpsRepository` is an `interface`, and making it an abstract class
+switches that port from structural to nominal typing — implementors must
+`extends` it, so composition has to change too. That is a decision for the
+feature that owns the port.
+
 `F-TRPC-01` — **a moved vertical needs `@trpc/server` in its own manifest.**
 `packages/features/model-provider/server` could not resolve it, which produces
 around forty `TS7031 implicitly any` errors downstream rather than one honest
