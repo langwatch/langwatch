@@ -43,6 +43,9 @@ const host = vi.hoisted(() => {
     openDrawer: vi.fn(),
     pushToCopies: vi.fn(async () => ({ pushedTo: 1, selectedCopies: 1 })),
     routerPush: vi.fn(),
+    // One stub, shared by every getUntypedClient() call, so a test can say
+    // what a dispatched procedure answers.
+    rpc: { query: vi.fn(async () => ({ ok: true })), mutation: vi.fn(async () => ({ ok: true })) },
   };
 });
 
@@ -87,7 +90,7 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 vi.mock("@trpc/client", () => ({
-  getUntypedClient: () => ({ query: vi.fn(), mutation: vi.fn() }),
+  getUntypedClient: () => host.rpc,
 }));
 
 vi.mock("~/components/CascadeArchiveDialog", () => ({
@@ -160,7 +163,8 @@ vi.mock("~/utils/compat/next-router", () => ({
 
 vi.mock("~/utils/formatTimeAgo", () => ({ formatTimeAgo: () => "just now" }));
 
-import AgentUiHost, { AgentHistoryDrawer } from "../agent-ui-host.adapter";
+import { trpcQueryFilter, trpcQueryKey } from "@langwatch/platform-api-client";
+import AgentUiHost, { AgentHistoryDrawer, PlatformRpcClient } from "../agent-ui-host.adapter";
 
 function renderHost(node: ReactNode = <AgentUiHost />) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -298,5 +302,57 @@ describe("Agent UI host", () => {
     });
     await user.click(screen.getByRole("button", { name: /close/i }));
     expect(host.closeDrawer).toHaveBeenCalled();
+  });
+});
+
+/**
+ * The agent's reads have to land in the SAME cache entries the rest of the
+ * application uses. They did not: this adapter keyed them under a namespace of
+ * its own (`["agent-ui", path, input]`), which shares no prefix with any tRPC
+ * key, so an invalidation on either side was invisible to the other and the
+ * symptom was stale UI that looked random.
+ *
+ * These assert the sharing itself rather than the shape of the key — a key
+ * whose encoding is right but which nothing else reaches is the bug, not the
+ * fix.
+ */
+describe("the agent's RPC cache", () => {
+  describe("given a procedure the agent has read", () => {
+    it("is invalidated by a tRPC invalidation naming that procedure", async () => {
+      const queryClient = new QueryClient();
+      const rpc = new PlatformRpcClient(queryClient);
+
+      await rpc.query("tracesV2.list", { projectId: "project_1" });
+
+      // What `utils.tracesV2.list.invalidate()` does, from anywhere else in
+      // the application.
+      await queryClient.invalidateQueries(trpcQueryFilter("tracesV2.list"));
+
+      const state = queryClient.getQueryState(
+        trpcQueryKey("tracesV2.list", {
+          input: { projectId: "project_1" },
+          type: "query",
+        }) as unknown as readonly unknown[],
+      );
+      expect(state?.isInvalidated).toBe(true);
+    });
+  });
+
+  describe("when the agent mutates", () => {
+    it("invalidates what the application cached, not only its own reads", async () => {
+      const queryClient = new QueryClient();
+      const rpc = new PlatformRpcClient(queryClient);
+
+      // Seeded the way an application hook would, never through the agent.
+      const appKey = trpcQueryKey("tracesV2.list", {
+        input: { projectId: "project_1" },
+        type: "query",
+      }) as unknown as readonly unknown[];
+      queryClient.setQueryData(appKey, { rows: [] });
+
+      await rpc.mutate("tracesV2.delete", { id: "trace_1" });
+
+      expect(queryClient.getQueryState(appKey)?.isInvalidated).toBe(true);
+    });
   });
 });

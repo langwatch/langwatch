@@ -15,6 +15,7 @@ import {
   getAgentEditorDrawer,
 } from "@langwatch/agent-web/screens/agent-management";
 import { createLogger } from "@langwatch/observability";
+import { trpcQueryKey } from "@langwatch/platform-api-client";
 import { RpcClientPort, TrpcAgentBrowserAdapter } from "@langwatch/ui";
 import { Spacer } from "@chakra-ui/react";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
@@ -40,7 +41,7 @@ import { api, trpcClient } from "~/utils/api";
 
 const logger = createLogger("AgentUiHost");
 
-class PlatformRpcClient extends RpcClientPort {
+export class PlatformRpcClient extends RpcClientPort {
   private readonly client;
 
   constructor(private readonly queryClient: QueryClient) {
@@ -48,9 +49,18 @@ class PlatformRpcClient extends RpcClientPort {
     this.client = getUntypedClient(trpcClient);
   }
 
+  /**
+   * Keyed the way tRPC keys it, not under a namespace of our own.
+   *
+   * `["agent-ui", path, input]` shares no prefix with any tRPC key, so what the
+   * agent read sat in a cache the rest of the application could not see: an
+   * `invalidate()` anywhere else left it stale, and the invalidation below
+   * reached nothing but itself. Same QueryClient plus the same encoding means a
+   * procedure the agent read and a procedure a hook read are one cache entry.
+   */
   query(path: string, input: unknown): Promise<unknown> {
     return this.queryClient.fetchQuery({
-      queryKey: ["agent-ui", path, input],
+      queryKey: trpcQueryKey(path, { input, type: "query" }),
       queryFn: () => this.client.query(path, input),
     });
   }
@@ -60,7 +70,12 @@ class PlatformRpcClient extends RpcClientPort {
       mutationFn: () => this.client.mutation(path, input),
     });
     const output = await mutation.execute(input);
-    await this.queryClient.invalidateQueries({ queryKey: ["agent-ui"] });
+    // Everything, because this adapter dispatches whatever procedure path the
+    // agent names and has no way to know what a given mutation touched. The
+    // old `["agent-ui"]` filter looked narrower but only ever matched this
+    // adapter's own private cache, so the page behind the agent never
+    // refreshed at all.
+    await this.queryClient.invalidateQueries();
     return output;
   }
 }
