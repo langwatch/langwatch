@@ -17,8 +17,17 @@ const logger = createLogger("langwatch:feature-flag-router");
 /** What both membership filters need off the request, and nothing more. */
 type TargetingContext = { prisma: PrismaClient; session: Session };
 
-/** The wire shape of the two targeting scopes: an id, or `null` for none. */
-type Targeting = { projectId: string | null; organizationId: string | null };
+/**
+ * The two targeting scopes as they arrive: an id, or `null` for a surface that
+ * has no such scope. The filter takes this shape and returns it, so the
+ * validated input and the type it is filtered into cannot drift apart.
+ */
+const targetingSchema = z.object({
+  projectId: z.string().nullable(),
+  organizationId: z.string().nullable(),
+});
+
+type Targeting = z.infer<typeof targetingSchema>;
 
 /**
  * The targeting identifiers the caller is actually allowed to be evaluated
@@ -151,13 +160,7 @@ export const featureFlagRouter = createTRPCRouter({
    * @returns { enabled: boolean }
    */
   isEnabled: protectedProcedure
-    .input(
-      z.object({
-        flag: frontendFeatureFlagSchema,
-        projectId: z.string().nullable(),
-        organizationId: z.string().nullable(),
-      }),
-    )
+    .input(targetingSchema.extend({ flag: frontendFeatureFlagSchema }))
     // The membership filter in the resolver is the real authorization check.
     // These ids are targeting input, not resources, so there is no permission
     // for the rbac middleware to test on them.
