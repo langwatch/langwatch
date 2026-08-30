@@ -9,12 +9,22 @@
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  */
 
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { CircleCheck, CircleX, XCircle } from "lucide-react";
+import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  ChevronDown,
+  ChevronRight,
+  CircleCheck,
+  CircleX,
+  XCircle,
+} from "lucide-react";
+import { useState } from "react";
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
-import { JsonHighlight } from "~/features/onboarding/components/sections/shared/JsonHighlight";
-import { safePrettyJson } from "~/features/traces-v2/components/TraceDrawer/JsonHighlight";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import {
+  resolveScenarioError,
+  scenarioErrorDetail,
+  scenarioErrorTitle,
+} from "~/server/scenarios/scenario-infra-error";
 import { FG_MUTED } from "../shared/design";
 
 /**
@@ -221,57 +231,125 @@ function CriteriaSection({
  * `stack`. When the payload parses as one, the drawer must not read it as
  * "the judge's reasoning"; it reads as the failure the run hit.
  */
-function readReasoningError(
-  reasoning: string | null | undefined,
-): { name: string; pretty: string } | null {
-  if (!reasoning) return null;
+function isErrorPayload(reasoning: string | null | undefined): boolean {
+  if (!reasoning) return false;
   const trimmed = reasoning.trim();
-  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return null;
+  if (!trimmed.startsWith("{")) return false;
   try {
     const parsed = JSON.parse(trimmed) as unknown;
-    if (
-      parsed &&
+    return (
+      !!parsed &&
       typeof parsed === "object" &&
       "name" in parsed &&
       typeof (parsed as { name?: unknown }).name === "string" &&
       /error$/i.test((parsed as { name: string }).name)
-    ) {
-      return {
-        name: (parsed as { name: string }).name,
-        pretty: JSON.stringify(parsed, null, 2),
-      };
-    }
-    return null;
+    );
   } catch {
-    return null;
+    return false;
   }
 }
 
 /**
- * The judge failure, drawn as a self-contained scrollable panel. The heading
- * carries a red icon so the eye reads "this is the error", not "this is the
- * judge's thought".
+ * The reasoning the scenario runner writes for every run it fails: the raw
+ * failure text with one sentence in front of it. The failure panel already
+ * names that failure, so a drawer that draws both reads it twice, the second
+ * time as the raw text the panel exists to replace.
  */
-function JudgeErrorPanel({ pretty }: { pretty: string }) {
+const RESTATED_FAILURE_PREFIX = /^scenario failed with error:/i;
+
+/** True when the reasoning only restates a failure that is drawn already. */
+function restatesFailure(reasoning: string): boolean {
+  return RESTATED_FAILURE_PREFIX.test(reasoning.trim());
+}
+
+/**
+ * Why a run never reached a verdict, read as a named failure.
+ *
+ * A run stores whatever failed it: an envelope the failure handler wrote, the
+ * scenario SDK's `{ name, message, stack }`, or a plain sentence. All three
+ * resolve to one title, one message the customer can act on, and one hint. The
+ * raw text sits behind More info, because a stack answers "where" for the one
+ * reader who asks for it and says nothing to everybody else.
+ */
+function RunFailurePanel({ raw }: { raw: string }) {
+  const [detailOpen, setDetailOpen] = useState(false);
+  const handled = resolveScenarioError(raw);
+  const detail = scenarioErrorDetail(raw);
+  const hasDetail = !!detail && detail.trim() !== handled.message.trim();
+
   return (
-    <VStack align="stretch" gap={2} marginTop={SPACE_BELOW_CRITERIA}>
+    <VStack align="stretch" gap={2} data-testid="run-verdict-error">
       <PanelHeading
+        color={FAILED_COLOR}
         icon={<XCircle size={13} color="var(--chakra-colors-red-fg)" />}
       >
-        Judge reasoning
+        {scenarioErrorTitle(handled.code)}
       </PanelHeading>
-      <Box
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="md"
-        background={{ base: "gray.900", _dark: "black" }}
-        color={{ base: "white", _dark: "gray.100" }}
-        maxHeight="320px"
-        overflow="auto"
-        data-testid="run-verdict-reasoning-error"
+      <Text
+        fontSize="12px"
+        lineHeight="short"
+        wordBreak="break-word"
+        data-testid="run-verdict-error-message"
       >
-        <JsonHighlight code={pretty} />
-      </Box>
+        {handled.message}
+      </Text>
+      {handled.hint ? (
+        <Text
+          fontSize="11.5px"
+          color={FG_MUTED}
+          lineHeight="short"
+          wordBreak="break-word"
+          data-testid="run-verdict-error-hint"
+        >
+          {handled.hint}
+        </Text>
+      ) : null}
+      {hasDetail ? (
+        <VStack align="stretch" gap={2}>
+          <Button
+            alignSelf="flex-start"
+            variant="plain"
+            size="xs"
+            height="auto"
+            paddingX={0}
+            fontSize="11px"
+            color={FG_MUTED}
+            onClick={() => setDetailOpen((open) => !open)}
+            data-testid="run-verdict-error-toggle"
+          >
+            {detailOpen ? (
+              <ChevronDown size={12} />
+            ) : (
+              <ChevronRight size={12} />
+            )}
+            {detailOpen ? "Hide details" : "More info"}
+          </Button>
+          {detailOpen ? (
+            <Box
+              borderWidth="1px"
+              borderColor="border.muted"
+              borderRadius="md"
+              background="bg.subtle"
+              padding={2}
+              maxHeight="260px"
+              overflow="auto"
+              data-testid="run-verdict-error-detail"
+            >
+              <Text
+                as="pre"
+                fontFamily="mono"
+                fontSize="10.5px"
+                lineHeight="short"
+                color={FG_MUTED}
+                whiteSpace="pre-wrap"
+                wordBreak="break-word"
+              >
+                {detail}
+              </Text>
+            </Box>
+          ) : null}
+        </VStack>
+      ) : null}
     </VStack>
   );
 }
@@ -297,7 +375,9 @@ export function RunVerdictPanel({
   /** Why the run never reached a verdict, when that is what happened. */
   error?: string | null;
 }) {
-  const reasoningError = readReasoningError(reasoning);
+  const reasoningIsError = isErrorPayload(reasoning);
+  const showsReasoning =
+    !!reasoning && !(!!error && restatesFailure(reasoning));
   const orderedMet = orderCriteria(metCriteria, declaredCriteria);
   const orderedUnmet = orderCriteria(unmetCriteria, declaredCriteria);
   const hasAnyCriteria = orderedMet.length + orderedUnmet.length > 0;
@@ -311,16 +391,7 @@ export function RunVerdictPanel({
     >
       <VerdictStatusLine status={status} />
       <VStack align="stretch" gap={SPACE_BETWEEN_SECTIONS}>
-        {error ? (
-          <Text
-            fontSize="11.5px"
-            color="red.fg"
-            whiteSpace="pre-wrap"
-            data-testid="run-verdict-error"
-          >
-            {error}
-          </Text>
-        ) : null}
+        {error ? <RunFailurePanel raw={error} /> : null}
         <CriteriaSection
           heading="Passed criteria"
           headingColor={PASSED_COLOR}
@@ -341,9 +412,11 @@ export function RunVerdictPanel({
           </Text>
         ) : null}
       </VStack>
-      {reasoningError ? (
-        <JudgeErrorPanel pretty={reasoningError.pretty} />
-      ) : reasoning ? (
+      {reasoningIsError && reasoning ? (
+        <Box marginTop={SPACE_BELOW_CRITERIA}>
+          <RunFailurePanel raw={reasoning} />
+        </Box>
+      ) : showsReasoning && reasoning ? (
         <VStack align="stretch" gap={2} marginTop={SPACE_BELOW_CRITERIA}>
           <PanelHeading>Judge reasoning</PanelHeading>
           <Text
@@ -361,10 +434,3 @@ export function RunVerdictPanel({
     </VStack>
   );
 }
-
-/** Re-exported for tests. */
-export const __RUN_VERDICT_INTERNAL = {
-  readReasoningError,
-  safePrettyJson,
-  orderCriteria,
-};

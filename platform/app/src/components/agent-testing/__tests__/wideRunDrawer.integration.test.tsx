@@ -501,6 +501,84 @@ describe("the wide run detail drawer", () => {
     expect(screen.getByText("The agent answered")).toBeInTheDocument();
   });
 
+  // --- A run that failed before it reached a verdict ---
+
+  /**
+   * The shape the scenario runner stores when a run fails: its own error, its
+   * message and its stack, as one JSON string in the run's error field.
+   */
+  const RUNNER_FAILURE_STACK = [
+    "Error: [UserSimulatorAgent] Error: No response content from LLM",
+    "    at ScenarioExecution.callAgent (/app/node_modules/@langwatch/scenario/dist/index.js:12358:13)",
+    "    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)",
+  ].join("\n");
+
+  const RUNNER_FAILURE = JSON.stringify({
+    name: "Error",
+    message: "[UserSimulatorAgent] Error: No response content from LLM",
+    stack: RUNNER_FAILURE_STACK,
+  });
+
+  function setFailedRunState() {
+    setRunState(
+      makeRunState({
+        status: ScenarioRunStatus.ERROR,
+        results: {
+          verdict: Verdict.FAILURE,
+          metCriteria: [],
+          unmetCriteria: [],
+          reasoning:
+            "Scenario failed with error: [UserSimulatorAgent] Error: No response content from LLM",
+          error: RUNNER_FAILURE,
+        },
+      }),
+    );
+  }
+
+  /** @scenario "A failed run reads a named failure instead of a stack" */
+  it("names the failure and holds the stack back", () => {
+    setFailedRunState();
+    renderWide();
+
+    expect(screen.getByTestId("run-verdict-error")).toHaveTextContent(
+      "Model answered with no text",
+    );
+    expect(screen.getByTestId("run-verdict-error-message")).toHaveTextContent(
+      /plays the simulated user/,
+    );
+    expect(screen.getByTestId("run-verdict-error-hint")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("run-verdict-error-detail"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/ScenarioExecution\.callAgent/)).toBeNull();
+  });
+
+  /** @scenario "A failed run does not read its own failure twice" */
+  it("does not read the failure twice when the reasoning restates it", () => {
+    setFailedRunState();
+    renderWide();
+
+    expect(screen.queryByTestId("run-verdict-reasoning")).toBeNull();
+  });
+
+  /** @scenario "The detail of a failure is one click away" */
+  it("reads the stack in a monospace block once More info is clicked", async () => {
+    const user = userEvent.setup();
+    setFailedRunState();
+    renderWide();
+
+    await user.click(screen.getByTestId("run-verdict-error-toggle"));
+
+    const detail = screen.getByTestId("run-verdict-error-detail");
+    expect(detail).toHaveTextContent(/ScenarioExecution\.callAgent/);
+    // The line breaks the runner recorded are kept rather than collapsed.
+    expect(detail.textContent).toContain("\n");
+    expect(detail).toHaveStyle({ overflow: "auto" });
+    expect(screen.getByTestId("run-verdict-error-toggle")).toHaveTextContent(
+      "Hide details",
+    );
+  });
+
   /** @scenario "The criteria appear the moment the run settles" */
   it("reads the stored run again when the run settles without criteria", () => {
     vi.useFakeTimers();

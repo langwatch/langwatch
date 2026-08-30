@@ -545,13 +545,22 @@ describe("frames", () => {
 
     it("leaves the payload cap the process carried", async () => {
       const carried = "7";
+      // Put back whatever the process held, rather than deleting: this test
+      // exists to prove a value survives, so its own teardown must not be the
+      // thing that drops one. `vi.stubEnv` is not usable here, because the
+      // helper calls `vi.unstubAllEnvs` and would clear this stub with its own.
+      const before = process.env.LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB;
       process.env.LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB = carried;
       try {
         await postFrameAboveCap();
 
         expect(process.env.LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB).toBe(carried);
       } finally {
-        delete process.env.LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB;
+        if (before === undefined) {
+          delete process.env.LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB;
+        } else {
+          process.env.LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB = before;
+        }
       }
     });
   });

@@ -27,6 +27,8 @@ export const ScenarioInfraErrorCode = {
   PlatformUnreachable: "scenario_platform_unreachable",
   /** The model provider rejected the request (bad key, unknown model, …). */
   ModelProviderError: "scenario_model_provider_error",
+  /** The provider answered, but the model wrote no text at all. */
+  ModelEmptyResponse: "scenario_model_empty_response",
   /** The resolved model is licensed for the coding-assistant surfaces only and can't run this simulation. */
   ModelNotAllowedForSurface: "scenario_model_not_allowed_for_surface",
   /** The judge combined a forced function tool with incompatible reasoning. */
@@ -468,6 +470,44 @@ function connectedAgentRules(): ClassificationRule[] {
   }));
 }
 
+/**
+ * The marker the scenario runner throws when a model answers with no text at
+ * all. The provider accepted the request and answered: the answer simply
+ * carried no words, which happens when a reasoning model spends its whole
+ * output budget on reasoning, or when the prompt leaves the model nothing
+ * more to say.
+ */
+const EMPTY_MODEL_RESPONSE_NEEDLE = "No response content from LLM";
+
+/**
+ * Which model went quiet, read from the `[AgentName]` prefix the scenario
+ * runner wraps every agent failure in. Naming it is most of the answer: the
+ * simulated user and the judge are models the platform chose, and the customer
+ * changes them in a different place than their own agent.
+ */
+const EMPTY_MODEL_RESPONSE_SUBJECTS: Record<string, string> = {
+  UserSimulatorAgent: "The model that plays the simulated user",
+  JudgeAgent: "The judge model",
+};
+
+/** The `[AgentName]` prefix of a wrapped agent failure. */
+const AGENT_NAME_PREFIX = /\[([A-Za-z0-9_]+)\]/;
+
+function emptyModelResponseRule(): ClassificationRule {
+  return {
+    needles: [EMPTY_MODEL_RESPONSE_NEEDLE],
+    build: (text) => {
+      const agentName = AGENT_NAME_PREFIX.exec(text)?.[1] ?? "";
+      const subject = EMPTY_MODEL_RESPONSE_SUBJECTS[agentName] ?? "The model";
+      return {
+        code: ScenarioInfraErrorCode.ModelEmptyResponse,
+        message: `${subject} answered with no text, so the simulation could not go on. The provider accepted the request and answered; the answer held no words.`,
+        hint: "A reasoning model can spend its whole answer on reasoning and write nothing. Select a different model in Settings > Model Providers, or give the scenario a clear end condition so the model always has something to say.",
+      };
+    },
+  };
+}
+
 const CLASSIFICATION_RULES: ClassificationRule[] = [
   // Connected agent failures. The child's adapter writes
   // `Connected agent call failed (<code>): <message>`, so the code between
@@ -479,6 +519,10 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
   // that a session is too large would otherwise read as a platform timeout, a
   // model-provider rejection, or a session the platform itself refused.
   ...connectedAgentRules(),
+  // A model that answered with nothing. Ahead of the provider rule: the two
+  // read alike in the raw text, and only this one is true of a request the
+  // provider accepted.
+  emptyModelResponseRule(),
   // A session the adapter itself refused. The connected relay writes its own
   // `agent_payload_too_large` envelope, so this rule only ever sees the text
   // an adapter wrote, never a connected agent's own words.
@@ -742,6 +786,48 @@ export function resolveScenarioError(raw: string): ScenarioErrorEnvelope {
   );
 }
 
+/**
+ * The raw text behind a failure, for a reader who opens the details.
+ *
+ * The customer-facing message says what happened; this says where. The
+ * scenario SDK stores `{ name, message, stack }`, so the stack is what a
+ * reader wants, with its line breaks kept. An envelope we wrote ourselves
+ * carries nothing under its message, so it answers with nothing.
+ */
+export function scenarioErrorDetail(
+  raw: string | null | undefined,
+): string | undefined {
+  const trimmed = (raw ?? "").trim();
+  if (trimmed.length === 0) return undefined;
+  if (decodeScenarioError(trimmed)) return undefined;
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    return detailOfErrorPayload(trimmed) ?? trimmed;
+  }
+  return trimmed;
+}
+
+/**
+ * The detail inside the scenario SDK's `{ name, message, stack }` payload:
+ * the stack, or the message when the runner recorded none. An object of any
+ * other shape is still shown, formatted rather than as one long line.
+ */
+function detailOfErrorPayload(trimmed: string): string | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return undefined;
+  }
+  if (!parsed || typeof parsed !== "object") return undefined;
+  const payload = parsed as { stack?: unknown; message?: unknown };
+  const stack = typeof payload.stack === "string" ? payload.stack.trim() : "";
+  if (stack.length > 0) return stack;
+  const message =
+    typeof payload.message === "string" ? payload.message.trim() : "";
+  if (message.length > 0) return message;
+  return JSON.stringify(parsed, null, 2);
+}
+
 /** Short human title for an envelope code, for the drawer's error heading. */
 export function scenarioErrorTitle(code: ScenarioInfraErrorCode): string {
   switch (code) {
@@ -751,6 +837,8 @@ export function scenarioErrorTitle(code: ScenarioInfraErrorCode): string {
       return "Couldn't reach the endpoint";
     case ScenarioInfraErrorCode.ModelProviderError:
       return "Model provider error";
+    case ScenarioInfraErrorCode.ModelEmptyResponse:
+      return "Model answered with no text";
     case ScenarioInfraErrorCode.ModelNotAllowedForSurface:
       return "Model not allowed for this simulation";
     case ScenarioInfraErrorCode.ModelToolReasoningConflict:

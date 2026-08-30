@@ -182,6 +182,26 @@ Feature: The wide run detail drawer
     And the criteria and the success rate read in the results
     And the drawer does not have to be closed and opened again
 
+  @integration
+  Scenario: A failed run reads a named failure instead of a stack
+    Given a run open in the wide drawer that failed before it reached a verdict
+    When the results side is read
+    Then it reads a title for the failure, one plain sentence and a hint
+    And the raw stack the runner recorded is not shown
+
+  @integration
+  Scenario: A failed run does not read its own failure twice
+    Given a failed run whose reasoning only restates the error
+    When the results side is read
+    Then the reasoning is not drawn a second time under the failure
+
+  @integration
+  Scenario: The detail of a failure is one click away
+    Given a failed run open in the wide drawer
+    When "More info" is clicked
+    Then the stack reads in a monospace block that scrolls
+    And its line breaks read as line breaks
+
   # --- v1 is unchanged ---
 
   @integration

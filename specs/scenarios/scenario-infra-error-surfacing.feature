@@ -209,6 +209,43 @@ Feature: Scenario infrastructure error surfacing and empty-response state
     And the message does not contain a raw stack trace
     And the hint points at the project's model default settings
 
+  # A model that answered with nothing is not a provider rejection: the
+  # request was accepted and answered, and the answer held no words. It gets
+  # its own code so the copy can say which model went quiet and what to do
+  # about it, instead of sending the customer to look at their API key.
+
+  @unit
+  Scenario: A model that answered with no text becomes an empty-response error
+    Given a scenario run failed because the model that plays the simulated user returned no text
+    When the failure is classified
+    Then the handled error code is "scenario_model_empty_response"
+    And the message names the model that plays the simulated user
+    And the message says the provider accepted the request
+    And the hint offers another model or a clearer end condition
+
+  @unit
+  Scenario: A judge model that answered with no text names the judge
+    Given a scenario run failed because the judge model returned no text
+    When the failure is classified
+    Then the handled error code is "scenario_model_empty_response"
+    And the message names the judge model
+
+  # The message says what happened; the detail says where. A reader who opens
+  # the details gets the stack the runner recorded, so the raw text is kept
+  # rather than lost, but it is never what the panel opens with.
+
+  @unit
+  Scenario: The stack of a run failure is kept as the detail
+    Given a run whose error field holds the runner's name, message and stack
+    When the detail of that failure is read
+    Then it is the stack, with its line breaks kept
+
+  @unit
+  Scenario: An envelope we wrote ourselves carries no detail
+    Given a run whose error field holds an encoded handled error
+    When the detail of that failure is read
+    Then there is none, as the envelope holds nothing under its message
+
   @unit
   Scenario: The handled error round-trips through the results error field
     Given a classified scenario handled error

@@ -58,9 +58,13 @@ const testState = {
   error: null as unknown,
 };
 
+// One stable mock, so a test can assert the drawer was actually closed. A
+// fresh `vi.fn()` per `useDrawer()` call records nothing a test can read.
+const { closeDrawer } = vi.hoisted(() => ({ closeDrawer: vi.fn() }));
+
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
-    closeDrawer: vi.fn(),
+    closeDrawer,
     openDrawer: vi.fn(),
     drawerOpen: vi.fn(() => true),
     goBack: vi.fn(),
@@ -157,14 +161,18 @@ describe("<ConnectedAgentDrawer />", () => {
   describe("given the agent was registered from code", () => {
     /** @scenario "The drawer edits nothing the process registered" */
     it("offers no field of its own and closes from the bottom right", async () => {
+      const user = userEvent.setup();
+      closeDrawer.mockClear();
       await renderDrawer();
 
-      expect(
-        await screen.findByTestId("connected-agent-close"),
-      ).toHaveTextContent("Close");
+      const close = await screen.findByTestId("connected-agent-close");
+      expect(close).toHaveTextContent("Close");
       // The test message is the only field; the name, the environment and the
       // parameters are read from the code.
       expect(screen.getAllByRole("textbox")).toHaveLength(1);
+
+      await user.click(close);
+      expect(closeDrawer).toHaveBeenCalled();
     });
   });
 

@@ -18,6 +18,7 @@ import {
   isTransportLevelScenarioFailure,
   resolveScenarioError,
   ScenarioInfraErrorCode,
+  scenarioErrorDetail,
   scenarioErrorTitle,
 } from "../scenario-infra-error";
 
@@ -494,6 +495,51 @@ describe("classifyScenarioInfraError", () => {
     });
   });
 
+  describe("when a model answered with no text at all", () => {
+    /** @scenario "A model that answered with no text becomes an empty-response error" */
+    it("names the model that plays the simulated user", () => {
+      const result = classifyScenarioInfraError(
+        "[UserSimulatorAgent] Error: No response content from LLM",
+      );
+      expect(result.code).toBe(ScenarioInfraErrorCode.ModelEmptyResponse);
+      expect(result.message).toContain("plays the simulated user");
+      expect(result.message).toContain("provider accepted the request");
+      expect(result.hint).toContain("Settings > Model Providers");
+      expectNoInternals(result.message);
+    });
+
+    /** @scenario "A judge model that answered with no text names the judge" */
+    it("names the judge model", () => {
+      const result = classifyScenarioInfraError(
+        "[JudgeAgent] Error: No response content from LLM",
+      );
+      expect(result.code).toBe(ScenarioInfraErrorCode.ModelEmptyResponse);
+      expect(result.message).toContain("The judge model");
+    });
+
+    /** @scenario "A model that answered with no text becomes an empty-response error" */
+    it("falls back to the model when no agent is named", () => {
+      const result = classifyScenarioInfraError(
+        "Error: No response content from LLM",
+      );
+      expect(result.code).toBe(ScenarioInfraErrorCode.ModelEmptyResponse);
+      expect(result.message).toContain("The model answered with no text");
+    });
+
+    /** @scenario "A model that answered with no text becomes an empty-response error" */
+    it("classifies the shape the runner actually stores", () => {
+      const raw = JSON.stringify({
+        name: "Error",
+        message: "[UserSimulatorAgent] Error: No response content from LLM",
+        stack:
+          "Error: [UserSimulatorAgent] Error: No response content from LLM\n    at ScenarioExecution.callAgent (/app/node_modules/@langwatch/scenario/dist/index.js:12358:13)",
+      });
+      const result = resolveScenarioError(raw);
+      expect(result.code).toBe(ScenarioInfraErrorCode.ModelEmptyResponse);
+      expectNoInternals(result.message);
+    });
+  });
+
   describe("when multiple failure reasons overlap in the raw error", () => {
     it("prefers the cert reason over the fetch-failed it rides on", () => {
       const raw =
@@ -655,6 +701,46 @@ describe("classifyScenarioInfraError session cap", () => {
       expect(result.code).toBe(ScenarioInfraErrorCode.AgentCallFailed);
       expect(result.message).toContain("Agent session too large");
     });
+  });
+});
+
+describe("scenarioErrorDetail", () => {
+  /** @scenario "The stack of a run failure is kept as the detail" */
+  it("answers with the stack the runner recorded", () => {
+    const stack =
+      "Error: boom\n    at ScenarioExecution.callAgent (/app/dist/index.js:1:1)";
+    const detail = scenarioErrorDetail(
+      JSON.stringify({ name: "Error", message: "boom", stack }),
+    );
+    expect(detail).toBe(stack);
+    expect(detail).toContain("\n");
+  });
+
+  it("falls back to the message when the runner recorded no stack", () => {
+    expect(
+      scenarioErrorDetail(JSON.stringify({ name: "Error", message: "boom" })),
+    ).toBe("boom");
+  });
+
+  /** @scenario "An envelope we wrote ourselves carries no detail" */
+  it("answers with nothing for an envelope of ours", () => {
+    const encoded = encodeScenarioError(
+      classifyScenarioInfraError(
+        "self-signed certificate in certificate chain",
+      ),
+    );
+    expect(scenarioErrorDetail(encoded)).toBeUndefined();
+  });
+
+  it("answers with nothing when there is no error at all", () => {
+    expect(scenarioErrorDetail("")).toBeUndefined();
+    expect(scenarioErrorDetail(null)).toBeUndefined();
+  });
+
+  it("keeps a plain sentence as it is", () => {
+    expect(scenarioErrorDetail("Child process exited with code 1")).toBe(
+      "Child process exited with code 1",
+    );
   });
 });
 

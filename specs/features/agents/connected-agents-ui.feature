@@ -125,12 +125,14 @@ Feature: Connected agents in the product
   # The agent drawer
   # ---------------------------------------------------------------------------
 
+  # The description of a parameter is written where the parameter is declared,
+  # so the drawer does not repeat it in a column of its own.
   @integration
   Scenario: The drawer lists the parameters the agent declares
     Given a connected agent that declares "model" with two options and a default
     When its drawer is open
     Then the parameters table names the parameter, its type, its options and its default
-    And the table has no description column, as the description reads in the code
+    And the table has no description column
 
   @integration
   Scenario: The drawer lists the instances that hold the agent

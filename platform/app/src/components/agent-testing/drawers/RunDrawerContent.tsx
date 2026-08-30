@@ -260,15 +260,22 @@ function SideBySideContent({ detail }: { detail: RunDetail }) {
         <ConversationSection detail={detail} />
       </Box>
       <Box
+        display="flex"
+        flexDirection="column"
         style={{ overflowY: "auto" }}
         borderLeftWidth="1px"
         borderColor="border.muted"
         data-testid="wide-drawer-results"
       >
         <ResultsSection detail={detail} isFirst />
-        <Accordion.Root multiple defaultValue={["parameters"]}>
-          <ParametersSection detail={detail} />
-        </Accordion.Root>
+        {/* The parameters read what the run was given, not what it decided,
+            so they sit at the foot of the column, under whatever room the
+            verdict takes. */}
+        <Box marginTop="auto" data-testid="wide-drawer-results-footer">
+          <Accordion.Root multiple defaultValue={["parameters"]}>
+            <ParametersSection detail={detail} />
+          </Accordion.Root>
+        </Box>
       </Box>
     </Grid>
   );
