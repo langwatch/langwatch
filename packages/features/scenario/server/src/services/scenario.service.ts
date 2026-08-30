@@ -381,9 +381,26 @@ export class ScenarioService extends ScenarioServiceContract {
       return { cancelled: false };
     }
 
+    return this.requestCancellation(input.projectId, input.scenarioRunId);
+  }
+
+  /**
+   * Dispatches the cancel command for one run, with no status read of its own.
+   *
+   * `cancelJob` reads and guards before calling this because it is the
+   * single-run door and nothing has filtered for it. `cancelBatchRun` has
+   * already filtered the same batch it read, so re-reading per run bought
+   * nothing: `handleSimulationRunCancelRequested` only stamps
+   * `CancellationRequestedAt` and never changes a run's status, so a cancel
+   * that lands on a run which finished in the meantime is inert.
+   */
+  private async requestCancellation(
+    projectId: string,
+    scenarioRunId: string,
+  ): Promise<{ cancelled: boolean }> {
     await this.options.simulations.cancelRun({
-      tenantId: input.projectId,
-      scenarioRunId: input.scenarioRunId,
+      tenantId: projectId,
+      scenarioRunId,
       occurredAt: this.options.clock.now().getTime(),
     });
 
@@ -406,15 +423,7 @@ export class ScenarioService extends ScenarioServiceContract {
     for (let index = 0; index < cancellable.length; index += 10) {
       const chunk = cancellable.slice(index, index + 10);
       const results = await Promise.all(
-        chunk.map((run) =>
-          this.cancelJob({
-            projectId: input.projectId,
-            scenarioSetId: input.scenarioSetId,
-            batchRunId: run.batchRunId,
-            scenarioRunId: run.scenarioRunId,
-            scenarioId: run.scenarioId,
-          }),
-        ),
+        chunk.map((run) => this.requestCancellation(input.projectId, run.scenarioRunId)),
       );
       cancelledCount += results.filter((result) => result.cancelled).length;
     }
