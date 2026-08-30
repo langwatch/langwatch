@@ -1,4 +1,3 @@
-import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 import { GovernanceKpisSubscriber } from "../governance-kpis.subscriber";
 import { GovernanceOcsfSubscriber } from "../governance-ocsf.subscriber";
@@ -12,11 +11,13 @@ import {
   TraceAlertTriggerPort,
   type GovernanceKpiContribution,
   type GovernanceOcsfEvent,
-  type GovernanceTraceContext,
-  type GovernanceTraceEvent,
   type TraceAlertTrigger,
 } from "../../ports/governance-subscriber.port";
 import { TraceAlertTriggerMatchSubscriber } from "../trace-alert-trigger-match.subscriber";
+import {
+  governanceTraceContext,
+  governanceTraceEvent,
+} from "../../ports/__tests__/subscribers/governance-subscriber.fixtures";
 
 class RecordingKpis extends GovernanceKpiContributionPort {
   readonly rows: GovernanceKpiContribution[] = [];
@@ -75,35 +76,10 @@ class RecordingMetrics extends TraceAlertMetricsPort {
   }
 }
 
-const event: GovernanceTraceEvent = {
-  id: "event-1",
-  aggregateId: "trace-1",
-  aggregateType: "trace",
-  tenantId: createTenantId("project-1"),
-  createdAt: 1_000,
-  occurredAt: 1_000,
-  type: "lw.obs.trace.span_received",
-  version: "2026-01-01",
-  data: {},
-};
-
-const context: GovernanceTraceContext = {
-  tenantId: "project-1",
-  aggregateId: "trace-1",
-  state: {
-    traceId: "trace-1",
-    occurredAt: 1_700_000_000_000,
-    totalCost: 0.0042,
-    totalPromptTokenCount: 120,
-    totalCompletionTokenCount: 42,
-    models: ["model-1"],
-    attributes: {
-      "langwatch.origin.kind": "ingestion_source",
-      "langwatch.ingestion_source.id": "source-1",
-      "langwatch.ingestion_source.source_type": "otel_generic",
-    },
-  },
-};
+// The same event and the same governed trace the three redelivery suites run
+// on, so a change to either lands on all four rather than on three of them.
+const event = governanceTraceEvent;
+const context = governanceTraceContext;
 
 describe("governance fold subscribers", () => {
   it("declines non-governance traces before enqueue and in the handler", async () => {
