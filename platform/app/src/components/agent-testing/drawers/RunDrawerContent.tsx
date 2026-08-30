@@ -127,17 +127,33 @@ const JUDGED_STATUSES = new Set<string>([
  *
  * The conversation runs first and the judge reads it afterwards, so the status
  * of the run is what separates the two: the judge speaks only once the run has
- * finished, and a finished run whose criteria have not landed yet is one the
+ * finished, and a finished run whose verdict has not landed yet is one the
  * judge has just read.
+ *
+ * A verdict is a verdict even with no criteria under it: a scripted run, such
+ * as the ping an agent test sends, is judged by its script and answers with a
+ * verdict and a reasoning alone.
  */
 function pendingMessageFor(scenarioState: RunScenarioState): string | null {
-  if (hasCriteria(scenarioState) || scenarioState.results?.error) return null;
+  if (hasVerdict(scenarioState)) return null;
   if (!isTerminalStatus(scenarioState.status)) {
     return CONVERSATION_RUNNING_MESSAGE;
   }
   return JUDGED_STATUSES.has(scenarioState.status)
     ? JUDGE_READING_MESSAGE
     : null;
+}
+
+/** True once the judge has spoken: criteria, a verdict, a reasoning or an error. */
+function hasVerdict(scenarioState: RunScenarioState): boolean {
+  const results = scenarioState.results;
+  if (!results) return false;
+  return (
+    hasCriteria(scenarioState) ||
+    Boolean(results.error) ||
+    Boolean(results.verdict) ||
+    Boolean(results.reasoning)
+  );
 }
 
 /**

@@ -150,6 +150,7 @@ Feature: Test agent with one scripted run
       When "Test agent" is chosen from the card menu
       Then a test run is requested for that agent
       And the run drawer opens on the scenario run id it answered
+      And it opens in the Agent Testing layout, the judge results beside the conversation
 
     @integration
     Scenario: The connected agent row offers Test agent

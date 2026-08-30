@@ -135,7 +135,7 @@ export class SerializedConnectedAgentAdapter extends SerializedAgentAdapter {
       session: this.sessionOf(input.threadId),
       traceparent,
     });
-    const url = `${this.config.endpoint.replace(/\/$/, "")}/api/agents/${this.config.agentId}/call`;
+    const url = `${this.config.endpoint.replace(/\/$/, "")}/api/v1/agents/${this.config.agentId}/call`;
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       "X-Auth-Token": this.projectApiKey,

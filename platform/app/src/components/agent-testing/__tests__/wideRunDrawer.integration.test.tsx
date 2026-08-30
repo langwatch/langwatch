@@ -471,6 +471,25 @@ describe("the wide run detail drawer", () => {
     expect(screen.getAllByText(/stays polite/).length).toBeGreaterThan(0);
   });
 
+  /** @scenario "A verdict with no criteria reads the judge's reasoning" */
+  it("reads the reasoning of a scripted verdict that has no criteria", () => {
+    setRunState(
+      makeRunState({
+        status: ScenarioRunStatus.SUCCESS,
+        results: {
+          verdict: Verdict.SUCCESS,
+          metCriteria: [],
+          unmetCriteria: [],
+          reasoning: "The agent answered",
+        },
+      }),
+    );
+    renderWide();
+
+    expect(screen.queryByTestId("run-verdict-pending")).not.toBeInTheDocument();
+    expect(screen.getByText("The agent answered")).toBeInTheDocument();
+  });
+
   /** @scenario "The criteria appear the moment the run settles" */
   it("reads the stored run again when the run settles without criteria", () => {
     vi.useFakeTimers();

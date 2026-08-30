@@ -113,7 +113,11 @@ describe("Test agent from the agents page", () => {
         batchRunId: "batch_1",
       });
       expect(openDrawer).toHaveBeenCalledWith("scenarioRunDetail", {
-        urlParams: { scenarioRunId: "run_1" },
+        urlParams: {
+          variant: "agent-testing",
+          scenarioRunId: "run_1",
+          batchRunId: "batch_1",
+        },
       });
     });
 

@@ -193,7 +193,7 @@ const body = JSON.stringify({
   threadId: "thread_1",
 });
 
-describe("POST /api/agents/:id/call", () => {
+describe("POST /api/v1/agents/:id/call", () => {
   describe("when the key holds only scenarios:view", () => {
     /** @scenario "The relay route needs scenarios create" */
     it("refuses as forbidden", async () => {

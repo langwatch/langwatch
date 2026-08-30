@@ -153,6 +153,13 @@ Feature: The wide run detail drawer
     And the criteria replace that line as soon as the verdict lands
 
   @integration
+  Scenario: A verdict with no criteria reads the judge's reasoning
+    Given a scripted run open in the wide drawer, such as the ping of an agent test
+    When its verdict lands with a reasoning and no criteria
+    Then the results side reads the verdict and the reasoning
+    And it does not say the judge is still reading
+
+  @integration
   Scenario: The criteria appear the moment the run settles
     Given a running run open in the wide drawer
     When the run reaches its verdict

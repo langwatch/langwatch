@@ -164,7 +164,7 @@ describe("SerializedConnectedAgentAdapter", () => {
 
       expect(output).toBe("hi");
       expect(relay.sent[0]?.url).toBe(
-        "http://app:5560/api/agents/agent_connected/call",
+        "http://app:5560/api/v1/agents/agent_connected/call",
       );
       expect(relay.sent[0]?.headers["X-Auth-Token"]).toBe("sk-lw-project");
       expect(relay.sent[0]?.body).toMatchObject({
