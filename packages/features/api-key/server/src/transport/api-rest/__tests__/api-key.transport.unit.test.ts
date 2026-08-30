@@ -734,7 +734,18 @@ describe("createApiKeysRestApp", () => {
      */
     it("only widens the read past the caller's own keys when both halves are held", async () => {
       const readWith = async (options: { admin: boolean; manage: boolean }) => {
-        const getByIdForCaller = vi.fn(async () => apiKeyDetail());
+        // The parameter is declared so `mock.calls[0][0]` exists in the type:
+        // a `vi.fn(async () => …)` records its arguments but reports `calls`
+        // as the EMPTY tuple, so reading the input the assertion is about was
+        // an index out of range to the compiler.
+        const getByIdForCaller = vi.fn(
+          async (_input: {
+            id: string;
+            organizationId: string;
+            callerUserId: string | null;
+            callerCanReadAnyKey: boolean;
+          }) => apiKeyDetail(),
+        );
         const { send } = buildApi({
           apiKeys: { getByIdForCaller, isOrgAdmin: vi.fn(async () => options.admin) },
           permissions: { hasApiKeyPermission: vi.fn(async () => options.manage) },

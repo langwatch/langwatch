@@ -260,7 +260,9 @@ describe("ExperimentApp", () => {
       const { app, experiments } = harness();
 
       await app.commitWorkbenchVersion(
-        { projectId: "project-1", id: "experiment-1" },
+        // `commitMessage` is required by the input and incidental to this
+        // test, which is about the attribution the app stamps on either verb.
+        { projectId: "project-1", id: "experiment-1", commitMessage: "a commit" },
         { kind: "user", id: "user-1" },
       );
       await app.restoreWorkbenchVersion(

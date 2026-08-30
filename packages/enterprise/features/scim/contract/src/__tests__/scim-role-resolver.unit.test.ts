@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { describe, expect, it } from "vitest";
-import { resolveHighestRole } from "../scim-role-resolver";
+import { resolveHighestRole, type ScimRole } from "../scim-role-resolver";
 
 describe("resolveHighestRole()", () => {
   describe("when resolving built-in roles", () => {
@@ -30,7 +30,7 @@ describe("resolveHighestRole()", () => {
     /** @scenario Removing a binding recalculates to remaining most permissive */
     it("recalculates to remaining most permissive role", () => {
       // Originally [VIEWER, MEMBER], MEMBER mapping removed → only VIEWER remains
-      const remainingRoles = ["VIEWER"];
+      const remainingRoles: ScimRole[] = ["VIEWER"];
 
       const result = resolveHighestRole(remainingRoles);
 
