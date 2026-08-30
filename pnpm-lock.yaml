@@ -3631,6 +3631,12 @@ importers:
       '@emotion/react':
         specifier: ^11.14.0
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
+      '@langwatch/trace-server':
+        specifier: workspace:*
+        version: link:../../trace/server
+      '@langwatch/trace-web':
+        specifier: workspace:*
+        version: link:../../trace/web
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.18

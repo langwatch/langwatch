@@ -61,6 +61,7 @@ export function EditableTraceName({
       });
       return () => cancelAnimationFrame(raf);
     }
+    return undefined;
   }, [isEditing]);
 
   function startEditing() {

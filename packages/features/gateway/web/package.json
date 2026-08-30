@@ -28,6 +28,8 @@
   "devDependencies": {
     "@chakra-ui/react": "^3.36.0",
     "@emotion/react": "^11.14.0",
+    "@langwatch/trace-server": "workspace:*",
+    "@langwatch/trace-web": "workspace:*",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "react": "^19.2.7",

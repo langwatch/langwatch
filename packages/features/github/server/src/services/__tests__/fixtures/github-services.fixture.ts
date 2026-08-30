@@ -12,6 +12,14 @@ export class TestOrganizationService extends OrganizationService {
     return unsupported();
   }
 
+  getSettings(): never {
+    return unsupported();
+  }
+
+  updateSettings(): never {
+    return unsupported();
+  }
+
   isMember(): Promise<boolean> {
     return Promise.resolve(this.isMemberResult);
   }
@@ -163,6 +171,10 @@ export class TestProjectService extends ProjectService {
 
   getOrganizationId(): Promise<string> {
     return Promise.resolve(this.organizationId);
+  }
+
+  tryGetOrganizationId(): never {
+    return unsupported();
   }
 
   touchCodingAgentPullRequestSeen(input: {
