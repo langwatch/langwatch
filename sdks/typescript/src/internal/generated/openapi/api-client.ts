@@ -724,6 +724,23 @@ export interface paths {
         patch: operations["patchApiAgentsById"];
         trace?: never;
     };
+    "/api/agents/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Run one scripted scenario against an agent: the user sends "ping", the agent answers, and the run succeeds when the answer arrives. No model is used and nothing is saved. Answers at once with the run ids; the run itself is asynchronous. */
+        post: operations["postApiAgentsByIdTest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agents/{id}/call": {
         parameters: {
             query?: never;
@@ -5287,6 +5304,56 @@ export interface operations {
                         message?: string;
                     };
                 };
+            };
+        };
+    };
+    postApiAgentsByIdTest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The test run is scheduled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The run to follow; open it in the simulations run drawer. */
+                        scenarioRunId: string;
+                        /** @description The batch the run belongs to. */
+                        batchRunId: string;
+                        /** @description The internal set that holds agent test runs. */
+                        setId: string;
+                    };
+                };
+            };
+            /** @description The agent is a personal development agent of someone else */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No agent with that id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The agent cannot be tested as it is set up */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

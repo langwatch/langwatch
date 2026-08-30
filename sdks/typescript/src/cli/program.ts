@@ -1842,6 +1842,17 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
+  emitsResult(
+    agentCmd
+      .command("test <id>")
+      .description("Test an agent with one scripted scenario run on the platform: the user sends \"ping\", the agent answers, and the run succeeds when the answer arrives. No model is used and nothing is saved")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
+      const { testAgentCommand: impl } = await import("./commands/agents/test.js");
+      return impl(id);
+    },
+  );
+
   // A live, human-only session: it never returns a CommandResult, so it is
   // registered with a plain action and the format gate honestly refuses
   // `-o json` instead of accepting a format the command never renders.

@@ -26,6 +26,7 @@ import { ModelNotConfiguredError } from "../../modelProviders/modelNotConfigured
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import { extractSuiteId } from "../../suites/suite-set-id";
 import { parseSuiteTargets } from "../../suites/types";
+import { isAgentTestScenarioId } from "../agent-test-scenario";
 import {
   mergeRunParameters,
   parseScenarioParameterDefinitions,
@@ -38,6 +39,7 @@ import {
   decryptRunSecretValues,
   type RunSecretCiphertext,
 } from "../run-secret-values";
+import { prefetchAgentTestData } from "./agent-test-prefetch";
 import { renderScenarioContent } from "./scenario-content-template";
 import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 
@@ -257,9 +259,9 @@ export type PrefetchResult =
        * The models this run resolved. A sibling of `data` rather than a member
        * of it: the child process builds its models from the prepared params,
        * so it needs no name, while the caller that queues the run records the
-       * names on it.
+       * names on it. Null for a scripted run, which resolves no model.
        */
-      resolvedModels: ResolvedRunModels;
+      resolvedModels: ResolvedRunModels | null;
     }
   | {
       success: false;
@@ -368,6 +370,27 @@ export async function prefetchScenarioData({
     },
     "Prefetching scenario data",
   );
+
+  // An agent test has no scenario row and no model: it reads the project and
+  // the agent the way every run does, and nothing else.
+  if (isAgentTestScenarioId(context.scenarioId)) {
+    return prefetchAgentTestData({
+      context,
+      target,
+      reads: {
+        project: () => fetchProject(context.projectId, deps.projectFetcher),
+        adapter: () => fetchAgentData(context.projectId, target, deps),
+        agentName: async () =>
+          (
+            await deps.agentFetcher.findById({
+              projectId: context.projectId,
+              id: target.referenceId,
+            })
+          )?.name ?? null,
+      },
+      onChildEnvReady,
+    });
+  }
 
   // Decrypted once, before anything is fetched. A key that no longer opens the
   // values fails the run here rather than sending the target a request with a

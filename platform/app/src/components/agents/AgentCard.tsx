@@ -16,6 +16,7 @@ import {
   Globe,
   MessageSquare,
   MoreVertical,
+  Play,
   RefreshCw,
   Workflow,
 } from "lucide-react";
@@ -159,6 +160,8 @@ export type AgentCardProps = {
   onPushToCopies?: () => void;
   onSyncFromSource?: () => void;
   onViewHistory?: () => void;
+  /** Runs one scripted scenario against the agent and opens the run. */
+  onTest?: () => void;
 };
 
 export function AgentCard({
@@ -171,6 +174,7 @@ export function AgentCard({
   onPushToCopies,
   onSyncFromSource,
   onViewHistory,
+  onTest,
 }: AgentCardProps) {
   const typeLabel = agentTypeLabels[agent.type] ?? agent.type;
 
@@ -185,7 +189,7 @@ export function AgentCard({
       testId={`agent-card-${agent.id}`}
       leading={<AgentTypeIcon type={agent.type} />}
       menu={
-        (onEdit || onDelete) && (
+        (onEdit || onDelete || onTest) && (
           <Menu.Root>
             <AgentCardMenuTrigger agentName={agent.name} />
             <Menu.Content className={CARD_MENU_CLASS}>
@@ -199,6 +203,19 @@ export function AgentCard({
                 >
                   <LuPencil size={14} />
                   Edit
+                </Menu.Item>
+              )}
+              {onTest && (
+                <Menu.Item
+                  value="test"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onTest();
+                  }}
+                  data-testid={`agent-test-${agent.id}`}
+                >
+                  <Play size={14} />
+                  Test agent
                 </Menu.Item>
               )}
               {agent.type === "workflow" && onOpenWorkflow && (

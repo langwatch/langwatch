@@ -342,6 +342,13 @@ const registry = {
     ],
     docsPath: "/agent-simulations/connect-your-agent",
   },
+  agent_test_refused: {
+    tips: [
+      "A test run sends the agent one message and waits for its answer; it needs an HTTP, code, workflow or connected agent whose configuration is complete",
+      "Open the agent, fix what the message names, save it and test again",
+    ],
+    docsPath: "/agent-simulations/connect-your-agent",
+  },
   scenario_parameter_option_invalid: {
     tips: [
       "A parameter with options accepts only the values it lists; pick one of them for this run",

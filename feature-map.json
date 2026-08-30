@@ -623,6 +623,7 @@
                 "agent get",
                 "agent create",
                 "agent run",
+                "agent test",
                 "agent dev",
                 "agent update",
                 "agent delete"
@@ -638,6 +639,7 @@
                 "platform_create_agent",
                 "platform_update_agent",
                 "platform_run_agent",
+                "platform_test_agent",
                 "platform_delete_agent"
               ],
               "skill": "connect-agent",

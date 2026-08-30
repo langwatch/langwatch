@@ -37,6 +37,7 @@ import {
 import { describeParameter, getAgentCommand } from "../get";
 import { agentOwnerLabel, agentStatusLabel, listAgentsCommand } from "../list";
 import { buildRelayBody, runAgentCommand } from "../run";
+import { testAgentCommand } from "../test";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -79,12 +80,17 @@ const httpAgent = (): AgentResponse => ({
   updatedAt: "2026-01-02T00:00:00Z",
 });
 
-let service: { list: ReturnType<typeof vi.fn>; get: ReturnType<typeof vi.fn>; call: ReturnType<typeof vi.fn> };
+let service: {
+  list: ReturnType<typeof vi.fn>;
+  get: ReturnType<typeof vi.fn>;
+  call: ReturnType<typeof vi.fn>;
+  test: ReturnType<typeof vi.fn>;
+};
 let printed: () => string;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  service = { list: vi.fn(), get: vi.fn(), call: vi.fn() };
+  service = { list: vi.fn(), get: vi.fn(), call: vi.fn(), test: vi.fn() };
   vi.mocked(AgentsApiService).mockImplementation(function () {
     return service as unknown as AgentsApiService;
   });
@@ -123,6 +129,29 @@ describe("listAgentsCommand()", () => {
       expect(agentOwnerLabel(connectedAgent({ owner: { userId: "u1", name: "Ada" } }))).toBe("Ada");
       expect(agentOwnerLabel(connectedAgent({ hostLabel: "ada-laptop" }))).toBe("ada-laptop");
       expect(agentOwnerLabel(connectedAgent())).toBe("");
+    });
+  });
+});
+
+describe("testAgentCommand()", () => {
+  describe("when an agent is tested", () => {
+    /** @scenario "The REST route schedules the same run" */
+    it("schedules the run through the test route and prints the ids to follow", async () => {
+      service.test.mockResolvedValue({
+        scenarioRunId: "run_1",
+        batchRunId: "batch_1",
+        setId: "__internal__proj_1__agent-test",
+      });
+
+      const result = await testAgentCommand("agent_http");
+      result?.table?.();
+
+      expect(service.test).toHaveBeenCalledWith("agent_http");
+      expect(result?.data).toMatchObject({ scenarioRunId: "run_1", batchRunId: "batch_1" });
+      const output = printed();
+      expect(output).toContain("run_1");
+      expect(output).toContain("batch_1");
+      expect(output).toContain("simulation-run get run_1");
     });
   });
 });

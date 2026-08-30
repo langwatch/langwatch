@@ -26,6 +26,7 @@
 
 import * as ScenarioRunner from "@langwatch/scenario";
 import { type TracerProvider, trace } from "@opentelemetry/api";
+import { buildAgentTestRun } from "./agent-test-script";
 import { createChildProcessLogger } from "./child-logger";
 import { selectRoleModelParams } from "./job-model-params";
 import {
@@ -129,24 +130,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     projectApiKey: langwatchApiKey,
     parameters,
   });
-  // The user-simulator and judge resolve their own models (run-plan /
-  // scenario override or the DEFAULT-role scenarios.* defaults). A job queued
-  // before that split carried only modelParams, so both roles fall back to it
-  // — preserving the previous single-model behavior across a deploy.
-  const roleModelParams = selectRoleModelParams(jobData);
-  const simulatorModel = createModelFromParams({
-    litellmParams: roleModelParams.simulator,
-    nlpServiceUrl,
-  });
-  const judgeModel = createJudgeModelFromParams({
-    litellmParams: roleModelParams.judge,
-    nlpServiceUrl,
-  });
-
-  const judgeAgent = ScenarioRunner.judgeAgent({
-    criteria: scenario.criteria,
-    model: judgeModel,
-  });
+  const cast = buildRunCast({ jobData, adapter });
 
   // Results are reported via LangWatch SDK automatically
   const verbose = process.env.SCENARIO_VERBOSE === "true";
@@ -157,11 +141,8 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
       name: scenario.name,
       description: scenario.situation,
       setId: context.setId,
-      agents: [
-        adapter,
-        ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
-        judgeAgent,
-      ],
+      agents: cast.agents,
+      ...(cast.script ? { script: cast.script } : {}),
       verbose,
       // An http target's own spans land in the trace each turn propagates,
       // so the judge fetches them back from the platform's trace API before
@@ -233,6 +214,51 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
   process.stdout.write(JSON.stringify(outputResult) + "\n", () => {
     process.exit(0);
   });
+}
+
+/**
+ * Who takes part in the run, and whether the conversation is written down.
+ *
+ * A scripted run (an agent test) carries its user's lines and decides its
+ * own verdict, so it builds no model. Every other run lets a user simulator
+ * play the person and a judge decide: both resolve their own models (run-plan
+ * or scenario override, else the DEFAULT-role scenarios.* defaults). A job
+ * queued before that split carried only modelParams, so both roles fall
+ * back to it, preserving the previous single-model behavior across a deploy.
+ */
+function buildRunCast({
+  jobData,
+  adapter,
+}: {
+  jobData: ChildProcessJobData;
+  adapter: ScenarioRunner.AgentAdapter;
+}): {
+  agents: ScenarioRunner.AgentAdapter[];
+  script?: ScenarioRunner.ScriptStep[];
+} {
+  if (jobData.script) {
+    return buildAgentTestRun({ adapter, script: jobData.script });
+  }
+  const { nlpServiceUrl, scenario } = jobData;
+  const roleModelParams = selectRoleModelParams(jobData);
+  const simulatorModel = createModelFromParams({
+    litellmParams: roleModelParams.simulator,
+    nlpServiceUrl,
+  });
+  const judgeModel = createJudgeModelFromParams({
+    litellmParams: roleModelParams.judge,
+    nlpServiceUrl,
+  });
+  return {
+    agents: [
+      adapter,
+      ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
+      ScenarioRunner.judgeAgent({
+        criteria: scenario.criteria,
+        model: judgeModel,
+      }),
+    ],
+  };
 }
 
 /**

@@ -177,7 +177,9 @@ export async function handleFailedJobResult(
     batchRunId: jobData.batchRunId,
     scenarioRunId: jobData.scenarioRunId,
     error,
-    name: scenario?.name,
+    // A run with no scenario row (an agent test) keeps the name it was
+    // queued with.
+    name: scenario?.name ?? jobData.scenarioName,
     description: scenario?.situation,
     target: jobData.target,
   });

@@ -956,6 +956,75 @@ describe("SimulationClickHouseRepository (integration)", () => {
     });
   });
 
+  describe("given a batch in the project's agent test set", () => {
+    const agentTestSetId = `__internal__${tenantId}__agent-test`;
+    const batchRunId = `batch-agent-test-${nanoid()}`;
+    const scenarioRunId = `run-agent-test-${nanoid()}`;
+
+    beforeAll(async () => {
+      await insertRow(
+        ch,
+        makeInsertRow({
+          ScenarioRunId: scenarioRunId,
+          BatchRunId: batchRunId,
+          ScenarioSetId: agentTestSetId,
+          ScenarioId: "__internal__agent-test",
+          Status: "SUCCESS",
+          CreatedAt: new Date(now),
+          UpdatedAt: new Date(now),
+        }),
+      );
+    });
+
+    /** @scenario "The results lists leave the agent test batches out" */
+    it("is in no set list, no batch list and no last-result summary", async () => {
+      const sets = await repo.getScenarioSetsData({ projectId: tenantId });
+      expect(
+        sets.find((s) => s.scenarioSetId === agentTestSetId),
+      ).toBeUndefined();
+
+      const batches = await repo.getRunDataForAllSuites({
+        projectId: tenantId,
+        limit: 100,
+      });
+      if (!batches.changed) throw new Error("expected changed");
+      expect(
+        batches.runs.find((r) => r.batchRunId === batchRunId),
+      ).toBeUndefined();
+      expect(batches.scenarioSetIds[batchRunId]).toBeUndefined();
+
+      const internal = await repo.getInternalSuiteSummaries({
+        projectId: tenantId,
+      });
+      expect(
+        internal.find((s) => s.scenarioSetId === agentTestSetId),
+      ).toBeUndefined();
+      const external = await repo.getExternalSetSummaries({
+        projectId: tenantId,
+      });
+      expect(
+        external.find((s) => s.scenarioSetId === agentTestSetId),
+      ).toBeUndefined();
+
+      const summaries = await repo.getLastResultSummaries({
+        projectId: tenantId,
+      });
+      expect(
+        summaries.find((s) => s.scenarioId === "__internal__agent-test"),
+      ).toBeUndefined();
+    });
+
+    /** @scenario "The run drawer opens a test run by its id" */
+    it("is still read by its own run id", async () => {
+      const run = await repo.getScenarioRunData({
+        projectId: tenantId,
+        scenarioRunId,
+      });
+      expect(run?.scenarioRunId).toBe(scenarioRunId);
+      expect(run?.batchRunId).toBe(batchRunId);
+    });
+  });
+
   describe("getDistinctExternalSetIds()", () => {
     describe("when rows exist with empty ScenarioSetId and 'default' ScenarioSetId", () => {
       it("merges empty-string and 'default' into a single entry", async () => {

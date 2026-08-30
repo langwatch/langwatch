@@ -43,6 +43,7 @@ import type { AgentComponentConfig } from "~/server/agents/agent.repository";
 import type { AgentWithFields } from "~/server/agents/agent-fields";
 import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 import { api } from "~/utils/api";
+import { AgentTestPanel } from "./AgentTestPanel";
 import {
   AuthConfigSection,
   BodyTemplateEditor,
@@ -736,6 +737,16 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                     />
                   </Tabs.Content>
                 </Tabs.Root>
+                {agentId && project?.id ? (
+                  <Box
+                    paddingX={6}
+                    paddingY={4}
+                    borderTopWidth="1px"
+                    borderColor="border"
+                  >
+                    <AgentTestPanel agentId={agentId} projectId={project.id} />
+                  </Box>
+                ) : null}
               </VStack>
             )}
           </Drawer.Body>

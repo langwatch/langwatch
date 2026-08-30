@@ -21,6 +21,7 @@ import {
   agentServiceMiddleware,
 } from "../../middleware/agent-service";
 import { NotFoundError, UnprocessableEntityError } from "../../shared/errors";
+import { runActorOf } from "../../shared/run-actor";
 import { agentPlatformUrl } from "../agent-platform-url";
 import { handleAgentError } from "./error-handler";
 
@@ -395,6 +396,56 @@ secured.access(requires("project:delete")).delete(
         type: agent.type,
         archivedAt: agent.archivedAt,
       });
+    } catch (error) {
+      return mapAgentNotFoundError(error);
+    }
+  },
+);
+
+// ── Test Agent (one scripted run) ────────────────────────────
+const agentTestRunResponseSchema = z.object({
+  scenarioRunId: z
+    .string()
+    .describe("The run to follow; open it in the simulations run drawer."),
+  batchRunId: z.string().describe("The batch the run belongs to."),
+  setId: z.string().describe("The internal set that holds agent test runs."),
+});
+
+secured.access(requires("scenarios:create")).post(
+  "/:id/test",
+  agentServiceMiddleware,
+  describeRoute({
+    description:
+      'Run one scripted scenario against an agent: the user sends "ping", the agent answers, and the run succeeds when the answer arrives. No model is used and nothing is saved. Answers at once with the run ids; the run itself is asynchronous.',
+    responses: {
+      200: {
+        description: "The test run is scheduled",
+        content: {
+          "application/json": {
+            schema: resolver(agentTestRunResponseSchema),
+          },
+        },
+      },
+      403: {
+        description:
+          "The agent is a personal development agent of someone else",
+      },
+      404: { description: "No agent with that id in this project" },
+      422: { description: "The agent cannot be tested as it is set up" },
+    },
+  }),
+  async (c) => {
+    const { id } = c.req.param();
+    const project = c.get("project");
+    const service = c.get("agentService");
+
+    try {
+      const run = await service.testRun({
+        projectId: project.id,
+        agentId: id,
+        actor: runActorOf(c),
+      });
+      return c.json(agentTestRunResponseSchema.parse(run));
     } catch (error) {
       return mapAgentNotFoundError(error);
     }

@@ -2,6 +2,29 @@ import { HandledError } from "@langwatch/handled-error";
 import { remediation } from "~/server/app-layer/error-remediation";
 
 /**
+ * Refuses a test run of an agent that cannot be run as it is: a kind no
+ * scenario runs against, or a configuration the run cannot be prepared from.
+ * `reason` carries the same message a queued run would fail with.
+ */
+export class AgentTestRefusedError extends HandledError {
+  declare readonly code: "agent_test_refused";
+
+  constructor({ reason }: { reason: string }) {
+    super(
+      "agent_test_refused",
+      "This agent cannot be tested as it is set up.",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { reason },
+        ...remediation("agent_test_refused"),
+      },
+    );
+    this.name = "AgentTestRefusedError";
+  }
+}
+
+/**
  * Domain error thrown when an agent cannot be found.
  * The route handler translates this to a 404 HTTP response.
  */

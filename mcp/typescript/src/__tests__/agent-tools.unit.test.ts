@@ -19,6 +19,7 @@ import { runPlanTargetSchema, toWireTargets } from "../schemas/run-plan.js";
 import { handleGetAgent } from "../tools/get-agent.js";
 import { handleListAgents } from "../tools/list-agents.js";
 import { handleRunAgent } from "../tools/run-agent.js";
+import { handleTestAgent } from "../tools/test-agent.js";
 
 const mockRequest = vi.mocked(makeRequest);
 const mockPublic = vi.mocked(requestPublicJson);
@@ -96,6 +97,26 @@ describe("handleGetAgent()", () => {
       expect(output).toContain("- pod-a (blue), connected 2026-01-02T00:00:00Z");
       expect(output).toContain("- pod-b, connected 2026-01-02T00:01:00Z");
       expect(output).toContain("**Owner**: Ada");
+    });
+  });
+});
+
+describe("handleTestAgent()", () => {
+  describe("when an agent is tested", () => {
+    /** @scenario "The REST route schedules the same run" */
+    it("posts to the test route and reports the run ids to follow", async () => {
+      mockRequest.mockResolvedValueOnce({
+        scenarioRunId: "run_1",
+        batchRunId: "batch_1",
+        setId: "__internal__proj_1__agent-test",
+      });
+
+      const output = await handleTestAgent({ id: "agent_http" });
+
+      expect(mockRequest).toHaveBeenCalledWith("POST", "/api/agents/agent_http/test", {});
+      expect(output).toContain("**Scenario run ID:** run_1");
+      expect(output).toContain("**Batch run ID:** batch_1");
+      expect(output).toContain("platform_get_simulation_run");
     });
   });
 });

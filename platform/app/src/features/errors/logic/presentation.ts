@@ -481,6 +481,15 @@ const presentations = {
     describe: () =>
       "Its name, environment and parameters come from the process that runs it. Edit the description here, or change the code and start the process again.",
   },
+  agent_test_refused: {
+    title: "This agent cannot be tested as it is set up",
+    describe: (error) => {
+      const reason = str(error, "reason", "");
+      return reason
+        ? `${reason}. Fix the agent and test it again.`
+        : "Check the agent's configuration and test it again.";
+    },
+  },
   agent_offline: {
     title: "This agent is not running",
     describe: (error) => {

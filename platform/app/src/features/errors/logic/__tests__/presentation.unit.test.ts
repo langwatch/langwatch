@@ -664,6 +664,11 @@ describe("explainHandledError", () => {
         // recipients to test-fire to."), and it names WHICH piece is missing.
         // Authored in `trigger-template.service.ts`, never relayed.
         test_fire_unavailable: new Set(["reason"]),
+        // `reason` is the sentence the agent test prefetch or the type check
+        // wrote for this exact agent ("Only HTTP, code, workflow and connected
+        // agents can be tested"). Authored in `agent-test-run.ts` and
+        // `agent-test-prefetch.ts`, never relayed from an SDK or a customer.
+        agent_test_refused: new Set(["reason"]),
       };
 
       /**
