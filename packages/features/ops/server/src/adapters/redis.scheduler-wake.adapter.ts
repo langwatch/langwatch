@@ -1,4 +1,4 @@
-import { SchedulerWakeService } from "../ports/scheduler-wake.port";
+import { SchedulerWakeService } from "../ports/scheduler-wake.service";
 
 const SCHEDULER_WAKE_CHANNEL = "scheduler:wake";
 

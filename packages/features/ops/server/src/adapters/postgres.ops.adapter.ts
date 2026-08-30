@@ -26,8 +26,8 @@ import { BlobStoreRedisRepository } from "../repositories/redis/redis.blob-store
 import { NullBlobStoreRepository } from "../repositories/blob-store.repository";
 import { PrismaAdminBackofficeRepository } from "../repositories/prisma/prisma.admin-backoffice.repository";
 import { AdminBackofficeService } from "../services/admin-backoffice.service";
-import type { SchedulerOpsRepository } from "../ports/scheduler-ops.port";
-import type { SchedulerWakeService } from "../ports/scheduler-wake.port";
+import type { SchedulerOpsRepository } from "../ports/scheduler-ops.repository";
+import type { SchedulerWakeService } from "../ports/scheduler-wake.service";
 import { SchedulerOpsService } from "../services/scheduler-ops.service";
 import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly-state.repository";
 import { QueueRedisRepository } from "../repositories/redis/queue.repository";

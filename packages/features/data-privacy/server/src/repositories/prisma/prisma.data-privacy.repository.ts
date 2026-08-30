@@ -7,7 +7,7 @@ import {
   type DataPrivacyConfig,
 } from "@langwatch/data-privacy-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { DataPrivacyPolicyRepository } from "../../ports/data-privacy.port";
+import { DataPrivacyPolicyRepository } from "../../ports/data-privacy.repository";
 
 type Database = PrismaClient;
 

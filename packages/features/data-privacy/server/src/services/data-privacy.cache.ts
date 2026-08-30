@@ -1,4 +1,4 @@
-import type { DataPrivacyPolicyRepository } from "../ports/data-privacy.port";
+import type { DataPrivacyPolicyRepository } from "../ports/data-privacy.repository";
 import {
   buildDataPrivacyChain,
   resolveDataPrivacy,
