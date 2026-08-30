@@ -548,6 +548,34 @@ jobs:
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/system-migrations run typecheck
 
+      # @langwatch/platform-api-client owns `trpcQueryKey`, which re-derives
+      # tRPC's React Query cache-key encoding from a procedure path. Every
+      # feature web package invalidating a procedure its own map does not
+      # declare goes through it, so if the encoding drifts from
+      # `@trpc/react-query`'s the failure is silent — an invalidation that
+      # matches nothing, and stale UI nobody can trace back here. Its suite is
+      # the only thing that pins the encoding, and it ran nowhere.
+      - name: Run @langwatch/platform-api-client unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/platform-api-client run test:unit
+
+      - name: Typecheck @langwatch/platform-api-client
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/platform-api-client run typecheck
+
+      # @langwatch/trace-web is the first feature web package, and the largest
+      # body of browser code that has left platform/app — 406 tests over 42
+      # files, none of which CI has ever run. The app's vitest root is
+      # `platform/app`, so they are unreachable from the sharded lanes however
+      # the shards are split.
+      - name: Run @langwatch/trace-web unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/trace-web run test:unit
+
+      - name: Typecheck @langwatch/trace-web
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/trace-web run typecheck
+
       # @langwatch/langyworker is the langy-worker pi-harness wrapper
       # (services/langyworker) the langyagent image compiles into the worker
       # binary. It sits outside platform/app, so the root typecheck and the
