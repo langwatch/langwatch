@@ -36108,7 +36108,7 @@ Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `la
 
 # Connect Your Agent to LangWatch Agent Testing
 
-Register the user's agent as an HTTP target. Scenario runs call the agent's endpoint from the LangWatch backend, one HTTP request per conversation turn, and the judge verifies behavior against the traces the agent itself reports: tool calls, database writes, retrievals. Work through the steps in order, then report what changed and the first run's result.
+Register the user's endpoint as an HTTP agent. Scenario runs call the agent's endpoint from the LangWatch backend, one HTTP request per conversation turn, and the judge verifies behavior against the traces the agent itself reports: tool calls, database writes, retrievals. Work through the steps in order, then report what changed and the first run's result.
 
 Do NOT skip the trace adoption step (Step 4). Without it the judge can only grade the reply text, and criteria about tool calls or lookups come back inconclusive.
 
@@ -53077,7 +53077,7 @@ Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `la
 
 # Connect Your Agent to LangWatch Agent Testing
 
-Register the user's agent as an HTTP target. Scenario runs call the agent's endpoint from the LangWatch backend, one HTTP request per conversation turn, and the judge verifies behavior against the traces the agent itself reports: tool calls, database writes, retrievals. Work through the steps in order, then report what changed and the first run's result.
+Register the user's endpoint as an HTTP agent. Scenario runs call the agent's endpoint from the LangWatch backend, one HTTP request per conversation turn, and the judge verifies behavior against the traces the agent itself reports: tool calls, database writes, retrievals. Work through the steps in order, then report what changed and the first run's result.
 
 Do NOT skip the trace adoption step (Step 4). Without it the judge can only grade the reply text, and criteria about tool calls or lookups come back inconclusive.
 
