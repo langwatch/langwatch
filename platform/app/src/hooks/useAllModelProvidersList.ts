@@ -1,5 +1,4 @@
-import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
-import { api } from "../utils/api";
+import { api, type RouterOutputs } from "../utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
 // A fresh `[]` on every render with no data (a disabled, in-flight, or
@@ -11,7 +10,19 @@ import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 // dependency arrays don't churn. `readonly` because every caller shares this
 // one instance: a stray `push`/`sort` on a "local" copy would corrupt the
 // empty list for everyone.
-const NO_PROVIDERS: readonly MaybeStoredModelProvider[] = [];
+/**
+ * One element type for this hook, taken from the procedure rather than
+ * asserted beside it.
+ *
+ * The empty case used to be typed `ModelProviderEditorValue[]` while the
+ * queries answer `(…).map(toLegacyProvider)`. The two differ, so
+ * `data ?? NO_PROVIDERS` produced a UNION, and a union does not satisfy
+ * `filterProvidersByScope<T extends ProviderWithScopes>` — `T` collapsed to
+ * the constraint and every caller lost the fields it reads.
+ */
+type ListedModelProvider = RouterOutputs["modelProvider"]["listAllForProjectForFrontend"][number];
+
+const NO_PROVIDERS: readonly ListedModelProvider[] = [];
 
 /**
  * Flat (uncollapsed) list of every stored ModelProvider row the caller can
@@ -87,12 +98,13 @@ export function useAllModelProvidersList() {
   );
   const activeQuery = canViewOrg ? orgQuery : projectQuery;
 
-  // Both procedures resolve to the identical `{ providers, modelMetadata }`
-  // shape (same MaybeStoredModelProvider[] / ModelMetadataForFrontend
-  // types on both branches), so tRPC's inference already gives
-  // `activeQuery.data?.providers` the right type here with no cast needed.
+  // Both procedures resolve to the same thing: the provider LIST itself,
+  // `(await …listFor…()).map(toLegacyProvider)`. They used to answer
+  // `{ providers, modelMetadata }`, and this read `data?.providers` — which on
+  // an array is `undefined`, so `?? NO_PROVIDERS` turned the whole settings
+  // page into an empty list without an error anywhere.
   return {
-    providers: activeQuery.data?.providers ?? NO_PROVIDERS,
+    providers: activeQuery.data ?? NO_PROVIDERS,
     // See the "Note on the loading signal" block above for what each of these
     // answers, and why they are not complementary.
     isReady: activeQuery.isSuccess,
@@ -117,13 +129,18 @@ export function isResolvableProviderId(modelProviderId: string | undefined): boo
  * title lookup so the two can never again resolve different rows for the
  * same id — the #5380 bug was exactly two separate resolvers drifting.
  */
-export function findModelProviderById({
+export function findModelProviderById<T extends { id: string }>({
   providers,
   modelProviderId,
 }: {
-  providers: readonly MaybeStoredModelProvider[];
+  // Generic over the row, not pinned to one shape: this resolves out of
+  // whatever list the caller holds, and naming a concrete type here would
+  // hand every caller back something narrower than what it passed in — the
+  // same way `filterProvidersByScope`'s constraint does when its argument is
+  // a union.
+  providers: readonly T[];
   modelProviderId: string | undefined;
-}): MaybeStoredModelProvider | undefined {
+}): T | undefined {
   if (!isResolvableProviderId(modelProviderId)) return undefined;
   return providers.find((p) => p.id === modelProviderId);
 }

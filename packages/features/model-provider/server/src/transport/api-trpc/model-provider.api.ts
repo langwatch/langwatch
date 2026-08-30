@@ -166,6 +166,14 @@ type CanonicalProvider = {
   customEmbeddingsModels: Array<{ id: string; label: string; type: string }>;
   models?: string[] | null;
   embeddingsModels?: string[] | null;
+  /**
+   * Where the provider is attached. Carried because the model-providers
+   * settings page filters and orders by it — narrowing it away here left
+   * `filterProvidersByScope` nothing to read, so picking any scope but "all"
+   * emptied the table. Not sensitive: a scope says which organization, team or
+   * project a provider belongs to, never anything about its credentials.
+   */
+  scopes: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>;
 };
 
 function toLegacyProvider(provider: CanonicalProvider) {
@@ -175,6 +183,7 @@ function toLegacyProvider(provider: CanonicalProvider) {
     enabled: provider.enabled,
     customKeys: provider.customKeys,
     deploymentMapping: null,
+    scopes: provider.scopes,
     models: provider.models ?? null,
     embeddingsModels: provider.embeddingsModels ?? null,
     customModels: provider.customModels.map((model) => ({
@@ -418,10 +427,7 @@ export class ModelProviderTrpcApi {
         );
 
         if (input.setAsCodingDefaults) {
-          await ctx.app.modelProviders.applyCodexCodingDefaults(
-            { scopes: input.scopes },
-            actor,
-          );
+          await ctx.app.modelProviders.applyCodexCodingDefaults({ scopes: input.scopes }, actor);
         }
 
         // The response hands the connector their own account email (PII), so
