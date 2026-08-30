@@ -26,7 +26,6 @@ import {
   langySetEgressInputSchema,
   type LangyStartConversationTurnInput,
   type LangyStopTurnInput,
-  langyStopTurnInputSchema,
   type LangyTurnInput,
   langyTurnInputSchema,
   type LangyTurnResultInput,
@@ -173,21 +172,14 @@ export class LangyService extends LangyServiceContract {
     return this.startTurnForConversation(langyTurnInputSchema.parse(input));
   }
 
-  async stopTurn(input: LangyStopTurnInput & { userId?: string }): Promise<void> {
-    if (input.userId !== undefined) {
-      await this.turnService.stopTurn(
-        input as {
-          projectId: string;
-          conversationId: string;
-          turnId: string;
-          userId: string;
-        },
-      );
-      return;
-    }
-    const parsed = langyStopTurnInputSchema.parse(input);
-    await this.getConversation(parsed);
-    await this.persistence.turns.stop(parsed);
+  /**
+   * The contract declares `userId` as required, and `LangyApp.stopTurn` — the
+   * only door — types it that way too. This widened it to `userId?` and carried
+   * a second branch for the absent case, which read `this.persistence` and so
+   * could only ever have thrown. Nothing could reach it.
+   */
+  async stopTurn(input: LangyStopTurnInput & { userId: string }): Promise<void> {
+    await this.turnService.stopTurn(input);
   }
 
   async listMessages(input: LangyConversationInput): Promise<readonly unknown[]> {

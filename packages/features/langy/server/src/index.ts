@@ -21,7 +21,6 @@ export type {
   LangyRelayCompositionOptions,
 } from "./services/langy.service";
 export type { LangyTurnAdmissionCapability } from "@langwatch/langy-contract";
-export { LangyPublicApi } from "./api/public/langy.api";
 export {
   LangyApp,
   LangySessionRequiredError,
@@ -137,24 +136,12 @@ export type {
   LangyWorkerDispatchIntent,
 } from "./ports/langy-conversation-process.port";
 export { LangyFrameDedupStore } from "./streaming/langy-frame-dedup";
-export type {
-  LangyFrameDedup,
-  LangyFrameDedupRedis,
-} from "./streaming/langy-frame-dedup";
+export type { LangyFrameDedup, LangyFrameDedupRedis } from "./streaming/langy-frame-dedup";
 export { LangyResourceLinksStore } from "./streaming/langy-resource-links";
-export type {
-  LangyLinkRedis,
-  LangyResourceLinkStore,
-} from "./streaming/langy-resource-links";
-export {
-  LangyTurnAccessStore,
-  LANGY_TURN_ACCESS_TTL_SECONDS,
-} from "./streaming/langy-turn-access";
+export type { LangyLinkRedis, LangyResourceLinkStore } from "./streaming/langy-resource-links";
+export { LangyTurnAccessStore, LANGY_TURN_ACCESS_TTL_SECONDS } from "./streaming/langy-turn-access";
 export type { LangyTurnAccess } from "./streaming/langy-turn-access";
-export {
-  LangyTurnHandoffStore,
-  LANGY_HANDOFF_TTL_SECONDS,
-} from "./streaming/langy-turn-handoff";
+export { LangyTurnHandoffStore, LANGY_HANDOFF_TTL_SECONDS } from "./streaming/langy-turn-handoff";
 export type { LangyHandoffRedis, LangyTurnHandoff } from "./streaming/langy-turn-handoff";
 export { LangyTokenBuffer } from "./streaming/langy-token-buffer";
 export type { LangyStreamEntry } from "./streaming/langy-token-buffer";
