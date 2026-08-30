@@ -88,73 +88,106 @@ export class TraceNameResolutionService {
     const spanStartMs = span.startTimeUnixMs;
     const spanType = String(span.spanAttributes[ATTR_KEYS.SPAN_TYPE] ?? "");
 
-    if (isRootSpan) {
-      const currentRootStartMs = state.rootSpanStartTimeMs;
-      const haveCanonicalRoot = currentRootStartMs !== undefined;
-      const isEarlierNamedRoot =
-        span.name !== "" && haveCanonicalRoot && spanStartMs < currentRootStartMs;
-      const upgradesEmptyNamedRoot =
-        haveCanonicalRoot && state.traceName === "" && span.name !== "";
+    return isRootSpan
+      ? this.fromRealRoot({
+          state,
+          span,
+          spanType,
+          spanStartMs,
+          nameFromFallback,
+          metadataFromFallback,
+          unchanged,
+        })
+      : this.fromFallbackCandidate({
+          state,
+          span,
+          spanType,
+          spanStartMs,
+          metadataFromFallback,
+          unchanged,
+        });
+  }
 
-      // A real root always wins over fallback metadata. The metadata
-      // takeover is gated on `metadataFromFallback`, NOT
-      // `nameFromFallback` — a user rename clears the name flag but
-      // leaves the metadata still fallback-sourced, and we still want
-      // a real root's metadata to land in that case.
-      if (
-        metadataFromFallback ||
-        !haveCanonicalRoot ||
-        isEarlierNamedRoot ||
-        upgradesEmptyNamedRoot
-      ) {
-        // The name only takes over when the *name* itself was still
-        // fallback-sourced (or empty). A user-supplied name survives a
-        // metadata upgrade — the user's intent overrides the discovery.
-        const nameTakesOver = nameFromFallback || state.traceName === "";
+  /** Rule 1 and rule 3: a span with no parent, and what it may take over. */
+  private fromRealRoot({
+    state,
+    span,
+    spanType,
+    spanStartMs,
+    nameFromFallback,
+    metadataFromFallback,
+    unchanged,
+  }: {
+    state: TraceSummaryData;
+    span: NormalizedSpan;
+    spanType: string;
+    spanStartMs: number;
+    nameFromFallback: boolean;
+    metadataFromFallback: boolean;
+    unchanged: ResolvedTraceName;
+  }): ResolvedTraceName {
+    const currentRootStartMs = state.rootSpanStartTimeMs;
+    const haveCanonicalRoot = currentRootStartMs !== undefined;
+    const isEarlierNamedRoot =
+      span.name !== "" && haveCanonicalRoot && spanStartMs < currentRootStartMs;
+    const upgradesEmptyNamedRoot = haveCanonicalRoot && state.traceName === "" && span.name !== "";
 
-        return {
-          traceName: nameTakesOver ? span.name : state.traceName,
-          rootSpanType: spanType || null,
-          rootSpanStartTimeMs: spanStartMs,
-          traceNameFromFallback: false,
-          rootMetadataFromFallback: false,
-        };
-      }
+    // A real root always wins over fallback metadata. The takeover is gated on
+    // `metadataFromFallback`, NOT `nameFromFallback` — a user rename clears the
+    // name flag but leaves the metadata still fallback-sourced, and a real
+    // root's metadata should still land in that case.
+    const claimsMetadata =
+      metadataFromFallback || !haveCanonicalRoot || isEarlierNamedRoot || upgradesEmptyNamedRoot;
+    if (!claimsMetadata) return unchanged;
 
-      return unchanged;
-    }
+    // The name only takes over when the NAME itself was still fallback-sourced
+    // (or empty). A user-supplied name survives a metadata upgrade — the user's
+    // intent overrides the discovery.
+    const nameTakesOver = nameFromFallback || state.traceName === "";
 
-    // Non-root span. Only the fallback path can update from here, and
-    // only if (a) we've never had a real root, and (b) this is now the
-    // earliest-starting span we've seen.
-    const haveRealRoot = !metadataFromFallback && state.rootSpanStartTimeMs !== undefined;
-    if (haveRealRoot) {
-      return unchanged;
-    }
-    // A user-overridden name is final; don't let the fallback path
-    // overwrite it even when no real root exists. The user explicitly
-    // told us what to call this trace.
-    if (state.traceNameUserOverridden) {
-      return unchanged;
-    }
+    return {
+      traceName: nameTakesOver ? span.name : state.traceName,
+      rootSpanType: spanType || null,
+      rootSpanStartTimeMs: spanStartMs,
+      traceNameFromFallback: false,
+      rootMetadataFromFallback: false,
+    };
+  }
 
+  /**
+   * Rule 4: a span WITH a parent, which can only ever set the fallback name.
+   *
+   * This recovers traces where a customer emits their first span with a bogus
+   * `parent_span_id` — without it the trace never gets a name at all, because
+   * no span ever satisfies `parentSpanId === null`.
+   */
+  private fromFallbackCandidate({
+    state,
+    span,
+    spanType,
+    spanStartMs,
+    metadataFromFallback,
+    unchanged,
+  }: {
+    state: TraceSummaryData;
+    span: NormalizedSpan;
+    spanType: string;
+    spanStartMs: number;
+    metadataFromFallback: boolean;
+    unchanged: ResolvedTraceName;
+  }): ResolvedTraceName {
     const currentStartMs = state.rootSpanStartTimeMs;
-    const isFirstFallback = currentStartMs === undefined;
-    const isEarlierThanCurrentFallback =
-      currentStartMs !== undefined && spanStartMs < currentStartMs;
-    // Same span re-arriving (or a different span at the same start)
-    // shouldn't ping-pong the name once we've claimed one — only a
-    // strictly-earlier start dethrones the current fallback.
-    if (!isFirstFallback && !isEarlierThanCurrentFallback) {
-      return unchanged;
-    }
-    // The fallback is supposed to be the *trace's* working name, not
-    // a placeholder of nothing. If the candidate span itself has no
-    // name (empty string) and we already have a name, keep the name.
-    const candidateNameIsBetter = state.traceName === "" || span.name !== "";
-    if (!candidateNameIsBetter) {
-      return unchanged;
-    }
+
+    // A real root has already spoken.
+    if (!metadataFromFallback && currentStartMs !== undefined) return unchanged;
+    // A user-overridden name is final, even with no real root: they told us
+    // what to call this trace.
+    if (state.traceNameUserOverridden) return unchanged;
+    // Same span re-arriving, or another at the same start, must not ping-pong
+    // the name — only a strictly earlier start dethrones the current fallback.
+    if (currentStartMs !== undefined && spanStartMs >= currentStartMs) return unchanged;
+    // The fallback is the trace's working name, not a placeholder of nothing.
+    if (state.traceName !== "" && span.name === "") return unchanged;
 
     return {
       traceName: span.name || state.traceName,
