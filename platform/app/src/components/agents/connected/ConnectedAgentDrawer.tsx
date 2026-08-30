@@ -28,7 +28,11 @@ import { useEffect, useState } from "react";
 import { CopyButton } from "~/components/CopyButton";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
-import { HandledErrorAlert, showErrorToast } from "~/features/errors";
+import {
+  HandledErrorAlert,
+  readHandledError,
+  showErrorToast,
+} from "~/features/errors";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -341,12 +345,7 @@ function TestPanel({
           Start the process that runs this agent to test it.
         </Text>
       ) : null}
-      {test.error ? (
-        <HandledErrorAlert
-          error={test.error}
-          fallbackTitle="The test call did not go through"
-        />
-      ) : null}
+      <TestError error={test.error} />
       {test.data ? (
         <VStack
           align="stretch"
@@ -385,4 +384,41 @@ function SectionTitle({ title, hint }: { title: string; hint?: string }) {
       ) : null}
     </VStack>
   );
+}
+
+/** The refusal of a test call, with the function's own error text under it. */
+function TestError({ error }: { error: unknown }) {
+  if (!error) return null;
+  const message = functionErrorMessage(error);
+  return (
+    <VStack align="stretch" gap={2}>
+      <HandledErrorAlert
+        error={error}
+        fallbackTitle="The test call did not go through"
+      />
+      {message ? (
+        <Text
+          fontSize="12px"
+          fontFamily="mono"
+          whiteSpace="pre-wrap"
+          color="fg.muted"
+          data-testid="connected-agent-test-error-message"
+        >
+          {message}
+        </Text>
+      ) : null}
+    </VStack>
+  );
+}
+
+/**
+ * The text the decorated function raised, when the call failed inside it.
+ * The registry copy never recites it, but the person testing an agent wrote
+ * that function and reads its error here without opening the process logs.
+ */
+function functionErrorMessage(error: unknown): string | null {
+  const handled = readHandledError(error);
+  if (handled?.code !== "agent_call_failed") return null;
+  const message = handled.meta.message;
+  return typeof message === "string" && message.trim() ? message : null;
 }

@@ -371,7 +371,7 @@ const registry = {
   },
   agent_call_failed: {
     tips: [
-      "Read `meta.message` for the error the function raised; the process logs carry the stack",
+      "Fix the error the function raised, then test again; the process logs carry the stack",
     ],
   },
   agent_disconnected: {
