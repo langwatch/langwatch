@@ -5,14 +5,12 @@ import {
   WebhookEndpointPolicyService,
   WebhookAccessService,
   WebhookEnvelopeService,
-  WebhookEventsClickHouseRepository,
   type DeliverPayload,
   type GatewaySpendProcessingEvent,
   type LegacyWebhookEventsServiceOptions,
   type WebhookDeliveryProcessDeps,
   type WebhookEndpointRuntime,
   type WebhookEndpointServiceOptions,
-  type WebhookEventsCursor,
   type WebhookSpendEventRow,
 } from "@langwatch/enterprise-webhook-server";
 import type { EntitlementService } from "@langwatch/entitlement-contract";
@@ -78,14 +76,5 @@ export const assertValidDeliveryControls = (
 export const describeDestination = (
   endpoint: Parameters<WebhookEndpointPolicyService["describeDestination"]>[0],
 ): string => WebhookEndpointPolicyService.create().describeDestination(endpoint);
-
-export const encodeWebhookEventsCursor = (cursor: WebhookEventsCursor): string =>
-  WebhookEventsClickHouseRepository.encodeCursor(cursor);
-
-export const decodeWebhookEventsCursor = (encoded: string) =>
-  WebhookEventsClickHouseRepository.decodeCursor(encoded);
-
-export const parseWebhookEventId = (id: string) =>
-  WebhookEventsClickHouseRepository.parseEventId(id);
 
 export type { LegacyWebhookEventsServiceOptions };
