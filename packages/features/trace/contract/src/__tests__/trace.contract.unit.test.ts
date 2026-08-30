@@ -26,7 +26,8 @@ type LiveSpanTreeNodeShape = {
   updatedAtMs?: number | null;
 };
 
-type ContractNode = import("../src").SpanTreeNode;
+// `".."`, not `"../src"`: from `src/__tests__/` that resolved to `src/src`.
+type ContractNode = import("..").SpanTreeNode;
 type NodeParity = [ContractNode] extends [LiveSpanTreeNodeShape]
   ? [LiveSpanTreeNodeShape] extends [ContractNode]
     ? true

@@ -103,6 +103,22 @@ const traceEditOverlayPatchObjectSchema = z.object({
  * code unit, so the two cheap comparisons decide every ordinary patch and only
  * a value inside the narrow band pays for an encode.
  */
+/**
+ * `TextEncoder` is a WHATWG global, present in every browser and in Node from
+ * 11 on — but its TYPE ships only in `lib.dom.d.ts` or `@types/node`, and this
+ * package's tsconfig takes `lib: ["es2022"]` and neither of those. Declaring
+ * the one member used here keeps the contract environment-neutral instead of
+ * pulling a whole runtime's surface in behind it. Same treatment as
+ * `identity-contract`'s password policy, for the same reason.
+ *
+ * Module-scoped rather than a `declare global`: an ambient global would travel
+ * to every consumer — the package ships its TypeScript sources — and collide
+ * with the real declaration in anything compiled with the DOM lib.
+ */
+declare const TextEncoder: {
+  new (): { encode(input: string): { length: number } };
+};
+
 function patchExceedsSizeLimit(value: unknown): boolean {
   const json = JSON.stringify(value) ?? "";
   if (json.length > TRACE_EDIT_OVERLAY_MAX_PATCH_BYTES) return true;

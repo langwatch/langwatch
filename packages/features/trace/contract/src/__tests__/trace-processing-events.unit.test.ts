@@ -1,6 +1,9 @@
-import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import { SPAN_RECEIVED_EVENT_TYPE, TOPIC_ASSIGNED_EVENT_TYPE } from "@langwatch/trace-contract";
+import {
+  SPAN_RECEIVED_EVENT_TYPE,
+  TOPIC_ASSIGNED_EVENT_TYPE,
+  tenantIdSchema,
+} from "@langwatch/trace-contract";
 import {
   isSpanReceivedEvent,
   isTopicAssignedEvent,
@@ -111,7 +114,7 @@ describe("events schemas", () => {
         id: "event-123",
         aggregateId: "trace-456",
         aggregateType: "trace",
-        tenantId: createTenantId("project_abc123"),
+        tenantId: tenantIdSchema.parse("project_abc123"),
         type: TOPIC_ASSIGNED_EVENT_TYPE,
         version: "2025-02-01",
         createdAt: Date.now(),
@@ -140,7 +143,7 @@ describe("events schemas", () => {
         id: "event-123",
         aggregateId: "trace-456",
         aggregateType: "trace",
-        tenantId: createTenantId("project_abc123"),
+        tenantId: tenantIdSchema.parse("project_abc123"),
         type: TOPIC_ASSIGNED_EVENT_TYPE,
         version: "2025-02-01",
         createdAt: Date.now(),
@@ -172,7 +175,7 @@ describe("events schemas", () => {
         id: "event-123",
         aggregateId: "trace-456",
         aggregateType: "trace" as const,
-        tenantId: createTenantId("project_abc123"),
+        tenantId: tenantIdSchema.parse("project_abc123"),
         type: TOPIC_ASSIGNED_EVENT_TYPE,
         version: "2025-02-01",
         createdAt: Date.now(),
@@ -214,7 +217,7 @@ describe("events schemas", () => {
         id: "event-123",
         aggregateId: "trace-456",
         aggregateType: "trace" as const,
-        tenantId: createTenantId("project_abc123"),
+        tenantId: tenantIdSchema.parse("project_abc123"),
         type: TOPIC_ASSIGNED_EVENT_TYPE,
         version: "2025-02-01",
         createdAt: Date.now(),

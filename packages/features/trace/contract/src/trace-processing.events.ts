@@ -40,7 +40,14 @@ export {
 export type { SpanReceivedEvent, SpanReceivedEventData, SpanReceivedEventMetadata };
 
 const aggregateTypeSchema = z.string().trim().min(1);
-const tenantIdSchema = z
+/**
+ * The contract's own definition of a valid tenant id, exported because anyone
+ * constructing one of these events needs to mint the branded value and the
+ * alternative is reaching into `@langwatch/eventing` for `createTenantId` —
+ * which would make this contract depend on the event-sourcing framework for a
+ * string brand it already declares.
+ */
+export const tenantIdSchema = z
   .string()
   .trim()
   .min(1, "[SECURITY] TenantId must be a non-empty string for tenant isolation")
