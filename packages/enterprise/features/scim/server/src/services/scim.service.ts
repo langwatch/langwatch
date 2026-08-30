@@ -36,6 +36,24 @@ import { ScimProvisioningService } from "./scim-provisioning.service";
  * Maps between SCIM 2.0 User resources and LangWatch User/OrganizationUser models.
  * All operations are scoped to an organization for multi-tenancy.
  */
+/**
+ * The three methods SCIM actually calls on the two services next to it —
+ * `auth.revokeAllBrowserSessions`, `governance.departmentAssignUser` and
+ * `governance.departmentResolveByNameOrCreate` — named rather than taken
+ * whole.
+ *
+ * Asking for a whole `AuthService` and a whole `GovernanceService` to use
+ * three methods is what forced every test here to build a one-method object
+ * and cast it at a service it shares nothing else with. The cast is the
+ * signal: a dependency that can only be satisfied by lying about it is asking
+ * for more than it needs.
+ */
+type ScimSessionRevocation = Pick<AuthService, "revokeAllBrowserSessions">;
+type ScimDepartmentAssignment = Pick<
+  GovernanceService,
+  "departmentAssignUser" | "departmentResolveByNameOrCreate"
+>;
+
 export class ScimService extends ScimServiceContract {
   private readonly repository: ScimRepositoryPort;
   private readonly userOperations: ScimProvisioningService;
@@ -57,8 +75,8 @@ export class ScimService extends ScimServiceContract {
     prisma: ScimRepositoryPort;
     writer: AuthzGrantsService;
     users: UserService;
-    auth: AuthService;
-    governance: GovernanceService;
+    auth: ScimSessionRevocation;
+    governance: ScimDepartmentAssignment;
     entitlements: EntitlementService;
     lifecycle: ScimSyncLifecyclePort;
     provenOffboarding: boolean;
@@ -86,8 +104,8 @@ export class ScimService extends ScimServiceContract {
     prisma: ScimRepositoryPort;
     writer: AuthzGrantsService;
     users: UserService;
-    auth: AuthService;
-    governance: GovernanceService;
+    auth: ScimSessionRevocation;
+    governance: ScimDepartmentAssignment;
     entitlements: EntitlementService;
     lifecycle: ScimSyncLifecyclePort;
     provenOffboarding: boolean;

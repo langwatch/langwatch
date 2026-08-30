@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { createHash } from "node:crypto";
-import type { AuthService } from "@langwatch/auth-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { UserService } from "@langwatch/user-contract";
-import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import { EntitlementService } from "@langwatch/entitlement-contract";
 import { ScimService } from "../scim.service";
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
@@ -77,7 +75,7 @@ function service(
   return ScimService.create({
     prisma: repo,
     writer: new GrantsFake(),
-    auth: { revokeAllBrowserSessions: vi.fn(async () => undefined) } as AuthService,
+    auth: { revokeAllBrowserSessions: vi.fn(async () => undefined) },
     users: {
       tryFindByEmail: vi.fn(async () => null),
       tryFindById: vi.fn(async () => null),
@@ -91,9 +89,13 @@ function service(
         id: "department_1",
         organizationId: "org_1",
         name: "Engineering",
+        // A Department carries its timestamps; the stub used to omit them and a
+        // cast onto the whole service hid it.
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
       })),
       departmentAssignUser: vi.fn(async () => undefined),
-    } as GovernanceService,
+    },
     entitlements: new FixedEntitlementService(enterprise),
     lifecycle,
     provenOffboarding: false,
@@ -271,15 +273,19 @@ describe("SCIM characterization: provisioning invariants", () => {
       prisma: repo,
       users,
       writer,
-      auth: { revokeAllBrowserSessions: vi.fn(async () => undefined) } as AuthService,
+      auth: { revokeAllBrowserSessions: vi.fn(async () => undefined) },
       governance: {
         departmentResolveByNameOrCreate: vi.fn(async () => ({
           id: "department_1",
           organizationId: "org_1",
           name: "Engineering",
+          // A Department carries its timestamps; the stub used to omit them and a
+          // cast onto the whole service hid it.
+          createdAt: new Date(0),
+          updatedAt: new Date(0),
         })),
         departmentAssignUser: vi.fn(async () => undefined),
-      } as GovernanceService,
+      },
       entitlements: new FixedEntitlementService(true),
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding: false,

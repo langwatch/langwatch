@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { AuthService } from "@langwatch/auth-contract";
-import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import { EntitlementService } from "@langwatch/entitlement-contract";
 import {
   SCIM_ENTERPRISE_USER_SCHEMA,
@@ -113,13 +111,17 @@ function harness(
       id: "department-1",
       organizationId: "org-1",
       name: "Engineering",
+      // A Department carries its timestamps; the stub used to omit them and a
+      // cast onto the whole service hid it.
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
     })),
     departmentAssignUser: vi.fn(async () => undefined),
-  } as GovernanceService;
+  };
   const writer = new GrantsFake();
   const auth = {
     revokeAllBrowserSessions: vi.fn(async () => undefined),
-  } as AuthService;
+  };
   const service = ScimService.create({
     prisma: repo,
     writer,

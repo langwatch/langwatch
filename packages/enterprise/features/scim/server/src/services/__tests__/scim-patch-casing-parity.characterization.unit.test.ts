@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { AuthService } from "@langwatch/auth-contract";
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import { EntitlementService } from "@langwatch/entitlement-contract";
 import { scimPatchRequestSchema } from "@langwatch/enterprise-scim-contract";
@@ -84,9 +83,13 @@ function governance(): GovernanceService {
       id: "department-1",
       organizationId: "org-1",
       name: "Engineering",
+      // A Department carries its timestamps; the stub used to omit them and a
+      // cast onto the whole service hid it.
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
     })),
     departmentAssignUser: vi.fn(async () => undefined),
-  } as GovernanceService;
+  };
 }
 
 describe("SCIM PATCH operation casing parity", () => {
@@ -126,7 +129,7 @@ describe("SCIM PATCH operation casing parity", () => {
       prisma: repo,
       writer: new GrantsFake(),
       users,
-      auth: { revokeAllBrowserSessions: vi.fn(async () => undefined) } as AuthService,
+      auth: { revokeAllBrowserSessions: vi.fn(async () => undefined) },
       governance: governance(),
       entitlements: new EnterpriseEntitlements(),
       lifecycle: new QuietScimSyncLifecycle(),
