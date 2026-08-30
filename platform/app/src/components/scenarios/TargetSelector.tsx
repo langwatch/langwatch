@@ -368,6 +368,65 @@ export function TargetSelector({
 }
 
 /**
+ * The mark on the left of a row: presence for a connected agent, kind for the
+ * agents the project defines itself.
+ */
+function AgentOptionMark({ agent }: { agent: ScenarioAgent }) {
+  if (agent.type === "connected") {
+    return (
+      <Box
+        boxSize="8px"
+        borderRadius="full"
+        flexShrink={0}
+        background={agent.status === "online" ? "green.500" : "fg.subtle"}
+        data-testid={`target-option-status-${agent.status ?? "offline"}`}
+      />
+    );
+  }
+  if (agent.type === "code") {
+    return <Code size={14} color="var(--chakra-colors-gray-500)" />;
+  }
+  return <Globe size={14} color="var(--chakra-colors-gray-500)" />;
+}
+
+/** The row itself: the mark, the label, and the marks the state adds to it. */
+function AgentOptionRow({
+  agent,
+  isSelected,
+  onSelect,
+}: {
+  agent: ScenarioAgent;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  const runnable = agent.runnable;
+  return (
+    <HStack
+      data-testid={`target-option-${agent.id}`}
+      paddingX={3}
+      paddingY={2}
+      cursor={runnable ? "pointer" : "not-allowed"}
+      opacity={runnable ? 1 : 0.5}
+      bg={isSelected ? "blue.50" : "transparent"}
+      _hover={{ bg: "bg.subtle" }}
+      onClick={runnable ? onSelect : undefined}
+      aria-disabled={!runnable}
+    >
+      <AgentOptionMark agent={agent} />
+      <Text fontSize="sm" flex={1}>
+        {agent.label}
+      </Text>
+      {agentHasDevTunnel(agent) && <LocalTunnelBadge />}
+      {isSelected && (
+        <Text color="blue.500" fontSize="sm">
+          ✓
+        </Text>
+      )}
+    </HStack>
+  );
+}
+
+/**
  * One agent in the list: its kind, its label, and, for a connected agent,
  * whether a process is holding it right now.
  *
@@ -385,40 +444,7 @@ function AgentOption({
   onSelect: () => void;
 }) {
   const row = (
-    <HStack
-      data-testid={`target-option-${agent.id}`}
-      paddingX={3}
-      paddingY={2}
-      cursor={agent.runnable ? "pointer" : "not-allowed"}
-      opacity={agent.runnable ? 1 : 0.5}
-      bg={isSelected ? "blue.50" : "transparent"}
-      _hover={{ bg: "bg.subtle" }}
-      onClick={() => agent.runnable && onSelect()}
-      aria-disabled={!agent.runnable}
-    >
-      {agent.type === "connected" ? (
-        <Box
-          boxSize="8px"
-          borderRadius="full"
-          flexShrink={0}
-          background={agent.status === "online" ? "green.500" : "fg.subtle"}
-          data-testid={`target-option-status-${agent.status ?? "offline"}`}
-        />
-      ) : agent.type === "code" ? (
-        <Code size={14} color="var(--chakra-colors-gray-500)" />
-      ) : (
-        <Globe size={14} color="var(--chakra-colors-gray-500)" />
-      )}
-      <Text fontSize="sm" flex={1}>
-        {agent.label}
-      </Text>
-      {agentHasDevTunnel(agent) && <LocalTunnelBadge />}
-      {isSelected && (
-        <Text color="blue.500" fontSize="sm">
-          ✓
-        </Text>
-      )}
-    </HStack>
+    <AgentOptionRow agent={agent} isSelected={isSelected} onSelect={onSelect} />
   );
 
   if (agent.runnable) return row;

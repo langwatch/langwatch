@@ -149,72 +149,134 @@ function EditableRow({
           disabled={disabled}
           testId={`run-dialog-parameter-name-${index}`}
         />
-        {row.secret ? (
-          <Input
-            {...DIALOG_FIELD_STYLE}
-            flex={1}
-            minWidth={0}
-            fontFamily="mono"
-            fontSize="12px"
-            type="password"
-            autoComplete="new-password"
-            placeholder="value"
-            aria-label={`Parameter ${index + 1} value`}
-            aria-invalid={isMissing || undefined}
-            value={row.value}
-            onChange={(event) =>
-              onChangeRow(index, { value: event.target.value })
-            }
-            disabled={disabled}
-            data-testid={`run-dialog-parameter-value-${index}`}
-          />
-        ) : (
-          <ParameterLineField
-            mode={{ kind: "value", name: row.name }}
-            flex={1}
-            minWidth={0}
-            placeholder="value"
-            ariaLabel={`Parameter ${index + 1} value`}
-            value={row.value}
-            onChange={(value) => onChangeRow(index, { value })}
-            definitions={definitions}
-            error={error}
-            disabled={disabled}
-            testId={`run-dialog-parameter-value-${index}`}
-          />
-        )}
+        <RowValueField
+          row={row}
+          index={index}
+          onChangeRow={onChangeRow}
+          definitions={definitions}
+          error={error}
+          isMissing={isMissing}
+          disabled={disabled}
+        />
         <LockToggle
           isSecret={row.secret}
           disabled={disabled || lockFixed}
           onToggle={() => onChangeRow(index, { secret: !row.secret })}
-          label={
-            lockFixed
-              ? `Parameter ${index + 1} is a secret shared by every target`
-              : row.secret
-                ? `Stop hiding the value of parameter ${index + 1}`
-                : `Hide the value of parameter ${index + 1}`
-          }
+          label={rowLockLabel({ index, isSecret: row.secret, lockFixed })}
           testId={`run-dialog-parameter-lock-${index}`}
         />
-        <chakra.button
-          type="button"
-          display="flex"
-          alignItems="center"
-          color={FG_MUTED}
-          cursor="pointer"
-          boxShadow={QUIET_BUTTON_SHADOW}
-          _hover={{ color: "red.fg" }}
-          title="Remove"
-          aria-label={`Remove parameter ${index + 1}`}
+        <RemoveRowButton
+          index={index}
           disabled={disabled}
-          onClick={() => onRemoveRow(index)}
-          data-testid={`run-dialog-parameter-remove-${index}`}
-        >
-          <X size={13} />
-        </chakra.button>
+          onRemove={onRemoveRow}
+        />
       </HStack>
       {isMissing && <MissingValueMessage testId={`row-${index}`} />}
     </VStack>
+  );
+}
+
+/** The value of one row: a hidden field for a secret, the offering field else. */
+function RowValueField({
+  row,
+  index,
+  onChangeRow,
+  definitions,
+  error,
+  isMissing,
+  disabled,
+}: {
+  row: ParameterRow;
+  index: number;
+  onChangeRow: (index: number, patch: Partial<ParameterRow>) => void;
+  definitions: readonly DeclaredParameter[];
+  error: string | undefined;
+  /** True while a secret row waits for the value that starts the run. */
+  isMissing: boolean;
+  disabled: boolean;
+}) {
+  if (row.secret) {
+    return (
+      <Input
+        {...DIALOG_FIELD_STYLE}
+        flex={1}
+        minWidth={0}
+        fontFamily="mono"
+        fontSize="12px"
+        type="password"
+        autoComplete="new-password"
+        placeholder="value"
+        aria-label={`Parameter ${index + 1} value`}
+        aria-invalid={isMissing || undefined}
+        value={row.value}
+        onChange={(event) => onChangeRow(index, { value: event.target.value })}
+        disabled={disabled}
+        data-testid={`run-dialog-parameter-value-${index}`}
+      />
+    );
+  }
+
+  return (
+    <ParameterLineField
+      mode={{ kind: "value", name: row.name }}
+      flex={1}
+      minWidth={0}
+      placeholder="value"
+      ariaLabel={`Parameter ${index + 1} value`}
+      value={row.value}
+      onChange={(value) => onChangeRow(index, { value })}
+      definitions={definitions}
+      error={error}
+      disabled={disabled}
+      testId={`run-dialog-parameter-value-${index}`}
+    />
+  );
+}
+
+/** What the lock of one row says, given whether the row can be made plain. */
+function rowLockLabel({
+  index,
+  isSecret,
+  lockFixed,
+}: {
+  index: number;
+  isSecret: boolean;
+  lockFixed: boolean;
+}): string {
+  if (lockFixed) {
+    return `Parameter ${index + 1} is a secret shared by every target`;
+  }
+  if (isSecret) return `Stop hiding the value of parameter ${index + 1}`;
+  return `Hide the value of parameter ${index + 1}`;
+}
+
+/** The x that takes one row away. */
+function RemoveRowButton({
+  index,
+  disabled,
+  onRemove,
+}: {
+  index: number;
+  disabled: boolean;
+  onRemove: (index: number) => void;
+}) {
+  return (
+    <chakra.button
+      type="button"
+      display="flex"
+      alignItems="center"
+      color={FG_MUTED}
+      cursor="pointer"
+      boxShadow={QUIET_BUTTON_SHADOW}
+      _hover={{ color: "red.fg" }}
+      title="Remove"
+      aria-label={`Remove parameter ${index + 1}`}
+      disabled={disabled}
+      onClick={() => onRemove(index)}
+      data-testid={`run-dialog-parameter-remove-${index}`}
+    >
+      <X size={13} />
+    </chakra.button>
   );
 }
 

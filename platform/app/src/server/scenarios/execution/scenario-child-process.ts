@@ -97,6 +97,26 @@ async function readJobDataFromStdin(): Promise<ChildProcessJobData> {
   });
 }
 
+/**
+ * The telemetry endpoint and key the run reports to.
+ *
+ * The parent process injects them as env vars (buildChildProcessEnv in
+ * scenario.processor.ts) and they come from prefetchScenarioData telemetry.
+ */
+function readTelemetryEnv(): {
+  langwatchEndpoint: string;
+  langwatchApiKey: string;
+} {
+  const langwatchEndpoint = process.env.LANGWATCH_ENDPOINT;
+  const langwatchApiKey = process.env.LANGWATCH_API_KEY;
+  if (!langwatchEndpoint || !langwatchApiKey) {
+    throw new Error(
+      "LANGWATCH_ENDPOINT and LANGWATCH_API_KEY must be set in child process env",
+    );
+  }
+  return { langwatchEndpoint, langwatchApiKey };
+}
+
 async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
   const {
     context,
@@ -108,15 +128,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     target,
   } = jobData;
 
-  // These are injected as env vars by the parent process (scenario.processor.ts
-  // buildChildProcessEnv). They originate from prefetchScenarioData telemetry.
-  const langwatchEndpoint = process.env.LANGWATCH_ENDPOINT;
-  const langwatchApiKey = process.env.LANGWATCH_API_KEY;
-  if (!langwatchEndpoint || !langwatchApiKey) {
-    throw new Error(
-      "LANGWATCH_ENDPOINT and LANGWATCH_API_KEY must be set in child process env",
-    );
-  }
+  const { langwatchEndpoint, langwatchApiKey } = readTelemetryEnv();
 
   // The platform API key rides the same telemetry channel every child
   // process already gets (buildChildProcessEnv in scenario.processor.ts

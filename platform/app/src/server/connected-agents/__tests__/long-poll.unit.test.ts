@@ -90,7 +90,12 @@ async function parkCall(
   };
   const ttl = 60 + CALL_KEY_SLACK_SECONDS;
   await store.set(callKey(callId), JSON.stringify(stored), ttl);
-  await store.zadd(pendingKey(instanceId), deadlineAt, callId, ttl);
+  await store.zadd({
+    key: pendingKey(instanceId),
+    score: deadlineAt,
+    member: callId,
+    ttlSeconds: ttl,
+  });
 }
 
 const resolved = {

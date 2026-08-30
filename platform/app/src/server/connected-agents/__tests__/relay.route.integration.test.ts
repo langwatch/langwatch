@@ -9,7 +9,15 @@
  */
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import {
   type Organization,
   OrganizationUserRole,
@@ -24,6 +32,15 @@ import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../relay.route";
 
+// The dispatcher is the boundary of this route: what reaches it, and what it
+// answers, is asserted here; how it reaches an instance is its own test.
+const dispatchMock = vi.hoisted(() => vi.fn());
+vi.mock("~/server/connected-agents/runtime", () => ({
+  getConnectedAgentRuntime: () => ({
+    dispatcher: { dispatch: dispatchMock },
+  }),
+}));
+
 wireDefaultTestApp();
 
 const ns = `relay-${nanoid(8)}`;
@@ -36,8 +53,10 @@ let projectApiKey: string;
 let otherProjectId: string;
 let otherAgentId: string;
 let viewerToken: string;
+let memberToken: string;
 
 async function connectedAgent(inProjectId: string): Promise<string> {
+  const host = nanoid(6).toLowerCase();
   const agent = await prisma.agent.create({
     data: {
       id: `agent_${nanoid()}`,
@@ -49,7 +68,7 @@ async function connectedAgent(inProjectId: string): Promise<string> {
         sdk: { name: "langwatch", version: "1.0.0", language: "python" },
       },
       environment: "production",
-      identityKey: `support-agent@production`,
+      identityKey: `support-agent@production/host:${host}`,
     },
   });
   return agent.id;
@@ -132,6 +151,26 @@ beforeAll(async () => {
       ],
     })
   ).token;
+  memberToken = (
+    await ApiKeyService.create(prisma).create({
+      name: `member-${ns}`,
+      userId,
+      createdByUserId: userId,
+      organizationId: organization.id,
+      permissionMode: "all",
+      bindings: [
+        {
+          role: TeamUserRole.ADMIN,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: organization.id,
+        },
+      ],
+    })
+  ).token;
+});
+
+beforeEach(() => {
+  dispatchMock.mockReset();
 });
 
 afterAll(async () => {
@@ -192,10 +231,41 @@ describe("POST /api/agents/:id/call", () => {
       const ownedAgentId = await connectedAgent(projectId);
       await prisma.agent.update({
         where: { id: ownedAgentId },
-        data: { ownerUserId: userId },
+        data: { ownerUserId: `user_${nanoid()}` },
       });
 
-      // The project key names no person, so it never matches the owner.
+      const response = await app.request(`/api/agents/${ownedAgentId}/call`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${memberToken}`,
+          "X-Project-Id": projectId,
+          "Content-Type": "application/json",
+        },
+        body,
+      });
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({
+        error: "agent_owner_only",
+      });
+      expect(dispatchMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the project key calls a personal development agent", () => {
+    /** @scenario "The relay route lets the project key call a personal agent" */
+    it("reaches the dispatcher, the way the scenario child does", async () => {
+      const ownedAgentId = await connectedAgent(projectId);
+      await prisma.agent.update({
+        where: { id: ownedAgentId },
+        data: { ownerUserId: userId },
+      });
+      dispatchMock.mockResolvedValue({
+        output: "pong",
+        durationMs: 12,
+        instance: { hostname: "laptop", label: null },
+      });
+
       const response = await app.request(`/api/agents/${ownedAgentId}/call`, {
         method: "POST",
         headers: {
@@ -205,12 +275,9 @@ describe("POST /api/agents/:id/call", () => {
         body,
       });
 
-      // No instance is connected, so a call that reached the dispatcher would
-      // answer 503. A 403 is what proves the guard ran in front of it.
-      expect(response.status).toBe(403);
-      expect(await response.json()).toMatchObject({
-        error: "agent_owner_only",
-      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ output: "pong" });
+      expect(dispatchMock).toHaveBeenCalledTimes(1);
     });
   });
 });

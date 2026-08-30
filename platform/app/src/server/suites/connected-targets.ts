@@ -59,23 +59,58 @@ export async function resolveConnectedReferences({
   agents: ConnectedTargetReads;
 }): Promise<SuiteTarget[]> {
   return Promise.all(
-    targets.map(async (target) => {
-      if (target.type !== "connected") return target;
-      const reference = parseConnectedReference(target.referenceId);
-      if (!reference) return target;
-      const rows = await agents.findConnectedByNameAndEnvironment({
-        projectId,
-        name: reference.name,
-        environment: reference.environment,
-      });
-      const own = actor
-        ? rows.find((row) => row.ownerUserId === actor.id)
-        : undefined;
-      const shared = rows.filter((row) => row.ownerUserId === null);
-      const picked = own ?? (shared.length === 1 ? shared[0] : undefined);
-      return picked ? { ...target, referenceId: picked.id } : target;
-    }),
+    targets.map((target) =>
+      resolveConnectedReference({ target, projectId, actor, agents }),
+    ),
   );
+}
+
+/**
+ * One target with its `<name>@<environment>` reference replaced by an agent
+ * id. Every other target, and every reference that names no agent, is
+ * answered as written.
+ */
+async function resolveConnectedReference({
+  target,
+  projectId,
+  actor,
+  agents,
+}: {
+  target: SuiteTarget;
+  projectId: string;
+  actor: RunActor | undefined;
+  agents: ConnectedTargetReads;
+}): Promise<SuiteTarget> {
+  if (target.type !== "connected") return target;
+  const reference = parseConnectedReference(target.referenceId);
+  if (!reference) return target;
+  const rows = await agents.findConnectedByNameAndEnvironment({
+    projectId,
+    name: reference.name,
+    environment: reference.environment,
+  });
+  const picked = pickReferencedAgent({ rows, actor });
+  return picked ? { ...target, referenceId: picked.id } : target;
+}
+
+/**
+ * The agent row a reference names among the rows that carry its name and
+ * environment: the actor's own row when there is one, else the shared row
+ * when exactly one exists.
+ */
+function pickReferencedAgent({
+  rows,
+  actor,
+}: {
+  rows: readonly Pick<AgentIdentityRow, "id" | "ownerUserId">[];
+  actor: RunActor | undefined;
+}): Pick<AgentIdentityRow, "id" | "ownerUserId"> | undefined {
+  const own = actor
+    ? rows.find((row) => row.ownerUserId === actor.id)
+    : undefined;
+  if (own) return own;
+  const shared = rows.filter((row) => row.ownerUserId === null);
+  return shared.length === 1 ? shared[0] : undefined;
 }
 
 /**

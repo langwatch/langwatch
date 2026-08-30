@@ -102,21 +102,29 @@ export function serializeTypedScalarValue({
   raw: string;
   type?: ScenarioParameterType;
 }): string | number | boolean {
-  if (type === "string") {
-    // A quoted string was quoted by display to keep it text; unquote it.
-    const parsed = serializeValue(raw);
-    return typeof parsed === "string" ? parsed : raw;
-  }
-  if (type === "number") {
-    const asNumber = Number(raw);
-    return raw.trim() !== "" && Number.isFinite(asNumber) ? asNumber : raw;
-  }
-  if (type === "boolean") {
-    if (raw === "true") return true;
-    if (raw === "false") return false;
-    return raw;
-  }
+  if (type === "string") return asDeclaredString(raw);
+  if (type === "number") return asDeclaredNumber(raw);
+  if (type === "boolean") return asDeclaredBoolean(raw);
   return serializeScalarValue(raw);
+}
+
+/** The text of a string parameter. A quoted string is unquoted by display. */
+function asDeclaredString(raw: string): string {
+  const parsed = serializeValue(raw);
+  return typeof parsed === "string" ? parsed : raw;
+}
+
+/** The number a number parameter holds; the text itself when it is not one. */
+function asDeclaredNumber(raw: string): string | number {
+  const asNumber = Number(raw);
+  return raw.trim() !== "" && Number.isFinite(asNumber) ? asNumber : raw;
+}
+
+/** The boolean a boolean parameter holds; the text itself when it is not one. */
+function asDeclaredBoolean(raw: string): string | boolean {
+  if (raw === "true") return true;
+  if (raw === "false") return false;
+  return raw;
 }
 
 /** {@link serializeTypedScalarValue} for an optional input: empty is absent. */

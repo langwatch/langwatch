@@ -238,38 +238,22 @@ export class CallDispatcher {
     const waitUntil = now() + this.firstTurnGraceMs;
     for (;;) {
       throwIfAborted(signal);
-      const live = (
-        await this.registry.listLive({
-          projectId,
-          agentId: agent.id,
-          now: now(),
-        })
-      ).filter((instance) => !excluded.includes(instance.instanceId));
+      const live = await this.liveInstances({
+        projectId,
+        agentId: agent.id,
+        excluded,
+        now,
+      });
 
-      if (pinned) {
-        const target = live.find((instance) => instance.instanceId === pinned);
-        if (target) return target;
-        throw new AgentInstanceLostError({ instanceId: pinned });
-      }
+      if (pinned) return pinnedInstance(live, pinned);
 
       if (live.length > 0) {
-        const free = live
-          .map((instance) => ({
-            instance,
-            slots: instance.maxConcurrency - instance.inflight,
-          }))
-          .filter(({ slots }) => slots > 0);
-        if (free.length === 0) {
-          throw new AgentBusyError({ retryAfterMs: BUSY_RETRY_AFTER_MS });
-        }
-        const chosen = pickMostFree(free, call.threadId).instance;
-        if (agent.sticky) {
-          await this.store.set(
-            pinKey,
-            chosen.instanceId,
-            STICKY_PIN_TTL_SECONDS,
-          );
-        }
+        const chosen = chooseInstance(live, call.threadId);
+        await this.pinThread({
+          sticky: agent.sticky,
+          pinKey,
+          instanceId: chosen.instanceId,
+        });
         return chosen;
       }
 
@@ -283,6 +267,40 @@ export class CallDispatcher {
       }
       await sleep(Math.min(this.firstTurnPollMs, waitUntil - now()), signal);
     }
+  }
+
+  /** The live instances of one agent, without the ones already tried. */
+  private async liveInstances({
+    projectId,
+    agentId,
+    excluded,
+    now,
+  }: {
+    projectId: string;
+    agentId: string;
+    excluded: string[];
+    now: () => number;
+  }): Promise<LiveInstance[]> {
+    const live = await this.registry.listLive({
+      projectId,
+      agentId,
+      now: now(),
+    });
+    return live.filter((instance) => !excluded.includes(instance.instanceId));
+  }
+
+  /** Holds a sticky thread on the instance that answers it. */
+  private async pinThread({
+    sticky,
+    pinKey,
+    instanceId,
+  }: {
+    sticky: boolean;
+    pinKey: string;
+    instanceId: string;
+  }): Promise<void> {
+    if (!sticky) return;
+    await this.store.set(pinKey, instanceId, STICKY_PIN_TTL_SECONDS);
   }
 
   /** Writes, nudges and waits for one call on one instance. */
@@ -308,28 +326,15 @@ export class CallDispatcher {
     | { kind: "disconnected" }
   > {
     const { callId, deadlineAt } = envelope;
-    const ttlSeconds =
-      Math.ceil((deadlineAt - now()) / 1000) + CALL_KEY_SLACK_SECONDS;
-    const stored: StoredCall = {
-      projectId,
-      envelope,
-      replyTo: this.podId,
-      instanceId: instance.instanceId,
-    };
 
     this.instanceOfCall.set(callId, instance.instanceId);
     await this.registry.incrementInflight(instance.instanceId);
-    await this.store.set(callKey(callId), JSON.stringify(stored), ttlSeconds);
-    await this.store.zadd(
-      pendingKey(instance.instanceId),
-      deadlineAt,
-      callId,
-      ttlSeconds,
-    );
-    const receivers = await this.store.publish(
-      instanceChannel(instance.instanceId),
-      JSON.stringify({ call: callId } satisfies InstanceNudge),
-    );
+    const receivers = await this.postCall({
+      projectId,
+      instance,
+      envelope,
+      now,
+    });
 
     try {
       if (receivers === 0 && this.store.shared) {
@@ -346,38 +351,8 @@ export class CallDispatcher {
         now,
       });
       switch (outcome.kind) {
-        case "result": {
-          const result = await this.readResult(callId);
-          if (!result || result.disconnected) {
-            // The socket pod closed the call without an answer. Before the
-            // function started that is safe to try elsewhere; after, it is
-            // not, since the function may have run.
-            const acknowledged = await this.store.get(callAckKey(callId));
-            return acknowledged ? { kind: "disconnected" } : { kind: "retry" };
-          }
-          if (result.error) {
-            throw remoteError(result.error);
-          }
-          if (sticky) {
-            await this.store.set(
-              threadPinKey(envelope.agentId, envelope.threadId),
-              instance.instanceId,
-              STICKY_PIN_TTL_SECONDS,
-            );
-          }
-          return {
-            kind: "answered",
-            answer: {
-              output: result.output ?? "",
-              session: result.session,
-              instance: {
-                instanceId: instance.instanceId,
-                hostname: instance.hostname,
-                label: instance.label,
-              },
-            },
-          };
-        }
+        case "result":
+          return await this.readAnswer({ instance, envelope, sticky });
         case "gone": {
           const acknowledged = await this.store.get(callAckKey(callId));
           await this.retire({ projectId, instance, agentId: envelope.agentId });
@@ -398,6 +373,89 @@ export class CallDispatcher {
       await this.registry.decrementInflight(instance.instanceId);
       await this.store.zrem(pendingKey(instance.instanceId), callId);
     }
+  }
+
+  /**
+   * Writes the envelope, lists it as pending on the instance, and nudges the
+   * instance channel. Resolves to how many subscribers took the nudge.
+   */
+  private async postCall({
+    projectId,
+    instance,
+    envelope,
+    now,
+  }: {
+    projectId: string;
+    instance: LiveInstance;
+    envelope: CallEnvelope;
+    now: () => number;
+  }): Promise<number> {
+    const { callId, deadlineAt } = envelope;
+    const ttlSeconds =
+      Math.ceil((deadlineAt - now()) / 1000) + CALL_KEY_SLACK_SECONDS;
+    const stored: StoredCall = {
+      projectId,
+      envelope,
+      replyTo: this.podId,
+      instanceId: instance.instanceId,
+    };
+
+    await this.store.set(callKey(callId), JSON.stringify(stored), ttlSeconds);
+    await this.store.zadd({
+      key: pendingKey(instance.instanceId),
+      score: deadlineAt,
+      member: callId,
+      ttlSeconds,
+    });
+    return this.store.publish(
+      instanceChannel(instance.instanceId),
+      JSON.stringify({ call: callId } satisfies InstanceNudge),
+    );
+  }
+
+  /** Reads a delivered result as the answer, a retry or a disconnect. */
+  private async readAnswer({
+    instance,
+    envelope,
+    sticky,
+  }: {
+    instance: LiveInstance;
+    envelope: CallEnvelope;
+    sticky: boolean;
+  }): Promise<
+    | { kind: "answered"; answer: Omit<CallOutcome, "durationMs"> }
+    | { kind: "retry" }
+    | { kind: "disconnected" }
+  > {
+    const { callId } = envelope;
+    const result = await this.readResult(callId);
+    if (!result || result.disconnected) {
+      // The socket pod closed the call without an answer. Before the
+      // function started that is safe to try elsewhere; after, it is
+      // not, since the function may have run.
+      const acknowledged = await this.store.get(callAckKey(callId));
+      return acknowledged ? { kind: "disconnected" } : { kind: "retry" };
+    }
+    if (result.error) {
+      throw remoteError(result.error);
+    }
+    await this.pinThread({
+      sticky,
+      pinKey: threadPinKey(envelope.agentId, envelope.threadId),
+      instanceId: instance.instanceId,
+    });
+    return {
+      kind: "answered",
+      answer: {
+        output: result.output ?? "",
+        session: result.session,
+        instance: {
+          instanceId: instance.instanceId,
+          hostname: instance.hostname,
+          label: instance.label,
+        },
+      },
+    };
   }
 
   /** Waits for a result nudge, a gone signal, the deadline or an abort. */
@@ -519,6 +577,27 @@ function remoteError(error: { code: string; message: string }): Error {
     remoteCode: error.code,
     remoteMessage: error.message,
   });
+}
+
+/** The instance a sticky thread is pinned to, while it is still live. */
+function pinnedInstance(live: LiveInstance[], pinned: string): LiveInstance {
+  const target = live.find((instance) => instance.instanceId === pinned);
+  if (!target) throw new AgentInstanceLostError({ instanceId: pinned });
+  return target;
+}
+
+/** The instance that takes the thread, or the refusal when all are busy. */
+function chooseInstance(live: LiveInstance[], threadId: string): LiveInstance {
+  const free = live
+    .map((instance) => ({
+      instance,
+      slots: instance.maxConcurrency - instance.inflight,
+    }))
+    .filter(({ slots }) => slots > 0);
+  if (free.length === 0) {
+    throw new AgentBusyError({ retryAfterMs: BUSY_RETRY_AFTER_MS });
+  }
+  return pickMostFree(free, threadId).instance;
 }
 
 /**

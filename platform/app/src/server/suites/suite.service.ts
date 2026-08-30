@@ -330,6 +330,23 @@ function assertTestSuiteUpdate(data: UpdateSuiteInput): void {
 }
 
 /**
+ * The plan name the caller asked for, trimmed; nothing when the caller sent
+ * none and the run derives its own.
+ *
+ * A name that holds only blanks is refused: it reads as no name at all on
+ * every screen the plan appears on.
+ */
+function readRequestedPlanName(name: string | undefined): string | undefined {
+  const trimmed = name?.trim();
+  if (name !== undefined && !trimmed) {
+    throw new ValidationError("A run needs a name", {
+      meta: { fieldErrors: { name: ["A run needs a name"] } },
+    });
+  }
+  return trimmed;
+}
+
+/**
  * The config a run plan is started with, as the caller sends it.
  *
  * The stored form fills the optional fields in and sorts the targets; see
@@ -1248,12 +1265,7 @@ export class SuiteService {
         },
       },
       async (span) => {
-        const requestedName = params.name?.trim();
-        if (params.name !== undefined && !requestedName) {
-          throw new ValidationError("A run needs a name", {
-            meta: { fieldErrors: { name: ["A run needs a name"] } },
-          });
-        }
+        const requestedName = readRequestedPlanName(params.name);
 
         // Normalised before the plan is matched and before anything is
         // stored, so hand-picking every suite and pressing Run all reach one

@@ -324,6 +324,20 @@ Feature: Connected agents
     When the project key posts a relay call to it
     Then the call is refused as not found
 
+  @integration
+  Scenario: The relay route refuses a personal agent of another person
+    Given a personal development agent owned by user "u_1"
+    When the personal key of user "u_2" posts a relay call to it
+    Then the call is refused with "agent_owner_only"
+    And nothing is dispatched
+
+  @integration
+  Scenario: The relay route lets the project key call a personal agent
+    Given a personal development agent owned by user "u_1"
+    And the owner gate already ran when the run was scheduled
+    When the project key posts a relay call to it, the way the scenario child does
+    Then the call reaches the dispatcher
+
   @unit
   Scenario: Connect is refused without Redis on a deployment with several replicas
     Given no Redis and LANGWATCH_APP_REPLICAS set to 3

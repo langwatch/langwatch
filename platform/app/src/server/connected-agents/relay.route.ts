@@ -20,6 +20,7 @@ import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
 import { bodyLimit } from "~/server/routes/_lib/body-limit";
 import { assertConnectedAgentsRunnable } from "~/server/suites/connected-targets";
+import type { DispatchAgent, DispatchCall } from "./call.dispatcher";
 import {
   DEFAULT_CALL_TIMEOUT_MS,
   MAX_CALL_TIMEOUT_MS,
@@ -87,6 +88,45 @@ export const relayCallResponseSchema = z.object({
   durationMs: z.number(),
 });
 
+/** The agent the dispatcher needs, with the per-call budget capped. */
+function dispatchAgentOf({
+  agent,
+  config,
+}: {
+  agent: { id: string; name: string; environment: string | null };
+  config: ConnectedComponentConfig;
+}): DispatchAgent {
+  return {
+    id: agent.id,
+    name: agent.name,
+    environment: agent.environment,
+    timeoutMs: Math.min(
+      config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
+      MAX_CALL_TIMEOUT_MS,
+    ),
+    sticky: config.sticky ?? false,
+  };
+}
+
+/** One turn as the dispatcher reads it, with the body defaults filled in. */
+function dispatchCallOf({
+  body,
+  traceparentHeader,
+}: {
+  body: z.infer<typeof relayCallBodySchema>;
+  traceparentHeader: string | null;
+}): DispatchCall {
+  return {
+    threadId: body.threadId ?? crypto.randomUUID(),
+    messages: body.messages,
+    newMessages: body.newMessages ?? body.messages.slice(-1),
+    params: body.params ?? {},
+    session: body.session,
+    traceparent: body.traceparent ?? traceparentHeader,
+    run: body.run ?? {},
+  };
+}
+
 const secured = createProjectApp({ basePath: "/api/agents" });
 
 secured.access(requires("scenarios:create")).post(
@@ -136,40 +176,31 @@ secured.access(requires("scenarios:create")).post(
     }
 
     // A development agent registered with a personal key belongs to one
-    // person. Project membership is not enough to call it, and a legacy
-    // project key names no person at all, so it is refused too.
+    // person, so a personal key of someone else is refused. The project key
+    // names no person and passes: the scenario child calls with it after the
+    // owner gate ran when the run was scheduled.
     const apiKeyUserId = c.get("apiKeyUserId");
-    await assertConnectedAgentsRunnable({
-      agents: [agent],
-      actor: apiKeyUserId ? { id: apiKeyUserId, label: "api" } : undefined,
-      users: prisma,
-    });
+    if (apiKeyUserId) {
+      await assertConnectedAgentsRunnable({
+        agents: [agent],
+        actor: { id: apiKeyUserId, label: "api" },
+        users: prisma,
+      });
+    }
 
-    const config = agent.config as ConnectedComponentConfig;
     const runtime = getConnectedAgentRuntime();
 
     try {
       const outcome = await runtime.dispatcher.dispatch({
         projectId: project.id,
-        agent: {
-          id: agent.id,
-          name: agent.name,
-          environment: agent.environment,
-          timeoutMs: Math.min(
-            config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
-            MAX_CALL_TIMEOUT_MS,
-          ),
-          sticky: config.sticky ?? false,
-        },
-        call: {
-          threadId: body.threadId ?? crypto.randomUUID(),
-          messages: body.messages,
-          newMessages: body.newMessages ?? body.messages.slice(-1),
-          params: body.params ?? {},
-          session: body.session,
-          traceparent: body.traceparent ?? c.req.header("traceparent") ?? null,
-          run: body.run ?? {},
-        },
+        agent: dispatchAgentOf({
+          agent,
+          config: agent.config as ConnectedComponentConfig,
+        }),
+        call: dispatchCallOf({
+          body,
+          traceparentHeader: c.req.header("traceparent") ?? null,
+        }),
         signal: c.req.raw.signal,
       });
       return c.json({

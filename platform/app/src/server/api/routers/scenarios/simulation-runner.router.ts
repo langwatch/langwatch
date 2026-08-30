@@ -13,6 +13,7 @@ import { getApp } from "~/server/app-layer/app";
 import { ScenarioReservedSetIdError } from "~/server/scenarios/errors";
 import {
   createDataPrefetcherDependencies,
+  type PrefetchResult,
   prefetchScenarioData,
 } from "~/server/scenarios/execution/data-prefetcher";
 import {
@@ -298,6 +299,56 @@ async function queueRun({
 }
 
 /**
+ * Reads back everything the run needs, so a configuration error refuses the
+ * run before a job exists.
+ *
+ * @throws {TRPCError} BAD_REQUEST when the run cannot be prepared
+ */
+async function validateRunData({
+  projectId,
+  scenarioId,
+  setId,
+  batchRunId,
+  parameters,
+  secretParameters,
+  target,
+}: {
+  projectId: string;
+  scenarioId: string;
+  setId: string;
+  batchRunId: string;
+  parameters: RunParameterValues;
+  secretParameters: RunSecretCiphertext;
+  target: SimulationTarget;
+}): Promise<Extract<PrefetchResult, { success: true }>> {
+  const prefetchResult = await prefetchScenarioData({
+    context: {
+      projectId,
+      scenarioId,
+      setId,
+      batchRunId,
+      parameters,
+      secretParameters,
+    },
+    target,
+    deps: createDataPrefetcherDependencies(),
+  });
+
+  if (!prefetchResult.success) {
+    logger.warn(
+      { projectId, scenarioId, error: prefetchResult.error },
+      "Scenario validation failed",
+    );
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: prefetchResult.error,
+    });
+  }
+
+  return prefetchResult;
+}
+
+/**
  * Simulation runner - executing scenarios against targets.
  */
 export const simulationRunnerRouter = createTRPCRouter({
@@ -332,35 +383,15 @@ export const simulationRunnerRouter = createTRPCRouter({
           values: input.parameters,
         });
 
-      // Validate early - prefetch data to catch configuration errors before scheduling
-      const deps = createDataPrefetcherDependencies();
-      const prefetchResult = await prefetchScenarioData({
-        context: {
-          projectId: input.projectId,
-          scenarioId: input.scenarioId,
-          setId,
-          batchRunId,
-          parameters,
-          secretParameters,
-        },
+      const prefetchResult = await validateRunData({
+        projectId: input.projectId,
+        scenarioId: input.scenarioId,
+        setId,
+        batchRunId,
+        parameters,
+        secretParameters,
         target,
-        deps,
       });
-
-      if (!prefetchResult.success) {
-        logger.warn(
-          {
-            projectId: input.projectId,
-            scenarioId: input.scenarioId,
-            error: prefetchResult.error,
-          },
-          "Scenario validation failed",
-        );
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: prefetchResult.error,
-        });
-      }
 
       const scenarioRunId = generate(KSUID_RESOURCES.SCENARIO_RUN).toString();
 

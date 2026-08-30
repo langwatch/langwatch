@@ -138,13 +138,8 @@ function rememberedParameters(subject: RunDialogSubject | null) {
   };
 }
 
-/** The fields of the dialog, reset whenever it opens on a new subject. */
-function useRunDialogFields(subject: RunDialogSubject | null) {
-  const [target, setTarget] = useState<TargetValue>(null);
-  const [mode, setMode] = useState<RunDialogMode>("agents");
-  const [showNote, setShowNote] = useState(false);
-  const [note, setNote] = useState("");
-  const [showParams, setShowParams] = useState(false);
+/** The state of the parameter block: its line, its rows and its secrets. */
+function useParameterFieldsState() {
   const [parameterLine, setParameterLine] = useState("");
   // Null while the line is what the block holds: the rows are read off the
   // line until something is typed into one of them.
@@ -153,6 +148,27 @@ function useRunDialogFields(subject: RunDialogSubject | null) {
   );
   const [rowsRequested, setRowsRequested] = useState(false);
   const [secretValues, setSecretValues] = useState<Record<string, string>>({});
+
+  return {
+    parameterLine,
+    setParameterLine,
+    parameterRows,
+    setParameterRows,
+    rowsRequested,
+    setRowsRequested,
+    secretValues,
+    setSecretValues,
+  };
+}
+
+/** The fields of the dialog, reset whenever it opens on a new subject. */
+function useRunDialogFields(subject: RunDialogSubject | null) {
+  const [target, setTarget] = useState<TargetValue>(null);
+  const [mode, setMode] = useState<RunDialogMode>("agents");
+  const [showNote, setShowNote] = useState(false);
+  const [note, setNote] = useState("");
+  const [showParams, setShowParams] = useState(false);
+  const parameterFields = useParameterFieldsState();
   const [inlineError, setInlineError] = useState<unknown>(null);
   // A refusal that names one parameter reads under the field that holds it.
   const [parameterError, setParameterError] =
@@ -175,10 +191,10 @@ function useRunDialogFields(subject: RunDialogSubject | null) {
     setShowNote(false);
     setNote("");
     setShowParams(remembered.show);
-    setParameterLine(remembered.line);
-    setRowsRequested(remembered.rowsRequested);
-    setParameterRows(remembered.rows);
-    setSecretValues({});
+    parameterFields.setParameterLine(remembered.line);
+    parameterFields.setRowsRequested(remembered.rowsRequested);
+    parameterFields.setParameterRows(remembered.rows);
+    parameterFields.setSecretValues({});
     setInlineError(null);
     setParameterError(null);
     setMissingProvider(false);
@@ -199,14 +215,7 @@ function useRunDialogFields(subject: RunDialogSubject | null) {
     setNote,
     showParams,
     setShowParams,
-    parameterLine,
-    setParameterLine,
-    parameterRows,
-    setParameterRows,
-    rowsRequested,
-    setRowsRequested,
-    secretValues,
-    setSecretValues,
+    ...parameterFields,
     inlineError,
     setInlineError,
     parameterError,
@@ -314,6 +323,53 @@ function targetAgentIdsOf({
 }
 
 /**
+ * The parameters in scope: what the scenarios of the run declare plus what the
+ * agents it goes against declare, and the secrets among them.
+ */
+function useDeclaredParameters({
+  scenarioIds,
+  allScenarios,
+  agents,
+  targetAgentIds,
+}: {
+  scenarioIds: string[];
+  allScenarios: readonly { id: string; parameters: unknown }[] | undefined;
+  agents: readonly RunDialogAgent[];
+  /** The ids of the agents the run goes against, sorted. */
+  targetAgentIds: readonly string[];
+}) {
+  const targetAgentKey = targetAgentIds.join(",");
+  const parameterDefinitions = useMemo(() => {
+    const inRun = new Set(targetAgentKey.split(","));
+    return unionParameterDefinitions({
+      scenarioIds,
+      scenarios: allScenarios ?? [],
+      agents: agents.filter((agent) => inRun.has(agent.id)),
+    });
+  }, [scenarioIds, allScenarios, agents, targetAgentKey]);
+
+  /** The declared parameters of the run against one agent alone. */
+  const declaredParametersOf = useCallback(
+    (agentId: string): DeclaredParameter[] =>
+      unionParameterDefinitions({
+        scenarioIds,
+        scenarios: allScenarios ?? [],
+        agents: agents.filter((agent) => agent.id === agentId),
+      }),
+    [scenarioIds, allScenarios, agents],
+  );
+
+  // The line a single input can carry, and the secrets that cannot ride on it.
+  const secretDefinitions = useMemo(
+    () =>
+      parameterDefinitions.filter((definition) => definition.secret === true),
+    [parameterDefinitions],
+  );
+
+  return { parameterDefinitions, declaredParametersOf, secretDefinitions };
+}
+
+/**
  * The overrides the run can carry, and the fields that collect them.
  *
  * The declared parameters are what the scenarios of the run declare plus
@@ -346,33 +402,13 @@ function useRunDialogParameters({
     [subject, allScenarios],
   );
 
-  const targetAgentKey = targetAgentIds.join(",");
-  const parameterDefinitions = useMemo(() => {
-    const inRun = new Set(targetAgentKey.split(","));
-    return unionParameterDefinitions({
+  const { parameterDefinitions, declaredParametersOf, secretDefinitions } =
+    useDeclaredParameters({
       scenarioIds,
-      scenarios: allScenarios ?? [],
-      agents: agents.filter((agent) => inRun.has(agent.id)),
+      allScenarios,
+      agents,
+      targetAgentIds,
     });
-  }, [scenarioIds, allScenarios, agents, targetAgentKey]);
-
-  /** The declared parameters of the run against one agent alone. */
-  const declaredParametersOf = useCallback(
-    (agentId: string): DeclaredParameter[] =>
-      unionParameterDefinitions({
-        scenarioIds,
-        scenarios: allScenarios ?? [],
-        agents: agents.filter((agent) => agent.id === agentId),
-      }),
-    [scenarioIds, allScenarios, agents],
-  );
-
-  // The line a single input can carry, and the secrets that cannot ride on it.
-  const secretDefinitions = useMemo(
-    () =>
-      parameterDefinitions.filter((definition) => definition.secret === true),
-    [parameterDefinitions],
-  );
 
   // A declared secret cannot ride on the line, so the block that holds one
   // opens on its rows and stays there.
@@ -862,36 +898,30 @@ function useRunDialogNaming({
   return { name, runScope, applyConfiguration };
 }
 
-/** Everything an open run dialog holds and offers. */
-export function useRunDialogForm(subject: RunDialogSubject | null) {
-  const subjectKey = subjectKeyOf(subject);
-  const choices = useRunDialogChoices(subject);
-  const fields = useRunDialogFields(subject);
-  const planFields = useRunPlanFields({ subject, subjectKey });
-  const targetAgentIds = targetAgentIdsOf({
-    target: fields.target,
-    compareRows: planFields.compareRows,
-  });
-  const parameters = useRunDialogParameters({
-    subject,
-    allScenarios: choices.allScenarios,
-    agents: choices.scenarioAgents,
-    targetAgentIds,
-    fields,
-    isCompare: planFields.showCompare,
-  });
-  const targeting = useRunDialogTargeting({
-    fields,
-    publishedPrompts: choices.publishedPrompts,
-  });
-  const comparing = useCompareRows({
-    fields,
-    planFields,
-    agents: choices.scenarioAgents,
-    defaults: parameters.parameterDefaults,
-    definitions: parameters.parameterDefinitions,
-  });
-
+/**
+ * What the dialog derives once its fields and its choices are known: the
+ * targets the run goes against, its name, the scenarios in scope, and the
+ * chips that add what is still folded away.
+ */
+function useDerivedRunDialogState({
+  subject,
+  subjectKey,
+  choices,
+  fields,
+  planFields,
+  parameters,
+  targeting,
+  comparing,
+}: {
+  subject: RunDialogSubject | null;
+  subjectKey: string;
+  choices: ReturnType<typeof useRunDialogChoices>;
+  fields: RunDialogFields;
+  planFields: RunPlanFields;
+  parameters: ReturnType<typeof useRunDialogParameters>;
+  targeting: ReturnType<typeof useRunDialogTargeting>;
+  comparing: ReturnType<typeof useCompareRows>;
+}) {
   const runTargets = runTargetsOf({
     target: fields.target,
     compareRows: planFields.compareRows,
@@ -926,12 +956,6 @@ export function useRunDialogForm(subject: RunDialogSubject | null) {
   });
 
   return {
-    ...fields,
-    ...choices,
-    ...parameters,
-    ...targeting,
-    ...comparing,
-    ...planFields,
     ...naming.name,
     applyConfiguration: naming.applyConfiguration,
     /** The scope the run goes out with, folded the way the server folds it. */
@@ -940,6 +964,58 @@ export function useRunDialogForm(subject: RunDialogSubject | null) {
     scopedScenarioIds: scopedIds,
     chips,
     caseCount: caseCountOf(subject, choices.allScenarios, scopedIds),
+  };
+}
+
+/** Everything an open run dialog holds and offers. */
+export function useRunDialogForm(subject: RunDialogSubject | null) {
+  const subjectKey = subjectKeyOf(subject);
+  const choices = useRunDialogChoices(subject);
+  const fields = useRunDialogFields(subject);
+  const planFields = useRunPlanFields({ subject, subjectKey });
+  const targetAgentIds = targetAgentIdsOf({
+    target: fields.target,
+    compareRows: planFields.compareRows,
+  });
+  const parameters = useRunDialogParameters({
+    subject,
+    allScenarios: choices.allScenarios,
+    agents: choices.scenarioAgents,
+    targetAgentIds,
+    fields,
+    isCompare: planFields.showCompare,
+  });
+  const targeting = useRunDialogTargeting({
+    fields,
+    publishedPrompts: choices.publishedPrompts,
+  });
+  const comparing = useCompareRows({
+    fields,
+    planFields,
+    agents: choices.scenarioAgents,
+    defaults: parameters.parameterDefaults,
+    definitions: parameters.parameterDefinitions,
+  });
+
+  const derived = useDerivedRunDialogState({
+    subject,
+    subjectKey,
+    choices,
+    fields,
+    planFields,
+    parameters,
+    targeting,
+    comparing,
+  });
+
+  return {
+    ...fields,
+    ...choices,
+    ...parameters,
+    ...targeting,
+    ...comparing,
+    ...planFields,
+    ...derived,
   };
 }
 

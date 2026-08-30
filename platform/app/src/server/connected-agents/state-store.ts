@@ -22,12 +22,12 @@ export interface AgentStateStore {
   setIfAbsent(key: string, value: string, ttlSeconds: number): Promise<boolean>;
   get(key: string): Promise<string | null>;
   del(key: string): Promise<void>;
-  zadd(
-    key: string,
-    score: number,
-    member: string,
-    ttlSeconds: number,
-  ): Promise<void>;
+  zadd(params: {
+    key: string;
+    score: number;
+    member: string;
+    ttlSeconds: number;
+  }): Promise<void>;
   /** ZADD XX LT: lowers the score of a present member, never raises it. */
   zaddLowerIfPresent(key: string, score: number, member: string): Promise<void>;
   zrem(key: string, member: string): Promise<void>;
@@ -55,9 +55,15 @@ export interface AgentStateStore {
 // Redis
 // ---------------------------------------------------------------------------
 
-export function createRedisStateStore(redis: RedisConnection): AgentStateStore {
-  // One subscriber connection per store; ioredis puts a subscribing
-  // connection into subscriber mode, so it cannot share the command one.
+/**
+ * The channel half of the Redis store, with the handlers by channel.
+ *
+ * One subscriber connection per store; ioredis puts a subscribing connection
+ * into subscriber mode, so it cannot share the command one.
+ */
+function createRedisChannels(
+  redis: RedisConnection,
+): Pick<AgentStateStore, "subscribe" | "close"> {
   let subscriber: RedisConnection | null = null;
   const handlers = new Map<string, Set<(message: string) => void>>();
 
@@ -69,6 +75,39 @@ export function createRedisStateStore(redis: RedisConnection): AgentStateStore {
     });
     return subscriber;
   };
+
+  return {
+    async subscribe(channel, handler) {
+      const connection = subscriberConnection();
+      let set = handlers.get(channel);
+      if (!set) {
+        set = new Set();
+        handlers.set(channel, set);
+        await connection.subscribe(channel);
+      }
+      set.add(handler);
+      return async () => {
+        const current = handlers.get(channel);
+        current?.delete(handler);
+        if (current && current.size === 0) {
+          handlers.delete(channel);
+          await connection.unsubscribe(channel).catch(() => undefined);
+        }
+      };
+    },
+    async close() {
+      handlers.clear();
+      if (subscriber) {
+        const closing = subscriber;
+        subscriber = null;
+        await closing.quit().catch(() => undefined);
+      }
+    },
+  };
+}
+
+export function createRedisStateStore(redis: RedisConnection): AgentStateStore {
+  const channels = createRedisChannels(redis);
 
   return {
     shared: true,
@@ -85,7 +124,7 @@ export function createRedisStateStore(redis: RedisConnection): AgentStateStore {
     async del(key) {
       await redis.del(key);
     },
-    async zadd(key, score, member, ttlSeconds) {
+    async zadd({ key, score, member, ttlSeconds }) {
       await redis
         .multi()
         .zadd(key, score, member)
@@ -124,32 +163,8 @@ export function createRedisStateStore(redis: RedisConnection): AgentStateStore {
     async publish(channel, message) {
       return redis.publish(channel, message);
     },
-    async subscribe(channel, handler) {
-      const connection = subscriberConnection();
-      let set = handlers.get(channel);
-      if (!set) {
-        set = new Set();
-        handlers.set(channel, set);
-        await connection.subscribe(channel);
-      }
-      set.add(handler);
-      return async () => {
-        const current = handlers.get(channel);
-        current?.delete(handler);
-        if (current && current.size === 0) {
-          handlers.delete(channel);
-          await connection.unsubscribe(channel).catch(() => undefined);
-        }
-      };
-    },
-    async close() {
-      handlers.clear();
-      if (subscriber) {
-        const closing = subscriber;
-        subscriber = null;
-        await closing.quit().catch(() => undefined);
-      }
-    },
+    subscribe: channels.subscribe,
+    close: channels.close,
   };
 }
 
@@ -158,6 +173,108 @@ export function createRedisStateStore(redis: RedisConnection): AgentStateStore {
 // ---------------------------------------------------------------------------
 
 type Expiring<T> = { value: T; expiresAt: number };
+
+/** The value under a key, or nothing once its expiry passed. */
+function live<T>(
+  map: Map<string, Expiring<T>>,
+  key: string,
+  now: () => number,
+): T | null {
+  const entry = map.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= now()) {
+    map.delete(key);
+    return null;
+  }
+  return entry.value;
+}
+
+/** The sorted-set half of the memory store. */
+function memorySortedSetOps({
+  sortedSets,
+  now,
+}: {
+  sortedSets: Map<string, Expiring<Map<string, number>>>;
+  now: () => number;
+}): Pick<
+  AgentStateStore,
+  "zadd" | "zaddLowerIfPresent" | "zrem" | "zremrangebyscore" | "zrangebyscore"
+> {
+  const sortedSet = (key: string, ttlSeconds: number): Map<string, number> => {
+    const existing = live(sortedSets, key, now);
+    const set = existing ?? new Map<string, number>();
+    sortedSets.set(key, { value: set, expiresAt: now() + ttlSeconds * 1000 });
+    return set;
+  };
+
+  return {
+    async zadd({ key, score, member, ttlSeconds }) {
+      sortedSet(key, ttlSeconds).set(member, score);
+    },
+    async zaddLowerIfPresent(key, score, member) {
+      const set = live(sortedSets, key, now);
+      const current = set?.get(member);
+      if (set && current !== undefined && score < current) {
+        set.set(member, score);
+      }
+    },
+    async zrem(key, member) {
+      live(sortedSets, key, now)?.delete(member);
+    },
+    async zremrangebyscore(key, max) {
+      const set = live(sortedSets, key, now);
+      if (!set) return;
+      for (const [member, score] of set) {
+        if (score <= max) set.delete(member);
+      }
+    },
+    async zrangebyscore(key, min) {
+      const set = live(sortedSets, key, now);
+      if (!set) return [];
+      return [...set]
+        .filter(([, score]) => score >= min)
+        .sort(([, left], [, right]) => left - right)
+        .map(([member]) => member);
+    },
+  };
+}
+
+/** The hash and counter half of the memory store. */
+function memoryHashOps({
+  hashes,
+  counters,
+  now,
+}: {
+  hashes: Map<string, Expiring<Record<string, string>>>;
+  counters: Map<string, Expiring<number>>;
+  now: () => number;
+}): Pick<AgentStateStore, "hset" | "hgetall" | "incr" | "decr"> {
+  return {
+    async hset(key, fields, ttlSeconds) {
+      const current = live(hashes, key, now) ?? {};
+      hashes.set(key, {
+        value: { ...current, ...fields },
+        expiresAt: now() + ttlSeconds * 1000,
+      });
+    },
+    async hgetall(key) {
+      return live(hashes, key, now);
+    },
+    async incr(key, ttlSeconds) {
+      const next = (live(counters, key, now) ?? 0) + 1;
+      counters.set(key, { value: next, expiresAt: now() + ttlSeconds * 1000 });
+      return next;
+    },
+    async decr(key) {
+      const entry = counters.get(key);
+      if (!entry) return 0;
+      const next = Math.max(0, entry.value - 1);
+      if (next === 0) counters.delete(key);
+      else counters.set(key, { ...entry, value: next });
+      return next;
+    },
+  };
+}
 
 /**
  * The in-process stand-in. Expiry is checked on read, so a test can drive
@@ -175,30 +292,18 @@ export function createMemoryStateStore({
   const bus = new EventEmitter();
   bus.setMaxListeners(0);
 
-  function live<T>(map: Map<string, Expiring<T>>, key: string): T | null {
-    const entry = map.get(key);
-    if (!entry) return null;
-    if (entry.expiresAt <= now()) {
-      map.delete(key);
-      return null;
-    }
-    return entry.value;
-  }
-
-  const sortedSet = (key: string, ttlSeconds: number): Map<string, number> => {
-    const existing = live(sortedSets, key);
-    const set = existing ?? new Map<string, number>();
-    sortedSets.set(key, { value: set, expiresAt: now() + ttlSeconds * 1000 });
-    return set;
-  };
-
   return {
     shared: false,
+    ...memorySortedSetOps({ sortedSets, now }),
+    ...memoryHashOps({ hashes, counters, now }),
     async set(key, value, ttlSeconds) {
       strings.set(key, { value, expiresAt: now() + ttlSeconds * 1000 });
     },
     async setIfAbsent(key, value, ttlSeconds) {
-      if (live(strings, key) !== null || live(counters, key) !== null) {
+      if (
+        live(strings, key, now) !== null ||
+        live(counters, key, now) !== null
+      ) {
         return false;
       }
       strings.set(key, { value, expiresAt: now() + ttlSeconds * 1000 });
@@ -206,66 +311,15 @@ export function createMemoryStateStore({
     },
     async get(key) {
       // A counter is a string key in Redis; GET reads it the same way.
-      const counter = live(counters, key);
+      const counter = live(counters, key, now);
       if (counter !== null) return String(counter);
-      return live(strings, key);
+      return live(strings, key, now);
     },
     async del(key) {
       strings.delete(key);
       sortedSets.delete(key);
       hashes.delete(key);
       counters.delete(key);
-    },
-    async zadd(key, score, member, ttlSeconds) {
-      sortedSet(key, ttlSeconds).set(member, score);
-    },
-    async zaddLowerIfPresent(key, score, member) {
-      const set = live(sortedSets, key);
-      const current = set?.get(member);
-      if (set && current !== undefined && score < current) {
-        set.set(member, score);
-      }
-    },
-    async zrem(key, member) {
-      live(sortedSets, key)?.delete(member);
-    },
-    async zremrangebyscore(key, max) {
-      const set = live(sortedSets, key);
-      if (!set) return;
-      for (const [member, score] of set) {
-        if (score <= max) set.delete(member);
-      }
-    },
-    async zrangebyscore(key, min) {
-      const set = live(sortedSets, key);
-      if (!set) return [];
-      return [...set]
-        .filter(([, score]) => score >= min)
-        .sort(([, left], [, right]) => left - right)
-        .map(([member]) => member);
-    },
-    async hset(key, fields, ttlSeconds) {
-      const current = live(hashes, key) ?? {};
-      hashes.set(key, {
-        value: { ...current, ...fields },
-        expiresAt: now() + ttlSeconds * 1000,
-      });
-    },
-    async hgetall(key) {
-      return live(hashes, key);
-    },
-    async incr(key, ttlSeconds) {
-      const next = (live(counters, key) ?? 0) + 1;
-      counters.set(key, { value: next, expiresAt: now() + ttlSeconds * 1000 });
-      return next;
-    },
-    async decr(key) {
-      const entry = counters.get(key);
-      if (!entry) return 0;
-      const next = Math.max(0, entry.value - 1);
-      if (next === 0) counters.delete(key);
-      else counters.set(key, { ...entry, value: next });
-      return next;
     },
     async publish(channel, message) {
       const count = bus.listenerCount(channel);

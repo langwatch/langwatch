@@ -61,6 +61,17 @@ function scalarTypeOf(property: Record<string, unknown>): {
   return { type: "string", downgraded: true };
 }
 
+/** A string the text type accepts, cut to the cap, or nothing. */
+function coerceString(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    return value.slice(0, MAX_PARAMETER_VALUE_LENGTH);
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return undefined;
+}
+
 /** A scalar the declared type accepts, or nothing. */
 function coerceValue(
   value: unknown,
@@ -68,13 +79,7 @@ function coerceValue(
 ): ScenarioParameterValue | undefined {
   switch (type) {
     case "string":
-      if (typeof value === "string") {
-        return value.slice(0, MAX_PARAMETER_VALUE_LENGTH);
-      }
-      if (typeof value === "number" || typeof value === "boolean") {
-        return String(value);
-      }
-      return undefined;
+      return coerceString(value);
     case "number":
       return typeof value === "number" && Number.isFinite(value)
         ? value
@@ -127,16 +132,10 @@ function assertUsableName(name: string): void {
   }
 }
 
-/**
- * Normalizes one JSON Schema object into parameter definitions.
- *
- * @throws {AgentParameterInvalidError} when a name breaks the grammar or is
- *   a turn field, when more than the cap are declared, or when the schema is
- *   not an object schema at all.
- */
-export function normalizeParameterSchema(
+/** The property entries of an object schema, within the declaration cap. */
+function propertyEntriesOf(
   schema: Record<string, unknown>,
-): NormalizedParameters {
+): [string, unknown][] {
   const properties = schema.properties;
   if (
     properties !== undefined &&
@@ -156,65 +155,113 @@ export function normalizeParameterSchema(
       reason: `an agent can declare at most ${MAX_SCENARIO_PARAMETER_DEFINITIONS} parameters, ${entries.length} were sent`,
     });
   }
-  const required = new Set(
+  return entries;
+}
+
+/** The names the schema marks required. */
+function requiredNamesOf(schema: Record<string, unknown>): Set<string> {
+  return new Set(
     Array.isArray(schema.required)
       ? schema.required.filter(
           (name): name is string => typeof name === "string",
         )
       : [],
   );
+}
 
-  const notes: string[] = [];
-  const parameters: ParameterSpec[] = [];
-  for (const [name, raw] of entries) {
-    assertUsableName(name);
-    const property =
-      typeof raw === "object" && raw !== null && !Array.isArray(raw)
-        ? (raw as Record<string, unknown>)
-        : {};
-    if (property.secret === true || property["x-langwatch-secret"] === true) {
-      throw new AgentParameterInvalidError({
-        name,
-        reason:
-          "a secret is declared on the scenario and supplied per run, never by the agent",
-      });
-    }
-    const { type, downgraded } = scalarTypeOf(property);
-    if (downgraded) {
-      notes.push(
-        `"${name}": the type ${describeType(property.type)} is not supported and is presented as text`,
-      );
-    }
-    const defaultValue = coerceValue(property.default, type);
-    const description =
-      typeof property.description === "string"
-        ? property.description.slice(0, MAX_PARAMETER_DESCRIPTION_LENGTH)
-        : undefined;
-    const options = optionsOf({ name, property, type, notes });
-    parameters.push({
-      name,
-      type,
-      ...(description !== undefined && { description }),
-      ...(defaultValue !== undefined && { defaultValue }),
-      ...(options !== undefined && { options }),
-      ...(required.has(name) &&
-        defaultValue === undefined && { required: true }),
-    });
-  }
+/** The schema value of one property, or an empty object when it is not one. */
+function propertyObjectOf(raw: unknown): Record<string, unknown> {
+  return typeof raw === "object" && raw !== null && !Array.isArray(raw)
+    ? (raw as Record<string, unknown>)
+    : {};
+}
 
-  // The scenario schema is the one source of the shape, so what the SDK
-  // declared is checked against it once more, exactly as a scenario is.
-  const parsed = scenarioParameterDefinitionsSchema.safeParse(parameters);
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
+/** A secret belongs to the scenario, so the agent may not declare one. */
+function assertNotSecret(
+  name: string,
+  property: Record<string, unknown>,
+): void {
+  if (property.secret === true || property["x-langwatch-secret"] === true) {
     throw new AgentParameterInvalidError({
-      name:
-        typeof issue?.path[0] === "number"
-          ? (parameters[issue.path[0]]?.name ?? null)
-          : null,
-      reason: issue?.message ?? "the declaration is not valid",
+      name,
+      reason:
+        "a secret is declared on the scenario and supplied per run, never by the agent",
     });
   }
+}
+
+/** One property as a definition, with what the normalization changed noted. */
+function normalizeProperty({
+  name,
+  raw,
+  required,
+  notes,
+}: {
+  name: string;
+  raw: unknown;
+  required: boolean;
+  notes: string[];
+}): ParameterSpec {
+  assertUsableName(name);
+  const property = propertyObjectOf(raw);
+  assertNotSecret(name, property);
+
+  const { type, downgraded } = scalarTypeOf(property);
+  if (downgraded) {
+    notes.push(
+      `"${name}": the type ${describeType(property.type)} is not supported and is presented as text`,
+    );
+  }
+  const defaultValue = coerceValue(property.default, type);
+  const description =
+    typeof property.description === "string"
+      ? property.description.slice(0, MAX_PARAMETER_DESCRIPTION_LENGTH)
+      : undefined;
+  const options = optionsOf({ name, property, type, notes });
+  return {
+    name,
+    type,
+    ...(description !== undefined && { description }),
+    ...(defaultValue !== undefined && { defaultValue }),
+    ...(options !== undefined && { options }),
+    ...(required && defaultValue === undefined && { required: true }),
+  };
+}
+
+/**
+ * The scenario schema is the one source of the shape, so what the SDK
+ * declared is checked against it once more, exactly as a scenario is.
+ */
+function assertScenarioShape(parameters: ParameterSpec[]): void {
+  const parsed = scenarioParameterDefinitionsSchema.safeParse(parameters);
+  if (parsed.success) return;
+  const issue = parsed.error.issues[0];
+  throw new AgentParameterInvalidError({
+    name:
+      typeof issue?.path[0] === "number"
+        ? (parameters[issue.path[0]]?.name ?? null)
+        : null,
+    reason: issue?.message ?? "the declaration is not valid",
+  });
+}
+
+/**
+ * Normalizes one JSON Schema object into parameter definitions.
+ *
+ * @throws {AgentParameterInvalidError} when a name breaks the grammar or is
+ *   a turn field, when more than the cap are declared, or when the schema is
+ *   not an object schema at all.
+ */
+export function normalizeParameterSchema(
+  schema: Record<string, unknown>,
+): NormalizedParameters {
+  const entries = propertyEntriesOf(schema);
+  const required = requiredNamesOf(schema);
+  const notes: string[] = [];
+  const parameters = entries.map(([name, raw]) =>
+    normalizeProperty({ name, raw, required: required.has(name), notes }),
+  );
+  assertScenarioShape(parameters);
   return { parameters, notes };
 }
 

@@ -61,29 +61,24 @@ export type ParameterDeclaringAgent = {
 };
 
 /**
- * Every parameter the run can carry: the union of what the scenarios in it
- * declare, then what its agents declare.
+ * The parameters the scenarios of the run declare, keyed by name.
  *
  * Two scenarios can declare the same name and only one of them describe it or
  * default it, so a name keeps the first description and the first default any
- * of them gives it rather than the last one read. A scenario declaration wins
- * over an agent's on a name both declare, the way the server resolves it.
+ * of them gives it rather than the last one read.
  *
  * Secret is the one field that is not first-wins: a name any scenario in the
  * run declares secret is offered as secret. The run refuses that pair anyway,
  * and asking for the value behind a password field is what lets the person see
  * the conflict instead of typing a credential into a plain field first.
  */
-export function unionParameterDefinitions({
+function scenarioDeclaredParameters({
   scenarioIds,
   scenarios,
-  agents = [],
 }: {
   scenarioIds: string[];
   scenarios: readonly { id: string; parameters: unknown }[];
-  /** The agents the run goes against, for the parameters they declare. */
-  agents?: readonly ParameterDeclaringAgent[];
-}): DeclaredParameter[] {
+}): Map<string, DeclaredParameter> {
   const inRun = new Set(scenarioIds);
   const declared = scenarios
     .filter((scenario) => inRun.has(scenario.id))
@@ -103,21 +98,47 @@ export function unionParameterDefinitions({
       source: "scenario",
     });
   }
-  for (const agent of agents) {
-    const agentLabel = targetLabelOf({
-      name: agent.name,
-      environment: agent.environment,
-      ownerName: agent.owner?.name,
-      differingNames: new Set(),
-    });
-    for (const definition of agent.parameters ?? []) {
-      if (union.has(definition.name)) continue;
-      union.set(definition.name, {
-        ...definition,
-        source: "agent",
-        agentLabel,
-      });
-    }
+  return union;
+}
+
+/** The parameters one agent declares, each tagged with the agent label. */
+function agentDeclaredParameters(
+  agent: ParameterDeclaringAgent,
+): DeclaredParameter[] {
+  const agentLabel = targetLabelOf({
+    name: agent.name,
+    environment: agent.environment,
+    ownerName: agent.owner?.name,
+    differingNames: new Set(),
+  });
+  return (agent.parameters ?? []).map((definition) => ({
+    ...definition,
+    source: "agent" as const,
+    agentLabel,
+  }));
+}
+
+/**
+ * Every parameter the run can carry: the union of what the scenarios in it
+ * declare, then what its agents declare.
+ *
+ * A scenario declaration wins over an agent's on a name both declare, the way
+ * the server resolves it.
+ */
+export function unionParameterDefinitions({
+  scenarioIds,
+  scenarios,
+  agents = [],
+}: {
+  scenarioIds: string[];
+  scenarios: readonly { id: string; parameters: unknown }[];
+  /** The agents the run goes against, for the parameters they declare. */
+  agents?: readonly ParameterDeclaringAgent[];
+}): DeclaredParameter[] {
+  const union = scenarioDeclaredParameters({ scenarioIds, scenarios });
+  for (const definition of agents.flatMap(agentDeclaredParameters)) {
+    if (union.has(definition.name)) continue;
+    union.set(definition.name, definition);
   }
   return [...union.values()];
 }

@@ -84,6 +84,68 @@ export function AgentBlocks({
   );
 }
 
+/** What a card takes as its background under the pointer. */
+function cardHoverBackground({
+  isActive,
+  canRun,
+}: {
+  isActive: boolean;
+  canRun: boolean;
+}): string | undefined {
+  if (isActive) return "blue.subtle";
+  if (canRun) return "bg.muted/60";
+  return undefined;
+}
+
+/**
+ * The line under the name of an agent: the presence of a connected agent, or
+ * the local tunnel of the other kinds.
+ *
+ * The row keeps its height with or without the line, so the cards line up.
+ */
+function AgentReachLine({ agent }: { agent: RunDialogAgent }) {
+  const hasDevTunnel = agentHasDevTunnel(agent);
+  const isConnected = agent.type === "connected";
+  const isOnline = agent.status === "online";
+
+  return (
+    <HStack
+      gap={1.5}
+      marginTop={1}
+      minHeight="16px"
+      data-testid={hasDevTunnel ? `agent-dev-tunnel-${agent.id}` : undefined}
+    >
+      {isConnected && (
+        <>
+          <Box
+            boxSize="8px"
+            borderRadius="full"
+            flexShrink={0}
+            background={isOnline ? "green.500" : "fg.subtle"}
+            data-testid={`agent-presence-${agent.id}`}
+          />
+          <Text fontSize="11px" color={FG_MUTED} truncate>
+            {isOnline ? "Online" : "Offline"}
+          </Text>
+        </>
+      )}
+      {!isConnected && hasDevTunnel && (
+        <>
+          <Box
+            boxSize="8px"
+            borderRadius="full"
+            flexShrink={0}
+            background="orange.500"
+          />
+          <Text fontSize="11px" color={FG_MUTED} truncate>
+            Local tunnel
+          </Text>
+        </>
+      )}
+    </HStack>
+  );
+}
+
 /** One agent card: its kind, its name, and how it can be reached. */
 function AgentBlock({
   agent,
@@ -95,9 +157,6 @@ function AgentBlock({
   onSelect: (target: NonNullable<TargetValue>) => void;
 }) {
   const AgentIcon = AGENT_ICONS[agent.type];
-  const hasDevTunnel = agentHasDevTunnel(agent);
-  const isConnected = agent.type === "connected";
-  const isOnline = agent.status === "online";
   const canRun = agent.runnable !== false;
 
   const card = (
@@ -109,13 +168,7 @@ function AgentBlock({
       borderWidth="1px"
       borderColor={isActive ? "blue.500" : "border"}
       background={isActive ? "blue.subtle" : undefined}
-      _hover={{
-        background: isActive
-          ? "blue.subtle"
-          : canRun
-            ? "bg.muted/60"
-            : undefined,
-      }}
+      _hover={{ background: cardHoverBackground({ isActive, canRun }) }}
       borderRadius="xl"
       paddingX={3}
       paddingY={2.5}
@@ -140,42 +193,7 @@ function AgentBlock({
       <Text fontSize="12.5px" fontWeight="medium" truncate marginTop={3}>
         {agent.label ?? agent.name}
       </Text>
-      {/* The row keeps its height with or without the line, so the cards
-          line up. */}
-      <HStack
-        gap={1.5}
-        marginTop={1}
-        minHeight="16px"
-        data-testid={hasDevTunnel ? `agent-dev-tunnel-${agent.id}` : undefined}
-      >
-        {isConnected && (
-          <>
-            <Box
-              boxSize="8px"
-              borderRadius="full"
-              flexShrink={0}
-              background={isOnline ? "green.500" : "fg.subtle"}
-              data-testid={`agent-presence-${agent.id}`}
-            />
-            <Text fontSize="11px" color={FG_MUTED} truncate>
-              {isOnline ? "Online" : "Offline"}
-            </Text>
-          </>
-        )}
-        {!isConnected && hasDevTunnel && (
-          <>
-            <Box
-              boxSize="8px"
-              borderRadius="full"
-              flexShrink={0}
-              background="orange.500"
-            />
-            <Text fontSize="11px" color={FG_MUTED} truncate>
-              Local tunnel
-            </Text>
-          </>
-        )}
-      </HStack>
+      <AgentReachLine agent={agent} />
     </Box>
   );
 

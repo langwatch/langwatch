@@ -76,6 +76,55 @@ function oneTurnInput({
 }
 
 /**
+ * Sends one turn to a connected agent, through the dispatcher and the
+ * instance choice a run uses, and answers what the instance returned.
+ */
+async function dispatchConnectedTurn({
+  projectId,
+  agent,
+  message,
+  params,
+}: {
+  projectId: string;
+  agent: AgentWithFields;
+  message: string;
+  params?: Record<string, string | number | boolean>;
+}): Promise<AgentTestTurnResult> {
+  const config = agent.config as ConnectedComponentConfig;
+  const messages = [{ role: "user" as const, content: message }];
+  const outcome = await getConnectedAgentRuntime().dispatcher.dispatch({
+    projectId,
+    agent: {
+      id: agent.id,
+      name: agent.name,
+      environment: agent.environment,
+      timeoutMs: Math.min(
+        config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
+        MAX_CALL_TIMEOUT_MS,
+      ),
+      sticky: config.sticky ?? false,
+    },
+    call: {
+      threadId: crypto.randomUUID(),
+      messages,
+      newMessages: messages,
+      params: params ?? {},
+      session: undefined,
+      traceparent: null,
+      run: {},
+    },
+  });
+  return {
+    output: outcome.output,
+    durationMs: outcome.durationMs,
+    instance: {
+      hostname: outcome.instance.hostname,
+      label: outcome.instance.label,
+    },
+  };
+}
+
+/**
  * Sends one turn to the agent and answers what it returned.
  *
  * @throws {AgentNotFoundError} when no such agent is in the project
@@ -121,38 +170,7 @@ export async function sendAgentTestTurn({
   });
 
   if (agent.type === "connected") {
-    const config = agent.config as ConnectedComponentConfig;
-    const messages = [{ role: "user" as const, content: message }];
-    const outcome = await getConnectedAgentRuntime().dispatcher.dispatch({
-      projectId,
-      agent: {
-        id: agent.id,
-        name: agent.name,
-        environment: agent.environment,
-        timeoutMs: Math.min(
-          config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
-          MAX_CALL_TIMEOUT_MS,
-        ),
-        sticky: config.sticky ?? false,
-      },
-      call: {
-        threadId: crypto.randomUUID(),
-        messages,
-        newMessages: messages,
-        params: params ?? {},
-        session: undefined,
-        traceparent: null,
-        run: {},
-      },
-    });
-    return {
-      output: outcome.output,
-      durationMs: outcome.durationMs,
-      instance: {
-        hostname: outcome.instance.hostname,
-        label: outcome.instance.label,
-      },
-    };
+    return await dispatchConnectedTurn({ projectId, agent, message, params });
   }
 
   // The same prepared data the scenario child receives, and the same adapter

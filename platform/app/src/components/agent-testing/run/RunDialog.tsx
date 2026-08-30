@@ -90,6 +90,41 @@ function runBlockedReason({
   return null;
 }
 
+/** The set of open lists with one list added or taken away. */
+function withOpenList({
+  current,
+  id,
+  isOpen,
+}: {
+  current: ReadonlySet<string>;
+  id: string;
+  isOpen: boolean;
+}): ReadonlySet<string> {
+  if (current.has(id) === isOpen) return current;
+  const next = new Set(current);
+  if (isOpen) next.add(id);
+  else next.delete(id);
+  return next;
+}
+
+/** The title bar of the dialog. */
+function RunDialogHeader({ subject }: { subject: RunDialogSubject }) {
+  return (
+    <Dialog.Header
+      borderBottomWidth="1px"
+      borderColor="border"
+      paddingX={5}
+      paddingY={3.5}
+      display="block"
+    >
+      <Dialog.Title fontSize="14px" fontWeight="semibold">
+        {dialogTitle(subject)}
+      </Dialog.Title>
+      <Dialog.CloseTrigger />
+    </Dialog.Header>
+  );
+}
+
 export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
   // Escape belongs to the run name list while that list is open. The dialog's
   // own Escape handling listens on the document in the capture phase, so it
@@ -98,13 +133,7 @@ export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
   // The parameter fields report their lists the same way, by id.
   const [openLists, setOpenLists] = useState<ReadonlySet<string>>(new Set());
   const reportOpenList = useCallback((id: string, isOpen: boolean) => {
-    setOpenLists((current) => {
-      if (current.has(id) === isOpen) return current;
-      const next = new Set(current);
-      if (isOpen) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+    setOpenLists((current) => withOpenList({ current, id, isOpen }));
   }, []);
   const form = useRunDialogForm(subject);
   const controller = useRunDialogSubmit({
@@ -145,18 +174,7 @@ export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
         onClick={(event) => event.stopPropagation()}
         data-testid={subject.kind === "case" ? "run-case-dialog" : "run-dialog"}
       >
-        <Dialog.Header
-          borderBottomWidth="1px"
-          borderColor="border"
-          paddingX={5}
-          paddingY={3.5}
-          display="block"
-        >
-          <Dialog.Title fontSize="14px" fontWeight="semibold">
-            {dialogTitle(subject)}
-          </Dialog.Title>
-          <Dialog.CloseTrigger />
-        </Dialog.Header>
+        <RunDialogHeader subject={subject} />
         <Dialog.Body
           paddingX={5}
           paddingY={4}

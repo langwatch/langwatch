@@ -96,12 +96,12 @@ export class InstanceRegistry {
   }): Promise<void> {
     await Promise.all([
       ...agentIds.map((agentId) =>
-        this.store.zadd(
-          instanceSetKey(projectId, agentId),
-          now,
-          instanceId,
-          PRESENCE_TTL_SECONDS,
-        ),
+        this.store.zadd({
+          key: instanceSetKey(projectId, agentId),
+          score: now,
+          member: instanceId,
+          ttlSeconds: PRESENCE_TTL_SECONDS,
+        }),
       ),
       this.touchMeta({ instanceId, agentIds, meta }),
     ]);
@@ -239,21 +239,26 @@ function fieldsOf(
   };
 }
 
+/** One field of the hash as text, empty when the hash misses it. */
+function textOf(fields: Record<string, string>, name: string): string {
+  return fields[name] ?? "";
+}
+
 function metaFromFields(fields: Record<string, string>): InstanceMeta {
   return {
-    instanceId: fields.instanceId ?? "",
-    projectId: fields.projectId ?? "",
-    hostname: fields.hostname ?? "",
-    username: fields.username ?? "",
-    pid: Number(fields.pid ?? 0),
+    instanceId: textOf(fields, "instanceId"),
+    projectId: textOf(fields, "projectId"),
+    hostname: textOf(fields, "hostname"),
+    username: textOf(fields, "username"),
+    pid: Number(textOf(fields, "pid")),
     sdk: {
-      name: fields.sdkName ?? "",
-      version: fields.sdkVersion ?? "",
-      language: fields.sdkLanguage ?? "",
+      name: textOf(fields, "sdkName"),
+      version: textOf(fields, "sdkVersion"),
+      language: textOf(fields, "sdkLanguage"),
     },
     label: fields.label ? fields.label : null,
-    podId: fields.podId ?? "",
-    connectedAt: Number(fields.connectedAt ?? 0),
-    maxConcurrency: Math.max(1, Number(fields.maxConcurrency ?? 1)),
+    podId: textOf(fields, "podId"),
+    connectedAt: Number(textOf(fields, "connectedAt")),
+    maxConcurrency: Math.max(1, Number(textOf(fields, "maxConcurrency"))),
   };
 }

@@ -47,6 +47,51 @@ type RunParametersFields = Pick<
   | "hideParameters"
 >;
 
+/** The switch that turns the single line into one row per parameter. */
+function SecretParametersToggle({
+  isOn,
+  isLockedInRows,
+  disabled,
+  onToggle,
+}: {
+  isOn: boolean;
+  /** True while a credential holds the block in its rows. */
+  isLockedInRows: boolean;
+  disabled: boolean;
+  onToggle: (wanted: boolean) => void;
+}) {
+  return (
+    <Tooltip
+      content={LOCKED_IN_ROWS_MESSAGE}
+      disabled={!isLockedInRows}
+      positioning={{ placement: "top" }}
+    >
+      <chakra.span
+        display="flex"
+        alignItems="center"
+        gap={1.5}
+        opacity={isLockedInRows ? 0.6 : 1}
+        title={isLockedInRows ? LOCKED_IN_ROWS_MESSAGE : undefined}
+        data-testid="run-dialog-secret-parameters-toggle"
+      >
+        <Text as="span" fontSize="11.5px" color={FG_MUTED}>
+          Secret parameters
+        </Text>
+        <Switch
+          size="sm"
+          checked={isOn}
+          disabled={disabled}
+          onCheckedChange={(event) => onToggle(event.checked)}
+          inputProps={{
+            "data-testid": "run-dialog-secret-parameters",
+          }}
+          aria-label="Secret parameters"
+        />
+      </chakra.span>
+    </Tooltip>
+  );
+}
+
 export function RunParametersSection({
   form,
   isBusy,
@@ -74,36 +119,12 @@ export function RunParametersSection({
             gap={1.5}
             marginLeft="auto"
           >
-            <Tooltip
-              content={LOCKED_IN_ROWS_MESSAGE}
-              disabled={!isLockedInRows}
-              positioning={{ placement: "top" }}
-            >
-              <chakra.span
-                display="flex"
-                alignItems="center"
-                gap={1.5}
-                opacity={isLockedInRows ? 0.6 : 1}
-                title={isLockedInRows ? LOCKED_IN_ROWS_MESSAGE : undefined}
-                data-testid="run-dialog-secret-parameters-toggle"
-              >
-                <Text as="span" fontSize="11.5px" color={FG_MUTED}>
-                  Secret parameters
-                </Text>
-                <Switch
-                  size="sm"
-                  checked={form.showParameterRows}
-                  disabled={isBusy || isLockedInRows}
-                  onCheckedChange={(event) =>
-                    form.setParameterRowsMode(event.checked)
-                  }
-                  inputProps={{
-                    "data-testid": "run-dialog-secret-parameters",
-                  }}
-                  aria-label="Secret parameters"
-                />
-              </chakra.span>
-            </Tooltip>
+            <SecretParametersToggle
+              isOn={form.showParameterRows}
+              isLockedInRows={isLockedInRows}
+              disabled={isBusy || isLockedInRows}
+              onToggle={form.setParameterRowsMode}
+            />
             <RemoveBlockButton
               label="Remove the parameter overrides"
               onClick={form.hideParameters}
