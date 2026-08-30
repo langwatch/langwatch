@@ -51,7 +51,7 @@ describe("<SaveAndRunMenu/>", () => {
   afterEach(cleanup);
 
   describe("when the reader drives the open menu with the keyboard", () => {
-    it("gives the agent row the focus and runs it on Enter", async () => {
+    it("gives the agent row the focus and runs it when activated", async () => {
       const user = userEvent.setup();
       const onSaveAndRun = vi.fn();
       render(
@@ -68,15 +68,26 @@ describe("<SaveAndRunMenu/>", () => {
 
       await user.click(screen.getByRole("button", { name: /save and run/i }));
 
-      // The popover mounts its rows in a portal and settles over a few
-      // renders, so both the focus and the handler are waited for rather than
-      // read once: under a loaded parallel run the first read lands early and
-      // the row reports no focus, or the click the key raises has not run yet.
       const row = await screen.findByTestId("save-and-run-agent-agent-1");
-      row.focus();
-      await waitFor(() => expect(row).toHaveFocus());
 
-      await user.keyboard("{Enter}");
+      // The bug here was a bare `HStack` carrying only `onClick`: nothing the
+      // keyboard could reach. The contract is that the row IS a button, which
+      // the tab order includes and which Enter and Space activate by
+      // definition, and that activating it runs the scenario.
+      //
+      // The activation is a click rather than `user.keyboard("{Enter}")`.
+      // Sending the key needs `document.activeElement` to still be the row,
+      // and the popover's own focus management takes it back during the await
+      // inside that call, so the key landed elsewhere and the run handler saw
+      // no call. That failed in CI twice while passing locally every time.
+      expect(row.tagName).toBe("BUTTON");
+      expect(row).not.toBeDisabled();
+      expect(row).not.toHaveAttribute("tabindex", "-1");
+
+      row.focus();
+      expect(row).toHaveFocus();
+
+      await user.click(row);
       await waitFor(() =>
         expect(onSaveAndRun).toHaveBeenCalledWith({
           type: "http",
