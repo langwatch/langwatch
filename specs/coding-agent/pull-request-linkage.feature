@@ -928,3 +928,46 @@ Rule: The organization-wide usage read is RBAC-scoped and numbers only
     When the pull request usage is read for that workspace
     Then the refusal carries a named code saying the key is for a different workspace
     And nothing in the refusal says whose workspace it is
+
+# The question is organization-wide, so the v1 door authenticates at the
+# organization: an sk-lw user-bound key alone, with no project named anywhere.
+# The personal-workspace indirection on the legacy path existed only to recover
+# the calling user, which the key itself already carries.
+Rule: The v1 usage read needs only an organization credential that names its user
+
+  @integration
+  Scenario: An organization key reads pull request usage without naming a project
+    Given a user-bound organization API key
+    When the v1 pull request usage is read with no project id anywhere in the request
+    Then the answer is the caller's organization-wide rollup
+    And the read is recorded against the caller, the organization and the pull request
+
+  # An organization service key authenticates fine but answers for nobody:
+  # the rollup is the CALLER's permission cut, and a key with no user has no
+  # caller to cut by. Refused with its own stable code, not a generic 401.
+  @integration
+  Scenario: An organization key with no bound user cannot read pull request usage
+    Given an organization API key created without a user
+    When the v1 pull request usage is read
+    Then the refusal carries a named code saying a user-bound API key is required
+
+  # A legacy project key carries no organization and no user, so it cannot
+  # authenticate at the organization door at all. The refusal names the
+  # credential class to swap, because the caller is holding a working key of
+  # the wrong family, not a typo.
+  @integration
+  Scenario: A legacy project key cannot reach the v1 usage read
+    Given a legacy project API key
+    When the v1 pull request usage is read
+    Then the refusal carries the credential class mismatch code
+    And the refusal names the organization key as the class this door needs
+
+  # The mapping is per organization, so another organization's key holds no
+  # question this instance can answer for that pull request — and learning
+  # whether the mapping exists elsewhere is not its to learn.
+  @integration
+  Scenario: An organization key from another organization learns nothing
+    Given a user-bound organization API key from a different organization
+    When the v1 pull request usage is read for a pull request mapped elsewhere
+    Then the caller receives the pull request not mapped failure
+    And nothing says the pull request is mapped for anyone else

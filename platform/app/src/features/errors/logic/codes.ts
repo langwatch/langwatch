@@ -382,6 +382,7 @@ export const APP_ERROR_CODES = [
   // and the scan is right to insist it be listed here as well.
   "unauthorized",
   "usage_report_failed",
+  "user_bound_key_required",
   "user_not_in_organization",
   "user_to_impersonate_not_found",
   // Raised by the shared package rather than an app-level subclass:

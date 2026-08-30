@@ -1309,6 +1309,7 @@
             "pages": [
               "api-reference/coding-agents/overview",
               "api-reference/coding-agents/get-pull-request-coding-agent-usage",
+              "api-reference/coding-agents/get-pull-request-usage",
               "api-reference/coding-agents/list-coding-agent-session-events"
             ]
           },

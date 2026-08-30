@@ -8751,7 +8751,7 @@
       "get": {
         "operationId": "getApiCodingAgentPullRequestUsage",
         "summary": "Get pull request coding agent usage",
-        "description": "Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price.",
+        "description": "Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price. Prefer `GET /api/v1/coding-agent/pull-request-usage`, which answers the same question with an organization API key alone and needs no X-Project-Id header.",
         "parameters": [
           {
             "name": "repository",
@@ -9127,6 +9127,312 @@
         "security": [
           {
             "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/coding-agent/pull-request-usage": {
+      "get": {
+        "operationId": "getPullRequestUsage",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pullRequest": {
+                      "type": "object",
+                      "properties": {
+                        "repositoryHost": {
+                          "type": "string"
+                        },
+                        "repositoryFullName": {
+                          "type": "string"
+                        },
+                        "prNumber": {
+                          "type": "number"
+                        },
+                        "headBranch": {
+                          "type": "string"
+                        },
+                        "htmlUrl": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "type": "string"
+                        },
+                        "isDraft": {
+                          "type": "boolean"
+                        },
+                        "authorLogin": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "prCreatedAtMs": {
+                          "type": "number"
+                        },
+                        "prClosedAtMs": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "prMergedAtMs": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "repositoryHost",
+                        "repositoryFullName",
+                        "prNumber",
+                        "headBranch",
+                        "htmlUrl",
+                        "state",
+                        "isDraft",
+                        "authorLogin",
+                        "prCreatedAtMs",
+                        "prClosedAtMs",
+                        "prMergedAtMs"
+                      ]
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "projectId": {
+                            "type": "string"
+                          },
+                          "projectSlug": {
+                            "type": "string"
+                          },
+                          "contributorLabel": {
+                            "type": "string"
+                          },
+                          "contributorIsProject": {
+                            "type": "boolean"
+                          },
+                          "agent": {
+                            "type": "string"
+                          },
+                          "models": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "sessionsCount": {
+                            "type": "number"
+                          },
+                          "inputTokens": {
+                            "type": "number"
+                          },
+                          "outputTokens": {
+                            "type": "number"
+                          },
+                          "cacheReadTokens": {
+                            "type": "number"
+                          },
+                          "cacheCreationTokens": {
+                            "type": "number"
+                          },
+                          "totalTokens": {
+                            "type": "number"
+                          },
+                          "costUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "billedCostUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "nonBilledCostUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "projectId",
+                          "projectSlug",
+                          "contributorLabel",
+                          "contributorIsProject",
+                          "agent",
+                          "models",
+                          "sessionsCount",
+                          "inputTokens",
+                          "outputTokens",
+                          "cacheReadTokens",
+                          "cacheCreationTokens",
+                          "totalTokens",
+                          "costUsd",
+                          "billedCostUsd",
+                          "nonBilledCostUsd"
+                        ]
+                      }
+                    },
+                    "totals": {
+                      "type": "object",
+                      "properties": {
+                        "sessionsCount": {
+                          "type": "number"
+                        },
+                        "inputTokens": {
+                          "type": "number"
+                        },
+                        "outputTokens": {
+                          "type": "number"
+                        },
+                        "cacheReadTokens": {
+                          "type": "number"
+                        },
+                        "cacheCreationTokens": {
+                          "type": "number"
+                        },
+                        "totalTokens": {
+                          "type": "number"
+                        },
+                        "costUsd": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "billedCostUsd": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "nonBilledCostUsd": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "sessionsCount",
+                        "inputTokens",
+                        "outputTokens",
+                        "cacheReadTokens",
+                        "cacheCreationTokens",
+                        "totalTokens",
+                        "costUsd",
+                        "billedCostUsd",
+                        "nonBilledCostUsd"
+                      ]
+                    },
+                    "modelBreakdown": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "model": {
+                            "type": "string"
+                          },
+                          "inputTokens": {
+                            "type": "number"
+                          },
+                          "outputTokens": {
+                            "type": "number"
+                          },
+                          "cacheReadTokens": {
+                            "type": "number"
+                          },
+                          "cacheCreationTokens": {
+                            "type": "number"
+                          },
+                          "totalTokens": {
+                            "type": "number"
+                          },
+                          "costUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "tokensKnown": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "model",
+                          "inputTokens",
+                          "outputTokens",
+                          "cacheReadTokens",
+                          "cacheCreationTokens",
+                          "totalTokens",
+                          "costUsd",
+                          "tokensKnown"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "pullRequest",
+                    "rows",
+                    "totals",
+                    "modelBreakdown"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Authenticate with your own organization API key and nothing else: no project id is sent anywhere. Rows appear only for projects you may view, and cost only for those you may price.",
+        "summary": "Get pull request usage",
+        "tags": [
+          "Coding Agents"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "repository",
+            "schema": {
+              "type": "string",
+              "pattern": "^[^/\\s]+\\/[^/\\s]+$"
+            },
+            "required": true,
+            "description": "The repository as \"owner/name\"."
+          },
+          {
+            "in": "query",
+            "name": "pullRequest",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": true,
+            "description": "The pull request number."
+          },
+          {
+            "in": "query",
+            "name": "host",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "default": "github.com"
+            },
+            "description": "The GitHub host, for GitHub Enterprise Server instances. Defaults to github.com."
+          }
+        ],
+        "security": [
+          {
+            "admin_api_key": []
           }
         ]
       }
