@@ -334,6 +334,15 @@ const registry = {
     docsPath: "/agent-simulations/authenticated-agents",
   },
 
+  // ---- connected agents ----
+  agent_register_only: {
+    tips: [
+      "A connected agent is created and updated by the SDK when the decorated function's process starts; change the code and start the process again",
+      "Only `config.description` can be edited through this API; the agent can also be archived",
+    ],
+    docsPath: "/agent-simulations/connect-your-agent",
+  },
+
   // ---- agent dev tunnel ----
   agent_dev_tunnel_unreachable: {
     tips: [

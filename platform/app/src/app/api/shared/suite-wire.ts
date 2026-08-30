@@ -33,11 +33,15 @@ import { parseSuiteScope, suiteScopeSchema } from "~/server/suites/scope";
  */
 export const suiteTargetSchema = z.object({
   type: z
-    .enum(["prompt", "http", "code", "workflow"])
-    .describe("What kind of thing the scenarios run against."),
+    .enum(["prompt", "http", "code", "workflow", "connected"])
+    .describe(
+      "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.",
+    ),
   referenceId: z
     .string()
-    .describe("The id of the prompt, agent or workflow to run against."),
+    .describe(
+      "The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id.",
+    ),
   runParameters: runParameterValuesSchema
     .optional()
     .describe(

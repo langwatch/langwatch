@@ -2796,13 +2796,23 @@ model Agent {
   copiedFromAgentId String?
   copiedFrom        Agent?    @relation("AgentCopies", fields: [copiedFromAgentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   copiedAgents      Agent[]   @relation("AgentCopies")
+  // Connected agents (ADR-128): the environment the SDK resolved, the scope of
+  // a development agent (a personal key's owner, or the host of a project key),
+  // the identity the SDK upserts by, and the last time an instance was seen.
+  environment       String?
+  ownerUserId       String?
+  hostLabel         String?
+  identityKey       String?
+  lastSeenAt        DateTime?
   archivedAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @default(now()) @updatedAt
 
+  @@unique([projectId, identityKey])
   @@index([projectId])
   @@index([workflowId])
   @@index([copiedFromAgentId])
+  @@index([projectId, lastSeenAt])
 }
 
 model Evaluator {

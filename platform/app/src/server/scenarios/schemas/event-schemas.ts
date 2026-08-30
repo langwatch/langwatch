@@ -65,7 +65,7 @@ const baseScenarioEventSchema = baseEventSchema.extend({
  */
 export const langwatchMetadataSchema = z.object({
   targetReferenceId: z.string(),
-  targetType: z.enum(["prompt", "http", "code", "workflow"]),
+  targetType: z.enum(["prompt", "http", "code", "workflow", "connected"]),
   /**
    * The key the target folds under: the reference id alone, or the reference
    * id and a hash of the target's parameter overrides when it carries any.

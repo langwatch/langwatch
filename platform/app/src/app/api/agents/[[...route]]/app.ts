@@ -7,6 +7,9 @@ import {
   type AgentComponentConfig,
   agentTypeSchema,
 } from "../../../../server/agents/agent.repository";
+import { toAgentListRow } from "../../../../server/agents/agent.service";
+import { AgentRegisterOnlyError } from "../../../../server/agents/errors";
+import { scenarioParameterDefinitionSchema } from "../../../../server/scenarios/parameters";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import {
   type AgentServiceMiddlewareVariables,
@@ -114,6 +117,9 @@ secured.access(requires("project:update")).post(
     const project = c.get("project");
     const { name, type, config, workflowId } = c.req.valid("json");
     const service = c.get("agentService");
+    // A connected agent is registered by the SDK from the process that runs
+    // it; a request body cannot stand in for that process.
+    if (type === "connected") throw new AgentRegisterOnlyError();
 
     let agent;
     try {
@@ -131,12 +137,7 @@ secured.access(requires("project:update")).post(
 
     return c.json(
       {
-        id: agent.id,
-        name: agent.name,
-        type: agent.type,
-        config: agent.config,
-        createdAt: agent.createdAt,
-        updatedAt: agent.updatedAt,
+        ...toAgentListRow(agent),
         platformUrl: agentPlatformUrl({
           projectSlug: project.slug,
           agentId: agent.id,
@@ -171,12 +172,7 @@ secured.access(requires("project:view")).get(
     }
 
     return c.json({
-      id: agent.id,
-      name: agent.name,
-      type: agent.type,
-      config: agent.config,
-      createdAt: agent.createdAt,
-      updatedAt: agent.updatedAt,
+      ...toAgentListRow(agent),
       platformUrl: agentPlatformUrl({
         projectSlug: project.slug,
         agentId: agent.id,
@@ -189,8 +185,39 @@ secured.access(requires("project:view")).get(
 const agentResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
-  type: agentTypeSchema,
+  type: agentTypeSchema.describe(
+    "The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.",
+  ),
   config: z.record(z.unknown()).nullable(),
+  environment: z
+    .string()
+    .nullable()
+    .describe(
+      "The environment a connected agent registered with, for example production or development. Null for every other kind.",
+    ),
+  ownerUserId: z
+    .string()
+    .nullable()
+    .describe(
+      "The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared.",
+    ),
+  hostLabel: z
+    .string()
+    .nullable()
+    .describe(
+      "The machine a development agent registered from with a project or service key. Null when the agent is personal or shared.",
+    ),
+  lastSeenAt: z
+    .date()
+    .nullable()
+    .describe(
+      "When an instance of a connected agent was last connected. Null for every other kind.",
+    ),
+  parameters: z
+    .array(scenarioParameterDefinitionSchema)
+    .describe(
+      "The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind.",
+    ),
   createdAt: z.date(),
   updatedAt: z.date(),
   platformUrl: z.string().url(),
@@ -264,12 +291,7 @@ function registerUpdateAgentVerb(verb: "patch" | "put"): void {
       }
 
       return c.json({
-        id: agent.id,
-        name: agent.name,
-        type: agent.type,
-        config: agent.config,
-        createdAt: agent.createdAt,
-        updatedAt: agent.updatedAt,
+        ...toAgentListRow(agent),
         platformUrl: agentPlatformUrl({
           projectSlug: project.slug,
           agentId: agent.id,

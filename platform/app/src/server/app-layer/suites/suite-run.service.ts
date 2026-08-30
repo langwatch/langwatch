@@ -50,7 +50,7 @@ export type SuiteRunResult = {
 
 /** Target reference for scheduling */
 export type SuiteRunTarget = {
-  type: "http" | "prompt" | "code" | "workflow";
+  type: "http" | "prompt" | "code" | "workflow" | "connected";
   referenceId: string;
   /** The parameter overrides of this target alone. See `target-key.ts`. */
   runParameters?: RunParameterValues;

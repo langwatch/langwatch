@@ -20,7 +20,11 @@ export const handleAgentError = async (
   const method = c.req.method;
   const routeParams = c.req.param();
   const status =
-    error instanceof HttpError ? error.status : (error.status ?? 500);
+    error instanceof HttpError
+      ? error.status
+      : HandledError.isHandled(error)
+        ? error.httpStatus
+        : (error.status ?? 500);
 
   logger.error(
     {

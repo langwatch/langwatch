@@ -18,7 +18,7 @@ import {
 import { isAgentTarget, useFilteredAgents } from "./useFilteredScenarioTargets";
 
 export type TargetValue = {
-  type: "prompt" | "http" | "code" | "workflow";
+  type: "prompt" | "http" | "code" | "workflow" | "connected";
   id: string;
 } | null;
 

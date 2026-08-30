@@ -1,12 +1,17 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
 
 import type { PrismaClient } from "~/generated/prisma/client";
-import type { Workflow } from "~/optimization_studio/types/dsl";
+import type {
+  ConnectedComponentConfig,
+  Workflow,
+} from "~/optimization_studio/types/dsl";
+import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import {
   type AgentComponentConfig,
   type AgentCopyRow,
   AgentRepository,
   type AgentType,
+  type ConnectedAgentIdentity,
   type CreateAgentInput,
   type TypedAgent,
   type UpdateAgentInput,
@@ -16,7 +21,49 @@ import {
   linkedWorkflowId,
   resolveAgentFields,
 } from "./agent-fields";
-import { AgentNotFoundError } from "./errors";
+import { AgentNotFoundError, AgentRegisterOnlyError } from "./errors";
+
+/**
+ * One agent as the REST list and read answer it: the row, plus the identity
+ * and the declared parameters of a connected agent, absent on the others.
+ */
+export type AgentListRow = {
+  id: string;
+  name: string;
+  type: string;
+  config: AgentComponentConfig;
+  environment: string | null;
+  ownerUserId: string | null;
+  hostLabel: string | null;
+  lastSeenAt: Date | null;
+  parameters: ScenarioParameterDefinition[];
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/** The parameters a connected agent declares; every other type declares none. */
+export function declaredAgentParameters(
+  agent: Pick<TypedAgent, "type" | "config">,
+): ScenarioParameterDefinition[] {
+  if (agent.type !== "connected") return [];
+  return (agent.config as ConnectedComponentConfig).parameters ?? [];
+}
+
+export function toAgentListRow(agent: TypedAgent): AgentListRow {
+  return {
+    id: agent.id,
+    name: agent.name,
+    type: agent.type,
+    config: agent.config,
+    environment: agent.environment,
+    ownerUserId: agent.ownerUserId,
+    hostLabel: agent.hostLabel,
+    lastSeenAt: agent.lastSeenAt,
+    parameters: declaredAgentParameters(agent),
+    createdAt: agent.createdAt,
+    updatedAt: agent.updatedAt,
+  };
+}
 
 /**
  * Service layer for Agent business logic.
@@ -116,8 +163,12 @@ export class AgentService {
 
   /**
    * Creates a new agent.
+   *
+   * A connected agent is never created here: the SDK registers it from the
+   * process that runs it, through {@link registerConnected}.
    */
   async create(input: CreateAgentInput): Promise<AgentWithFields> {
+    if (input.type === "connected") throw new AgentRegisterOnlyError();
     const agent = await this.repository.create(input);
     const [enriched] = await this.withFields({
       agents: [agent],
@@ -128,14 +179,82 @@ export class AgentService {
 
   /**
    * Updates an existing agent.
+   *
+   * On a connected agent only the description may change; the rest of the
+   * row is what the SDK registered and is refused with `agent_register_only`.
    */
   async update(input: UpdateAgentInput): Promise<AgentWithFields> {
-    const agent = await this.repository.update(input);
+    const narrowed = await this.narrowConnectedUpdate(input);
+    const agent = await this.repository.update(narrowed);
     const [enriched] = await this.withFields({
       agents: [agent],
       projectId: input.projectId,
     });
     return enriched!;
+  }
+
+  /**
+   * Creates or re-registers a connected agent on the row its identity key
+   * names. A reconnect of an archived identity restores the same row.
+   */
+  async registerConnected(input: {
+    id: string;
+    projectId: string;
+    name: string;
+    config: ConnectedComponentConfig;
+    identity: ConnectedAgentIdentity;
+  }): Promise<TypedAgent> {
+    const existing = await this.repository.findByIdentityKey({
+      projectId: input.projectId,
+      identityKey: input.identity.identityKey,
+    });
+    if (existing) {
+      return this.repository.reregisterConnected({
+        id: existing.id,
+        projectId: input.projectId,
+        name: input.name,
+        config: input.config,
+      });
+    }
+    return this.repository.create({
+      id: input.id,
+      projectId: input.projectId,
+      name: input.name,
+      type: "connected",
+      config: input.config,
+      identity: input.identity,
+    });
+  }
+
+  /**
+   * The update a connected agent accepts: its description, merged into the
+   * config the SDK registered. Any other field, or an update that changes the
+   * type of any agent to connected, is refused.
+   */
+  private async narrowConnectedUpdate(
+    input: UpdateAgentInput,
+  ): Promise<UpdateAgentInput> {
+    if (input.data.type === "connected") throw new AgentRegisterOnlyError();
+    const existing = await this.repository.findById({
+      id: input.id,
+      projectId: input.projectId,
+    });
+    if (existing?.type !== "connected") return input;
+
+    const { config, ...rest } = input.data;
+    const editsOtherFields = Object.keys(rest).length > 0;
+    const configKeys = Object.keys(config ?? {});
+    const editsOtherConfig = configKeys.some((key) => key !== "description");
+    if (editsOtherFields || editsOtherConfig) {
+      throw new AgentRegisterOnlyError();
+    }
+    if (!config) return input;
+    return {
+      ...input,
+      data: {
+        config: { ...existing.config, description: config.description },
+      },
+    };
   }
 
   /**
@@ -153,14 +272,7 @@ export class AgentService {
     page: number;
     limit: number;
   }): Promise<{
-    data: Array<{
-      id: string;
-      name: string;
-      type: string;
-      config: AgentComponentConfig;
-      createdAt: Date;
-      updatedAt: Date;
-    }>;
+    data: Array<AgentListRow>;
     pagination: {
       page: number;
       limit: number;
@@ -171,14 +283,7 @@ export class AgentService {
     const { data, total } = await this.repository.findAllPaginated(input);
 
     return {
-      data: data.map((agent) => ({
-        id: agent.id,
-        name: agent.name,
-        type: agent.type,
-        config: agent.config,
-        createdAt: agent.createdAt,
-        updatedAt: agent.updatedAt,
-      })),
+      data: data.map(toAgentListRow),
       pagination: {
         page: input.page,
         limit: input.limit,
@@ -230,7 +335,7 @@ export class AgentService {
     if (!existing) {
       throw new AgentNotFoundError();
     }
-    return this.repository.update(input);
+    return this.repository.update(await this.narrowConnectedUpdate(input));
   }
 
   /**

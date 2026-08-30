@@ -475,6 +475,13 @@ const presentations = {
       "This agent points at a local development tunnel that seems to have ended. Run `langwatch agent dev` again on the machine that started it, or restore the agent's URL in its settings.",
   },
 
+  // ---- connected agents ----
+  agent_register_only: {
+    title: "This agent is registered from code",
+    describe: () =>
+      "Its name, environment and parameters come from the process that runs it. Edit the description here, or change the code and start the process again.",
+  },
+
   // ---- agent-submitted reports ----
   agent_report_rate_limited: {
     // The reader here is usually a coding agent's operator on the CLI or MCP,

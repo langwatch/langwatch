@@ -20,6 +20,7 @@
  */
 export const APP_ERROR_CODES = [
   "agent_dev_tunnel_unreachable",
+  "agent_register_only",
   "agent_report_rate_limited",
   "ai_call_failed",
   "ai_query_provider_error",

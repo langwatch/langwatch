@@ -17,6 +17,10 @@ export function getAgentEditorDrawer(type: AgentType): AgentEditorDrawerName {
       throw new Error(
         `Unhandled agent type: ${type} — signature agents have no editor drawer`,
       );
+    case "connected":
+      throw new Error(
+        `Unhandled agent type: ${type} — connected agents are registered from code and have no editor drawer`,
+      );
     default: {
       const _exhaustive: never = type;
       throw new Error(`Unhandled agent type: ${_exhaustive as string}`);

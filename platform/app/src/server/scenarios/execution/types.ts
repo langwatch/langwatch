@@ -221,12 +221,31 @@ export const WorkflowAgentDataSchema = z.object({
 });
 export type WorkflowAgentData = z.infer<typeof WorkflowAgentDataSchema>;
 
+/**
+ * Pre-fetched connected agent configuration for serialized execution.
+ *
+ * The child reaches the agent through the relay route with the project key,
+ * so all it needs is the agent id, where the platform is, and the per-call
+ * budget the agent declared. The parameters the agent declares travel with
+ * the job so a typed value is sent as its declared type.
+ */
+export const ConnectedAgentDataSchema = z.object({
+  type: z.literal("connected"),
+  agentId: z.string(),
+  /** The platform's own address, the origin the relay route is posted to. */
+  endpoint: z.string(),
+  /** Per-call budget in milliseconds, already capped by the platform. */
+  timeoutMs: z.number().int().positive(),
+});
+export type ConnectedAgentData = z.infer<typeof ConnectedAgentDataSchema>;
+
 /** Union type for all supported target adapter data */
 export const TargetAdapterDataSchema = z.discriminatedUnion("type", [
   PromptConfigDataSchema,
   HttpAgentDataSchema,
   CodeAgentDataSchema,
   WorkflowAgentDataSchema,
+  ConnectedAgentDataSchema,
 ]);
 export type TargetAdapterData = z.infer<typeof TargetAdapterDataSchema>;
 
@@ -288,7 +307,7 @@ export type TelemetryConfig = z.infer<typeof TelemetryConfigSchema>;
 
 /** Target configuration - what to test against */
 export const TargetConfigSchema = z.object({
-  type: z.enum(["prompt", "http", "code", "workflow"]),
+  type: z.enum(["prompt", "http", "code", "workflow", "connected"]),
   referenceId: z.string(),
 });
 export type TargetConfig = z.infer<typeof TargetConfigSchema>;

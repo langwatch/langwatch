@@ -40,6 +40,17 @@ export const MAX_PARAMETER_NAME_LENGTH = 64;
 /** How long a parameter's description may be. */
 export const MAX_PARAMETER_DESCRIPTION_LENGTH = 500;
 
+/** How many values a closed option list may hold. */
+export const MAX_PARAMETER_OPTIONS = 50;
+
+/** The value types a declaration can name. */
+export const SCENARIO_PARAMETER_TYPES = [
+  "string",
+  "number",
+  "boolean",
+] as const;
+export type ScenarioParameterType = (typeof SCENARIO_PARAMETER_TYPES)[number];
+
 /**
  * The grammar a parameter name must satisfy.
  *
@@ -114,6 +125,31 @@ export const scenarioParameterDefinitionSchema = z.object({
     .optional()
     .describe(
       "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue.",
+    ),
+  /**
+   * The value type. Absent on a declaration authored before types existed,
+   * which reads as text. A connected agent declares it from the function's
+   * own annotations.
+   */
+  type: z
+    .enum(SCENARIO_PARAMETER_TYPES)
+    .optional()
+    .describe(
+      "The value type: string, number or boolean. Absent reads as string.",
+    ),
+  /**
+   * A closed list of the values the parameter accepts. A run that supplies a
+   * value outside the list is refused before anything is scheduled.
+   */
+  options: z
+    .array(parameterValueSchema)
+    .max(
+      MAX_PARAMETER_OPTIONS,
+      `A parameter can list at most ${MAX_PARAMETER_OPTIONS} options`,
+    )
+    .optional()
+    .describe(
+      `The values the parameter accepts, at most ${MAX_PARAMETER_OPTIONS}. A run supplying another value is refused.`,
     ),
 });
 
@@ -213,6 +249,15 @@ export type ScenarioParameterValue = z.infer<typeof parameterValueSchema>;
 export type ScenarioParameterDefinition = z.infer<
   typeof scenarioParameterDefinitionSchema
 >;
+
+/**
+ * A parameter as a connected agent declares it: one definition with the type
+ * always known, since it is read from the function's own annotations, and
+ * never secret. Secrets stay scenario-declared and run-level.
+ */
+export type ParameterSpec = Omit<ScenarioParameterDefinition, "secret"> & {
+  type: ScenarioParameterType;
+};
 export type RunParameterValues = z.infer<typeof runParameterValuesSchema>;
 
 /**

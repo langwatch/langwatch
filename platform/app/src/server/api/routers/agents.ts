@@ -2,44 +2,19 @@ import type { JsonValue } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import {
-  codeComponentSchema,
-  customComponentSchema,
-  httpComponentSchema,
-  signatureComponentSchema,
-} from "~/optimization_studio/types/dsl";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import {
   type AgentComponentConfig,
-  type AgentType,
   agentTypeSchema,
+  getConfigSchemaForType,
 } from "../../agents/agent.repository";
 import { AgentService } from "../../agents/agent.service";
+import { AgentRegisterOnlyError } from "../../agents/errors";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   copyWorkflowWithDatasets,
   saveOrCommitWorkflowVersion,
 } from "./workflows";
-
-/**
- * Get config schema based on agent type for validation
- */
-const getConfigInputSchema = (type: AgentType) => {
-  switch (type) {
-    case "signature":
-      return signatureComponentSchema;
-    case "code":
-      return codeComponentSchema;
-    case "workflow":
-      return customComponentSchema;
-    case "http":
-      return httpComponentSchema;
-    default: {
-      const _exhaustive: never = type;
-      throw new Error(`Unknown agent type: ${_exhaustive}`);
-    }
-  }
-};
 
 /**
  * Agent Router - Manages agent CRUD operations
@@ -100,7 +75,7 @@ export const agentsRouter = createTRPCRouter({
         .refine(
           (data) => {
             // Validate config matches the specified type's DSL schema
-            const schema = getConfigInputSchema(data.type);
+            const schema = getConfigSchemaForType(data.type);
             const result = schema.safeParse(data.config);
             return result.success;
           },
@@ -113,6 +88,9 @@ export const agentsRouter = createTRPCRouter({
     )
     .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
+      // A connected agent is registered by the SDK from the process that runs
+      // it; there is nothing a form could fill in for one.
+      if (input.type === "connected") throw new AgentRegisterOnlyError();
       const agentService = AgentService.create(ctx.prisma);
       // Config is validated by the refine above, safe to cast
       return await agentService.create({
