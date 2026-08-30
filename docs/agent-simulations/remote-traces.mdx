@@ -7,15 +7,15 @@ description: Judge scenario criteria against what your agent did, tool calls, wr
 
 ## Connecting your agent traces to the scenario run
 
-Linked traces are the agent's own execution traces, which the judge fetches from LangWatch before its verdict. An agent behind an HTTP endpoint returns final text; its traces carry what happened on the way there: the span tree, the tool calls with their inputs and outputs, the retrievals, the writes. The judge reads them next to the conversation, so it verifies a criterion about behavior against evidence.
+Linked traces are the agent's own execution traces, which the judge fetches from LangWatch before its verdict. The agent returns final text; its traces carry what happened on the way there: the span tree, the tool calls with their inputs and outputs, the retrievals, the writes. The judge reads them next to the conversation, so it verifies a criterion about behavior against evidence.
 
 For example, a support agent replies "your order ships Tuesday". The reply alone cannot show whether the agent looked the order up or made the date up. The trace shows the `lookup_order` tool call and its result, and the judge scores the criterion "the agent looks up the order before answering" from that span.
 
 ## One trace per conversation turn
 
-Each turn of a simulation runs as one LangWatch trace, grouped under the run's thread. On every call to an HTTP agent, the platform sends that turn's W3C `traceparent` header. When the agent's server adopts the header, the spans it produces during the turn land in the same trace, in the same project.
+Each turn of a simulation runs as one LangWatch trace, grouped under the run's thread. The platform passes that turn's W3C trace context on every call, and the spans the agent produces during the turn land in the same trace, in the same project.
 
-Adoption is one change on the agent's side, and no change at all when the server runs OpenTelemetry HTTP auto-instrumentation. The snippets are in [Connect your agent](/agent-simulations/connect-your-agent#4-adopt-the-trace-context).
+A [connected agent](/agent-simulations/connect-your-agent) adopts the context inside the SDK, before it calls the decorated function, so your code adds no step. An HTTP agent receives the context as a `traceparent` header and its server adopts it, which is no change at all when the server runs OpenTelemetry HTTP auto-instrumentation and one middleware otherwise. The snippets are in [Other ways to connect](/agent-simulations/other-ways-to-connect#4-adopt-the-trace-context).
 
 The agent must report its traces to the same LangWatch project that runs the scenarios. Traces in another project are invisible to the judge.
 
@@ -23,6 +23,7 @@ The agent must report its traces to the same LangWatch project that runs the sce
 
 | Target | How the trace context reaches your system |
 |---|---|
+| Connected agent | The SDK adopts the turn's context before it calls your function. Always on, with no code of yours involved. |
 | HTTP agent | The `traceparent` header, sent on every call. Always on. |
 | HTTP agent, custom header or body field | `{{ traceId }}` and `{{ traceparent }}` render in the URL, the header values and the body template, for a system that reads `X-Trace-Id: {{ traceId }}` or a body field instead of the standard header. |
 | Code agent | `params.trace_id` and `params.traceparent`, injected at call time, for the Python code to forward to whatever it calls. |
@@ -32,7 +33,7 @@ The agent must report its traces to the same LangWatch project that runs the sce
 
 ## What the judge sees
 
-Before its verdict on a run against an HTTP agent, the judge fetches every trace the conversation produced, one per turn, and reads:
+Before its verdict, the judge fetches every trace the conversation produced, one per turn, and reads:
 
 - the span tree, with timing,
 - each tool call, with its input and its output,
@@ -141,9 +142,9 @@ For the full SDK reference, see the [Scenario documentation](https://langwatch.a
 
 <CardGroup cols={2}>
   <Card title="Connect your agent" icon="plug" href="/agent-simulations/connect-your-agent">
-    Register your agent's HTTP endpoint and adopt the trace context
+    Decorate the function that runs your agent, and the SDK adopts the trace context
   </Card>
-  <Card title="Local development" icon="laptop-code" href="/agent-simulations/local-development">
-    Run platform test suites against the agent on your machine with a tunnel
+  <Card title="Environments" icon="laptop-code" href="/agent-simulations/environments">
+    Your machine, staging and production as separate targets
   </Card>
 </CardGroup>

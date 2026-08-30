@@ -105,10 +105,11 @@
                 "group": "Connect your agent",
                 "pages": [
                   "agent-simulations/connect-your-agent",
-                  "agent-simulations/remote-traces",
-                  "agent-simulations/local-development",
+                  "agent-simulations/environments",
                   "agent-simulations/scenario-parameters",
-                  "agent-simulations/authenticated-agents"
+                  "agent-simulations/remote-traces",
+                  "agent-simulations/authenticated-agents",
+                  "agent-simulations/other-ways-to-connect"
                 ]
               },
               "agent-simulations/testing-your-agent",
@@ -315,6 +316,7 @@
                 "pages": [
                   "integration/python/guide",
                   "integration/python/reference",
+                  "integration/python/agent-reference",
                   "integration/python/tutorials/manual-instrumentation",
                   "integration/python/tutorials/open-telemetry"
                 ]
@@ -325,6 +327,7 @@
                 "pages": [
                   "integration/typescript/guide",
                   "integration/typescript/reference",
+                  "integration/typescript/agent-reference",
                   "integration/typescript/tutorials/filtering-spans",
                   "integration/typescript/tutorials/manual-instrumentation",
                   "integration/typescript/tutorials/opentelemetry-migration",
@@ -1755,6 +1758,10 @@
     {
       "source": "/self-hosting/open-source",
       "destination": "/self-hosting/deployment/docker-compose"
+    },
+    {
+      "source": "/agent-simulations/local-development",
+      "destination": "/agent-simulations/environments"
     },
     {
       "source": "/agent-simulations/overview",

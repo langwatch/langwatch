@@ -37598,7 +37598,7 @@ A crash or a kill signal the process cannot catch skips the restore, and the age
 
 A code agent is a small piece of Python stored in the agent configuration and executed by the platform. It reads the project's secrets as an injected `secrets` namespace and the run's values as `params`, and returns the reply under a declared output key.
 
-It fits a target that is glue and nothing more: a token exchange in front of an API, or a call into a service that has no repository of its own. It does not run your product's code, its dependencies or its secrets, so it is not the way to test a real agent. Use [connecting from code](/agent-simulations/connect-your-agent) for that.
+It fits a target that is glue and no more than glue: a token exchange in front of an API, or a call into a service that has no repository of its own. It does not run your product's code, its dependencies or its secrets, so it is not the way to test a real agent. Use [connecting from code](/agent-simulations/connect-your-agent) for that.
 
 ```python
 import requests

@@ -237,6 +237,66 @@ For canary or blue/green deployments, create custom tags with `langwatch prompt 
 
 For the full Prompts CLI reference, see the [Prompt Management CLI guide](/prompt-management/cli).
 
+## Manage agents
+
+An agent is what a scenario runs against. `langwatch agent list` prints one row per agent:
+
+```bash
+langwatch agent list
+langwatch agent list --format json
+langwatch agent get <id>
+```
+
+| Column | Value |
+|---|---|
+| `Name` | The agent's name |
+| `Environment` | Which environment the row belongs to, for a connected agent |
+| `Status` | `Online` with the instance count, or `Offline` with the time it was last seen |
+| `Type` | `connected`, `http`, `code` or `workflow` |
+| `ID` | The agent id, which every `--target` accepts |
+| `Owner` | The person or the machine a personal development agent belongs to |
+| `Updated` | When the agent was last changed |
+
+`--format json` adds the parameters the agent declares and the instances that serve it.
+
+A **connected** agent registers itself: the process that runs the agent opens the connection and reports its name, its environment and its parameters. The CLI creates no row for it. See [Connect your agent](/agent-simulations/connect-your-agent).
+
+An **HTTP** agent is a URL the platform calls, and it is created from the CLI:
+
+```bash
+langwatch agent create 'My Agent' --type http --config '{
+  "url": "https://staging.example.com/chat",
+  "bodyTemplate": "{\"thread_id\": \"{{ threadId }}\", \"messages\": {{ messages }}}",
+  "outputPath": "$.reply"
+}'
+
+langwatch agent update <id> --config '{"url": "https://staging.example.com/v2/chat"}'
+langwatch agent run <id> --input '{"message": "where is my order?"}'
+langwatch agent delete <id>
+```
+
+### Point an HTTP agent at your machine
+
+`langwatch agent dev` (alias `langwatch agent tunnel`) fronts a local port with a public tunnel, points a registered HTTP agent's URL at it, and restores the previous URL on Ctrl-C.
+
+```bash
+langwatch agent dev --port 8010
+langwatch agent dev --port 8010 --agent <id or name>
+```
+
+| Flag | Effect |
+|---|---|
+| `--port <port>` | Tunnel `localhost:<port>`. |
+| `--url <url>` | Tunnel a full local URL, path included. |
+| `--agent <id or name>` | Which registered HTTP agent to repoint. A picker opens when omitted. |
+| `--tunnel-url <url>` | Use a tunnel you already run and skip provisioning one. Also skips the session secret proxy. |
+| `--no-update-url` | Print the tunnel URL and leave the agent configuration as it is. |
+| `--no-auth` | Skip the session secret proxy, for a server that authenticates every request itself. |
+
+The command is a live session with no machine-readable output, so it refuses `-o json`.
+
+A connected agent needs none of this: it reaches out from your machine, so a local process is already a target. See [Other ways to connect](/agent-simulations/other-ways-to-connect) for when each one applies.
+
 ## Run scenario tests
 
 Scenarios are the LangWatch equivalent of end-to-end tests for agents: a user simulator chats with your agent, an LLM judge scores the conversation against criteria you define, and everything is recorded for later inspection.
@@ -277,7 +337,7 @@ langwatch run-plan archive <id>
 
 | Flag | Effect |
 |---|---|
-| `--target <type:id>` | What to run against, repeatable. `http:`, `code:` and `workflow:` take an agent id, `prompt:` takes a prompt id. A `?key=value` suffix gives that target its own parameter values. |
+| `--target <type:id>` | What to run against, repeatable. `connected:`, `http:`, `code:` and `workflow:` take an agent id, `prompt:` takes a prompt id. `connected:` also takes `<name>@<environment>`. A `?key=value` suffix gives that target its own parameter values. |
 | `--all`, `--test-suite`, `--label`, `--scenario` | The scope. Exactly one kind per run; `--test-suite`, `--label` and `--scenario` repeat. |
 | `--name <text>` | The plan to run under. Left out, the platform names the plan itself. |
 | `--repeat <n>` | How many times to run each scenario, 1 to 5. |
@@ -286,6 +346,16 @@ langwatch run-plan archive <id>
 | `--note <text>` | One line about this run, up to 200 characters. It belongs to the run, not to the plan. |
 | `--idempotency-key <key>` | Repeat it to make a retry join the first run instead of starting a second one. |
 | `--wait` | Block until the batch is complete, and exit non-zero when a run failed. |
+
+A target is written `<type>:<referenceId>`. A **connected** agent takes a second form, `connected:<name>@<environment>`, which reads better in a CI job than an id and survives a project rebuild:
+
+```bash
+langwatch run-plan run --test-suite "Checkout" \
+  --target connected:support-agent@production \
+  --target connected:support-agent@staging --wait
+```
+
+Every connected target must be online when the run starts. A run naming an offline agent is refused with `agent_offline` before any scenario is scheduled. A personal development agent is refused with `agent_owner_only` for anyone but its owner, and a project API key names nobody, so it can never target one.
 
 Add `--format json` (or `-o json`) to any of the three run commands and they print one final document on stdout. With `--wait` that document comes after the poll and carries `outcome`, `tallies` and the per-run `results`.
 
@@ -405,7 +475,7 @@ Available resources include:
 - **`evaluator`**, create and version evaluators (answer correctness, faithfulness, custom LLM judges)
 - **`monitor`**, online evaluations that score production traces automatically
 - **`dataset`**, evaluation datasets (upload CSV, download, manage columns)
-- **`agent`**, agent definitions used by scenarios and monitors
+- **`agent`**, agent definitions used by scenarios and monitors (see [Manage agents](#manage-agents))
 - **`dashboard`** and **`graph`**, custom analytics dashboards
 - **`trigger`**, automations (alerts, webhooks, dataset-append on failure)
 - **`secret`**, encrypted environment variables for scheduled agent runs
