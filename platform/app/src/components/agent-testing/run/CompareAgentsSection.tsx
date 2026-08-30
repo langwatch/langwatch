@@ -44,7 +44,8 @@ export const COMPARE_HINT =
 
 /** What an agent reads as in the list, with its tunnel mark. */
 function agentOptionLabel(agent: RunDialogAgent): string {
-  return agentHasDevTunnel(agent) ? `${agent.name} · Local tunnel` : agent.name;
+  const name = agent.label ?? agent.name;
+  return agentHasDevTunnel(agent) ? `${name} · Local tunnel` : name;
 }
 
 function AddTargetButton({
