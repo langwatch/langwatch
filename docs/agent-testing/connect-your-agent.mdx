@@ -622,7 +622,7 @@ The platform normalizes the declaration into the same shape a scenario declares,
 
 A parameter the run does not supply takes its default. A parameter with no default that the run does not supply is refused before the function is called, with the name in the message.
 
-Scenario-declared parameters and agent-declared parameters share one list. See [Run parameters](/agent-testing/scenario-parameters) for how a run supplies values, for secret parameters, and for what happens when two targets accept different names.
+Scenario-declared parameters and agent-declared parameters share one list. See [Run parameters](/agent-testing/run-parameters) for how a run supplies values, for secret parameters, and for what happens when two targets accept different names.
 
 ## Session, when your agent keeps its own conversation id
 
@@ -733,7 +733,7 @@ The platform passes the turn's trace context in the call, and the SDK adopts it 
 
 There is no middleware to add, and the SDK does this for a synchronous function and an asynchronous one alike.
 
-Report the traces to the same project that runs the scenarios. Traces sent to another project, or to another observability backend only, are invisible to the judge. See [Linking your traces](/agent-testing/remote-traces) for what the judge reads and how long it waits.
+Report the traces to the same project that runs the scenarios. Traces sent to another project, or to another observability backend only, are invisible to the judge. See [Linking your traces](/agent-testing/linking-your-traces) for what the judge reads and how long it waits.
 
 ## Security
 
@@ -860,13 +860,13 @@ The run settings also record which instance served each run, so a result from a 
   <Card title="Environments and personal agents" icon="laptop-code" href="/agent-testing/environments">
     Your machine, staging and production as separate targets
   </Card>
-  <Card title="Run parameters" icon="sliders" href="/agent-testing/scenario-parameters">
+  <Card title="Run parameters" icon="sliders" href="/agent-testing/run-parameters">
     Declare values a run supplies, and offer them in the run dialog
   </Card>
   <Card title="Other ways to connect" icon="plug" href="/agent-testing/other-ways-to-connect">
     HTTP agents, the local tunnel, and code agents
   </Card>
-  <Card title="Linking your traces" icon="diagram-project" href="/agent-testing/remote-traces">
+  <Card title="Linking your traces" icon="diagram-project" href="/agent-testing/linking-your-traces">
     What the judge reads from your agent's own spans
   </Card>
 </CardGroup>

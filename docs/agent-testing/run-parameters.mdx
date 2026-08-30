@@ -43,7 +43,7 @@ Each run records the values it used, so every result shows which plan it tested.
 
 Open the scenario and click **Parameters**, next to **Labels** at the bottom of the editor. Add one row per parameter: a name, an optional description, and an optional default value.
 
-<img src="/images/simulations/scenario-parameters-form.png" alt="The scenario editor with the parameters dialog open over it, declaring a fixture parameter with a description and a default value, referenced as params.fixture in the situation and criteria" width="100%" />
+<img src="/images/agent-testing/scenario-parameters-form.png" alt="The scenario editor with the parameters dialog open over it, declaring a fixture parameter with a description and a default value, referenced as params.fixture in the situation and criteria" width="100%" />
 
 - **Name** is what `{{ params.NAME }}` reads. Letters, digits and underscores, and the first character is a letter or an underscore.
 - **Description** appears beside the field when someone starts a run.
@@ -171,11 +171,11 @@ https://api.your-company.internal/{{ params.region }}/chat
 }
 ```
 
-<img src="/images/simulations/scenario-parameters-body-template.png" alt="The HTTP agent body template editor referencing params.fixture, with the available variables hint listing params.NAME" width="100%" />
+<img src="/images/agent-testing/scenario-parameters-body-template.png" alt="The HTTP agent body template editor referencing params.fixture, with the available variables hint listing params.NAME" width="100%" />
 
 Auth fields read project secrets, not parameters. See [Testing agents behind authentication](/agent-testing/authenticated-agents#referencing-project-secrets-from-an-http-target).
 
-Next to `params`, the same fields render `{{ messages }}`, `{{ input }}` and `{{ threadId }}` from the conversation, and `{{ traceId }}` and `{{ traceparent }}` from the turn's trace context. See [Linking your traces](/agent-testing/remote-traces) for what the trace variables carry.
+Next to `params`, the same fields render `{{ messages }}`, `{{ input }}` and `{{ threadId }}` from the conversation, and `{{ traceId }}` and `{{ traceparent }}` from the turn's trace context. See [Linking your traces](/agent-testing/linking-your-traces) for what the trace variables carry.
 
 ### Prompt targets
 
@@ -224,7 +224,7 @@ A value set at run time overrides the scenario's default. A parameter with no ru
 
 Running a test suite opens a confirmation dialog with one field per parameter, prefilled with the defaults. Edit a field to change the value for that run; the scenario keeps its defaults.
 
-<img src="/images/simulations/scenario-parameters-run-dialog.png" alt="The test suite run confirmation dialog with a Parameters block, the fixture field prefilled from the scenario's default value" width="100%" />
+<img src="/images/agent-testing/scenario-parameters-run-dialog.png" alt="The test suite run confirmation dialog with a Parameters block, the fixture field prefilled from the scenario's default value" width="100%" />
 
 The **Save and Run** button in the scenario editor skips the dialog and runs with the defaults. To change a value, start the run from the test suite in **Agent Testing > Scenarios**.
 
@@ -276,7 +276,7 @@ The response carries the batch id that the scheduled runs share:
 }
 ```
 
-See [Run from CI](/agent-testing/run-suites-from-ci) for the full request and response, and for the poll that waits on the batch.
+See [Run from CI](/agent-testing/run-from-ci) for the full request and response, and for the poll that waits on the batch.
 
 ### With the SDKs
 
@@ -374,7 +374,7 @@ The platform runs these checks before it schedules any jobs. A rejected run sche
 - The run detail drawer shows the values under **Parameters**, one row per name. A secret parameter appears as its name with a masked value.
 - The CSV export writes them as one JSON object per run: the `parameters` column in a criteria export, the `run_parameters` column in a full export. Secret parameters are left out.
 
-<img src="/images/simulations/scenario-parameters-run-drawer.png" alt="The simulation run detail drawer with the Parameters section showing the resolved value the run used, next to the rendered criteria and the judge's verdict" width="100%" />
+<img src="/images/agent-testing/scenario-parameters-run-drawer.png" alt="The simulation run detail drawer with the Parameters section showing the resolved value the run used, next to the rendered criteria and the judge's verdict" width="100%" />
 
 ## Next steps
 
@@ -382,13 +382,13 @@ The platform runs these checks before it schedules any jobs. A rejected run sche
   <Card title="Authenticated agents" icon="key" href="/agent-testing/authenticated-agents">
     Reference project secrets from an HTTP target or a code agent
   </Card>
-  <Card title="Simulations getting started" icon="rocket" href="/agent-testing/getting-started">
+  <Card title="Simulations getting started" icon="rocket" href="/agent-testing/scenarios-in-code">
     Create a scenario, add a target, and run your first simulation
   </Card>
   <Card title="Command line interface" icon="terminal" href="/integration/cli">
     Every run command and its flags
   </Card>
-  <Card title="Run from CI" icon="code" href="/agent-testing/run-suites-from-ci">
+  <Card title="Run from CI" icon="code" href="/agent-testing/run-from-ci">
     Start a test suite from a CI job and wait for the batch
   </Card>
 </CardGroup>

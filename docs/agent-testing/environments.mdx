@@ -79,7 +79,7 @@ langwatch run-plan run --test-suite "Checkout" \
   --name "Checkout model comparison"
 ```
 
-Quote the target, because the shell reads `?` and `&` itself. A value after `?` is a [run parameter](/agent-testing/scenario-parameters) for that target alone.
+Quote the target, because the shell reads `?` and `&` itself. A value after `?` is a [run parameter](/agent-testing/run-parameters) for that target alone.
 
 Every target of the run must be online when the run starts. A run naming an offline target is refused before any scenario is scheduled, with `agent_offline`.
 
@@ -105,10 +105,10 @@ LANGWATCH_AGENT_CONNECT=0
   <Card title="Connect your agent" icon="plug" href="/agent-testing/connect-your-agent">
     Decorate the function that runs your agent
   </Card>
-  <Card title="Run parameters" icon="sliders" href="/agent-testing/scenario-parameters">
+  <Card title="Run parameters" icon="sliders" href="/agent-testing/run-parameters">
     Values a run supplies, declared by the scenario or by the agent
   </Card>
-  <Card title="Run from CI" icon="code" href="/agent-testing/run-suites-from-ci">
+  <Card title="Run from CI" icon="code" href="/agent-testing/run-from-ci">
     Start a test suite from a CI job and wait for the batch
   </Card>
   <Card title="Other ways to connect" icon="plug" href="/agent-testing/other-ways-to-connect">

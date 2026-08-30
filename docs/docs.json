@@ -114,7 +114,6 @@
                   "agent-testing/connect-your-agent",
                   "agent-testing/targets",
                   "agent-testing/environments",
-                  "agent-testing/run-parameters",
                   "agent-testing/linking-your-traces",
                   "agent-testing/authenticated-agents",
                   "agent-testing/other-ways-to-connect"

@@ -340,42 +340,42 @@ const registry = {
       "A connected agent is created and updated by the SDK when the decorated function's process starts; change the code and start the process again",
       "This API can archive the agent; every other field is the SDK's to write",
     ],
-    docsPath: "/agent-simulations/connect-your-agent",
+    docsPath: "/agent-testing/connect-your-agent",
   },
   agent_test_refused: {
     tips: [
       "A test run sends the agent one message and waits for its answer; it needs an HTTP, code, workflow or connected agent whose configuration is complete",
       "Open the agent, fix what the message names, save it and test again",
     ],
-    docsPath: "/agent-simulations/connect-your-agent",
+    docsPath: "/agent-testing/connect-your-agent",
   },
   scenario_parameter_option_invalid: {
     tips: [
       "A parameter with options accepts only the values it lists; pick one of them for this run",
       "To accept another value, widen the options on the scenario, or on the decorated function of a connected agent",
     ],
-    docsPath: "/agent-simulations/scenario-parameters",
+    docsPath: "/agent-testing/run-parameters",
   },
   agent_not_found: {
     tips: [
       "List the project's agents with `langwatch agent list` and use an id from that list",
       "An archived agent is not found; a connected agent that registers again restores its row",
     ],
-    docsPath: "/agent-simulations/connect-your-agent",
+    docsPath: "/agent-testing/connect-your-agent",
   },
   agent_offline: {
     tips: [
       "Start the process that runs the decorated function; the agent shows Online in the agents list once it connects",
       "Check that the process connects with the same project and environment as the agent you are running against",
     ],
-    docsPath: "/agent-simulations/connect-your-agent",
+    docsPath: "/agent-testing/connect-your-agent",
   },
   agent_owner_only: {
     tips: [
       "A development agent registered with a personal key belongs to that person; connect your own process to get your own copy",
       "To share one development agent with the team, register it with a project key or name its environment, for example dev-shared",
     ],
-    docsPath: "/agent-simulations/connect-your-agent",
+    docsPath: "/agent-testing/connect-your-agent",
   },
   agent_call_timeout: {
     tips: [
@@ -411,21 +411,21 @@ const registry = {
       "Declare at most 20 parameters and at most 50 options per parameter",
       "A secret is declared on the scenario, never on the agent",
     ],
-    docsPath: "/agent-simulations/scenario-parameters",
+    docsPath: "/agent-testing/run-parameters",
   },
   agent_register_refused: {
     tips: [
       "Read `meta.reason`: api_key_invalid, project_required, permission_denied, key_type_not_allowed, replica_count_unsupported, parameters_invalid or environment_invalid",
       "The key needs `scenarios:manage`; an ingestion key or a Langy session key can never connect",
     ],
-    docsPath: "/agent-simulations/connect-your-agent",
+    docsPath: "/agent-testing/connect-your-agent",
   },
   agent_session_unknown: {
     tips: [
       "Post a new register frame to /api/v1/agents/connect/register and use the instance token it answers with",
       "A session expires five minutes after its last poll",
     ],
-    docsPath: "/agent-simulations/connect-your-agent",
+    docsPath: "/agent-testing/connect-your-agent",
   },
   agent_payload_too_large: {
     tips: [

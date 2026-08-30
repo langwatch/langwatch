@@ -52,8 +52,8 @@ The body template renders as a Liquid template on every turn, and `outputPath` i
 | `{{ input }}` | The text of the last user message |
 | `{{ threadId }}` | A conversation id, the same on every turn of a run |
 | `{{ session }}` | What the endpoint returned at `sessionPath` on the previous turn of the conversation, empty on the first turn |
-| `{{ params.NAME }}` | A [run parameter](/agent-testing/scenario-parameters) |
-| `{{ traceId }}`, `{{ traceparent }}` | The turn's trace identifiers, see [Linking your traces](/agent-testing/remote-traces) |
+| `{{ params.NAME }}` | A [run parameter](/agent-testing/run-parameters) |
+| `{{ traceId }}`, `{{ traceparent }}` | The turn's trace identifiers, see [Linking your traces](/agent-testing/linking-your-traces) |
 
 The URL and the header values render the same variables.
 
@@ -273,7 +273,7 @@ The mapped input is `None` on the first turn of a conversation, and afterwards e
   <Card title="Authenticated agents" icon="key" href="/agent-testing/authenticated-agents">
     Reference project secrets, and exchange OAuth2 credentials
   </Card>
-  <Card title="Linking your traces" icon="diagram-project" href="/agent-testing/remote-traces">
+  <Card title="Linking your traces" icon="diagram-project" href="/agent-testing/linking-your-traces">
     What the judge reads from your agent's own spans
   </Card>
   <Card title="Command line interface" icon="terminal" href="/integration/cli">

@@ -11,7 +11,7 @@
  * is the form the SDK types `params` from and validates the incoming values
  * with.
  *
- * @see docs/agent-simulations/connect-your-agent.mdx
+ * @see docs/agent-testing/connect-your-agent.mdx
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
