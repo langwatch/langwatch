@@ -80,6 +80,13 @@ describe("service result contract lint", () => {
     expect(resultPolicies(root)).toEqual([]);
   });
 
+  it("accepts an adjective that merely starts with the same letters", () => {
+    const root = fixture(
+      "export class EvaluationPreconditionService { requiredFieldsArePresent(): boolean { return true; } }",
+    );
+    expect(resultPolicies(root)).toEqual([]);
+  });
+
   it("rejects redundant require naming", () => {
     const root = fixture(
       "export abstract class ProjectService { abstract requireById(): Promise<string>; }",
@@ -112,10 +119,7 @@ describe("service result contract lint", () => {
     const root = fixture(
       "export abstract class ProjectService { abstract getById(): Promise<string>; }",
     );
-    const target = join(
-      root,
-      "packages/features/project/server/src/ports/project.port.ts",
-    );
+    const target = join(root, "packages/features/project/server/src/ports/project.port.ts");
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(
       target,

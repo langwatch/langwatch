@@ -56,8 +56,7 @@ function definitelyNonNullableType(node: ts.TypeNode): boolean {
 
 function isPublicNamedClassMethod(node: ts.Node): node is ts.MethodDeclaration {
   if (!ts.isMethodDeclaration(node)) return false;
-  const isClassMember =
-    ts.isClassDeclaration(node.parent) || ts.isClassExpression(node.parent);
+  const isClassMember = ts.isClassDeclaration(node.parent) || ts.isClassExpression(node.parent);
   const hasName = node.name !== void 0 && ts.isIdentifier(node.name);
   const isPublic = !node.modifiers?.some(
     (modifier) => modifier.kind === ts.SyntaxKind.PrivateKeyword,
@@ -78,7 +77,11 @@ function lintResultContract(file: string): ArchitectureViolation[] {
     if (isPublicNamedClassMethod(node)) {
       const name = ts.isIdentifier(node.name) ? node.name.text : void 0;
       if (!name) return;
-      if (name.startsWith("require")) {
+      // `requireById` — the imperative — is the redundant one: an ordinary
+      // method already returns a value or throws. `requiredFieldsArePresent` is
+      // an adjective, and `required` is one of the boolean prefixes
+      // `require-boolean-name-prefix` explicitly allows, so it is not that.
+      if (/^require[A-Z]/.test(name)) {
         violations.push({
           policy: "fallible-result-naming",
           file,

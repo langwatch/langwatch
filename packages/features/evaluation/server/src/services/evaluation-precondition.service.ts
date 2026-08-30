@@ -36,6 +36,56 @@ type PreconditionTraceData = {
 
 type ResolvedValue = string | string[] | null;
 
+/**
+ * Every precondition field this service can answer, and how.
+ *
+ * A table rather than a switch so the vocabulary reads as a list. That matters
+ * because there is a SECOND implementation of these rules —
+ * `platform/app/src/server/filters/precondition-matchers.ts`, which the monitor
+ * sample preview uses — and it knows thirteen fields this one does not:
+ * the nine `evaluations.*`, `traces.name`, `metadata.key` and
+ * `events.metrics.value`. A precondition on any of those matches traces in the
+ * preview and then never fires, because an unknown field resolves to null here
+ * and `matches` reads null as "not met". See
+ * dev/docs/plans/feature-cleanup/evaluation-precondition-divergence.md.
+ */
+const FIELD_RESOLVERS: Record<
+  string,
+  (data: PreconditionTraceData, key: string | undefined) => ResolvedValue
+> = {
+  input: (data) => data.input,
+  output: (data) => data.output,
+  "traces.origin": (data) => data.origin,
+  "traces.error": (data) => (data.hasError ? "true" : "false"),
+  "metadata.user_id": (data) => data.userId,
+  "metadata.thread_id": (data) => data.threadId,
+  "metadata.customer_id": (data) => data.customerId,
+  "metadata.labels": (data) => data.labels,
+  "metadata.prompt_ids": (data) => data.promptIds,
+  "metadata.value": (data, key) => {
+    if (!key) return null;
+    // The UI encodes a dotted metadata key with a middle dot so the field
+    // string stays parseable, and prefixes it the way the trace stores it.
+    const decoded = key.replaceAll("\u00b7", ".");
+    const metadataKey = decoded.replace(/^(langwatch\.)?metadata\./u, "");
+    return data.customMetadata?.[metadataKey] ?? null;
+  },
+  "spans.type": (data) => data.spanTypes,
+  "spans.model": (data) => data.spanModels,
+  "topics.topics": (data) => (data.topicId ? [data.topicId] : null),
+  "topics.subtopics": (data) => (data.subTopicId ? [data.subTopicId] : null),
+  "events.event_type": (data) => data.events?.map((event) => event.eventType) ?? null,
+  "events.metrics.key": (data, key) =>
+    data.events?.find((candidate) => candidate.eventType === key)?.metrics.map((m) => m.key) ??
+    null,
+  "events.event_details.key": (data, key) =>
+    data.events?.find((candidate) => candidate.eventType === key)?.details.map((d) => d.key) ??
+    null,
+};
+
+/** The fields above, for the suite that pins them against the preview's set. */
+export const PRECONDITION_FIELDS = Object.keys(FIELD_RESOLVERS);
+
 export class EvaluationPreconditionService {
   static create(): EvaluationPreconditionService {
     return new EvaluationPreconditionService();
@@ -115,58 +165,7 @@ export class EvaluationPreconditionService {
     data: PreconditionTraceData,
     key: string | undefined,
   ): ResolvedValue {
-    switch (field) {
-      case "input":
-        return data.input;
-      case "output":
-        return data.output;
-      case "traces.origin":
-        return data.origin;
-      case "traces.error":
-        return data.hasError ? "true" : "false";
-      case "metadata.user_id":
-        return data.userId;
-      case "metadata.thread_id":
-        return data.threadId;
-      case "metadata.customer_id":
-        return data.customerId;
-      case "metadata.labels":
-        return data.labels;
-      case "metadata.prompt_ids":
-        return data.promptIds;
-      case "metadata.value": {
-        if (!key) {
-          return null;
-        }
-
-        const decoded = key.replaceAll("·", ".");
-        const metadataKey = decoded.replace(/^(langwatch\.)?metadata\./u, "");
-
-        return data.customMetadata?.[metadataKey] ?? null;
-      }
-      case "spans.type":
-        return data.spanTypes;
-      case "spans.model":
-        return data.spanModels;
-      case "topics.topics":
-        return data.topicId ? [data.topicId] : null;
-      case "topics.subtopics":
-        return data.subTopicId ? [data.subTopicId] : null;
-      case "events.event_type":
-        return data.events?.map((event) => event.eventType) ?? null;
-      case "events.metrics.key": {
-        const event = data.events?.find((candidate) => candidate.eventType === key);
-
-        return event?.metrics.map((metric) => metric.key) ?? null;
-      }
-      case "events.event_details.key": {
-        const event = data.events?.find((candidate) => candidate.eventType === key);
-
-        return event?.details.map((detail) => detail.key) ?? null;
-      }
-      default:
-        return null;
-    }
+    return FIELD_RESOLVERS[field]?.(data, key) ?? null;
   }
 
   private matches(
