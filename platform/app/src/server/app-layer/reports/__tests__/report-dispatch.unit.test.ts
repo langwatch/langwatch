@@ -65,10 +65,18 @@ function makeReportTrigger(overrides: Partial<Trigger> = {}): Trigger {
     triggerKind: TriggerKind.REPORT,
     active: true,
     deleted: false,
-    slackTemplateType: null,
-    slackTemplate: null,
-    emailSubjectTemplate: null,
-    emailBodyTemplate: null,
+    // The four author-written templates arrive grouped, not as the four flat
+    // columns Postgres stores them in: the automation service maps them on the
+    // way out and `Trigger` declares `templates` as one required object. This
+    // fixture used to carry the columns, which typechecked only because of the
+    // cast below — and left `trigger.templates` undefined, so every dispatch
+    // path threw reading a field off it.
+    templates: {
+      slackTemplateType: null,
+      slackTemplate: null,
+      emailSubjectTemplate: null,
+      emailBodyTemplate: null,
+    },
     filterQuery: null,
     actionParams: {
       source: { kind: "traceQuery", filters: {}, topN: 5 },
@@ -91,7 +99,15 @@ function makeDeps(
   loadReportCharts: ReturnType<typeof vi.fn>;
   recordFire: ReturnType<typeof vi.fn>;
 } {
+  // The dispatcher takes a mailer PORT, not a send function: it asks the port
+  // for the deployment's From address as well as sending through it. A bare
+  // `sendEmail` stub is the shape this interface had before the port existed,
+  // and passing one left `deps.mailer` undefined.
   const sendEmail = vi.fn(async () => undefined);
+  const mailer = {
+    defaultFrom: () => "reports@langwatch.test",
+    send: sendEmail,
+  } as unknown as ReportDispatchDeps["mailer"];
   const sendSlack = vi.fn(async () => undefined);
   const sendSlackBot = vi.fn(async () => undefined);
   const listReportTraces = vi.fn(async () => opts.traces ?? []);
@@ -108,14 +124,12 @@ function makeDeps(
       recordFire: recordFire as unknown as ReportDispatchDeps["recordFire"],
       loadTrigger: vi.fn(async () => trigger),
       loadProject: vi.fn(async () => PROJECT),
-      sendEmail: sendEmail as unknown as ReportDispatchDeps["sendEmail"],
+      mailer,
       sendSlack: sendSlack as unknown as ReportDispatchDeps["sendSlack"],
       sendSlackBot: sendSlackBot as unknown as ReportDispatchDeps["sendSlackBot"],
       filterSuppressedRecipients: vi.fn(async ({ emails }) => emails),
-      listReportTraces:
-        listReportTraces as unknown as ReportDispatchDeps["listReportTraces"],
-      loadReportCharts:
-        loadReportCharts as unknown as ReportDispatchDeps["loadReportCharts"],
+      listReportTraces: listReportTraces as unknown as ReportDispatchDeps["listReportTraces"],
+      loadReportCharts: loadReportCharts as unknown as ReportDispatchDeps["loadReportCharts"],
       baseHost: "https://app.langwatch.ai",
     },
   };
@@ -232,10 +246,7 @@ describe("dispatchScheduledReport", () => {
   describe("given a traceQuery report is due", () => {
     it("queries the schedule window and renders the matching traces into Slack", async () => {
       const { deps, sendSlack, listReportTraces } = makeDeps(makeReportTrigger(), {
-        traces: [
-          makeTraceRow(),
-          makeTraceRow({ traceId: "trace-def", input: "second input" }),
-        ],
+        traces: [makeTraceRow(), makeTraceRow({ traceId: "trace-def", input: "second input" })],
       });
 
       await dispatchScheduledReport({ deps, fire });
