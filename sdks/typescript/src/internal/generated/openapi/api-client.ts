@@ -741,6 +741,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agents/connect/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Register the connected agents of a process over HTTP, for a network that blocks WebSockets. The body is the register frame of the connect protocol. Answers with the registered frame and the instance token the poll and frames routes are addressed with, or with a refused frame. */
+        post: operations["postApiAgentsConnectRegister"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agents/connect/poll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Wait for the next call and cancel frames of a registered instance, up to 25 seconds, then answer with what is waiting or with an empty list. Each poll refreshes the instance presence, so a process that polls reads Online. Addressed with the instance token in the X-Agent-Instance-Token header. */
+        get: operations["getApiAgentsConnectPoll"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agents/connect/frames": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Post the ack, result and deregister frames of a registered instance. Addressed with the instance token in the X-Agent-Instance-Token header. */
+        post: operations["postApiAgentsConnectFrames"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/api-keys": {
         parameters: {
             query?: never;
@@ -5374,6 +5425,208 @@ export interface operations {
             };
             /** @description No instance of the agent is connected */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    postApiAgentsConnectRegister: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": unknown;
+            };
+        };
+        responses: {
+            /** @description The instance is registered */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The registered frame, or the refused frame with its reason. */
+                        frame: {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "registered";
+                            agents: {
+                                name: string;
+                                environment: string;
+                                id: string;
+                                url: string;
+                                parameterNotes: string[];
+                            }[];
+                            heartbeatIntervalMs: number;
+                            instanceId: string;
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "refused";
+                            /** @enum {string} */
+                            code: "api_key_invalid" | "project_required" | "permission_denied" | "key_type_not_allowed" | "replica_count_unsupported" | "parameters_invalid" | "environment_invalid" | "protocol_invalid";
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                        };
+                        /** @description The token the poll and frames routes are addressed with, in the X-Agent-Instance-Token header. Present when the register was accepted. */
+                        instanceToken?: string;
+                    };
+                };
+            };
+            /** @description The API key is not valid: a refused frame */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The key type or its permissions cannot connect an agent: a refused frame */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The body is not a register frame, or an agent of it is not valid: a refused frame */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The deployment runs several replicas without Redis: a refused frame */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getApiAgentsConnectPoll: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The frames waiting for the instance, possibly none */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The call and cancel frames waiting for the instance; empty once the poll wait passes with none. */
+                        frames: ({
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "call";
+                            callId: string;
+                            agentId: string;
+                            threadId: string;
+                            messages: ({
+                                role: string;
+                            } & {
+                                [key: string]: unknown;
+                            })[];
+                            newMessages: ({
+                                role: string;
+                            } & {
+                                [key: string]: unknown;
+                            })[];
+                            params: {
+                                [key: string]: string | number | boolean;
+                            };
+                            session?: unknown;
+                            traceparent: string | null;
+                            deadlineAt: number;
+                            run: {
+                                scenarioRunId?: string;
+                                scenarioName?: string;
+                                batchRunId?: string;
+                            };
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "cancel";
+                            callId: string;
+                        })[];
+                    };
+                };
+            };
+            /** @description The API key is not valid: a refused frame */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The instance token is not known; register the instance again */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    postApiAgentsConnectFrames: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": unknown;
+            };
+        };
+        responses: {
+            /** @description The frames were taken */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description How many frames were taken. */
+                        accepted: number;
+                    };
+                };
+            };
+            /** @description The API key is not valid: a refused frame */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The instance token is not known; register the instance again */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description A frame is not one the route takes */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -22739,6 +22992,10 @@ export interface operations {
                             actorId?: string;
                             /** @enum {string} */
                             actorLabel?: "user" | "api" | "cli";
+                            agentInstance?: {
+                                hostname: string;
+                                label: string | null;
+                            };
                         };
                     } & {
                         [key: string]: unknown;
