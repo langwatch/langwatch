@@ -103,6 +103,25 @@ describe("the events one Azure cost read produces", () => {
     });
 
     /** @scenario "A day already recorded is re-read and its figure replaced, not added to" */
+    it("keys on the day and meter alone, never on the subscription", () => {
+      const under = (subscriptionId: string) =>
+        azureCostEvents({ days: [day()], subscriptionId });
+      const hintOf = (events: ReturnType<typeof under>) =>
+        events[0]?.extra?.[PULLED_USAGE_HINT_KEY] as Record<string, unknown>;
+
+      // The restatement key hashes the ingestion source id already, which is
+      // what separates two customers. Adding the subscription would mean an
+      // admin correcting a mistyped one mints fresh keys for the whole
+      // trailing week — and those days are ADDED beside the figures they were
+      // meant to replace.
+      expect(
+        hintOf(under("aaaaaaaa-0000-0000-0000-000000000000")).dimensions,
+      ).toEqual(
+        hintOf(under("bbbbbbbb-0000-0000-0000-000000000000")).dimensions,
+      );
+    });
+
+    /** @scenario "A day already recorded is re-read and its figure replaced, not added to" */
     it("keeps two meter categories on one day apart", () => {
       const [first, second] = eventsFor([
         day({ meterCategory: "Load Balancer" }),

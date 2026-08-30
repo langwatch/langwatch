@@ -401,30 +401,35 @@ describe("GovernanceCostRollupFoldProjection", () => {
     it("reaches the same total whichever order the outcomes arrive in", () => {
       const forwards = fold([
         confirmedEvent({
-          costNanoMinor: 300,
+          costNanoUsd: 300,
           occurredAt: Date.parse("2026-08-01T01:00:00.000Z"),
           id: "a",
         }),
         confirmedEvent({
-          costNanoMinor: 700,
+          costNanoUsd: 700,
           occurredAt: Date.parse("2026-08-01T02:00:00.000Z"),
           id: "b",
         }),
       ]);
       const backwards = fold([
         confirmedEvent({
-          costNanoMinor: 700,
+          costNanoUsd: 700,
           occurredAt: Date.parse("2026-08-01T02:00:00.000Z"),
           id: "b",
         }),
         confirmedEvent({
-          costNanoMinor: 300,
+          costNanoUsd: 300,
           occurredAt: Date.parse("2026-08-01T01:00:00.000Z"),
           id: "a",
         }),
       ]);
-      expect(governanceCostRollupTotals(forwards).amountNanoUsd).toBe(
-        governanceCostRollupTotals(backwards).amountNanoUsd,
+      // The value first, then the equality. `toBe` is Object.is, so NaN
+      // equals NaN — an assertion of equality alone passes for a fold that
+      // read the money field under a name the events do not carry, which is
+      // exactly how this test came to assert nothing once already.
+      expect(governanceCostRollupTotals(forwards).amountNanoUsd).toBe(1_000);
+      expect(governanceCostRollupTotals(backwards).amountNanoUsd).toBe(
+        governanceCostRollupTotals(forwards).amountNanoUsd,
       );
     });
   });

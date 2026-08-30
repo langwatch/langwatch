@@ -117,6 +117,17 @@ export interface AzureCostRead {
   unreadableRows: number;
   /** The next page, when the reply offers one. */
   nextLink: string | null;
+  /**
+   * The whole reply was not the shape this reads — an HTTP 200 carrying an
+   * error body, or a contract change.
+   *
+   * Distinct from an empty `days`, and the distinction is the point: taken as
+   * "Azure says this window cost nothing" the caller would mark the window
+   * priced and move on, reporting a genuinely free week. It is the same
+   * confusion `unreadableRows` prevents one level down, at the level the row
+   * count cannot see.
+   */
+  malformed: boolean;
 }
 
 /**
@@ -279,7 +290,7 @@ export function readAzureCostRows({
 }): AzureCostRead {
   const parsed = azureCostQueryResponseSchema.safeParse(response);
   if (!parsed.success) {
-    return { days: [], unreadableRows: 0, nextLink: null };
+    return { days: [], unreadableRows: 0, nextLink: null, malformed: true };
   }
   const { columns, rows, nextLink } = parsed.data.properties;
 
@@ -321,7 +332,7 @@ export function readAzureCostRows({
     });
   }
 
-  return { days, unreadableRows, nextLink };
+  return { days, unreadableRows, nextLink, malformed: false };
 }
 
 /** The verb these events carry, so a reader can tell them from a conversation. */
@@ -350,10 +361,16 @@ export function azureCostEvents({
   subscriptionId: string;
 }): NormalizedPullEvent[] {
   return days.map((day) => {
+    // The subscription is deliberately NOT a dimension. `restatementKeyFor`
+    // already hashes the ingestion source id, which is what separates two
+    // customers reading the same bill — so the subscription adds nothing to
+    // the identity and takes something away from it: an admin who corrects a
+    // mistyped subscription on an existing source would mint fresh keys for
+    // the trailing week, and those days would be ADDED beside the figures
+    // they were meant to replace rather than over them.
     const dimensions: Record<string, string> = {
       granularity: "1d",
       meterCategory: day.meterCategory,
-      subscriptionId,
     };
 
     return {

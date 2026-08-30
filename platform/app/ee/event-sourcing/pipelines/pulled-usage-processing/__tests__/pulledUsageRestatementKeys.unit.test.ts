@@ -25,9 +25,13 @@ const RESTATEMENT_KEY = "sha256-of-the-bucket-coordinates";
 function observation({
   costNanoMinor,
   observedAtMs,
+  currencyCode = "USD",
+  costNanoUsd = null,
 }: {
   costNanoMinor: number;
   observedAtMs: number;
+  currencyCode?: string;
+  costNanoUsd?: number | null;
 }): PulledUsageObservedEventData & {
   tenantId: string;
   occurredAt: number;
@@ -50,6 +54,8 @@ function observation({
     tokensCacheRead: 0,
     tokensCacheWrite: 0,
     costNanoMinor,
+    currencyCode,
+    costNanoUsd,
     rateVersion: "registry@2026-08-01",
     costBasis: "computed",
     costStatus: "estimate",
@@ -158,6 +164,56 @@ describe("recording successive observations of one provider bucket", () => {
       ).not.toBe(
         await idempotencyKeyFor(
           observation({ costNanoMinor: 12_000_000_000, observedAtMs: at }),
+        ),
+      );
+    });
+  });
+
+  describe("when only the currency changed", () => {
+    it("mints a distinct key, so a re-denominated period is not deduped away", async () => {
+      const at = 5_000;
+
+      // Same number, different money. Without the currency in the key this
+      // reads as an unchanged re-pull and the correction never lands.
+      expect(
+        await idempotencyKeyFor(
+          observation({ costNanoMinor: 10_000_000_000, observedAtMs: at }),
+        ),
+      ).not.toBe(
+        await idempotencyKeyFor(
+          observation({
+            costNanoMinor: 10_000_000_000,
+            observedAtMs: at,
+            currencyCode: "EUR",
+          }),
+        ),
+      );
+    });
+  });
+
+  describe("when only the biller's dollar figure changed", () => {
+    it("mints a distinct key, so a late conversion is not deduped away", async () => {
+      const at = 5_000;
+
+      // Azure can publish the native amount before its own dollar
+      // conversion settles. That later figure changes the record without
+      // changing the amount, and a key blind to it would drop the update.
+      expect(
+        await idempotencyKeyFor(
+          observation({
+            costNanoMinor: 10_000_000_000,
+            observedAtMs: at,
+            currencyCode: "EUR",
+          }),
+        ),
+      ).not.toBe(
+        await idempotencyKeyFor(
+          observation({
+            costNanoMinor: 10_000_000_000,
+            observedAtMs: at,
+            currencyCode: "EUR",
+            costNanoUsd: 11_400_000_000,
+          }),
         ),
       );
     });

@@ -3,6 +3,7 @@
 import {
   type PulledUsageObservedEvent,
   PulledUsageObservedEventSchema,
+  readPulledUsageMoney,
 } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
 import {
   type GatewaySpendConfirmedEvent,
@@ -166,7 +167,12 @@ function dimensionsOf(event: {
       // The currency the PROVIDER billed in, carried from the event. A cell is
       // keyed by it, so a day billed in two currencies is two rows and nothing
       // can sum across them (ADR-128 §3).
-      currencyCode: d.currencyCode,
+      //
+      // Read through `readPulledUsageMoney` because nothing parses these
+      // events on the way in here: an event predating currencies would
+      // otherwise put `undefined` in the key, and a rebuild would address
+      // every historical cell under a key the stored row does not have.
+      currencyCode: readPulledUsageMoney(d).currencyCode,
       rawActorId: "",
     };
   }
@@ -505,6 +511,10 @@ export class GovernanceCostRollupFoldProjection
 
     const amountBefore = governanceCostRollupTotals(state).amountNanoUsd;
     const dims = dimensionsOf(event as never);
+    // Same reason as the key: an event written before money carried a
+    // currency names its amount `costNanoUsd`, and read literally that amount
+    // would be `undefined` here and every total from this cell onward `NaN`.
+    const money = readPulledUsageMoney(d);
     return {
       ...state,
       ...dims,
@@ -513,8 +523,8 @@ export class GovernanceCostRollupFoldProjection
       pulledItems: {
         ...state.pulledItems,
         [d.restatementKey]: {
-          amountNanoMinor: d.costNanoMinor,
-          amountNanoUsd: d.costNanoUsd,
+          amountNanoMinor: money.costNanoMinor,
+          amountNanoUsd: money.costNanoUsd,
           observedAtMs: d.observedAtMs,
           tokensInput: d.tokensInput,
           tokensOutput: d.tokensOutput,
