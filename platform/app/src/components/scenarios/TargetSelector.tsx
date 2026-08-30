@@ -4,10 +4,14 @@ import {
   ChevronDown,
   Code,
   Globe,
+  Plug,
   Plus,
   Workflow,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Switch } from "~/components/ui/switch";
+import { Tooltip } from "~/components/ui/tooltip";
+import { useSession } from "~/utils/auth-client";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
 import { api } from "../../utils/api";
@@ -15,7 +19,16 @@ import {
   agentHasDevTunnel,
   LocalTunnelBadge,
 } from "../agents/LocalTunnelBadge";
-import { isAgentTarget, useFilteredAgents } from "./useFilteredScenarioTargets";
+import {
+  agentTargetLabel,
+  hasTeammateAgents,
+  isAgentTarget,
+  offeredAgents,
+  ownerOnlyCopy,
+  type ScenarioAgent,
+  TEAMMATES_TOGGLE_LABEL,
+  useFilteredAgents,
+} from "./useFilteredScenarioTargets";
 
 export type TargetValue = {
   type: "prompt" | "http" | "code" | "workflow" | "connected";
@@ -49,7 +62,9 @@ export function TargetSelector({
     { enabled: !!project?.id },
   );
 
+  const { data: session } = useSession();
   const [searchValue, setSearchValue] = useState("");
+  const [showTeammates, setShowTeammates] = useState(false);
   const [open, setOpen] = useState(false);
   const [maxDropdownHeight, setMaxDropdownHeight] = useState(400);
   const [dropUp, setDropUp] = useState(false);
@@ -87,7 +102,15 @@ export function TargetSelector({
     );
   }, [prompts, searchValue]);
 
-  const filteredAgents = useFilteredAgents(agents, searchValue);
+  const allAgents = useFilteredAgents({
+    agents,
+    searchValue,
+    viewerUserId: session?.user?.id ?? null,
+  });
+  const filteredAgents = offeredAgents({
+    agents: allAgents,
+    showTeammates,
+  });
 
   // Get the selected item's label for display
   const selectedLabel = useMemo(() => {
@@ -97,7 +120,7 @@ export function TargetSelector({
       return prompt ? (prompt.handle ?? prompt.id) : null;
     }
     const agent = agents?.find((a) => a.id === value.id);
-    return agent?.name ?? null;
+    return agent ? agentTargetLabel(agent) : null;
   }, [value, prompts, agents]);
 
   const handleSelect = (target: NonNullable<TargetValue>) => {
@@ -159,6 +182,7 @@ export function TargetSelector({
           {value?.type === "http" && <Globe size={14} />}
           {value?.type === "code" && <Code size={14} />}
           {value?.type === "workflow" && <Workflow size={14} />}
+          {value?.type === "connected" && <Plug size={14} />}
           <Text>{selectedLabel ?? placeholder}</Text>
         </HStack>
         <ChevronDown size={14} />
@@ -226,42 +250,36 @@ export function TargetSelector({
                 </Text>
               ) : (
                 filteredAgents.map((agent) => (
-                  <HStack
+                  <AgentOption
                     key={agent.id}
-                    data-testid={`target-option-${agent.id}`}
-                    paddingX={3}
-                    paddingY={2}
-                    cursor="pointer"
-                    bg={
-                      isAgentTarget(value) && value.id === agent.id
-                        ? "blue.50"
-                        : "transparent"
+                    agent={agent}
+                    isSelected={isAgentTarget(value) && value.id === agent.id}
+                    onSelect={() =>
+                      handleSelect({ type: agent.type, id: agent.id })
                     }
-                    _hover={{ bg: "bg.subtle" }}
-                    onClick={() =>
-                      handleSelect({
-                        type: agent.type,
-                        id: agent.id,
-                      })
-                    }
-                  >
-                    {agent.type === "code" ? (
-                      <Code size={14} color="var(--chakra-colors-gray-500)" />
-                    ) : (
-                      <Globe size={14} color="var(--chakra-colors-gray-500)" />
-                    )}
-                    <Text fontSize="sm" flex={1}>
-                      {agent.name}
-                    </Text>
-                    {agentHasDevTunnel(agent) && <LocalTunnelBadge />}
-                    {isAgentTarget(value) && value.id === agent.id && (
-                      <Text color="blue.500" fontSize="sm">
-                        ✓
-                      </Text>
-                    )}
-                  </HStack>
+                  />
                 ))
               )}
+              {hasTeammateAgents(allAgents) && (
+                <HStack
+                  paddingX={3}
+                  paddingY={2}
+                  borderTopWidth="1px"
+                  borderColor="border.muted"
+                  justifyContent="space-between"
+                >
+                  <Text fontSize="xs" color="fg.muted">
+                    {TEAMMATES_TOGGLE_LABEL}
+                  </Text>
+                  <Switch
+                    size="sm"
+                    checked={showTeammates}
+                    onCheckedChange={(event) => setShowTeammates(event.checked)}
+                    data-testid="target-selector-show-teammates"
+                  />
+                </HStack>
+              )}
+
               {/* Add New Agent Button */}
               <HStack
                 paddingX={3}
@@ -346,5 +364,67 @@ export function TargetSelector({
         </Box>
       )}
     </Box>
+  );
+}
+
+/**
+ * One agent in the list: its kind, its label, and, for a connected agent,
+ * whether a process is holding it right now.
+ *
+ * A development agent of another person is drawn but cannot be picked: only
+ * its owner can run it, and hiding the reason would leave the reader clicking
+ * a row that does nothing.
+ */
+function AgentOption({
+  agent,
+  isSelected,
+  onSelect,
+}: {
+  agent: ScenarioAgent;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  const row = (
+    <HStack
+      data-testid={`target-option-${agent.id}`}
+      paddingX={3}
+      paddingY={2}
+      cursor={agent.runnable ? "pointer" : "not-allowed"}
+      opacity={agent.runnable ? 1 : 0.5}
+      bg={isSelected ? "blue.50" : "transparent"}
+      _hover={{ bg: "bg.subtle" }}
+      onClick={() => agent.runnable && onSelect()}
+      aria-disabled={!agent.runnable}
+    >
+      {agent.type === "connected" ? (
+        <Box
+          boxSize="8px"
+          borderRadius="full"
+          flexShrink={0}
+          background={agent.status === "online" ? "green.500" : "fg.subtle"}
+          data-testid={`target-option-status-${agent.status ?? "offline"}`}
+        />
+      ) : agent.type === "code" ? (
+        <Code size={14} color="var(--chakra-colors-gray-500)" />
+      ) : (
+        <Globe size={14} color="var(--chakra-colors-gray-500)" />
+      )}
+      <Text fontSize="sm" flex={1}>
+        {agent.label}
+      </Text>
+      {agentHasDevTunnel(agent) && <LocalTunnelBadge />}
+      {isSelected && (
+        <Text color="blue.500" fontSize="sm">
+          ✓
+        </Text>
+      )}
+    </HStack>
+  );
+
+  if (agent.runnable) return row;
+  return (
+    <Tooltip content={ownerOnlyCopy(agent.owner?.name)}>
+      <Box>{row}</Box>
+    </Tooltip>
   );
 }

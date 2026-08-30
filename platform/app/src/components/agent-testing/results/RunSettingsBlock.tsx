@@ -155,9 +155,12 @@ function overridesOf(target: BatchTarget): RunSettingParameter[] {
 function TargetsRow({
   targets,
   parametersOf,
+  instanceOf,
 }: {
   targets: BatchTarget[];
   parametersOf: (target: BatchTarget) => RunSettingParameter[];
+  /** The connected agent instance that served the target, when one did. */
+  instanceOf: (target: BatchTarget) => string | undefined;
 }) {
   return (
     <SettingRow label="Targets" testId="run-settings-targets">
@@ -172,6 +175,24 @@ function TargetsRow({
           >
             <TargetDot color={target.color} />
             <Text fontSize="12px">{target.name}</Text>
+            {target.environmentLabel ? (
+              <Text
+                fontSize="11.5px"
+                color={FG_MUTED}
+                data-testid={`run-settings-target-environment-${target.key}`}
+              >
+                {target.environmentLabel}
+              </Text>
+            ) : null}
+            {instanceOf(target) ? (
+              <Text
+                fontSize="11.5px"
+                color={FG_MUTED}
+                data-testid={`run-settings-target-instance-${target.key}`}
+              >
+                {`served by ${instanceOf(target)}`}
+              </Text>
+            ) : null}
             {parametersOf(target).map((parameter) => (
               <ParameterChip
                 key={parameter.name}
@@ -234,7 +255,11 @@ export function RunSettingsBlock({
       ) : null}
 
       {targets.length > 0 ? (
-        <TargetsRow targets={targets} parametersOf={parametersOf} />
+        <TargetsRow
+          targets={targets}
+          parametersOf={parametersOf}
+          instanceOf={(target) => settings.instanceByTarget.get(target.key)}
+        />
       ) : null}
 
       {!isComparison && settings.parameters.length > 0 ? (

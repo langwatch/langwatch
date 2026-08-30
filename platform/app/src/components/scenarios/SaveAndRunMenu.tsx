@@ -9,12 +9,17 @@ import {
   Save,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
+import { useSession } from "~/utils/auth-client";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
 import { api } from "../../utils/api";
 import { Popover } from "../ui/popover";
 import type { TargetValue } from "./TargetSelector";
-import { isAgentTarget, useFilteredAgents } from "./useFilteredScenarioTargets";
+import {
+  isAgentTarget,
+  offeredAgents,
+  useFilteredAgents,
+} from "./useFilteredScenarioTargets";
 
 interface SaveAndRunMenuProps {
   selectedTarget: TargetValue;
@@ -41,6 +46,7 @@ export function SaveAndRunMenu({
 }: SaveAndRunMenuProps) {
   const { project } = useOrganizationTeamProject();
   const { data: prompts } = useAllPromptsForProject();
+  const { data: session } = useSession();
 
   const [searchValue, setSearchValue] = useState("");
   const [open, setOpen] = useState(false);
@@ -67,7 +73,16 @@ export function SaveAndRunMenu({
     );
   }, [prompts, searchValue]);
 
-  const filteredAgents = useFilteredAgents(agents, searchValue);
+  // Only agents this person can run: the menu saves and runs in one click,
+  // so an agent that would be refused has nothing to offer here.
+  const filteredAgents = offeredAgents({
+    agents: useFilteredAgents({
+      agents,
+      searchValue,
+      viewerUserId: session?.user?.id ?? null,
+    }),
+    showTeammates: false,
+  });
 
   const handleSelectAndRun = (target: TargetValue) => {
     onTargetChange(target);
@@ -187,7 +202,7 @@ export function SaveAndRunMenu({
                       <Globe size={14} color="var(--chakra-colors-fg-muted)" />
                     )}
                     <Text fontSize="sm" flex={1}>
-                      {agent.name}
+                      {agent.label}
                     </Text>
                     <Play size={12} color="var(--chakra-colors-blue-500)" />
                   </HStack>

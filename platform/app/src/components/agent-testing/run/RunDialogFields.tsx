@@ -15,6 +15,7 @@ import { CustomizeChips } from "../shared/CustomizeChips";
 import { FieldLabel } from "../shared/DialogFields";
 import { CompareAgentsSection } from "./CompareAgentsSection";
 import { MissingProviderNotice } from "./MissingProviderNotice";
+import { OfflineTargetsNotice } from "./OfflineTargetsNotice";
 import { ParameterRowsEditor } from "./ParameterRowsEditor";
 import { RunNameField } from "./RunNameField";
 import { RunNoteField } from "./RunNoteField";
@@ -133,6 +134,15 @@ function RunDialogNotices({ form }: { form: RunDialogForm }) {
   return (
     <>
       {form.missingProvider && <MissingProviderNotice />}
+
+      <OfflineTargetsNotice
+        agents={form.scenarioAgents}
+        targets={
+          form.showCompare
+            ? form.compareRows.map((row) => row.target)
+            : [form.target]
+        }
+      />
 
       {form.inlineError != null && (
         <Box data-testid="run-dialog-error">
