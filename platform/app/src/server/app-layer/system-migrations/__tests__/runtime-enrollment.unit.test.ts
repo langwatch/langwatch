@@ -45,11 +45,7 @@ const stubs = vi.hoisted(() => {
 /** Answers the cohort's per-user membership probes from a plain map. */
 function stubMemberships(memberships: Record<string, string[]>): void {
   stubs.organizationUserFindFirst.mockImplementation(
-    async ({
-      where,
-    }: {
-      where: { userId: string; organizationId: { in: string[] } };
-    }) => {
+    async ({ where }: { where: { userId: string; organizationId: { in: string[] } } }) => {
       const organizations = memberships[where.userId] ?? [];
       return organizations.some((organizationId) =>
         where.organizationId.in.includes(organizationId),
@@ -61,6 +57,17 @@ function stubMemberships(memberships: Record<string, string[]>): void {
 }
 
 vi.mock("~/server/db", () => ({ prisma: stubs.prisma }));
+// The private-dataplane routing table. Several scenarios below name
+// "org_private" and one of them says outright that it is "mocked above" — so
+// this is the mock they were written against, and its absence is why they
+// failed. Only the KEYS are ever read: the cohort asks which organizations run
+// their own instance, never queries them. The real accessor refuses to answer
+// at all until a runtime has been composed, which is right for a process and
+// wrong for a unit test of the cohort wiring.
+vi.mock("~/server/clickhouse/clickhouseClient", () => ({
+  getPrivateClickHouseUrls: () =>
+    new Map<string, string>([["org_private", "https://org-private.clickhouse.invalid"]]),
+}));
 vi.mock("~/env.mjs", () => ({ env: { IS_SAAS: true } }));
 vi.mock("~/runtime/app/features/audit-log", () => ({ auditLog: vi.fn() }));
 vi.mock("../../app", () => ({ tryGetApp: () => null }));
@@ -242,20 +249,12 @@ describe("userMigrationPassCohort on cloud", () => {
 
       const cohort = await userMigrationPassCohort();
 
-      await expect(
-        cohort({ tenantId: "user_sam", migrationName: backfill }),
-      ).resolves.toBe(true);
-      await expect(
-        cohort({ tenantId: "user_ann", migrationName: backfill }),
-      ).resolves.toBe(true);
+      await expect(cohort({ tenantId: "user_sam", migrationName: backfill })).resolves.toBe(true);
+      await expect(cohort({ tenantId: "user_ann", migrationName: backfill })).resolves.toBe(true);
       // Only a member of globex, which nobody enrolled.
-      await expect(
-        cohort({ tenantId: "user_gil", migrationName: backfill }),
-      ).resolves.toBe(false);
+      await expect(cohort({ tenantId: "user_gil", migrationName: backfill })).resolves.toBe(false);
       // Outside every organization: nothing enrolls them on cloud.
-      await expect(
-        cohort({ tenantId: "user_solo", migrationName: backfill }),
-      ).resolves.toBe(false);
+      await expect(cohort({ tenantId: "user_solo", migrationName: backfill })).resolves.toBe(false);
       // Membership is probed per user against the enrolled organizations
       // only - never materialized fleet-wide.
       expect(stubs.organizationUserFindFirst).toHaveBeenCalledWith(
@@ -284,12 +283,8 @@ describe("userMigrationPassCohort on cloud", () => {
 
       const cohort = await userMigrationPassCohort();
 
-      await expect(
-        cohort({ tenantId: "user_sam", migrationName: backfill }),
-      ).resolves.toBe(true);
-      await expect(
-        cohort({ tenantId: "user_both", migrationName: backfill }),
-      ).resolves.toBe(false);
+      await expect(cohort({ tenantId: "user_sam", migrationName: backfill })).resolves.toBe(true);
+      await expect(cohort({ tenantId: "user_both", migrationName: backfill })).resolves.toBe(false);
     });
   });
 
