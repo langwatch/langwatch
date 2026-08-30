@@ -539,6 +539,9 @@ describe("SimulationClickHouseRepository (integration)", () => {
         const scenarioSetId = `__internal__allsuites_${nanoid()}__suite`;
         const batchRunId = `batch-allsuites-${nanoid()}`;
 
+        // The page is ordered by `max(CreatedAt)` and breaks ties on the batch
+        // id. Every other row of this file shares one `CreatedAt`, so a newer
+        // one here puts this batch on the first page whatever the random ids.
         await insertRow(
           ch,
           makeInsertRow({
@@ -546,6 +549,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
             BatchRunId: batchRunId,
             ScenarioSetId: scenarioSetId,
             Metadata: JSON.stringify({ all_suites: true }),
+            CreatedAt: new Date(now + 60_000),
           }),
         );
 
