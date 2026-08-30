@@ -75,10 +75,6 @@ export const apiResponseConfigCreatedSchema = z.object({
   id: z.string(),
 });
 
-export type CreateModelDefaultConfigInput = z.infer<
-  typeof createModelDefaultConfigInputSchema
->;
-export type UpdateModelDefaultConfigInput = z.infer<
-  typeof updateModelDefaultConfigInputSchema
->;
+export type CreateModelDefaultConfigInput = z.infer<typeof createModelDefaultConfigInputSchema>;
+export type UpdateModelDefaultConfigInput = z.infer<typeof updateModelDefaultConfigInputSchema>;
 export type ApiResponseModelDefaults = z.infer<typeof apiResponseModelDefaultsSchema>;

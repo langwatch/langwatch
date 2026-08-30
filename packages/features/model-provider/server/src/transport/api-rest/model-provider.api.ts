@@ -2,14 +2,14 @@ import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { type OrganizationService, TeamNotFoundError } from "@langwatch/organization-contract";
 import type { MiddlewareHandler } from "hono";
-import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod";
 import { requires } from "@langwatch/api";
 import {
   type AppRestProjectVariables,
   type AppRestSecurity,
   baseResponses,
+  conflictResponses,
+  errorSchema,
   type SecuredApp,
   validator as zValidator,
 } from "@langwatch/api/rest";
@@ -143,12 +143,14 @@ export function createModelProvidersRestApp(options: {
             },
           },
         },
-        400: {
-          description: "Bad request",
+        // 400 comes from `baseResponses` with the framework's envelope. The
+        // local override here declared `{ error: string }`, which is not the
+        // shape any failure has ever had, and it shadowed the correct one.
+        ...conflictResponses,
+        404: {
+          description: "Not Found",
           content: {
-            "application/json": {
-              schema: resolver(z.object({ error: z.string() })),
-            },
+            "application/json": { schema: resolver(errorSchema) },
           },
         },
       },
@@ -162,34 +164,32 @@ export function createModelProvidersRestApp(options: {
 
       logger.info({ projectId: project.id, provider }, "Upserting model provider");
 
-      try {
-        // Ensure defaultModel has the provider prefix (e.g. "openai/gpt-4o")
-        // required by litellm for routing
-        let defaultModel = data.defaultModel;
-        if (defaultModel && !defaultModel.includes("/")) {
-          defaultModel = `${provider}/${defaultModel}`;
-        }
-
-        // REST endpoint is keyed on the provider string in the URL and
-        // preserves the legacy single-instance upsert contract. The
-        // multi-instance create flow lives behind the tRPC `update`
-        // procedure, which goes through the id-based path.
-        await service.upsert({
-          projectId: project.id,
-          provider,
-          enabled: data.enabled,
-          customKeys: data.customKeys as Record<string, unknown> | undefined,
-          customModels: toCanonicalModels(data.customModels, "chat"),
-          customEmbeddingsModels: toCanonicalModels(data.customEmbeddingsModels, "embedding"),
-          extraHeaders: data.extraHeaders,
-          defaultModel,
-        });
-      } catch (error) {
-        if (error instanceof Error) {
-          throw new HTTPException(400, { message: error.message });
-        }
-        throw error;
+      // Ensure defaultModel has the provider prefix (e.g. "openai/gpt-4o")
+      // required by litellm for routing
+      let defaultModel = data.defaultModel;
+      if (defaultModel && !defaultModel.includes("/")) {
+        defaultModel = `${provider}/${defaultModel}`;
       }
+
+      // REST endpoint is keyed on the provider string in the URL and preserves
+      // the legacy single-instance upsert contract. The multi-instance create
+      // flow lives behind the tRPC `update` procedure, which goes through the
+      // id-based path.
+      //
+      // Nothing is caught here on purpose. Every failure `upsert` raises is a
+      // HandledError carrying its own status and code, and the framework
+      // boundary renders it; catching them to rethrow one 400 replaced every
+      // status with 400 and every code with `http_error`.
+      await service.upsert({
+        projectId: project.id,
+        provider,
+        enabled: data.enabled,
+        customKeys: data.customKeys as Record<string, unknown> | undefined,
+        customModels: toCanonicalModels(data.customModels, "chat"),
+        customEmbeddingsModels: toCanonicalModels(data.customEmbeddingsModels, "embedding"),
+        extraHeaders: data.extraHeaders,
+        defaultModel,
+      });
 
       // Return updated providers list with masked keys
       const providers = await service.getForProject({ projectId: project.id });
