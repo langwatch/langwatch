@@ -6,6 +6,7 @@ import { generateSpecs as generateSpecsUnpinned } from "hono-openapi";
 import path from "path";
 import { app as agentCacheApp } from "../app/api/agent-cache/[[...route]]/app";
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
+import { app as connectedAgentRelayApp } from "../server/connected-agents/relay.route";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
 import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";
 import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
@@ -191,6 +192,8 @@ export default async function execute() {
   const agentCacheSpec = await generateSpecs(agentCacheApp);
   console.log("Building agents spec...");
   const agentsSpec = await generateSpecs(agentsApp);
+  console.log("Building connected agent relay spec...");
+  const connectedAgentRelaySpec = await generateSpecs(connectedAgentRelayApp);
   console.log("Building api keys spec...");
   const apiKeysSpec = await generateSpecs(apiKeysApp);
   console.log("Building analytics spec...");
@@ -285,6 +288,7 @@ export default async function execute() {
       currentSpec,
       agentCacheSpec,
       agentsSpec,
+      connectedAgentRelaySpec,
       apiKeysSpec,
       analyticsSpec,
       analyticsSqlSpec,

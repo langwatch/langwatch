@@ -135,7 +135,8 @@ export interface CallFrame {
   params: Record<string, AgentParameterValue>;
   session: unknown;
   traceparent: string | null;
-  deadlineAt: string | null;
+  /** Epoch milliseconds, null when the platform sent none. */
+  deadlineAt: number | null;
   run: CallRun;
 }
 
@@ -163,11 +164,13 @@ const readRegistered = (frame: Record<string, unknown>): RegisteredFrame | null 
   if (!Array.isArray(frame.agents) || !isString(frame.instanceId)) return null;
   const agents: RegisteredAgent[] = [];
   for (const entry of frame.agents) {
-    if (!isRecord(entry) || !isString(entry.name) || !isString(entry.id)) return null;
+    if (!isRecord(entry) || !isString(entry.name)) return null;
+    const id = isString(entry.id) ? entry.id : isString(entry.agentId) ? entry.agentId : null;
+    if (id === null) return null;
     agents.push({
       name: entry.name,
       environment: isString(entry.environment) ? entry.environment : "",
-      id: entry.id,
+      id,
       url: isString(entry.url) ? entry.url : "",
       parameterNotes: isStringList(entry.parameterNotes) ? entry.parameterNotes : [],
     });
@@ -201,6 +204,16 @@ const readParams = (value: unknown): Record<string, AgentParameterValue> => {
   return params;
 };
 
+/** A deadline as epoch milliseconds, from a number or an ISO string. */
+const readDeadline = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (isString(value)) {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+};
+
 const readCall = (frame: Record<string, unknown>): CallFrame | null => {
   if (!isString(frame.callId) || !isString(frame.agentId)) return null;
   const messages = isMessageList(frame.messages) ? frame.messages : [];
@@ -216,7 +229,7 @@ const readCall = (frame: Record<string, unknown>): CallFrame | null => {
     params: readParams(frame.params),
     session: frame.session === undefined ? null : frame.session,
     traceparent: isString(frame.traceparent) ? frame.traceparent : null,
-    deadlineAt: isString(frame.deadlineAt) ? frame.deadlineAt : null,
+    deadlineAt: readDeadline(frame.deadlineAt),
     run: {
       ...(isString(run.scenarioRunId) ? { scenarioRunId: run.scenarioRunId } : {}),
       ...(isString(run.scenarioName) ? { scenarioName: run.scenarioName } : {}),
