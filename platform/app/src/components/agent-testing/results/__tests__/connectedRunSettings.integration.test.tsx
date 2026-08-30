@@ -53,9 +53,17 @@ function runAgainst({
 const IDENTITIES = new Map<string, TargetIdentity>([
   [
     "agent_dev",
-    { name: "support-agent", environment: "development", ownerName: "Ana" },
+    {
+      name: "support-agent",
+      kind: "connected",
+      environment: "development",
+      ownerName: "Ana",
+    },
   ],
-  ["agent_http", { name: "http-agent", environment: null, ownerName: null }],
+  [
+    "agent_http",
+    { name: "http-agent", kind: "http", environment: null, ownerName: null },
+  ],
 ]);
 
 function renderSettings(scenarioRuns: ScenarioRunData[]) {
@@ -102,6 +110,17 @@ describe("run settings of a connected agent target", () => {
       expect(
         screen.getByText("served by build-box (eu-pod)"),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("given the run went against one target", () => {
+    /** @scenario "The mark of a target carries its colour only in a comparison" */
+    it("marks it with the kind of its agent and no colour", () => {
+      renderSettings([runAgainst({ referenceId: "agent_dev" })]);
+
+      const mark = screen.getByTestId("run-settings-mark-agent_dev");
+      expect(mark.dataset.kind).toBe("connected");
+      expect(mark.dataset.color).toBeUndefined();
     });
   });
 

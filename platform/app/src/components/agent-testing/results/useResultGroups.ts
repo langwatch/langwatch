@@ -21,7 +21,7 @@
 import { useMemo } from "react";
 import type { Period, PeriodMode } from "~/components/PeriodSelector";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useTargetNameMap } from "~/hooks/useTargetNameMap";
+import { useTargetIdentityMap } from "~/hooks/useTargetNameMap";
 import type {
   CodeScenario,
   ResultAtom,
@@ -31,7 +31,9 @@ import type {
   SeriesBucket,
 } from "~/server/app-layer/simulations/result-atoms/atom.types";
 import type { RunParameterValues } from "~/server/scenarios/parameters";
+import { splitTargetKey } from "~/server/suites/target-key";
 import { api } from "~/utils/api";
+import type { TargetKind } from "../shared/TargetMark";
 import type { PlanRowModel } from "./PlanRowsTable";
 import type { ResultsFilterOption } from "./ResultsFilterMenu";
 import {
@@ -88,6 +90,8 @@ export type UseResultGroupsResult = {
   labelOptions: ResultsFilterOption[];
   targetOptions: ResultsFilterOption[];
   resolveTargetName: (targetKey: string) => string;
+  /** The kind of agent behind a target key, for the mark that leads its row. */
+  resolveTargetKind: (targetKey: string) => TargetKind;
   isLoading: boolean;
   /** True while the source holds atoms it has not handed over. */
   hasMore: boolean;
@@ -527,6 +531,33 @@ function useTargetNaming({
   return { targetNames, targetParameters, resolveTargetName };
 }
 
+/**
+ * What the page reads off the agents and the prompts of the project: the name
+ * a target key stands for, and the kind of agent behind it.
+ *
+ * A target key carries the parameters of the target as well as the id, so the
+ * kind is read off the reference id inside it.
+ */
+function useTargetReads() {
+  const targetIdentities = useTargetIdentityMap();
+  const platformTargetNames = useMemo(
+    () =>
+      new Map(
+        [...targetIdentities].map(
+          ([id, identity]) => [id, identity.name] as const,
+        ),
+      ),
+    [targetIdentities],
+  );
+  const resolveTargetKind = useMemo(
+    () => (targetKey: string) =>
+      targetIdentities.get(splitTargetKey(targetKey).referenceId)?.kind ??
+      "unknown",
+    [targetIdentities],
+  );
+  return { platformTargetNames, resolveTargetKind };
+}
+
 export function useResultGroups({
   plans,
   period,
@@ -568,7 +599,7 @@ export function useResultGroups({
     { enabled: !!project },
   );
 
-  const platformTargetNames = useTargetNameMap();
+  const { platformTargetNames, resolveTargetKind } = useTargetReads();
   const groups = overview.data?.groups ?? EMPTY_GROUPS;
 
   const { targetNames, targetParameters, resolveTargetName } = useTargetNaming({
@@ -615,6 +646,7 @@ export function useResultGroups({
     buckets: overview.data?.totals.series ?? [],
     ...options,
     resolveTargetName,
+    resolveTargetKind,
     isLoading: overview.isLoading,
     hasMore: atomPage.data?.hasMore ?? false,
   };

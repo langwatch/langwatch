@@ -35,6 +35,7 @@ import {
   targetParametersLabel,
   targetSortKey,
 } from "~/server/suites/target-key";
+import type { TargetKind } from "../shared/TargetMark";
 import { targetColor } from "../shared/target-colors";
 
 /** One target of a run, as the run detail reads it. */
@@ -47,6 +48,8 @@ export type BatchTarget = {
   parameters: RunParameterValues | null;
   /** The name of the agent or the prompt, or the reference id when unknown. */
   name: string;
+  /** The kind of agent behind the target, for the mark that leads its rows. */
+  kind: TargetKind;
   /**
    * The name, with the parameters that differ from the other targets of the
    * same agent when the agent appears more than once.
@@ -169,6 +172,8 @@ export function batchTargetsOf({
     identityOf(target)?.environment ?? null;
   const ownerNameOf = (target: { referenceId: string }) =>
     identityOf(target)?.ownerName ?? null;
+  const kindOf = (target: { referenceId: string }): TargetKind =>
+    identityOf(target)?.kind ?? "unknown";
   const labelled = sorted.map((target) => ({
     referenceId: target.referenceId,
     runParameters: target.parameters ?? undefined,
@@ -191,6 +196,7 @@ export function batchTargetsOf({
     referenceId: target.referenceId,
     parameters: target.parameters,
     name: nameOf(target),
+    kind: kindOf(target),
     label: labels[index] ?? nameOf(target),
     shortLabel: repeated.has(target.referenceId)
       ? targetParametersLabel({

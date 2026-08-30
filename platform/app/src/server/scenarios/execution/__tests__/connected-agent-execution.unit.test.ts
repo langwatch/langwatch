@@ -227,6 +227,32 @@ describe("SerializedConnectedAgentAdapter", () => {
         "Connected agent call failed (agent_call_failed): bad input",
       );
     });
+
+    /** @scenario "The child names a refused call by the code the relay wrote" */
+    it("names the failure by the code, not by the status text beside it", async () => {
+      const relay = fakeRelay([
+        relayReply(
+          {
+            code: "agent_offline",
+            message: "agent_offline",
+            error: "Service Unavailable",
+            meta: { agentName: "support-agent", environment: "production" },
+          },
+          503,
+        ),
+      ]);
+      const adapter = adapterWith(relay);
+
+      const failure = await adapter
+        .call(turn("thread_a", "hello"))
+        .catch((error: unknown) => error);
+
+      const typed = failure as ConnectedAgentCallError;
+      expect(typed.code).toBe("agent_offline");
+      expect(classifyScenarioInfraError(typed.message).code).toBe(
+        ScenarioInfraErrorCode.AgentOffline,
+      );
+    });
   });
 });
 

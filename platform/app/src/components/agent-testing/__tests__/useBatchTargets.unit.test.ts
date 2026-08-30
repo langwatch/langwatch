@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import type { TargetIdentity } from "~/hooks/useTargetNameMap";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { targetKeyOf } from "~/server/suites/target-key";
@@ -16,9 +17,20 @@ import {
 } from "../results/useBatchTargets";
 import { TARGET_COLORS } from "../shared/target-colors";
 
-const NAMES = new Map([
-  ["agent_dev", { name: "dev-agent", environment: null, ownerName: null }],
-  ["agent_prod", { name: "prod-agent", environment: null, ownerName: null }],
+const NAMES = new Map<string, TargetIdentity>([
+  [
+    "agent_dev",
+    {
+      name: "dev-agent",
+      kind: "connected",
+      environment: null,
+      ownerName: null,
+    },
+  ],
+  [
+    "agent_prod",
+    { name: "prod-agent", kind: "http", environment: null, ownerName: null },
+  ],
 ]);
 
 /** One run against a target, with the overrides the platform stamped on it. */

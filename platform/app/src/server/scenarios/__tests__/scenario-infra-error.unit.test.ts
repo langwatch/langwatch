@@ -616,6 +616,25 @@ describe("extractScenarioErrorText", () => {
   it("returns a plain string unchanged", () => {
     expect(extractScenarioErrorText("boom")).toBe("boom");
   });
+
+  describe("when the runner led the message with the adapter class name", () => {
+    /** @scenario "The name of the adapter is dropped from a run failure" */
+    it("drops the name and keeps the sentence behind it", () => {
+      expect(
+        extractScenarioErrorText(
+          "[SerializedConnectedAgentAdapter] ConnectedAgentCallError: boom",
+        ),
+      ).toBe("ConnectedAgentCallError: boom");
+    });
+
+    it("drops it from a serialized error too", () => {
+      const raw = JSON.stringify({
+        name: "Error",
+        message: "[SerializedHttpAgentAdapter] fetch failed",
+      });
+      expect(extractScenarioErrorText(raw)).toBe("fetch failed");
+    });
+  });
 });
 
 describe("resolveScenarioError", () => {
@@ -672,6 +691,20 @@ describe("resolveScenarioError", () => {
 
     expect(result.message).not.toContain("<html");
     expect(result.message).not.toContain("DOCTYPE");
+  });
+});
+
+describe("classifyScenarioInfraError adapter name", () => {
+  describe("when the failure was caught by one of our adapters", () => {
+    /** @scenario "The name of the adapter is dropped from a run failure" */
+    it("classifies it with no adapter name in the message", () => {
+      const result = classifyScenarioInfraError(
+        "[SerializedConnectedAgentAdapter] something the classifier cannot name",
+      );
+
+      expect(result.message).not.toContain("SerializedConnectedAgentAdapter");
+      expect(result.message).toContain("something the classifier cannot name");
+    });
   });
 });
 

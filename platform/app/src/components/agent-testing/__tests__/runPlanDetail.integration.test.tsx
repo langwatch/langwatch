@@ -1553,8 +1553,8 @@ describe("<RunPlanDetail/> on a comparison run", () => {
     mockFreshnessQuery.mockReturnValue({ data: undefined });
     vi.mocked(api.agents.getAll.useQuery).mockReturnValue({
       data: [
-        { id: DEV, name: "dev-agent" },
-        { id: PROD, name: "prod-agent" },
+        { id: DEV, name: "dev-agent", type: "connected", environment: null },
+        { id: PROD, name: "prod-agent", type: "http" },
       ],
     } as never);
     setRuns(comparisonBatch());
@@ -1889,6 +1889,22 @@ describe("<RunPlanDetail/> on a comparison run", () => {
         screen.getByTestId(`runs-sidebar-item-batch_3-target-dot-${DEV}`),
       ).backgroundColor,
     ).toBe(rgbOf(TARGET_COLORS[0]));
+  });
+
+  /** @scenario "The mark of a target carries its colour only in a comparison" */
+  it("marks each target with the kind of its agent, in the colour of that target", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const dev = screen.getByTestId(`run-settings-mark-${DEV}`);
+    const prod = screen.getByTestId(`run-settings-mark-${PROD}`);
+
+    expect(dev.dataset.kind).toBe("connected");
+    expect(prod.dataset.kind).toBe("http");
+    expect(dev.dataset.color).toBe(TARGET_COLORS[0]);
+    expect(prod.dataset.color).toBe(TARGET_COLORS[1]);
   });
 
   /** @scenario "The run settings of a comparison read one layer of parameters" */

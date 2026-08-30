@@ -694,6 +694,21 @@ function targetHostFromTransportError(text: string): string | undefined {
 }
 
 /**
+ * The class name of the adapter, which the scenario runner writes in front of
+ * every failure it catches: `[SerializedConnectedAgentAdapter] ...`.
+ *
+ * On the platform the adapter is ours and the reader never chose it, so the
+ * name states an implementation detail and pushes the sentence that matters
+ * off the first line. The classifier reads the sentence behind it either way.
+ */
+const RUNNER_ADAPTER_PREFIX = /^\[\w*Adapter\]\s*/;
+
+/** The same text with the runner's adapter name taken off the front. */
+function withoutAdapterName(text: string): string {
+  return text.replace(RUNNER_ADAPTER_PREFIX, "");
+}
+
+/**
  * Classify a raw scenario-runner error string into a handled error envelope.
  *
  * Falls back to a trimmed generic message so we never lose information, but
@@ -702,7 +717,7 @@ function targetHostFromTransportError(text: string): string | undefined {
 export function classifyScenarioInfraError(
   raw: string | undefined,
 ): ScenarioErrorEnvelope {
-  const text = (raw ?? "").trim();
+  const text = withoutAdapterName((raw ?? "").trim());
 
   if (text.length === 0) {
     return {
@@ -773,7 +788,7 @@ export function decodeScenarioError(
  * Runs report errors in a few shapes: the scenario SDK stores a serialized
  * `{ name, message, stack }` JSON (via the ingest path), while a child crash may
  * be a plain string. We take the `message` (falling back to `stack`, then the
- * raw string) so the classifier sees the real failure text — never a bare
+ * raw string) so the classifier sees the real failure text, never a bare
  * `{name,message,stack}` wrapper.
  */
 export function extractScenarioErrorText(raw: string): string {
@@ -785,16 +800,16 @@ export function extractScenarioErrorText(raw: string): string {
         stack?: unknown;
       };
       if (typeof parsed.message === "string" && parsed.message.length > 0) {
-        return parsed.message;
+        return withoutAdapterName(parsed.message);
       }
       if (typeof parsed.stack === "string" && parsed.stack.length > 0) {
-        return parsed.stack;
+        return withoutAdapterName(parsed.stack);
       }
     } catch {
-      // Not JSON — fall through to the raw string.
+      // Not JSON: fall through to the raw string.
     }
   }
-  return raw;
+  return withoutAdapterName(raw);
 }
 
 /**

@@ -29,6 +29,7 @@ import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { FG_MUTED } from "../shared/design";
 import { FromCodeBadge } from "../shared/FromCodeBadge";
 import { PassRateText } from "../shared/PassRateText";
+import { type TargetKind, TargetMark } from "../shared/TargetMark";
 import { TrendSparkline } from "../shared/TrendSparkline";
 import {
   ResultsTableBody,
@@ -53,6 +54,37 @@ const SCOPE_ICONS: Record<RunPlanScopeKind, typeof Layers> = {
   scenarios: Crosshair,
   external: FolderCode,
 };
+
+/**
+ * The targets a plan runs against, behind one mark.
+ *
+ * A plan that compares carries no one kind, so the row reads the target mark
+ * instead of the mark of an agent, the same way the run detail marks a
+ * comparison.
+ */
+function TargetsCell({
+  targetKeys,
+  resolveTargetName,
+  resolveTargetKind,
+}: {
+  targetKeys: string[];
+  resolveTargetName: (targetKey: string) => string;
+  resolveTargetKind: (targetKey: string) => TargetKind;
+}) {
+  const label = targetsLabel(targetKeys.map((key) => resolveTargetName(key)));
+  const first = targetKeys[0];
+  const kind: TargetKind =
+    targetKeys.length > 1 || !first ? "several" : resolveTargetKind(first);
+
+  return (
+    <HStack gap={1.5} minWidth={0} data-testid="plan-targets">
+      {label ? <TargetMark kind={kind} testId="plan-targets-mark" /> : null}
+      <Text fontSize="11.5px" color={FG_MUTED} truncate>
+        {label}
+      </Text>
+    </HStack>
+  );
+}
 
 function ScopeCell({ plan }: { plan: RunPlan }) {
   return (
@@ -238,6 +270,7 @@ export type PlanRowsTableProps = {
   /** The window, in days, for the row that says nothing ran inside it. */
   days: number;
   resolveTargetName: (targetKey: string) => string;
+  resolveTargetKind: (targetKey: string) => TargetKind;
   onSelectPlan: (planSlug: string) => void;
   onEditPlan: (suiteId: string) => void;
   onArchivePlan: (plan: RunPlan) => void;
@@ -249,6 +282,7 @@ export function PlanRowsTable({
   rows,
   days,
   resolveTargetName,
+  resolveTargetKind,
   onSelectPlan,
   onEditPlan,
   onArchivePlan,
@@ -286,16 +320,11 @@ export function PlanRowsTable({
 
             <ScopeCell plan={plan} />
 
-            <Text
-              fontSize="11.5px"
-              color={FG_MUTED}
-              truncate
-              data-testid="plan-targets"
-            >
-              {targetsLabel(
-                (group?.targetKeys ?? []).map((key) => resolveTargetName(key)),
-              )}
-            </Text>
+            <TargetsCell
+              targetKeys={group?.targetKeys ?? []}
+              resolveTargetName={resolveTargetName}
+              resolveTargetKind={resolveTargetKind}
+            />
 
             <PassRateText passRate={group?.passRate ?? null} />
 

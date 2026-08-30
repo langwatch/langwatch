@@ -237,6 +237,17 @@ Feature: Comparison mode
     And each rate reads in its own pass-rate colour
     And the entry carries no "passed" count
 
+  # The mark of a target is the icon of the kind of agent behind it, the same
+  # icon the agents page draws. The colour is what tells the targets of a
+  # comparison apart, so a run against one target wears none.
+
+  @integration
+  Scenario: The mark of a target carries its colour only in a comparison
+    Given a comparison run against a connected agent and an HTTP agent
+    Then each target of the run settings is marked with the kind of its agent
+    And each mark carries the colour of that target
+    But the mark of a run against one target carries no colour
+
   @integration
   Scenario: The run settings of a comparison read one layer of parameters
     Given a run against "dev-agent" and "dev-agent" on "model=gpt-5-mini", both over "locale=de"

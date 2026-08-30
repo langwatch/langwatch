@@ -229,22 +229,53 @@ export class SerializedConnectedAgentAdapter extends SerializedAgentAdapter {
   }
 }
 
+/**
+ * The handled code the relay named, from whichever field of its body carries
+ * it.
+ *
+ * The REST boundary writes `code` and repeats it under `error` on the routes
+ * that answer the older envelope, where `error` is the status text instead
+ * (`Service Unavailable`). A refusal from the authentication chain nests the
+ * whole thing under `error`. The code is what the failure classifier names
+ * the run by, so reading the status text as the code loses the name.
+ */
+function codeOf({
+  parsed,
+  status,
+}: {
+  parsed: { error?: unknown; code?: unknown };
+  status: number;
+}): string {
+  if (typeof parsed.code === "string" && parsed.code.length > 0) {
+    return parsed.code;
+  }
+  const nested = parsed.error;
+  if (typeof nested === "object" && nested !== null) {
+    const inner = (nested as { code?: unknown }).code;
+    if (typeof inner === "string" && inner.length > 0) return inner;
+  }
+  if (typeof nested === "string" && nested.length > 0) return nested;
+  return `http_${status}`;
+}
+
 /** The relay's own error body as a typed error. */
 async function failureOf(response: {
   status: number;
   text(): Promise<string>;
 }): Promise<ConnectedAgentCallError> {
   const raw = await response.text().catch(() => "");
-  let parsed: { error?: unknown; message?: unknown; meta?: unknown } = {};
+  let parsed: {
+    error?: unknown;
+    code?: unknown;
+    message?: unknown;
+    meta?: unknown;
+  } = {};
   try {
     parsed = JSON.parse(raw);
   } catch {
     // Not JSON: the status alone names the failure.
   }
-  const code =
-    typeof parsed.error === "string" && parsed.error.length > 0
-      ? parsed.error
-      : `http_${response.status}`;
+  const code = codeOf({ parsed, status: response.status });
   const meta =
     typeof parsed.meta === "object" && parsed.meta !== null
       ? (parsed.meta as Record<string, unknown>)

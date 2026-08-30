@@ -252,6 +252,16 @@ Feature: Scenario infrastructure error surfacing and empty-response state
     When the failure is classified
     Then the reason inside the wrapper names the handled error, not the wrapper
 
+  # The scenario runner writes the class name of the adapter in front of every
+  # failure it catches. On the platform the adapter is ours, so the name states
+  # an implementation detail and pushes the sentence that matters off the line.
+
+  @unit
+  Scenario: The name of the adapter is dropped from a run failure
+    Given a scenario run failed with a message the runner led with the adapter class name
+    When the failure is classified
+    Then the message does not carry the adapter class name
+
   @unit
   Scenario: The stack of a run failure is kept as the detail
     Given a run whose error field holds the runner's name, message and stack

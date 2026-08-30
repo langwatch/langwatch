@@ -11,7 +11,7 @@
  */
 
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
-import { ChevronDown, ChevronRight, Target } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useNow } from "~/hooks/useNow";
 import type { ResultGroup } from "~/server/app-layer/simulations/result-atoms/atom.types";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
@@ -19,6 +19,7 @@ import { FG_MUTED, GROUP_HEADER_BG, ROW_HOVER_BG } from "../shared/design";
 import { FromCodeBadge } from "../shared/FromCodeBadge";
 import { PassRateText } from "../shared/PassRateText";
 import { passRateColor } from "../shared/pass-rate-color";
+import { type TargetKind, TargetMark } from "../shared/TargetMark";
 import { TrendSparkline } from "../shared/TrendSparkline";
 import {
   ResultsTableBody,
@@ -148,12 +149,14 @@ function GroupSummaryRow({
   isOpen,
   onToggleOpen,
   resolveTargetName,
+  resolveTargetKind,
 }: {
   group: ResultGroup;
   isScenario: boolean;
   isOpen: boolean;
   onToggleOpen: (key: string) => void;
   resolveTargetName: (targetKey: string) => string;
+  resolveTargetKind: (targetKey: string) => TargetKind;
 }) {
   // A target group is keyed by a reference id, and the read leaves naming it
   // to the client, which holds the names of the agents and the prompts.
@@ -171,9 +174,10 @@ function GroupSummaryRow({
 
       <HStack gap={1.5} minWidth={0}>
         {!isScenario ? (
-          <Box color={FG_MUTED} flexShrink={0} display="flex">
-            <Target size={13} />
-          </Box>
+          <TargetMark
+            kind={resolveTargetKind(group.key)}
+            testId={`results-group-target-mark-${group.key}`}
+          />
         ) : null}
         <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
           {title}
@@ -267,6 +271,7 @@ export type GroupedRowsTableProps = {
    */
   rowsByGroupKey: Map<string, ResultRow[]>;
   resolveTargetName: (targetKey: string) => string;
+  resolveTargetKind: (targetKey: string) => TargetKind;
   onOpenRun: (row: ResultRow) => void;
 };
 
@@ -277,6 +282,7 @@ export function GroupedRowsTable({
   onToggleOpen,
   rowsByGroupKey,
   resolveTargetName,
+  resolveTargetKind,
   onOpenRun,
 }: GroupedRowsTableProps) {
   const now = useNow();
@@ -308,6 +314,7 @@ export function GroupedRowsTable({
               isOpen={openedKeys.includes(group.key)}
               onToggleOpen={onToggleOpen}
               resolveTargetName={resolveTargetName}
+              resolveTargetKind={resolveTargetKind}
             />
 
             {openedKeys.includes(group.key) ? (

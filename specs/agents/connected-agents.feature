@@ -222,6 +222,18 @@ Feature: Connected agents
     When the relay request is aborted
     Then the instance receives a cancel frame for that call
 
+  # The relay writes the handled code under "code". The older envelope repeats
+  # it under "error", where a route that answers the canonical body writes the
+  # status text instead. The code is what names the run's failure, so the
+  # adapter reads the field that carries it.
+
+  @unit
+  Scenario: The child names a refused call by the code the relay wrote
+    Given the relay refused a call with a body that carries the code and the status text
+    When the child adapter raises the failure
+    Then the failure carries the relay's code, not the status text
+    And the run reads under the copy of that code
+
   @unit
   Scenario: A call that reaches its deadline fails with a typed timeout
     Given an instance that never answers
