@@ -134,9 +134,7 @@ describe("given an organization the genesis import has not reached", () => {
 
     it("still answers the duplicates the identity pre-check found", async () => {
       const { writer, db } = harness({ onLedger: false });
-      db.roleBinding.findMany.mockResolvedValueOnce([
-        { ...legacyRow({ id: "rb_existing" }) },
-      ]);
+      db.roleBinding.findMany.mockResolvedValueOnce([{ ...legacyRow({ id: "rb_existing" }) }]);
 
       const outcome = await writer.attachBindings({
         organizationId: ORG_ID,

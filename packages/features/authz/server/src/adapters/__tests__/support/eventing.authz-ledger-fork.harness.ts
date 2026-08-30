@@ -154,8 +154,6 @@ export function legacyRow({ id }: { id: string }) {
   };
 }
 
-export function auditRows(
-  db: ReturnType<typeof harness>["db"],
-): Record<string, unknown>[] {
+export function auditRows(db: ReturnType<typeof harness>["db"]): Record<string, unknown>[] {
   return db.auditLog.createMany.mock.calls[0]![0].data;
 }

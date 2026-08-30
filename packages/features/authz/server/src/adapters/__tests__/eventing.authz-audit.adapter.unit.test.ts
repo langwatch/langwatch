@@ -95,12 +95,8 @@ describe("EventingAuthzAuditAdapter", () => {
       TENANT_ID,
       TENANT_ID,
     ]);
-    expect(store.attempts.map(({ organizationId }) => organizationId)).not.toContain(
-      "grant_1",
-    );
-    expect(store.attempts.map(({ organizationId }) => organizationId)).not.toContain(
-      "role_1",
-    );
+    expect(store.attempts.map(({ organizationId }) => organizationId)).not.toContain("grant_1");
+    expect(store.attempts.map(({ organizationId }) => organizationId)).not.toContain("role_1");
   });
 
   it("skips imported grant sources and both migration role actors", async () => {

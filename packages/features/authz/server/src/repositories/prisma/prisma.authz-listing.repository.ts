@@ -179,9 +179,7 @@ export class PrismaAuthzListingRepository extends AuthzListingRepository {
   }): Promise<Map<string, AuthzTeamMemberBinding[]>> {
     // Pre-seed every requested teamId so the caller can rely on a hit even
     // for teams with no members, and so a single query covers all teams.
-    const byTeam = new Map<string, AuthzTeamMemberBinding[]>(
-      teamIds.map((teamId) => [teamId, []]),
-    );
+    const byTeam = new Map<string, AuthzTeamMemberBinding[]>(teamIds.map((teamId) => [teamId, []]));
     if (teamIds.length === 0) return byTeam;
 
     const bindings = (await this.database.roleBinding.findMany({
@@ -265,8 +263,7 @@ export class PrismaAuthzListingRepository extends AuthzListingRepository {
 
     return bindings
       .filter(
-        (binding) =>
-          !binding.group || binding.group.organizationId === binding.organizationId,
+        (binding) => !binding.group || binding.group.organizationId === binding.organizationId,
       )
       .map(({ group: _group, ...binding }) => binding);
   }

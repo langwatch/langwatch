@@ -13,9 +13,7 @@ describe("RedisAuthzEpochAdapter", () => {
     const epoch = RedisAuthzEpochAdapter.create({ redis });
 
     await expect(epoch.tryRead({ organizationId: ORGANIZATION_ID })).resolves.toBe(42);
-    await expect(
-      epoch.bump({ organizationId: ORGANIZATION_ID }),
-    ).resolves.toBeUndefined();
+    await expect(epoch.bump({ organizationId: ORGANIZATION_ID })).resolves.toBeUndefined();
     expect(redis.get).toHaveBeenCalledWith(KEY);
     expect(redis.incr).toHaveBeenCalledWith(KEY);
   });
@@ -30,9 +28,7 @@ describe("RedisAuthzEpochAdapter", () => {
         },
       });
 
-      await expect(
-        epoch.tryRead({ organizationId: ORGANIZATION_ID }),
-      ).resolves.toBeNull();
+      await expect(epoch.tryRead({ organizationId: ORGANIZATION_ID })).resolves.toBeNull();
     },
   );
 
@@ -45,17 +41,13 @@ describe("RedisAuthzEpochAdapter", () => {
     const epoch = RedisAuthzEpochAdapter.create({ redis });
 
     await expect(epoch.tryRead({ organizationId: ORGANIZATION_ID })).resolves.toBeNull();
-    await expect(
-      epoch.bump({ organizationId: ORGANIZATION_ID }),
-    ).resolves.toBeUndefined();
+    await expect(epoch.bump({ organizationId: ORGANIZATION_ID })).resolves.toBeUndefined();
   });
 
   it("does not touch storage when Redis is not composed", async () => {
     const epoch = RedisAuthzEpochAdapter.create({ redis: null });
 
     await expect(epoch.tryRead({ organizationId: ORGANIZATION_ID })).resolves.toBeNull();
-    await expect(
-      epoch.bump({ organizationId: ORGANIZATION_ID }),
-    ).resolves.toBeUndefined();
+    await expect(epoch.bump({ organizationId: ORGANIZATION_ID })).resolves.toBeUndefined();
   });
 });

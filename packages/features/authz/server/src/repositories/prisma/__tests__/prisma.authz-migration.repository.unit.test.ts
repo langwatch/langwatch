@@ -94,9 +94,7 @@ describe("PrismaAuthzMigrationRepository", () => {
     });
     const repository = PrismaAuthzMigrationRepository.create(database);
 
-    await expect(
-      repository.findLegacyBindingRows({ organizationId: "org_1" }),
-    ).resolves.toEqual([
+    await expect(repository.findLegacyBindingRows({ organizationId: "org_1" })).resolves.toEqual([
       {
         id: "binding_1",
         userId: "user_1",

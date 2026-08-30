@@ -43,6 +43,9 @@ function makeService({
   const epochPort = new StubAuthzEpoch();
   epochPort.tryRead.mockImplementation(() => epoch());
   return AuthzService.create({
+    // These suites exercise the engine path, which is what the absent
+    // gate used to default to.
+    isOnEngine: async () => true,
     repository: reader,
     listing: new StubAuthzListingRepository(),
     bindings: new StubAuthzBindingRepository(),
@@ -56,6 +59,9 @@ function makeService({
  *  service that has never cached anything. */
 function makeUncachedService(reader: AuthzReadRepository) {
   return AuthzService.create({
+    // These suites exercise the engine path, which is what the absent
+    // gate used to default to.
+    isOnEngine: async () => true,
     repository: reader,
     listing: new StubAuthzListingRepository(),
     bindings: new StubAuthzBindingRepository(),

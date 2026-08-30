@@ -20,10 +20,7 @@ import {
   EventingAuthzAdapter,
   RevokeGrantCommand,
 } from "../eventing.authz.adapter";
-import {
-  AuthzAuditTrailStore,
-  type AuthzAuditRow,
-} from "../eventing.authz-audit.adapter";
+import { AuthzAuditTrailStore, type AuthzAuditRow } from "../eventing.authz-audit.adapter";
 import {
   type GrantProjectionWrite,
   GrantProjectionWriteStore,
@@ -55,10 +52,7 @@ const ROLE = {
 } as const;
 
 class NullGrantProjectionWriteStore extends GrantProjectionWriteStore {
-  async append(
-    _write: GrantProjectionWrite,
-    _context: ProjectionStoreContext,
-  ): Promise<void> {}
+  async append(_write: GrantProjectionWrite, _context: ProjectionStoreContext): Promise<void> {}
 }
 
 class NullAuthzAuditTrailStore extends AuthzAuditTrailStore {
@@ -131,12 +125,7 @@ describe("EventingAuthzAdapter", () => {
       },
       "grant_1",
     ],
-    [
-      "define role",
-      new DefineRoleCommand(),
-      { ...IDENTITY, role: ROLE, actor: ACTOR },
-      "role_1",
-    ],
+    ["define role", new DefineRoleCommand(), { ...IDENTITY, role: ROLE, actor: ACTOR }, "role_1"],
     [
       "change role permissions",
       new ChangeRolePermissionsCommand(),

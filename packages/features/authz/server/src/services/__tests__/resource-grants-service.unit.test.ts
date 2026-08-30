@@ -14,6 +14,9 @@ describe("AuthzService on a resource scope", () => {
   describe("given a live public share link for trace t1 and no session", () => {
     const authzWithLink = () =>
       AuthzService.create({
+        // These suites exercise the engine path, which is what the absent
+        // gate used to default to.
+        isOnEngine: async () => true,
         listing: new StubAuthzListingRepository(),
         bindings: new StubAuthzBindingRepository(),
         repository: makeReader({

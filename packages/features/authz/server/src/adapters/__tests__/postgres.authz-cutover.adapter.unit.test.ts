@@ -92,9 +92,7 @@ describe("PostgresAuthzCutoverAdapter", () => {
     await expect(adapter.tryGetFinalizedAt({ organizationId: ORG_ID })).resolves.toEqual(
       occurredAt,
     );
-    await expect(
-      adapter.tryGetFinalizedAt({ organizationId: ORG_ID }),
-    ).resolves.toBeNull();
+    await expect(adapter.tryGetFinalizedAt({ organizationId: ORG_ID })).resolves.toBeNull();
   });
 
   it("raises through the uncached read used by revocation routing", async () => {
@@ -107,9 +105,7 @@ describe("PostgresAuthzCutoverAdapter", () => {
       reporter: new RecordingReporter(),
     });
 
-    await expect(adapter.readUncached({ organizationId: ORG_ID })).rejects.toThrow(
-      "pg is down",
-    );
+    await expect(adapter.readUncached({ organizationId: ORG_ID })).rejects.toThrow("pg is down");
   });
 
   it("coalesces repeated reads inside the cache window", async () => {

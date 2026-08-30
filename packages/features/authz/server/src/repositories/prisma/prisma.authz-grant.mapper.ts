@@ -57,10 +57,7 @@ export type GrantResourceKindDb = "TRACE" | "THREAD";
 /** The single seam for the ledger's lowercase resource kind ↔ the Grant/
  *  ShareLink tables' uppercase spelling - `authz-read.grants.repository.ts`
  *  imports this rather than keeping its own copy. */
-export const RESOURCE_KIND_TO_DB: Record<
-  ResourceGrantTerms["kind"],
-  GrantResourceKindDb
-> = {
+export const RESOURCE_KIND_TO_DB: Record<ResourceGrantTerms["kind"], GrantResourceKindDb> = {
   trace: "TRACE",
   thread: "THREAD",
 };
@@ -81,9 +78,7 @@ const RESOURCE_KIND_FROM_DB: Record<GrantResourceKindDb, ResourceGrantTerms["kin
  * engine as `kind: undefined`, which reads as a resource grant that names no
  * kind of thing — a share row that matches whichever resource is asked about.
  */
-function resourceKindFromDb(
-  value: string | null,
-): ResourceGrantTerms["kind"] | undefined {
+function resourceKindFromDb(value: string | null): ResourceGrantTerms["kind"] | undefined {
   if (value === "TRACE" || value === "THREAD") {
     return RESOURCE_KIND_FROM_DB[value];
   }
@@ -133,12 +128,10 @@ export function grantFactToRow({
     scopeId: grant.scope.id,
     token: grant.resource?.token ?? null,
     permission: grant.resource?.permission ?? null,
-    resourceKind:
-      grant.resource != null ? RESOURCE_KIND_TO_DB[grant.resource.kind] : null,
+    resourceKind: grant.resource != null ? RESOURCE_KIND_TO_DB[grant.resource.kind] : null,
     projectId: grant.resource?.projectId ?? null,
     createdByUserId: grant.resource?.createdByUserId ?? null,
-    expiresAt:
-      grant.resource?.expiresAtMs != null ? new Date(grant.resource.expiresAtMs) : null,
+    expiresAt: grant.resource?.expiresAtMs != null ? new Date(grant.resource.expiresAtMs) : null,
     maxViews: grant.resource?.maxViews ?? null,
     occurredAt: new Date(grant.occurredAtMs),
   };
@@ -268,18 +261,10 @@ export function grantFactToCompatBinding({
   organizationId: string;
 }): CompatBindingRowShape | null {
   const { scope, principal, roleKey } = grant;
-  if (
-    scope.type !== "ORGANIZATION" &&
-    scope.type !== "TEAM" &&
-    scope.type !== "PROJECT"
-  ) {
+  if (scope.type !== "ORGANIZATION" && scope.type !== "TEAM" && scope.type !== "PROJECT") {
     return null;
   }
-  if (
-    principal.type !== "user" &&
-    principal.type !== "group" &&
-    principal.type !== "apiKey"
-  ) {
+  if (principal.type !== "user" && principal.type !== "group" && principal.type !== "apiKey") {
     return null;
   }
   if (roleKey == null || principal.id == null) return null;

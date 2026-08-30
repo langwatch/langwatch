@@ -106,7 +106,14 @@ export type AuthzServiceOptions = {
   /** Absolute cache-entry age bound; defaults to 30s. */
   cacheMaxAgeMs?: number;
   /** Rollout head used only by legacy app fallbacks during migration. */
-  isOnEngine?: (organizationId: string) => Promise<boolean>;
+  /**
+   * Whether an organization has cut over to the authz engine. Seven production
+   * call sites branch on the answer, so it is required: an absent gate used to
+   * default to `true`, which is the service claiming a migration state it has
+   * no evidence for. The only production composition
+   * (`postgres.authz.adapter.ts`) has always supplied it.
+   */
+  isOnEngine: (organizationId: string) => Promise<boolean>;
   /** Finalized cutover time used by compatibility fact minting. */
   tryGetEngineCutoverAt?: (organizationId: string) => Promise<Date | null>;
 };
@@ -181,7 +188,7 @@ export class AuthzService extends AuthzServiceContract {
   }
 
   async isOnEngine({ organizationId }: { organizationId: string }): Promise<boolean> {
-    return this.options.isOnEngine?.(organizationId) ?? true;
+    return await this.options.isOnEngine(organizationId);
   }
 
   async tryGetEngineCutoverAt({

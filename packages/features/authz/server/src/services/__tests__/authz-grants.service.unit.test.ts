@@ -667,6 +667,9 @@ describe("AuthzGrantsService.offboard", () => {
       // offboarding (nobody deleted the key), but its owner has nothing
       // left, and the §9 ceiling is what closes the hole.
       const authz = AuthzService.create({
+        // These suites exercise the engine path, which is what the absent
+        // gate used to default to.
+        isOnEngine: async () => true,
         listing: new StubAuthzListingRepository(),
         repository: makeReader({
           tryFindApiKeyOwner: vi.fn().mockResolvedValue({ userId: "dave" }),

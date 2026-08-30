@@ -54,10 +54,7 @@ export type GrantProjectionWrite =
 
 /** Storage port for the guarded, state-setting projection writes. */
 export abstract class GrantProjectionWriteStore implements AppendStore<GrantProjectionWrite> {
-  abstract append(
-    write: GrantProjectionWrite,
-    context: ProjectionStoreContext,
-  ): Promise<void>;
+  abstract append(write: GrantProjectionWrite, context: ProjectionStoreContext): Promise<void>;
 
   bulkAppend?(writes: GrantProjectionWrite[], context: BulkAppendContext): Promise<void>;
 }
@@ -119,9 +116,7 @@ export class AuthzGrantProjection implements MapProjectionDefinition<
         resourceKind: data.resource ? RESOURCE_KIND_TO_DB[data.resource.kind] : null,
         projectId: data.resource?.projectId ?? null,
         createdByUserId: data.resource?.createdByUserId ?? null,
-        expiresAt: data.resource?.expiresAtMs
-          ? new Date(data.resource.expiresAtMs)
-          : null,
+        expiresAt: data.resource?.expiresAtMs ? new Date(data.resource.expiresAtMs) : null,
         maxViews: data.resource?.maxViews ?? null,
         occurredAt: new Date(event.occurredAt),
       },
@@ -162,9 +157,7 @@ export class AuthzGrantProjection implements MapProjectionDefinition<
     };
   }
 
-  mapAuthzRolePermissionsChanged(
-    event: RolePermissionsChangedEvent,
-  ): GrantProjectionWrite {
+  mapAuthzRolePermissionsChanged(event: RolePermissionsChangedEvent): GrantProjectionWrite {
     return {
       kind: "role.setPermissions",
       roleId: event.data.roleId,

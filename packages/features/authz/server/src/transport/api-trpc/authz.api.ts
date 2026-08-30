@@ -77,10 +77,8 @@ export class AuthzTrpcApi {
     const { protected: procedure, policy } = procedures;
 
     return trpc.router({
-      effectivePermissions: policy(RESOLVES_OWN_STANDING)(
-        procedure.input(scopeInputSchema),
-      ).query(async ({ ctx, input }) =>
-        ctx.app.authzApp.effectivePermissionsFor(input, ctx.actor()),
+      effectivePermissions: policy(RESOLVES_OWN_STANDING)(procedure.input(scopeInputSchema)).query(
+        async ({ ctx, input }) => ctx.app.authzApp.effectivePermissionsFor(input, ctx.actor()),
       ),
     });
   }

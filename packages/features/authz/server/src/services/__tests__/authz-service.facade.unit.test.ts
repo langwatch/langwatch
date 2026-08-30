@@ -16,6 +16,9 @@ function makeService({ listing = new StubAuthzListingRepository(), reader = make
   return {
     listing,
     service: AuthzService.create({
+      // These suites exercise the engine path, which is what the absent
+      // gate used to default to.
+      isOnEngine: async () => true,
       repository: reader,
       listing,
       bindings: new StubAuthzBindingRepository(),

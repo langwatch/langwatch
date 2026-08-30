@@ -71,9 +71,9 @@ describe("given a create that collides with an identical binding", () => {
         attachBindings: vi.fn().mockRejectedValue(new DuplicateBindingError()),
       } as Partial<EventingAuthzLedgerAdapter>);
 
-      await expect(
-        repository.createBinding({ row: binding, actor: ACTOR }),
-      ).rejects.toMatchObject({ code: "role_binding_already_exists" });
+      await expect(repository.createBinding({ row: binding, actor: ACTOR })).rejects.toMatchObject({
+        code: "role_binding_already_exists",
+      });
     });
   });
 
@@ -83,9 +83,9 @@ describe("given a create that collides with an identical binding", () => {
         attachBindings: vi.fn().mockRejectedValue(prismaError("P2002")),
       } as Partial<EventingAuthzLedgerAdapter>);
 
-      await expect(
-        repository.createBinding({ row: binding, actor: ACTOR }),
-      ).rejects.toMatchObject({ code: "role_binding_already_exists" });
+      await expect(repository.createBinding({ row: binding, actor: ACTOR })).rejects.toMatchObject({
+        code: "role_binding_already_exists",
+      });
     });
   });
 });

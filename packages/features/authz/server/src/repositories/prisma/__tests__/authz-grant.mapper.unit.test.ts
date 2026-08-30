@@ -92,9 +92,7 @@ describe("grant row mapping", () => {
       expect(row.legacyRole).toBe("ADMIN");
       expect(grantRowToFact(row)).toEqual(imported);
       // Ledger-born grants have no legacy row to preserve.
-      expect(
-        grantFactToRow({ grant: fact(), organizationId: ORG }).legacyRole,
-      ).toBeNull();
+      expect(grantFactToRow({ grant: fact(), organizationId: ORG }).legacyRole).toBeNull();
     });
 
     it("uppercases the principal type for the table and lowers it back", () => {
@@ -315,9 +313,7 @@ describe("compat share link mapping", () => {
         roleKey: null,
         scope: { type: "RESOURCE", id: "trace_t1" },
       });
-      expect(
-        grantFactToCompatShareLink({ grant: termless, organizationId: ORG }),
-      ).toBeNull();
+      expect(grantFactToCompatShareLink({ grant: termless, organizationId: ORG })).toBeNull();
     });
   });
 });

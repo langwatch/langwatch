@@ -47,9 +47,7 @@ export type PostgresAuthzCutoverAdapterOptions = {
 export class PostgresAuthzCutoverAdapter {
   private readonly cache: PerOrganizationCachedGateStore;
 
-  static create(
-    options: PostgresAuthzCutoverAdapterOptions,
-  ): PostgresAuthzCutoverAdapter {
+  static create(options: PostgresAuthzCutoverAdapterOptions): PostgresAuthzCutoverAdapter {
     return new PostgresAuthzCutoverAdapter(options);
   }
 
@@ -72,9 +70,7 @@ export class PostgresAuthzCutoverAdapter {
       },
       select: { status: true },
     });
-    return (
-      record !== null && (ON_ENGINE_STATUSES as readonly string[]).includes(record.status)
-    );
+    return record !== null && (ON_ENGINE_STATUSES as readonly string[]).includes(record.status);
   }
 
   async query({ organizationId }: { organizationId: string }): Promise<boolean> {
@@ -97,11 +93,7 @@ export class PostgresAuthzCutoverAdapter {
     });
   }
 
-  async tryGetFinalizedAt({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<Date | null> {
+  async tryGetFinalizedAt({ organizationId }: { organizationId: string }): Promise<Date | null> {
     try {
       const record = await this.options.database.systemMigrationTenantState.findUnique({
         where: {

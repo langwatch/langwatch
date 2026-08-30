@@ -76,30 +76,18 @@ type AuthzEvent<Type extends string, Payload> = Event<Payload> & {
   type: Type;
 };
 
-export type GrantAttachedEvent = AuthzEvent<
-  typeof GRANT_ATTACHED_EVENT_TYPE,
-  GrantAttachedPayload
->;
+export type GrantAttachedEvent = AuthzEvent<typeof GRANT_ATTACHED_EVENT_TYPE, GrantAttachedPayload>;
 export type GrantRoleChangedEvent = AuthzEvent<
   typeof GRANT_ROLE_CHANGED_EVENT_TYPE,
   GrantRoleChangedPayload
 >;
-export type GrantRevokedEvent = AuthzEvent<
-  typeof GRANT_REVOKED_EVENT_TYPE,
-  GrantRevokedPayload
->;
-export type RoleDefinedEvent = AuthzEvent<
-  typeof ROLE_DEFINED_EVENT_TYPE,
-  RoleDefinedPayload
->;
+export type GrantRevokedEvent = AuthzEvent<typeof GRANT_REVOKED_EVENT_TYPE, GrantRevokedPayload>;
+export type RoleDefinedEvent = AuthzEvent<typeof ROLE_DEFINED_EVENT_TYPE, RoleDefinedPayload>;
 export type RolePermissionsChangedEvent = AuthzEvent<
   typeof ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
   RolePermissionsChangedPayload
 >;
-export type RoleDeletedEvent = AuthzEvent<
-  typeof ROLE_DELETED_EVENT_TYPE,
-  RoleDeletedPayload
->;
+export type RoleDeletedEvent = AuthzEvent<typeof ROLE_DELETED_EVENT_TYPE, RoleDeletedPayload>;
 
 export type AuthzGrantsEvent =
   | GrantAttachedEvent
@@ -269,9 +257,7 @@ export class ChangeRolePermissionsCommand implements CommandHandler<
     return payload.roleId;
   }
 
-  handle(
-    command: Command<ChangeRolePermissionsCommandData>,
-  ): RolePermissionsChangedEvent[] {
+  handle(command: Command<ChangeRolePermissionsCommandData>): RolePermissionsChangedEvent[] {
     const { commandId, roleId, permissions, actor, occurredAtMs } = command.data;
     return [
       EventUtils.createEvent<RolePermissionsChangedEvent>({
@@ -349,53 +335,55 @@ export class EventingAuthzAdapter {
   }
 
   build() {
-    return definePipeline<AuthzGrantsEvent>({
-      name: AUTHZ_GRANT_PIPELINE_NAME,
-      aggregate: defineAggregate({
-        type: AUTHZ_GRANT_AGGREGATE_TYPE,
-        events: defineEvents(AUTHZ_GRANTS_EVENT_TYPES),
-      }),
-    })
-      .withClickHouseMapProjection(
-        AuthzGrantProjection.create(this.options.authzGrantsWriteStore),
-      )
-      .withEventSubscriber(
-        "auditTrail",
-        EventingAuthzAuditAdapter.create({
-          store: this.options.authzAuditTrailStore,
+    return (
+      definePipeline<AuthzGrantsEvent>({
+        name: AUTHZ_GRANT_PIPELINE_NAME,
+        aggregate: defineAggregate({
+          type: AUTHZ_GRANT_AGGREGATE_TYPE,
+          events: defineEvents(AUTHZ_GRANTS_EVENT_TYPES),
         }),
-      )
-      // ADR-114 (amended): every command about ONE grant rides ONE lane.
-      // `serializeByAggregate` keys the lane on the grant id AND drops the
-      // command NAME from the job path, so `attachGrant` and the `revokeGrant`
-      // that follows it queue behind each other instead of racing in two lanes.
-      //
-      // The projection's guard cannot recover that order on its own. `revoked`
-      // is a conditional UPDATE: a revoke that arrives before the row exists
-      // matches nothing and writes nothing, and the late `attached` then
-      // inserts a live row that no revocation contradicts. Ordering is the
-      // queue's job, and this option is what makes the queue do it.
-      //
-      // The batch bound means something narrower than a throughput lever: it
-      // folds ONE grant's own queued same-command jobs into a single insert —
-      // the `serializeByAggregate` shape `queueManager` names, safe precisely
-      // because those jobs share an aggregate. It buys no cross-grant economy,
-      // and is not meant to.
-      .withCommand("attachGrant", AttachGrantCommand, {
-        serializeByAggregate: true,
-        coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
       })
-      .withCommand("changeGrantRole", ChangeGrantRoleCommand, {
-        serializeByAggregate: true,
-        coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
-      })
-      .withCommand("revokeGrant", RevokeGrantCommand, {
-        serializeByAggregate: true,
-        coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
-      })
-      .withCommand("defineRole", DefineRoleCommand)
-      .withCommand("changeRolePermissions", ChangeRolePermissionsCommand)
-      .withCommand("deleteRole", DeleteRoleCommand)
-      .build();
+        .withClickHouseMapProjection(
+          AuthzGrantProjection.create(this.options.authzGrantsWriteStore),
+        )
+        .withEventSubscriber(
+          "auditTrail",
+          EventingAuthzAuditAdapter.create({
+            store: this.options.authzAuditTrailStore,
+          }),
+        )
+        // ADR-114 (amended): every command about ONE grant rides ONE lane.
+        // `serializeByAggregate` keys the lane on the grant id AND drops the
+        // command NAME from the job path, so `attachGrant` and the `revokeGrant`
+        // that follows it queue behind each other instead of racing in two lanes.
+        //
+        // The projection's guard cannot recover that order on its own. `revoked`
+        // is a conditional UPDATE: a revoke that arrives before the row exists
+        // matches nothing and writes nothing, and the late `attached` then
+        // inserts a live row that no revocation contradicts. Ordering is the
+        // queue's job, and this option is what makes the queue do it.
+        //
+        // The batch bound means something narrower than a throughput lever: it
+        // folds ONE grant's own queued same-command jobs into a single insert —
+        // the `serializeByAggregate` shape `queueManager` names, safe precisely
+        // because those jobs share an aggregate. It buys no cross-grant economy,
+        // and is not meant to.
+        .withCommand("attachGrant", AttachGrantCommand, {
+          serializeByAggregate: true,
+          coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
+        })
+        .withCommand("changeGrantRole", ChangeGrantRoleCommand, {
+          serializeByAggregate: true,
+          coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
+        })
+        .withCommand("revokeGrant", RevokeGrantCommand, {
+          serializeByAggregate: true,
+          coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
+        })
+        .withCommand("defineRole", DefineRoleCommand)
+        .withCommand("changeRolePermissions", ChangeRolePermissionsCommand)
+        .withCommand("deleteRole", DeleteRoleCommand)
+        .build()
+    );
   }
 }

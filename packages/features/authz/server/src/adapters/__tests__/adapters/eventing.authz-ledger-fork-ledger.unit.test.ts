@@ -23,10 +23,7 @@ describe("given an organization past the genesis import", () => {
       // row for the same api key that has no compat binding (a roleKey-only
       // import).
       db.roleBinding.findMany.mockResolvedValue([{ id: "grant_compat" }]);
-      db.grant.findMany.mockResolvedValue([
-        { id: "grant_compat" },
-        { id: "grant_no_compat" },
-      ]);
+      db.grant.findMany.mockResolvedValue([{ id: "grant_compat" }, { id: "grant_no_compat" }]);
 
       const count = await writer.revokeBindingsWhere({
         organizationId: ORG_ID,

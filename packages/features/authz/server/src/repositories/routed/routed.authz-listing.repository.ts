@@ -69,9 +69,7 @@ export class RoutedAuthzListingRepository extends AuthzListingRepository {
     return (await this.readerFor(args.organizationId)).findUserBindings(args);
   }
 
-  async findOrganizationBindings(args: {
-    organizationId: string;
-  }): Promise<AuthzAccessBinding[]> {
+  async findOrganizationBindings(args: { organizationId: string }): Promise<AuthzAccessBinding[]> {
     return (await this.readerFor(args.organizationId)).findOrganizationBindings(args);
   }
 
@@ -145,9 +143,7 @@ export class RoutedAuthzListingRepository extends AuthzListingRepository {
     return [...legacyRows, ...grantsRows];
   }
 
-  async findUserCreatedRoles(args: {
-    organizationId: string;
-  }): Promise<AuthzCustomRole[]> {
+  async findUserCreatedRoles(args: { organizationId: string }): Promise<AuthzCustomRole[]> {
     return (await this.readerFor(args.organizationId)).findUserCreatedRoles(args);
   }
 

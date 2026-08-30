@@ -321,9 +321,7 @@ describe("EventingAuthzListingRepository", () => {
           ]),
         },
       };
-      const legacy = PrismaAuthzListingRepository.create(
-        legacyPrisma as unknown as AuthzDatabase,
-      );
+      const legacy = PrismaAuthzListingRepository.create(legacyPrisma as unknown as AuthzDatabase);
       const { repository: grants } = prismaWith({
         grants: [
           grantRow({
@@ -459,9 +457,10 @@ describe("EventingAuthzListingRepository", () => {
         userId: "alice",
       });
 
-      expect(
-        rows.map((row) => `${row.organizationId}:${row.scopeId}:${row.role}`),
-      ).toEqual([`${ORG}:team-1:MEMBER`, `${ORG}:team-1:VIEWER`]);
+      expect(rows.map((row) => `${row.organizationId}:${row.scopeId}:${row.role}`)).toEqual([
+        `${ORG}:team-1:MEMBER`,
+        `${ORG}:team-1:VIEWER`,
+      ]);
     });
   });
 

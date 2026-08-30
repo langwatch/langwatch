@@ -72,10 +72,7 @@ const BINDING_PRINCIPAL_TYPES = ["USER", "GROUP", "API_KEY"] as const;
 /** The roleKey shapes the legacy vocabulary can carry: the three built-ins
  *  and `custom:<id>`. Everything else (`lite-member`, null) is dormant. */
 const LISTABLE_ROLE_KEY_WHERE = {
-  OR: [
-    { roleKey: { in: ["admin", "member", "viewer"] } },
-    { roleKey: { startsWith: "custom:" } },
-  ],
+  OR: [{ roleKey: { in: ["admin", "member", "viewer"] } }, { roleKey: { startsWith: "custom:" } }],
 };
 
 const GRANT_ROW_SELECT = {
@@ -218,9 +215,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     organizationId: string;
     teamIds: readonly string[];
   }): Promise<Map<string, AuthzTeamMemberBinding[]>> {
-    const byTeam = new Map<string, AuthzTeamMemberBinding[]>(
-      teamIds.map((teamId) => [teamId, []]),
-    );
+    const byTeam = new Map<string, AuthzTeamMemberBinding[]>(teamIds.map((teamId) => [teamId, []]));
     if (teamIds.length === 0) return byTeam;
 
     const rows = await this.findGrantRows({
@@ -241,9 +236,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
       ...new Set(grants.flatMap(({ row }) => (row.principalId ? [row.principalId] : []))),
     ];
     const roleIds = [
-      ...new Set(
-        grants.flatMap(({ customRoleId }) => (customRoleId ? [customRoleId] : [])),
-      ),
+      ...new Set(grants.flatMap(({ customRoleId }) => (customRoleId ? [customRoleId] : []))),
     ];
     const [users, roles] = await Promise.all([
       userIds.length > 0
@@ -261,9 +254,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     const roleById = new Map(roles.map((role) => [role.id, role]));
 
     for (const grant of grants) {
-      const user = grant.row.principalId
-        ? userById.get(grant.row.principalId)
-        : undefined;
+      const user = grant.row.principalId ? userById.get(grant.row.principalId) : undefined;
       if (!user) continue;
       byTeam.get(grant.row.scopeId)?.push({
         userId: user.id,
@@ -272,9 +263,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
         createdAt: grant.row.occurredAt,
         updatedAt: grant.row.updatedAt,
         user,
-        customRole: grant.customRoleId
-          ? (roleById.get(grant.customRoleId) ?? null)
-          : null,
+        customRole: grant.customRoleId ? (roleById.get(grant.customRoleId) ?? null) : null,
       });
     }
     return byTeam;
@@ -520,12 +509,8 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     ]);
     return {
       userById: new Map((users as AuthzAccessUser[]).map((user) => [user.id, user])),
-      groupById: new Map(
-        (groups as AuthzAccessGroup[]).map((group) => [group.id, group]),
-      ),
-      apiKeyById: new Map(
-        (apiKeys as AuthzAccessApiKey[]).map((apiKey) => [apiKey.id, apiKey]),
-      ),
+      groupById: new Map((groups as AuthzAccessGroup[]).map((group) => [group.id, group])),
+      apiKeyById: new Map((apiKeys as AuthzAccessApiKey[]).map((apiKey) => [apiKey.id, apiKey])),
       roleById: new Map(roles.map((role) => [role.id, role])),
     };
   }
@@ -589,10 +574,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
   }
 
   private tryTeamUserRoleFrom(value: string | null): TeamUserRole | null {
-    return value === "ADMIN" ||
-      value === "MEMBER" ||
-      value === "VIEWER" ||
-      value === "CUSTOM"
+    return value === "ADMIN" || value === "MEMBER" || value === "VIEWER" || value === "CUSTOM"
       ? value
       : null;
   }
@@ -653,18 +635,10 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     const { principalId } = row;
     if (!principalId) return { user: null, group: null, apiKey: null };
     return {
-      user:
-        row.principalType === "USER"
-          ? (decoration.userById.get(principalId) ?? null)
-          : null,
-      group:
-        row.principalType === "GROUP"
-          ? (decoration.groupById.get(principalId) ?? null)
-          : null,
+      user: row.principalType === "USER" ? (decoration.userById.get(principalId) ?? null) : null,
+      group: row.principalType === "GROUP" ? (decoration.groupById.get(principalId) ?? null) : null,
       apiKey:
-        row.principalType === "API_KEY"
-          ? (decoration.apiKeyById.get(principalId) ?? null)
-          : null,
+        row.principalType === "API_KEY" ? (decoration.apiKeyById.get(principalId) ?? null) : null,
     };
   }
 

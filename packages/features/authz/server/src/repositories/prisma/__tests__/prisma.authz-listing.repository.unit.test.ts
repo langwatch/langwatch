@@ -224,10 +224,7 @@ describe("PrismaAuthzListingRepository", () => {
         expect.objectContaining({
           where: {
             organizationId: { in: ["org-1", "org-2"] },
-            OR: [
-              { userId: "alice" },
-              { group: { members: { some: { userId: "alice" } } } },
-            ],
+            OR: [{ userId: "alice" }, { group: { members: { some: { userId: "alice" } } } }],
             scopeType: { in: ["TEAM", "ORGANIZATION", "PROJECT"] },
           },
         }),

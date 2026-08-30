@@ -66,9 +66,7 @@ describe("grant identity", () => {
     it("ignores sub-second differences in business time", () => {
       // KSUID timestamps are second-precision; a retry landing in the same
       // second as the original command derives the same id.
-      expect(deriveGrantId({ ...base, occurredAtMs: OCCURRED_AT + 500 })).toBe(
-        deriveGrantId(base),
-      );
+      expect(deriveGrantId({ ...base, occurredAtMs: OCCURRED_AT + 500 })).toBe(deriveGrantId(base));
     });
   });
 

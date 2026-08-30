@@ -75,12 +75,7 @@ describe("PostgresAuthzAdapter", () => {
       now: () => 1_755_000_000_000,
     }).build();
 
-    expect(Object.keys(built).sort()).toEqual([
-      "authz",
-      "grants",
-      "migration",
-      "pipeline",
-    ]);
+    expect(Object.keys(built).sort()).toEqual(["authz", "grants", "migration", "pipeline"]);
     expect(built.authz).toBeInstanceOf(AuthzServiceContract);
     expect(built.grants).toBeInstanceOf(AuthzGrantsServiceContract);
     expect(built.pipeline.metadata.name).toBe(AUTHZ_GRANT_PIPELINE_NAME);

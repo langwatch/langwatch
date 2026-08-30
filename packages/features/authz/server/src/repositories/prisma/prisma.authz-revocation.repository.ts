@@ -22,9 +22,7 @@ export type PrismaAuthzRevocationRepositoryOptions = {
 export class PrismaAuthzRevocationRepository {
   private readonly database: RevocationDatabase;
 
-  static create(
-    options: PrismaAuthzRevocationRepositoryOptions,
-  ): PrismaAuthzRevocationRepository {
+  static create(options: PrismaAuthzRevocationRepositoryOptions): PrismaAuthzRevocationRepository {
     return new PrismaAuthzRevocationRepository(options);
   }
 

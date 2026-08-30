@@ -14,9 +14,7 @@ import type {
 
 /** Private access-listing read model consumed only through AuthzService. */
 export abstract class AuthzListingRepository {
-  abstract findUserBindings(
-    input: AuthzListUserBindingsInput,
-  ): Promise<AuthzAccessBinding[]>;
+  abstract findUserBindings(input: AuthzListUserBindingsInput): Promise<AuthzAccessBinding[]>;
 
   abstract findOrganizationBindings(
     input: AuthzListOrganizationBindingsInput,
@@ -26,13 +24,9 @@ export abstract class AuthzListingRepository {
     input: AuthzListUserAndGroupBindingsInput,
   ): Promise<AuthzAccessBinding[]>;
 
-  abstract findScopeBindings(
-    input: AuthzListScopeBindingsInput,
-  ): Promise<AuthzAccessBinding[]>;
+  abstract findScopeBindings(input: AuthzListScopeBindingsInput): Promise<AuthzAccessBinding[]>;
 
-  abstract findGroupBindings(
-    input: AuthzListGroupBindingsInput,
-  ): Promise<AuthzAccessBinding[]>;
+  abstract findGroupBindings(input: AuthzListGroupBindingsInput): Promise<AuthzAccessBinding[]>;
 
   abstract findTeamMemberBindings(
     input: AuthzListTeamMemberBindingsInput,
@@ -42,7 +36,5 @@ export abstract class AuthzListingRepository {
     input: AuthzListBindingsForSynthesisInput,
   ): Promise<AuthzBindingForSynthesis[]>;
 
-  abstract findUserCreatedRoles(input: {
-    organizationId: string;
-  }): Promise<AuthzCustomRole[]>;
+  abstract findUserCreatedRoles(input: { organizationId: string }): Promise<AuthzCustomRole[]>;
 }

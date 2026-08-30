@@ -20,10 +20,7 @@ const TENANT_ID = "org_acme";
 const ACTOR = { type: "user", id: "user_admin" } as const;
 
 class NullGrantProjectionWriteStore extends GrantProjectionWriteStore {
-  async append(
-    _write: GrantProjectionWrite,
-    _context: ProjectionStoreContext,
-  ): Promise<void> {}
+  async append(_write: GrantProjectionWrite, _context: ProjectionStoreContext): Promise<void> {}
 }
 
 function event(

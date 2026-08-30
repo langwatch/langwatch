@@ -37,11 +37,8 @@ export function bindingIdentityKey({
   role,
   customRoleId,
 }: BindingIdentityInput): string {
-  let resolvedPrincipal:
-    | { userId: string }
-    | { groupId: string }
-    | { apiKeyId: string }
-    | null = null;
+  let resolvedPrincipal: { userId: string } | { groupId: string } | { apiKeyId: string } | null =
+    null;
   if (principal.userId) resolvedPrincipal = { userId: principal.userId };
   else if (principal.groupId) {
     resolvedPrincipal = { groupId: principal.groupId };

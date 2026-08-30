@@ -18,9 +18,7 @@ import type {
  * behind AuthzGrantsService and is never exported from the package root.
  */
 export abstract class AuthzCompatibilityLedgerPort {
-  abstract attachBindings(
-    args: AuthzAttachBindingsInput,
-  ): Promise<AuthzAttachBindingsOutput>;
+  abstract attachBindings(args: AuthzAttachBindingsInput): Promise<AuthzAttachBindingsOutput>;
 
   abstract attachResourceGrant(args: AuthzAttachResourceGrantInput): Promise<void>;
 

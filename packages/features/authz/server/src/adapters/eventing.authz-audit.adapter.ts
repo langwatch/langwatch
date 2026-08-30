@@ -45,14 +45,7 @@ const AUDIT_VERB_BY_EVENT_TYPE: Record<AuditableEventType, AuthzAuditVerb> = {
 };
 
 const AUDIT_METADATA_FIELDS: Record<AuditableEventType, readonly string[]> = {
-  [GRANT_ATTACHED_EVENT_TYPE]: [
-    "grantId",
-    "principal",
-    "roleKey",
-    "scope",
-    "source",
-    "legacyRole",
-  ],
+  [GRANT_ATTACHED_EVENT_TYPE]: ["grantId", "principal", "roleKey", "scope", "source", "legacyRole"],
   [GRANT_ROLE_CHANGED_EVENT_TYPE]: ["grantId", "from", "to"],
   [GRANT_REVOKED_EVENT_TYPE]: ["grantId", "selector", "reason"],
   [ROLE_DEFINED_EVENT_TYPE]: ["roleId", "name", "description", "permissions", "kind"],
@@ -92,17 +85,10 @@ class UnmappedAuthzAuditEventError extends Error {
 class AuthzAuditRowMapper {
   static isAuditable(event: AuthzGrantsEvent): boolean {
     const { source, actor } = this.guardFields(event);
-    if (
-      source !== undefined &&
-      (NON_AUDITABLE_SOURCES as readonly string[]).includes(source)
-    ) {
+    if (source !== undefined && (NON_AUDITABLE_SOURCES as readonly string[]).includes(source)) {
       return false;
     }
-    if (
-      actor?.type === "system" &&
-      actor.id !== null &&
-      NON_AUDITABLE_ACTOR_IDS.has(actor.id)
-    ) {
+    if (actor?.type === "system" && actor.id !== null && NON_AUDITABLE_ACTOR_IDS.has(actor.id)) {
       return false;
     }
     return true;
@@ -170,10 +156,7 @@ export class EventingAuthzAuditAdapter {
     return AuthzAuditRowMapper.isAuditable(event);
   }
 
-  async handler(
-    event: AuthzGrantsEvent,
-    _context?: TriggerContext<unknown>,
-  ): Promise<void> {
+  async handler(event: AuthzGrantsEvent, _context?: TriggerContext<unknown>): Promise<void> {
     if (!AuthzAuditRowMapper.isAuditable(event)) return;
     await this.store.insert(AuthzAuditRowMapper.toRow(event));
   }

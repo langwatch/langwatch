@@ -31,6 +31,9 @@ const projectBinding = (role: CollectedBinding["role"]): CollectedBinding[] => [
 
 function makeAuthz(reader: AuthzReadRepository) {
   return AuthzService.create({
+    // These suites exercise the engine path, which is what the absent
+    // gate used to default to.
+    isOnEngine: async () => true,
     repository: reader,
     listing: new StubAuthzListingRepository(),
     bindings: new StubAuthzBindingRepository(),

@@ -158,15 +158,11 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
     // Each write names one row and they are independent, so batching is only
     // about round trips. One transaction keeps a partial batch from leaving
     // the model half-written.
-    const results = await this.prisma.$transaction(
-      writes.map((write) => this.statementFor(write)),
-    );
+    const results = await this.prisma.$transaction(writes.map((write) => this.statementFor(write)));
     writes.forEach((write, index) =>
       AuthzProjectionResultMapper.reportMissedRow(write, results[index]),
     );
-    await this.writeCompatHeads(
-      writes.map((write, index) => ({ write, result: results[index] })),
-    );
+    await this.writeCompatHeads(writes.map((write, index) => ({ write, result: results[index] })));
   }
 
   /**
@@ -206,10 +202,7 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
     }
   }
 
-  private async writeCompatHead(
-    write: GrantProjectionWrite,
-    result: unknown,
-  ): Promise<void> {
+  private async writeCompatHead(write: GrantProjectionWrite, result: unknown): Promise<void> {
     switch (write.kind) {
       case "grant.upsert":
         // The guard returns the affected-row count. > 0 means this event won
