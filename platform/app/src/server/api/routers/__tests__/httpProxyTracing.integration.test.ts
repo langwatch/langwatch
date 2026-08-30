@@ -21,7 +21,7 @@ vi.mock("~/app/api/workflows/post_event/post-event", () => ({
   studioBackendPostEvent: (args: unknown) => mockPostEvent(args),
 }));
 
-// Mock getApp().traces.recordSpan to capture the OTLP span the route records.
+// Mock getApp().commands.traces.recordSpan to capture the OTLP span the route records.
 // Mock both path forms used across the codebase — relative (matches the
 // httpProxyTracing.ts import) and tsconfig-alias. vi.mock is hoisted so the
 // shared mock fn lives in vi.hoisted() to be visible to both factories.
@@ -92,10 +92,7 @@ function recordSpanArgs(): RecordSpanArgs {
   return mockScheduleTrace.mock.calls[0]![0] as RecordSpanArgs;
 }
 
-function findAttr(
-  attrs: OtlpAttr[] | undefined,
-  key: string,
-): OtlpAttr["value"] | undefined {
+function findAttr(attrs: OtlpAttr[] | undefined, key: string): OtlpAttr["value"] | undefined {
   return attrs?.find((a) => a.key === key)?.value;
 }
 
@@ -147,14 +144,9 @@ function getTraceJob(): CollectorJobFacade {
   };
 }
 
-function parseOutputValue(
-  span: CollectorJobFacade["spans"][number],
-): Record<string, unknown> {
+function parseOutputValue(span: CollectorJobFacade["spans"][number]): Record<string, unknown> {
   const value = span.output?.value;
-  return (typeof value === "string" ? JSON.parse(value) : value) as Record<
-    string,
-    unknown
-  >;
+  return (typeof value === "string" ? JSON.parse(value) : value) as Record<string, unknown>;
 }
 
 describe("HTTP Proxy Tracing", () => {
@@ -352,9 +344,7 @@ describe("HTTP Proxy Tracing", () => {
         bodyTemplate: "{}",
       });
 
-      expect(dispatchedHeaders().traceparent).toMatch(
-        /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/,
-      );
+      expect(dispatchedHeaders().traceparent).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
     });
 
     it("uses same trace ID in traceparent header and submitted trace", async () => {
@@ -465,13 +455,7 @@ describe("HTTP Proxy Tracing", () => {
 
       const inputValue = getTraceJob().spans[0]!.input?.value as Record<string, unknown>;
       const headers = inputValue.headers as Record<string, string>;
-      for (const name of [
-        "X-API-Key",
-        "X-Session-Token",
-        "X-Authorization",
-        "X-Auth",
-        "Cookie",
-      ]) {
+      for (const name of ["X-API-Key", "X-Session-Token", "X-Authorization", "X-Auth", "Cookie"]) {
         expect(headers[name]).toBe("[REDACTED]");
       }
       // Not everything with "key" or "api" in the name is a secret, and a trace

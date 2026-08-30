@@ -73,7 +73,7 @@ export async function updateTraceMetadata({
   const nowNano = String(now * 1_000_000);
   const spanId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
 
-  await getApp().traces.recordSpan({
+  await getApp().commands.traces.recordSpan({
     tenantId: projectId,
     span: {
       traceId,

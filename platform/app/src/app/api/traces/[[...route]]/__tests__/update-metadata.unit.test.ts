@@ -9,8 +9,13 @@ vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
   tryGetApp: () => null,
   getApp: vi.fn(() => ({
-    traces: {
-      recordSpan: mockRecordSpan,
+    // `App.traces` is a TraceApp and has no `recordSpan` — recording goes
+    // through `App.commands`. Mocking it flat is what let this suite stay green
+    // while PATCH /api/traces/{id}/metadata threw on every call.
+    commands: {
+      traces: {
+        recordSpan: mockRecordSpan,
+      },
     },
   })),
 }));
@@ -247,10 +252,9 @@ describe("PATCH /:traceId/metadata", () => {
         "../../../../../../../..",
         "docs/api-reference/traces/update-trace-metadata.mdx",
       );
-      expect(
-        fs.existsSync(docsPath),
-        `expected the endpoint's docs page at ${docsPath}`,
-      ).toBe(true);
+      expect(fs.existsSync(docsPath), `expected the endpoint's docs page at ${docsPath}`).toBe(
+        true,
+      );
 
       const content = fs.readFileSync(docsPath, "utf-8");
       expect(content).toContain("Update trace metadata");

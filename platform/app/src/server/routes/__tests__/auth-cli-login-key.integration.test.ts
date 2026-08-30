@@ -39,10 +39,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import {
-  clearClickHouseTestApp,
-  installClickHouseTestApp,
-} from "~/test-utils/clickhouseTestApp";
+import { clearClickHouseTestApp, installClickHouseTestApp } from "~/test-utils/clickhouseTestApp";
 import { createProjectRestApp } from "@langwatch/platform-api";
 import { appRestSecurity } from "~/server/api/security";
 import { app as tracesApp } from "../../../app/api/traces/[[...route]]/app";
@@ -170,29 +167,19 @@ async function runFlow(args: {
     keySelection: args.keySelection,
   });
   if (approved.status !== 200) {
-    throw new Error(
-      `approve answered ${approved.status}: ${JSON.stringify(approved.json)}`,
-    );
+    throw new Error(`approve answered ${approved.status}: ${JSON.stringify(approved.json)}`);
   }
   const exchanged = await exchange({
     deviceCode: dc.device_code,
     hostname: args.hostname,
   });
   if (exchanged.status !== 200) {
-    throw new Error(
-      `exchange answered ${exchanged.status}: ${JSON.stringify(exchanged.json)}`,
-    );
+    throw new Error(`exchange answered ${exchanged.status}: ${JSON.stringify(exchanged.json)}`);
   }
   return exchanged.json;
 }
 
-async function mintedKeyFor({
-  userId,
-  deviceLabel,
-}: {
-  userId: string;
-  deviceLabel: string;
-}) {
+async function mintedKeyFor({ userId, deviceLabel }: { userId: string; deviceLabel: string }) {
   return prisma.apiKey.findFirst({
     where: {
       organizationId: ORG_ID,
@@ -470,9 +457,7 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
       const scopes = key!.roleBindings
         .map((binding) => `${binding.scopeType}:${binding.scopeId}`)
         .sort();
-      expect(scopes).toEqual(
-        [`TEAM:${TEAM_SHARED_ID}`, `TEAM:${MEMBER_PTEAM_ID}`].sort(),
-      );
+      expect(scopes).toEqual([`TEAM:${TEAM_SHARED_ID}`, `TEAM:${MEMBER_PTEAM_ID}`].sort());
       expect(result.cli_api_key_scope!.kind).toBe("projects");
       expect([...result.cli_api_key_scope!.project_ids].sort()).toEqual(
         [PROJECT_A_ID, MEMBER_PPROJECT_ID].sort(),
@@ -534,9 +519,7 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
 
       expect(refused.status).toBe(422);
       expect(refused.json.error).toBe("cli_key_selection_invalid");
-      expect(
-        (refused.json.fieldErrors as Record<string, unknown>).bindings,
-      ).toBeDefined();
+      expect((refused.json.fieldErrors as Record<string, unknown>).bindings).toBeDefined();
 
       const raw = await redisConnection!.get(`lwcli:device:${dc.device_code}`);
       const record = JSON.parse(raw!) as {
@@ -670,7 +653,7 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
       // landed — the interleaving the race produces. Excluding only its own
       // key is not enough; without the createdBefore bound it would revoke
       // the key the second exchange just handed to the CLI.
-      await getApp().apiKeys.revokeCliLoginKeysForDevice({
+      await getApp().apiKeys.apiKeyService.revokeCliLoginKeysForDevice({
         userId: MEMBER_ID,
         organizationId: ORG_ID,
         deviceLabel: HOSTNAME,
@@ -712,12 +695,8 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
         select: { revokedAt: true },
       });
       expect(after!.revokedAt).not.toBeNull();
-      expect(
-        await redisConnection!.get(`lwcli:access:${result.access_token}`),
-      ).toBeNull();
-      expect(
-        await redisConnection!.get(`lwcli:refresh:${result.refresh_token}`),
-      ).toBeNull();
+      expect(await redisConnection!.get(`lwcli:access:${result.access_token}`)).toBeNull();
+      expect(await redisConnection!.get(`lwcli:refresh:${result.refresh_token}`)).toBeNull();
     });
   });
 
@@ -759,9 +738,7 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
         });
 
         expect(exchanged.status).toBe(410);
-        expect((exchanged.json as unknown as { error: string }).error).toBe(
-          "access_denied",
-        );
+        expect((exchanged.json as unknown as { error: string }).error).toBe("access_denied");
         // Burned, so the CLI's next poll cannot re-run the ceiling walk.
         expect(await redisConnection!.get(`lwcli:device:${dc.device_code}`)).toBeNull();
       } finally {

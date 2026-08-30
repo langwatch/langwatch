@@ -110,7 +110,7 @@ async function syncTraceAnnotations({
   annotationIds: string[];
 }): Promise<boolean> {
   try {
-    await app.traces.bulkSyncAnnotations({
+    await app.commands.traces.bulkSyncAnnotations({
       tenantId: projectId,
       traceId,
       annotationIds,
@@ -118,10 +118,7 @@ async function syncTraceAnnotations({
     });
     return true;
   } catch (error) {
-    logger.error(
-      { error, projectId, traceId },
-      "Failed to backfill annotations for trace",
-    );
+    logger.error({ error, projectId, traceId }, "Failed to backfill annotations for trace");
     return false;
   }
 }

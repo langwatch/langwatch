@@ -49,7 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const app = getApp();
-  const resolved = await app.apiKeys.tryResolveToken({
+  const resolved = await app.apiKeys.apiKeyService.tryResolveToken({
     token: credentials.token,
     projectId: credentials.projectId,
   });
@@ -76,10 +76,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     params = dspyInitParamsSchema.parse(req.body);
   } catch (error) {
-    logger.error(
-      { error, body: req.body, projectId: project.id },
-      "invalid init data received",
-    );
+    logger.error({ error, body: req.body, projectId: project.id }, "invalid init data received");
     // TODO: should it be a warning instead of exception on sentry? here and all over our APIs
     captureException(toError(error), { extra: { projectId: project.id } });
 
@@ -100,7 +97,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // for a successful request. Fire-and-forget; a DB hiccup must not mask the
   // experiment creation.
   if (resolved.type === "apiKey") {
-    app.apiKeys.markUsed({ id: resolved.apiKeyId });
+    app.apiKeys.apiKeyService.markUsed({ id: resolved.apiKeyId });
   }
 
   return res.status(200).json({

@@ -258,7 +258,7 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
         });
 
         // The token authorizes ingest and self-scopes to the named project.
-        const resolved = await app.apiKeys.tryResolveToken({
+        const resolved = await app.apiKeys.apiKeyService.tryResolveToken({
           token: json.token as string,
           projectId: null,
         });
@@ -322,7 +322,7 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
         expect(second.json.token).not.toBe(first.json.token);
 
         for (const token of [first.json.token, second.json.token] as string[]) {
-          const resolved = await app.apiKeys.tryResolveToken({
+          const resolved = await app.apiKeys.apiKeyService.tryResolveToken({
             token,
             projectId: null,
           });
