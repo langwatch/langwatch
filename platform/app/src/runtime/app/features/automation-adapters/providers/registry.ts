@@ -10,6 +10,7 @@ import {
 import { TriggerAction } from "@langwatch/automation-contract";
 import {
   AutomationWebhookProviderPort,
+  type AutomationWebhookStoredParams,
   WebhookProviderAdapter,
 } from "@langwatch/automation-server";
 import annotationQueueServer from "./annotationQueue/server";

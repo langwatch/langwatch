@@ -1,4 +1,8 @@
-import { type FrontendFeatureFlag, NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import {
+  type FeatureFlagTargetId,
+  type FrontendFeatureFlag,
+  NOT_TARGETED,
+} from "@langwatch/feature-flag-contract";
 import { api } from "../utils/api";
 
 // The service caches operator rows for five seconds. Refetching every mounted

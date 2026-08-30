@@ -60,9 +60,15 @@ export function LangyPlanCard({
   isStreaming?: boolean;
 }) {
   const reduce = useReducedMotion();
-  // A plan is a small status receipt first; the checklist is available on
-  // demand. This keeps a three-step task from becoming the whole conversation.
-  const [cardOpen, setCardOpen] = useState(false);
+  // While the turn runs, the card is OPEN: the reader is watching work happen,
+  // and every command the agent ran is nested in here. Closed, a turn that
+  // spent four minutes running twenty commands showed one line and a wall of
+  // narration with nothing between the paragraphs — and once the last step
+  // completed there was no current step left to show either. A settled turn in
+  // a scrolled-back transcript is a status receipt again, with the checklist
+  // one click away. Either way the reader's own click wins from then on.
+  const [cardOpenOverride, setCardOpenOverride] = useState<boolean | null>(null);
+  const cardOpen = cardOpenOverride ?? isStreaming;
   const currentItem = plan.currentIndex >= 0 ? plan.items[plan.currentIndex] : undefined;
 
   // The plan is a `progress` card in the taxonomy (asaplangy CARD_TAXONOMY): the
@@ -115,12 +121,7 @@ export function LangyPlanCard({
           ) : null}
         </>
       ) : currentItem ? (
-        <PlanStep
-          item={currentItem}
-          isCurrent
-          isStreaming={isStreaming}
-          reduce={reduce}
-        />
+        <PlanStep item={currentItem} isCurrent isStreaming={isStreaming} reduce={reduce} />
       ) : null}
     </LangyCard>
   );
@@ -251,9 +252,7 @@ function PlanStep({
           height="8px"
           borderRadius="2px"
           background="orange.solid"
-          css={
-            pulsing ? { animation: `${dotPulse} 1.4s ease-in-out infinite` } : undefined
-          }
+          css={pulsing ? { animation: `${dotPulse} 1.4s ease-in-out infinite` } : undefined}
         />
       </Box>
     ) : (

@@ -1,7 +1,10 @@
 import { Box, Card } from "@chakra-ui/react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import { CustomGraph, type CustomGraphInput } from "~/components/analytics/CustomGraph";
+import { LangWatchQLDashboardWidget } from "~/features/analytics-query/components/LangWatchQLDashboardWidget";
+import { WORKBENCH_SQL_CHART_KIND } from "~/server/analytics/chartKinds";
 import type { FilterField } from "~/server/filters/types";
 import { GraphCardHeader } from "./GraphCardHeader";
 import type { SizeOption } from "./GraphCardMenu";
@@ -54,8 +57,9 @@ export function DraggableGraphCard({
   onGranularityChange,
   isDeleting,
 }: DraggableGraphCardProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: graph.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: graph.id,
+  });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -113,13 +117,7 @@ export function DraggableGraphCard({
  * The card's chart, routed by the row's kind: a placed workbench chart mounts
  * the live LangWatchQL widget; every other row is a builder graph.
  */
-function GraphCardChartArea({
-  graph,
-  projectId,
-}: {
-  graph: GraphData;
-  projectId: string;
-}) {
+function GraphCardChartArea({ graph, projectId }: { graph: GraphData; projectId: string }) {
   if (graph.kind === WORKBENCH_SQL_CHART_KIND) {
     return (
       <LangWatchQLDashboardWidget
@@ -143,9 +141,7 @@ function GraphCardChartArea({
         height: graph.rowSpan === 2 ? 600 : 300,
       }}
       filters={
-        graph.filters as
-          | Record<FilterField, string[] | Record<string, string[]>>
-          | undefined
+        graph.filters as Record<FilterField, string[] | Record<string, string[]>> | undefined
       }
     />
   );

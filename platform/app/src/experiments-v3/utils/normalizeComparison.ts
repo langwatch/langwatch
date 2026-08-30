@@ -116,13 +116,54 @@ const normalizeCarrier = <T extends ComparisonCarrier>(carrier: T): T => {
   return { ...rest, comparison } as T;
 };
 
-export const normalizeEvaluators = (evaluators: EvaluatorConfig[]): EvaluatorConfig[] =>
-  evaluators.map(normalizeCarrier);
+/**
+ * Drop a `comparison` config from an evaluator whose type cannot own a
+ * standalone comparison column.
+ *
+ * Rows written before that invariant was enforced can hold one: a plain
+ * evaluator with a `comparison` renders as a comparison column and runs as a
+ * judge that never receives the candidates it is asked to compare. Everything
+ * else on the evaluator, its per-target mappings included, is already what an
+ * attached evaluator needs, so the repair is to remove the one field and leave
+ * the rest alone.
+ */
+const stripInvalidComparison = <T extends EvaluatorCarrier>(evaluator: T): T => {
+  if (!evaluator.comparison) return evaluator;
+  if (isComparisonEvaluatorType(evaluator.evaluatorType)) return evaluator;
+
+  const { comparison: _invalid, ...attached } = evaluator;
+  return attached as T;
+};
+
+/**
+ * Generic over the evaluator shape so the browser store (which holds the
+ * narrowed `EvaluatorConfig`) and the server read path (which holds the
+ * persisted shape, whose `evaluatorType` is a plain string) run the same
+ * function rather than two copies that can drift.
+ */
+export const normalizeEvaluators = <T extends EvaluatorCarrier>(evaluators: T[]): T[] =>
+  evaluators.map((evaluator) => stripInvalidComparison(normalizeCarrier(evaluator)));
+
+/**
+ * Drop a `comparison` config from a target that cannot own a comparison column.
+ *
+ * A comparison column is always an evaluator target: the target names a DB
+ * evaluator row rather than carrying an evaluator type, so its kind is the only
+ * check this seam can make. A persisted prompt or agent target holding a stale
+ * comparison reached the store, where every comparison edit silently skipped it
+ * and its editor saved nothing. The repair matches the evaluator one: remove
+ * the field the target cannot own and leave the rest alone.
+ */
+const stripNonEvaluatorComparison = (target: TargetConfig): TargetConfig => {
+  if (!target.comparison) return target;
+  if (target.type === "evaluator") return target;
+
+  const { comparison: _invalid, ...rest } = target;
+  return rest as TargetConfig;
+};
 
 export const normalizeTargets = (targets: TargetConfig[]): TargetConfig[] =>
-  targets.map((target) =>
-    stripNonEvaluatorComparison(normalizeCarrier(target)),
-  );
+  targets.map((target) => stripNonEvaluatorComparison(normalizeCarrier(target)));
 
 /**
  * Whether a stored verdict label names this variant.
@@ -151,6 +192,4 @@ export const labelNamesVariant = ({
   target: Pick<TargetConfig, "id"> & { promptId?: string };
   resolvedName?: string;
 }): boolean =>
-  label === target.id ||
-  label === target.promptId ||
-  (!!resolvedName && label === resolvedName);
+  label === target.id || label === target.promptId || (!!resolvedName && label === resolvedName);

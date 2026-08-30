@@ -1,12 +1,4 @@
-import {
-  Box,
-  chakra,
-  HStack,
-  IconButton,
-  Separator,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, chakra, HStack, IconButton, Separator, Text, VStack } from "@chakra-ui/react";
 import {
   APP_HEADER_HEIGHT,
   attachedContextToChip,
@@ -28,6 +20,7 @@ import {
   type LangyPanelEffect,
   type LangyPanelMode,
   type LangyPeekPhase,
+  langyPlan,
   langyRestingFloorPx,
   LangyThinkingLine,
   type LangyUiActionHandlers,
@@ -108,7 +101,8 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
 // drifted, `safeParse` silently dropped `pageContext` on every single turn and
 // nobody found out for weeks.
 import type { LangyResourceContext } from "@langwatch/langy-contract";
-import { api } from "~/utils/api";
+import { api, trpcClient } from "~/utils/api";
+import { LangyPlanCard } from "./LangyPlanCard";
 import { useRouter } from "~/utils/compat/next-router";
 import { useLangyConversationCommands } from "../data/useLangyConversationCommands";
 import { useLangyConversationList } from "../data/useLangyConversationList";
@@ -133,10 +127,7 @@ import {
   readLangyTrpcError,
   resolveLiveTurnError,
 } from "../logic/langyErrorExplainer";
-import {
-  type MakeDefaultWritePlan,
-  makeDefaultOffer,
-} from "../logic/langyMakeDefaultOffer";
+import { type MakeDefaultWritePlan, makeDefaultOffer } from "../logic/langyMakeDefaultOffer";
 import { langyToolNarrator } from "../adapters/langy-tool-narrator.adapter";
 import { buildTimeTravelView } from "../logic/langyTimeTravel";
 import { isInternalHref } from "../logic/spaLink";
@@ -152,11 +143,7 @@ import { LangyExternalLinkDialog } from "./LangyExternalLinkDialog";
 import { LangyMakeDefaultDialog } from "./LangyMakeDefaultDialog";
 import { LangyRecoveringLine } from "./LangyRecoveringLine";
 import { toPendingCapabilities } from "./LangyToolActivity";
-import {
-  type LangyProposal,
-  MessageContent,
-  type ProposalHandlers,
-} from "./MessageContent";
+import { type LangyProposal, MessageContent, type ProposalHandlers } from "./MessageContent";
 import { RecentChatsView } from "./RecentChatsView";
 // Langy's own skin: scoped warm/cream palette + serif display face. The
 // `.langy-root` class (below) is where the Chakra semantic-token overrides land.
@@ -349,10 +336,7 @@ interface LangySidecarProps {
   actionHandlersRef?: React.RefObject<LangyUiActionHandlers>;
 }
 
-export function LangySidecar({
-  proposalHandlersRef,
-  actionHandlersRef,
-}: LangySidecarProps) {
+export function LangySidecar({ proposalHandlersRef, actionHandlersRef }: LangySidecarProps) {
   const isOpen = useLangyStore((s) => s.isOpen);
   const toggle = useLangyStore((s) => s.togglePanel);
   const openPanel = useLangyStore((s) => s.openPanel);
@@ -547,8 +531,7 @@ function LangyPanel({
   const dismissChip = useLangyStore((s) => s.dismissChip);
   // Drop a page target onto the panel to hand it over. See
   // `useLangyContextDropZone`; the click path is `useLangyContextTarget`.
-  const { isOver: isContextDropOver, dropProps: contextDropProps } =
-    useLangyContextDropZone();
+  const { isOver: isContextDropOver, dropProps: contextDropProps } = useLangyContextDropZone();
   const chooseChip = useLangyStore((s) => s.chooseChip);
   // Context handed to Langy by a surface (home cards, briefing receipts). Shown
   // prominently in the sidebar and forwarded to the agent alongside the derived
@@ -598,8 +581,7 @@ function LangyPanel({
     if (!devDrawerVisible) return;
     const node = panelRef.current;
     if (!node || typeof ResizeObserver === "undefined") return;
-    const measure = () =>
-      setPanelHeightPx(Math.round(node.getBoundingClientRect().height));
+    const measure = () => setPanelHeightPx(Math.round(node.getBoundingClientRect().height));
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(node);
@@ -667,8 +649,7 @@ function LangyPanel({
   });
   const [peekHovered, setPeekHovered] = useState(false);
   const [peekFocused, setPeekFocused] = useState(false);
-  const peekPhase: LangyPeekPhase =
-    peekNear || peekHovered || peekFocused ? "near" : "rest";
+  const peekPhase: LangyPeekPhase = peekNear || peekHovered || peekFocused ? "near" : "rest";
   // Leaving the peek behind must not strand a stale raise on the next minimise.
   useEffect(() => {
     if (isOpen) {
@@ -764,8 +745,7 @@ function LangyPanel({
     organizationId,
   });
   const isUiActionChannelClosedRef = useRef(false);
-  isUiActionChannelClosedRef.current =
-    !uiActionsFlag.isLoading && !uiActionsFlag.enabled;
+  isUiActionChannelClosedRef.current = !uiActionsFlag.isLoading && !uiActionsFlag.enabled;
 
   // `router` (from react-router underneath) gets a new identity on every
   // route change; the transport below is memoised once (`[]`), so it reads
@@ -844,9 +824,7 @@ function LangyPanel({
               store.setTurnProgressSample({
                 current: signal.current,
                 total: signal.total,
-                ...(signal.batchItems !== undefined
-                  ? { batchItems: signal.batchItems }
-                  : {}),
+                ...(signal.batchItems !== undefined ? { batchItems: signal.batchItems } : {}),
                 ...(signal.batchDurationMs !== undefined
                   ? { batchDurationMs: signal.batchDurationMs }
                   : {}),
@@ -931,10 +909,7 @@ function LangyPanel({
   );
   const langyModelsAllowed = modelsAllowedQuery.data?.modelsAllowed ?? null;
 
-  const modelOptions = useMemo(
-    () => langyModelsAllowed ?? allModelOptions,
-    [langyModelsAllowed],
-  );
+  const modelOptions = useMemo(() => langyModelsAllowed ?? allModelOptions, [langyModelsAllowed]);
   const langyDefaultModel = modelOptions.includes(resolvedDefaultQuery.data?.model ?? "")
     ? resolvedDefaultQuery.data?.model
     : null;
@@ -950,12 +925,7 @@ function LangyPanel({
     } else if (langyModelsAllowed) {
       setModelOverride(langyModelsAllowed[0]!);
     }
-  }, [
-    resolvedDefaultQuery.data?.model,
-    modelOverride,
-    langyModelsAllowed,
-    setModelOverride,
-  ]);
+  }, [resolvedDefaultQuery.data?.model, modelOverride, langyModelsAllowed, setModelOverride]);
 
   // Race fix: if the allowlist lands AFTER we seeded an out-of-list model, snap
   // to the first allowed model.
@@ -973,9 +943,7 @@ function LangyPanel({
   // logic/langyMakeDefaultOffer).
   const setRoleAssignment = api.modelProvider.setRoleAssignmentForScope.useMutation();
   const setFeatureOverride = api.modelProvider.setFeatureOverrideForScope.useMutation();
-  const [makeDefaultPlan, setMakeDefaultPlan] = useState<MakeDefaultWritePlan | null>(
-    null,
-  );
+  const [makeDefaultPlan, setMakeDefaultPlan] = useState<MakeDefaultWritePlan | null>(null);
   // Declines are per model per panel session: refusing once must not nag on
   // the next pick of the same model, and must not mute the ask forever.
   const makeDefaultDeclinedRef = useRef<Set<string>>(new Set());
@@ -1077,8 +1045,7 @@ function LangyPanel({
   // streaming: the worker is provably alive then, and a warm racing the turn
   // (a mid-stream model switch re-arms one) has nothing to add. Fire-and-
   // forget: the hook surfaces nothing.
-  const modelQueriesSettled =
-    !resolvedDefaultQuery.isLoading && !modelsAllowedQuery.isLoading;
+  const modelQueriesSettled = !resolvedDefaultQuery.isLoading && !modelsAllowedQuery.isLoading;
   useLangyWarmWorker({
     projectId,
     isOpen,
@@ -1099,8 +1066,7 @@ function LangyPanel({
   // `fork` is deliberately not destructured: the mutation still exists on the
   // server, but the panel offers no way to branch a conversation (see the
   // recents list's row actions).
-  const { remove: removeConversation, rename: renameConversation } =
-    useLangyConversationCommands();
+  const { remove: removeConversation, rename: renameConversation } = useLangyConversationCommands();
   const {
     messages: historyMessages,
     lastError: historyLastError,
@@ -1145,9 +1111,7 @@ function LangyPanel({
   // `unconfirmedConversations`): the create command is accepted before the
   // projection lands, and in that window the history read answers not-found.
   const isActiveConversationUnconfirmed = useLangyStore((s) =>
-    s.activeConversationId
-      ? s.unconfirmedConversations[s.activeConversationId] === true
-      : false,
+    s.activeConversationId ? s.unconfirmedConversations[s.activeConversationId] === true : false,
   );
   const suppressedNotFoundRef = useRef(false);
 
@@ -1158,10 +1122,7 @@ function LangyPanel({
     // lagging the accepted create — "not yet", never an error. The card would
     // claim a conversation doesn't exist moments before its turn is accepted;
     // render nothing and let the confirmation drive the refetch below.
-    if (
-      domain?.code === "langy_conversation_not_found" &&
-      isActiveConversationUnconfirmed
-    ) {
+    if (domain?.code === "langy_conversation_not_found" && isActiveConversationUnconfirmed) {
       suppressedNotFoundRef.current = true;
       return null;
     }
@@ -1169,8 +1130,7 @@ function LangyPanel({
     return {
       kind: "langy_history_unavailable",
       title: "This conversation isn't loading",
-      description:
-        "Its messages can't be reached right now. You can still start a new chat.",
+      description: "Its messages can't be reached right now. You can still start a new chat.",
       render: "card" as const,
       action: { label: "Try again", kind: "retry" as const },
     };
@@ -1516,8 +1476,7 @@ function LangyPanel({
   // A conversation that is merely still loading is NOT an empty one: resting on
   // the empty floor underneath its placeholder only to step up as the messages
   // land is the same bounce this floor exists to prevent.
-  const emptyAndSettled =
-    isEmpty && !isBusy && !pendingPrompt && !isRestoringConversation;
+  const emptyAndSettled = isEmpty && !isBusy && !pendingPrompt && !isRestoringConversation;
   // What the card has to hold: the messages it has, or — while restoring — the
   // count the recents list says are coming.
   const expectedMessageCount = restoringMessageCount ?? messages.length;
@@ -1637,9 +1596,7 @@ function LangyPanel({
   // The transport needs current context and recovery state, but the composer
   // must not receive a new callback on every streamed token. Keep its public
   // callback stable and refresh only the implementation it delegates to.
-  const sendImplementationRef = useRef<(text: string) => Promise<void>>(
-    async () => undefined,
-  );
+  const sendImplementationRef = useRef<(text: string) => Promise<void>>(async () => undefined);
   const send = useCallback((text: string) => sendImplementationRef.current(text), []);
   sendImplementationRef.current = async (text: string) => {
     if (!text.trim() || !projectId || isBusy) return;
@@ -2094,11 +2051,8 @@ function LangyPanel({
   // result then arrives as an ordinary measured card via the envelope path.
   const verifyDerivedCard = useCallback(
     ({ card }: { card: LangyDerivedCard }) => {
-      const subject =
-        "title" in card && card.title ? `"${card.title}"` : "this derived card";
-      void send(
-        `Verify ${subject} with a real analytics query and show the measured result.`,
-      );
+      const subject = "title" in card && card.title ? `"${card.title}"` : "this derived card";
+      void send(`Verify ${subject} with a real analytics query and show the measured result.`);
     },
     [send],
   );
@@ -2168,9 +2122,7 @@ function LangyPanel({
     settledTool(currentTurnMessage) ||
     !!displaySignals.reasoning;
   const statusForDisplay =
-    displaySignals.statusIsReadiness && turnHasVisibleOutput
-      ? null
-      : displaySignals.status;
+    displaySignals.statusIsReadiness && turnHasVisibleOutput ? null : displaySignals.status;
   const hasTurnDetail =
     !!statusForDisplay ||
     displaySignals.progress !== null ||
@@ -2217,13 +2169,8 @@ function LangyPanel({
       // NOT an error. A missing integration is a setup step, so it surfaces as the
       // connect card at the point in the conversation where Langy needed it —
       // never a red card and never a toast.
-      <LangyGitHubConnectCard
-        organizationId={organizationId}
-        onConnected={onGithubConnected}
-      />
-    ) : turnError &&
-      turnError.render !== "composer-notice" &&
-      !recovery.willAutoRecover ? (
+      <LangyGitHubConnectCard organizationId={organizationId} onConnected={onGithubConnected} />
+    ) : turnError && turnError.render !== "composer-notice" && !recovery.willAutoRecover ? (
       // `!willAutoRecover` pins the card OUT the moment a failure is known to be
       // auto-retryable, so it cannot flash for a frame before the retry timer
       // arms. A `composer-notice` error rides above the composer instead.
@@ -2285,9 +2232,7 @@ function LangyPanel({
         // The dock is deliberately slimmer than the floating card — see
         // SIDEBAR_PANEL_WIDTH. The drawer companion keeps the dock width.
         width={
-          isDrawerCompanion || !floating
-            ? `${SIDEBAR_PANEL_WIDTH}px`
-            : FLOATING_PANEL_CSS_WIDTH
+          isDrawerCompanion || !floating ? `${SIDEBAR_PANEL_WIDTH}px` : FLOATING_PANEL_CSS_WIDTH
         }
         // Dialogs, drawers, and command surfaces must be able to cover Langy.
         // Riding beside a drawer, the panel sits ABOVE the drawer CARD (Chakra's
@@ -2346,9 +2291,7 @@ function LangyPanel({
         // edge its peek sliver rests on.
         transformOrigin={floating ? "bottom right" : "right center"}
         initial={false}
-        animate={
-          isOpen ? "open" : peekDismissed ? "peekDismissed" : peeking ? "peek" : "closed"
-        }
+        animate={isOpen ? "open" : peekDismissed ? "peekDismissed" : peeking ? "peek" : "closed"}
         variants={variants}
         // The peek's whole motion, on the one element: rest → near → open is
         // a single property easing on the panel's own curve. Never set while
@@ -2577,10 +2520,7 @@ function LangyPanel({
               error INSIDE the panel frame instead of white-screening the host
               page. The panel chrome stays mounted (unmounting would tear down
               the in-flight stream); switching conversation re-attempts. */}
-          <IsolatedErrorBoundary
-            scope="Langy hit a snag"
-            resetKeys={[activeConversationId]}
-          >
+          <IsolatedErrorBoundary scope="Langy hit a snag" resetKeys={[activeConversationId]}>
             <PanelHeader
               conversationTitle={conversationTitle}
               onNewChat={handleNewChat}
@@ -2750,8 +2690,8 @@ function LangyPanel({
                           paddingTop={floating ? "19px" : "14px"}
                         >
                           <Text textStyle="2xs" color="fg.subtle">
-                            Showing the messages we last loaded. This conversation
-                            couldn&apos;t be refreshed.
+                            Showing the messages we last loaded. This conversation couldn&apos;t be
+                            refreshed.
                           </Text>
                           {historyRetryIsComing ? null : (
                             // The same quiet retry the inline error uses (see
@@ -2788,9 +2728,7 @@ function LangyPanel({
                         double title. */}
                           <ModelProviderScreen
                             variant="langy"
-                            {...(reconnectCodex
-                              ? { initialProviderKey: "codex" as const }
-                              : {})}
+                            {...(reconnectCodex ? { initialProviderKey: "codex" as const } : {})}
                             onComplete={() => {
                               void resolvedDefaultQuery.refetch();
                               if (reconnectCodex) {
@@ -2915,9 +2853,7 @@ function LangyPanel({
                                 // render read-only from the replayed record.
                                 choicesTimeline={choicesTimeline}
                                 onChoiceSelect={timeTravel ? undefined : selectChoice}
-                                onVerifyDerivedCard={
-                                  timeTravel ? undefined : verifyDerivedCard
-                                }
+                                onVerifyDerivedCard={timeTravel ? undefined : verifyDerivedCard}
                                 // (No connect-card prop: MessageContent no longer sniffs
                                 // the prose for `[langy:connect-github]`. The connect card
                                 // is driven by the structured `langy_github_not_connected`
@@ -2939,10 +2875,7 @@ function LangyPanel({
                             lost. Drawn as the real bubble, in the place the
                             real bubble will appear, so the swap is invisible. */}
                           {!timeTravel && pendingPrompt ? (
-                            <QueuedPrompt
-                              prompt={pendingPrompt}
-                              reduceMotion={reduceMotion}
-                            />
+                            <QueuedPrompt prompt={pendingPrompt} reduceMotion={reduceMotion} />
                           ) : null}
                           {turnInFlight ? (
                             // No extra air above the working lines. The answer
@@ -2960,14 +2893,11 @@ function LangyPanel({
                           ("Thinking…" instead of a false escalation toward
                           "stuck"). The store still accumulates the text — the
                           fold's `thinking` motion is derived from it. */}
-                              {hasTurnDetail &&
-                              activityOwnership.showStandaloneSignals ? (
+                              {hasTurnDetail && activityOwnership.showStandaloneSignals ? (
                                 <StreamingStatusLine
                                   status={activityOwnership.standaloneStatus}
                                   progress={activityOwnership.standaloneProgress}
-                                  progressSample={
-                                    activityOwnership.standaloneProgressSample
-                                  }
+                                  progressSample={activityOwnership.standaloneProgressSample}
                                   metrics={displaySignals.metrics}
                                   segment={displaySignals.segment}
                                 />
@@ -3088,16 +3018,10 @@ function LangyPanel({
                 stop, the past. The strip names the viewed moment and is the way
                 back. */}
                 {timeTravel ? (
-                  <HStack
-                    paddingX={floating ? "19px" : "14px"}
-                    paddingBottom="4px"
-                    gap={2}
-                  >
+                  <HStack paddingX={floating ? "19px" : "14px"} paddingBottom="4px" gap={2}>
                     <Text textStyle="2xs" color="orange.fg" fontWeight="600">
                       Viewing tape @{" "}
-                      {timeTravel.atMs
-                        ? new Date(timeTravel.atMs).toLocaleTimeString()
-                        : "start"}
+                      {timeTravel.atMs ? new Date(timeTravel.atMs).toLocaleTimeString() : "start"}
                     </Text>
                     <chakra.button
                       type="button"
@@ -3172,13 +3096,7 @@ function LangyPanel({
  *
  * Spec: specs/home/langy-home-morph.feature
  */
-function QueuedPrompt({
-  prompt,
-  reduceMotion,
-}: {
-  prompt: string;
-  reduceMotion: boolean;
-}) {
+function QueuedPrompt({ prompt, reduceMotion }: { prompt: string; reduceMotion: boolean }) {
   return (
     <MotionBox
       alignSelf="flex-end"
@@ -3321,11 +3239,7 @@ function PanelHeader({
           overflow="hidden"
           textOverflow="ellipsis"
         >
-          {conversationTitle ? (
-            <AnimatedConversationTitle title={conversationTitle} />
-          ) : (
-            "Langy"
-          )}
+          {conversationTitle ? <AnimatedConversationTitle title={conversationTitle} /> : "Langy"}
         </Box>
 
         <HStack gap={0.5} flexShrink={0}>
@@ -3390,10 +3304,7 @@ function PanelHeader({
             </Tooltip>
           )}
 
-          <LangyOverflowMenu
-            devDrawerOpen={devDrawerOpen}
-            onToggleDevDrawer={onToggleDevDrawer}
-          />
+          <LangyOverflowMenu devDrawerOpen={devDrawerOpen} onToggleDevDrawer={onToggleDevDrawer} />
 
           {/* The exit stands apart — always the rightmost control. Hidden while
               riding beside a drawer: the drawer's own X is the single close, so
@@ -3498,12 +3409,7 @@ function LangyOverflowMenu({
       <Tooltip content="More" positioning={{ placement: "bottom" }}>
         <TriggerAnchor>
           <Menu.Trigger asChild>
-            <IconButton
-              size="xs"
-              variant="ghost"
-              aria-label="More Langy options"
-              color="fg.muted"
-            >
+            <IconButton size="xs" variant="ghost" aria-label="More Langy options" color="fg.muted">
               <MoreHorizontal size={15} />
             </IconButton>
           </Menu.Trigger>

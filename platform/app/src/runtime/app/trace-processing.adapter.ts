@@ -36,6 +36,7 @@ import {
   hasSyncableEvaluations,
   hasSyncableFeedback,
   isRealFirstIngest,
+  needsOriginResolution,
   projectMetadataGroupKey,
   trackedEventSyncDedupId,
   type EventingTracePipelineAdapterOptions,
@@ -114,10 +115,7 @@ export interface TraceProcessingPipelineDeps {
  * `build` time, so requiring it here would ask the caller for something it
  * cannot have yet.
  */
-export type AppTraceProcessingPipelineDeps = Omit<
-  TraceProcessingPipelineDeps,
-  "originGateHandler"
->;
+export type AppTraceProcessingPipelineDeps = Omit<TraceProcessingPipelineDeps, "originGateHandler">;
 
 /** App-side composition of Trace's external subscribers into its pipeline. */
 export class AppTraceProcessingPipeline extends TraceProcessingPipelinePort {

@@ -1,4 +1,5 @@
 import { usePublicEnv } from "~/hooks/usePublicEnv.ts";
+import { useActiveProject } from "../../../contexts/ActiveProjectContext";
 import { parseSnippet } from "./snippets.ts";
 import type { FrameworkKey, PlatformKey } from "../types";
 import { getRegistryEntry } from "./registry";

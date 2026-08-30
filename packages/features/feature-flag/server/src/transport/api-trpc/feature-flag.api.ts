@@ -53,8 +53,13 @@ type FeatureFlagTrpcProcedures<
 const legacyFlagInputSchema = z
   .object({
     flag: frontendFeatureFlagSchema,
-    projectId: z.string().optional(),
-    organizationId: z.string().optional(),
+    // `nullish`, not `optional`: #7588 made every flag read state its project
+    // and organization, and `null` is how a caller says "targeted at neither"
+    // rather than "I forgot to say". `useFeatureFlag`'s `toWireTargetId` sends
+    // exactly that, so narrowing this to `optional` alone made the app's own
+    // hook stop typechecking against the procedure it calls.
+    projectId: z.string().nullish(),
+    organizationId: z.string().nullish(),
   })
   .strict();
 const organizationFlagsInputSchema = z
@@ -156,7 +161,7 @@ async function authorizeTarget(
 /** The compatibility target shape: optional ids rather than a tagged union. */
 async function authorizeLegacyTarget(
   ctx: FeatureFlagTrpcContext,
-  input: { projectId?: string; organizationId?: string },
+  input: { projectId?: string | null; organizationId?: string | null },
 ): Promise<AuthenticatedExperimentTarget> {
   const userId = ctx.actor().id;
 

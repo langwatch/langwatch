@@ -19,11 +19,7 @@ import type {
   TargetConfig,
 } from "~/experiments-v3/types";
 import { isComparisonEvaluatorType } from "~/experiments-v3/types";
-import {
-  applyHandledErrorToForm,
-  FormServerError,
-  showErrorToast,
-} from "~/features/errors";
+import { applyHandledErrorToForm, FormServerError, showErrorToast } from "~/features/errors";
 import {
   getComplexProps,
   getDrawerStack,
@@ -65,15 +61,6 @@ const EMPTY_COMPARISON_CONFIG: ComparisonEvaluatorConfig = {
   includeMetrics: [],
   randomizeOrder: true,
 };
-
-/**
- * A legacy pairwise evaluator opens in the same form as a current one: its
- * config is normalized to the comparison shape on load, so the only thing its
- * evaluatorType still selects is which judge endpoint runs it.
- */
-const isComparisonEvaluatorType = (evaluatorType: string | undefined): boolean =>
-  evaluatorType === COMPARISON_EVALUATOR_TYPE ||
-  evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
 
 export type EvaluatorMappingsConfig = {
   level?: "trace" | "thread";
@@ -122,12 +109,8 @@ export type EvaluatorEditorController = {
   form: UseFormReturn<EvaluatorFormValues>;
   evaluatorId: string | undefined;
   evaluatorType: string | undefined;
-  evaluatorDef:
-    | (typeof AVAILABLE_EVALUATORS)[keyof typeof AVAILABLE_EVALUATORS]
-    | undefined;
-  effectiveEvaluatorDef:
-    | { requiredFields?: string[]; optionalFields?: string[] }
-    | undefined;
+  evaluatorDef: (typeof AVAILABLE_EVALUATORS)[keyof typeof AVAILABLE_EVALUATORS] | undefined;
+  effectiveEvaluatorDef: { requiredFields?: string[]; optionalFields?: string[] } | undefined;
   isLoadingEvaluator: boolean;
   workflowCard:
     | {
@@ -146,9 +129,7 @@ export type EvaluatorEditorController = {
   isValid: boolean;
   saveButtonText: string | undefined;
   mappingsConfig: EvaluatorMappingsConfig | undefined;
-  onMappingChange:
-    | ((identifier: string, mapping: UIFieldMapping | undefined) => void)
-    | undefined;
+  onMappingChange: ((identifier: string, mapping: UIFieldMapping | undefined) => void) | undefined;
   /** Comparison drawer context. Set only for comparison evaluator types. */
   comparisonContext:
     | {
@@ -203,8 +184,7 @@ export function useEvaluatorEditorController(
     (complexProps.evaluatorId as string | undefined);
 
   const mappingsConfig =
-    props.mappingsConfig ??
-    (complexProps.mappingsConfig as EvaluatorMappingsConfig | undefined);
+    props.mappingsConfig ?? (complexProps.mappingsConfig as EvaluatorMappingsConfig | undefined);
   const onMappingChange = flowCallbacks?.onMappingChange;
   // Comparison: when this context is set, the drawer renders
   // ComparisonConfigForm instead of the per-row mappings section.
@@ -246,8 +226,7 @@ export function useEvaluatorEditorController(
   const saveButtonText =
     props.saveButtonText ?? (complexProps.saveButtonText as string | undefined);
 
-  const onLocalConfigChange =
-    props.onLocalConfigChange ?? flowCallbacks?.onLocalConfigChange;
+  const onLocalConfigChange = props.onLocalConfigChange ?? flowCallbacks?.onLocalConfigChange;
   const initialLocalConfig =
     props.initialLocalConfig ??
     (complexProps.initialLocalConfig as LocalEvaluatorConfig | undefined);
@@ -261,9 +240,8 @@ export function useEvaluatorEditorController(
 
   const isWorkflowEvaluator = evaluatorQuery.data?.type === "workflow";
 
-  const loadedEvaluatorType = (
-    evaluatorQuery.data?.config as { evaluatorType?: string } | null
-  )?.evaluatorType;
+  const loadedEvaluatorType = (evaluatorQuery.data?.config as { evaluatorType?: string } | null)
+    ?.evaluatorType;
   const evaluatorType =
     props.evaluatorType ??
     drawerParams.evaluatorType ??
@@ -328,8 +306,7 @@ export function useEvaluatorEditorController(
   ]);
 
   const forceUserToDecideAName =
-    evaluatorType?.startsWith("langevals/llm_") &&
-    evaluatorType !== "langevals/llm_answer_match"
+    evaluatorType?.startsWith("langevals/llm_") && evaluatorType !== "langevals/llm_answer_match"
       ? true
       : false;
 
@@ -361,14 +338,7 @@ export function useEvaluatorEditorController(
       settings: defaultSettings,
     });
     didInitializeCreateFormRef.current = key;
-  }, [
-    evaluatorDef,
-    evaluatorId,
-    evaluatorType,
-    defaultSettings,
-    form,
-    forceUserToDecideAName,
-  ]);
+  }, [evaluatorDef, evaluatorId, evaluatorType, defaultSettings, form, forceUserToDecideAName]);
 
   const savedFormValuesRef = useRef<EvaluatorFormValues | null>(null);
   const onLocalConfigChangeRef = useRef(onLocalConfigChange);
@@ -519,8 +489,7 @@ export function useEvaluatorEditorController(
   // when one or both slots are unset, so `.length` alone can't tell a fully
   // configured comparison from an under-filled one.
   const hasEnoughVariants =
-    !isComparisonEvaluatorType(evaluatorType) ||
-    comparison.variants.filter(Boolean).length >= 2;
+    !isComparisonEvaluatorType(evaluatorType) || comparison.variants.filter(Boolean).length >= 2;
   const isValid = !!name && name.trim().length > 0 && hasEnoughVariants;
 
   const handleSave = useCallback(() => {
@@ -695,11 +664,7 @@ export function useEvaluatorEditorController(
 // Body
 // ============================================================================
 
-export function EvaluatorEditorBody({
-  controller,
-}: {
-  controller: EvaluatorEditorController;
-}) {
+export function EvaluatorEditorBody({ controller }: { controller: EvaluatorEditorController }) {
   const {
     form,
     evaluatorId,
@@ -817,8 +782,7 @@ export function EvaluatorEditorBody({
         {isWorkflowEvaluator && workflowCard && (
           <VStack gap={4} paddingTop={4} align="stretch">
             <Text fontSize="sm" color="fg.muted">
-              This evaluator is powered by a workflow. Click below to open the workflow
-              editor:
+              This evaluator is powered by a workflow. Click below to open the workflow editor:
             </Text>
             <Link
               href={`/${projectSlug}/studio/${workflowCard.workflowId}`}
@@ -889,10 +853,7 @@ export type EvaluatorEditorFooterProps = {
   onCancel?: () => void;
 };
 
-export function EvaluatorEditorFooter({
-  controller,
-  onCancel,
-}: EvaluatorEditorFooterProps) {
+export function EvaluatorEditorFooter({ controller, onCancel }: EvaluatorEditorFooterProps) {
   const {
     evaluatorId,
     hasUnsavedChanges,
@@ -928,11 +889,7 @@ export function EvaluatorEditorFooter({
 // Header title (renderable — for parents that want to show the unsaved badge)
 // ============================================================================
 
-export function EvaluatorEditorHeading({
-  controller,
-}: {
-  controller: EvaluatorEditorController;
-}) {
+export function EvaluatorEditorHeading({ controller }: { controller: EvaluatorEditorController }) {
   const { title, hasUnsavedChanges, onLocalConfigChange } = controller;
   return (
     <EvaluatorEditorHeadingPresentation

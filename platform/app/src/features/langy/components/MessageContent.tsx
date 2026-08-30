@@ -20,11 +20,14 @@ import {
   LANGY_ACTION_SHADOW,
   type LangyAnswerSegment,
   langyAnswerSegments,
+  langyAnswerSegmentsFromText,
   LangyCardBoundary,
   LangyFailedCard,
   LangyGitHubProgressCard,
   LangyMeshLayer,
   langyPlan,
+  langyRunText,
+  langyTranscriptRuns,
   parseLangyFeedbackDirective,
   questionToolCardParts,
   stripReasoningTitles,
@@ -115,10 +118,7 @@ function MessageContentImpl({
    */
   choicesTimeline?: LangyChoicesTimelineEntry[];
   /** Answer a choices card. Absent = read-only (time travel, shared views). */
-  onChoiceSelect?: (a: {
-    selection: LangyChoiceSelection;
-    card: LangyDerivedChoicesCard;
-  }) => void;
+  onChoiceSelect?: (a: { selection: LangyChoiceSelection; card: LangyDerivedChoicesCard }) => void;
   /** Bind a derived card's verify hint. Absent = chip hidden. */
   onVerifyDerivedCard?: (a: { card: LangyDerivedCard }) => void;
 }) {
@@ -140,8 +140,7 @@ function MessageContentImpl({
   // drop the mid-turn narration the saved reply does not keep). Nothing stamped
   // that copy, so its fences are read at render — see `AnswerRun`. A RECORDED
   // message is left alone: the relay already ruled on its fences.
-  const isRecorded =
-    (message.metadata as { recorded?: boolean } | undefined)?.recorded === true;
+  const isRecorded = (message.metadata as { recorded?: boolean } | undefined)?.recorded === true;
 
   // A turn is a sequence, so it renders as one: the paragraphs and the calls in
   // the order the parts carry, rather than every card in a pile above the whole
@@ -153,9 +152,7 @@ function MessageContentImpl({
     () => (isUser ? [] : langyTranscriptRuns(message.parts)),
     [isUser, message.parts],
   );
-  const lastActivityRunIndex = runs.findLastIndex(
-    (run) => run.kind === "activity",
-  );
+  const lastActivityRunIndex = runs.findLastIndex((run) => run.kind === "activity");
 
   // The agent's `question` TOOL call, mapped onto the choices contract
   // (langyQuestionTool.ts) and rendered through the same card path a stamped
@@ -256,6 +253,21 @@ function MessageContentImpl({
         text: reasoningFold.text,
         hasActivity: hasActivityRecord,
       });
+  // The block channel (ADR-060): a settled assistant message whose parts
+  // carry stamped `langy-card` / `langy-card-failed` parts renders as an
+  // ORDERED sequence — prose, card where the block sat, prose — instead of
+  // one joined markdown body. Fence-less messages keep the joined path
+  // untouched, and the live streaming turn never has stamped parts (the
+  // preview is Phase 4's seam), so `isStreaming` rendering is unaffected.
+  // Memoized: parts are replaced wholesale on settle/rehydrate, so identity
+  // is a faithful cache key and history messages never re-split per render.
+  const blockSegments = useMemo(
+    () =>
+      !isUser && !isStreaming && hasLangyBlockParts(message.parts)
+        ? langyAnswerSegments(message.parts)
+        : null,
+    [isUser, isStreaming, message.parts],
+  );
   // A turn whose only output is a stamped card block has no prose at all, and
   // reading "No content" under a card the reader can see is worse than saying
   // nothing.
@@ -335,11 +347,7 @@ function MessageContentImpl({
             over — the record of what the turn set out to do. */}
         {plan && !isStreaming ? (
           <LangyCardBoundary scope="the plan">
-            <LangyPlanCard
-              plan={plan}
-              reasoningTitles={reasoningFold.titles}
-              isStreaming={false}
-            />
+            <LangyPlanCard plan={plan} reasoningTitles={reasoningFold.titles} isStreaming={false} />
           </LangyCardBoundary>
         ) : null}
         {/* The turn itself, in its own order: a paragraph, the call it ran, the
@@ -349,17 +357,12 @@ function MessageContentImpl({
             mapping still lives in LangyToolActivity. */}
         {runs.map((run, index) =>
           run.kind === "activity" ? (
-            <LangyCardBoundary
-              key={`activity-${index}`}
-              scope="the tool activity"
-            >
+            <LangyCardBoundary key={`activity-${index}`} scope="the tool activity">
               <LangyActivityParts
                 parts={run.parts}
                 // The receipt's thinking headlines belong to the turn, not to
                 // one run of it, so they ride the last activity run.
-                reasoningTitles={
-                  index === lastActivityRunIndex ? reasoningFold.titles : []
-                }
+                reasoningTitles={index === lastActivityRunIndex ? reasoningFold.titles : []}
                 // A call is only ever closed by its own output, so a stopped or
                 // dead turn leaves its open calls looking like they still run.
                 // Off the streaming turn, an open call is an interrupted one.
@@ -429,10 +432,7 @@ function MessageContentImpl({
             // relay stamps with at settle (ADR-060 §7). Fence-less streams
             // take the plain path inside, unchanged.
             <Box paddingX="2px">
-              <StreamingAnswerWithCards
-                text={displayText}
-                projectSlug={project?.slug ?? null}
-              />
+              <StreamingAnswerWithCards text={displayText} projectSlug={project?.slug ?? null} />
             </Box>
           ) : (
             <Box
@@ -506,11 +506,7 @@ function MessageContentImpl({
             messageId={message.id}
             sentiment={feedbackDirective.sentiment}
             origin={
-              feedbackDirective.requested
-                ? "directive"
-                : shouldAskFeedback
-                  ? "asked"
-                  : "requested"
+              feedbackDirective.requested ? "directive" : shouldAskFeedback ? "asked" : "requested"
             }
           />
         ) : null}
@@ -528,10 +524,7 @@ interface AnswerBlockContext {
   firstTextIndex: number;
   projectSlug: string | null;
   choicesTimeline?: LangyChoicesTimelineEntry[];
-  onChoiceSelect?: (a: {
-    selection: LangyChoiceSelection;
-    card: LangyDerivedChoicesCard;
-  }) => void;
+  onChoiceSelect?: (a: { selection: LangyChoiceSelection; card: LangyDerivedChoicesCard }) => void;
   onVerifyDerivedCard?: (a: { card: LangyDerivedCard }) => void;
 }
 
@@ -579,9 +572,7 @@ function AnswerRun({
   });
 
   if (segments) {
-    return segments.length > 0 ? (
-      <AnswerWithCards segments={segments} {...context} />
-    ) : null;
+    return segments.length > 0 ? <AnswerWithCards segments={segments} {...context} /> : null;
   }
   if (!display) return null;
   // The live turn: prose streams as ever, and any forming ```langy-card fence
@@ -590,10 +581,7 @@ function AnswerRun({
   if (isStreaming) {
     return (
       <Box paddingX="2px">
-        <StreamingAnswerWithCards
-          text={display}
-          projectSlug={context.projectSlug}
-        />
+        <StreamingAnswerWithCards text={display} projectSlug={context.projectSlug} />
       </Box>
     );
   }
@@ -609,11 +597,7 @@ function AnswerRun({
         "& table": { display: "block", overflowX: "auto" },
       }}
     >
-      <Markdown
-        fontSize="langyAnswer"
-        linkVariant="langy"
-        color="langy.answerFg"
-      >
+      <Markdown fontSize="langyAnswer" linkVariant="langy" color="langy.answerFg">
         {display}
       </Markdown>
     </Box>
@@ -886,13 +870,7 @@ export function ProposalCard({
             overflow="hidden"
           >
             {!destructive && <LangyMeshLayer borderRadius="md" active={isApplying} />}
-            <Box
-              position="relative"
-              zIndex={1}
-              display="flex"
-              alignItems="center"
-              gap={1.5}
-            >
+            <Box position="relative" zIndex={1} display="flex" alignItems="center" gap={1.5}>
               <Check size={12} />
               {isApplying
                 ? destructive
@@ -911,12 +889,7 @@ export function ProposalCard({
       {isApplied && hasOpen && (
         <HStack paddingTop={2.5}>
           {onOpen ? (
-            <Button
-              size="xs"
-              variant="outline"
-              colorPalette="green"
-              onClick={triggerOpen}
-            >
+            <Button size="xs" variant="outline" colorPalette="green" onClick={triggerOpen}>
               {openLabel}
               <ArrowRight size={12} />
             </Button>
@@ -934,16 +907,13 @@ export function ProposalCard({
   );
 }
 
-function extractProposals(
-  message: UIMessage,
-): Array<{ id: string; proposal: LangyProposal }> {
+function extractProposals(message: UIMessage): Array<{ id: string; proposal: LangyProposal }> {
   const result: Array<{ id: string; proposal: LangyProposal }> = [];
   for (const part of message.parts) {
     if (!part.type?.startsWith("tool-")) continue;
     const output = (part as { output?: unknown }).output;
     if (!isLangyProposal(output)) continue;
-    const id =
-      (part as { toolCallId?: string }).toolCallId ?? `${message.id}:${result.length}`;
+    const id = (part as { toolCallId?: string }).toolCallId ?? `${message.id}:${result.length}`;
     result.push({ id, proposal: output });
   }
   return result;
@@ -952,9 +922,5 @@ function extractProposals(
 function isLangyProposal(value: unknown): value is LangyProposal {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
-  return (
-    v.langyProposal === true &&
-    typeof v.kind === "string" &&
-    typeof v.summary === "string"
-  );
+  return v.langyProposal === true && typeof v.kind === "string" && typeof v.summary === "string";
 }

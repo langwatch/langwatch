@@ -3,6 +3,7 @@ import { AlertCircle, Check, Cloud, CloudOff, RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
 import type { AutosaveState } from "@langwatch/dataset-web";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { AUTOSAVE_OUT_OF_DATE_REASON } from "../constants";
 
 type AutosaveStatusProps = {
   evaluationState: AutosaveState;
@@ -100,9 +101,7 @@ export function AutosaveStatus({
     { state: evaluationState, reason: evaluationError },
     { state: datasetState, reason: datasetError },
   ].filter(({ state }) => state === "error");
-  const hasError = failures.some(
-    ({ reason }) => reason !== AUTOSAVE_OUT_OF_DATE_REASON,
-  );
+  const hasError = failures.some(({ reason }) => reason !== AUTOSAVE_OUT_OF_DATE_REASON);
   const isOutOfDate = failures.length > 0 && !hasError;
   const isSaving = evaluationState === "saving" || datasetState === "saving";
   const isSaved =
