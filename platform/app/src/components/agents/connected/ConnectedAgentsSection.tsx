@@ -26,7 +26,7 @@ import {
 } from "./connected-agent-rows";
 
 /** The columns of one row: presence, environment, who, SDK, parameters. */
-const ROW_COLUMNS = "160px 150px 150px 1fr 32px";
+const ROW_COLUMNS = "210px 140px 150px 1fr 32px";
 
 export function ConnectedAgentsSection({
   agents,

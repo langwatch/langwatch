@@ -103,9 +103,27 @@ export interface MachineReader {
   userInfo: () => { username: string };
 }
 
+const HOST_LABEL_MAX_LENGTH = 24;
+
+/**
+ * A short label for this machine: lowercase, `[a-z0-9-]`, 24 characters.
+ *
+ * The platform scopes a development agent connected with a project key to
+ * this label, and the Python SDK sends the same shape, so one machine reads
+ * the same whichever SDK connected it.
+ */
+export function hostLabel(hostname: string): string {
+  return hostname
+    .toLowerCase()
+    .replace(/\.(local|lan|home|localdomain)$/i, "")
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, HOST_LABEL_MAX_LENGTH);
+}
+
 const readHostname = (machine: MachineReader): string => {
   try {
-    return machine.hostname();
+    return hostLabel(machine.hostname());
   } catch {
     return "";
   }

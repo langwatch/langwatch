@@ -9,6 +9,7 @@ import { LANGWATCH_SDK_VERSION } from "../../internal/constants";
 import {
   buildConnectHeaders,
   buildInstance,
+  hostLabel,
   resolveConnectUrl,
   resolveEnabled,
   resolveEnvironment,
@@ -88,6 +89,23 @@ describe("resolveInstanceLabel()", () => {
 });
 
 describe("buildInstance()", () => {
+  /** @scenario "The hostname is sent as a host label" */
+  it("sends the hostname as a lowercase host label", () => {
+    const machineNamed = (name: string) => ({
+      hostname: () => name,
+      userInfo: () => ({ username: "dev" }),
+    });
+
+    expect(buildInstance({ machine: machineNamed("ACME-Laptop.home") }).hostname).toBe(
+      "acme-laptop",
+    );
+    expect(hostLabel("ip-10-0-1-23.eu-west-1.compute.internal")).toBe(
+      "ip-10-0-1-23-eu-west-1-c",
+    );
+    expect(hostLabel("a".repeat(40))).toHaveLength(24);
+    expect(hostLabel("--Pod A--")).toBe("pod-a");
+  });
+
   /** @scenario "The instance identity is read defensively" */
   it("carries an empty hostname when the machine refuses to name itself", () => {
     expect(typeof buildInstance({}).hostname).toBe("string");

@@ -154,6 +154,12 @@ Feature: connectAgent turns a function into a simulation target
       Then it becomes "my-staging-env"
       And a name longer than 32 characters is cut to 32
 
+    Scenario: The hostname is sent as a host label
+      Given os.hostname is "ACME-Laptop.home"
+      When the instance identity is built
+      Then the hostname is "acme-laptop"
+      And a hostname longer than 24 characters is cut to 24
+
     Scenario: The instance identity is read defensively
       Given os.hostname throws
       When the instance identity is built

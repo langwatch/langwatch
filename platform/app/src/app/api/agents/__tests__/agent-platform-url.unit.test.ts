@@ -6,7 +6,11 @@ describe("agentPlatformUrl", () => {
     it("opens the drawer that edits or shows that type", () => {
       const drawerOf = (agentType: string) =>
         new URL(
-          agentPlatformUrl({ projectSlug: "acme", agentId: "agent_1", agentType }),
+          agentPlatformUrl({
+            projectSlug: "acme",
+            agentId: "agent_1",
+            agentType,
+          }),
         ).searchParams.get("drawer.open");
 
       expect(drawerOf("http")).toBe("agentHttpEditor");
