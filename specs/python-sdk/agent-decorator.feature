@@ -242,7 +242,7 @@ Feature: Python SDK connect_agent decorator
   @unit
   Scenario: The environment is sanitized
     Given an environment value with spaces, uppercase letters and symbols
-    Then the resolved environment is lowercase with dashes and at most 64 characters
+    Then the resolved environment is lowercase with dashes and at most 32 characters
 
   @unit
   Scenario: The instance identity carries hostname, username, pid and label
@@ -295,13 +295,13 @@ Feature: Python SDK connect_agent decorator
     And the connection stays open
 
   @unit
-  @unit
   Scenario: The deadline of a call is read as epoch milliseconds
     Given a call frame whose deadlineAt is an epoch in milliseconds
     When the SDK computes the seconds left
     Then the remaining time is measured from now
     And an ISO 8601 deadline is still accepted
 
+  @unit
   Scenario: A call past its deadline answers agent_call_timeout
     Given a function that runs longer than the deadline
     Then a result frame with error code agent_call_timeout is sent
