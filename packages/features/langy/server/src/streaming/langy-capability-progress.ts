@@ -1,11 +1,17 @@
 /**
  * Server-side wording for a capability while its result is still streaming.
  *
- * This is deliberately separate from the browser card registry: the relay is
- * a server transport and must not import UI composition. The vocabulary mirrors
- * the CLI capability catalog; the settled card remains responsible for richer
- * presentation.
+ * Deliberately separate from the browser CARD REGISTRY: the relay is a server
+ * transport and must not import UI composition. That rule does not reach the
+ * contract, which both sides already depend on — so which verbs answer with a
+ * collection comes from `CLI_COLLECTION_VERBS` rather than a second copy. The
+ * copy had drifted: it held `results` and lacked `tag` and `types`, so the
+ * server and the browser pluralised different verbs for the same CLI result.
+ *
+ * The settled card remains responsible for richer presentation.
  */
+import { CLI_COLLECTION_VERBS } from "@langwatch/langy-contract";
+
 const NOUNS: Record<string, { singular: string; plural: string }> = {
   trace: { singular: "trace", plural: "traces" },
   session: { singular: "session", plural: "sessions" },
@@ -40,16 +46,6 @@ const NOUNS: Record<string, { singular: string; plural: string }> = {
   "role-binding": { singular: "role binding", plural: "role bindings" },
   "scim-token": { singular: "SCIM token", plural: "SCIM tokens" },
 };
-
-const COLLECTION_VERBS = new Set([
-  "search",
-  "query",
-  "list",
-  "versions",
-  "list-runs",
-  "records",
-  "results",
-]);
 
 const PRESENT_VERBS: Record<string, string> = {
   search: "Searching",
@@ -87,9 +83,7 @@ const humanize = (value: string): string =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 
-export function resolveLangyCapabilityProgress(
-  rawName: string,
-): { headline: string } | null {
+export function resolveLangyCapabilityProgress(rawName: string): { headline: string } | null {
   const match = /^langwatch\.([a-z][a-z0-9-]*)\.([a-z][a-z0-9-]*)$/.exec(rawName);
   if (!match) return null;
   const resource = match[1]!;
@@ -98,6 +92,6 @@ export function resolveLangyCapabilityProgress(
     singular: humanize(resource).toLowerCase(),
     plural: `${humanize(resource).toLowerCase()}s`,
   };
-  const label = COLLECTION_VERBS.has(verb) ? noun.plural : noun.singular;
+  const label = CLI_COLLECTION_VERBS.has(verb) ? noun.plural : noun.singular;
   return { headline: `${PRESENT_VERBS[verb] ?? "Working on"} ${label}` };
 }
