@@ -31,7 +31,7 @@ export { WebhookSecretPort } from "./ports/webhook-secret.port";
 // The ClickHouse repository, its client shape and its cursor codec are private
 // to the feature: nothing outside it names them any more.
 export { WebhookEventsAdapter } from "./adapters/clickhouse.webhook-events.adapter";
-export { WebhookEventsRepository } from "./ports/webhook-events.port";
+export { WebhookEventsRepositoryPort } from "./ports/webhook-events.port";
 export {
   WebhookEndpointConfiguration,
   WebhookEndpointPolicyService,

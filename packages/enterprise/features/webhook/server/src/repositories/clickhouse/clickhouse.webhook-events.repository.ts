@@ -1,5 +1,5 @@
 import {
-  WebhookEventsRepository,
+  WebhookEventsRepositoryPort,
   type WebhookEventsPage,
 } from "../../ports/webhook-events.port";
 import type {
@@ -125,7 +125,7 @@ function parseEventId(
   return null;
 }
 
-export class WebhookEventsClickHouseRepository extends WebhookEventsRepository {
+export class WebhookEventsClickHouseRepository extends WebhookEventsRepositoryPort {
   private constructor(private readonly resolveClient: WebhookClickHouseClientResolver) {
     super();
   }

@@ -10,14 +10,14 @@ import {
 import type { GatewaySpendState } from "@langwatch/gateway-server";
 import { GatewaySpendEventsRepository } from "@langwatch/gateway-server";
 import { WebhookEventsAdapter } from "~/runtime/app/features/webhooks";
-import type { WebhookEventsRepository } from "@langwatch/enterprise-webhook-server";
+import type { WebhookEventsRepositoryPort } from "@langwatch/enterprise-webhook-server";
 
 const tenantId = `test-webhook-events-${nanoid(8)}`;
 const baseTime = Date.UTC(2026, 6, 20, 12, 0, 0);
 
 let client: ClickHouseClient;
 let spendRepo: GatewaySpendEventsRepository;
-let eventsRepo: WebhookEventsRepository;
+let eventsRepo: WebhookEventsRepositoryPort;
 
 function state(occurredAtMs: number): GatewaySpendState {
   return {
