@@ -84,6 +84,23 @@ test_ceiling_above_stream_idle_timeout_is_refused() {
   expect_render_fails "above idle timeout" "--set langwatch_nlp.codeBlockTimeoutSeconds=900"
 }
 
+# @scenario "The chart's ceiling matches the Lambda clamp's ceiling exactly"
+test_ceiling_matches_the_lambda_clamp_boundary() {
+  local values
+  if ! render "--set langwatch_nlp.codeBlockTimeoutSeconds=710"; then
+    fail "at the Lambda-clamp ceiling" "render failed, expected 710 to be accepted: $render_out"
+    return
+  fi
+  values=$(emitted_ceilings)
+  if [ "$values" != "710" ]; then
+    fail "at the Lambda-clamp ceiling" "expected every caller to get 710, got: $(echo "$values" | tr '\n' ' ')"
+    return
+  fi
+  echo "ok   [at the Lambda-clamp ceiling] 710 accepted and carried by all callers"
+
+  expect_render_fails "one above the Lambda-clamp ceiling" "--set langwatch_nlp.codeBlockTimeoutSeconds=711"
+}
+
 # @scenario "The ceiling is still checked when the NLP service is external"
 test_ceiling_is_checked_with_the_service_disabled() {
   # Both directions: too high is caught by the range check, and ANY change is
@@ -137,6 +154,7 @@ test_reserved_timeout_envs_are_refused_everywhere() {
 
 test_default_ceiling_reaches_every_caller
 test_ceiling_above_stream_idle_timeout_is_refused
+test_ceiling_matches_the_lambda_clamp_boundary
 test_ceiling_is_checked_with_the_service_disabled
 test_external_service_renders_on_the_default
 test_reserved_timeout_envs_are_refused_everywhere

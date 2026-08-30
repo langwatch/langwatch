@@ -713,10 +713,18 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      reach the app and workers unchecked and their derived client deadline
      would cut every turn short of the engine's own ceiling.
 
-     720 is the engine's stream idle timeout default
+     710 is the ceiling — the engine's stream idle timeout default, 720
      (`NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS`, `httpapi.DefaultStreamIdleTimeout`
-     in services/nlpgo); a code-block ceiling at or above it races the stream
-     shutting down.
+     in services/nlpgo; `NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS` in
+     platform/app/src/server/nlpgo/timeouts.ts), minus the same 10s margin
+     (`CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS`, also in timeouts.ts) that
+     `clampCodeBlockTimeoutSeconds`
+     (platform/app/src/optimization_studio/server/lambda/index.ts) subtracts
+     before it silently clamps a Lambda's env override. Anything above 710
+     races the stream shutting down with no margin left for nlpgo to report
+     its own timeout first — and, left at 720, would sail through here and
+     be silently cut to 710 on the Lambda path, the exact two-numbers drift
+     this pair exists to prevent.
 
      With `langwatch_nlp.enabled` false the engine is external and the chart
      cannot impose the ceiling, only report it to the clients. The value is
@@ -725,8 +733,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      so it does not pretend to. */}}
 {{- define "langwatch.codeBlockTimeoutSeconds" -}}
 {{- $seconds := int (.Values.langwatch_nlp.codeBlockTimeoutSeconds | default 600) -}}
-{{- if ge $seconds 720 -}}
-{{- fail "langwatch_nlp.codeBlockTimeoutSeconds must stay below the engine's stream idle timeout (720s) — a code-block ceiling at or above it races the stream shutting down" -}}
+{{- $streamIdleTimeoutSeconds := 720 -}}
+{{- $safetyMarginSeconds := 10 -}}
+{{- $maxSeconds := sub $streamIdleTimeoutSeconds $safetyMarginSeconds -}}
+{{- if gt $seconds $maxSeconds -}}
+{{- fail (printf "langwatch_nlp.codeBlockTimeoutSeconds must stay at or below %d — the engine's %ds stream idle timeout (NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS) minus the %ds safety margin (CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS in platform/app/src/server/nlpgo/timeouts.ts) that lets nlpgo report its own timeout before the enclosing Lambda deadline fires. Got %d." $maxSeconds $streamIdleTimeoutSeconds $safetyMarginSeconds $seconds) -}}
 {{- end -}}
 {{- $seconds -}}
 {{- end -}}
