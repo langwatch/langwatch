@@ -34,14 +34,15 @@ class InMemoryStateStore implements StateProjectionStore<IdentityFoldState> {
   readonly stored = new Map<string, StoredProjection<IdentityFoldState>>();
   readonly storeContexts: ProjectionStoreContext[] = [];
 
-  async load(key: string, _context: ProjectionStoreContext) {
+  // `tryLoad`, not `load`: the contract's reader answers null for a key it
+  // holds nothing for rather than throwing, which is what this already did —
+  // only the name was stale. `implements` would have caught it, but tests are
+  // outside the typecheck people run.
+  async tryLoad(key: string, _context: ProjectionStoreContext) {
     return this.stored.get(key) ?? null;
   }
 
-  async store(
-    projection: StoredProjection<IdentityFoldState>,
-    context: ProjectionStoreContext,
-  ) {
+  async store(projection: StoredProjection<IdentityFoldState>, context: ProjectionStoreContext) {
     this.storeContexts.push(context);
     this.stored.set(context.aggregateId, projection);
   }
@@ -67,16 +68,8 @@ class ProjectionHeads implements IdentityHeadsRepository {
       : emptyIdentityHeads({ userId });
   }
 
-  async findIdentifier({
-    userId,
-    identifierId,
-  }: {
-    userId: string;
-    identifierId: string;
-  }) {
-    return (
-      this.store.stored.get(userId)?.state.identifiers[identifierId] ?? null
-    );
+  async findIdentifier({ userId, identifierId }: { userId: string; identifierId: string }) {
+    return this.store.stored.get(userId)?.state.identifiers[identifierId] ?? null;
   }
 
   async findIdentifierIdForAccount() {
@@ -225,9 +218,7 @@ describe("the identity ledger writer", () => {
       const projection = store.stored.get(USER)!;
       const facts = Object.values(projection.state.identifiers);
       expect(facts[0]!.value).toBe("sam.j@acme.com");
-      expect(projection.cursor.eventId).toBe(
-        (appended[0]?.[0] as IdentityEvent).id,
-      );
+      expect(projection.cursor.eventId).toBe((appended[0]?.[0] as IdentityEvent).id);
     });
 
     it("stages the COMMAND, not the facts: the queue re-runs the guard", async () => {
@@ -255,9 +246,7 @@ describe("the identity ledger writer", () => {
         shouldStagingFail: true,
       });
 
-      await expect(identity.attachIdentifier(attachData())).rejects.toThrow(
-        "redis unavailable",
-      );
+      await expect(identity.attachIdentifier(attachData())).rejects.toThrow("redis unavailable");
       expect(appended).toHaveLength(0);
       expect(order).toEqual(["stage"]);
     });
@@ -277,17 +266,13 @@ describe("the identity ledger writer", () => {
     /** @scenario "A lagging fold does not fail the ceremony" */
     it("the ceremony still succeeds, and the timeout is counted", async () => {
       const { identity, staged } = harness({ foldNeverLands: true });
-      const before = await counterValue(
-        identityProjectionConvergenceTimeoutsTotal,
-      );
+      const before = await counterValue(identityProjectionConvergenceTimeoutsTotal);
 
       const events = await identity.attachIdentifier(attachData());
 
       expect(events).toHaveLength(1);
       expect(staged).toHaveLength(1);
-      expect(
-        await counterValue(identityProjectionConvergenceTimeoutsTotal),
-      ).toBe(before + 1);
+      expect(await counterValue(identityProjectionConvergenceTimeoutsTotal)).toBe(before + 1);
     });
   });
 
