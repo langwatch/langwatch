@@ -72,9 +72,7 @@ export { resourceLimitCooldown };
 // 2. planLimitCooldown (TtlCache) — blocks subsequent ticks and coordinates
 //    across pods via Redis. The DB 30-day window remains authoritative.
 const planLimitInFlight = new Set<string>();
-const planLimitCooldown = new MemoryCooldownCache(
-  MIN_DAYS_BETWEEN_ALERTS * 24 * 60 * 60 * 1000,
-);
+const planLimitCooldown = new MemoryCooldownCache(MIN_DAYS_BETWEEN_ALERTS * 24 * 60 * 60 * 1000);
 
 export { planLimitCooldown, planLimitInFlight };
 
@@ -92,9 +90,7 @@ export interface BillingUsageLimitOrganization {
     members: Array<{ user: { id: string; name: string | null; email: string | null } }>;
   } | null>;
   updateSentPlanLimitAlert(organizationId: string, timestamp: Date): Promise<void>;
-  findProjectsWithName(
-    organizationId: string,
-  ): Promise<Array<{ id: string; name: string }>>;
+  findProjectsWithName(organizationId: string): Promise<Array<{ id: string; name: string }>>;
 }
 
 export interface BillingUsageCounter {
@@ -323,10 +319,7 @@ export class UsageLimitService {
       ]);
 
       try {
-        await this.organizationService.updateSentPlanLimitAlert(
-          organizationId,
-          new Date(),
-        );
+        await this.organizationService.updateSentPlanLimitAlert(organizationId, new Date());
       } catch (error) {
         this.errorReporter.capture(
           new Error(
@@ -377,8 +370,7 @@ export class UsageLimitService {
 
       let planName = "unknown";
       try {
-        planName =
-          (await this.planProvider.getActivePlan({ organizationId })).name ?? "unknown";
+        planName = (await this.planProvider.getActivePlan({ organizationId })).name ?? "unknown";
       } catch {
         // fall through with "unknown"
       }
@@ -402,37 +394,28 @@ export class UsageLimitService {
         { error, organizationId, limitType },
         "[billing] Failed to send resource limit alert",
       );
-      this.errorReporter.capture(
-        error instanceof Error ? error : new Error(String(error)),
-      );
+      this.errorReporter.capture(error instanceof Error ? error : new Error(String(error)));
       await this.resourceCooldown.delete(cooldownKey);
     }
   }
 
   /**
-   * Checks if a usage limit warning notification should be sent and sends it if needed.
-   * Creates a notification record in the database after successfully sending the email.
+   * Sends a usage-limit warning email if one is due, and records that it went.
    *
-   * @param data Usage limit data including organization ID, current usage, and limit
-   * @returns The created notification record, or null if no notification was sent
+   * Returns the notification record, or null when nothing was sent — which is
+   * the common case: below every threshold, already warned this month, no
+   * organization, no admin with an email.
    */
-  async checkAndSendWarning(data: UsageLimitData) {
+  async checkAndSendWarning(data: UsageLimitData): Promise<Notification | null> {
     const { organizationId, currentMonthMessagesCount, maxMonthlyUsageLimit } = data;
 
     const usagePercentage =
-      maxMonthlyUsageLimit > 0
-        ? (currentMonthMessagesCount / maxMonthlyUsageLimit) * 100
-        : 0;
-
+      maxMonthlyUsageLimit > 0 ? (currentMonthMessagesCount / maxMonthlyUsageLimit) * 100 : 0;
     const crossedThreshold = this.calculateThreshold(usagePercentage);
 
     if (!crossedThreshold) {
       logger.debug(
-        {
-          organizationId,
-          usagePercentage,
-          lowestThreshold: USAGE_WARNING_THRESHOLDS[0],
-        },
+        { organizationId, usagePercentage, lowestThreshold: USAGE_WARNING_THRESHOLDS[0] },
         "Usage below all warning thresholds, skipping notification",
       );
       return null;
@@ -450,80 +433,14 @@ export class UsageLimitService {
       return null;
     }
 
-    // Check if we've sent a notification for this specific threshold in the current calendar month.
-    //
-    // NOTE: This check-then-insert pattern has a small race window where two concurrent
-    // workers could both pass the check and send duplicate emails. This is acceptable
-    // because: (1) this runs from a single cron worker and a user-initiated tRPC mutation
-    // that is unlikely to fire concurrently, and (2) the worst case is a duplicate email
-    // in the same month, which is benign. If a stronger guarantee is needed, add a unique
-    // constraint on (organizationId, threshold, yearMonth) via a database migration.
-    const currentMonthStart = getCurrentMonthStart();
-
-    const recentNotifications = await this.notificationRecords.listRecentByOrganization({
-      organizationId,
-      since: currentMonthStart,
-    });
-
-    const recentNotification = recentNotifications.find((notification) => {
-      if (!notification.metadata || typeof notification.metadata !== "object") {
-        return false;
-      }
-      const metadata = notification.metadata as Record<string, unknown>;
-      return (
-        metadata.type === NOTIFICATION_TYPES.USAGE_LIMIT_WARNING &&
-        metadata.threshold === crossedThreshold
-      );
-    });
-
-    if (recentNotification) {
-      logger.debug(
-        {
-          organizationId,
-          threshold: crossedThreshold,
-          lastSentAt: recentNotification.sentAt,
-          currentMonthStart,
-        },
-        "Notification already sent for this threshold in current calendar month, skipping duplicate",
-      );
+    if (await this.alreadyWarnedThisMonth({ organizationId, crossedThreshold })) {
       return null;
     }
 
-    // Fetch projects and their usage
-    const projects = await this.organizationService.findProjectsWithName(organizationId);
-
-    const projectIds = projects.map((p) => p.id);
-    const counts = await this.usageService.getCountByProjects({
-      organizationId,
-      projectIds,
-    });
-    // The per-project breakdown is the substance of this email. Sending it with
-    // every project reading 0 — which is what an unknown count used to become —
-    // tells an admin their usage collapsed, in a message whose entire premise
-    // is that their usage is high. Skip the send; the threshold is still
-    // crossed on the next run, when the numbers are real.
-    if (counts === USAGE_UNKNOWN) {
-      logger.warn(
-        { organizationId, crossedThreshold },
-        "usage is unknown, skipping usage-limit email rather than reporting zeros",
-      );
-      return;
+    const projectUsageData = await this.projectUsage({ organizationId, crossedThreshold });
+    if (projectUsageData === null) {
+      return null;
     }
-    const countsMap = new Map(counts.map((c) => [c.projectId, c.count]));
-    const projectUsageData = projects.map((p) => ({
-      id: p.id,
-      name: p.name,
-      messageCount: countsMap.get(p.id) ?? 0,
-    }));
-
-    const emailContext = this.buildEmailContext({
-      organizationName: organization.name,
-      usagePercentage,
-      currentMonthMessagesCount,
-      maxMonthlyUsageLimit,
-      crossedThreshold,
-      projectUsageData,
-    });
 
     const deliverableAdmins = organization.members.filter((member) => member.user.email);
 
@@ -540,11 +457,149 @@ export class UsageLimitService {
       return null;
     }
 
+    return this.sendAndRecord({
+      organizationId,
+      organizationName: organization.name,
+      deliverableAdmins,
+      emailContext: this.buildEmailContext({
+        organizationName: organization.name,
+        usagePercentage,
+        currentMonthMessagesCount,
+        maxMonthlyUsageLimit,
+        crossedThreshold,
+        projectUsageData,
+      }),
+      currentMonthMessagesCount,
+      maxMonthlyUsageLimit,
+      usagePercentage,
+      crossedThreshold,
+    });
+  }
+
+  /**
+   * Whether this threshold was already warned about in the current calendar
+   * month.
+   *
+   * Check-then-insert, so two workers could in principle both pass and send a
+   * duplicate. Accepted: this runs from one cron worker and a user-initiated
+   * mutation that are unlikely to fire together, and a repeated email in the
+   * same month is benign. A unique constraint on
+   * (organizationId, threshold, yearMonth) is the fix if that stops being true.
+   */
+  private async alreadyWarnedThisMonth({
+    organizationId,
+    crossedThreshold,
+  }: {
+    organizationId: string;
+    crossedThreshold: number;
+  }): Promise<boolean> {
+    const currentMonthStart = getCurrentMonthStart();
+
+    const recentNotifications = await this.notificationRecords.listRecentByOrganization({
+      organizationId,
+      since: currentMonthStart,
+    });
+
+    const alreadySent = recentNotifications.find((notification) => {
+      if (!notification.metadata || typeof notification.metadata !== "object") {
+        return false;
+      }
+      const metadata = notification.metadata as Record<string, unknown>;
+
+      return (
+        metadata.type === NOTIFICATION_TYPES.USAGE_LIMIT_WARNING &&
+        metadata.threshold === crossedThreshold
+      );
+    });
+
+    if (!alreadySent) {
+      return false;
+    }
+
+    logger.debug(
+      {
+        organizationId,
+        threshold: crossedThreshold,
+        lastSentAt: alreadySent.sentAt,
+        currentMonthStart,
+      },
+      "Notification already sent for this threshold in current calendar month, skipping duplicate",
+    );
+
+    return true;
+  }
+
+  /**
+   * Per-project message counts, or null when they cannot be read.
+   *
+   * The breakdown is the substance of this email. Sending it with every project
+   * reading 0 — which is what an unknown count used to become — tells an admin
+   * their usage collapsed, in a message whose entire premise is that their
+   * usage is high. Better to send nothing: the threshold is still crossed on
+   * the next run, when the numbers are real.
+   */
+  private async projectUsage({
+    organizationId,
+    crossedThreshold,
+  }: {
+    organizationId: string;
+    crossedThreshold: number;
+  }): Promise<Array<{ id: string; name: string; messageCount: number }> | null> {
+    const projects = await this.organizationService.findProjectsWithName(organizationId);
+    const counts = await this.usageService.getCountByProjects({
+      organizationId,
+      projectIds: projects.map((project) => project.id),
+    });
+
+    if (counts === USAGE_UNKNOWN) {
+      logger.warn(
+        { organizationId, crossedThreshold },
+        "usage is unknown, skipping usage-limit email rather than reporting zeros",
+      );
+
+      return null;
+    }
+
+    const countsMap = new Map(counts.map((count) => [count.projectId, count.count]));
+
+    return projects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      messageCount: countsMap.get(project.id) ?? 0,
+    }));
+  }
+
+  /**
+   * Sends to every deliverable admin and records that it happened.
+   *
+   * Throws when not one email got through, so the caller's retry can have
+   * another go — recording a notification nobody received would suppress the
+   * warning for the rest of the month.
+   */
+  private async sendAndRecord({
+    organizationId,
+    organizationName,
+    deliverableAdmins,
+    emailContext,
+    currentMonthMessagesCount,
+    maxMonthlyUsageLimit,
+    usagePercentage,
+    crossedThreshold,
+  }: {
+    organizationId: string;
+    organizationName: string;
+    deliverableAdmins: Array<{ user: { id: string; name: string | null; email: string | null } }>;
+    emailContext: ReturnType<UsageLimitService["buildEmailContext"]>;
+    currentMonthMessagesCount: number;
+    maxMonthlyUsageLimit: number;
+    usagePercentage: number;
+    crossedThreshold: number;
+  }): Promise<Notification> {
     try {
       const { recipientsSuccessCount, recipientsFailureCount, failedRecipients } =
         await this.dispatchEmails({
           organizationId,
-          organizationName: organization.name,
+          organizationName,
           deliverableAdmins,
           emailContext,
         });
@@ -560,9 +615,7 @@ export class UsageLimitService {
           },
           "All usage limit warning emails failed to send, aborting notification creation to allow retries",
         );
-        throw new Error(
-          `All ${recipientsFailureCount} usage limit warning emails failed to send`,
-        );
+        throw new Error(`All ${recipientsFailureCount} usage limit warning emails failed to send`);
       }
 
       const notification = await this.recordNotification({
@@ -593,10 +646,7 @@ export class UsageLimitService {
 
       return notification;
     } catch (error) {
-      logger.error(
-        { error, organizationId },
-        "Error sending usage limit warning notifications",
-      );
+      logger.error({ error, organizationId }, "Error sending usage limit warning notifications");
       throw error;
     }
   }
@@ -752,7 +802,7 @@ export class UsageLimitService {
     recipientsSuccessCount: number;
     recipientsFailureCount: number;
     failedRecipients: Array<{ userId: string; error: string }>;
-  }) {
+  }): Promise<Notification> {
     return this.notificationRecords.create({
       organizationId,
       sentAt: new Date(),
