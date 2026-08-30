@@ -145,14 +145,18 @@ export class AnomalyDetectorService {
   }): Anomaly {
     const sustainMinutes =
       input.tier === "hard" ? HARD_TIER_SUSTAIN_MINUTES : SURFACE_TIER_SUSTAIN_MINUTES;
+    const currentRate = Math.round(input.rate);
+    const baseline = Math.round(input.baseline);
+    const overBaseline = Math.round(input.rate / input.baseline);
+
     return {
       tenantId: input.tenantId,
       kind: "rate_breaker",
       tier: input.tier,
-      currentRate: Math.round(input.rate),
-      baseline: Math.round(input.baseline),
+      currentRate,
+      baseline,
       triggeredAt: input.existing?.triggeredAt ?? Date.now(),
-      reason: `rate ${Math.round(input.rate)}/min is ${Math.round(input.rate / input.baseline)}× baseline ${Math.round(input.baseline)}/min sustained ${sustainMinutes}min`,
+      reason: `rate ${currentRate}/min is ${overBaseline}× baseline ${baseline}/min sustained ${sustainMinutes}min`,
     };
   }
 
