@@ -75,6 +75,33 @@ export function hasCriteria(scenarioState: {
 }
 
 /**
+ * True once the judge has spoken: criteria, a verdict, a reasoning or an error.
+ *
+ * A verdict is a verdict with no criteria under it. A scripted run, such as the
+ * ping an agent test sends, is judged by its script and answers with a verdict
+ * and a reasoning alone. The pending line and the reread both read this, so a
+ * scripted run stops asking for results it already holds.
+ */
+export function hasVerdict(scenarioState: {
+  results?: {
+    metCriteria?: string[] | null;
+    unmetCriteria?: string[] | null;
+    error?: unknown;
+    verdict?: unknown;
+    reasoning?: unknown;
+  } | null;
+}): boolean {
+  const results = scenarioState.results;
+  if (!results) return false;
+  return (
+    hasCriteria(scenarioState) ||
+    Boolean(results.error) ||
+    Boolean(results.verdict) ||
+    Boolean(results.reasoning)
+  );
+}
+
+/**
  * How long to wait before each reread of a settled run. The list also sets
  * how many rereads there are: once it runs out, the drawer stops asking.
  */
@@ -104,7 +131,7 @@ function useRereadOnSettled({
   const isSettledWithoutResults =
     !!scenarioState &&
     isTerminalStatus(scenarioState.status) &&
-    !hasCriteria(scenarioState as Parameters<typeof hasCriteria>[0]);
+    !hasVerdict(scenarioState as Parameters<typeof hasVerdict>[0]);
 
   const [rereadCount, setRereadCount] = useState(0);
 
@@ -210,7 +237,11 @@ function useDrawerDetail({
   const { project } = useOrganizationTeamProject();
   const params = useDrawerParams();
   const targetNameMap = useTargetNameMap();
-  const isQueued = open && !detail.scenarioState && !detail.runStateError;
+  // NOT_FOUND is the ordinary answer while a run is queued, since the record
+  // is written after the job goes out. Only a read that truly failed stops
+  // the stand-in.
+  const isQueued =
+    open && !detail.scenarioState && !isHardReadError(detail.runStateError);
 
   const { data: queuedScenario } =
     api.scenarios.getByIdIncludingArchived.useQuery(

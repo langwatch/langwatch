@@ -205,7 +205,7 @@ Feature: The wide run detail drawer
   @integration
   Scenario: A queued run draws the whole drawer
     Given a run opened from the scenario table the moment it is queued
-    When the drawer opens before the run is written down
+    When the drawer opens
     Then the header, the two columns and the borders read as they do on a running run
     And a spinner beside the word Queued stands where the messages will be
     And the results side says it waits for the run to start

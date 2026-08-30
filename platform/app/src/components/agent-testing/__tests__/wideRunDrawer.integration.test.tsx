@@ -623,6 +623,23 @@ describe("the wide run detail drawer", () => {
     );
   });
 
+  /** @scenario "A queued run reads the whole drawer with a spinner" */
+  it("draws the stand-in once the read answers that no run exists yet", () => {
+    // The record is written after the job goes out, so the first read of a
+    // queued run answers NOT_FOUND. That is the ordinary case rather than a
+    // failure, and the drawer must still draw the queued run.
+    setRunState(undefined, { data: { code: "NOT_FOUND" } });
+    renderWide();
+
+    expect(screen.getByTestId("wide-drawer-queued")).toHaveTextContent(
+      "Queued",
+    );
+    expect(screen.getByTestId("wide-drawer-side-by-side")).toBeInTheDocument();
+    expect(screen.getByTestId("run-verdict-pending")).toHaveTextContent(
+      "Waiting for the run to start",
+    );
+  });
+
   /** @scenario "The criteria appear the moment the run settles" */
   it("reads the stored run again when the run settles without criteria", () => {
     vi.useFakeTimers();
@@ -643,6 +660,36 @@ describe("the wide run detail drawer", () => {
       expect(mockInvalidateRunState).toHaveBeenCalledWith({
         scenarioRunId: "run_1",
       });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  /** @scenario "The criteria appear the moment the run settles" */
+  it("stops reading again once a scripted run answers with a verdict", () => {
+    vi.useFakeTimers();
+    try {
+      // A scripted run, such as the ping an agent test sends, is judged by
+      // its script and answers with a verdict and a reasoning and no criteria
+      // at all. Its results are there, so there is nothing to wait for.
+      setRunState(
+        makeRunState({
+          status: ScenarioRunStatus.SUCCESS,
+          results: {
+            verdict: Verdict.SUCCESS,
+            reasoning: "The agent answered the ping.",
+            metCriteria: [],
+            unmetCriteria: [],
+          },
+        }),
+      );
+      renderWide();
+
+      act(() => {
+        vi.advanceTimersByTime(10_000);
+      });
+
+      expect(mockInvalidateRunState).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }

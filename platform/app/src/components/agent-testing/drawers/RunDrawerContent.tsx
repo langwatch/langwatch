@@ -36,7 +36,7 @@ import {
 } from "~/server/scenarios/scenario-event.enums";
 import { RunVerdictPanel } from "./RunVerdictPanel";
 import {
-  hasCriteria,
+  hasVerdict,
   type RunDetail,
   type RunScenarioState,
 } from "./useRunDrawerState";
@@ -239,18 +239,6 @@ function pendingMessageFor(scenarioState: RunScenarioState): string | null {
   return JUDGED_STATUSES.has(scenarioState.status)
     ? JUDGE_READING_MESSAGE
     : null;
-}
-
-/** True once the judge has spoken: criteria, a verdict, a reasoning or an error. */
-function hasVerdict(scenarioState: RunScenarioState): boolean {
-  const results = scenarioState.results;
-  if (!results) return false;
-  return (
-    hasCriteria(scenarioState) ||
-    Boolean(results.error) ||
-    Boolean(results.verdict) ||
-    Boolean(results.reasoning)
-  );
 }
 
 /**

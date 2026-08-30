@@ -733,42 +733,52 @@ describe("classifyScenarioInfraError session cap", () => {
 });
 
 describe("scenarioErrorDetail", () => {
-  /** @scenario "The stack of a run failure is kept as the detail" */
-  it("answers with the stack the runner recorded", () => {
-    const stack =
-      "Error: boom\n    at ScenarioExecution.callAgent (/app/dist/index.js:1:1)";
-    const detail = scenarioErrorDetail(
-      JSON.stringify({ name: "Error", message: "boom", stack }),
-    );
-    expect(detail).toBe(stack);
-    expect(detail).toContain("\n");
+  describe("when the runner recorded a stack", () => {
+    /** @scenario "The stack of a run failure is kept as the detail" */
+    it("answers with the stack the runner recorded", () => {
+      const stack =
+        "Error: boom\n    at ScenarioExecution.callAgent (/app/dist/index.js:1:1)";
+      const detail = scenarioErrorDetail(
+        JSON.stringify({ name: "Error", message: "boom", stack }),
+      );
+      expect(detail).toBe(stack);
+      expect(detail).toContain("\n");
+    });
   });
 
-  it("falls back to the message when the runner recorded no stack", () => {
-    expect(
-      scenarioErrorDetail(JSON.stringify({ name: "Error", message: "boom" })),
-    ).toBe("boom");
+  describe("when the runner recorded no stack", () => {
+    it("falls back to the message", () => {
+      expect(
+        scenarioErrorDetail(JSON.stringify({ name: "Error", message: "boom" })),
+      ).toBe("boom");
+    });
   });
 
-  /** @scenario "An envelope we wrote ourselves carries no detail" */
-  it("answers with nothing for an envelope of ours", () => {
-    const encoded = encodeScenarioError(
-      classifyScenarioInfraError(
-        "self-signed certificate in certificate chain",
-      ),
-    );
-    expect(scenarioErrorDetail(encoded)).toBeUndefined();
+  describe("when the error is an envelope we wrote ourselves", () => {
+    /** @scenario "An envelope we wrote ourselves carries no detail" */
+    it("answers with nothing", () => {
+      const encoded = encodeScenarioError(
+        classifyScenarioInfraError(
+          "self-signed certificate in certificate chain",
+        ),
+      );
+      expect(scenarioErrorDetail(encoded)).toBeUndefined();
+    });
   });
 
-  it("answers with nothing when there is no error at all", () => {
-    expect(scenarioErrorDetail("")).toBeUndefined();
-    expect(scenarioErrorDetail(null)).toBeUndefined();
+  describe("when there is no error at all", () => {
+    it("answers with nothing", () => {
+      expect(scenarioErrorDetail("")).toBeUndefined();
+      expect(scenarioErrorDetail(null)).toBeUndefined();
+    });
   });
 
-  it("keeps a plain sentence as it is", () => {
-    expect(scenarioErrorDetail("Child process exited with code 1")).toBe(
-      "Child process exited with code 1",
-    );
+  describe("when the error is a plain sentence", () => {
+    it("keeps it as it is", () => {
+      expect(scenarioErrorDetail("Child process exited with code 1")).toBe(
+        "Child process exited with code 1",
+      );
+    });
   });
 });
 
