@@ -108,7 +108,7 @@ export function RunParametersSection({
           Parameters
           <FieldInfoTooltip
             description={PARAMETERS_HELP}
-            docHref="/agent-simulations/scenario-parameters"
+            docHref="/agent-testing/run-parameters"
             docLabel="How to annotate an agent"
             trigger="hover"
             testId="run-parameters-info"

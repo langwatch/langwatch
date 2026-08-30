@@ -331,7 +331,7 @@ const registry = {
       "Check the name, which is case sensitive",
       "An entry is gone once its lifetime passes; store it again with a longer one if the run needs it for longer",
     ],
-    docsPath: "/agent-simulations/authenticated-agents",
+    docsPath: "/agent-testing/authenticated-agents",
   },
 
   // ---- connected agents ----

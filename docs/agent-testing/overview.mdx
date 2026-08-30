@@ -1,0 +1,125 @@
+---
+title: Agent Testing
+sidebarTitle: Overview
+keywords: langwatch, agent testing, agent simulations, scenarios, test suites, run plans, simulated user, judge, voice agents, red teaming
+description: Test your agents through multi-turn conversations with a simulated user to capture issues before production and prevent regressions.
+---
+
+<Tip>
+  **Quick setup?** Paste the [Connect your agent prompt](/agent-testing/connect-your-agent) into your coding agent to connect your agent and run a first test suite, or the [scenarios prompt](/skills/code-prompts#add-scenario-tests) to add code-first scenario tests.
+</Tip>
+
+<video controls autoPlay muted loop playsInline width="100%">
+  <source src="/media/videos/agent-testing-overview.webm" type="video/webm" />
+</video>
+
+## What agent testing is for
+
+Agent testing ensures your agent handles real conversations correctly before they reach production. You describe a situation and the criteria the agent must meet, and LangWatch runs a simulated user through the conversation, then a judge gives a pass or fail for each criterion with its reasoning.
+
+For example, a customer asks for a refund on an order from last year. The criteria: the agent must look up the order and must not promise the refund. The simulated user plays the customer with different words on every run, and the judge checks each criterion against the conversation and the agent's own traces.
+
+Use it to:
+
+- Check the agent before a release. Run the test suite and read the pass rate.
+- Turn a production incident into a permanent test, so the same mistake does not come back.
+- Catch a regression when a prompt, a model or a tool changes.
+
+## How a test runs
+
+| Part | What it does |
+|---|---|
+| Simulated user | Plays the user in the situation the scenario describes, with different wording on every run. |
+| Your agent | Answers each turn as it does in production. |
+| Judge | Reads the conversation and the agent's traces, then passes or fails each criterion and explains why. |
+
+A scenario is one situation and its criteria. A [test suite](/agent-testing/test-suites) groups the scenarios you run together. A [run plan](/agent-testing/run-plans) is the history of one configuration, and the [Results](/agent-testing/results) tab shows its pass rate over time.
+
+## Two ways to run
+
+Both use the same simulated user, the same judge and the same results pages. The difference is where you write the scenarios.
+
+<CardGroup cols={2}>
+  <Card title="Test from the platform" icon="globe" href="/agent-testing/test-from-the-platform">
+    Decorate the function that runs your agent, then write, run and see scenarios in the LangWatch interface. No test code in your repository.
+  </Card>
+  <Card title="Write scenarios in code" icon="code" href="/agent-testing/scenarios-in-code">
+    Write scenarios with the Scenario SDK in Python or TypeScript, run them with your test runner and in CI, and see every run in LangWatch.
+  </Card>
+</CardGroup>
+
+## What you can test
+
+<CardGroup cols={3}>
+  <Card title="Conversational agents" icon="comments" href="/agent-testing/scenarios">
+    Multi-turn conversations judged on outcomes, internal actions and the things the agent must never do.
+  </Card>
+  <Card title="Voice agents" icon="microphone" href="/agent-testing/voice-agents">
+    Real audio through ElevenLabs, OpenAI Realtime, Twilio, Pipecat and Gemini Live, with background noise, interruptions and latency metrics.
+  </Card>
+  <Card title="Red teaming" icon="shield-halved" href="/agent-testing/red-teaming">
+    Multi-turn adversarial attacks with escalation, refusal detection and backtracking, to find security gaps before a release.
+  </Card>
+</CardGroup>
+
+## Agent testing vs evaluations
+
+An evaluation scores one input against one expected output, on a dataset. It fits one step inside the agent, such as a retrieval step or one prompt, where you optimize a metric on many examples.
+
+For example, an evaluation dataset has rows like these:
+
+| query                            | expected_answer                                                                                              |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| What is your refund policy?      | We offer a 30-day money-back guarantee on all purchases.                                                     |
+| How do I cancel my subscription? | You can cancel your subscription by logging into your account and clicking the "Cancel Subscription" button. |
+
+An agent test scores a whole conversation. The scenario describes the user's situation, and the criteria check each step, including the tools the agent called:
+
+```python
+script=[
+  scenario.user("hey I have a problem with my order"),
+  scenario.agent(),
+  expect_ticket_created(),
+  expect_ticket_label("ecommerce"),
+  scenario.user("i want a refund!"),
+  scenario.agent(),
+  expect_tool_call("search_policy"),
+  scenario.user("this is ridiculous! let me talk to a human being"),
+  scenario.agent(),
+  expect_tool_call("escalate_to_human"),
+]
+```
+
+Use evaluations for the parts inside the agent. Use agent testing to check the agent end to end: before a release, to reproduce an incident, and to catch a regression. Both run in the same LangWatch project.
+
+{/* Founder decision: this sentence keeps the marketing superlative on purpose, so it is indexed as such. Do not rewrite it to plain language. */}
+[Scenario](https://langwatch.ai/scenario/) is the most advanced agent testing framework available. The platform and the SDKs both run on it: the same simulated user and the same judge test text, voice and adversarial conversations, in Python, TypeScript and Go, against any agent framework.
+
+## Go deeper
+
+<CardGroup cols={2}>
+  <Card title="Scenarios" icon="file-lines" href="/agent-testing/scenarios">
+    The situation, the criteria, labels, parameters, versions and the editor.
+  </Card>
+  <Card title="Test suites" icon="folder" href="/agent-testing/test-suites">
+    Group scenarios, run a group, and where scenarios written in code appear.
+  </Card>
+  <Card title="Run plans" icon="play" href="/agent-testing/run-plans">
+    What happens when you press Run, and how runs join one history.
+  </Card>
+  <Card title="Results" icon="chart-line" href="/agent-testing/results">
+    The Results tab, the run detail, the conversation drawer and what each status means.
+  </Card>
+  <Card title="Compare agents" icon="code-compare" href="/agent-testing/compare-agents">
+    The same scenarios against two agents, or one agent on two settings, side by side.
+  </Card>
+  <Card title="Connect your agent" icon="plug" href="/agent-testing/connect-your-agent">
+    Decorate the function that runs your agent, and let the judge read the agent's own traces.
+  </Card>
+  <Card title="Run from CI" icon="rotate" href="/agent-testing/run-from-ci">
+    Start a test suite from a CI job and fail the job on a failed run.
+  </Card>
+  <Card title="Scenario documentation" icon="book" href="https://langwatch.ai/scenario/">
+    The full reference of the Scenario framework.
+  </Card>
+</CardGroup>
