@@ -34,6 +34,7 @@ import {
   discoverFeatureFiles,
   isEntryModule,
   isInert,
+  isPartiallyTagged,
 } from "../check-feature-parity";
 
 let root = "";
@@ -288,6 +289,65 @@ describe("isInert", () => {
       it("does not report the file as inert", () => {
         // Nothing was claimed, so nothing is being overclaimed.
         expect(isInert({ scenarios: [], totalScenarios: 0 })).toBe(false);
+      });
+    });
+  });
+});
+
+describe("isPartiallyTagged", () => {
+  const enforcedScenario = {
+    title: "t",
+    tags: ["@unit"],
+    line: 1,
+    bindings: [],
+  };
+
+  describe("given a file with enforced scenarios and untagged ones alongside", () => {
+    describe("when the floor is applied", () => {
+      it("reports the file as partially tagged", () => {
+        // This is the `15/15 bound` lie on a file holding 27 scenarios:
+        // the 12 untagged ones are invisible to the bound count.
+        expect(
+          isPartiallyTagged({
+            scenarios: [enforcedScenario],
+            untaggedScenarios: 12,
+          }),
+        ).toBe(true);
+      });
+    });
+  });
+
+  describe("given a file whose scenarios are all untagged", () => {
+    describe("when the floor is applied", () => {
+      it("leaves the file to the inert floor instead", () => {
+        // Inert and partial must not overlap: one file, one list, one fix.
+        expect(
+          isPartiallyTagged({ scenarios: [], untaggedScenarios: 20 }),
+        ).toBe(false);
+        expect(isInert({ scenarios: [], totalScenarios: 20 })).toBe(true);
+      });
+    });
+  });
+
+  describe("given a fully tagged file", () => {
+    describe("when the floor is applied", () => {
+      it("does not report the file as partially tagged", () => {
+        expect(
+          isPartiallyTagged({
+            scenarios: [enforcedScenario],
+            untaggedScenarios: 0,
+          }),
+        ).toBe(false);
+      });
+    });
+  });
+
+  describe("given a file that declares no scenarios at all", () => {
+    describe("when the floor is applied", () => {
+      it("does not report the file as partially tagged", () => {
+        expect(isPartiallyTagged({ scenarios: [], untaggedScenarios: 0 })).toBe(
+          false,
+        );
       });
     });
   });

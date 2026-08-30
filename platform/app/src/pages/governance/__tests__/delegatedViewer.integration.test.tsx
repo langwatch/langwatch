@@ -218,6 +218,7 @@ describe("governance pages for a delegated viewer", () => {
     });
 
     /** @scenario "The overview names the grant a refused panel needs" */
+    /** @scenario "Top-level /governance renders the dashboard" */
     it("names activityMonitor:view on the overview and still renders the rest", () => {
       renderPage({ Page: GovernanceOverviewPage });
 
