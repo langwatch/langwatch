@@ -25,11 +25,12 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ### Connect your agent
 
-- [Connect Your Agent](https://langwatch.ai/docs/agent-simulations/connect-your-agent.md): Register your agent's HTTP endpoint as a simulation target, so your team runs scenario suites from the platform and the judge verifies behavior against the agent's own traces.
-- [Linking Your Traces](https://langwatch.ai/docs/agent-simulations/remote-traces.md): Judge scenario criteria against what your agent did, tool calls, writes and retrievals, read from its own traces rather than from its reply text.
-- [Local Development](https://langwatch.ai/docs/agent-simulations/local-development.md): Run platform test suites against the agent on your machine, edit the code, and run them again, with no deployment in between.
+- [Connect Your Agent](https://langwatch.ai/docs/agent-simulations/connect-your-agent.md): Decorate the function that runs your agent and start the process. The agent registers itself as a simulation target, and scenario suites run against your real code.
+- [Environments and Personal Agents](https://langwatch.ai/docs/agent-simulations/environments.md): One agent name, one row per environment. Your machine, staging and production are separate targets that a single run compares.
 - [Scenario Run Parameters](https://langwatch.ai/docs/agent-simulations/scenario-parameters.md): Run the same scenario with different parameters, to set different setup conditions or fixtures for your agent.
+- [Linking Your Traces](https://langwatch.ai/docs/agent-simulations/remote-traces.md): Judge scenario criteria against what your agent did, tool calls, writes and retrievals, read from its own traces rather than from its reply text.
 - [Testing Agents Behind Authentication](https://langwatch.ai/docs/agent-simulations/authenticated-agents.md): Reference project secrets from an HTTP target, and connect an API protected by OAuth2 client-credentials (Auth0 machine-to-machine) to LangWatch simulations using a custom code agent.
+- [Other Ways to Connect](https://langwatch.ai/docs/agent-simulations/other-ways-to-connect.md): Register an agent by its HTTP endpoint, front a local process with a tunnel, or run a small piece of Python as the target, when the SDK cannot run inside your agent.
 
 - [Testing Your Agent](https://langwatch.ai/docs/agent-simulations/testing-your-agent.md): Create scenarios, run them against your agent, and read the results, all from the LangWatch interface. Written for product managers and domain experts, no code involved.
 - [Write Scenarios in Code](https://langwatch.ai/docs/agent-simulations/getting-started.md)
@@ -189,6 +190,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Python Integration Guide](https://langwatch.ai/docs/integration/python/guide.md): Follow the LangWatch Python integration guide to capture traces, debug pipelines, and enable observability for agent testing.
 - [Python SDK API Reference](https://langwatch.ai/docs/integration/python/reference.md): Use the LangWatch Python SDK API reference to implement tracing, events, and evaluation logic for AI agent testing workflows.
+- [Python Connected Agent Reference](https://langwatch.ai/docs/integration/python/agent-reference.md): API reference for langwatch.connect_agent, the decorator that makes a Python function a LangWatch simulation target, with its options, turn fields, parameter reflection and reply types.
 - [Manual Instrumentation](https://langwatch.ai/docs/integration/python/tutorials/manual-instrumentation.md): Learn manual instrumentation with the LangWatch Python SDK for full control over tracing, evaluations, and agent testing.
 - [OpenTelemetry Migration](https://langwatch.ai/docs/integration/python/tutorials/open-telemetry.md): Integrate LangWatch with existing OpenTelemetry setups to enhance tracing, analysis, and agent evaluation workflows.
 
@@ -196,6 +198,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [TypeScript Integration Guide](https://langwatch.ai/docs/integration/typescript/guide.md): Get started with the LangWatch TypeScript SDK to trace LLM calls, track tokens, and prepare data for AI agent testing.
 - [TypeScript SDK API Reference](https://langwatch.ai/docs/integration/typescript/reference.md): Access the LangWatch TypeScript SDK reference to instrument LLMs, capture traces, and support AI agent testing workflows.
+- [TypeScript Connected Agent Reference](https://langwatch.ai/docs/integration/typescript/agent-reference.md): API reference for connectAgent from langwatch/agent, the wrapper that makes a Node handler a LangWatch simulation target, with its options, turn fields, parameter definitions and reply types.
 - [Filtering Spans in TypeScript](https://langwatch.ai/docs/integration/typescript/tutorials/filtering-spans.md): Filter which spans are exported to LangWatch using presets or explicit criteria.
 - [Manual Instrumentation](https://langwatch.ai/docs/integration/typescript/tutorials/manual-instrumentation.md): Use LangWatch TypeScript manual instrumentation for fine-grained tracing control during AI agent testing.
 - [OpenTelemetry Migration](https://langwatch.ai/docs/integration/typescript/tutorials/opentelemetry-migration.md): Migrate from OpenTelemetry to LangWatch while preserving custom tracing to support more advanced AI agent testing.

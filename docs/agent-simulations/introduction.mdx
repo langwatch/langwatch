@@ -5,7 +5,7 @@ keywords: langwatch, agent simulations, agent testing, agent development, voice 
 ---
 
 <Tip>
-  **Quick setup?** Paste the [Connect your agent prompt](/agent-simulations/connect-your-agent) into your coding agent to connect your agent's HTTP endpoint and run a first test suite, or the [scenarios prompt](/skills/code-prompts#add-scenario-tests) to add code-first simulation tests.
+  **Quick setup?** Paste the [Connect your agent prompt](/agent-simulations/connect-your-agent) into your coding agent to connect your agent and run a first test suite, or the [scenarios prompt](/skills/code-prompts#add-scenario-tests) to add code-first simulation tests.
 </Tip>
 
 # What are Agent Simulations?
@@ -22,7 +22,7 @@ Both share the same simulated user, the same judge, and the same results pages. 
 
 <CardGroup cols={2}>
   <Card title="Run from the platform" icon="globe" href="/agent-simulations/connect-your-agent">
-    Connect your agent over HTTP and run test suites from the platform. Product people create, edit and run the tests, and the judge reads your agent's own traces. No test code in your repository.
+    Decorate the function that runs your agent, and run test suites from the platform. Product people create, edit and run the tests, and the judge reads your agent's own traces. No test code in your repository.
   </Card>
   <Card title="Write scenarios in code" icon="code" href="/agent-simulations/getting-started">
     Write scenarios with the Scenario SDK in Python or TypeScript, run them with your test runner and in CI, and see every run in LangWatch.
@@ -139,7 +139,7 @@ See [the LangWatch Simulations visualizer](https://langwatch.ai/scenario/visuali
 
 ## Next Steps
 
-- [Connect your agent](/agent-simulations/connect-your-agent) - Run test suites from the platform against your agent's HTTP endpoint
+- [Connect your agent](/agent-simulations/connect-your-agent) - Run test suites from the platform against the process that runs your agent
 - [Write scenarios in code](/agent-simulations/getting-started) - Set up your first code-first simulation
 - [Linking your traces](/agent-simulations/remote-traces) - How the judge reads your agent's traces
 - [Voice Agents](/agent-simulations/voice-agents) - Test voice agents end-to-end over real audio

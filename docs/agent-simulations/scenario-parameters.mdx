@@ -7,7 +7,7 @@ description: Run the same scenario with different parameters, to set different s
 
 ## What are Run Parameters
 
-A run parameter is a named value that a scenario receives when a run starts. The scenario declares the parameter, with an optional default value. The scenario text and the target configuration read it as `{{ params.NAME }}`. You supply the values when you start the run, from the platform, the API, the CLI or an SDK.
+A run parameter is a named value that a run supplies. Two things declare parameters: a **scenario**, so its text and its criteria read the value, and a **connected agent**, so the code under test receives it. The scenario text and the target configuration read a value as `{{ params.NAME }}`. You supply the values when you start the run, from the platform, the API, the CLI or an SDK.
 
 For example, a scenario that tests subscription cancellation can declare a `plan` parameter, so one scenario covers each plan's policy:
 
@@ -54,6 +54,72 @@ A scenario can declare up to 20 parameters.
 
 The API accepts the same declarations: `POST /api/scenarios` and `PATCH /api/scenarios/{id}` take a `parameters` array of `{ name, description, defaultValue, secret }` objects.
 
+## Parameters declared by the agent
+
+A [connected agent](/agent-simulations/connect-your-agent) declares its parameters in the code, from the function that runs it. The platform reads them when the agent connects, so the declaration is the code and no second copy needs to be kept in step by hand.
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    from typing import Literal
+    import langwatch
+
+    @langwatch.connect_agent(name="support-agent")
+    async def support_agent(
+        messages: list[dict],
+        *,
+        model: Literal["gpt-5", "gpt-5-mini"] = "gpt-5-mini",
+        plan: str = "free",
+        max_tools: int = 5,
+    ) -> str:
+        ...
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    export const supportAgent = connectAgent(
+      {
+        name: "support-agent",
+        parameters: {
+          model: { options: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" },
+          plan: { default: "free", description: "Customer plan" },
+          maxTools: { type: "number", default: 5 },
+        },
+      },
+      async ({ messages, params }) => runMyAgent(messages, { model: params.model }),
+    );
+    ```
+  </Tab>
+</Tabs>
+
+An agent declaration carries the same fields a scenario declaration does, plus two the code makes available:
+
+- **`type`**, one of `string`, `number` or `boolean`. It comes from the annotation in Python and from `type` in the TypeScript definition map. The value reaches the run with that type, so a string parameter keeps `007` as text instead of turning it into the number 7.
+- **`options`**, a closed list of allowed values, up to 50. It comes from `Literal` or an `Enum` in Python and from `options` in TypeScript.
+
+An agent declares up to 20 parameters. A type the platform cannot map is offered as text, and the SDK logs which parameter that happened to.
+
+### How the run dialog offers them
+
+The parameter fields in the run dialog read every declaration in scope: the scenarios of the run, and the agent behind each target.
+
+- The key field suggests every declared name, with its description, its default and where it was declared.
+- The value field offers the options when the parameter has a closed list, and the default otherwise.
+- Free text always commits. The server refuses what is invalid when the run starts.
+- The compare rows offer the selected agent's own options, so running one agent on two models is two choices from a list.
+
+### Names are checked per target
+
+A run with two targets checks each name against the scenarios of the run plus that target's own agent. A name the new agent declares and the old one does not is accepted for the new target and refused for the old one, with the target named in the message. That keeps a comparison run from failing as a whole because one side does not know a parameter yet.
+
+### A value outside the options is refused
+
+A value that is not in a closed list is refused before anything is scheduled, with `scenario_parameter_option_invalid`. The message names the parameter and lists the accepted values.
+
+A parameter with no default that the run does not supply is refused too, with the name in the message. A parameter the run does not supply and that has a default takes the default.
+
+Secret parameters stay scenario-declared. An agent does not declare a secret parameter, because a credential belongs to the project's secret store rather than to a function signature.
+
 ## Use the values in the scenario text
 
 The situation and the criteria read a value as `{{ params.NAME }}`, as in the example above. Both render before the run starts, so the simulated user acts on the value and the judge scores against the same value.
@@ -64,10 +130,21 @@ A scenario with no declared parameters is not a template. Its text does not rend
 
 | Target | Reads a value as |
 |---|---|
+| **Connected agent** | A keyword argument of the decorated function (Python), or a field of `params` (TypeScript) |
 | **HTTP agent** | `{{ params.NAME }}` in the URL, the header values and the body template |
 | **Prompt** | `{{ params.NAME }}` in the prompt template |
 | **Code agent** | `params.NAME` in the Python code |
 | **Workflow** | One entry input per parameter |
+
+### Connected agents
+
+The function receives the values the run supplied, with the type it declared. A parameter the run did not supply arrives as its default, so the function signature is complete on its own and a plain call from a unit test needs no parameters at all.
+
+```python
+@langwatch.connect_agent(name="support-agent")
+async def support_agent(messages: list[dict], *, region: str = "eu-central") -> str:
+    return await run_my_agent(messages, region=region)
+```
 
 ### HTTP agents
 
@@ -261,6 +338,8 @@ Also check: [Testing agents behind authentication](/agent-simulations/authentica
 | Limit | Value |
 |---|---|
 | Parameters declared on one scenario | 20 |
+| Parameters declared by one agent | 20 |
+| Options in one closed list | 50 |
 | Names one run supplies values for | 50 |
 | All of a run's values together | 16 kilobytes |
 | One string value | 4096 characters |
@@ -271,7 +350,8 @@ Also check: [Testing agents behind authentication](/agent-simulations/authentica
 
 | Error | What happened | What to do |
 |---|---|---|
-| `scenario_parameter_unknown` | The run set a name that no scenario in the run declares, usually a spelling error. The message lists the rejected key and the accepted names. | Correct the spelling, or declare the parameter on the scenario that reads it. |
+| `scenario_parameter_unknown` | The run set a name that neither a scenario in the run nor the target's agent declares, usually a spelling error. The message lists the rejected key, the target it was rejected for, and the accepted names. | Correct the spelling, or declare the parameter on the scenario or on the agent that reads it. |
+| `scenario_parameter_option_invalid` | A value is outside the closed option list its declaration carries. The message names the parameter and lists the accepted values. | Use one of the listed values, or widen the option list where it is declared. |
 | `scenario_parameter_missing` | The situation or a criterion reads a name with no value: the run set none and the scenario has no default. The message names the parameter and the field. | Set a value for the run, or give the parameter a default. |
 | `scenario_parameter_template_invalid` | A field references a parameter in a form that cannot be rendered. | Write the reference as `{{ params.name }}`. |
 | `scenario_secret_parameter_missing` | A scenario declares a secret parameter and the run set no value for it. A secret has no default, so the run cannot fall back. | Set the value when you start the run. |

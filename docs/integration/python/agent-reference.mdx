@@ -1,0 +1,159 @@
+---
+title: Python Connected Agent Reference
+sidebarTitle: Agent reference
+description: API reference for langwatch.connect_agent, the decorator that makes a Python function a LangWatch simulation target, with its options, turn fields, parameter reflection and reply types.
+keywords: langwatch, python, sdk, api, reference, connect_agent, agent simulations, connected agent, run parameters
+icon: terminal
+---
+
+## `@langwatch.connect_agent()`
+
+Registers the decorated function as a simulation target. The SDK opens one outbound connection per process, registers the agent with its name, its environment and the parameters read from the signature, and calls the function once per conversation turn.
+
+```python
+import langwatch
+
+@langwatch.connect_agent(name="support-agent")
+async def support_agent(messages: list[dict], thread_id: str) -> str:
+    return await run_my_agent(messages)
+```
+
+The function keeps working as a plain function. A direct call runs the body and touches no connection.
+
+The process connects only with an API key. The SDK reads `LANGWATCH_API_KEY` from the environment, logs one line when it is absent, and lets the process run.
+
+### Options
+
+| Option | Type | Default | Effect |
+|---|---|---|---|
+| `name` | `str` | required | The agent's name, and the first half of a `connected:<name>@<environment>` target. |
+| `environment` | `str \| None` | resolved, see below | The environment row this process registers under. |
+| `description` | `str \| None` | `None` | One line about the agent, shown on the agents page. |
+| `parameters` | `dict \| None` | read from the signature | An explicit declaration that replaces signature reflection. |
+| `enabled` | `bool \| None` | `True`, `False` when `CI` is set | Whether this process connects. |
+| `instance_label` | `str \| None` | `None` | A name for this instance in the instances table. |
+| `timeout` | `float` | `120` | Seconds one call may take. The ceiling is `300`. |
+| `concurrency` | `int \| None` | `1` in `development`, `4` elsewhere | Calls this instance takes at the same time. |
+| `sticky` | `bool` | `False` | Keep every turn of one conversation on one instance. |
+| `api_key` | `str \| None` | `LANGWATCH_API_KEY` | The key the connection authenticates with. |
+| `endpoint` | `str \| None` | `LANGWATCH_ENDPOINT` | The LangWatch instance to connect to. |
+| `project_id` | `str \| None` | `None` | The project, for a key that covers more than one. |
+
+### Environment resolution
+
+`environment`, then `LANGWATCH_AGENT_ENVIRONMENT`, then `APP_ENV`, `ENVIRONMENT` and `NODE_ENV`, then `development`.
+
+`development` makes the agent personal: it belongs to the API key's owner when the key is personal, and to the machine when the key is a project key. Every other name is shared by the project. See [Environments and personal agents](/agent-simulations/environments).
+
+### Turn fields
+
+The platform sends the same fields on every call. The SDK reads the signature once, at decoration, and passes exactly the names the function declares. A function that declares `**kwargs` receives all of them.
+
+| Name | Type | Value |
+|---|---|---|
+| `messages` | `list[dict]` | The whole conversation so far, as OpenAI-style messages |
+| `new_messages` | `list[dict]` | The messages added since the previous turn |
+| `thread_id` | `str` | The platform's conversation id, the same on every turn of one run |
+| `session` | `Any \| None` | What the function returned as `session` on the previous turn |
+| `trace_id` | `str` | The id of the turn's trace |
+
+These names are never run parameters.
+
+### `langwatch.AgentCall`
+
+A function whose first parameter is annotated `langwatch.AgentCall` receives one object carrying every turn field plus `parameters`, instead of separate arguments.
+
+```python
+@langwatch.connect_agent(name="support-agent")
+async def support_agent(call: langwatch.AgentCall) -> str:
+    return await run_my_agent(call.messages, tenant=call.parameters["tenant"])
+```
+
+| Attribute | Value |
+|---|---|
+| `messages`, `new_messages`, `thread_id`, `session`, `trace_id` | The turn fields above |
+| `parameters` | A `dict` of the run's values for the declared parameters |
+
+### Run parameters
+
+Every parameter with a default that is not a turn field is a run parameter.
+
+| Read from | Gives |
+|---|---|
+| `str`, `int`, `float`, `bool` | The parameter's type |
+| `Literal[...]`, an `Enum` class | A closed list of options |
+| `Optional[T]` | The type, and a value that may be empty |
+| The default value | The default the run dialog prefills |
+| `Annotated[T, langwatch.Param(...)]` | A description, an options list, or a type |
+
+An annotation the SDK does not map falls back to that type's JSON schema and is offered as text.
+
+Values arrive validated against the declaration. A value the declaration refuses fails the call with `agent_parameter_invalid` before the function runs. A parameter the run did not supply arrives as its default; one with no default that the run did not supply fails the call with the name in the message.
+
+### `langwatch.Param()`
+
+Annotates one run parameter.
+
+| Argument | Type | Effect |
+|---|---|---|
+| `description` | `str` | Shown beside the field in the run dialog |
+| `options` | `list` | A closed list of allowed values, up to 50 |
+| `type` | `str` | Overrides the type read from the annotation |
+
+```python
+from typing import Annotated
+
+tenant: Annotated[str, langwatch.Param(description="Which tenant to answer for")] = "acme"
+```
+
+### Return values
+
+| Return | Meaning |
+|---|---|
+| `str` | The reply text |
+| `dict` | One message |
+| `list[dict]` | Several messages |
+| `langwatch.AgentReply(output, session=...)` | A reply plus the session value for the next turn |
+
+A generator is refused with a message saying that streaming is not supported.
+
+### `langwatch.AgentReply`
+
+| Field | Type | Value |
+|---|---|---|
+| `output` | `str \| dict \| list[dict]` | The reply |
+| `session` | `Any \| None` | An opaque JSON value the platform echoes on the next turn of the same conversation, up to 64 kilobytes |
+
+### `langwatch.agent.serve()`
+
+Blocks the calling thread while the connection runs, for a script whose only job is the agent. A web server does not need it: the connection runs on its own daemon thread.
+
+### Lifecycle
+
+The connection starts on first use, once per process, on a daemon thread with its own event loop. A fork restarts it in the child, so a preloading worker server keeps working. SIGINT, SIGTERM and normal exit send a deregistration, so the agent reads Offline at once. A dropped connection is retried with a growing wait, from 1 second to 30 seconds.
+
+### Environment variables
+
+| Variable | Effect |
+|---|---|
+| `LANGWATCH_API_KEY` | The project key. Without it, the process does not connect. |
+| `LANGWATCH_ENDPOINT` | The LangWatch instance, for a self-hosted deployment. |
+| `LANGWATCH_PROJECT_ID` | The project, for a key that covers more than one. |
+| `LANGWATCH_AGENT_ENVIRONMENT` | The environment to register under. |
+| `LANGWATCH_AGENT_CONNECT` | `0` or `false` stops this process from connecting. |
+| `LANGWATCH_AGENT_INSTANCE_LABEL` | The instance name shown in the instances table. |
+
+### Errors
+
+A failing call answers with a typed code rather than a stack trace. `agent_offline`, `agent_owner_only`, `agent_call_timeout`, `agent_call_failed`, `agent_disconnected`, `agent_instance_lost`, `agent_busy`, `agent_parameter_invalid`, `agent_register_refused`, `agent_payload_too_large`.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Connect your agent" icon="plug" href="/agent-simulations/connect-your-agent">
+    The three-step guide, with the session and parameter recipes
+  </Card>
+  <Card title="Python SDK reference" icon="terminal" href="/integration/python/reference">
+    Setup, tracing, spans and prompt management
+  </Card>
+</CardGroup>
