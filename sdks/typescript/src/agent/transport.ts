@@ -153,6 +153,15 @@ const POST_RETRY_DELAYS_MS = [250, 500, 1000];
  */
 const EMPTY_POLL_FLOOR_MS = 250;
 
+/**
+ * How long a close waits for the queued frames to go out before it drops them.
+ * A frames request has no deadline of its own, so a proxy that accepts the
+ * request and never answers would otherwise keep the socket from ever
+ * reporting its close, and the client that is waiting to open a replacement
+ * would wait with it.
+ */
+const CLOSE_DEADLINE_MS = 500;
+
 const describe = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms).unref());
@@ -182,6 +191,7 @@ export class HttpLongPollSocket implements SocketLike {
   private readonly pingListeners: Array<() => void> = [];
   private readonly inFlight = new Set<string>();
   private readonly polls = new AbortController();
+  private readonly frames = new AbortController();
   private outbox: Promise<void> = Promise.resolve();
   private token: string | null = null;
   private closed = false;
@@ -222,16 +232,30 @@ export class HttpLongPollSocket implements SocketLike {
       .catch(() => undefined);
   }
 
-  /** Stops polling, lets the frames already queued go out, then reports the close. */
+  /**
+   * Stops polling, lets the frames already queued go out, then reports the
+   * close. The wait is bounded: on the deadline the frame requests are aborted
+   * and the close is reported anyway, so a request that never answers cannot
+   * hold the connection open.
+   */
   close(code = 1000): void {
     this.closed = true;
     this.polls.abort();
-    void this.outbox.finally(() => this.emitClose(code));
+    const deadline = setTimeout(() => {
+      this.frames.abort();
+      this.emitClose(code);
+    }, CLOSE_DEADLINE_MS);
+    deadline.unref();
+    void this.outbox.finally(() => {
+      clearTimeout(deadline);
+      this.emitClose(code);
+    });
   }
 
   terminate(): void {
     this.closed = true;
     this.polls.abort();
+    this.frames.abort();
     this.emitClose(1006);
   }
 
@@ -347,14 +371,17 @@ export class HttpLongPollSocket implements SocketLike {
   private async post(data: string): Promise<void> {
     if (!this.token) return;
     for (let attempt = 0; ; attempt += 1) {
+      if (this.frames.signal.aborted) return;
       let response: Response | null = null;
       try {
         response = await this.fetchImpl(`${this.url}/frames`, {
           method: "POST",
           headers: this.requestHeaders(),
           body: `{"frames":[${data}]}`,
+          signal: this.frames.signal,
         });
       } catch {
+        if (this.frames.signal.aborted) return;
         response = null;
       }
       if (response?.ok) return;
@@ -385,6 +412,7 @@ export class HttpLongPollSocket implements SocketLike {
     for (const listener of this.errorListeners) listener(new Error(message));
     this.closed = true;
     this.polls.abort();
+    this.frames.abort();
     this.emitClose(code);
   }
 

@@ -48,7 +48,7 @@ function buildDocumentedApp() {
         { noPermission: { reason: "framework test endpoint" }, input: z.object({ value: z.number() }) },
         async (c) => c.json({ accepted: true }),
       );
-      // Reads its body by hand and documents it through docs.requestBody.
+      // No `input` schema: the body is documented through docs.requestBody.
       v.post(
         "/frames",
         {
@@ -59,7 +59,7 @@ function buildDocumentedApp() {
             requestBody: {
               content: {
                 "application/json": {
-                  schema: { type: "object", properties: { frames: { type: "array" } } },
+                  schema: { type: "object", properties: { frames: { type: "array", items: { type: "object" } } } },
                 },
               },
             },
@@ -148,7 +148,7 @@ describe("OpenAPI documentation", () => {
       expect(frames?.requestBody).toEqual({
         content: {
           "application/json": {
-            schema: { type: "object", properties: { frames: { type: "array" } } },
+            schema: { type: "object", properties: { frames: { type: "array", items: { type: "object" } } } },
           },
         },
       });

@@ -38,9 +38,9 @@ Feature: Connected agents
   @integration
   Scenario: Two instances registering together settle on one row
     Given two processes registering the same name and environment at once
-    When one of them writes the row first
-    Then the other is answered with that row
-    And no second row is created
+    When both registrations are answered
+    Then both carry the same agent row
+    And the project holds one agent for that identity
 
   @integration
   Scenario: A reconnect of an unseen identity lists the row again
@@ -276,7 +276,7 @@ Feature: Connected agents
   Scenario: A socket that goes away during registration retires its instance
     Given a process whose socket closes while its registration is still running
     When the registration finishes
-    Then the pod holds no session for it
+    Then the replica holds no connection for it
     And the instance is no longer live
 
   # ---------------------------------------------------------------------------

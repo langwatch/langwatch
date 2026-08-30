@@ -1,6 +1,5 @@
 import { getAgent as apiGetAgent, type AgentParameterSpec } from "../langwatch-api-agents.js";
 
-/** One parameter on one line: name, type, options, default and required. */
 export const describeParameter = ({
   name,
   type,

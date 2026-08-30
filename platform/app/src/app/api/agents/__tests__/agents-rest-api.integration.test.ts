@@ -152,9 +152,7 @@ describe("Feature: Agent REST API", () => {
     });
   }
 
-  // ── Authentication ─────────────────────────────────────────────
-
-  describe("Authentication", () => {
+  describe("when the credential at the door is missing or invalid", () => {
     /** @scenario Request without API key returns 401 */
     it("returns 401 without X-Auth-Token header", async () => {
       const res = await app.request("/api/v1/agents");
@@ -170,9 +168,7 @@ describe("Feature: Agent REST API", () => {
     });
   });
 
-  // ── List Agents ──────────────────────────────────────────────
-
-  describe("GET /api/v1/agents", () => {
+  describe("when the client lists agents at GET /api/v1/agents", () => {
     describe("when the project has 3 agents and 1 archived agent", () => {
       beforeEach(async () => {
         await createAgent({ name: "Agent A" });
@@ -252,9 +248,7 @@ describe("Feature: Agent REST API", () => {
     });
   });
 
-  // ── Create Agent ─────────────────────────────────────────────
-
-  describe("POST /api/v1/agents", () => {
+  describe("when the client creates an agent at POST /api/v1/agents", () => {
     /** @scenario Create an agent with name, type, and config */
     it("creates an agent with name, type, and config", async () => {
       const res = await helpers.api.post("/api/v1/agents", {
@@ -300,9 +294,7 @@ describe("Feature: Agent REST API", () => {
     });
   });
 
-  // ── Get Single Agent ─────────────────────────────────────────
-
-  describe("GET /api/v1/agents/:id", () => {
+  describe("when the client reads one agent at GET /api/v1/agents/:id", () => {
     /** @scenario Get an agent by id */
     it("returns agent details by id", async () => {
       const agent = await createAgent({
@@ -332,9 +324,7 @@ describe("Feature: Agent REST API", () => {
     });
   });
 
-  // ── Update Agent ─────────────────────────────────────────────
-
-  describe("PATCH /api/v1/agents/:id", () => {
+  describe("when the client updates an agent at PATCH /api/v1/agents/:id", () => {
     /** @scenario Update an agent name */
     it("updates agent name", async () => {
       const agent = await createAgent({ name: "Original Name" });
@@ -384,9 +374,7 @@ describe("Feature: Agent REST API", () => {
     });
   });
 
-  // ── Delete (Archive) Agent ───────────────────────────────────
-
-  describe("DELETE /api/v1/agents/:id", () => {
+  describe("when the client deletes an agent at DELETE /api/v1/agents/:id", () => {
     /** @scenario Delete an agent archives it */
     it("archives the agent and returns archivedAt", async () => {
       const agent = await createAgent({ name: "To Delete" });
@@ -414,9 +402,7 @@ describe("Feature: Agent REST API", () => {
       expect(res.status).toBe(404);
     });
   });
-  // ── Deprecated alias ─────────────────────────────────────────
-
-  describe("the deprecated /api/agents alias", () => {
+  describe("when the client calls the deprecated /api/agents alias", () => {
     const aliasGet = (path: string) =>
       aliasApp.request(path, { headers: createAuthHeaders(testApiKey) });
 

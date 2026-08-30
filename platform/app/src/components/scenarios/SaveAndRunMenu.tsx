@@ -1,4 +1,12 @@
-import { Box, Button, HStack, Input, Portal, Text } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  chakra,
+  HStack,
+  Input,
+  Portal,
+  Text,
+} from "@chakra-ui/react";
 import {
   BookText,
   ChevronDown,
@@ -292,6 +300,10 @@ export function SaveAndRunMenu({
  * One agent of the menu. A development agent of another person is drawn
  * disabled and says why on hover: the menu saves and runs in one click, and
  * a run against it would be refused.
+ *
+ * It is a button, so the keyboard reaches it and Enter or Space picks it. A
+ * row that cannot be run keeps its focus, so the reason in its tooltip is
+ * still readable, and only drops the handler.
  */
 function AgentRow({
   agent,
@@ -303,7 +315,13 @@ function AgentRow({
   onSelect: () => void;
 }) {
   const row = (
-    <HStack
+    <chakra.button
+      type="button"
+      display="flex"
+      alignItems="center"
+      gap={2}
+      width="full"
+      textAlign="left"
       paddingX={3}
       paddingY={2}
       cursor={agent.isRunnable ? "pointer" : "not-allowed"}
@@ -323,7 +341,7 @@ function AgentRow({
         {agent.label}
       </Text>
       <Play size={12} color="var(--chakra-colors-blue-500)" />
-    </HStack>
+    </chakra.button>
   );
 
   if (agent.isRunnable) return row;

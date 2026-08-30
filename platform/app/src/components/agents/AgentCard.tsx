@@ -103,7 +103,6 @@ export function AgentCardShell({
       >
         <Card.Body padding={4}>
           <VStack align="start" gap={2} height="full" width="full" minWidth={0}>
-            {/* Top row: mark, then what the card says about itself, then the menu */}
             <HStack width="full" gap={2}>
               {leading}
               <Spacer />
@@ -145,7 +144,6 @@ export function AgentCardMenuTrigger({ agentName }: { agentName: string }) {
   );
 }
 
-/** The square at the top left of a card, with one icon in it. */
 export function AgentCardIcon({ icon: Icon }: { icon: LucideIcon }) {
   return (
     <Box bg="blue.subtle" padding={1} borderRadius="md">
@@ -154,7 +152,6 @@ export function AgentCardIcon({ icon: Icon }: { icon: LucideIcon }) {
   );
 }
 
-/** The square with the icon of the agent kind. */
 function AgentTypeIcon({ type }: { type: string }) {
   return <AgentCardIcon icon={agentTypeIcons[type] ?? Bot} />;
 }

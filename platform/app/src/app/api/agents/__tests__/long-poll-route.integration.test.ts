@@ -15,7 +15,7 @@ import {
   RedisConnectionService,
 } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   type Organization,
   OrganizationUserRole,
@@ -537,31 +537,53 @@ describe("frames", () => {
   describe("when the body is above the frame cap", () => {
     /** @scenario "A frames body above the cap names the limit alone" */
     it("names the limit and no size, since nothing measured one", async () => {
-      const capMb = 0.001;
-      const limitBytes = relayPayloadCaps(capMb).frameBytes;
-      process.env.LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB = String(capMb);
+      const { response, body, limitBytes } = await postFrameAboveCap();
+
+      expect(response.status).toBe(413);
+      expect(body.meta).toEqual({ what: "result", limitBytes });
+    });
+
+    it("leaves the payload cap the process carried", async () => {
+      const carried = "7";
+      process.env.LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB = carried;
       try {
-        const app = createAgentsApp({ transport: () => podA.transport });
+        await postFrameAboveCap();
 
-        const response = await app.request("/api/v1/agents/connect/frames", {
-          method: "POST",
-          headers: headers(projectApiKey, {
-            "X-Agent-Instance-Token": "ait_whatever",
-          }),
-          body: JSON.stringify({
-            frames: [{ type: "ack", callId: "x".repeat(limitBytes) }],
-          }),
-        });
-        const body = (await response.json()) as Json;
-
-        expect(response.status).toBe(413);
-        expect(body.meta).toEqual({ what: "result", limitBytes });
+        expect(process.env.LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB).toBe(carried);
       } finally {
         delete process.env.LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB;
       }
     });
   });
 });
+
+/**
+ * Posts one frame above the cap, with the cap lowered far enough that a short
+ * body already passes it. The override is a stub, so the value the process
+ * carried into the test is back when this returns.
+ */
+async function postFrameAboveCap() {
+  const capMb = 0.001;
+  const limitBytes = relayPayloadCaps(capMb).frameBytes;
+  vi.stubEnv("LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB", String(capMb));
+  try {
+    const app = createAgentsApp({ transport: () => podA.transport });
+
+    const response = await app.request("/api/v1/agents/connect/frames", {
+      method: "POST",
+      headers: headers(projectApiKey, {
+        "X-Agent-Instance-Token": "ait_whatever",
+      }),
+      body: JSON.stringify({
+        frames: [{ type: "ack", callId: "x".repeat(limitBytes) }],
+      }),
+    });
+
+    return { response, body: (await response.json()) as Json, limitBytes };
+  } finally {
+    vi.unstubAllEnvs();
+  }
+}
 
 describe("deregister over HTTP", () => {
   describe("when the process posts a deregister frame", () => {

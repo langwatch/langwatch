@@ -36,10 +36,13 @@ class FakeHttpPlatform {
   willSendInstanceToken = true;
   /** Whether a poll waits for a frame, the way a proxy in the way would not. */
   willHoldPolls = true;
+  /** Whether a frames POST is left unanswered, the way a stalled proxy leaves it. */
+  willHoldFrames = false;
   /** How many polls arrived, counted before the answer is chosen. */
   polls = 0;
   private readonly waitingPolls: Array<(frames: Json[]) => void> = [];
   private readonly queuedFrames: Json[] = [];
+  private readonly heldFrames: ServerResponse[] = [];
   private readonly requestWaiters: Array<{ match: (seen: Seen) => boolean; resolve: (seen: Seen) => void }> = [];
   private nextToken = 1;
 
@@ -174,6 +177,10 @@ class FakeHttpPlatform {
       return;
     }
     if (seen.path === "/api/v1/agents/connect/frames") {
+      if (this.willHoldFrames) {
+        this.heldFrames.push(response);
+        return;
+      }
       answer(200, { accepted: ((seen.body?.frames as Json[] | undefined) ?? []).length });
       return;
     }
@@ -181,6 +188,7 @@ class FakeHttpPlatform {
   }
 
   close(): Promise<void> {
+    for (const held of this.heldFrames.splice(0)) held.destroy();
     for (const reply of this.waitingPolls.splice(0)) reply([]);
     this.server.closeAllConnections();
     return new Promise((resolve) => this.server.close(() => resolve()));
@@ -387,6 +395,27 @@ describe("the agent client over HTTP long polling, given a fake platform", () =>
 
       expect(platform.polls).toBeGreaterThan(0);
       expect(platform.polls).toBeLessThan(8);
+    });
+  });
+
+  describe("when a frames request stalls and the agents change", () => {
+    /** @scenario "A stalled frames request does not hold the socket open" */
+    it("gives the close a deadline and registers again with the new agent", async () => {
+      define(async () => "ok", { transport: "http" });
+      await platform.nextRegister();
+      await until(() => sharedClientForTests()?.isRegistered === true);
+
+      // The ack and the result both post to a route that never answers, so the
+      // outbox of the socket never drains.
+      platform.willHoldFrames = true;
+      platform.deliver(callFrame("call_stalled"));
+      await platform.nextFrame("ack");
+
+      // Adding an agent restarts the socket, which closes the stalled one.
+      define(async () => "ok too", { transport: "http", name: "second" });
+
+      const again = await platform.nextRegister(2000);
+      expect((again.body as unknown as RegisterFrame).agents.map((agent) => agent.name)).toContain("second");
     });
   });
 

@@ -1,7 +1,15 @@
+import { z } from "zod";
 import {
   runAgent as apiRunAgent,
   type AgentCallParams,
 } from "../langwatch-api-agents.js";
+
+/**
+ * A scalar and an array both parse as JSON, and either one reaches the agent
+ * as a body it cannot read, so only an object passes.
+ */
+const jsonObjectSchema = z.looseObject({});
+type JsonObject = z.infer<typeof jsonObjectSchema>;
 
 /**
  * Handles the platform_run_agent MCP tool invocation.
@@ -21,20 +29,19 @@ export async function handleRunAgent({
   parameters?: AgentCallParams;
   threadId?: string;
 }): Promise<string> {
-  let parsedInput: Record<string, unknown> = {};
+  let parsedInput: JsonObject = {};
   if (input) {
-    let parsed: unknown;
+    let decoded: unknown;
     try {
-      parsed = JSON.parse(input);
+      decoded = JSON.parse(input);
     } catch {
       return "Error: `input` must be a valid JSON object.";
     }
-    // A scalar and an array both parse, and either one reaches the agent as a
-    // body it cannot read.
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    const result = jsonObjectSchema.safeParse(decoded);
+    if (!result.success) {
       return "Error: `input` must be a valid JSON object.";
     }
-    parsedInput = parsed as Record<string, unknown>;
+    parsedInput = result.data;
   }
 
   const { agentType, result } = await apiRunAgent({

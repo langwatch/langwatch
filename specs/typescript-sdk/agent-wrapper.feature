@@ -375,6 +375,12 @@ Feature: connectAgent turns a function into a simulation target
       When the client polls
       Then the polls are spaced by the poll floor instead of spinning
 
+    Scenario: A stalled frames request does not hold the socket open
+      Given a client registered over HTTP whose frames route never answers
+      When an agent is added and the client closes the connection to register again
+      Then the close gives the queued frames a deadline and reports itself anyway
+      And the client posts a new register frame that lists the added agent
+
   Rule: The traceparent of a call is the parent context of the handler
 
     Scenario: The handler runs under the traceparent of the call

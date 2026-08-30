@@ -90,7 +90,11 @@ function runBlockedReason({
   return null;
 }
 
-/** `isOpen` decides whether the id joins the set or leaves it. */
+/**
+ * Gives back the set it received when the id is already on the side it asks
+ * for, so the state setter sees the same value and the dialog does not
+ * re-render on a report that changes nothing.
+ */
 function withOpenList({
   current,
   id,

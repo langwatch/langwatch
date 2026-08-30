@@ -40,7 +40,6 @@ type AnnotationParams struct {
 //
 //	annotations, err := lw.Annotations.List(ctx)
 func (s *AnnotationsService) List(ctx context.Context) ([]Annotation, error) {
-	// No anchor filter: this returns every annotation, the way the method says.
 	resp, err := s.client.gen.GetApiAnnotations(ctx, nil)
 	var out []Annotation
 	if derr := decodeInto("Annotations.List", resp, err, &out); derr != nil {
@@ -65,7 +64,6 @@ func (s *AnnotationsService) Get(ctx context.Context, id string) (*Annotation, e
 //
 //	annotations, err := lw.Annotations.ListByTrace(ctx, "trace_abc123")
 func (s *AnnotationsService) ListByTrace(ctx context.Context, traceID string) ([]Annotation, error) {
-	// No anchor filter: every annotation on the trace, the way the method says.
 	resp, err := s.client.gen.GetApiAnnotationsTraceId(ctx, traceID, nil)
 	var out []Annotation
 	if derr := decodeInto("Annotations.ListByTrace", resp, err, &out); derr != nil {
