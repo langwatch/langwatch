@@ -2,6 +2,7 @@ import {
   createLangWatchApiClient,
   type LangwatchApiClient,
 } from "@/internal/api/client";
+import type { paths } from "@/internal/generated/openapi/api-client";
 import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
@@ -58,30 +59,17 @@ export interface AgentListResponse {
   };
 }
 
-/** One conversation message as the relay carries it, OpenAI style. */
-export interface AgentCallMessage {
-  role: string;
-  content?: unknown;
-  [key: string]: unknown;
-}
+/** The body `POST /api/agents/{id}/call` takes. */
+export type AgentCallBody = NonNullable<
+  paths["/api/agents/{id}/call"]["post"]["requestBody"]
+>["content"]["application/json"];
 
-/** The body `POST /api/agents/:id/call` takes. */
-export interface AgentCallBody {
-  messages: AgentCallMessage[];
-  newMessages?: AgentCallMessage[];
-  threadId?: string;
-  params?: Record<string, string | number | boolean>;
-  session?: unknown;
-  traceparent?: string;
-}
+/** One conversation message as the relay carries it, OpenAI style. */
+export type AgentCallMessage = AgentCallBody["messages"][number];
 
 /** The reply of the relay: the function's output and the instance that ran it. */
-export interface AgentCallResponse {
-  output: unknown;
-  session?: unknown;
-  instance: { hostname: string; label?: string | null };
-  durationMs: number;
-}
+export type AgentCallResponse =
+  paths["/api/agents/{id}/call"]["post"]["responses"][200]["content"]["application/json"];
 
 export class AgentsApiError extends Error {
   constructor(
@@ -92,14 +80,6 @@ export class AgentsApiError extends Error {
     super(message);
     this.name = "AgentsApiError";
   }
-}
-
-/** The relay route, called through the client as an untyped path until the OpenAPI types carry it. */
-interface RelayClient {
-  POST: (
-    path: string,
-    init: { params: { path: { id: string } }; body: AgentCallBody },
-  ) => Promise<{ data?: unknown; error?: unknown }>;
 }
 
 export class AgentsApiService {
@@ -171,8 +151,7 @@ export class AgentsApiService {
    * dispatches it to a live instance and answers with the function's output.
    */
   async call(id: string, body: AgentCallBody): Promise<AgentCallResponse> {
-    const relay = this.apiClient as unknown as RelayClient;
-    const { data, error } = await relay.POST("/api/agents/{id}/call", {
+    const { data, error } = await this.apiClient.POST("/api/agents/{id}/call", {
       params: { path: { id } },
       body,
     });

@@ -110,6 +110,10 @@ export function refusalAdvice(frame: RefusedFrame): string {
       return "this key type cannot connect agents. Set LANGWATCH_API_KEY to a personal or project API key.";
     case "permission_denied":
       return "the API key cannot manage scenarios. Use a key with the scenarios:manage permission.";
+    case "protocol_invalid":
+      return `${frame.message} Update the langwatch package to a version that speaks protocol ${PROTOCOL_VERSION} or later.`;
+    case "replica_count_unsupported":
+      return `${frame.message} Connected agents on a LangWatch deployment without Redis need one app replica.`;
     case "parameters_invalid":
     case "environment_invalid":
       return frame.message;
@@ -181,6 +185,12 @@ export class AgentClient {
   /** True while a reconnect is scheduled with a timer that keeps the process up. */
   get hasPendingConnect(): boolean {
     return this.connectTimer?.hasRef() ?? false;
+  }
+
+  /** True while the client is between attempts or inside one, with the process kept up. */
+  get isRetrying(): boolean {
+    if (this.stopped) return false;
+    return this.connectTimer ? this.connectTimer.hasRef() : this.socket !== null;
   }
 
   /** Adds an agent and connects on the next tick, or re-registers when already connected. */
@@ -462,7 +472,7 @@ export class AgentClient {
       });
       return;
     }
-    if (frame.deadlineAt && Date.parse(frame.deadlineAt) <= Date.now()) {
+    if (frame.deadlineAt !== null && frame.deadlineAt <= Date.now()) {
       this.sendError({
         callId: frame.callId,
         code: "agent_call_timeout",

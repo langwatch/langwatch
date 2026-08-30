@@ -60,6 +60,32 @@ describe("parseServerFrame()", () => {
     });
   });
 
+  describe("when given a registered frame that names agents by agentId", () => {
+    it("reads agentId as the id", () => {
+      const frame = parseServerFrame(
+        JSON.stringify({
+          type: "registered",
+          protocol: 1,
+          agents: [{ name: "a", environment: "development", agentId: "agent_1", url: "", parameterNotes: [] }],
+          heartbeatIntervalMs: 5000,
+          instanceId: "inst_1",
+        }),
+      );
+      expect(frame).toMatchObject({ type: "registered", agents: [{ id: "agent_1" }] });
+    });
+  });
+
+  describe("when a call carries a numeric deadline", () => {
+    it("reads it as epoch milliseconds, and an ISO string too", () => {
+      const at = 1_700_000_000_000;
+      const base = { type: "call", protocol: 1, callId: "c", agentId: "a", messages: [] };
+      expect(parseServerFrame(JSON.stringify({ ...base, deadlineAt: at }))).toMatchObject({ deadlineAt: at });
+      expect(parseServerFrame(JSON.stringify({ ...base, deadlineAt: new Date(at).toISOString() }))).toMatchObject({
+        deadlineAt: at,
+      });
+    });
+  });
+
   describe("when given a refused frame", () => {
     it("carries the code, the message and the meta", () => {
       expect(

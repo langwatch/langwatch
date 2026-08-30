@@ -724,6 +724,23 @@ export interface paths {
         patch: operations["patchApiAgentsById"];
         trace?: never;
     };
+    "/api/agents/{id}/call": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Send one conversation turn to a connected agent and get its answer. The agent must be online: a process running the decorated function must be connected. */
+        post: operations["postApiAgentsByIdCall"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/api-keys": {
         parameters: {
             query?: never;
@@ -5219,6 +5236,148 @@ export interface operations {
                         message?: string;
                     };
                 };
+            };
+        };
+    };
+    postApiAgentsByIdCall: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The whole conversation so far, OpenAI style. */
+                    messages: ({
+                        role: string;
+                    } & {
+                        [key: string]: unknown;
+                    })[];
+                    /** @description The messages added since the agent's last turn. Defaults to the last message. */
+                    newMessages?: ({
+                        role: string;
+                    } & {
+                        [key: string]: unknown;
+                    })[];
+                    /** @description The conversation id. Turns of one conversation share it; a new id starts a new one. */
+                    threadId?: string;
+                    /** @description Run parameter values by name, as JSON scalars. */
+                    params?: {
+                        [key: string]: string | number | boolean;
+                    };
+                    /** @description The session the agent returned on its previous turn of this conversation, echoed back as is. */
+                    session?: unknown;
+                    /** @description The W3C trace context the agent adopts, so its spans join this turn's trace. */
+                    traceparent?: string;
+                    /** @description The simulation run this turn belongs to, if any. */
+                    run?: {
+                        scenarioRunId?: string;
+                        scenarioName?: string;
+                        batchRunId?: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description The agent answered */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description What the function answered: text, one message, or a list of messages. */
+                        output: string | ({
+                            role: string;
+                        } & {
+                            [key: string]: unknown;
+                        }) | ({
+                            role: string;
+                        } & {
+                            [key: string]: unknown;
+                        })[];
+                        /** @description The agent's per-conversation memory, to send on the next turn. */
+                        session?: unknown;
+                        instance: {
+                            hostname: string;
+                            label: string | null;
+                        };
+                        durationMs: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description No connected agent with that id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Every instance is busy; Retry-After says when to try again */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description No instance of the agent is connected */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

@@ -436,7 +436,7 @@ describe("the agent client, given a fake platform", () => {
       const handler = vi.fn(async () => "never");
       const { connection } = await connectSupport(handler);
 
-      connection.send(callFrame({ deadlineAt: new Date(Date.now() - 1000).toISOString() }));
+      connection.send(callFrame({ deadlineAt: Date.now() - 1000 }));
 
       expect(await connection.nextFrame("result")).toMatchObject({ error: { code: "agent_call_timeout" } });
       expect(handler).not.toHaveBeenCalled();
@@ -521,6 +521,8 @@ describe("the agent client, given a fake platform", () => {
       expect(advice("permission_denied")).toMatch(/scenarios:manage/);
       expect(advice("parameters_invalid", "model: enum too long")).toBe("model: enum too long");
       expect(advice("environment_invalid", "environment must match")).toBe("environment must match");
+      expect(advice("protocol_invalid", "protocol 0 is not supported.")).toMatch(/Update the langwatch package/);
+      expect(advice("replica_count_unsupported", "two replicas.")).toMatch(/one app replica/);
       expect(advice("something_else")).toBe("server says so (something_else)");
     });
   });
@@ -541,7 +543,7 @@ describe("the agent client, given a fake platform", () => {
       expect(warnings).toHaveLength(1);
       expect(warnings[0]).toContain(`could not reach ws://127.0.0.1:${port}/api/agents/connect`);
       expect(warnings[0]).toContain("LANGWATCH_ENDPOINT");
-      expect(sharedClientForTests()?.hasPendingConnect).toBe(true);
+      expect(sharedClientForTests()?.isRetrying).toBe(true);
       expect(sharedClientForTests()?.isStopped).toBe(false);
       expect((await agent({ messages: [] })).output).toBe("ok");
     });

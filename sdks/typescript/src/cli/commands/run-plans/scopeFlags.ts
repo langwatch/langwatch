@@ -115,7 +115,16 @@ export function describeScope(scope: RunPlanScope | null | undefined): string {
  * agent by id, or by `<name>@<environment>`; the platform resolves the
  * second form, so it is passed through as the reference id.
  */
-const TARGET_TYPES = ["prompt", "http", "code", "workflow", "connected"] as const;
+const TARGET_TYPES = [
+  "prompt",
+  "http",
+  "code",
+  "workflow",
+  "connected",
+] as const satisfies readonly RunPlanTarget["type"][];
+
+const isTargetType = (value: string): value is RunPlanTarget["type"] =>
+  (TARGET_TYPES as readonly string[]).includes(value);
 
 /**
  * A target as the command line writes it: what to run against, plus the
@@ -227,7 +236,7 @@ export function parseTargets(
     }
     const type = value.slice(0, colonIndex);
     const rest = value.slice(colonIndex + 1);
-    if (!TARGET_TYPES.includes(type as (typeof TARGET_TYPES)[number])) {
+    if (!isTargetType(type)) {
       console.error(
         chalk.red(
           `Error: invalid target type "${type}". It must be one of: ${TARGET_TYPES.join(", ")}.`,
@@ -239,7 +248,7 @@ export function parseTargets(
     const questionIndex = rest.indexOf("?");
     if (questionIndex === -1) {
       return {
-        type: type as RunPlanTarget["type"],
+        type,
         referenceId: decodeQueryPart({ part: rest, target: value }),
       };
     }
@@ -258,7 +267,7 @@ export function parseTargets(
       );
     }
     return {
-      type: type as RunPlanTarget["type"],
+      type,
       referenceId,
       runParameters: parseTargetParameters({ query, target: value }),
     };
