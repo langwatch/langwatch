@@ -8,9 +8,8 @@ const mockGetAllTracesForProject = vi.fn();
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: vi.fn(() => ({
-    traces: {
-      read: { getAllTracesForProject: mockGetAllTracesForProject },
-    },
+    // `c.app.traceRead`, not `c.app.traces.read` — see get-trace's mock.
+    traceRead: { getAllTracesForProject: mockGetAllTracesForProject },
   })),
 }));
 
@@ -40,9 +39,7 @@ vi.mock("~/server/traces/trace-formatting", () => ({
 }));
 
 vi.mock("~/app/api/shared/platform-url", () => ({
-  platformUrl: vi.fn(
-    ({ path }: { path: string }) => `https://app.langwatch.ai/project${path}`,
-  ),
+  platformUrl: vi.fn(({ path }: { path: string }) => `https://app.langwatch.ai/project${path}`),
 }));
 
 vi.mock("@langwatch/observability", () => ({

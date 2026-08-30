@@ -10,11 +10,13 @@ const mockGetEvaluationsMultiple = vi.fn();
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: vi.fn(() => ({
-    traces: {
-      read: {
-        getById: mockGetById,
-        getEvaluationsMultiple: mockGetEvaluationsMultiple,
-      },
+    // The routes read `c.app.traceRead`, which `App` hoisted to a top-level
+    // field from `deps.traces.read`. Mocking the old nested shape left
+    // `c.app.traceRead` undefined, so every case here 500'd on the route
+    // rather than on anything it was asserting.
+    traceRead: {
+      getById: mockGetById,
+      getEvaluationsMultiple: mockGetEvaluationsMultiple,
     },
   })),
 }));
@@ -25,9 +27,7 @@ vi.mock("~/server/traces/trace.service", async () => {
       public readonly prefix: string,
       public readonly candidateTraceIds: string[],
     ) {
-      super(
-        `Trace ID prefix "${prefix}" is ambiguous — matches: ${candidateTraceIds.join(", ")}`,
-      );
+      super(`Trace ID prefix "${prefix}" is ambiguous — matches: ${candidateTraceIds.join(", ")}`);
       this.name = "AmbiguousTraceIdPrefixError";
     }
   }
@@ -60,9 +60,7 @@ vi.mock("~/server/traces/trace-formatting", () => ({
 }));
 
 vi.mock("~/app/api/shared/platform-url", () => ({
-  platformUrl: vi.fn(
-    ({ path }: { path: string }) => `https://app.langwatch.ai/project${path}`,
-  ),
+  platformUrl: vi.fn(({ path }: { path: string }) => `https://app.langwatch.ai/project${path}`),
 }));
 
 vi.mock("@langwatch/observability", () => ({
@@ -199,12 +197,9 @@ describe("GET /:traceId", () => {
       const res = await makeRequest("trace-abc", { format: "json" });
 
       expect(res.status).toBe(200);
-      expect(mockGetById).toHaveBeenCalledWith(
-        "project-123",
-        "trace-abc",
-        expect.any(Object),
-        { full: true },
-      );
+      expect(mockGetById).toHaveBeenCalledWith("project-123", "trace-abc", expect.any(Object), {
+        full: true,
+      });
     });
 
     it("fetches evaluations via TraceService.getEvaluationsMultiple", async () => {
@@ -295,13 +290,8 @@ describe("GET /:traceId", () => {
   describe("when the prefix matches multiple traces", () => {
     /** @scenario Ambiguous prefix returns 409 with the matching IDs */
     it("returns 409 with the candidate trace IDs", async () => {
-      const candidates = [
-        "abc1230000000000000000000000aaaa",
-        "abc1230000000000000000000000bbbb",
-      ];
-      mockGetById.mockRejectedValue(
-        new AmbiguousTraceIdPrefixError("abc12345", candidates),
-      );
+      const candidates = ["abc1230000000000000000000000aaaa", "abc1230000000000000000000000bbbb"];
+      mockGetById.mockRejectedValue(new AmbiguousTraceIdPrefixError("abc12345", candidates));
 
       const res = await makeRequest("abc12345");
 
