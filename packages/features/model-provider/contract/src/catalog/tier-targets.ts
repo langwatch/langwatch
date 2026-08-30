@@ -1,8 +1,6 @@
-import {
-  llmModels,
-  resolveLatestAlias,
-  type LLMModelEntry,
-} from "@langwatch/model-provider-contract";
+import { llmModels } from "./model-catalog";
+import { resolveLatestAlias } from "./latest-aliases";
+import type { LLMModelEntry } from "./model-catalog.types";
 
 const MODEL_TIERS = ["complex", "reasoning", "fast"] as const;
 type ModelTier = (typeof MODEL_TIERS)[number];
@@ -26,11 +24,7 @@ export interface SuggestTierTargetsInput {
 
 const DEFAULT_LIMIT = 8;
 const FLAGSHIP_ALIASES = ["openai/latest", "anthropic/latest", "gemini/latest"] as const;
-const FAST_ALIASES = [
-  "openai/latest-mini",
-  "anthropic/latest-mini",
-  "gemini/latest-mini",
-] as const;
+const FAST_ALIASES = ["openai/latest-mini", "anthropic/latest-mini", "gemini/latest-mini"] as const;
 const REASONING_PARAMETERS = ["reasoning", "reasoning_effort"];
 
 function isChatModel(entry: LLMModelEntry): boolean {
@@ -40,9 +34,7 @@ function isChatModel(entry: LLMModelEntry): boolean {
 }
 
 function supportsReasoning(entry: LLMModelEntry): boolean {
-  return REASONING_PARAMETERS.some((parameter) =>
-    entry.supportedParameters.includes(parameter),
-  );
+  return REASONING_PARAMETERS.some((parameter) => entry.supportedParameters.includes(parameter));
 }
 
 function blendedCostPerToken(entry: LLMModelEntry): number | null {
@@ -91,9 +83,7 @@ function tierOrderedRest(
   catalog: LLMModelEntry[],
   exclude: ReadonlySet<string>,
 ): LLMModelEntry[] {
-  const candidates = catalog
-    .filter((entry) => !exclude.has(entry.id))
-    .filter(isRankableByPrice);
+  const candidates = catalog.filter((entry) => !exclude.has(entry.id)).filter(isRankableByPrice);
   if (tier === "reasoning") {
     return candidates.filter(supportsReasoning).sort((a, b) => priceOf(b) - priceOf(a));
   }

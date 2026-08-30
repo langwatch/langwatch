@@ -15,7 +15,7 @@ import {
   isRankableByPrice,
   partitionTierAliases,
   suggestTierTargets,
-} from "@langwatch/model-provider-server";
+} from "@langwatch/model-provider-contract";
 
 describe("given a tier and no provider filter", () => {
   it.each(MODEL_TIERS)("offers candidates for the %s tier", (tier) => {

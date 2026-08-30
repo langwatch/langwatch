@@ -28,14 +28,6 @@ export {
   toLegacyProviderSummary,
 } from "./adapters/legacy-model-provider.adapter";
 export {
-  isKnownModelId,
-  isRankableByPrice,
-  partitionTierAliases,
-  suggestTierTargets,
-  type SuggestTierTargetsInput,
-  type TierTargetSuggestion,
-} from "./adapters/suggest-tier-targets.adapter";
-export {
   ModelProviderApp,
   type ModelProviderAppDependencies,
   type ModelProviderCaller,

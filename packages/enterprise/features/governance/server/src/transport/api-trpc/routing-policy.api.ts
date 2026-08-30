@@ -20,12 +20,11 @@
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { routingPolicyScopeTypeSchema } from "@langwatch/enterprise-governance-contract";
-import { suggestTierTargets, type SuggestTierTargetsInput } from "@langwatch/model-provider-server";
-import type {
-  AnyTRPCRootTypes,
-  TRPCRootObject,
-  TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import {
+  suggestTierTargets,
+  type SuggestTierTargetsInput,
+} from "@langwatch/model-provider-contract";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { GovernanceApp } from "#app/governance.app";
 
