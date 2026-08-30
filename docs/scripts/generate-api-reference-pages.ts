@@ -111,6 +111,8 @@ const SKIP_PATHS: Record<string, string> = {
     UNDOCUMENTED_LWQL_ANALYTICS_SQL,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}":
     UNDOCUMENTED_LWQL_ANALYTICS_SQL,
+  "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement":
+    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
 };
 
 const ENDPOINT_GROUPS: EndpointGroup[] = [
@@ -216,11 +218,25 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Query simulation run results. List runs, get batch summaries, and retrieve individual run details.",
   },
   {
+    name: "Run Plans",
+    dirName: "run-plans",
+    pathPrefixes: ["/api/v1/run-plans"],
+    overviewDescription:
+      "Run agent tests. A run plan is identified by its name: a run started under a name joins that plan and replaces its configuration, or creates the plan when no plan holds that name. List, read, run and archive run plans.",
+  },
+  {
+    name: "Test Suites",
+    dirName: "test-suites",
+    pathPrefixes: ["/api/v1/test-suites"],
+    overviewDescription:
+      "Organise agent tests. A test suite groups scenarios; the targets a run goes against are sent with the run. Create, read, rename, archive and run test suites.",
+  },
+  {
     name: "Suites",
     dirName: "suites",
     pathPrefixes: ["/api/suites"],
     overviewDescription:
-      "Manage test suites (run plans) that group scenarios for batch execution. Create, update, duplicate, and trigger suite runs.",
+      "Deprecated. The /api/suites family is a frozen alias. New integrations use Run Plans and Test Suites.",
   },
   {
     name: "Agents",
@@ -289,6 +305,13 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     pathPrefixes: ["/api/secrets"],
     overviewDescription:
       "Manage project secrets used for external integrations. Values are encrypted at rest and never returned in API responses.",
+  },
+  {
+    name: "Agent Cache",
+    dirName: "agent-cache",
+    pathPrefixes: ["/api/agent-cache"],
+    overviewDescription:
+      "A per-project store an agent keeps its own run state in. Values are encrypted at rest and each entry expires by itself.",
   },
   {
     name: "Model Providers",

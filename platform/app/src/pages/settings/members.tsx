@@ -28,7 +28,10 @@ import { useMemberDisableAction } from "~/hooks/useMemberDisableAction";
 import { captureException } from "~/utils/posthogErrorCapture";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { CopyInput } from "../../components/CopyInput";
+import { DomainJoinCard } from "../../components/members/DomainJoinCard";
 import { InvitesTable } from "../../components/members/InvitesTable";
+import { JoinRequestsTable } from "../../components/members/JoinRequestsTable";
+import { useJoinRequests } from "../../components/members/useJoinRequests";
 import SettingsLayout from "../../components/SettingsLayout";
 import { DepartmentPicker } from "../../components/settings/DepartmentPicker";
 import { MemberDetailDialog } from "../../components/settings/MemberDetailDialog";
@@ -146,10 +149,9 @@ function MembersList({
   const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
 
   // The add-member flow (create invites) now lives in the invite drawer; the
-  // page keeps these handlers for the invites table's approve / reject / delete.
-  const { approveInvite, rejectInvite, deleteInvite } = useInviteActions({
+  // page keeps these handlers for the invites table's resend / revoke.
+  const { resendInvite, revokeInvite } = useInviteActions({
     organizationId: organization.id,
-    isAdmin: hasOrganizationManagePermission,
     hasEmailProvider: hasEmailProvider ?? false,
     onInviteCreated: setSelectedInvites,
     onClose: () => {},
@@ -270,21 +272,19 @@ function MembersList({
   const canDisableMember = (memberId: string) =>
     hasOrganizationManagePermission && memberId !== user?.id;
 
-  const sentInvites = useMemo(
-    () =>
-      (pendingInvites.data ?? []).filter(
-        (invite) => invite.status === "PENDING",
-      ),
+  const invites = useMemo(
+    () => pendingInvites.data ?? [],
     [pendingInvites.data],
   );
 
-  const waitingApprovalInvites = useMemo(
-    () =>
-      (pendingInvites.data ?? []).filter(
-        (invite) => invite.status === "WAITING_APPROVAL",
-      ),
-    [pendingInvites.data],
-  );
+  // One panel, two directions (D12): an invitation is the organization
+  // reaching out, a request is somebody reaching in, and an admin answers
+  // both in the same place. Renders nothing when nothing is waiting — which
+  // is also what the flag being off looks like from here.
+  const joinRequests = useJoinRequests({
+    organizationId: organization.id,
+    canManage: hasOrganizationManagePermission,
+  });
 
   return (
     <SettingsLayout>
@@ -447,16 +447,31 @@ function MembersList({
           </Card.Body>
         </Card.Root>
 
-        <InvitesTable
-          waitingApprovalInvites={waitingApprovalInvites}
-          sentInvites={sentInvites}
+        {hasOrganizationManagePermission && (
+          <DomainJoinCard
+            key={`${joinRequests.joining.domainJoin}:${joinRequests.joining.joinDomains.join(",")}`}
+            domainJoin={joinRequests.joining.domainJoin}
+            joinDomains={joinRequests.joining.joinDomains}
+            saving={joinRequests.savingJoining}
+            onSave={joinRequests.setJoining}
+          />
+        )}
+
+        <JoinRequestsTable
+          requests={joinRequests.requests}
           isAdmin={hasOrganizationManagePermission}
-          currentUserId={user?.id ?? ""}
+          answeringId={joinRequests.answeringId}
+          onApprove={joinRequests.approve}
+          onReject={joinRequests.reject}
+        />
+
+        <InvitesTable
+          invites={invites}
+          isAdmin={hasOrganizationManagePermission}
           teams={teams}
-          onApprove={approveInvite}
-          onReject={rejectInvite}
           onViewInviteLink={viewInviteLink}
-          onDeleteInvite={deleteInvite}
+          onResendInvite={resendInvite}
+          onRevokeInvite={revokeInvite}
         />
       </VStack>
 

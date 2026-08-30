@@ -79,6 +79,9 @@ export default defineConfig({
     // ever flakes a shard, drop this line first.
     isolate: false,
     testTimeout: 30000, // 30s default to handle slower CI runners
+    // Hooks get the same budget as test bodies. The vitest default is 10s,
+    // which a beforeEach that imports a module can exceed on a loaded shard.
+    hookTimeout: 30000,
     // Global setup runs once before all tests. Unit needs no containers; this
     // only carries a CI-gated hard-floor that mirrors the integration
     // globalSetup, releasing the vitest finalize wedge on unit shards (which
@@ -93,7 +96,11 @@ export default defineConfig({
       "**/*.browser.test.{ts,tsx}",
       ".next/**/*",
       ".next-saas/**/*",
-      "**/e2e/**/*",
+      // e2e stays out of the unit run — it needs a live stack — EXCEPT for
+      // `*.unit.test.ts`, which tests the e2e HARNESS itself (the scenario
+      // runner, its retry policy) and needs nothing but mocks. Without this
+      // carve-out such a test is silently collected by nobody and rots green.
+      "**/e2e/**/!(*.unit).{test,spec}.?(c|m)[jt]s?(x)",
     ],
     env: {
       /*

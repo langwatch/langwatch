@@ -99,6 +99,42 @@ const readPersistedSnapshot = (): string =>
 export type AutosaveOutcome = "saved" | "unchanged" | "refused" | "failed";
 
 /**
+ * What a refusal leaves the save loop to do.
+ *
+ * `adopted` is the one case that is not an ending: the newer version came from
+ * a run this page started, so the page takes that version and sends the same
+ * edits again at it.
+ */
+type RefusalOutcome = AutosaveOutcome | "adopted";
+
+/**
+ * What a refusal says about the version the tab has to reload to, and who
+ * wrote it.
+ *
+ * Someone else — another tab, Langy, the API — holds a newer version. Both
+ * facts ride in the refusal's meta, and the actor is what lets the banner name
+ * Langy instead of telling the reader the change came from "somewhere else"
+ * while Langy was driving their own tab. An older server sends neither, so the
+ * version falls back to "one past what this tab knows" and the actor to none.
+ */
+function refusedSaveStaleness({
+  meta,
+  knownVersion,
+}: {
+  meta?: Record<string, unknown>;
+  knownVersion?: number;
+}): { serverVersion: number; actorLabel?: string; runId?: string } {
+  const serverVersion =
+    typeof meta?.currentVersion === "number"
+      ? meta.currentVersion
+      : (knownVersion ?? 0) + 1;
+  const actorLabel =
+    typeof meta?.actorLabel === "string" ? meta.actorLabel : undefined;
+  const runId = typeof meta?.runId === "string" ? meta.runId : undefined;
+  return { serverVersion, actorLabel, runId };
+}
+
+/**
  * Manages syncing the evaluations v3 state with the database.
  * Uses workbenchState field in the Experiment model for persistence.
  *
@@ -334,17 +370,23 @@ export const useAutosaveEvaluationsV3 = () => {
   }: {
     error: unknown;
     snapshot: string;
-  }): AutosaveOutcome => {
+  }): RefusalOutcome => {
     const state = useEvaluationsV3Store.getState();
     const handled = readHandledError(error);
     if (handled?.code === "experiment_stale_workbench_state") {
-      // Someone else (another tab, Langy, the API) wrote a newer version. The
-      // current server version rides in the error's meta when available.
-      const serverVersion =
-        typeof handled.meta?.currentVersion === "number"
-          ? handled.meta.currentVersion
-          : (state.workbenchVersion ?? 0) + 1;
-      setStaleWorkbench({ serverVersion });
+      const refusal = refusedSaveStaleness({
+        meta: handled.meta,
+        knownVersion: state.workbenchVersion,
+      });
+      // A run this page started wrote the newer version. The page already
+      // holds every cell that run produced, so the refusal is about a write it
+      // is not behind on. Take the version and send the edits again, rather
+      // than standing autosave down and asking the reader to reload over them.
+      if (refusal.runId && state.runsStartedHere?.includes(refusal.runId)) {
+        setWorkbenchVersion(refusal.serverVersion);
+        return "adopted";
+      }
+      setStaleWorkbench(refusal);
       setAutosaveStatus("evaluation", "error", AUTOSAVE_OUT_OF_DATE_REASON);
       return "refused";
     }
@@ -402,7 +444,11 @@ export const useAutosaveEvaluationsV3 = () => {
       clearTimeout(debounceTimeoutRef.current);
       debounceTimeoutRef.current = null;
     }
-    const attemptSave = async (): Promise<AutosaveOutcome> => {
+    const attemptSave = async (
+      { isRetry }: { isRetry: boolean } = {
+        isRetry: false,
+      },
+    ): Promise<AutosaveOutcome> => {
       const state = useEvaluationsV3Store.getState();
       if (!project || !state.experimentId || !state.name) return "unchanged";
       // Out of date against the server: saving now would clobber the newer
@@ -441,21 +487,37 @@ export const useAutosaveEvaluationsV3 = () => {
         markSaved();
         return "saved";
       } catch (error) {
-        return handleAutosaveFailure({ error, snapshot });
+        const outcome = handleAutosaveFailure({ error, snapshot });
+        if (outcome !== "adopted") return outcome;
+        // Once. A second refusal at the adopted version is a different writer,
+        // and looping on it would spin against whoever is actually ahead.
+        if (isRetry) {
+          setStaleWorkbench(
+            refusedSaveStaleness({
+              meta: readHandledError(error)?.meta,
+              knownVersion: useEvaluationsV3Store.getState().workbenchVersion,
+            }),
+          );
+          setAutosaveStatus("evaluation", "error", AUTOSAVE_OUT_OF_DATE_REASON);
+          return "refused";
+        }
+        return await attemptSave({ isRetry: true });
       }
     };
-    const link = inFlightRef.current.then(attemptSave).catch((error) => {
-      // Reached only when the save threw outside its own guard: reporting the
-      // failure, reading the store, or building the snapshot. Nothing was
-      // written, and the next change gets a fresh attempt.
-      console.error("Failed to autosave evaluations v3:", error);
-      setAutosaveStatus(
-        "evaluation",
-        "error",
-        error instanceof Error ? error.message : "Unknown error",
-      );
-      return "failed" as const;
-    });
+    const link = inFlightRef.current
+      .then(() => attemptSave())
+      .catch((error) => {
+        // Reached only when the save threw outside its own guard: reporting the
+        // failure, reading the store, or building the snapshot. Nothing was
+        // written, and the next change gets a fresh attempt.
+        console.error("Failed to autosave evaluations v3:", error);
+        setAutosaveStatus(
+          "evaluation",
+          "error",
+          error instanceof Error ? error.message : "Unknown error",
+        );
+        return "failed" as const;
+      });
     inFlightRef.current = link;
     return link;
     // eslint-disable-next-line react-hooks/exhaustive-deps

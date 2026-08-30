@@ -238,16 +238,16 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		return err
 	}
 
-	// Per-worker AGENTS.md with ${LANGWATCH_ENDPOINT} substituted, the same
-	// template (embedded assets, read once at pool boot) and the same
-	// substitution the opencode provision applies, so the operating contract
-	// is byte-identical across harnesses.
+	// The operating contract, written through byte for byte, from the same
+	// template the opencode provision writes (embedded assets, read once at pool
+	// boot), so the contract is identical across harnesses. Nothing is
+	// substituted into it: the prompt reaches the user through the reply, so an
+	// address only the worker can use must never enter it.
 	if in.AgentsTemplate == "" {
 		return fmt.Errorf("AGENTS.md template unavailable")
 	}
-	rendered := strings.ReplaceAll(in.AgentsTemplate, "${LANGWATCH_ENDPOINT}", in.Creds.LangwatchEndpoint)
 	agentsPath := filepath.Join(in.Home, "AGENTS.md")
-	if err := os.WriteFile(agentsPath, []byte(rendered), 0o600); err != nil {
+	if err := os.WriteFile(agentsPath, []byte(in.AgentsTemplate), 0o600); err != nil {
 		return fmt.Errorf("write AGENTS.md: %w", err)
 	}
 	if err := in.Runner.Chown(agentsPath, in.UID); err != nil {

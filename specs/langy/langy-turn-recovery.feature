@@ -294,6 +294,58 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     When the liveness timer fires
     Then it does not touch the newer turn and does not fail the old one
 
+  # The heartbeat is refreshed only by a frame the worker posts to the control
+  # plane, and the key it writes lives ten seconds. A loaded host can swallow
+  # that much worker-to-app traffic without anything being wrong, so a lapsed
+  # heartbeat on its own says nothing about whether the worker is running. What
+  # the turn is still DOING says it. The record kept for reviving a turn ages
+  # out well before a long turn ends, so its absence is routine on a long turn:
+  # a five-minute answer plus one missed heartbeat window must never be
+  # reported to the user as a worker that stopped while the worker is
+  # mid-answer.
+  @unit
+  Scenario: A turn still doing work is not failed because its heartbeat lapsed
+    Given a turn whose heartbeat has lapsed but which is still recording activity
+    And nothing on hand to revive that turn with
+    When the liveness timer fires
+    Then the turn is left running and the check is armed again
+    And the turn is not failed and not re-dispatched
+
+  @unit
+  Scenario: A turn that really stalled with nothing to revive it is failed
+    Given a turn whose heartbeat has lapsed and which has recorded no activity for longer than the stall window
+    And nothing on hand to revive that turn with
+    When the liveness timer fires
+    Then the turn fails as a worker that stopped
+    And no re-dispatch is attempted
+
+  # The record kept for reviving a turn was given its lifetime once, when the
+  # turn was dispatched, and nothing extended it. So a turn that ran longer than
+  # that lifetime lost the record while the worker was still working, and there
+  # was nothing to revive it with for the rest of the answer. The heartbeat is
+  # already the proof that the worker is alive, so it is what extends the
+  # record. It extends the lifetime only, because a heartbeat says the worker is
+  # alive, not that anything about the turn's resume inputs changed.
+  @unit
+  Scenario: A heartbeat keeps the turn's revival record alive
+    Given a turn that has been running for longer than the revival record lives
+    When the worker posts a heartbeat
+    Then the revival record is given its full lifetime again
+    And the record itself is not rewritten
+
+  @unit
+  Scenario: A revival record that already aged out is not recreated
+    Given a turn whose revival record has already expired
+    When the worker posts a heartbeat
+    Then nothing is written back, and the heartbeat still counts as liveness
+
+  @unit
+  Scenario: A heartbeat still counts when the revival record cannot be reached
+    Given the store holding revival records refuses the request
+    When the worker posts a heartbeat
+    Then the turn is still marked as alive
+    And the frame is not rejected
+
   @unit
   Scenario: A late failure never overwrites a completed answer
     Given a turn completed and the conversation is idle

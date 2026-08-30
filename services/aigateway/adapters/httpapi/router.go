@@ -1517,6 +1517,13 @@ var (
 // (specs/ai-gateway/error-transparency.feature). Everything else gets the
 // standard {"type":"error","error":{"type":"provider_error","message":...}}
 // object.
+//
+// A handled error never reaches the frame through err.Error(): herr.E renders
+// its whole Meta map and every wrapped reason into that string, so a frame
+// built from it carried the engine's internal cause — the one the JSON
+// boundary deliberately keeps to the log line — straight to the caller. The
+// customer copy the classifier wrote is used instead, so a failure reads the
+// same whether it arrives before the stream opens or during it.
 func streamErrorFrame(err error) []byte {
 	var ue *domain.UpstreamError
 	if errors.As(err, &ue) && len(ue.Body) > 0 && sonic.Valid(ue.Body) {
@@ -1524,6 +1531,17 @@ func streamErrorFrame(err error) []byte {
 	}
 	msg := err.Error()
 	errType := "provider_error"
+	var e herr.E
+	if errors.As(err, &e) {
+		// Never err.Error() for a handled error: it renders the whole Meta map
+		// and every wrapped reason. The code is the floor, the customer copy
+		// the classifier wrote is the message when there is one.
+		errType = string(e.Code)
+		msg = string(e.Code)
+		if text, ok := e.Meta["message"].(string); ok && text != "" {
+			msg = text
+		}
+	}
 	if ue != nil {
 		if ue.Message != "" {
 			msg = ue.Message
@@ -1628,10 +1646,37 @@ func writeError(logger *zap.Logger, w http.ResponseWriter, ctx context.Context, 
 	}
 	var e herr.E
 	if errors.As(err, &e) {
-		herr.WriteHTTP(w, e)
+		herr.WriteHTTP(w, domain.Remediate(withFault(e)))
 		return
 	}
-	herr.WriteHTTP(w, herr.New(ctx, domain.ErrInternal, nil))
+	herr.WriteHTTP(w, domain.Remediate(withFault(herr.New(ctx, domain.ErrInternal, nil))))
+}
+
+// withFault stamps the error's fault attribution onto the envelope, from the
+// one fault table the log line already uses.
+//
+// Attribution has to travel WITH the error. The gateway authors most of its
+// failures rather than forwarding a provider response, so there is no upstream
+// status for a client, an agent or a support conversation to infer "whose
+// problem is this" from. Doing it here, at the single write choke point, is
+// what makes it impossible for a gateway error to reach a client unattributed
+// — and keeps faultForCode as the only place the question is answered, rather
+// than asking every construction site to remember.
+//
+// An explicit fault already in meta wins: a construction site that knows
+// better than the code-level default (budget.go, classifyRequestBuildError)
+// has said so deliberately.
+func withFault(e herr.E) herr.E {
+	if _, ok := e.Meta["fault"]; ok {
+		return e
+	}
+	meta := make(herr.M, len(e.Meta)+1)
+	for k, v := range e.Meta {
+		meta[k] = v
+	}
+	meta["fault"] = string(faultForCode(e.Code))
+	e.Meta = meta
+	return e
 }
 
 // writeUpstreamError forwards a provider's terminal response to the client.
@@ -1722,6 +1767,25 @@ func registerErrorStatusesOnce() {
 	herr.RegisterStatus(domain.ErrModelNotRecognized, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrProviderError, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrProviderTimeout, http.StatusGatewayTimeout)
+	// The three terminal provider-setup failures. 400, like their siblings
+	// no_provider_configured and model_provider_not_bound: the request cannot
+	// be served until something in the customer's model provider settings
+	// changes, and a 5xx here is what made agent clients retry a dead
+	// credential ten times before giving up.
+	herr.RegisterStatus(domain.ErrProviderCredentialInvalid, http.StatusBadRequest)
+	herr.RegisterStatus(domain.ErrProviderConfigInvalid, http.StatusBadRequest)
+	// 401: the provider itself refused the credential, and forwarding its own
+	// verdict is what error-transparency promises.
+	herr.RegisterStatus(domain.ErrProviderCredentialRejected, http.StatusUnauthorized)
+	// 502: the provider was never reached. Retryable, unlike the three above.
+	herr.RegisterStatus(domain.ErrProviderConnectionFailed, http.StatusBadGateway)
+	// 499 is nginx's "client closed request": the caller hung up before a
+	// response was written. net/http has no constant for it because it is not
+	// an IANA status — it exists to be LOGGED, which is exactly what makes it
+	// right here. The alternatives both lie: 504 blames a provider that was
+	// answering, and a 2xx credits a request nobody received. Written as a
+	// literal because herrgen reads these registrations statically.
+	herr.RegisterStatus(domain.ErrRequestAbandoned, 499)
 	herr.RegisterStatus(domain.ErrBadRequest, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrMissingModel, http.StatusBadRequest)
 	// Fail-closed attribution: the request is missing a required field

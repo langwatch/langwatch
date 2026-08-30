@@ -28,6 +28,7 @@ import {
   type RunParameterValues,
   withoutParameterNames,
 } from "../parameters";
+import { type ResolvedRunModels, resolveRunModels } from "../run-models";
 import {
   decryptRunSecretValues,
   type RunSecretCiphertext,
@@ -37,6 +38,7 @@ import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
 
+import { tryGetAgentSandboxApiKey } from "~/server/api-key/agent-sandbox-key";
 import { decrypt } from "~/utils/encryption";
 import {
   AgentRepository,
@@ -146,11 +148,29 @@ export interface WorkflowVersionFetcher {
   }): Promise<{ workflowId: string; dsl: Record<string, unknown> } | null>;
 }
 
-/** Minimal interface for project lookup */
+/**
+ * Minimal interface for project lookup.
+ *
+ * The organization comes along because minting a run's sandbox key needs it,
+ * and the project row is already being read.
+ */
 export interface ProjectFetcher {
   findUnique(projectId: string): Promise<{
     apiKey: string | null;
+    team: { organizationId: string } | null;
   } | null>;
+}
+
+/**
+ * Mints the short-lived credential a code agent's sandbox authenticates with.
+ * Answers undefined when the platform could not mint one, which leaves the run
+ * to do its work once per row.
+ */
+export interface SandboxKeyMinter {
+  mint(params: {
+    projectId: string;
+    organizationId: string;
+  }): Promise<string | undefined>;
 }
 
 /**
@@ -215,6 +235,7 @@ export interface DataPrefetcherDependencies {
   modelResolver: ModelResolver;
   projectSecretsFetcher: ProjectSecretsFetcher;
   traceWaitBudgetResolver: TraceWaitBudgetResolver;
+  sandboxKeyMinter: SandboxKeyMinter;
 }
 
 // ============================================================================
@@ -226,6 +247,13 @@ export type PrefetchResult =
       success: true;
       data: ChildProcessJobData;
       telemetry: { endpoint: string; apiKey: string };
+      /**
+       * The models this run resolved. A sibling of `data` rather than a member
+       * of it: the child process builds its models from the prepared params,
+       * so it needs no name, while the caller that queues the run records the
+       * names on it.
+       */
+      resolvedModels: ResolvedRunModels;
     }
   | {
       success: false;
@@ -499,6 +527,17 @@ export async function prefetchScenarioData({
   // prompt with this run plan, so they arrive with the suite rather than with
   // the prompt. Agents carry their own on the agent record, already loaded
   // above.
+  // One key for the whole run, and the same key the project's other runs
+  // hold: every turn of this run shares the cache entries it writes, and a key
+  // per turn or per run would leave a ledger of live credentials behind. A
+  // run that cannot get one still runs, and every turn does its own work.
+  if (adapterData.type === "code" && project.organizationId) {
+    adapterData.sandboxApiKey = await deps.sandboxKeyMinter.mint({
+      projectId: context.projectId,
+      organizationId: project.organizationId,
+    });
+  }
+
   if (adapterData.type === "prompt") {
     adapterData.scenarioMappings = suiteOverrides?.targets?.find(
       (candidate) =>
@@ -519,17 +558,18 @@ export async function prefetchScenarioData({
             context.projectId,
           );
     }
-    simulatorModel =
-      suiteOverrides?.simulatorModel ??
-      scenarioResult.simulatorModel ??
-      (await deps.modelResolver.resolve(
-        "scenarios.user_simulator",
-        context.projectId,
-      ));
-    judgeModel =
-      suiteOverrides?.judgeModel ??
-      scenarioResult.judgeModel ??
-      (await deps.modelResolver.resolve("scenarios.judge", context.projectId));
+    ({ simulatorModel, judgeModel } = await resolveRunModels({
+      plan: {
+        simulatorModel: suiteOverrides?.simulatorModel,
+        judgeModel: suiteOverrides?.judgeModel,
+      },
+      scenario: {
+        simulatorModel: scenarioResult.simulatorModel,
+        judgeModel: scenarioResult.judgeModel,
+      },
+      resolveFeatureModel: (featureKey) =>
+        deps.modelResolver.resolve(featureKey, context.projectId),
+    }));
   } catch (err) {
     const message =
       err instanceof Error
@@ -646,6 +686,7 @@ export async function prefetchScenarioData({
       endpoint: env.LANGWATCH_ENDPOINT,
       apiKey: project.apiKey,
     },
+    resolvedModels: { simulatorModel, judgeModel },
   };
 }
 
@@ -719,7 +760,10 @@ async function fetchScenario({
 }
 
 type FetchProjectResult =
-  | { success: true; data: { apiKey: string } }
+  | {
+      success: true;
+      data: { apiKey: string; organizationId: string | null };
+    }
   | { success: false; error: string };
 
 async function fetchProject(
@@ -733,7 +777,13 @@ async function fetchProject(
   if (!project.apiKey) {
     return { success: false, error: `Project ${projectId} missing API key` };
   }
-  return { success: true, data: { apiKey: project.apiKey } };
+  return {
+    success: true,
+    data: {
+      apiKey: project.apiKey,
+      organizationId: project.team?.organizationId ?? null,
+    },
+  };
 }
 
 /** Failure result propagated from hydrateLlmParameters through the fetch chain */
@@ -893,6 +943,8 @@ const RawCodeAgentConfigSchema = z.object({
     .optional(),
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   scenarioOutputField: z.string().optional(),
+  /** Per-agent code budget in ms; the engine clamps it to the operator ceiling. */
+  timeoutMs: z.number().int().positive().optional(),
 });
 
 async function fetchCodeAgentData(
@@ -928,6 +980,7 @@ async function fetchCodeAgentData(
     scenarioMappings: config.scenarioMappings,
     scenarioOutputField: config.scenarioOutputField,
     secrets,
+    timeoutMs: config.timeoutMs,
   };
 }
 
@@ -1295,8 +1348,11 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
       findUnique: async (projectId) =>
         prisma.project.findUnique({
           where: { id: projectId },
-          select: { apiKey: true },
+          select: { apiKey: true, team: { select: { organizationId: true } } },
         }),
+    },
+    sandboxKeyMinter: {
+      mint: (params) => tryGetAgentSandboxApiKey({ prisma, ...params }),
     },
     modelResolver: {
       resolve: async (featureKey, projectId) => {

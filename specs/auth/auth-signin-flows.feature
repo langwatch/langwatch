@@ -12,13 +12,23 @@ Feature: Sign-in flows (credentials, Google OAuth, Auth0 OAuth)
   feature-parity gate. Binding notes per scenario record where the behavior
   is actually exercised today.
 
+  Ported at D13 (ADR-117): what the SCREENS do in front of these flows now
+  starts with the address, and the answer to where it signs in is the
+  router's - specs/identity/signin-signup-screens.feature owns and binds that,
+  and specs/identity/signin-router.feature owns the decisions themselves. What
+  stays here is the transport underneath, unchanged by the front door: the
+  same endpoints, the same session cookie, the same legacy callback path that
+  customer identity-provider applications are configured against. The Auth0
+  flow retires at D10, when the legacy callback shim goes.
+
   # Exercised end-to-end by the BetterAuth smoke test
   # (platform/app/e2e/auth-regression/better-auth-smoketest.ts, "Credentials
   # signin with correct password" -> HTTP 200 + session cookie).
   Scenario: On-prem credentials signin works end-to-end
-    Given NEXTAUTH_PROVIDER is "email"
+    Given the deployment's default method set offers email and password
     And a user exists with a bcrypt password in their Account row
-    When I POST to /api/auth/sign-in/email with email + password
+    When the screen submits the address and the routed method is the password form
+    And I POST to /api/auth/sign-in/email with email + password
     Then the response sets a session cookie
     And GET /api/auth/session returns the user
 
@@ -27,9 +37,10 @@ Feature: Sign-in flows (credentials, Google OAuth, Auth0 OAuth)
   # by the buildSocialProviders unit test in
   # platform/app/src/server/better-auth/__tests__/index.test.ts.
   Scenario: Google OAuth signin works end-to-end
-    Given NEXTAUTH_PROVIDER is "google"
+    Given the deployment's default method set offers Google
     And GOOGLE_CLIENT_* envs are set
-    When I start the /api/auth/sign-in/social?provider=google flow
+    When the routed decision names Google and the screen dials it
+    And I start the /api/auth/sign-in/social?provider=google flow
     Then I am redirected to google.com
     And on callback I land signed in at /
 

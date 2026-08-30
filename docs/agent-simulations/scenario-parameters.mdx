@@ -1,7 +1,7 @@
 ---
 title: Scenario Run Parameters
 sidebarTitle: Run parameters
-keywords: langwatch, agent simulations, scenario parameters, run parameters, params, suite run, plan, tenant, fixture, test account
+keywords: langwatch, agent simulations, scenario parameters, run parameters, params, test suite, run plan, tenant, fixture, test account
 description: Run the same scenario with different parameters, to set different setup conditions or fixtures for your agent.
 ---
 
@@ -22,8 +22,8 @@ Agent follows the cancellation policy of the {{ params.plan }} plan
 Start one run per plan:
 
 ```bash
-langwatch suite run <suite-id> --param plan=free
-langwatch suite run <suite-id> --param plan=enterprise
+langwatch test-suite run <test-suite-id> --target http:<agent-id> --param plan=free
+langwatch test-suite run <test-suite-id> --target http:<agent-id> --param plan=enterprise
 ```
 
 Each run records the values it used, so every result shows which plan it tested. The run dialog in the platform, the API and the SDKs set values the same way; see [Set the values when you start a run](#set-the-values-when-you-start-a-run).
@@ -136,32 +136,34 @@ A value set at run time overrides the scenario's default. A parameter with no ru
 
 ### In the platform
 
-Running a suite opens a confirmation dialog with one field per parameter, prefilled with the defaults. Edit a field to change the value for that run; the scenario keeps its defaults.
+Running a test suite opens a confirmation dialog with one field per parameter, prefilled with the defaults. Edit a field to change the value for that run; the scenario keeps its defaults.
 
-<img src="/images/simulations/scenario-parameters-run-dialog.png" alt="The suite run confirmation dialog with a Parameters block, the fixture field prefilled from the scenario's default value" width="100%" />
+<img src="/images/simulations/scenario-parameters-run-dialog.png" alt="The test suite run confirmation dialog with a Parameters block, the fixture field prefilled from the scenario's default value" width="100%" />
 
-The **Save and Run** button in the suite editor skips the dialog and runs with the defaults. To change a value, start the run from the suite page.
+The **Save and Run** button in the scenario editor skips the dialog and runs with the defaults. To change a value, start the run from the test suite in **Agent Testing > Scenarios**.
 
 ### With the CLI
 
 `--param key=value` repeats once per parameter:
 
 ```bash
-langwatch suite run <suite-id> --param plan=enterprise --param region=eu-central
+langwatch test-suite run <test-suite-id> --target http:<agent-id> --param plan=enterprise --param region=eu-central
 langwatch scenario run <scenario-id> --target http:<agent-id> --param plan=free
+langwatch run-plan run --target http:<agent-id> --all --param plan=free
 ```
 
 `true` and `false` become booleans. A plain number like `42` becomes a number. `007` and `1.50` stay text, because their number form would change the digits. Repeat a name and the last value wins.
 
 ### With the API
 
-`POST /api/suites/{id}/run` takes a `parameters` object. Values are strings, numbers or booleans:
+`POST /api/v1/test-suites/{id}/run` takes a `parameters` object. Values are strings, numbers or booleans:
 
 ```bash
-curl -X POST "https://app.langwatch.ai/api/suites/suite_abc123/run" \
+curl -X POST "https://app.langwatch.ai/api/v1/test-suites/suite_abc123/run" \
   -H "X-Auth-Token: ${LANGWATCH_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
+    "targets": [{ "type": "http", "referenceId": "agent_abc123" }],
     "parameters": {
       "plan": "enterprise",
       "region": "eu-central",
@@ -169,6 +171,8 @@ curl -X POST "https://app.langwatch.ai/api/suites/suite_abc123/run" \
     }
   }'
 ```
+
+`POST /api/v1/run-plans/run` takes the same `parameters` object beside its `config`.
 
 The response carries the batch id that the scheduled runs share:
 
@@ -178,12 +182,15 @@ The response carries the batch id that the scheduled runs share:
   "batchRunId": "batch_xyz789",
   "setId": "set_abc123",
   "jobCount": 6,
+  "runPlanId": "plan_abc123",
+  "planName": "Cancellation Support Agent",
+  "created": false,
   "skippedArchived": { "scenarios": [], "targets": [] },
   "items": []
 }
 ```
 
-See the [suite run endpoint reference](/api-reference/suites/action-run) for the full request and response.
+See [Run from CI](/agent-simulations/run-suites-from-ci) for the full request and response, and for the poll that waits on the batch.
 
 ### With the SDKs
 
@@ -194,8 +201,9 @@ import langwatch
 
 langwatch.setup()
 
-result = langwatch.suites.run(
+result = langwatch.test_suites.run(
     "suite_abc123",
+    targets=[{"type": "http", "referenceId": "agent_abc123"}],
     parameters={"plan": "enterprise", "region": "eu-central"},
 )
 print(result["batchRunId"])
@@ -207,7 +215,8 @@ import { LangWatch } from "langwatch";
 
 const langwatch = new LangWatch();
 
-const result = await langwatch.suites.run("suite_abc123", {
+const result = await langwatch.testSuites.run("suite_abc123", {
+  targets: [{ type: "http", referenceId: "agent_abc123" }],
   parameters: { plan: "enterprise", region: "eu-central" },
 });
 console.log(result.batchRunId);
@@ -232,7 +241,7 @@ Bearer {{ secrets.api_token }}
 ```
 
 ```bash
-langwatch suite run <suite-id> --param api_token="$TENANT_API_TOKEN"
+langwatch test-suite run <test-suite-id> --target http:<agent-id> --param api_token="$TENANT_API_TOKEN"
 ```
 
 Read the value from a CI secret variable, as above. A value typed in full on the command line stays in the shell history and in the process list of the machine that runs it, which is outside what the platform can protect.
@@ -269,7 +278,7 @@ Also check: [Testing agents behind authentication](/agent-simulations/authentica
 | `scenario_secret_parameter_in_text` | The situation or a criterion reads a secret parameter. Scenario text is recorded with the run, so it cannot carry a secret. | Read the value from the target instead, as `{{ secrets.NAME }}`. |
 | `scenario_secret_parameter_conflict` | One scenario in the run declares the name as secret and another declares it as plain. | Give the two parameters different names, or make both declarations agree. |
 
-The platform runs these checks before it schedules any jobs. A rejected run schedules nothing.
+The platform runs these checks before it schedules any jobs. A rejected run schedules no job at all.
 
 ## Where the values are recorded
 
@@ -290,7 +299,7 @@ The platform runs these checks before it schedules any jobs. A rejected run sche
   <Card title="Command line interface" icon="terminal" href="/integration/cli">
     Every run command and its flags
   </Card>
-  <Card title="Suite run endpoint" icon="code" href="/api-reference/suites/action-run">
-    The full request and response for a suite run
+  <Card title="Run from CI" icon="code" href="/agent-simulations/run-suites-from-ci">
+    Start a test suite from a CI job and wait for the batch
   </Card>
 </CardGroup>

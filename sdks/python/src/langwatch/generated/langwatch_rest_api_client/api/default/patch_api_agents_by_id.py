@@ -6,13 +6,16 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.patch_api_agents_by_id_body import PatchApiAgentsByIdBody
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...models.patch_api_agents_by_id_response_200 import PatchApiAgentsByIdResponse200
+from ...models.patch_api_agents_by_id_response_404 import PatchApiAgentsByIdResponse404
+from ...models.patch_api_agents_by_id_response_422 import PatchApiAgentsByIdResponse422
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: PatchApiAgentsByIdBody | Unset = UNSET,
+    body: PatchApiAgentsByIdBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -23,8 +26,7 @@ def _get_kwargs(
         ),
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -32,14 +34,33 @@ def _get_kwargs(
     return _kwargs
 
 
-def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Any | None:
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> PatchApiAgentsByIdResponse200 | PatchApiAgentsByIdResponse404 | PatchApiAgentsByIdResponse422 | None:
+    if response.status_code == 200:
+        response_200 = PatchApiAgentsByIdResponse200.from_dict(response.json())
+
+        return response_200
+
+    if response.status_code == 404:
+        response_404 = PatchApiAgentsByIdResponse404.from_dict(response.json())
+
+        return response_404
+
+    if response.status_code == 422:
+        response_422 = PatchApiAgentsByIdResponse422.from_dict(response.json())
+
+        return response_422
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
         return None
 
 
-def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[Any]:
+def _build_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[PatchApiAgentsByIdResponse200 | PatchApiAgentsByIdResponse404 | PatchApiAgentsByIdResponse422]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -54,21 +75,21 @@ def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiAgentsByIdBody | Unset = UNSET,
-) -> Response[Any]:
+    client: AuthenticatedClient,
+    body: PatchApiAgentsByIdBody,
+) -> Response[PatchApiAgentsByIdResponse200 | PatchApiAgentsByIdResponse404 | PatchApiAgentsByIdResponse422]:
     """Update an agent by its id
 
     Args:
         id (str):
-        body (PatchApiAgentsByIdBody | Unset):
+        body (PatchApiAgentsByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any]
+        Response[PatchApiAgentsByIdResponse200 | PatchApiAgentsByIdResponse404 | PatchApiAgentsByIdResponse422]
     """
 
     kwargs = _get_kwargs(
@@ -83,24 +104,51 @@ def sync_detailed(
     return _build_response(client=client, response=response)
 
 
-async def asyncio_detailed(
+def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiAgentsByIdBody | Unset = UNSET,
-) -> Response[Any]:
+    client: AuthenticatedClient,
+    body: PatchApiAgentsByIdBody,
+) -> PatchApiAgentsByIdResponse200 | PatchApiAgentsByIdResponse404 | PatchApiAgentsByIdResponse422 | None:
     """Update an agent by its id
 
     Args:
         id (str):
-        body (PatchApiAgentsByIdBody | Unset):
+        body (PatchApiAgentsByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any]
+        PatchApiAgentsByIdResponse200 | PatchApiAgentsByIdResponse404 | PatchApiAgentsByIdResponse422
+    """
+
+    return sync_detailed(
+        id=id,
+        client=client,
+        body=body,
+    ).parsed
+
+
+async def asyncio_detailed(
+    id: str,
+    *,
+    client: AuthenticatedClient,
+    body: PatchApiAgentsByIdBody,
+) -> Response[PatchApiAgentsByIdResponse200 | PatchApiAgentsByIdResponse404 | PatchApiAgentsByIdResponse422]:
+    """Update an agent by its id
+
+    Args:
+        id (str):
+        body (PatchApiAgentsByIdBody):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[PatchApiAgentsByIdResponse200 | PatchApiAgentsByIdResponse404 | PatchApiAgentsByIdResponse422]
     """
 
     kwargs = _get_kwargs(
@@ -111,3 +159,32 @@ async def asyncio_detailed(
     response = await client.get_async_httpx_client().request(**kwargs)
 
     return _build_response(client=client, response=response)
+
+
+async def asyncio(
+    id: str,
+    *,
+    client: AuthenticatedClient,
+    body: PatchApiAgentsByIdBody,
+) -> PatchApiAgentsByIdResponse200 | PatchApiAgentsByIdResponse404 | PatchApiAgentsByIdResponse422 | None:
+    """Update an agent by its id
+
+    Args:
+        id (str):
+        body (PatchApiAgentsByIdBody):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        PatchApiAgentsByIdResponse200 | PatchApiAgentsByIdResponse404 | PatchApiAgentsByIdResponse422
+    """
+
+    return (
+        await asyncio_detailed(
+            id=id,
+            client=client,
+            body=body,
+        )
+    ).parsed

@@ -35,7 +35,7 @@ import type {
   PrismaClient,
 } from "~/generated/prisma/client";
 import { featureFlagService } from "~/server/featureFlag/featureFlag.service";
-
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import {
   type ApplicableBudget,
   resolveApplicableBudgetsForTarget,
@@ -155,6 +155,9 @@ export class BudgetOverviewService {
     const governanceEnabled = await featureFlagService
       .isEnabled("release_ui_ai_governance_enabled", {
         distinctId: input.userId,
+        // The member budget surfaces are organization pages. No project
+        // takes part in the read.
+        projectId: NOT_TARGETED,
         organizationId: input.organizationId,
         defaultValue: true,
       })

@@ -10,6 +10,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { resolveLatestAlias } from "~/server/modelProviders/latestAliases";
 import { encryptRunSecretValues } from "~/server/scenarios/run-secret-values";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import {
@@ -21,6 +22,7 @@ import {
   type ProjectSecretsFetcher,
   type PromptFetcher,
   prefetchScenarioData,
+  type SandboxKeyMinter,
   type ScenarioFetcher,
   type SuiteConfigFetcher,
   type TraceWaitBudgetResolver,
@@ -57,6 +59,7 @@ describe("prefetchScenarioData", () => {
 
   const defaultProject = {
     apiKey: "test-api-key",
+    team: { organizationId: "organization_1" },
   };
 
   const defaultModelParams: LiteLLMParams = {
@@ -94,6 +97,10 @@ describe("prefetchScenarioData", () => {
 
     const projectFetcher: ProjectFetcher = {
       findUnique: vi.fn().mockResolvedValue(defaultProject),
+    };
+
+    const sandboxKeyMinter: SandboxKeyMinter = {
+      mint: vi.fn().mockResolvedValue("sk-lw-run-scoped"),
     };
 
     const modelParamsProvider: ModelParamsProvider = {
@@ -141,6 +148,7 @@ describe("prefetchScenarioData", () => {
       modelResolver,
       projectSecretsFetcher,
       traceWaitBudgetResolver,
+      sandboxKeyMinter,
       ...overrides,
     };
   }
@@ -680,6 +688,130 @@ describe("prefetchScenarioData", () => {
       });
     });
 
+    describe("given a model override that is a latest alias", () => {
+      // The alias is stored verbatim, so the prefetcher is the boundary
+      // that must expand it before litellm params are prepared: providers
+      // do not understand "latest" as a model id. The expected concrete
+      // model comes from the same registry resolution the picker shows.
+      const concreteFor = (alias: string) => {
+        const concrete = resolveLatestAlias(alias);
+        if (concrete === null || concrete === alias) {
+          throw new Error(`"${alias}" does not resolve to a concrete model`);
+        }
+        return concrete;
+      };
+
+      /** @scenario "A latest alias on the scenario simulator model expands to a concrete model at run time" */
+      it("expands a scenario simulator alias before preparing params", async () => {
+        const deps = createMockDeps({
+          scenarioFetcher: {
+            getById: vi.fn().mockResolvedValue({
+              ...defaultScenario,
+              simulatorModel: "openai/latest",
+              judgeModel: null,
+            }),
+          },
+          agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+          modelParamsProvider: echoingProvider(),
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: httpTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.simulatorModelParams?.model).toBe(
+            concreteFor("openai/latest"),
+          );
+        }
+      });
+
+      /** @scenario "A latest alias on the scenario judge model expands to a concrete model at run time" */
+      it("expands a scenario judge alias before preparing params", async () => {
+        const deps = createMockDeps({
+          scenarioFetcher: {
+            getById: vi.fn().mockResolvedValue({
+              ...defaultScenario,
+              simulatorModel: null,
+              judgeModel: "anthropic/latest-mini",
+            }),
+          },
+          agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+          modelParamsProvider: echoingProvider(),
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: httpTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.judgeModelParams?.model).toBe(
+            concreteFor("anthropic/latest-mini"),
+          );
+        }
+      });
+
+      /** @scenario "A latest alias on the run plan simulator model expands to a concrete model at run time" */
+      it("expands a run plan simulator alias before preparing params", async () => {
+        const deps = createMockDeps({
+          suiteConfigFetcher: {
+            getBySetId: vi.fn().mockResolvedValue({
+              simulatorModel: "openai/latest-mini",
+              judgeModel: null,
+            }),
+          },
+          agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+          modelParamsProvider: echoingProvider(),
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: httpTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.simulatorModelParams?.model).toBe(
+            concreteFor("openai/latest-mini"),
+          );
+        }
+      });
+
+      /** @scenario "A latest alias on the run plan judge model expands to a concrete model at run time" */
+      it("expands a run plan judge alias before preparing params", async () => {
+        const deps = createMockDeps({
+          suiteConfigFetcher: {
+            getBySetId: vi.fn().mockResolvedValue({
+              simulatorModel: null,
+              judgeModel: "gemini/latest",
+            }),
+          },
+          agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+          modelParamsProvider: echoingProvider(),
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: httpTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.judgeModelParams?.model).toBe(
+            concreteFor("gemini/latest"),
+          );
+        }
+      });
+    });
+
     describe("given a run plan with no model override", () => {
       describe("when prefetching a scenario in that plan with no override", () => {
         /** @scenario "A run plan with no model override falls back to the scenario or project default" */
@@ -848,6 +980,128 @@ describe("prefetchScenarioData", () => {
             expect(result.error).toContain("Code agent");
             expect(result.error).toContain("not found");
           }
+        });
+      });
+    });
+
+    describe("given a code target", () => {
+      const codeAgent = {
+        id: "agent_code",
+        type: "code" as const,
+        name: "Test Code Agent",
+        projectId: "proj_123",
+        config: {
+          parameters: [
+            {
+              identifier: "code",
+              type: "code",
+              value: "def execute(input):\n    return input",
+            },
+          ],
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+        },
+        workflowId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        archivedAt: null,
+      };
+      const codeTarget: TargetConfig = {
+        type: "code",
+        referenceId: "agent_code",
+      };
+
+      describe("when the platform mints a key for the run", () => {
+        it("carries it on the adapter data", async () => {
+          const deps = createMockDeps({
+            agentFetcher: { findById: vi.fn().mockResolvedValue(codeAgent) },
+          });
+
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: codeTarget,
+            deps,
+          });
+
+          expect(result.success).toBe(true);
+          if (!result.success) return;
+          expect(deps.sandboxKeyMinter.mint).toHaveBeenCalledWith({
+            projectId: defaultContext.projectId,
+            organizationId: "organization_1",
+          });
+          expect(result.data.adapterData).toMatchObject({
+            type: "code",
+            sandboxApiKey: "sk-lw-run-scoped",
+          });
+        });
+      });
+
+      describe("when the platform cannot mint a key", () => {
+        it("still prepares the run, with no credential on it", async () => {
+          const deps = createMockDeps({
+            agentFetcher: { findById: vi.fn().mockResolvedValue(codeAgent) },
+            sandboxKeyMinter: { mint: vi.fn().mockResolvedValue(undefined) },
+          });
+
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: codeTarget,
+            deps,
+          });
+
+          expect(result.success).toBe(true);
+          if (!result.success) return;
+          expect(result.data.adapterData).toMatchObject({ type: "code" });
+          expect(
+            (result.data.adapterData as { sandboxApiKey?: string })
+              .sandboxApiKey,
+          ).toBeUndefined();
+        });
+      });
+
+      describe("when the agent config sets its own code timeout", () => {
+        it("carries it on the adapter data as timeoutMs", async () => {
+          const deps = createMockDeps({
+            agentFetcher: {
+              findById: vi.fn().mockResolvedValue({
+                ...codeAgent,
+                config: { ...codeAgent.config, timeoutMs: 5000 },
+              }),
+            },
+          });
+
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: codeTarget,
+            deps,
+          });
+
+          expect(result.success).toBe(true);
+          if (!result.success) return;
+          expect(result.data.adapterData).toMatchObject({
+            type: "code",
+            timeoutMs: 5000,
+          });
+        });
+      });
+
+      describe("when the agent config sets no code timeout", () => {
+        it("leaves timeoutMs off the adapter data", async () => {
+          const deps = createMockDeps({
+            agentFetcher: { findById: vi.fn().mockResolvedValue(codeAgent) },
+          });
+
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: codeTarget,
+            deps,
+          });
+
+          expect(result.success).toBe(true);
+          if (!result.success) return;
+          expect(
+            (result.data.adapterData as { timeoutMs?: number }).timeoutMs,
+          ).toBeUndefined();
         });
       });
     });

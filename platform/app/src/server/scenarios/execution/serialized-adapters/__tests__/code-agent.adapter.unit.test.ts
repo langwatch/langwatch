@@ -3,7 +3,7 @@
  */
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CodeAgentData } from "../../types";
 
 // Capture withActiveSpan calls so the timeout/error paths can be verified.
@@ -970,6 +970,212 @@ describe("SerializedCodeAgentAdapter", () => {
       expect(sentParams(0).trace_id).toBe(TRACE_ID);
       expect(sentParams(1).trace_id).toBe(secondTraceId);
       expect(sentParams(1).traceparent).toBe(secondTraceparent);
+    });
+  });
+  describe("when the agent config carries a per-agent code timeout", () => {
+    /** The code node's parameters, as sent on the synthesized workflow DSL. */
+    const codeNodeParameters = (): {
+      identifier: string;
+      type: string;
+      value: unknown;
+    }[] => {
+      const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
+      const codeNode = callBody.payload.workflow.nodes.find(
+        (n: { id: string }) => n.id === "code_agent",
+      );
+      return codeNode.data.parameters;
+    };
+
+    it("sends it as the code node's timeout_ms parameter", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: { ...defaultConfig, timeoutMs: 5000 },
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(codeNodeParameters()).toContainEqual({
+        identifier: "timeout_ms",
+        type: "int",
+        value: 5000,
+      });
+    });
+
+    it("still sends the code parameter", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: { ...defaultConfig, timeoutMs: 5000 },
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(codeNodeParameters()).toContainEqual({
+        identifier: "code",
+        type: "code",
+        value: defaultConfig.code,
+      });
+    });
+
+    it("keeps its own fetch deadline above the requested code budget", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: { ...defaultConfig, timeoutMs: 300_000 },
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      const spanAttributes = withActiveSpanCalls[0]!.options.attributes;
+      expect(spanAttributes["nlp.timeout_ms"] as number).toBeGreaterThan(
+        300_000,
+      );
+    });
+
+    it("clamps its own fetch deadline to the platform's maximum for one turn", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: { ...defaultConfig, timeoutMs: Number.MAX_SAFE_INTEGER },
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      // The engine ceiling bounds the agent's Python, not this HTTP request.
+      // Without a maximum here an absurd config parks a worker on a socket
+      // for as long as the number says — up to ~24.9 days.
+      const spanAttributes = withActiveSpanCalls[0]!.options.attributes;
+      expect(spanAttributes["nlp.timeout_ms"]).toBe(900_000);
+    });
+
+    it("clamps a budget only just past the platform's maximum", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        // 890s + the 30s headroom lands at 920s, above the 900s maximum.
+        config: { ...defaultConfig, timeoutMs: 890_000 },
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      const spanAttributes = withActiveSpanCalls[0]!.options.attributes;
+      expect(spanAttributes["nlp.timeout_ms"]).toBe(900_000);
+    });
+
+    it("omits timeout_ms when the config carries no timeout", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(
+        codeNodeParameters().some((p) => p.identifier === "timeout_ms"),
+      ).toBe(false);
+    });
+  });
+
+  describe("when the operator configures the platform's fetch ceiling", () => {
+    /** The fetch deadline this adapter armed, as reported on the span. */
+    const armedFetchTimeoutMs = (): unknown =>
+      withActiveSpanCalls[0]!.options.attributes["nlp.timeout_ms"];
+
+    /** A code budget large enough that only the ceiling can decide the result. */
+    const hugeBudget = { ...defaultConfig, timeoutMs: Number.MAX_SAFE_INTEGER };
+
+    const callWith = async (config: CodeAgentData) => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+      await adapter.call(defaultInput);
+    };
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("falls back to 15 minutes when NLP_FETCH_MAX_TIMEOUT_MS is unset", async () => {
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", undefined);
+
+      await callWith(hugeBudget);
+
+      expect(armedFetchTimeoutMs()).toBe(900_000);
+    });
+
+    it("honors a raised ceiling so the engine still gets to report its own timeout", async () => {
+      // An operator who raises NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS past
+      // 900s must be able to raise this one too, or the platform aborts the
+      // fetch first and the caller sees a generic fetch-side timeout instead
+      // of the engine's diagnosis.
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "1800000");
+
+      await callWith(hugeBudget);
+
+      expect(armedFetchTimeoutMs()).toBe(1_800_000);
+    });
+
+    it("honors a lowered ceiling", async () => {
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "300000");
+
+      await callWith(hugeBudget);
+
+      expect(armedFetchTimeoutMs()).toBe(300_000);
+    });
+
+    it.each([
+      ["an empty value", ""],
+      ["a non-numeric value", "banana"],
+      ["a zero", "0"],
+      ["a negative value", "-5000"],
+      ["a whitespace-only value", "   "],
+      ["an infinite value", "Infinity"],
+    ])("falls back to 15 minutes on %s", async (_label, raw) => {
+      // Clamp, never reject: the same contract the engine keeps for its own
+      // knobs. A nonsensical ceiling must not fail the scenario run.
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", raw);
+
+      await callWith(hugeBudget);
+
+      expect(armedFetchTimeoutMs()).toBe(900_000);
+    });
+
+    it("clamps a large code budget down to the configured ceiling", async () => {
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "200000");
+
+      // 300s + the 30s headroom would be 330s, above the 200s ceiling.
+      await callWith({ ...defaultConfig, timeoutMs: 300_000 });
+
+      expect(armedFetchTimeoutMs()).toBe(200_000);
+    });
+
+    it("bounds the default deadline too when set below the 2-minute floor", async () => {
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "45000");
+
+      await callWith(defaultConfig);
+
+      expect(armedFetchTimeoutMs()).toBe(45_000);
+    });
+
+    it("leaves the default deadline at 2 minutes under the default ceiling", async () => {
+      await callWith(defaultConfig);
+
+      expect(armedFetchTimeoutMs()).toBe(120_000);
+    });
+
+    it("is read per call, so a change between turns takes effect", async () => {
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "300000");
+      await callWith(hugeBudget);
+      expect(armedFetchTimeoutMs()).toBe(300_000);
+
+      withActiveSpanCalls.length = 0;
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "600000");
+      await callWith(hugeBudget);
+      expect(armedFetchTimeoutMs()).toBe(600_000);
     });
   });
 });

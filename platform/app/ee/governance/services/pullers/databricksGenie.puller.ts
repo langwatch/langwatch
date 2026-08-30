@@ -271,6 +271,10 @@ async function resolveWorkspaceToken(params: {
       },
       body: "grant_type=client_credentials&scope=all-apis",
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+      // This request carries the client secret itself, not a token minted
+      // from it. Following a redirect here would hand it to the redirect
+      // target, and the helper follows up to ten by default.
+      followRedirects: false,
     },
   );
 
@@ -3073,6 +3077,8 @@ export class DatabricksGeniePuller
       },
       body: JSON.stringify(body),
       signal,
+      // See the sibling call above: a redirect would carry this token onward.
+      followRedirects: false,
     });
     if (!response.ok) {
       throw new GenieHttpError({
@@ -3116,6 +3122,10 @@ export class DatabricksGeniePuller
       method: "GET",
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
       signal,
+      // The workspace host is pinned on the write path, but a redirect from a
+      // real workspace would still carry this token onward, and the helper
+      // follows up to ten by default.
+      followRedirects: false,
     });
     if (!response.ok) {
       throw new GenieHttpError({

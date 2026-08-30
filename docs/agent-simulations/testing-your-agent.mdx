@@ -26,7 +26,7 @@ Write criteria about outcomes, not wording. "The agent looks up the order before
 
 ## Where your scenarios live
 
-Open **Simulations → Scenarios** in the sidebar. The Scenario Library lists every scenario in the project, with labels to organize them:
+Open **Agent Testing > Scenarios** in the sidebar. The rail on the left lists the test suites of the project, and the table lists the scenarios of the open test suite. A test suite groups scenarios: it has a name and the scenarios you file under it. Every project has a **Default** test suite, so a new scenario always has a place. Labels organize the scenarios inside a test suite:
 
 <Frame>
 <img className="block" src="/images/agent-simulations/scenario-library.png" alt="The Scenario Library with scenarios and their labels" />
@@ -91,18 +91,35 @@ Then it asks which models play the simulated user and the judge. The defaults ar
 <img className="block" src="/images/agent-simulations/scenario-choose-models.png" alt="The model picker for the user simulator and the judge" />
 </Frame>
 
-### Run a set of scenarios with a run plan
+The run of one scenario is recorded like every other run. It goes under the run plan named after the scenario and the target, so you can run the same check again later and compare.
 
-A run plan groups scenarios and runs them together against a target. This is what you run before a release, or after every change. Open **Simulations → Runs**, create a run plan with **New Run Plan**, pick the scenarios and the agent, and press **Run**:
+### Run a test suite
 
-<Frame>
-<img className="block" src="/images/agent-simulations/run-plan.png" alt="A run plan with its scenarios, pass rate and run history" />
-</Frame>
+A test suite runs every scenario in it against the agent you pick. This is what you run before a release, or after every change. Open the test suite in **Agent Testing > Scenarios** and press **Run**.
 
 The confirmation shows what is about to run, including any parameters the scenarios declare, such as which test account to act as:
 
 <Frame>
 <img className="block" src="/images/agent-simulations/run-plan-confirm.png" alt="The run confirmation with the scenario count and the run parameters" />
+</Frame>
+
+### What a run plan is
+
+Every run belongs to a **run plan**, and the name of the plan is its identity. A test suite run uses the plan named after the test suite and the target, so each run of the same test suite against the same agent joins one history and you see the pass rate over time. Give the run a different name to keep it apart, or the name of a plan that exists to run under that plan again.
+
+The plan holds the configuration of the run:
+
+- **Scope**: all scenarios of the project, the scenarios of one or more test suites, the scenarios with given labels, or a hand-picked list.
+- **Targets**: the agents or prompts to test.
+- **Repeat count**: how many times to run each scenario, 1 to 5.
+- **Models**: which model plays the simulated user, and which one judges.
+
+A run also takes the values for the parameters the scenarios declare, and a note of up to 200 characters saying what you tested this time. The note belongs to the one run, not to the plan.
+
+**Agent Testing > Results** lists the run plans of the project. Open a plan to see its runs, and open a run to see its results. **Show run settings** on a run tells you the configuration it ran with:
+
+<Frame>
+<img className="block" src="/images/agent-simulations/run-plan.png" alt="A run plan with its scenarios, pass rate and run history" />
 </Frame>
 
 ### Watch it run
@@ -139,6 +156,6 @@ Each turn also carries a **View trace** link, opening the exact steps the agent 
 
 ## Make it a habit
 
-- Run your run plan before every release. The history on the run plan page shows the pass rate over time, so a regression is visible the moment it happens.
+- Run your test suite before every release. The history of the run plan in **Agent Testing > Results** shows the pass rate over time, so a regression is visible the moment it happens.
 - After every incident or complaint, add a scenario for it. The library becomes the collective memory of everything your agent must never do again.
 - Keep scenarios short and focused: one situation, a handful of criteria. Ten small scenarios find more than one large one.

@@ -14,6 +14,7 @@ import {
   MAX_RUN_PARAMETER_KEYS,
   MAX_SCENARIO_PARAMETER_DEFINITIONS,
   mergeRunParameters,
+  parseRunParametersJson,
   parseScenarioParameterDefinitions,
   partitionParameterDefinitions,
   runParameterValuesSchema,
@@ -353,6 +354,36 @@ describe("scenario run parameters", () => {
 
         expect(resolved).toEqual({ region: "us-east" });
       });
+    });
+  });
+});
+
+describe("parseRunParametersJson", () => {
+  describe("given the raw parameters a run stored", () => {
+    it("reads back strings, numbers and booleans", () => {
+      expect(
+        parseRunParametersJson(
+          JSON.stringify({ region: "eu-central", seats: 12, trial: false }),
+        ),
+      ).toEqual({ region: "eu-central", seats: 12, trial: false });
+    });
+
+    it("reads a run that stored none as no parameters", () => {
+      expect(parseRunParametersJson("")).toEqual({});
+    });
+
+    it("drops a value the current shape cannot carry", () => {
+      expect(
+        parseRunParametersJson(
+          JSON.stringify({ region: "eu", extra: { a: 1 } }),
+        ),
+      ).toEqual({ region: "eu" });
+    });
+
+    it("reads anything that is not an object as no parameters", () => {
+      expect(parseRunParametersJson("not json")).toEqual({});
+      expect(parseRunParametersJson("[1, 2]")).toEqual({});
+      expect(parseRunParametersJson("null")).toEqual({});
     });
   });
 });

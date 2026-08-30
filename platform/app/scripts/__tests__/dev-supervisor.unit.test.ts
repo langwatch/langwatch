@@ -18,6 +18,7 @@ import {
   chmodSync,
   existsSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -139,16 +140,71 @@ function launchFrom(command: string, env: Record<string, string> = {}): number {
   return child.pid as number;
 }
 
-/** Every live pid whose command line carries this test's marker. */
-function stackPids(): number[] {
+/** How a sentinel is told from a supervisor: it re-enters behind this flag. */
+const SENTINEL_FLAG = "--sentinel";
+
+/** The live pids whose command line carries this test's marker and passes `keep`. */
+function markedPids(keep: (line: string) => boolean): number[] {
   const out = spawnSync("ps", ["-Ao", "pid=", "-o", "command="], {
     encoding: "utf8",
   }).stdout;
   return out
     .split("\n")
-    .filter((l) => l.includes(marker) && !l.includes("pkill"))
+    .filter((l) => l.includes(marker) && !l.includes("pkill") && keep(l))
     .map((l) => Number.parseInt(l.trim(), 10))
     .filter((n) => Number.isInteger(n));
+}
+
+/** Every live pid whose command line carries this test's marker. */
+function stackPids(): number[] {
+  return markedPids(() => true);
+}
+
+/**
+ * The sentinels posted for this test's stack. A sentinel carries the guarded
+ * command in its argv, so the marker tells this test's sentinels from the ones
+ * any other run posted.
+ */
+function sentinelPids(): number[] {
+  return markedPids(
+    (l) => l.includes("dev-supervisor.mjs") && l.includes(SENTINEL_FLAG),
+  );
+}
+
+/** Every live pid, with its parent, as `ps` reports them. */
+function processTree(): { pid: number; ppid: number; command: string }[] {
+  const out = spawnSync(
+    "ps",
+    ["-Ao", "pid=", "-o", "ppid=", "-o", "command="],
+    {
+      encoding: "utf8",
+    },
+  ).stdout;
+  const rows: { pid: number; ppid: number; command: string }[] = [];
+  for (const line of out.split("\n")) {
+    const match = /^(\d+)\s+(\d+)\s+(.*)$/.exec(line.trim());
+    if (match === null) continue;
+    const [, pid, ppid, command] = match;
+    if (pid === undefined || ppid === undefined || command === undefined) {
+      continue;
+    }
+    rows.push({
+      pid: Number.parseInt(pid, 10),
+      ppid: Number.parseInt(ppid, 10),
+      command,
+    });
+  }
+  return rows;
+}
+
+/** Whether a pid still exists, for the launcher this test must not disturb. */
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
 }
 
 async function waitUntil(
@@ -190,12 +246,29 @@ function runAsGroupLeader(
 function runSupervised(
   args: string[],
   env: Record<string, string> = {},
+  { supervisor = SUPERVISOR }: { supervisor?: string } = {},
 ): { stdout: string; stderr: string; status: number | null } {
-  const r = spawnSync(process.execPath, [SUPERVISOR, ...args], {
+  const r = spawnSync(process.execPath, [supervisor, ...args], {
     encoding: "utf8",
     env: { ...process.env, ...FAST, ...env },
   });
   return { stdout: r.stdout, stderr: r.stderr, status: r.status };
+}
+
+/**
+ * A copy of the supervisor with one string replaced, for the failures that
+ * cannot be provoked from the outside: a sentinel that will not spawn, or one
+ * that comes up and names no stack. The copy is the real script otherwise, and
+ * it imports nothing but node builtins, so it runs anywhere.
+ */
+function supervisorWith(from: string, to: string): string {
+  const source = readFileSync(SUPERVISOR, "utf8");
+  if (!source.includes(from)) {
+    throw new Error(`dev-supervisor.mjs no longer contains ${from}`);
+  }
+  const file = path.join(scratch, `${marker}-supervisor.mjs`);
+  writeFileSync(file, source.replace(from, to), "utf8");
+  return file;
 }
 
 describe("dev stack supervisor", () => {
@@ -315,6 +388,115 @@ describe("dev stack supervisor", () => {
     });
   });
 
+  describe("given a stack whose supervisor is killed outright", () => {
+    /**
+     * The supervisor's pid, found by its command line: it carries this test's
+     * marker (the stack path is its argument) and is not the sentinel. The
+     * launcher does not match, because ps shows its argv (`bash .../launcher.sh`),
+     * not the script body that mentions the supervisor.
+     */
+    function supervisorPid(): number | null {
+      const [pid] = markedPids(
+        (l) => l.includes("dev-supervisor.mjs") && !l.includes(SENTINEL_FLAG),
+      );
+      return pid ?? null;
+    }
+
+    describe("when the supervisor and the shell are both killed by pid", () => {
+      /** @scenario "The stack goes down even when the supervisor is killed outright" */
+      it("still takes the whole stack down, sentinel included", async () => {
+        const stack = writeStack(DEEP_STACK);
+        const launcher = launchFrom(
+          `node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`,
+        );
+        expect(await stackIsUp()).toBe(true);
+        await waitUntil(() => supervisorPid() !== null);
+        const supervisor = supervisorPid();
+        expect(supervisor).not.toBeNull();
+
+        // The shape of a hard session teardown: the launching group dies to
+        // SIGKILL, so no signal ever reaches the detached stack group.
+        process.kill(supervisor as number, "SIGKILL");
+        process.kill(launcher, "SIGKILL");
+
+        // stackPids counts the sentinel too (the guarded command is in its
+        // argv), so reaching zero also means the sentinel did not linger.
+        expect(await waitUntil(() => stackPids().length === 0)).toBe(true);
+      });
+    });
+
+    describe("when only the supervisor is killed", () => {
+      /** @scenario "A killed supervisor alone does not take a living launcher's stack" */
+      it("keeps the stack for the launcher, and takes it down when the launcher dies", async () => {
+        const stack = writeStack(DEEP_STACK);
+        const launcher = launchFrom(
+          `node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`,
+        );
+        expect(await stackIsUp()).toBe(true);
+        await waitUntil(() => supervisorPid() !== null);
+        const supervisor = supervisorPid();
+        expect(supervisor).not.toBeNull();
+
+        process.kill(supervisor as number, "SIGKILL");
+        await sleep(1500);
+        // Launcher, lanes and sentinel are all still here: a crashed
+        // supervisor is not a reason to pull work out from under a live shell.
+        expect(stackPids().length).toBeGreaterThanOrEqual(3);
+
+        process.kill(launcher, "SIGKILL");
+        expect(await waitUntil(() => stackPids().length === 0)).toBe(true);
+      });
+    });
+
+    describe("when the stack is running", () => {
+      /** @scenario "The stack is never running without a guard outside the doomed group" */
+      it("was started by the sentinel, so it was never unguarded", async () => {
+        const stack = writeStack(DEEP_STACK);
+        launchFrom(`node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`);
+        expect(await stackIsUp()).toBe(true);
+
+        // The stack script's own process, and who created it. A sentinel
+        // posted AFTER the stack would leave the supervisor as the parent, and
+        // with it the window this asserts away: for as long as posting takes,
+        // a detached stack whose only watcher is inside the doomed group.
+        const tree = processTree();
+        const stackProc = tree.find(
+          (p) => p.command.includes(stack) && !p.command.includes(SUPERVISOR),
+        );
+        expect(stackProc).toBeDefined();
+
+        const parent = tree.find((p) => p.pid === stackProc?.ppid);
+        expect(parent?.command).toContain("dev-supervisor.mjs");
+        expect(parent?.command).toContain(SENTINEL_FLAG);
+      });
+    });
+
+    describe("when the stack exits on its own", () => {
+      /** @scenario "Supervision leaves nothing behind when the stack exits on its own" */
+      it("leaves no sentinel running", async () => {
+        // The stack runs until this test releases it, so the sentinel can be
+        // observed alive first: a run that never posted one would otherwise
+        // pass this test by having nothing to leave behind.
+        const stopFile = path.join(scratch, "stop");
+        const stack = writeStack(
+          `while [ ! -f ${asBashWord(stopFile)} ]; do sleep 0.1; done`,
+        );
+        const launcher = launchFrom(
+          `node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`,
+        );
+        expect(await stackIsUp()).toBe(true);
+        expect(await waitUntil(() => sentinelPids().length > 0)).toBe(true);
+
+        writeFileSync(stopFile, "", "utf8");
+
+        // Nobody was killed: the stack ended by itself and the sentinel went
+        // with it, leaving the launcher that is still there untouched.
+        expect(await waitUntil(() => sentinelPids().length === 0)).toBe(true);
+        expect(pidAlive(launcher)).toBe(true);
+      });
+    });
+  });
+
   describe("given supervision cannot or should not apply", () => {
     describe("when the command is run anyway", () => {
       /** @scenario "Supervision can be turned off" */
@@ -351,6 +533,45 @@ describe("dev stack supervisor", () => {
 
         expect(result.status).toBe(0);
         expect(result.stdout).toBe(`${marker}-unsupervised\n`);
+      });
+
+      /** @scenario "A sentinel that cannot be started does not stop the command" */
+      it("runs the command anyway when the sentinel will not spawn", () => {
+        // spawn hands back a child and only then emits `error`, so this is the
+        // asynchronous failure: an unheard one takes the supervisor down with
+        // it, which is the one thing supervision must never do.
+        const result = runSupervised(
+          ["sh", "-c", `echo ${marker}-ran`],
+          {},
+          {
+            supervisor: supervisorWith(
+              "      process.execPath,\n      [\n        SELF,",
+              '      "/definitely-not-node",\n      [\n        SELF,',
+            ),
+          },
+        );
+
+        expect(result.stdout).toBe(`${marker}-ran\n`);
+        expect(result.status).toBe(0);
+        expect(result.stderr).toContain("sentinel did not come up");
+      });
+
+      /** @scenario "A sentinel that cannot be started does not stop the command" */
+      it("runs the command anyway when the sentinel names no stack", () => {
+        const result = runSupervised(
+          ["sh", "-c", `echo ${marker}-ran`],
+          {},
+          {
+            supervisor: supervisorWith(
+              "async function runSentinel(args, env) {",
+              "async function runSentinel(args, env) {\n  return 1;",
+            ),
+          },
+        );
+
+        expect(result.stdout).toBe(`${marker}-ran\n`);
+        expect(result.status).toBe(0);
+        expect(result.stderr).toContain("sentinel did not come up");
       });
 
       /** @scenario "A command still runs when it cannot be supervised" */

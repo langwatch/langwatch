@@ -1,4 +1,4 @@
-# The generic system-migrations runner: enrollment, cohorts, passes, claims,
+# The generic system-migrations runner: cohorts, enrollment, passes, claims,
 # rollback and the operator surfaces. What any one migration does when it runs
 # lives in that migration's own spec — for the authz migration,
 # specs/migration/authz-grants-rollout.feature.
@@ -6,9 +6,11 @@
 @migration @runner
 Feature: Running system migrations across organizations
   As a LangWatch operator
-  I want migrations to run organization by organization, paced by enrollment,
-  claimed by one process at a time and reversible without a deploy
-  So that a platform-wide change lands gradually and any organization can be
+  I want migrations to run organization by organization, paced while a rollout
+  is happening and automatic once it is finished, claimed by one process at a
+  time and reversible without a deploy
+  So that a platform-wide change lands gradually, reaches every organization
+  in the end including the ones created since, and any organization can be
   taken back off it the moment something looks wrong
 
   Background:
@@ -48,7 +50,136 @@ Feature: Running system migrations across organizations
     When a later pass runs
     Then it is skipped
 
+  # ═══ Converging ═══════════════════════════════════════════════════════
+  # One pass is never enough on its own: a pass cannot observe its own
+  # events, so an organization it adopts reads as held and only a LATER pass
+  # finalizes it. Starting the app therefore drives passes rather than one
+  # pass — nobody should have to restart the app, or click "run a pass",
+  # until the counts settle.
+  #
+  # It stops on NO PROGRESS, never on "everything is terminal": a held
+  # organization is re-proved on every pass and may legitimately never reach
+  # a terminal state, so waiting for terminal would never stop.
+
+  @unit
+  Scenario: The runner drives passes until nothing advances
+    When the app starts
+    Then passes run one after another while each one advances an organization
+    And the first pass that advances nothing ends the run
+
+  @unit
+  Scenario: A held tenant that never advances does not loop forever
+    Given an organization held with a disagreement nothing resolves
+    When the app starts
+    Then it is re-proved once and the run ends
+    And being re-proved into the same state does not count as progress
+
+  @unit
+  Scenario: Shutting down stops the loop between passes
+    Given a run waiting between two passes
+    When the app shuts down
+    Then no further pass starts
+    And the shutdown does not wait out the interval
+
+  # `lease.acquire` fails safe to false on contention AND on any Redis error,
+  # and a tenant that cannot be claimed does no work — so a pass shut out of
+  # the whole fleet reports exactly what a converged one reports. Reading that
+  # as convergence would stop this process for its whole lifetime, and if the
+  # pod actually holding the claims is then evicted, nothing drives the rest.
+  @unit
+  Scenario: A pass shut out by another process is not convergence
+    Given every organization claimed by another process
+    When the pass advances nothing
+    Then the run continues rather than stopping
+    But an installation with no organizations at all is converged
+
+  @unit
+  Scenario: A loop that never converges stops at its cap and says so
+    Given passes that report progress every time
+    When the maximum number of passes is reached
+    Then the run stops
+    And it says how many passes it gave up after
+
+  @unit
+  Scenario: A failed pass ends the loop rather than retrying it
+    Given a pass that fails outright
+    When the run reaches it
+    Then the run stops rather than retrying immediately
+    And the failure is recorded for the next start to retry
+
+  # ═══ Automatic enrollment ═════════════════════════════════════════════
+  # Enrollment paces a rollout while it is happening. A finished rollout has
+  # the opposite problem: every organization created since must migrate too,
+  # and nothing should depend on an operator remembering to enroll it. A
+  # migration says which of the two it is, once, in its own declaration — so
+  # a migration mid-rollout and a migration that has finished one can coexist
+  # on the same installation.
+
+  @unit
+  Scenario: A migration can declare that every organization is in its cohort
+    Given a cloud installation
+    And a migration declared enrolled automatically
+    When a pass computes its cohort
+    Then an organization nobody enrolled is in it
+
+  @unit
+  Scenario: An organization nobody enrolled migrates for an automatically enrolled migration
+    Given a cloud installation
+    And a migration declared enrolled automatically
+    And an organization created after the rollout finished
+    When a pass runs
+    Then that organization is migrated
+
+  # A dedicated data plane is not a reason to leave an organization out on
+  # this axis: these migrations are rooted in the ORGANIZATION, and an
+  # organization-rooted append is placed on that organization's own instance
+  # by the routing. Leaving them out would strand exactly those customers on
+  # their legacy path forever.
+  #
+  # The user-rooted axis says the same thing now, and briefly did not. A user
+  # tenant could not be placed at all, so that axis excluded private-dataplane
+  # members rather than write somewhere wrong. It can be placed now — user
+  # data lands on the shared instance, whoever the person belongs to, because
+  # what those events record is how somebody signs in rather than any
+  # organization's data (specs/private-dataplane/clickhouse-routing.feature).
+  # So neither axis holds anyone back for having a dedicated data plane.
+  @unit
+  Scenario: An automatic cohort includes a private-dataplane organization
+    Given a migration declared enrolled automatically
+    And an organization with a dedicated data plane exists
+    When a pass computes its cohort
+    Then that organization is in it
+
+  @unit
+  Scenario: Enrolling an organization for an automatically enrolled migration is refused
+    Given a migration declared enrolled automatically
+    When an operator enrols an organization for it
+    Then the action is refused
+    And no enrollment row is written
+
+  @unit
+  Scenario: Withdrawing from an automatically enrolled migration is refused
+    Given a migration declared enrolled automatically
+    When an operator withdraws an organization from it
+    Then the action is refused
+    And nothing is paused
+
+  @unit
+  Scenario: A targeted run needs no enrollment for an automatically enrolled migration
+    Given a migration declared enrolled automatically
+    And an organization no enrollment row names
+    When an operator targets it
+    Then the migration runs for that organization
+
+  @unit
+  Scenario: The migrations page is told there is nothing to enroll
+    Given a migration declared enrolled automatically
+    When the migrations page reads that migration
+    Then it is told every organization runs it
+    And it is offered no enrollment count
+
   # ═══ Enrollment ═══════════════════════════════════════════════════════
+  # What paces a migration that has not declared itself automatic.
 
   @unit
   Scenario: Enrollment alone decides which organizations migrate
@@ -171,8 +302,9 @@ Feature: Running system migrations across organizations
     Then a typed confirmation is required first
 
   # ═══ Self-hosted installations ════════════════════════════════════════
-  # Cloud paces by enrollment; self-hosted paces by the migration declaring
-  # itself released for self-hosting.
+  # Cloud decides WHO by the migration's cohort; self-hosted decides WHETHER
+  # by the migration declaring itself released for self-hosting. Two axes,
+  # two declarations, and self-hosted never reads the cohort one.
 
   @unit
   Scenario: Enrollment does not apply to self-hosted installations
@@ -210,7 +342,7 @@ Feature: Running system migrations across organizations
     Given a cloud installation
     And a migration not declared released for self-hosting
     When a pass runs
-    Then enrolled organizations are still processed
+    Then the organizations in its cohort are still processed
 
   @unit
   Scenario: Self-hosted installations run the preparation work but not the cutover yet
@@ -232,6 +364,24 @@ Feature: Running system migrations across organizations
     Given "org_acme" is migrated
     When an operator rolls it back
     Then "org_acme" answers from its legacy path again
+
+  # The pin is the ONLY runtime lever an automatically enrolled migration has -
+  # there is no enrollment to withdraw - so it has to be placeable whatever
+  # state the organization is in, including states that never touched the
+  # ledger. What varies is whether the migration's rollback EFFECT runs.
+  @unit
+  Scenario: An operator stops a rollout for an organization that keeps erroring
+    Given "org_acme" parks on every pass
+    When an operator rolls it back
+    Then the pin is recorded and later passes leave it alone
+    And no rollback effect runs, because it never cut over
+
+  @unit
+  Scenario: An operator holds an organization out of a rollout before it is reached
+    Given the migration has never processed "org_acme"
+    When an operator rolls it back
+    Then the pin is recorded and no pass ever processes it
+    And no rollback effect runs, because it never cut over
 
   @unit
   Scenario: Rolling back a cutover takes effect without a deploy, even with the queue stopped
@@ -285,6 +435,14 @@ Feature: Running system migrations across organizations
     Given a pass is already running
     When an operator targets "org_acme"
     Then the action is refused
+
+  @unit
+  Scenario: One contended member does not discard a user-rooted run's outcome
+    Given a user-rooted migration whose tenants are "org_acme"'s members
+    And one member is claimed by another pass while the rest finalize
+    When an operator targets "org_acme"
+    Then the run reports the organization rather than refusing outright
+    And the contended member keeps the organization on the operator's list
 
   @unit
   Scenario: A targeted run that only waited says so, rather than reporting a held organization

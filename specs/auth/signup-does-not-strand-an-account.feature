@@ -14,6 +14,16 @@ Feature: Signing up never strands an account
   # members list either, and neither side can move.
   #
   # The account is not the problem. Dead-ending on it is.
+  #
+  # Amended at D13 (ADR-117 §6): under the identifier-first front door the
+  # mechanism changes and the guarantee does not. Signing up with an address
+  # that already has an account no longer refuses at all - the page quietly
+  # becomes the log-in step for that address, with the reset link on the same
+  # card - so the door into a half-created account is wider than it was, never
+  # narrower. The scenarios below stay bound to the screens that answer before
+  # the flip; the new screen's behavior is bound in
+  # specs/identity/signin-signup-screens.feature ("Sign-up with an address
+  # that already has an account becomes a log-in").
 
   Background:
     Given a credentials installation

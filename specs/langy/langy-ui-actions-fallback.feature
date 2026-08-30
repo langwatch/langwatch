@@ -40,6 +40,14 @@ Feature: Langy UI actions fall back to the backend and the page catches up
     And the change is never applied a second time behind the page
 
   @unit
+  Scenario: A backend action that runs past the ceiling is reported by the server
+    Given no page answered and the backend took the action
+    And the backend does not finish inside the time the server allows
+    When the ceiling is reached
+    Then the agent is told the action timed out by the server
+    And the wait ends before the command's own deadline
+
+  @unit
   Scenario: A backend fallback without the experiment named is refused
     Given no page answered and the dispatch carried no experiment slug
     When the backend fallback would run
@@ -77,9 +85,51 @@ Feature: Langy UI actions fall back to the backend and the page catches up
 
   @integration
   Scenario: A backend edit never clobbers a workbench with unsaved changes
-    Given the workbench has unsaved edits
+    Given the workbench has unsaved edits and autosave has stood down
     When a newer version lands for this experiment
     Then the stale banner appears and nothing reloads until the user asks
+
+  # One turn that duplicates a target, writes its prompt and runs it is three
+  # saves in a row. While the page reloads for the first, the later versions
+  # arrive with a reload already running. Ignoring them left the page holding
+  # whatever that one fetch happened to bring back, so a target created after
+  # the fetch left the server was never learned and its cells read "No output
+  # yet" until the reader reloaded by hand.
+  @integration
+  Scenario: A burst of backend saves leaves the page on the newest one
+    Given the workbench is open with no unsaved edits
+    And a reload is already running for a version that landed
+    When a newer version lands for this experiment
+    Then the page reloads again once the running reload finishes
+
+  # A tab with unsaved edits already has its own save coming, and that save's
+  # answer is the truth: a new version, or a refusal. Bannering on the version
+  # signal instead told the reader their work clashed with "somewhere else"
+  # while Langy was driving THAT TAB, seconds before the tab's own save landed
+  # and made the whole thing moot. The reader was interrupted by their own
+  # keystrokes.
+  @integration
+  Scenario: A tab with a save on the way waits for its own answer
+    Given the workbench has unsaved edits and a save on the way
+    When a newer version lands for this experiment
+    Then no banner appears, and the tab's own save decides what happens next
+
+  # A save that failed leaves the workbench dirty and schedules no retry, so
+  # there is no answer to wait for. Waiting anyway kept the tab silent about
+  # every later version until the reader happened to type again.
+  @integration
+  Scenario: A tab whose autosave failed still hears the next version
+    Given the workbench has unsaved edits and its last save failed
+    When a newer version lands for this experiment
+    Then the stale banner appears and nothing reloads until the user asks
+
+  # Langy drives the open page, so most versions it announces are its own work
+  # on the reader's behalf. "Somewhere else" reads as a stranger.
+  @integration
+  Scenario: A change Langy made is named as Langy's
+    Given the server holds a newer version written by Langy
+    When the tab probes the version after coming back into focus
+    Then the banner names Langy rather than saying it happened somewhere else
 
   @integration
   Scenario: A returning tab detects staleness and reloads a clean workbench
@@ -93,3 +143,12 @@ Feature: Langy UI actions fall back to the backend and the page catches up
     When the tab's autosave sends its expected version
     Then the save is refused before anything is written
     And autosave stands down until the user reloads
+
+  # The refusal is the path a dirty tab reaches the banner by, so it is the
+  # path that most needs the name. The refusal itself says who holds the
+  # newer version.
+  @integration
+  Scenario: A refused save names who holds the newer version
+    Given Langy saved a newer version than this tab loaded
+    When the tab's autosave is refused
+    Then the banner names Langy rather than saying it happened somewhere else

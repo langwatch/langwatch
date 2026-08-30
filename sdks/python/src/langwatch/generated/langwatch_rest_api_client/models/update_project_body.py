@@ -6,7 +6,6 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..models.update_project_body_pii_redaction_level import UpdateProjectBodyPiiRedactionLevel
 from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="UpdateProjectBody")
@@ -19,13 +18,13 @@ class UpdateProjectBody:
         name (str | Unset):
         language (str | Unset):
         framework (str | Unset):
-        pii_redaction_level (UpdateProjectBodyPiiRedactionLevel | Unset):
+        team_id (str | Unset): Moves the project to this team
     """
 
     name: str | Unset = UNSET
     language: str | Unset = UNSET
     framework: str | Unset = UNSET
-    pii_redaction_level: UpdateProjectBodyPiiRedactionLevel | Unset = UNSET
+    team_id: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -35,9 +34,7 @@ class UpdateProjectBody:
 
         framework = self.framework
 
-        pii_redaction_level: str | Unset = UNSET
-        if not isinstance(self.pii_redaction_level, Unset):
-            pii_redaction_level = self.pii_redaction_level.value
+        team_id = self.team_id
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -48,8 +45,8 @@ class UpdateProjectBody:
             field_dict["language"] = language
         if framework is not UNSET:
             field_dict["framework"] = framework
-        if pii_redaction_level is not UNSET:
-            field_dict["piiRedactionLevel"] = pii_redaction_level
+        if team_id is not UNSET:
+            field_dict["teamId"] = team_id
 
         return field_dict
 
@@ -62,18 +59,13 @@ class UpdateProjectBody:
 
         framework = d.pop("framework", UNSET)
 
-        _pii_redaction_level = d.pop("piiRedactionLevel", UNSET)
-        pii_redaction_level: UpdateProjectBodyPiiRedactionLevel | Unset
-        if isinstance(_pii_redaction_level, Unset):
-            pii_redaction_level = UNSET
-        else:
-            pii_redaction_level = UpdateProjectBodyPiiRedactionLevel(_pii_redaction_level)
+        team_id = d.pop("teamId", UNSET)
 
         update_project_body = cls(
             name=name,
             language=language,
             framework=framework,
-            pii_redaction_level=pii_redaction_level,
+            team_id=team_id,
         )
 
         update_project_body.additional_properties = d

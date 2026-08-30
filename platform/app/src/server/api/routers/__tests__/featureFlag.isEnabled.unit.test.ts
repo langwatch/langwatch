@@ -3,9 +3,10 @@
  *
  * Unit tests for the featureFlag.isEnabled tRPC procedure.
  *
- * The procedure takes an optional `organizationId` and `projectId` from the
- * client and hands both to the flag store, which evaluates targeting rules
- * against them. Neither is a resource being read — the response is one boolean
+ * The procedure takes an `organizationId` and a `projectId` from the client
+ * and hands both to the flag store, which evaluates targeting rules against
+ * them. Both are stated on every call; `null` says the calling surface has no
+ * such scope. Neither is a resource being read — the response is one boolean
  * — so nothing about them looks like a permission check, and for a long time
  * nothing checked them at all. That is the hole: an authenticated user could
  * name any organization id and read that tenant's flag state one call at a
@@ -15,8 +16,8 @@
  * against real memberships since it shipped. This singular one, sitting in the
  * same file, never did.
  *
- * The fix drops an id the caller is not a current member of and evaluates the
- * flag without it, rather than throwing, so the response cannot tell "not a
+ * The fix replaces an id the caller is not a current member of with the same
+ * "no such scope" the store gets from an untargeted call, rather than throwing, so the response cannot tell "not a
  * member" apart from "flag off". A project is reached through the organization
  * that owns its team — the same boundary every project permission path fails
  * closed on — and a seat an admin disabled does not count as membership.
@@ -24,6 +25,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { NOT_TARGETED } from "../../../featureFlag/targeting";
 import { createInnerTRPCContext } from "../../trpc";
 import { featureFlagRouter } from "../featureFlag";
 
@@ -131,6 +133,8 @@ function targetingPassedToService() {
   const opts = mockIsEnabled.mock.calls[0]?.[1] as
     | { projectId?: string; organizationId?: string }
     | undefined;
+  // A dropped id arrives as NOT_TARGETED, which is what an untargeted caller
+  // sends too — that sameness is the point, so assert on it directly.
   return {
     projectId: opts?.projectId,
     organizationId: opts?.organizationId,
@@ -152,6 +156,7 @@ describe("featureFlag.isEnabled", () => {
 
       const result = await caller.isEnabled({
         flag: FLAG,
+        projectId: null,
         organizationId: OWN_ORG,
       });
 
@@ -167,10 +172,14 @@ describe("featureFlag.isEnabled", () => {
         buildMockPrisma({ memberOf: new Set([OWN_ORG]) }),
       );
 
-      await caller.isEnabled({ flag: FLAG, organizationId: FOREIGN_ORG });
+      await caller.isEnabled({
+        flag: FLAG,
+        projectId: null,
+        organizationId: FOREIGN_ORG,
+      });
 
       expect(mockIsEnabled).toHaveBeenCalledTimes(1);
-      expect(targetingPassedToService().organizationId).toBeUndefined();
+      expect(targetingPassedToService().organizationId).toBe(NOT_TARGETED);
     });
 
     it("answers exactly as it does for a member whose flag is off, so the response cannot oracle membership", async () => {
@@ -178,10 +187,10 @@ describe("featureFlag.isEnabled", () => {
 
       const outsider = await buildCaller(
         buildMockPrisma({ memberOf: new Set([OWN_ORG]) }),
-      ).isEnabled({ flag: FLAG, organizationId: FOREIGN_ORG });
+      ).isEnabled({ flag: FLAG, projectId: null, organizationId: FOREIGN_ORG });
       const member = await buildCaller(
         buildMockPrisma({ memberOf: new Set([OWN_ORG]) }),
-      ).isEnabled({ flag: FLAG, organizationId: OWN_ORG });
+      ).isEnabled({ flag: FLAG, projectId: null, organizationId: OWN_ORG });
 
       expect(outsider).toEqual(member);
       expect(outsider).toEqual({ enabled: false });
@@ -198,9 +207,13 @@ describe("featureFlag.isEnabled", () => {
         }),
       );
 
-      await caller.isEnabled({ flag: FLAG, organizationId: OWN_ORG });
+      await caller.isEnabled({
+        flag: FLAG,
+        projectId: null,
+        organizationId: OWN_ORG,
+      });
 
-      expect(targetingPassedToService().organizationId).toBeUndefined();
+      expect(targetingPassedToService().organizationId).toBe(NOT_TARGETED);
     });
   });
 
@@ -210,7 +223,11 @@ describe("featureFlag.isEnabled", () => {
         buildMockPrisma({ memberOf: new Set([OWN_ORG]) }),
       );
 
-      await caller.isEnabled({ flag: FLAG, projectId: OWN_PROJECT });
+      await caller.isEnabled({
+        flag: FLAG,
+        projectId: OWN_PROJECT,
+        organizationId: null,
+      });
 
       expect(targetingPassedToService().projectId).toBe(OWN_PROJECT);
     });
@@ -220,9 +237,13 @@ describe("featureFlag.isEnabled", () => {
         buildMockPrisma({ memberOf: new Set([OWN_ORG]) }),
       );
 
-      await caller.isEnabled({ flag: FLAG, projectId: FOREIGN_PROJECT });
+      await caller.isEnabled({
+        flag: FLAG,
+        projectId: FOREIGN_PROJECT,
+        organizationId: null,
+      });
 
-      expect(targetingPassedToService().projectId).toBeUndefined();
+      expect(targetingPassedToService().projectId).toBe(NOT_TARGETED);
     });
 
     it("drops one that does not exist, rather than passing the id through", async () => {
@@ -230,9 +251,13 @@ describe("featureFlag.isEnabled", () => {
         buildMockPrisma({ memberOf: new Set([OWN_ORG]) }),
       );
 
-      await caller.isEnabled({ flag: FLAG, projectId: UNKNOWN_PROJECT });
+      await caller.isEnabled({
+        flag: FLAG,
+        projectId: UNKNOWN_PROJECT,
+        organizationId: null,
+      });
 
-      expect(targetingPassedToService().projectId).toBeUndefined();
+      expect(targetingPassedToService().projectId).toBe(NOT_TARGETED);
     });
   });
 
@@ -257,8 +282,8 @@ describe("featureFlag.isEnabled", () => {
 
       expect(mockIsEnabled).toHaveBeenCalledTimes(1);
       expect(targetingPassedToService()).toEqual({
-        projectId: undefined,
-        organizationId: undefined,
+        projectId: NOT_TARGETED,
+        organizationId: NOT_TARGETED,
       });
     });
   });
@@ -268,7 +293,11 @@ describe("featureFlag.isEnabled", () => {
       const prisma = buildMockPrisma({ memberOf: new Set([OWN_ORG]) });
       const caller = buildCaller(prisma);
 
-      const result = await caller.isEnabled({ flag: FLAG });
+      const result = await caller.isEnabled({
+        flag: FLAG,
+        projectId: null,
+        organizationId: null,
+      });
 
       expect(result).toEqual({ enabled: false });
       expect(prisma.organizationUser.findFirst).not.toHaveBeenCalled();

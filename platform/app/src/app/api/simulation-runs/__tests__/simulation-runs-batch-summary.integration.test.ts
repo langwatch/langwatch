@@ -32,6 +32,8 @@ function makeSummary(overrides: Partial<BatchSummary> = {}): BatchSummary {
     lastUpdatedAt: 2000,
     firstCompletedAt: 1500,
     allCompletedAt: null,
+    note: null,
+    startedBy: null,
     ...overrides,
   };
 }
@@ -156,6 +158,31 @@ describe("Feature: a batch of simulation runs reports when it is complete", () =
       const body = (await res.json()) as { isComplete: boolean };
 
       expect(body.isComplete).toBe(true);
+    });
+  });
+
+  describe("when the batch was run with a note", () => {
+    it("serves the note as a field of its own", async () => {
+      withSummary(makeSummary({ note: "nightly regression" }));
+
+      const res = await getAuthenticated(
+        "/api/simulation-runs/batches/batch_1",
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { note: string | null };
+
+      expect(body.note).toBe("nightly regression");
+    });
+
+    it("serves null for a batch run without one", async () => {
+      withSummary(makeSummary());
+
+      const res = await getAuthenticated(
+        "/api/simulation-runs/batches/batch_1",
+      );
+      const body = (await res.json()) as { note: string | null };
+
+      expect(body.note).toBeNull();
     });
   });
 

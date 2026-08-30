@@ -20,12 +20,12 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import type { EnrichedAuditLog } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { useRouter } from "~/utils/compat/next-router";
-import { ProjectSelector } from "../../components/DashboardLayout";
 import { NavigationFooter } from "../../components/NavigationFooter";
 import {
   PeriodSelector,
   usePeriodSelector,
 } from "../../components/PeriodSelector";
+import { ProjectSelector } from "../../components/ProjectSelector";
 import SettingsLayout from "../../components/SettingsLayout";
 import { ContactSalesBlock } from "../../components/subscription/ContactSalesBlock";
 import { InputGroup } from "../../components/ui/input-group";

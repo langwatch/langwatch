@@ -145,6 +145,20 @@ Feature: LangWatchQL query workbench — native tables and LangWatchQL Vega-Lite
     Then the visible result is marked stale
     And the action reads Run query again
 
+  @unit
+  Scenario: Changing the granularity step marks the result stale and restores Run query
+    Given a successful result for a submitted snapshot at one granularity step
+    When the member picks a different granularity step
+    Then the visible result is marked stale
+    And the action reads Run query again
+
+  @unit
+  Scenario: Clearing the chosen step sends no step at all, not an empty one
+    Given a submission that had chosen a granularity step
+    When the member clears the step and runs the query
+    Then the request carries no granularity field at all
+    And it is not sent as a present field holding no value
+
   @integration
   Scenario: A stale result stays labelled as belonging to the previous submission
     Given a result marked stale by an edit
@@ -372,6 +386,13 @@ Feature: LangWatchQL query workbench — native tables and LangWatchQL Vega-Lite
     When the entry, Table-mode, and unrelated route chunks are inspected
     Then no Vega runtime code is present in them
     And the Vega runtime loads only when Chart mode is first entered
+
+  @unit
+  Scenario: Each lazy Vega wrapper defers its own module, in Chart mode and on the dashboard widget
+    Given the lazy wrapper for Chart mode and the lazy wrapper for the dashboard widget chart
+    When each wrapper's own static import graph is walked
+    Then neither wrapper's graph reaches Vega or the module it defers
+    And each wrapper's source still names its deferred module in a dynamic import
 
   @unit
   Scenario: Policy modules stay pure and server-import-safe
@@ -603,6 +624,13 @@ Feature: LangWatchQL query workbench — native tables and LangWatchQL Vega-Lite
     When the request carries a value for period_start of its own
     Then it is refused with error code lwql_reserved_parameter_supplied
     And nothing reaches the database
+
+  @unit
+  Scenario: The refusal names the reserved parameter the caller actually supplied
+    Given a request refused for supplying a reserved parameter of its own
+    When the workbench shows the refusal
+    Then the copy names the parameter that was supplied
+    And it does not name a reserved parameter the request never sent
 
   @unit
   Scenario: A reserved period parameter declared as anything but a date-time is refused
@@ -858,3 +886,200 @@ Feature: LangWatchQL query workbench — native tables and LangWatchQL Vega-Lite
 #   → Scenario: A statement declaring only one reserved period parameter is given that one
 #   → Scenario: A period-aware statement run with no window names what is unset
 #   → Scenario: The schema browser names the reserved period parameters where SQL is written
+
+# --- Granularity contract (#6713 slice 3, S1): the surface-owned bucket size ---
+#
+# A statement may declare `{period_granularity_seconds:UInt32}` and use it as
+# the multiplier of a fixed-unit interval -- `INTERVAL
+# {period_granularity_seconds:UInt32} SECOND` -- because ClickHouse compiles an
+# interval unit to a function name, so only the multiplier can be a bound value.
+#
+# AC1 "a chart declaring the parameter runs at the step the surface supplies"
+#   → Scenario: A statement declaring the granularity parameter runs at the step the workbench supplies
+#   → Scenario: A granularity declared with no step supplied runs on its own authored bucketing
+# AC2 "a caller-supplied value for a reserved name is refused" (granularity half)
+#   → Scenario: A caller that supplies period_granularity_seconds itself is refused
+# AC3 "the declaration must be UInt32"
+#   → Scenario: The granularity parameter declared as anything but UInt32 is refused
+#   → Scenario: A zero or fractional step is refused as a wrong declaration
+# AC4 "declaring granularity requires declaring both period bounds, checked at save"
+#   → Scenario: A saved chart declaring granularity without both period parameters is refused at save
+#   → Scenario: A granularity declared alongside a mistyped period bound is refused at save
+# AC5 "a window finer than the bucket ceiling is refused on caller-owned surfaces"
+#   → Scenario: A window that would produce more buckets than the ceiling refuses on the workbench and REST
+#   → Scenario: A window too wide for even the coarsest offered step is refused everywhere
+# AC6 "offered steps are sub-day: 1 second, 1 minute, 1 hour" — O1 resolved to
+#     sub-day by probe: over the Amsterdam fallback night the timezone-argument
+#     seconds form drifts off local midnight while toStartOfDay stays at 00:00.
+#     Day-scale waits on a reserved period_timezone parameter.
+#   → covered by the offered-step constant and its unit test; no runtime behaviour of its own.
+# AC7 "each new code has a presentation entry and a remediation entry" → guarded
+#    by `codes.unit.test.ts` and the exhaustive `satisfies` in `presentation.ts`.
+
+# The S1-bindable scenarios below are bound by
+# `src/server/analytics/lwql/__tests__/lwqlGranularity.unit.test.ts` and
+# `.../lwqlGranularityDeclaration.unit.test.ts`. The run-path ones are bound by
+# the wiring suites: save-time refusal by
+# `src/server/api/routers/__tests__/savedWorkbenchCharts.router.integration.test.ts`,
+# the budget refusal on caller-owned doors by
+# `src/server/api/routers/__tests__/lwqlGranularityBudget.router.integration.test.ts`
+# (workbench) and
+# `src/app/api/analytics-sql/__tests__/lwqlGranularityRestApi.integration.test.ts`
+# (REST), and run-by-chart-id by
+# `src/server/analytics/saved-workbench-charts/__tests__/savedWorkbenchChart.service.unit.test.ts`.
+
+@unit
+Scenario: A statement declaring the granularity parameter runs at the step the workbench supplies
+  Given SQL declaring period_granularity_seconds as UInt32 alongside both period bounds
+  And the workbench supplies a step of 60 seconds
+  When the member runs the query
+  Then the statement is bound with a granularity of 60 seconds
+  And the result is labelled as following the granularity
+
+@unit
+Scenario: The step a statement declares is offered as a control, not as a parameter to fill in
+  Given a statement whose first run is refused for an unfilled period_granularity_seconds
+  When the workbench shows the refusal
+  Then the step is not listed among the parameters to give a value
+  And a granularity control offers the steps the contract admits
+
+@unit
+Scenario: Choosing a step sends it beside the query rather than among its parameters
+  Given the workbench is showing the granularity control
+  When the member chooses a step and runs the query
+  Then the request carries that step in its own field
+  And no reserved name appears among the parameters sent
+
+@unit
+Scenario: A step too fine for the window is refused where the member chose it
+  Given the workbench is showing the granularity control
+  When the member chooses a step that would exceed the bucket ceiling
+  Then the refusal is shown against the query
+
+@unit
+Scenario: The resolver reports an unfilled declared granularity rather than inventing a step
+  Given SQL declaring period_granularity_seconds as UInt32
+  And no step supplied
+  When the declaration is resolved on its own, apart from the run path that would refuse it
+  Then the resolution still says the statement follows the granularity
+  And it carries no granularity value, since inventing one would change what a member's chart shows without them asking
+
+@unit
+Scenario: A caller that supplies period_granularity_seconds itself is refused
+  Given SQL declaring period_granularity_seconds as UInt32
+  When a caller supplies a value for period_granularity_seconds directly
+  Then the run is refused as a reserved parameter supplied
+  And the refusal names exactly the parameters the caller supplied
+
+@unit
+Scenario: The granularity parameter declared as anything but UInt32 is refused
+  Given SQL declaring period_granularity_seconds as a String
+  When the statement is validated
+  Then it is refused as a wrong granularity declaration
+  And the refusal names UInt32 as the required declared type
+
+@unit
+Scenario: A zero or fractional step is refused as a wrong declaration
+  Given SQL declaring period_granularity_seconds as UInt32
+  When the surface supplies a step that is zero, negative, fractional, or not an offered step
+  Then the run is refused as a wrong granularity declaration
+  And the refusal says the step must be one of the offered steps
+
+@integration
+Scenario: A saved chart declaring granularity without both period parameters is refused at save
+  Given SQL declaring period_granularity_seconds without period_start or period_end
+  When the member saves the chart
+  Then the save is refused because granularity requires the period parameters
+  And the refusal names which period bounds are absent
+
+@unit
+Scenario: A granularity declared alongside a mistyped period bound is refused at save
+  Given SQL declaring period_granularity_seconds and period_start declared as a String
+  When the statement is validated
+  Then it is refused because granularity requires well-typed period parameters
+  And the refusal distinguishes the mistyped bound from an absent one
+
+@integration
+Scenario: A window that would produce more buckets than the ceiling refuses on the workbench and REST
+  Given a chart declaring granularity and a requested step of 1 second
+  And a period wide enough that the window divided by the step exceeds 10,000 buckets
+  When the member runs it on a caller-owned surface
+  Then the run is refused as too fine for the period
+  And a dashboard running the same chart is coarsened to the finest step that fits
+  And the refusal carries the bucket arithmetic in its structured detail
+
+@unit
+Scenario: A window too wide for even the coarsest offered step is refused everywhere
+  Given a chart declaring granularity over a period spanning a decade
+  When even the one-hour step would exceed 10,000 buckets for that period
+  Then the run is refused as too fine for the period on coarsening surfaces too
+  And the refusal names the requested step and the bucket ceiling
+
+@unit
+Scenario: A chart declaring the granularity parameter runs at the step the surface supplies
+  Given a saved chart whose SQL declares period_granularity_seconds as UInt32
+  And the surface supplies an offered step
+  When the chart is run by id
+  Then the stored statement is executed at the supplied step
+  And the result is labelled as following the granularity
+
+@unit
+Scenario: A declared granularity with no step supplied refuses to run naming the parameter
+  Given a saved chart whose SQL declares period_granularity_seconds as UInt32
+  And the surface supplies no step
+  When the chart is run by id
+  Then the run is refused for the missing parameter
+  And the refusal names period_granularity_seconds
+
+@unit
+Scenario: Running a saved chart executes its stored statement with its saved values and the surface's window and step
+  Given a saved chart with stored SQL and saved parameter values
+  When the surface runs it with its own time window and step
+  Then the stored statement is executed with the saved values
+  And the surface's window and step are the ones bound
+
+@unit
+Scenario: Another project's saved chart is not runnable
+  Given a chart saved in one project
+  When a run names it from another project
+  Then the run is refused as chart not found
+
+@unit
+Scenario: Running a saved chart refuses a step finer than the period's bucket budget
+  Given a saved chart declaring granularity
+  And a step and period whose quotient exceeds the bucket ceiling
+  When the chart is run by id
+  Then the run is refused as too fine for the period
+
+# The run-by-chart-id procedure's own wiring, as distinct from what the service
+# decides. Bound by
+# `src/server/api/routers/__tests__/savedWorkbenchCharts.router.integration.test.ts`,
+# which runs against a real Postgres and the real RBAC tables so the permission
+# claims cannot be answered by a fake that was told what to return.
+
+@integration
+Scenario: Running a saved chart carries the same permission and switch as every other chart procedure
+  Given a project with the LangWatchQL workbench switched off
+  When a member runs a saved chart by id
+  Then the run is refused with the not-enabled code
+  And with the switch on, the run requires the analytics view permission
+
+@integration
+Scenario: A run is refused for a member without the analytics view permission, and nothing is executed
+  Given a member whose role carries no analytics view permission
+  When they run a saved chart by id
+  Then the run is refused as permission denied
+  And the query engine is never consulted
+
+@integration
+Scenario: A run names the tenant the database holds for the project in the request
+  Given a project whose LangWatchQL key is stored in the database
+  When a member runs a saved chart by id
+  Then the execution request carries that stored key
+  And not any key supplied by the caller
+
+@integration
+Scenario: Being allowed to read a chart is being allowed to run one
+  Given a member whose role grants analytics view but not chart management
+  When they run a saved chart by id
+  Then the run succeeds

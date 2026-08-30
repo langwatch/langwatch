@@ -7,6 +7,26 @@
 
 import { z } from "zod";
 import { FieldMappingSchema } from "../scenarios/field-mapping";
+import {
+  MAX_PARAMETER_NAME_LENGTH,
+  MAX_RUN_PARAMETER_KEYS,
+  runParameterValuesSchema,
+} from "../scenarios/parameters";
+
+/**
+ * The kinds of SimulationSuite.
+ *
+ * "run_plan" is a hand-assembled plan; "test_suite" is a suite that groups
+ * scenarios through Scenario.testSuiteId. A string column plus this const
+ * union, not a Prisma enum: adding a kind must not need a database migration.
+ */
+export const SUITE_KINDS = ["test_suite", "run_plan"] as const;
+export type SuiteKind = (typeof SUITE_KINDS)[number];
+
+/** Type guard: narrows a stored string to SuiteKind. */
+export function isSuiteKind(value: string): value is SuiteKind {
+  return (SUITE_KINDS as readonly string[]).includes(value);
+}
 
 const suiteTargetFields = z.object({
   type: z.enum(["prompt", "http", "code", "workflow"]),
@@ -21,6 +41,29 @@ const suiteTargetFields = z.object({
    * the pairing. Optional, so suites saved before this field still parse.
    */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+  /**
+   * The parameter overrides this target runs with, merged over the values
+   * supplied for the run as a whole. The target's values win.
+   *
+   * They are part of the target's identity: one agent may appear twice in a
+   * run with different overrides, and each is its own target with its own
+   * key and its own column. See `target-key.ts`.
+   *
+   * Secret parameters are never kept here: their values are typed once per
+   * run and travel with the run alone. A target naming one is refused.
+   */
+  runParameters: runParameterValuesSchema.optional(),
+  /**
+   * The names of the parameters the last run marked secret.
+   *
+   * The value of a secret is never written down. The name is, so the next run
+   * dialog shows the row again with an empty field and asks for the value
+   * instead of losing the row.
+   */
+  runSecretParameterNames: z
+    .array(z.string().max(MAX_PARAMETER_NAME_LENGTH))
+    .max(MAX_RUN_PARAMETER_KEYS)
+    .optional(),
 });
 
 /**

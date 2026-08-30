@@ -15,10 +15,16 @@ interface ScenarioRunActionsProps {
   scenario: { archivedAt: Date | null } | null | undefined;
   /** Whether the scenario is currently being run. */
   isRunning: boolean;
-  /** Called when the user clicks "Run again". */
-  onRunAgain: () => void;
-  /** Called when the user clicks "Edit scenario". */
-  onEditScenario: () => void;
+  /**
+   * Called when the user clicks "Run again". Pass `null` to hide the button
+   * so the caller can offer the same action from its own control.
+   */
+  onRunAgain: (() => void) | null;
+  /**
+   * Called when the user clicks "Edit scenario". Pass `null` to hide the
+   * button so the caller can offer the same action from its own control.
+   */
+  onEditScenario: (() => void) | null;
   /** When set, the overflow menu offers "Open thread". */
   onOpenThread?: (() => void) | null;
   /**
@@ -47,6 +53,8 @@ export function ScenarioRunActions({
 }: ScenarioRunActionsProps) {
   const isArchived = !!scenario && scenario.archivedAt !== null;
   const hasOverflow = !!onOpenThread || !!onOpenInTraces || !!dejaViewHref;
+  const showRunAgain = !!scenario && onRunAgain !== null;
+  const showEditScenario = !!scenario && !isArchived && onEditScenario !== null;
 
   if (!scenario && !hasOverflow) {
     return null;
@@ -54,7 +62,7 @@ export function ScenarioRunActions({
 
   return (
     <HStack gap={1} flexShrink={0}>
-      {scenario && (
+      {showRunAgain && (
         <Tooltip
           content={
             isArchived
@@ -69,7 +77,7 @@ export function ScenarioRunActions({
           <Button
             size="xs"
             variant="ghost"
-            onClick={isArchived ? undefined : onRunAgain}
+            onClick={isArchived ? undefined : (onRunAgain ?? undefined)}
             loading={isRunning}
             aria-disabled={isArchived}
             opacity={isArchived ? 0.5 : undefined}
@@ -80,12 +88,12 @@ export function ScenarioRunActions({
           </Button>
         </Tooltip>
       )}
-      {scenario && !isArchived && (
+      {showEditScenario && (
         <Tooltip content="Edit scenario" positioning={{ placement: "bottom" }}>
           <Button
             size="xs"
             variant="ghost"
-            onClick={onEditScenario}
+            onClick={onEditScenario ?? undefined}
             aria-label="Edit scenario"
           >
             <Icon as={Edit2} boxSize={3.5} />
@@ -100,19 +108,19 @@ export function ScenarioRunActions({
             </Button>
           </Menu.Trigger>
           <Menu.Content minWidth="200px">
-            {onOpenInTraces && (
-              <Menu.Item value="open-in-traces" onClick={onOpenInTraces}>
-                <HStack gap={2}>
-                  <Icon as={ListTree} boxSize={3.5} />
-                  <Text>View conversation in Trace Explorer</Text>
-                </HStack>
-              </Menu.Item>
-            )}
             {onOpenThread && (
               <Menu.Item value="open-thread" onClick={onOpenThread}>
                 <HStack gap={2}>
                   <Icon as={MessagesSquare} boxSize={3.5} />
                   <Text>Open thread</Text>
+                </HStack>
+              </Menu.Item>
+            )}
+            {onOpenInTraces && (
+              <Menu.Item value="open-in-traces" onClick={onOpenInTraces}>
+                <HStack gap={2}>
+                  <Icon as={ListTree} boxSize={3.5} />
+                  <Text>View in Traces Explorer</Text>
                 </HStack>
               </Menu.Item>
             )}

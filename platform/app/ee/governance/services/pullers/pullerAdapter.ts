@@ -106,10 +106,38 @@ export type NormalizedPullEvent = z.infer<typeof normalizedPullEventSchema>;
 
 /**
  * Result of a single `runOnce` invocation. Drained when `cursor === null`.
+ *
+ * `cursor` and `errorCount` are ONE contract, not two independent fields: the
+ * worker reads them together to decide whether a run that reported errors made
+ * progress or not, so an adapter that sets one without the other is telling it
+ * the wrong thing.
+ *
+ *   - An adapter that DELIBERATELY ADVANCES past input it cannot read (a
+ *     malformed line, an object it cannot fetch) MUST return the advanced
+ *     cursor together with a non-zero `errorCount`. The worker treats that as a
+ *     partial success: it writes the events collected, persists the advance, and
+ *     logs the error count. This is what stops one unreadable object wedging a
+ *     source forever.
+ *   - An adapter that COULD NOT MAKE PROGRESS (transport failure, exhausted
+ *     retries) MUST return the INCOMING cursor unchanged, with a non-zero
+ *     `errorCount`. The worker fails the run and the same window is retried.
+ *
+ * Returning `null` never signals progress — it is the "no cursor yet / drained"
+ * sentinel — so an adapter reporting errors must not use it to mean "advanced".
  */
 export interface PullResult {
   events: NormalizedPullEvent[];
+  /**
+   * The cursor to persist. Advanced past everything this run consumed —
+   * INCLUDING input it deliberately skipped — or the incoming cursor unchanged
+   * when the run made no progress. See the contract note above.
+   */
   cursor: string | null;
+  /**
+   * How many items this run could not read. Read together with `cursor`: with
+   * an advanced cursor it reports skipped input on an otherwise successful run;
+   * with an unchanged cursor it fails the run.
+   */
   errorCount: number;
 }
 

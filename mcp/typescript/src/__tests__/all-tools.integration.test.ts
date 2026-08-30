@@ -301,21 +301,34 @@ const CANNED_AGENT_DETAIL = {
   id: "agent_abc", name: "Test Agent", type: "http", config: { url: "http://example.com" }, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z",
 };
 
-const CANNED_SUITES_LIST = [
-  { id: "suite_abc", name: "Regression Suite", slug: "regression-suite", description: null, scenarioIds: ["scen_abc123"], targets: [{ type: "http", referenceId: "agent_abc" }], repeatCount: 1, labels: [], createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
-];
-
-const CANNED_SUITE_DETAIL = {
-  id: "suite_abc", name: "Regression Suite", slug: "regression-suite", description: "A test suite", scenarioIds: ["scen_abc123"], targets: [{ type: "http", referenceId: "agent_abc" }], repeatCount: 1, labels: [], createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z",
+const CANNED_RUN_PLAN = {
+  id: "plan_abc", name: "Regression Plan", slug: "regression-plan", scope: { mode: "labels", labels: ["auth"] }, scenarioIds: ["scen_abc123"], targets: [{ type: "http", referenceId: "agent_abc" }], repeatCount: 2, simulatorModel: "openai/gpt-5-mini", judgeModel: null, labels: [], archivedAt: null, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z", platformUrl: "https://app.langwatch.ai/proj/simulations/run-plans/plan_abc",
 };
 
-const CANNED_SUITE_CREATED = {
-  id: "suite_new", name: "New Suite", slug: "new-suite", description: null, scenarioIds: ["scen_abc123"], targets: [{ type: "http", referenceId: "agent_abc" }], repeatCount: 1, labels: [], createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z",
+const CANNED_RUN_PLANS_LIST = [CANNED_RUN_PLAN];
+
+const CANNED_RUN_PLAN_RUN = {
+  scheduled: true, batchRunId: "batch_123", setId: "set_456", jobCount: 2, skippedArchived: { scenarios: [], targets: [] }, items: [{ scenarioRunId: "run_1", scenarioId: "scen_abc123", target: { type: "http", referenceId: "agent_abc" }, name: "Test" }], runPlanId: "plan_abc", planName: "Regression Plan", created: true, platformUrl: "https://app.langwatch.ai/proj/simulations/batches/batch_123",
 };
 
-const CANNED_SUITE_RUN = {
-  scheduled: true, batchRunId: "batch_123", setId: "set_456", jobCount: 1, skippedArchived: { scenarios: [], targets: [] }, items: [{ scenarioRunId: "run_1", scenarioId: "scen_abc123", target: { type: "http", referenceId: "agent_abc" }, name: "Test" }],
+const CANNED_RUN_PLAN_RERUN = { ...CANNED_RUN_PLAN_RUN, created: false };
+
+const CANNED_TEST_SUITE = {
+  id: "suite_abc", name: "Checkout", slug: "checkout", scenarioIds: ["scen_abc123"], scenarioCount: 1, archivedAt: null, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z", platformUrl: "https://app.langwatch.ai/proj/simulations/test-suites/suite_abc",
 };
+
+const CANNED_TEST_SUITES_LIST = [CANNED_TEST_SUITE];
+
+const CANNED_TEST_SUITE_DETAIL = {
+  ...CANNED_TEST_SUITE,
+  scenarios: [{ id: "scen_abc123", name: "Login Flow Happy Path" }],
+};
+
+const CANNED_TEST_SUITE_CREATED = {
+  ...CANNED_TEST_SUITE, id: "suite_new", name: "New Suite", slug: "new-suite", scenarioIds: [], scenarioCount: 0,
+};
+
+const CANNED_TEST_SUITE_RENAMED = { ...CANNED_TEST_SUITE, name: "Checkout v2", slug: "checkout-v2" };
 
 const CANNED_SIMULATION_RUNS = {
   runs: [{ scenarioRunId: "run_abc", scenarioId: "scen_abc123", batchRunId: "batch_xyz", name: "Login Flow", status: "SUCCESS", durationInMs: 5200, totalCost: 0.0042, timestamp: 1700000000000, updatedAt: 1700000001000 }],
@@ -509,26 +522,40 @@ function createMockServer(): Server {
         res.writeHead(200);
         res.end(JSON.stringify({ id: "agent_abc", name: "Test Agent" }));
       }
-      // --- Suite endpoints ---
-      else if (url === "/api/suites" && method === "GET") {
+      // --- Run plan endpoints ---
+      else if (url === "/api/v1/run-plans/run" && method === "POST") {
         res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SUITES_LIST));
-      } else if (url === "/api/suites" && method === "POST") {
+        res.end(JSON.stringify(CANNED_RUN_PLAN_RUN));
+      } else if (url?.match(/^\/api\/v1\/run-plans(\?.*)?$/) && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_RUN_PLANS_LIST));
+      } else if (url?.match(/^\/api\/v1\/run-plans\/[^/]+\/run$/) && method === "POST") {
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_RUN_PLAN_RERUN));
+      } else if (url?.match(/^\/api\/v1\/run-plans\/[^/]+$/) && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_RUN_PLAN));
+      } else if (url?.match(/^\/api\/v1\/run-plans\/[^/]+$/) && method === "DELETE") {
+        res.writeHead(200);
+        res.end(JSON.stringify({ id: "plan_abc", archived: true }));
+      }
+      // --- Test suite endpoints ---
+      else if (url === "/api/v1/test-suites" && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_TEST_SUITES_LIST));
+      } else if (url === "/api/v1/test-suites" && method === "POST") {
         res.writeHead(201);
-        res.end(JSON.stringify(CANNED_SUITE_CREATED));
-      } else if (url?.match(/^\/api\/suites\/[^/]+\/run$/) && method === "POST") {
+        res.end(JSON.stringify(CANNED_TEST_SUITE_CREATED));
+      } else if (url?.match(/^\/api\/v1\/test-suites\/[^/]+\/run$/) && method === "POST") {
         res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SUITE_RUN));
-      } else if (url?.match(/^\/api\/suites\/[^/]+\/duplicate$/) && method === "POST") {
-        res.writeHead(201);
-        res.end(JSON.stringify(CANNED_SUITE_CREATED));
-      } else if (url?.match(/^\/api\/suites\/[^/]+$/) && method === "GET") {
+        res.end(JSON.stringify(CANNED_RUN_PLAN_RUN));
+      } else if (url?.match(/^\/api\/v1\/test-suites\/[^/]+$/) && method === "GET") {
         res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SUITE_DETAIL));
-      } else if (url?.match(/^\/api\/suites\/[^/]+$/) && method === "PATCH") {
+        res.end(JSON.stringify(CANNED_TEST_SUITE_DETAIL));
+      } else if (url?.match(/^\/api\/v1\/test-suites\/[^/]+$/) && method === "PATCH") {
         res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SUITE_DETAIL));
-      } else if (url?.match(/^\/api\/suites\/[^/]+$/) && method === "DELETE") {
+        res.end(JSON.stringify(CANNED_TEST_SUITE_RENAMED));
+      } else if (url?.match(/^\/api\/v1\/test-suites\/[^/]+$/) && method === "DELETE") {
         res.writeHead(200);
         res.end(JSON.stringify({ id: "suite_abc", archived: true }));
       }
@@ -1443,58 +1470,150 @@ describe("All MCP tools integration", () => {
   });
 
   // =====================
-  // Suite Tools
+  // Run Plan Tools
   // =====================
-  describe("platform_list_suites", () => {
-    it("returns formatted suite list", async () => {
-      const { handleListSuites } = await import("../tools/list-suites.js");
-      const result = await handleListSuites({});
-
-      expect(result).toContain("Suites / Run Plans (1 total)");
-      expect(result).toContain("Regression Suite");
-    });
-  });
-
-  describe("platform_get_suite", () => {
-    it("returns suite details", async () => {
-      const { handleGetSuite } = await import("../tools/get-suite.js");
-      const result = await handleGetSuite({ id: "suite_abc" });
-
-      expect(result).toContain("Regression Suite");
-      expect(result).toContain("suite_abc");
-    });
-  });
-
-  describe("platform_create_suite", () => {
-    it("creates a suite and returns confirmation", async () => {
-      const { handleCreateSuite } = await import("../tools/create-suite.js");
-      const result = await handleCreateSuite({
-        name: "New Suite",
-        scenarioIds: ["scen_abc123"],
-        targets: JSON.stringify([{ type: "http", referenceId: "agent_abc" }]),
+  describe("platform_run_plan", () => {
+    it("runs a configuration and reports the plan it created", async () => {
+      const { handleRunPlan } = await import("../tools/run-plan.js");
+      const result = await handleRunPlan({
+        name: "Regression Plan",
+        scope: { mode: "labels", labels: ["auth"] },
+        targets: [{ type: "http", referenceId: "agent_abc" }],
+        repeatCount: 2,
+        note: "nightly regression",
       });
 
-      expect(result).toContain("created successfully");
-      expect(result).toContain("New Suite");
+      expect(result).toContain("Regression Plan");
+      expect(result).toContain("created and started");
+      expect(result).toContain("batch_123");
+      expect(result).toContain("**Jobs**: 2");
     });
   });
 
-  describe("platform_run_suite", () => {
-    it("triggers a suite run and returns batch info", async () => {
-      const { handleRunSuite } = await import("../tools/run-suite.js");
-      const result = await handleRunSuite({ id: "suite_abc" });
+  describe("platform_list_run_plans", () => {
+    it("returns formatted run plan list", async () => {
+      const { handleListRunPlans } = await import("../tools/list-run-plans.js");
+      const result = await handleListRunPlans({});
 
-      expect(result).toContain("scheduled successfully");
+      expect(result).toContain("Run Plans (1 total)");
+      expect(result).toContain("Regression Plan");
+    });
+  });
+
+  describe("platform_get_run_plan", () => {
+    it("returns the plan configuration", async () => {
+      const { handleGetRunPlan } = await import("../tools/get-run-plan.js");
+      const result = await handleGetRunPlan({ id: "plan_abc" });
+
+      expect(result).toContain("Regression Plan");
+      expect(result).toContain("plan_abc");
+      expect(result).toContain("labels: auth");
+    });
+  });
+
+  describe("platform_rerun_run_plan", () => {
+    it("runs the stored configuration again and reports it joined the plan", async () => {
+      const { handleRerunRunPlan } = await import(
+        "../tools/rerun-run-plan.js"
+      );
+      const result = await handleRerunRunPlan({ id: "plan_abc" });
+
+      expect(result).toContain("Regression Plan");
+      expect(result).toContain("configuration of this run");
       expect(result).toContain("batch_123");
     });
   });
 
-  describe("platform_archive_suite", () => {
-    it("archives the suite", async () => {
-      const { handleArchiveSuite } = await import("../tools/archive-suite.js");
-      const result = await handleArchiveSuite({ id: "suite_abc" });
+  describe("platform_archive_run_plan", () => {
+    it("archives the run plan", async () => {
+      const { handleArchiveRunPlan } = await import(
+        "../tools/archive-run-plan.js"
+      );
+      const result = await handleArchiveRunPlan({ id: "plan_abc" });
 
       expect(result).toContain("archived");
+      expect(result).toContain("plan_abc");
+    });
+  });
+
+  // =====================
+  // Test Suite Tools
+  // =====================
+  describe("platform_list_test_suites", () => {
+    it("returns formatted test suite list", async () => {
+      const { handleListTestSuites } = await import(
+        "../tools/list-test-suites.js"
+      );
+      const result = await handleListTestSuites({});
+
+      expect(result).toContain("Test Suites (1 total)");
+      expect(result).toContain("Checkout");
+    });
+  });
+
+  describe("platform_create_test_suite", () => {
+    it("creates a test suite and returns confirmation", async () => {
+      const { handleCreateTestSuite } = await import(
+        "../tools/create-test-suite.js"
+      );
+      const result = await handleCreateTestSuite({ name: "New Suite" });
+
+      expect(result).toContain("created");
+      expect(result).toContain("New Suite");
+      expect(result).toContain("suite_new");
+    });
+  });
+
+  describe("platform_get_test_suite", () => {
+    it("returns the suite with the scenarios filed in it", async () => {
+      const { handleGetTestSuite } = await import(
+        "../tools/get-test-suite.js"
+      );
+      const result = await handleGetTestSuite({ id: "suite_abc" });
+
+      expect(result).toContain("Checkout");
+      expect(result).toContain("Login Flow Happy Path");
+    });
+  });
+
+  describe("platform_rename_test_suite", () => {
+    it("renames the test suite", async () => {
+      const { handleRenameTestSuite } = await import(
+        "../tools/rename-test-suite.js"
+      );
+      const result = await handleRenameTestSuite({
+        id: "suite_abc",
+        name: "Checkout v2",
+      });
+
+      expect(result).toContain("Checkout v2");
+    });
+  });
+
+  describe("platform_archive_test_suite", () => {
+    it("archives the suite and says the filed scenarios went with it", async () => {
+      const { handleArchiveTestSuite } = await import(
+        "../tools/archive-test-suite.js"
+      );
+      const result = await handleArchiveTestSuite({ id: "suite_abc" });
+
+      expect(result).toContain("archived");
+      expect(result).toContain("scenarios filed in it");
+    });
+  });
+
+  describe("platform_run_test_suite", () => {
+    it("runs the suite against a target and reports the derived plan", async () => {
+      const { handleRunTestSuite } = await import(
+        "../tools/run-test-suite.js"
+      );
+      const result = await handleRunTestSuite({
+        id: "suite_abc",
+        targets: [{ type: "http", referenceId: "agent_abc" }],
+      });
+
+      expect(result).toContain("Regression Plan");
+      expect(result).toContain("batch_123");
     });
   });
 

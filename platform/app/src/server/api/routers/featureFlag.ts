@@ -5,6 +5,7 @@ import type { Session } from "~/server/auth";
 import { featureFlagService } from "../../featureFlag";
 import { FRONTEND_FEATURE_FLAGS } from "../../featureFlag/frontendFeatureFlags";
 import type { FeatureFlagKey } from "../../featureFlag/registry";
+import { NOT_TARGETED } from "../../featureFlag/targeting";
 import {
   isCurrentOrganizationMember,
   isCurrentProjectOrganizationMember,
@@ -15,6 +16,9 @@ const logger = createLogger("langwatch:feature-flag-router");
 
 /** What both membership filters need off the request, and nothing more. */
 type TargetingContext = { prisma: PrismaClient; session: Session };
+
+/** The wire shape of the two targeting scopes: an id, or `null` for none. */
+type Targeting = { projectId: string | null; organizationId: string | null };
 
 /**
  * The targeting identifiers the caller is actually allowed to be evaluated
@@ -48,28 +52,34 @@ async function allowedTargeting({
   input,
 }: {
   ctx: TargetingContext;
-  input: { projectId?: string; organizationId?: string };
-}): Promise<{ projectId?: string; organizationId?: string }> {
+  input: Targeting;
+}): Promise<Targeting> {
   const userId = ctx.session.user.id;
+  const { projectId, organizationId } = input;
 
-  const [organizationId, projectId] = await Promise.all([
-    input.organizationId === undefined
-      ? Promise.resolve(undefined)
+  // `null` in and `null` out carry the meaning the wire contract gives them:
+  // no such scope. A dropped id comes back as `null` rather than as a refusal,
+  // so a non-member gets the answer every untargeted caller gets and the
+  // response cannot be read as a membership oracle. A scope the caller never
+  // stated costs no query.
+  const [allowedOrganizationId, allowedProjectId] = await Promise.all([
+    organizationId === null
+      ? Promise.resolve(null)
       : isCurrentOrganizationMember({
           prisma: ctx.prisma,
           userId,
-          organizationId: input.organizationId,
-        }).then((member) => (member ? input.organizationId : undefined)),
-    input.projectId === undefined
-      ? Promise.resolve(undefined)
-      : isCurrentProjectOrganizationMember(ctx, input.projectId).then(
-          (member) => (member ? input.projectId : undefined),
+          organizationId,
+        }).then((member) => (member ? organizationId : null)),
+    projectId === null
+      ? Promise.resolve(null)
+      : isCurrentProjectOrganizationMember(ctx, projectId).then((member) =>
+          member ? projectId : null,
         ),
   ]);
 
   return {
-    ...(organizationId !== undefined ? { organizationId } : {}),
-    ...(projectId !== undefined ? { projectId } : {}),
+    projectId: allowedProjectId,
+    organizationId: allowedOrganizationId,
   };
 }
 
@@ -111,8 +121,9 @@ const frontendFeatureFlagSchema = z.enum([...FRONTEND_FEATURE_FLAGS] as [
 /**
  * tRPC router for feature flag checks.
  *
- * Resolves through the in-code registry and the operator flag store, with
- * optional project/organization targeting.
+ * Resolves through the in-code registry and the operator flag store. Every
+ * read states the project and the organization it is about, so targeting
+ * rules can match.
  * Results are cached server-side (5s TTL) and client-side (React Query).
  *
  * @see dev/docs/adr/005-feature-flags.md for architecture decisions
@@ -121,23 +132,30 @@ export const featureFlagRouter = createTRPCRouter({
   /**
    * Check if a feature flag is enabled for the current user.
    *
-   * Both targeting ids are client input, so both are filtered through
+   * Both targeting fields are required on the wire, and `null` states that
+   * the calling surface has no such scope. An optional field would let a
+   * caller drop the organization by accident, and an organization rule would
+   * then match nothing. JSON has no `undefined`, so `null` also carries the
+   * "not known yet" case; the client disables the query in that case.
+   *
+   * Both are also client input, so both are filtered through
    * {@link allowedTargeting} before they reach the store: an id the caller is
-   * not a current member of is dropped and the flag is evaluated without it.
-   * Without that filter the procedure answers "is flag X on for org Y" for any
-   * org id an authenticated user cares to type.
+   * not a current member of becomes `null`, the same as never having stated a
+   * scope, and the flag is evaluated without it. Without that filter the
+   * procedure answers "is flag X on for org Y" for any org id an authenticated
+   * user cares to type.
    *
    * @param flag - The feature flag key (must be in FRONTEND_FEATURE_FLAGS)
-   * @param projectId - Optional project ID for project-level targeting
-   * @param organizationId - Optional organization ID for org-level targeting
+   * @param projectId - Project ID for project-level targeting, or null
+   * @param organizationId - Organization ID for org-level targeting, or null
    * @returns { enabled: boolean }
    */
   isEnabled: protectedProcedure
     .input(
       z.object({
         flag: frontendFeatureFlagSchema,
-        projectId: z.string().optional(),
-        organizationId: z.string().optional(),
+        projectId: z.string().nullable(),
+        organizationId: z.string().nullable(),
       }),
     )
     // The membership filter in the resolver is the real authorization check.
@@ -190,8 +208,8 @@ export const featureFlagRouter = createTRPCRouter({
         {
           distinctId: userId,
           defaultValue: false,
-          projectId: targeting.projectId,
-          organizationId: targeting.organizationId,
+          projectId: targeting.projectId ?? NOT_TARGETED,
+          organizationId: targeting.organizationId ?? NOT_TARGETED,
         },
       );
 
@@ -264,6 +282,9 @@ export const featureFlagRouter = createTRPCRouter({
           featureFlagService.isEnabled(input.flag as FeatureFlagKey, {
             distinctId: userId,
             defaultValue: false,
+            // The procedure asks one organization at a time by design, and
+            // the surfaces that call it have no project of their own.
+            projectId: NOT_TARGETED,
             organizationId,
           }),
         ),
@@ -319,6 +340,9 @@ export const featureFlagRouter = createTRPCRouter({
             await featureFlagService.isEnabled(input.flag as FeatureFlagKey, {
               distinctId: userId,
               defaultValue: false,
+              // Same as above: an organization-at-a-time read from a
+              // workspace surface that has no project.
+              projectId: NOT_TARGETED,
               organizationId,
             }),
           ],

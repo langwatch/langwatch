@@ -212,3 +212,15 @@ Feature: Langy can run a conversation on the pi harness
     Then the span carries the cache-read and cache-write token counts
     And the hour-long share of the writes when the provider states it
     And the counts use the same attribute names the gateway's own span uses
+
+  # The gateway drops request options a provider cannot take and names them
+  # on the response (X-LangWatch-Params-Dropped). Two production outages were
+  # invisible until a live probe because nothing on the langy side recorded
+  # what the gateway removed: the next field pi starts sending should show up
+  # as a drop record on the first turn, not as a dead card in production.
+  @unit
+  Scenario: An option the gateway dropped from a model call is visible on the turn's telemetry
+    Given a pi worker's mediated LLM call whose response names dropped options
+    When the relay retells the call as a gen_ai span
+    Then the span records which options the gateway dropped
+    And the relay logs the drop once per distinct set, not once per call

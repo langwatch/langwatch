@@ -9,6 +9,7 @@ import {
 } from "../actions/manifest";
 import {
   addColumn as addColumnTransform,
+  assertComparisonColumnAllowed,
   attachEvaluator,
   attachTarget,
   duplicateTarget as duplicateTargetTransform,
@@ -137,6 +138,20 @@ const runTransformOrKeep = <Payload, Result>(args: {
   }
 };
 
+/**
+ * The same swallow for a store action that holds an invariant itself instead of
+ * through a transform: run the edit, and keep the state untouched when the edit
+ * refuses. Only a refusal is swallowed, so a genuine bug still surfaces.
+ */
+const editOrKeep = <Slice>(edit: () => Slice, keep: Slice): Slice => {
+  try {
+    return edit();
+  } catch (error) {
+    if (isTransformError(error)) return keep;
+    throw error;
+  }
+};
+
 // ============================================================================
 // Store Implementation
 // ============================================================================
@@ -166,6 +181,15 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 
   setStaleWorkbench: (staleWorkbench) => {
     set({ staleWorkbench });
+  },
+
+  rememberRunStartedHere: (runId) => {
+    set((state) => {
+      const known = state.runsStartedHere ?? [];
+      return known.includes(runId)
+        ? {}
+        : { runsStartedHere: [...known, runId] };
+    });
   },
 
   // -------------------------------------------------------------------------
@@ -721,7 +745,16 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       const existingTarget = state.targets.find((r) => r.id === targetId);
       // Silently skip non-comparison targets so we never perturb the prompt /
       // agent / plain-evaluator code paths.
-      if (!existingTarget || !isComparisonEvaluator(existingTarget)) {
+      //
+      // A comparison column is always an evaluator target. The target itself
+      // carries no evaluator type (it names a DB evaluator row instead), so the
+      // kind of the target is the type check this seam can make: it stops a
+      // prompt or agent target that somehow holds a stale comparison config
+      // from having derived comparison mappings written onto it.
+      if (
+        existingTarget?.type !== "evaluator" ||
+        !isComparisonEvaluator(existingTarget)
+      ) {
         return state;
       }
 
@@ -809,16 +842,37 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     // The transform's core, for the same reason as addTarget: the caller's
     // EvaluatorConfig is already typed, and the auto-mapping is shared.
     set((state) =>
-      sliceOf(attachEvaluator({ state: workbenchStateOf(state), evaluator })),
+      editOrKeep<PartializedState | EvaluationsV3State>(
+        () =>
+          sliceOf(
+            attachEvaluator({ state: workbenchStateOf(state), evaluator }),
+          ),
+        state,
+      ),
     );
   },
 
+  /**
+   * A shallow merge, refused when the result would be an evaluator that cannot
+   * be what it now claims to be. `comparison` is the field that decides whether
+   * an evaluator is a column of its own or a chip on every column, so a merge
+   * that writes it onto a plain evaluator changes the kind of the thing, not
+   * one of its settings.
+   */
   updateEvaluator: (evaluatorId, updates) => {
-    set((state) => ({
-      evaluators: state.evaluators.map((e) =>
-        e.id === evaluatorId ? { ...e, ...updates } : e,
+    set((state) =>
+      editOrKeep<Pick<EvaluationsV3State, "evaluators"> | EvaluationsV3State>(
+        () => ({
+          evaluators: state.evaluators.map((e) => {
+            if (e.id !== evaluatorId) return e;
+            const merged = { ...e, ...updates };
+            assertComparisonColumnAllowed(merged);
+            return merged;
+          }),
+        }),
+        state,
       ),
-    }));
+    );
   },
 
   removeEvaluator: (evaluatorId) => {

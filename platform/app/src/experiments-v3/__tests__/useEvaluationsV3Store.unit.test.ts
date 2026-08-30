@@ -504,6 +504,84 @@ describe("useEvaluationsV3Store", () => {
       const state = useEvaluationsV3Store.getState();
       expect(state.evaluators).toHaveLength(0);
     });
+
+    describe("when an update would make a plain evaluator a comparison column", () => {
+      const comparison = {
+        variants: ["target-1", "target-2"],
+        hasGoldenAnswer: true,
+        goldenField: "expected_output",
+        includeMetrics: [] as ("cost" | "duration")[],
+        randomizeOrder: true,
+      };
+
+      /** @scenario "Only the comparison judge can be a standalone comparison column" */
+      it("keeps the evaluator attached to every target column", () => {
+        const store = useEvaluationsV3Store.getState();
+        store.addEvaluator(createTestEvaluator("eval-1"));
+
+        store.updateEvaluator("eval-1", { comparison });
+
+        expect(
+          useEvaluationsV3Store.getState().evaluators[0]?.comparison,
+        ).toBeUndefined();
+      });
+
+      it("keeps every other edit in that same call out of the store", () => {
+        const store = useEvaluationsV3Store.getState();
+        store.addEvaluator(createTestEvaluator("eval-1"));
+
+        store.updateEvaluator("eval-1", {
+          comparison,
+          inputs: [{ identifier: "renamed_output", type: "str" }],
+        });
+
+        expect(
+          useEvaluationsV3Store.getState().evaluators[0]?.inputs[0]?.identifier,
+        ).toBe("output");
+      });
+    });
+
+    describe("when the evaluator is the comparison judge", () => {
+      it("writes the comparison config", () => {
+        const store = useEvaluationsV3Store.getState();
+        store.addEvaluator({
+          ...createTestEvaluator("eval-1"),
+          evaluatorType: "langevals/select_best_compare",
+        });
+
+        store.updateEvaluator("eval-1", {
+          comparison: {
+            variants: ["target-1", "target-2"],
+            hasGoldenAnswer: false,
+            includeMetrics: [],
+            randomizeOrder: true,
+          },
+        });
+
+        expect(
+          useEvaluationsV3Store.getState().evaluators[0]?.comparison?.variants,
+        ).toEqual(["target-1", "target-2"]);
+      });
+    });
+
+    describe("when a plain evaluator is added with a comparison config", () => {
+      /** @scenario "Only the comparison judge can be a standalone comparison column" */
+      it("is not added at all", () => {
+        const store = useEvaluationsV3Store.getState();
+
+        store.addEvaluator({
+          ...createTestEvaluator("eval-1"),
+          comparison: {
+            variants: ["target-1", "target-2"],
+            hasGoldenAnswer: false,
+            includeMetrics: [],
+            randomizeOrder: true,
+          },
+        });
+
+        expect(useEvaluationsV3Store.getState().evaluators).toHaveLength(0);
+      });
+    });
   });
 
   describe("Evaluator mapping operations (evaluators apply to all targets)", () => {

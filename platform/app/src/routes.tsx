@@ -79,7 +79,15 @@ const routes: RouteObject[] = [
     path: "/auth/reset-password",
     ...page(() => import("./pages/auth/reset-password")),
   },
+  // The email-verification magic link lands here; it renders only (D01).
+  {
+    path: "/auth/verify-email",
+    ...page(() => import("./pages/auth/verify-email")),
+  },
   { path: "/auth/error", ...page(() => import("./pages/auth/error")) },
+  // Join before create (ADR-117 §6): a new account passes through here on its
+  // way to making an organization. Renders nothing until D12 fills it.
+  { path: "/auth/join", ...page(() => import("./pages/auth/join")) },
 
   // Top-level pages
   { path: "/", ...page(() => import("./pages/index")) },
@@ -603,6 +611,16 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/[project]/experiments/[experiment]")),
       },
 
+      // Agent Testing (catch-all, behind release_ui_agent_testing_v2_enabled)
+      {
+        path: "/:project/agent-testing",
+        ...page(() => import("./pages/[project]/agent-testing/[[...path]]")),
+      },
+      {
+        path: "/:project/agent-testing/*",
+        ...page(() => import("./pages/[project]/agent-testing/[[...path]]")),
+      },
+
       // Simulations (catch-all)
       {
         path: "/:project/simulations/scenarios",
@@ -689,6 +707,10 @@ const routes: RouteObject[] = [
   {
     path: "/ops/backoffice/subscriptions",
     ...page(() => import("./pages/ops/backoffice/subscriptions")),
+  },
+  {
+    path: "/ops/backoffice/sso-connections",
+    ...page(() => import("./pages/ops/backoffice/sso-connections")),
   },
 
   // @project redirect - Next.js parallel route that redirects /@project/path to /:project/path

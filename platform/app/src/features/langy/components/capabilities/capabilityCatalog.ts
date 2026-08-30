@@ -203,10 +203,15 @@ export const CAPABILITY_CATALOG = {
     digestStrategy: "id-ref",
     noun: { singular: "simulation run", plural: "simulation runs" },
   },
-  suite: {
+  "test-suite": {
     surface: "simulations",
     digestStrategy: "id-ref",
-    noun: { singular: "suite", plural: "suites" },
+    noun: { singular: "test suite", plural: "test suites" },
+  },
+  "run-plan": {
+    surface: "simulations",
+    digestStrategy: "id-ref",
+    noun: { singular: "run plan", plural: "run plans" },
   },
   prompt: {
     surface: "prompts",
@@ -242,6 +247,11 @@ export const CAPABILITY_CATALOG = {
     surface: "dashboards",
     digestStrategy: "id-ref",
     noun: { singular: "graph", plural: "graphs" },
+  },
+  chart: {
+    surface: "dashboards",
+    digestStrategy: "id-ref",
+    noun: { singular: "chart", plural: "charts" },
   },
   trigger: {
     surface: "automations",

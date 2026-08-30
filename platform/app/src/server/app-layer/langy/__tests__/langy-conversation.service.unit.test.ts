@@ -1044,4 +1044,94 @@ describe("LangyConversationService", () => {
       });
     });
   });
+
+  // Two paths finish a turn and race each other: the relay's terminal frame and
+  // the agent's own HTTP post. Both land here, so the turn's ordered account is
+  // read HERE rather than by either caller — otherwise the record's shape would
+  // depend on which of them won.
+  describe("given a turn that wrote between its calls", () => {
+    const account = [
+      { kind: "text" as const, text: "Reading the failures first." },
+      { kind: "tool" as const, id: "call-1" },
+      { kind: "text" as const, text: "Now trying a tighter prompt." },
+      { kind: "tool" as const, id: "call-2" },
+      { kind: "text" as const, text: "Done." },
+    ];
+    const toolCalls = [
+      { id: "call-1", name: "read", output: "{}" },
+      { id: "call-2", name: "write", output: "{}" },
+    ];
+
+    const partKinds = (
+      recordAgentResponse: ReturnType<typeof vi.fn>,
+    ): string[] => {
+      const [call] = recordAgentResponse.mock.calls;
+      const { parts } = (call?.[0] ?? { parts: [] }) as {
+        parts: Array<{ type: string; text?: string }>;
+      };
+      return parts.map((part) =>
+        part.type === "text" ? `text:${part.text}` : part.type,
+      );
+    };
+
+    /** @scenario "The order does not depend on which path finished the turn" */
+    it("records the paragraphs and the calls in the order they happened", async () => {
+      const recordAgentResponse = vi.fn(async () => {});
+      const svc = new LangyConversationService(
+        makeRepo(),
+        makeCommands({ recordAgentResponse }),
+        undefined,
+        null,
+        { readTurnOrder: vi.fn(async () => account) },
+      );
+
+      await svc.ingestAgentTurnResult({
+        projectId: "p1",
+        conversationId: "c1",
+        turnId: "t1",
+        status: "completed",
+        text: "Done.",
+        toolCalls,
+      });
+
+      expect(partKinds(recordAgentResponse)).toEqual([
+        "text:Reading the failures first.",
+        "tool-read",
+        "text:Now trying a tighter prompt.",
+        "tool-write",
+        "text:Done.",
+      ]);
+    });
+
+    /** @scenario "A turn whose order cannot be read is still recorded" */
+    it("records the calls before the reply when the account cannot be read", async () => {
+      const recordAgentResponse = vi.fn(async () => {});
+      const svc = new LangyConversationService(
+        makeRepo(),
+        makeCommands({ recordAgentResponse }),
+        undefined,
+        null,
+        {
+          readTurnOrder: vi.fn(async () => {
+            throw new Error("redis is down");
+          }),
+        },
+      );
+
+      await svc.ingestAgentTurnResult({
+        projectId: "p1",
+        conversationId: "c1",
+        turnId: "t1",
+        status: "completed",
+        text: "Done.",
+        toolCalls,
+      });
+
+      expect(partKinds(recordAgentResponse)).toEqual([
+        "tool-read",
+        "tool-write",
+        "text:Done.",
+      ]);
+    });
+  });
 });

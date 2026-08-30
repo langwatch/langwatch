@@ -650,6 +650,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agent-cache/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read a cache entry by name. An entry that was never stored, or whose lifetime has passed, answers 404. Requires the agentCache:manage grain, because a caller that can overwrite an entry can already choose what the next read answers. A legacy project API key reaches this route, the same as it reaches the rest of the project surface. */
+        get: operations["getApiAgentCacheByName"];
+        /** @description Store a value under a name, whether or not the name is held yet. The value is encrypted at rest and expires by itself after ttl_seconds, which defaults to 900 seconds. The last write wins. */
+        put: operations["putApiAgentCacheByName"];
+        post?: never;
+        /** @description Remove a cache entry. A name the project does not hold answers the same as one it does, so a caller can clear an entry without reading it first. */
+        delete: operations["deleteApiAgentCacheByName"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agent-cache/{name}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Store a value under a name only if the project does not hold that name yet. The answer says whether this caller is the one that took it: `claimed` is true when the value was written, and false when the name was already held, which leaves the held value alone. Losing is an ordinary answer and not a refusal, so a caller branches on `claimed` rather than on an error. This is what one row of a run uses to do work the rows beside it then reuse, instead of every row doing it at once. The value is encrypted at rest and expires by itself after ttl_seconds, which defaults to 900 seconds. */
+        post: operations["postApiAgentCacheByNameClaim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agents": {
         parameters: {
             query?: never;
@@ -677,7 +713,8 @@ export interface paths {
         };
         /** @description Get an agent by its id */
         get: operations["getApiAgentsById"];
-        put?: never;
+        /** @description Update an agent by its id */
+        put: operations["putApiAgentsById"];
         post?: never;
         /** @description Archive an agent (soft-delete) */
         delete: operations["deleteApiAgentsById"];
@@ -846,6 +883,30 @@ export interface paths {
          * @description Replaces a saved chart's name, its definition, or both. A definition offered here passes exactly the validators a save passes, resolved against this key's current permissions — so a chart cannot be edited into naming a column the caller may no longer read. A request carrying neither field is refused.
          */
         patch: operations["patchApiV1ProjectsByProjectIdAnalyticsChartsByChartId"];
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Place a saved workbench chart on a dashboard
+         * @description Places one saved LangWatchQL chart on a dashboard in the same project, at the grid position supplied — or, when no grid row is given, at the next row free on that dashboard, counting charts of every kind. A dashboard that is not in this project is reported as not found, exactly like a chart that is not, and nothing is written.
+         */
+        put: operations["putApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement"];
+        post?: never;
+        /**
+         * Remove a saved workbench chart from its dashboard
+         * @description Removes one saved LangWatchQL chart from whatever dashboard it is on, clearing its grid position along with the dashboard id. Idempotent: unplacing a chart that is not placed answers 204 all the same. The chart itself — its statement, parameter values and specification — is untouched.
+         */
+        delete: operations["deleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/coding-agent/sessions/{sessionId}/events": {
@@ -1245,6 +1306,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/experiments/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one experiment
+         * @description Read a single experiment by its slug, in the same shape the list returns. Accepts the experiment id as well, so either identifier the list hands back can be used.
+         */
+        get: operations["getApiExperimentsBySlug"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/evaluations/list": {
         parameters: {
             query?: never;
@@ -1478,7 +1559,7 @@ export interface paths {
         };
         /**
          * List an experiment's versions
-         * @description Every saved version of the experiment's setup, newest first. Page through them with `limit` and `cursor`.
+         * @description Every saved version of the experiment's setup, newest first. A commit, an agent write and a restore each add a numbered version. Ordinary typing rewrites one autosave row, which is the entry with `autoSaved` true. Page through them with `limit` and `cursor`.
          */
         get: operations["getApiExperimentsBySlugVersions"];
         put?: never;
@@ -2677,10 +2758,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List the organization's SCIM bearer tokens: id, description, creation time and last use. Token values and hashes are never returned; the value exists only in the create response, once. */
+        /** @description List the organization's SCIM bearer tokens: id, description, the connection each one manages, creation time and last use. Token values and hashes are never returned; the value exists only in the create response, once. */
         get: operations["listScimTokens"];
         put?: never;
-        /** @description Mint a SCIM bearer token for this organization's /api/scim/v2 endpoints. The token value is returned once, here, and never again; store it in the identity provider immediately. */
+        /** @description Mint a SCIM bearer token for one of this organization's single sign-on connections, for use against /api/scim/v2. The token only manages the people that connection provisioned. The token value is returned once, here, and never again; store it in the identity provider immediately. */
         post: operations["createScimToken"];
         delete?: never;
         options?: never;
@@ -2888,7 +2969,7 @@ export interface paths {
         put?: never;
         /** @description Create a new scenario event */
         post: operations["postApiScenarioEvents"];
-        /** @description Archive all simulation runs for a scenario set. Pass `scenarioSetId=default` to archive runs in the implicit default set; future SDK runs without an explicit setId will repopulate it. */
+        /** @description Archive simulation runs. Pass exactly one of `scenarioSetId` (archives every run in the set; `scenarioSetId=default` targets the implicit default set) or `scenarioRunId` (archives that one run). */
         delete: operations["deleteApiScenarioEvents"];
         options?: never;
         head?: never;
@@ -2944,6 +3025,41 @@ export interface paths {
         post?: never;
         /** @description Archive (soft-delete) a scenario */
         delete: operations["deleteApiScenariosById"];
+        options?: never;
+        head?: never;
+        /** @description Update an existing scenario */
+        patch: operations["patchApiScenariosById"];
+        trace?: never;
+    };
+    "/api/scenarios/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the saved versions of a scenario, newest first. A scenario saved before versions were recorded closes its history with a synthesized Created entry. */
+        get: operations["getApiScenariosByIdVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scenarios/{id}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get one saved version of a scenario, with the name, situation, criteria, labels and parameters as that version saved them. */
+        get: operations["getApiScenariosByIdVersionsByVersion"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3085,7 +3201,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List simulation runs, optionally filtered by scenarioSetId or batchRunId */
+        /** @description List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass `include=messages` to read whole conversations, which caps the page at 20 runs, ending on a batch boundary. A batch-scoped listing always carries whole conversations. */
         get: operations["getApiSimulationRuns"];
         put?: never;
         post?: never;
@@ -3153,10 +3269,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List all non-archived suites (run plans) for the project */
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. List all non-archived suites for the project. By default only run plans are returned; pass kind=folder for test suites.
+         */
         get: operations["getApiSuites"];
         put?: never;
-        /** @description Create a new suite (run plan) */
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Create a new suite (run plan).
+         */
         post: operations["postApiSuites"];
         delete?: never;
         options?: never;
@@ -3171,15 +3293,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Get a suite (run plan) by its ID */
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Get a suite (run plan) by its ID.
+         */
         get: operations["getApiSuitesById"];
         put?: never;
         post?: never;
-        /** @description Archive (soft-delete) a suite (run plan) */
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Archive (soft-delete) a suite. Archiving a folder also archives every scenario filed in it, in one transaction.
+         */
         delete: operations["deleteApiSuitesById"];
         options?: never;
         head?: never;
-        /** @description Update a suite (run plan) */
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Update a suite (run plan).
+         */
         patch: operations["patchApiSuitesById"];
         trace?: never;
     };
@@ -3192,7 +3323,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Duplicate a suite (run plan) */
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Duplicate a suite (run plan).
+         */
         post: operations["postApiSuitesByIdDuplicate"];
         delete?: never;
         options?: never;
@@ -3209,8 +3343,143 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Trigger a suite run. Schedules scenario executions for all active scenarios × targets × repeatCount. */
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Trigger a suite run. Schedules scenario executions for all active scenarios x targets x repeatCount. When the id names a test suite, the targets, the repeat count and the models are read from the body.
+         */
         post: operations["postApiSuitesByIdRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/run-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the project's run plans. Archived plans are left out unless includeArchived is set. Test suites are not run plans and are listed by the test suites family. */
+        get: operations["listRunPlans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/run-plans/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Run a configuration under a name. The name identifies the run plan: send a name already in use and that plan's configuration is replaced with this one, send a new name and the plan is created, send no name and one is derived from what the run covers and what it runs against. */
+        post: operations["runRunPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/run-plans/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read one run plan. An id the project does not hold, and a test suite id, both answer 404 suite_not_found. */
+        get: operations["getRunPlan"];
+        put?: never;
+        post?: never;
+        /** @description Archive a run plan. The plan stops being listed and its run history is kept. The scenarios it referenced are left where they are. */
+        delete: operations["archiveRunPlan"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/run-plans/{id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run a plan again
+         * @description Run a run plan again, with the configuration it already holds. To run a different configuration, post it to /run under the plan's name.
+         */
+        post: operations["rerunRunPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/test-suites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the project's test suites. Archived suites are left out unless includeArchived is set. Run plans are not test suites and are listed by the run plans family. */
+        get: operations["listTestSuites"];
+        put?: never;
+        /** @description Create a test suite. It starts empty: scenarios join it by being filed into it, and the targets a run goes against are sent with the run. */
+        post: operations["createTestSuite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/test-suites/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one test suite
+         * @description Read one test suite with the scenarios filed in it, named. An id the project does not hold, and a run plan id, both answer 404 suite_not_found.
+         */
+        get: operations["getTestSuite"];
+        put?: never;
+        post?: never;
+        /** @description Archive a test suite. The scenarios filed in it are archived with it, in one step, because the suite is where they live. */
+        delete: operations["archiveTestSuite"];
+        options?: never;
+        head?: never;
+        /** @description Rename a test suite. The slug is kept, so links and run history stay where they are. */
+        patch: operations["renameTestSuite"];
+        trace?: never;
+    };
+    "/api/v1/test-suites/{id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run a test suite
+         * @description Run every scenario filed in the test suite against the targets sent with the request. The run is filed under a run plan named after the suite and its targets unless a name is sent. A request that names no target answers 422 suite_targets_required.
+         */
+        post: operations["runTestSuite"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4203,6 +4472,461 @@ export interface operations {
             };
         };
     };
+    getApiAgentCacheByName: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        name: string;
+                        value: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description The project holds no live entry under that name */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    putApiAgentCacheByName: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    value: string;
+                    ttl_seconds?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Entry stored */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        name: string;
+                        ttl_seconds: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    deleteApiAgentCacheByName: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Entry removed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        name: string;
+                        deleted: boolean;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiAgentCacheByNameClaim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    value: string;
+                    ttl_seconds?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Claim resolved, taken or not */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        name: string;
+                        claimed: boolean;
+                        ttl_seconds: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
     getApiAgents: {
         parameters: {
             query?: {
@@ -4250,6 +4974,76 @@ export interface operations {
         requestBody?: never;
         responses: never;
     };
+    putApiAgentsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    /** @enum {string} */
+                    type?: "signature" | "code" | "workflow" | "http";
+                    config?: {
+                        [key: string]: unknown;
+                    };
+                    workflowId?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Agent updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        /** @enum {string} */
+                        type: "signature" | "code" | "workflow" | "http";
+                        config: {
+                            [key: string]: unknown;
+                        } | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Agent not found in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description The request body does not match the expected shape */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
     deleteApiAgentsById: {
         parameters: {
             query?: never;
@@ -4284,7 +5078,53 @@ export interface operations {
                 };
             };
         };
-        responses: never;
+        responses: {
+            /** @description Agent updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        /** @enum {string} */
+                        type: "signature" | "code" | "workflow" | "http";
+                        config: {
+                            [key: string]: unknown;
+                        } | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Agent not found in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description The request body does not match the expected shape */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
     };
     listApiKeys: {
         parameters: {
@@ -5185,6 +6025,7 @@ export interface operations {
                         start: string | number;
                         end: string | number;
                     };
+                    granularitySeconds?: 1 | 60 | 3600;
                 };
             };
         };
@@ -5211,6 +6052,9 @@ export interface operations {
                         };
                         truncated: boolean;
                         followsTimeWindow: boolean;
+                        followsGranularity: boolean;
+                        granularitySeconds?: number;
+                        coarsenedFromSeconds?: number;
                         diagnostics: {
                             /** @enum {string} */
                             code: "RESULT_TRUNCATED" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD";
@@ -5480,6 +6324,11 @@ export interface operations {
                             createdAt: string;
                             updatedAt: string;
                             platformUrl: string;
+                            dashboardId: string | null;
+                            gridColumn: number;
+                            gridRow: number;
+                            colSpan: number;
+                            rowSpan: number;
                         }[];
                     };
                 };
@@ -5606,6 +6455,11 @@ export interface operations {
                         createdAt: string;
                         updatedAt: string;
                         platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
                     };
                 };
             };
@@ -5725,6 +6579,11 @@ export interface operations {
                         createdAt: string;
                         updatedAt: string;
                         platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
                     };
                 };
             };
@@ -5992,8 +6851,288 @@ export interface operations {
                         createdAt: string;
                         updatedAt: string;
                         platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
                     };
                 };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No chart with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    putApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                chartId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    dashboardId: string;
+                    gridColumn?: number;
+                    gridRow?: number;
+                    colSpan?: number;
+                    rowSpan?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description The chart, now placed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            sql: string;
+                            parameters: {
+                                [key: string]: unknown;
+                            };
+                            vegaLiteSpec?: {
+                                [key: string]: unknown;
+                            };
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No chart with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    deleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                chartId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The chart is no longer on any dashboard */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Bad Request */
             400: {
@@ -7499,6 +8638,106 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiExperimentsBySlug: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The experiment's slug, or its id */
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        slug: string;
+                        name: string | null;
+                        type: string;
+                        workflowId: string | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        runsCount: number;
+                        lastRunAt: string | null;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description No experiment with that slug or id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
                     };
                 };
             };
@@ -9061,10 +10300,13 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        /** @description Newest first */
+                        /** @description Newest first, by `counterVersion` */
                         versions: {
+                            /** @description Restore this version by this number. Named versions run 1, 2, 3 with no gaps. The autosave row also has a number, but it changes with every save, so read it as a handle and not as a place in the history. */
                             version: number;
-                            /** @description True for a version written by an ordinary save */
+                            /** @description The setup version this row was written at. It says how recent the row is, and it equals the experiment's current version on the row holding the live setup. */
+                            counterVersion: number;
+                            /** @description True for the single autosave row, which every ordinary save rewrites in place */
                             autoSaved: boolean;
                             commitMessage: string | null;
                             /**
@@ -9074,8 +10316,10 @@ export interface operations {
                             authorLabel: string;
                             /** @description User id, when a person wrote it */
                             authorId: string | null;
-                            /** @description ISO 8601 timestamp */
+                            /** @description ISO 8601 timestamp of the first write */
                             createdAt: string;
+                            /** @description ISO 8601 timestamp of the last write. The autosave row is rewritten in place, so this is what says how old its content is. */
+                            updatedAt: string;
                         }[];
                         /** @description Pass as `cursor` to read the next page, null on the last one */
                         nextCursor: number | null;
@@ -19868,6 +21112,7 @@ export interface operations {
                         tokens: {
                             id: string;
                             description: string | null;
+                            connectionId: string | null;
                             createdAt: string;
                             lastUsedAt: string | null;
                         }[];
@@ -19887,6 +21132,7 @@ export interface operations {
             content: {
                 "application/json": {
                     description?: string;
+                    connectionId?: string;
                 };
             };
         };
@@ -19900,6 +21146,7 @@ export interface operations {
                     "application/json": {
                         id: string;
                         token: string;
+                        connectionId: string;
                         description: string | null;
                     };
                 };
@@ -21214,11 +22461,29 @@ export interface operations {
                     metadata: {
                         name?: string;
                         description?: string;
+                        note?: string;
+                        agents?: {
+                            name: string;
+                            /** @enum {string} */
+                            role: "agent" | "user" | "judge";
+                        }[];
                         langwatch?: {
                             targetReferenceId: string;
                             /** @enum {string} */
                             targetType: "prompt" | "http" | "code" | "workflow";
+                            targetKey?: string;
+                            targetParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
                             simulationSuiteId?: string;
+                            scenarioVersion?: number;
+                            simulatorModel?: string;
+                            judgeModel?: string;
+                            resolvedSimulatorModel?: string;
+                            resolvedJudgeModel?: string;
+                            actorId?: string;
+                            /** @enum {string} */
+                            actorLabel?: "user" | "api" | "cli";
                         };
                     } & {
                         [key: string]: unknown;
@@ -21715,8 +22980,9 @@ export interface operations {
     };
     deleteApiScenarioEvents: {
         parameters: {
-            query: {
-                scenarioSetId: string;
+            query?: {
+                scenarioSetId?: string;
+                scenarioRunId?: string;
             };
             header?: never;
             path?: never;
@@ -21735,10 +23001,14 @@ export interface operations {
                         failed: number;
                         scenarioSetId: string;
                         hasMore: boolean;
+                    } | {
+                        archived: number;
+                        failed: number;
+                        scenarioRunId: string;
                     };
                 };
             };
-            /** @description Missing or invalid scenarioSetId */
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -21746,6 +23016,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         error: string;
+                        message?: string;
                     };
                 };
             };
@@ -21761,7 +23032,18 @@ export interface operations {
                     };
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Scenario run not found in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid scope parameter */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -21769,7 +23051,6 @@ export interface operations {
                 content: {
                     "application/json": {
                         error: string;
-                        message?: string;
                     };
                 };
             };
@@ -21890,11 +23171,19 @@ export interface operations {
                         parameters: {
                             name: string;
                             description?: string;
-                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                             defaultValue?: string | number | boolean;
-                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                             secret?: boolean;
                         }[];
+                        /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        simulatorModel?: string | null;
+                        /** @description The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        judgeModel?: string | null;
+                        /** @description The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family. */
+                        maxTurns?: number | null;
+                        /** @description The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family. */
+                        minTurns?: number | null;
+                        /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
+                        testSuiteId?: string | null;
                         /** Format: uri */
                         platformUrl: string;
                     }[];
@@ -21970,11 +23259,19 @@ export interface operations {
                     parameters?: {
                         name: string;
                         description?: string;
-                        /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                         defaultValue?: string | number | boolean;
-                        /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                         secret?: boolean;
                     }[];
+                    /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    simulatorModel?: string | null;
+                    /** @description Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    judgeModel?: string | null;
+                    /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
+                    maxTurns?: number | null;
+                    /** @description Minimum conversation turns before the judge may end the run. Null uses the default. */
+                    minTurns?: number | null;
+                    /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
+                    testSuiteId?: string | null;
                 };
             };
         };
@@ -21994,11 +23291,19 @@ export interface operations {
                         parameters: {
                             name: string;
                             description?: string;
-                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                             defaultValue?: string | number | boolean;
-                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                             secret?: boolean;
                         }[];
+                        /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        simulatorModel?: string | null;
+                        /** @description The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        judgeModel?: string | null;
+                        /** @description The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family. */
+                        maxTurns?: number | null;
+                        /** @description The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family. */
+                        minTurns?: number | null;
+                        /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
+                        testSuiteId?: string | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -22080,11 +23385,19 @@ export interface operations {
                         parameters: {
                             name: string;
                             description?: string;
-                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                             defaultValue?: string | number | boolean;
-                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                             secret?: boolean;
                         }[];
+                        /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        simulatorModel?: string | null;
+                        /** @description The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        judgeModel?: string | null;
+                        /** @description The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family. */
+                        maxTurns?: number | null;
+                        /** @description The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family. */
+                        minTurns?: number | null;
+                        /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
+                        testSuiteId?: string | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -22172,11 +23485,19 @@ export interface operations {
                     parameters?: {
                         name: string;
                         description?: string;
-                        /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                         defaultValue?: string | number | boolean;
-                        /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                         secret?: boolean;
                     }[];
+                    /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    simulatorModel?: string | null;
+                    /** @description Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    judgeModel?: string | null;
+                    /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
+                    maxTurns?: number | null;
+                    /** @description Minimum conversation turns before the judge may end the run. Null uses the default. */
+                    minTurns?: number | null;
+                    /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
+                    testSuiteId?: string | null;
                 };
             };
         };
@@ -22196,11 +23517,19 @@ export interface operations {
                         parameters: {
                             name: string;
                             description?: string;
-                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                             defaultValue?: string | number | boolean;
-                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                             secret?: boolean;
                         }[];
+                        /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        simulatorModel?: string | null;
+                        /** @description The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        judgeModel?: string | null;
+                        /** @description The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family. */
+                        maxTurns?: number | null;
+                        /** @description The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family. */
+                        minTurns?: number | null;
+                        /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
+                        testSuiteId?: string | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -22316,6 +23645,358 @@ export interface operations {
                 };
             };
             /** @description Scenario not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    patchApiScenariosById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    situation?: string;
+                    criteria?: string[];
+                    labels?: string[];
+                    /** @description The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text. */
+                    parameters?: {
+                        name: string;
+                        description?: string;
+                        defaultValue?: string | number | boolean;
+                        secret?: boolean;
+                    }[];
+                    /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    simulatorModel?: string | null;
+                    /** @description Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    judgeModel?: string | null;
+                    /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
+                    maxTurns?: number | null;
+                    /** @description Minimum conversation turns before the judge may end the run. Null uses the default. */
+                    minTurns?: number | null;
+                    /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
+                    testSuiteId?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Scenario updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        situation: string;
+                        criteria: string[];
+                        labels: string[];
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                            secret?: boolean;
+                        }[];
+                        /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        simulatorModel?: string | null;
+                        /** @description The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        judgeModel?: string | null;
+                        /** @description The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family. */
+                        maxTurns?: number | null;
+                        /** @description The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family. */
+                        minTurns?: number | null;
+                        /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
+                        testSuiteId?: string | null;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Scenario not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiScenariosByIdVersions: {
+        parameters: {
+            query?: {
+                limit?: number;
+                /** @description Read the page below this version number. */
+                cursor?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        versions: {
+                            /** @description The version number, counting from 1. */
+                            version: number;
+                            /** @description Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a scenario saved before versions were recorded. */
+                            authorLabel: string | null;
+                            /** @description The user who saved the version. Null when the save came from an API key. */
+                            authorId: string | null;
+                            changeDescription: string | null;
+                            /** @description The fields whose value this save changed. */
+                            changedFields: string[];
+                            /** @description When the version was written, in ISO 8601. */
+                            createdAt: string;
+                            /** @description True on the Created entry a scenario saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back. */
+                            isSynthesized: boolean;
+                        }[];
+                        /** @description Pass as cursor to read the page below this one. Null on the last page. */
+                        nextCursor: number | null;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Scenario not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiScenariosByIdVersionsByVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version: number;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The version number, counting from 1. */
+                        version: number;
+                        /** @description Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a scenario saved before versions were recorded. */
+                        authorLabel: string | null;
+                        /** @description The user who saved the version. Null when the save came from an API key. */
+                        authorId: string | null;
+                        changeDescription: string | null;
+                        /** @description The fields whose value this save changed. */
+                        changedFields: string[];
+                        /** @description When the version was written, in ISO 8601. */
+                        createdAt: string;
+                        /** @description True on the Created entry a scenario saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back. */
+                        isSynthesized: boolean;
+                        /** @description The shape the snapshot was written in. */
+                        schemaVersion: number;
+                        /** @description The editable content of the scenario as this version saved it. */
+                        snapshot: {
+                            name: string;
+                            situation: string;
+                            criteria: string[];
+                            labels: string[];
+                            parameters: {
+                                name: string;
+                                description?: string;
+                                defaultValue?: string | number | boolean;
+                                secret?: boolean;
+                            }[];
+                            simulatorModel: string | null;
+                            judgeModel: string | null;
+                            maxTurns: number | null;
+                            minTurns: number | null;
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Scenario or version not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -23150,6 +24831,8 @@ export interface operations {
                 batchRunId?: string;
                 limit?: number;
                 cursor?: string;
+                /** @description Pass `messages` to read whole conversations instead of the first few messages of each run. The page size is capped at 20 runs when set, and ends on a batch boundary. */
+                include?: "messages";
             };
             header?: never;
             path?: never;
@@ -23182,10 +24865,16 @@ export interface operations {
                                 role: string;
                                 content: string;
                             }[];
+                            /** @description True when `messages` holds only the first few messages of a longer conversation. Pass `include=messages` to read them all. */
+                            messagesTruncated?: boolean;
                             timestamp: number;
                             updatedAt: number;
                             durationInMs: number;
                             totalCost?: number;
+                            /** @description One short line saying why the run was started, as given when it was queued. Null on a run started without one. Absent on servers that predate run notes. */
+                            note?: string | null;
+                            /** @description The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. Absent on servers that predate scenario versions. */
+                            scenarioVersion?: number | null;
                             /** Format: uri */
                             platformUrl: string;
                         }[];
@@ -23279,10 +24968,16 @@ export interface operations {
                             role: string;
                             content: string;
                         }[];
+                        /** @description True when `messages` holds only the first few messages of a longer conversation. Pass `include=messages` to read them all. */
+                        messagesTruncated?: boolean;
                         timestamp: number;
                         updatedAt: number;
                         durationInMs: number;
                         totalCost?: number;
+                        /** @description One short line saying why the run was started, as given when it was queued. Null on a run started without one. Absent on servers that predate run notes. */
+                        note?: string | null;
+                        /** @description The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. Absent on servers that predate scenario versions. */
+                        scenarioVersion?: number | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -23388,6 +25083,8 @@ export interface operations {
                             allCompletedAt: number | null;
                             /** @description True when every run of the batch reached a terminal status. */
                             isComplete: boolean;
+                            /** @description One short line saying why the batch was run, as given when it was queued. Null on a batch run without one. Absent on servers that predate run notes. */
+                            note?: string | null;
                         }[];
                         hasMore?: boolean;
                         nextCursor?: string;
@@ -23479,6 +25176,8 @@ export interface operations {
                         allCompletedAt: number | null;
                         /** @description True when every run of the batch reached a terminal status. */
                         isComplete: boolean;
+                        /** @description One short line saying why the batch was run, as given when it was queued. Null on a batch run without one. Absent on servers that predate run notes. */
+                        note?: string | null;
                     };
                 };
             };
@@ -23546,7 +25245,10 @@ export interface operations {
     };
     getApiSuites: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Which kind of suite to list. Defaults to custom, so callers that predate test suites keep seeing exactly the run plans they always did. */
+                kind?: "custom" | "folder";
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -23563,12 +25265,41 @@ export interface operations {
                         id: string;
                         name: string;
                         slug: string;
+                        /**
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.
+                         * @enum {string}
+                         */
+                        kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
+                        /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        scope?: {
+                            /** @constant */
+                            mode: "all";
+                        } | {
+                            /** @constant */
+                            mode: "folders";
+                            folderIds: string[];
+                        } | {
+                            /** @constant */
+                            mode: "labels";
+                            labels: string[];
+                        } | {
+                            /** @constant */
+                            mode: "cases";
+                        } | null;
                         targets: {
-                            /** @enum {string} */
+                            /**
+                             * @description What kind of thing the scenarios run against.
+                             * @enum {string}
+                             */
                             type: "prompt" | "http" | "code" | "workflow";
+                            /** @description The id of the prompt, agent or workflow to run against. */
                             referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
                         }[];
                         repeatCount: number;
                         labels: string[];
@@ -23640,12 +25371,44 @@ export interface operations {
             content: {
                 "application/json": {
                     name: string;
+                    /**
+                     * @description custom (the default) is a run plan and needs scenarioIds and targets; folder is a test suite that starts empty and gets scenarios by filing them into it.
+                     * @default custom
+                     * @enum {string}
+                     */
+                    kind?: "custom" | "folder";
                     description?: string;
-                    scenarioIds: string[];
-                    targets: {
-                        /** @enum {string} */
+                    /** @default [] */
+                    scenarioIds?: string[];
+                    /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                    scope?: {
+                        /** @constant */
+                        mode: "all";
+                    } | {
+                        /** @constant */
+                        mode: "folders";
+                        folderIds: string[];
+                    } | {
+                        /** @constant */
+                        mode: "labels";
+                        labels: string[];
+                    } | {
+                        /** @constant */
+                        mode: "cases";
+                    };
+                    /** @default [] */
+                    targets?: {
+                        /**
+                         * @description What kind of thing the scenarios run against.
+                         * @enum {string}
+                         */
                         type: "prompt" | "http" | "code" | "workflow";
+                        /** @description The id of the prompt, agent or workflow to run against. */
                         referenceId: string;
+                        /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                        runParameters?: {
+                            [key: string]: string | number | boolean;
+                        };
                     }[];
                     /** @default 1 */
                     repeatCount?: number;
@@ -23665,12 +25428,41 @@ export interface operations {
                         id: string;
                         name: string;
                         slug: string;
+                        /**
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.
+                         * @enum {string}
+                         */
+                        kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
+                        /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        scope?: {
+                            /** @constant */
+                            mode: "all";
+                        } | {
+                            /** @constant */
+                            mode: "folders";
+                            folderIds: string[];
+                        } | {
+                            /** @constant */
+                            mode: "labels";
+                            labels: string[];
+                        } | {
+                            /** @constant */
+                            mode: "cases";
+                        } | null;
                         targets: {
-                            /** @enum {string} */
+                            /**
+                             * @description What kind of thing the scenarios run against.
+                             * @enum {string}
+                             */
                             type: "prompt" | "http" | "code" | "workflow";
+                            /** @description The id of the prompt, agent or workflow to run against. */
                             referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
                         }[];
                         repeatCount: number;
                         labels: string[];
@@ -23752,12 +25544,41 @@ export interface operations {
                         id: string;
                         name: string;
                         slug: string;
+                        /**
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.
+                         * @enum {string}
+                         */
+                        kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
+                        /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        scope?: {
+                            /** @constant */
+                            mode: "all";
+                        } | {
+                            /** @constant */
+                            mode: "folders";
+                            folderIds: string[];
+                        } | {
+                            /** @constant */
+                            mode: "labels";
+                            labels: string[];
+                        } | {
+                            /** @constant */
+                            mode: "cases";
+                        } | null;
                         targets: {
-                            /** @enum {string} */
+                            /**
+                             * @description What kind of thing the scenarios run against.
+                             * @enum {string}
+                             */
                             type: "prompt" | "http" | "code" | "workflow";
+                            /** @description The id of the prompt, agent or workflow to run against. */
                             referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
                         }[];
                         repeatCount: number;
                         labels: string[];
@@ -23801,6 +25622,8 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        /** @description The domain error code, when the refusal names one. */
+                        code?: string;
                     };
                 };
             };
@@ -23886,6 +25709,8 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        /** @description The domain error code, when the refusal names one. */
+                        code?: string;
                     };
                 };
             };
@@ -23929,11 +25754,35 @@ export interface operations {
                 "application/json": {
                     name?: string;
                     description?: string | null;
+                    /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                    scope?: {
+                        /** @constant */
+                        mode: "all";
+                    } | {
+                        /** @constant */
+                        mode: "folders";
+                        folderIds: string[];
+                    } | {
+                        /** @constant */
+                        mode: "labels";
+                        labels: string[];
+                    } | {
+                        /** @constant */
+                        mode: "cases";
+                    };
                     scenarioIds?: string[];
                     targets?: {
-                        /** @enum {string} */
+                        /**
+                         * @description What kind of thing the scenarios run against.
+                         * @enum {string}
+                         */
                         type: "prompt" | "http" | "code" | "workflow";
+                        /** @description The id of the prompt, agent or workflow to run against. */
                         referenceId: string;
+                        /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                        runParameters?: {
+                            [key: string]: string | number | boolean;
+                        };
                     }[];
                     repeatCount?: number;
                     labels?: string[];
@@ -23951,12 +25800,41 @@ export interface operations {
                         id: string;
                         name: string;
                         slug: string;
+                        /**
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.
+                         * @enum {string}
+                         */
+                        kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
+                        /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        scope?: {
+                            /** @constant */
+                            mode: "all";
+                        } | {
+                            /** @constant */
+                            mode: "folders";
+                            folderIds: string[];
+                        } | {
+                            /** @constant */
+                            mode: "labels";
+                            labels: string[];
+                        } | {
+                            /** @constant */
+                            mode: "cases";
+                        } | null;
                         targets: {
-                            /** @enum {string} */
+                            /**
+                             * @description What kind of thing the scenarios run against.
+                             * @enum {string}
+                             */
                             type: "prompt" | "http" | "code" | "workflow";
+                            /** @description The id of the prompt, agent or workflow to run against. */
                             referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
                         }[];
                         repeatCount: number;
                         labels: string[];
@@ -24000,6 +25878,8 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        /** @description The domain error code, when the refusal names one. */
+                        code?: string;
                     };
                 };
             };
@@ -24050,12 +25930,41 @@ export interface operations {
                         id: string;
                         name: string;
                         slug: string;
+                        /**
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.
+                         * @enum {string}
+                         */
+                        kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
+                        /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        scope?: {
+                            /** @constant */
+                            mode: "all";
+                        } | {
+                            /** @constant */
+                            mode: "folders";
+                            folderIds: string[];
+                        } | {
+                            /** @constant */
+                            mode: "labels";
+                            labels: string[];
+                        } | {
+                            /** @constant */
+                            mode: "cases";
+                        } | null;
                         targets: {
-                            /** @enum {string} */
+                            /**
+                             * @description What kind of thing the scenarios run against.
+                             * @enum {string}
+                             */
                             type: "prompt" | "http" | "code" | "workflow";
+                            /** @description The id of the prompt, agent or workflow to run against. */
                             referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
                         }[];
                         repeatCount: number;
                         labels: string[];
@@ -24099,6 +26008,8 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        /** @description The domain error code, when the refusal names one. */
+                        code?: string;
                     };
                 };
             };
@@ -24141,10 +26052,34 @@ export interface operations {
             content: {
                 "application/json": {
                     idempotencyKey?: string;
+                    /** @description The run plan this run joins or creates. Used only when the id names a test suite; derived from the suite name and the targets when absent. */
+                    name?: string;
+                    /** @description The prompts, agents or workflows the run goes against. Used only when the id names a test suite, which stores no target of its own. */
+                    targets?: {
+                        /**
+                         * @description What kind of thing the scenarios run against.
+                         * @enum {string}
+                         */
+                        type: "prompt" | "http" | "code" | "workflow";
+                        /** @description The id of the prompt, agent or workflow to run against. */
+                        referenceId: string;
+                        /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                        runParameters?: {
+                            [key: string]: string | number | boolean;
+                        };
+                    }[];
+                    /** @description How many times each scenario and target pairing runs, between 1 and 5. Used only when the id names a test suite. */
+                    repeatCount?: number;
+                    /** @description The model that plays the user for every scenario in the run. Used only when the id names a test suite. */
+                    simulatorModel?: string | null;
+                    /** @description The model that judges every scenario in the run. Used only when the id names a test suite. */
+                    judgeModel?: string | null;
                     /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name. */
                     parameters?: {
                         [key: string]: string | number | boolean;
                     };
+                    /** @description One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters. */
+                    note?: string;
                 };
             };
         };
@@ -24168,9 +26103,17 @@ export interface operations {
                             scenarioRunId: string;
                             scenarioId: string;
                             target: {
-                                /** @enum {string} */
+                                /**
+                                 * @description What kind of thing the scenarios run against.
+                                 * @enum {string}
+                                 */
                                 type: "prompt" | "http" | "code" | "workflow";
+                                /** @description The id of the prompt, agent or workflow to run against. */
                                 referenceId: string;
+                                /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                                runParameters?: {
+                                    [key: string]: string | number | boolean;
+                                };
                             };
                             name: string | null;
                         }[];
@@ -24210,6 +26153,8 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        /** @description The domain error code, when the refusal names one. */
+                        code?: string;
                     };
                 };
             };
@@ -24234,6 +26179,748 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                    };
+                };
+            };
+        };
+    };
+    listRunPlans: {
+        parameters: {
+            query?: {
+                /** @description Include archived run plans in the list. true, 1, yes for yes; false, 0, no or omitted for no. */
+                includeArchived?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The run plan id. */
+                        id: string;
+                        /** @description The run plan name. This is the plan's identity: a run started under this name joins this plan. */
+                        name: string;
+                        /** @description The plan's address in the platform. It is kept when the plan is renamed, so run history never moves. */
+                        slug: string;
+                        /** @description What the run plan covers: all (every active scenario), test_suites (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or scenarios (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        scope: {
+                            /** @constant */
+                            mode: "all";
+                        } | {
+                            /** @constant */
+                            mode: "test_suites";
+                            testSuiteIds: string[];
+                        } | {
+                            /** @constant */
+                            mode: "labels";
+                            labels: string[];
+                        } | {
+                            /** @constant */
+                            mode: "scenarios";
+                        };
+                        /** @description The scenarios the last run of this plan covered. */
+                        scenarioIds: string[];
+                        /** @description What the plan runs against, in the order the results show. A target carrying runParameters runs with those values. */
+                        targets: {
+                            /**
+                             * @description What kind of thing the scenarios run against.
+                             * @enum {string}
+                             */
+                            type: "prompt" | "http" | "code" | "workflow";
+                            /** @description The id of the prompt, agent or workflow to run against. */
+                            referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
+                        }[];
+                        /** @description How many times each scenario and target pairing runs. */
+                        repeatCount: number;
+                        /** @description The model that plays the user, or null for the scenario or project default. */
+                        simulatorModel: string | null;
+                        /** @description The model that judges the run, or null for the scenario or project default. */
+                        judgeModel: string | null;
+                        /** @description The labels the plan carries. */
+                        labels: string[];
+                        /** @description When the plan was archived, or null while it is active. */
+                        archivedAt: string | null;
+                        /** @description When the plan was created. */
+                        createdAt: string;
+                        /** @description When the plan was last written. */
+                        updatedAt: string;
+                        /**
+                         * Format: uri
+                         * @description Where to open this run plan in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                    }[];
+                };
+            };
+        };
+    };
+    runRunPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The run plan this run joins or creates. A run plan is identified by its name, so sending the same name again replaces that plan's configuration with this one. Leave it out and the name is derived from what the run covers and what it runs against. Up to 200 characters. */
+                    name?: string;
+                    /** @description What this run covers and what it runs against. Written onto the run plan the name resolves. */
+                    config: {
+                        /** @description What the run plan covers: all (every active scenario), test_suites (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or scenarios (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        scope: {
+                            /** @constant */
+                            mode: "all";
+                        } | {
+                            /** @constant */
+                            mode: "test_suites";
+                            testSuiteIds: string[];
+                        } | {
+                            /** @constant */
+                            mode: "labels";
+                            labels: string[];
+                        } | {
+                            /** @constant */
+                            mode: "scenarios";
+                        };
+                        /** @description The prompts, agents or workflows every scenario runs against. Every target runs every scenario, so naming more than one compares them in the same run. */
+                        targets: {
+                            /**
+                             * @description What kind of thing the scenarios run against.
+                             * @enum {string}
+                             */
+                            type: "prompt" | "http" | "code" | "workflow";
+                            /** @description The id of the prompt, agent or workflow to run against. */
+                            referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
+                        }[];
+                        /** @description How many times each scenario and target pairing runs. Between 1 and 5; defaults to 1. */
+                        repeatCount?: number;
+                        /** @description The model that plays the user for every scenario in the run. Overrides each scenario's own choice. Leave it out for the scenario or project default. */
+                        simulatorModel?: string | null;
+                        /** @description The model that judges every scenario in the run. Overrides each scenario's own choice. Leave it out for the scenario or project default. */
+                        judgeModel?: string | null;
+                        /** @description The scenarios a test_suites or scenarios scope covers. Read by a scenarios scope alone; a scope that states a rule resolves its own list at run time. */
+                        scenarioIds?: string[];
+                    };
+                    /** @description Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call. */
+                    idempotencyKey?: string;
+                    /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name, and a target that names the same parameter in its runParameters overrides it for that target. */
+                    parameters?: {
+                        [key: string]: string | number | boolean;
+                    };
+                    /** @description One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters. */
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description True once the runs are queued. */
+                        scheduled: boolean;
+                        /** @description The id of this batch. Every run started here carries it. */
+                        batchRunId: string;
+                        /** @description The result set the batch is filed under in the platform. */
+                        setId: string;
+                        /** @description How many runs were queued. */
+                        jobCount: number;
+                        /** @description What the run left out, and why. */
+                        skippedArchived: {
+                            /** @description Scenarios left out because they are archived. */
+                            scenarios: string[];
+                            /** @description Targets left out because they are archived. */
+                            targets: string[];
+                        };
+                        /** @description Every run this call queued. */
+                        items: {
+                            /** @description The id of this single run. */
+                            scenarioRunId: string;
+                            /** @description The scenario that was run. */
+                            scenarioId: string;
+                            /** @description What it was run against. */
+                            target: {
+                                /**
+                                 * @description What kind of thing the scenarios run against.
+                                 * @enum {string}
+                                 */
+                                type: "prompt" | "http" | "code" | "workflow";
+                                /** @description The id of the prompt, agent or workflow to run against. */
+                                referenceId: string;
+                                /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                                runParameters?: {
+                                    [key: string]: string | number | boolean;
+                                };
+                            };
+                            /** @description The scenario name, when known. */
+                            name: string | null;
+                        }[];
+                        /** @description The run plan this run was filed under. */
+                        runPlanId: string;
+                        /** @description The name that plan answers to. */
+                        planName: string;
+                        /** @description True when this run created the plan, false when it joined a plan already there. */
+                        created: boolean;
+                        /**
+                         * Format: uri
+                         * @description Where to watch this run in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
+    };
+    getRunPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The run plan id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The run plan id. */
+                        id: string;
+                        /** @description The run plan name. This is the plan's identity: a run started under this name joins this plan. */
+                        name: string;
+                        /** @description The plan's address in the platform. It is kept when the plan is renamed, so run history never moves. */
+                        slug: string;
+                        /** @description What the run plan covers: all (every active scenario), test_suites (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or scenarios (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        scope: {
+                            /** @constant */
+                            mode: "all";
+                        } | {
+                            /** @constant */
+                            mode: "test_suites";
+                            testSuiteIds: string[];
+                        } | {
+                            /** @constant */
+                            mode: "labels";
+                            labels: string[];
+                        } | {
+                            /** @constant */
+                            mode: "scenarios";
+                        };
+                        /** @description The scenarios the last run of this plan covered. */
+                        scenarioIds: string[];
+                        /** @description What the plan runs against, in the order the results show. A target carrying runParameters runs with those values. */
+                        targets: {
+                            /**
+                             * @description What kind of thing the scenarios run against.
+                             * @enum {string}
+                             */
+                            type: "prompt" | "http" | "code" | "workflow";
+                            /** @description The id of the prompt, agent or workflow to run against. */
+                            referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
+                        }[];
+                        /** @description How many times each scenario and target pairing runs. */
+                        repeatCount: number;
+                        /** @description The model that plays the user, or null for the scenario or project default. */
+                        simulatorModel: string | null;
+                        /** @description The model that judges the run, or null for the scenario or project default. */
+                        judgeModel: string | null;
+                        /** @description The labels the plan carries. */
+                        labels: string[];
+                        /** @description When the plan was archived, or null while it is active. */
+                        archivedAt: string | null;
+                        /** @description When the plan was created. */
+                        createdAt: string;
+                        /** @description When the plan was last written. */
+                        updatedAt: string;
+                        /**
+                         * Format: uri
+                         * @description Where to open this run plan in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
+    };
+    archiveRunPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The run plan id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The run plan that was archived. */
+                        id: string;
+                        /**
+                         * @description Always true once the plan is archived.
+                         * @constant
+                         */
+                        archived: true;
+                    };
+                };
+            };
+        };
+    };
+    rerunRunPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The run plan id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call. */
+                    idempotencyKey?: string;
+                    /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name, and a target that names the same parameter in its runParameters overrides it for that target. */
+                    parameters?: {
+                        [key: string]: string | number | boolean;
+                    };
+                    /** @description One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters. */
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description True once the runs are queued. */
+                        scheduled: boolean;
+                        /** @description The id of this batch. Every run started here carries it. */
+                        batchRunId: string;
+                        /** @description The result set the batch is filed under in the platform. */
+                        setId: string;
+                        /** @description How many runs were queued. */
+                        jobCount: number;
+                        /** @description What the run left out, and why. */
+                        skippedArchived: {
+                            /** @description Scenarios left out because they are archived. */
+                            scenarios: string[];
+                            /** @description Targets left out because they are archived. */
+                            targets: string[];
+                        };
+                        /** @description Every run this call queued. */
+                        items: {
+                            /** @description The id of this single run. */
+                            scenarioRunId: string;
+                            /** @description The scenario that was run. */
+                            scenarioId: string;
+                            /** @description What it was run against. */
+                            target: {
+                                /**
+                                 * @description What kind of thing the scenarios run against.
+                                 * @enum {string}
+                                 */
+                                type: "prompt" | "http" | "code" | "workflow";
+                                /** @description The id of the prompt, agent or workflow to run against. */
+                                referenceId: string;
+                                /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                                runParameters?: {
+                                    [key: string]: string | number | boolean;
+                                };
+                            };
+                            /** @description The scenario name, when known. */
+                            name: string | null;
+                        }[];
+                        /** @description The run plan this run was filed under. */
+                        runPlanId: string;
+                        /** @description The name that plan answers to. */
+                        planName: string;
+                        /** @description True when this run created the plan, false when it joined a plan already there. */
+                        created: boolean;
+                        /**
+                         * Format: uri
+                         * @description Where to watch this run in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
+    };
+    listTestSuites: {
+        parameters: {
+            query?: {
+                /** @description Include archived test suites in the list. true, 1, yes for yes; false, 0, no or omitted for no. */
+                includeArchived?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The test suite id. */
+                        id: string;
+                        /** @description The test suite name. */
+                        name: string;
+                        /** @description The suite's address in the platform. It is kept when the suite is renamed. */
+                        slug: string;
+                        /** @description The scenarios filed in this suite, in the order it shows them. */
+                        scenarioIds: string[];
+                        /** @description How many scenarios are filed in it. */
+                        scenarioCount: number;
+                        /** @description When the suite was archived, or null while it is active. */
+                        archivedAt: string | null;
+                        /** @description When the suite was created. */
+                        createdAt: string;
+                        /** @description When the suite was last written. */
+                        updatedAt: string;
+                        /**
+                         * Format: uri
+                         * @description Where to open this test suite in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                    }[];
+                };
+            };
+        };
+    };
+    createTestSuite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The test suite name, as it reads in the platform. */
+                    name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The test suite id. */
+                        id: string;
+                        /** @description The test suite name. */
+                        name: string;
+                        /** @description The suite's address in the platform. It is kept when the suite is renamed. */
+                        slug: string;
+                        /** @description The scenarios filed in this suite, in the order it shows them. */
+                        scenarioIds: string[];
+                        /** @description How many scenarios are filed in it. */
+                        scenarioCount: number;
+                        /** @description When the suite was archived, or null while it is active. */
+                        archivedAt: string | null;
+                        /** @description When the suite was created. */
+                        createdAt: string;
+                        /** @description When the suite was last written. */
+                        updatedAt: string;
+                        /**
+                         * Format: uri
+                         * @description Where to open this test suite in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
+    };
+    getTestSuite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The test suite id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The test suite id. */
+                        id: string;
+                        /** @description The test suite name. */
+                        name: string;
+                        /** @description The suite's address in the platform. It is kept when the suite is renamed. */
+                        slug: string;
+                        /** @description The scenarios filed in this suite, in the order it shows them. */
+                        scenarioIds: string[];
+                        /** @description How many scenarios are filed in it. */
+                        scenarioCount: number;
+                        /** @description When the suite was archived, or null while it is active. */
+                        archivedAt: string | null;
+                        /** @description When the suite was created. */
+                        createdAt: string;
+                        /** @description When the suite was last written. */
+                        updatedAt: string;
+                        /**
+                         * Format: uri
+                         * @description Where to open this test suite in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                        /** @description The active scenarios filed in this suite. An archived scenario is left out. */
+                        scenarios: {
+                            /** @description The scenario id. */
+                            id: string;
+                            /** @description The scenario name. */
+                            name: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    archiveTestSuite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The test suite id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The test suite that was archived. */
+                        id: string;
+                        /**
+                         * @description Always true once the suite is archived.
+                         * @constant
+                         */
+                        archived: true;
+                    };
+                };
+            };
+        };
+    };
+    renameTestSuite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The test suite id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The test suite name, as it reads in the platform. */
+                    name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The test suite id. */
+                        id: string;
+                        /** @description The test suite name. */
+                        name: string;
+                        /** @description The suite's address in the platform. It is kept when the suite is renamed. */
+                        slug: string;
+                        /** @description The scenarios filed in this suite, in the order it shows them. */
+                        scenarioIds: string[];
+                        /** @description How many scenarios are filed in it. */
+                        scenarioCount: number;
+                        /** @description When the suite was archived, or null while it is active. */
+                        archivedAt: string | null;
+                        /** @description When the suite was created. */
+                        createdAt: string;
+                        /** @description When the suite was last written. */
+                        updatedAt: string;
+                        /**
+                         * Format: uri
+                         * @description Where to open this test suite in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
+    };
+    runTestSuite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The test suite id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The prompts, agents or workflows the suite runs against. A test suite stores none of its own, so a run states them. Every target runs every scenario, so naming more than one compares them in the same run. */
+                    targets: {
+                        /**
+                         * @description What kind of thing the scenarios run against.
+                         * @enum {string}
+                         */
+                        type: "prompt" | "http" | "code" | "workflow";
+                        /** @description The id of the prompt, agent or workflow to run against. */
+                        referenceId: string;
+                        /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                        runParameters?: {
+                            [key: string]: string | number | boolean;
+                        };
+                    }[];
+                    /** @description The run plan this run joins or creates. Leave it out and the name is derived from the suite name and the targets. */
+                    name?: string;
+                    /** @description How many times each scenario and target pairing runs. Between 1 and 5; defaults to 1. */
+                    repeatCount?: number;
+                    /** @description The model that plays the user for every scenario in this run. Leave it out for the scenario or project default. */
+                    simulatorModel?: string | null;
+                    /** @description The model that judges every scenario in this run. Leave it out for the scenario or project default. */
+                    judgeModel?: string | null;
+                    /** @description Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call. */
+                    idempotencyKey?: string;
+                    /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name, and a target that names the same parameter in its runParameters overrides it for that target. */
+                    parameters?: {
+                        [key: string]: string | number | boolean;
+                    };
+                    /** @description One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters. */
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description True once the runs are queued. */
+                        scheduled: boolean;
+                        /** @description The id of this batch. Every run started here carries it. */
+                        batchRunId: string;
+                        /** @description The result set the batch is filed under in the platform. */
+                        setId: string;
+                        /** @description How many runs were queued. */
+                        jobCount: number;
+                        /** @description What the run left out, and why. */
+                        skippedArchived: {
+                            /** @description Scenarios left out because they are archived. */
+                            scenarios: string[];
+                            /** @description Targets left out because they are archived. */
+                            targets: string[];
+                        };
+                        /** @description Every run this call queued. */
+                        items: {
+                            /** @description The id of this single run. */
+                            scenarioRunId: string;
+                            /** @description The scenario that was run. */
+                            scenarioId: string;
+                            /** @description What it was run against. */
+                            target: {
+                                /**
+                                 * @description What kind of thing the scenarios run against.
+                                 * @enum {string}
+                                 */
+                                type: "prompt" | "http" | "code" | "workflow";
+                                /** @description The id of the prompt, agent or workflow to run against. */
+                                referenceId: string;
+                                /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                                runParameters?: {
+                                    [key: string]: string | number | boolean;
+                                };
+                            };
+                            /** @description The scenario name, when known. */
+                            name: string | null;
+                        }[];
+                        /** @description The run plan this run was filed under. */
+                        runPlanId: string;
+                        /** @description The name that plan answers to. */
+                        planName: string;
+                        /** @description True when this run created the plan, false when it joined a plan already there. */
+                        created: boolean;
+                        /**
+                         * Format: uri
+                         * @description Where to watch this run in the LangWatch platform.
+                         */
+                        platformUrl: string;
                     };
                 };
             };

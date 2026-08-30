@@ -109,13 +109,13 @@ describe("Connect Agent Skill", () => {
                 "Agent made the chat endpoint adopt the incoming W3C traceparent header (OpenTelemetry context extraction in the server code)",
                 "Agent added a dedicated scenario authentication path (an environment variable key checked against the Authorization Bearer header) and did NOT weaken or remove the existing session authentication for normal traffic",
                 "Agent attempted to register the HTTP agent with `langwatch agent create` (the command is visible in the transcript)",
-                "If any `langwatch` platform command failed or the platform was unreachable, the agent reported that failure and did NOT claim a scenario or suite run succeeded",
+                "If any `langwatch` platform command failed or the platform was unreachable, the agent reported that failure and did NOT claim a scenario or test suite run succeeded",
               ],
             }),
           ],
           script: [
             scenario.user(
-              "connect my agent to LangWatch scenarios so suites can run against it over HTTP. " +
+              "connect my agent to LangWatch scenarios so test suites can run against it over HTTP. " +
                 "The service is deployed at https://staging.acme-gear.example.com. For the " +
                 "scenario key, generate a test value yourself and use it for both the server " +
                 "env and the platform secret.",
@@ -175,7 +175,7 @@ describe("Connect Agent Skill", () => {
       }
     },
     // One long autonomous turn: server edits (auth + trace adoption) plus a
-    // chain of CLI commands (secret, agent, scenario, suite, run).
+    // chain of CLI commands (secret, agent, scenario, test suite, run).
     1_800_000,
   );
 });

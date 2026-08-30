@@ -14,7 +14,7 @@ Near-complete coverage landed across three PRs:
 ```
 observability/       — Tracing, Analytics, User Events, Annotations
 evaluations/         — Experiments, Online Evaluation (guardrails via as_guardrail=True)
-agent-simulations/   — Scenarios, Runs, Suites
+agent-simulations/   — Scenarios, Runs, Test Suites, Run Plans
 prompt-management/   — Prompts, Prompt Playground
 library/             — Agents, Workflows, Evaluators, Datasets
 dashboards/          — Custom analytics dashboards
@@ -71,7 +71,8 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 | **Agent Simulations** | | | | | | | | | | |
 | Scenarios | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Runs | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | ✅ |
-| Suites (Run Plans) | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | — |
+| Test Suites | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | — |
+| Run Plans | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | — |
 | **Prompt Management** | | | | | | | | | | |
 | Prompts | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ |
 | Prompt Playground | — | — | — | — | — | ✅ | — | — | ✅ | ✅ |
@@ -145,9 +146,9 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 - **Scenario SDK** — separate: `@langwatch/scenario` / `langwatch-scenario`
 
 ### Skills
-- **Feature skills** — `skills/{tracing,evaluations,scenarios,prompts}/SKILL.md`
-- **Cross-cutting** — `skills/{analytics,datasets}/SKILL.md`
-- **Meta** — `skills/level-up/SKILL.md` (orchestrates the feature skills)
+- **Feature skills** — `skills/{tracing,evaluations,scenarios,prompts}/SKILL.mdx`
+- **Cross-cutting** — `skills/{analytics,datasets}/SKILL.mdx`
+- **Meta** — `skills/level-up/SKILL.mdx` (orchestrates the feature skills)
 - **Recipes** — `skills/recipes/{debug-instrumentation,improve-setup,test-cli-usability,evaluate-multimodal,generate-rag-dataset,test-compliance}`
 
 ### Documentation
@@ -162,7 +163,7 @@ Validation checklist:
 
 - Every `api` value corresponds to a route in `platform/app/src/app/api/` or `platform/app/src/pages/api/`
 - Every `mcp` tool name appears in `mcp/typescript/src/index.ts`
-- Every `skill` name has a `skills/{name}/SKILL.md`
+- Every `skill` name has a `skills/{name}/SKILL.mdx`
 - Every `cli` command exists in `sdks/typescript/src/cli/`
 - Every `ui` route exists in `platform/app/src/utils/routes.ts`
 - No aspirational entries — use `plannedSync` for future intent

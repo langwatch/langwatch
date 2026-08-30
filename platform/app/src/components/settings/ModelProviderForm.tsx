@@ -9,6 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import {
   findModelProviderById,
   isResolvableProviderId,
@@ -107,6 +108,7 @@ export const EditModelProviderForm = ({
   const { enabled: gatewayMenuEnabled } = useFeatureFlag(
     "release_ui_ai_gateway_menu_enabled",
     {
+      projectId: project?.id ?? NOT_TARGETED,
       organizationId: organization?.id,
       enabled: !!organization?.id,
     },
