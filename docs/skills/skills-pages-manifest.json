@@ -161,7 +161,7 @@
       }
     ]
   },
-  "agent-simulations/connect-your-agent.mdx": {
+  "agent-testing/connect-your-agent.mdx": {
     "connect-agent": [
       {
         "title": "Connect my agent to LangWatch simulations",

@@ -1,0 +1,52 @@
+---
+title: Test Suites
+sidebarTitle: Test suites
+keywords: langwatch, agent testing, test suite, scenarios, default test suite, from code, labels, archive
+description: A test suite is a named group of scenarios that you run together. It holds no targets, no models and no repeat count; those belong to the run plan.
+---
+
+## The rail
+
+The **Scenarios** tab lists the test suites of the project under **Test Suites** in the rail on the left. Press one to open its scenarios in the table. **New Test Suite** asks for a name only.
+
+<Frame>
+<img className="block" src="/images/agent-testing/test-suite-rail-menu.png" alt="The test suite rail with the row menu of the Refunds test suite open" />
+</Frame>
+
+The row menu of a test suite offers:
+
+| Action | What it does |
+|---|---|
+| **New scenario** | Opens the editor with this test suite preselected. |
+| **Run suite** | Opens the run dialog with every scenario of the test suite in scope. |
+| **Rename** | Changes the name. Runs keep the name they ran under. |
+| **Open recent runs** | Lists the latest runs of this test suite. |
+| **Archive suite** | Archives the test suite and the scenarios in it. Test runs are preserved. |
+
+Every project has a **Default** test suite. A scenario saved with **No test suite** goes there.
+
+## Run a test suite
+
+**Run suite**, in the rail menu or at the top of the table, opens the [run dialog](/agent-testing/run-plans#the-run-dialog). The run goes under the run plan named after the test suite and the agent, for example `Refunds checkout-prod`, so every run of the same test suite against the same agent joins one history on the Results tab.
+
+## Move scenarios between test suites
+
+**Move to suite...** in the row menu of a scenario moves one. Select several rows and press **Move to suite** in the bar that appears to move them together. A scenario belongs to exactly one test suite.
+
+<Frame>
+<img className="block" src="/images/agent-testing/move-to-test-suite.png" alt="The Move to suite dialog with the test suites of the project" />
+</Frame>
+
+## Test suites and labels
+
+A test suite is the group you run before a release. A label is a tag on a scenario, and a scenario can have any number of them. A run plan can scope by labels across every test suite, for example every scenario labelled `smoke`, so use labels for a cut that crosses the test suites and a test suite for the group that ships together.
+
+## From Code
+
+Scenarios written with the Scenario SDK and run from your own test runner report to the project and appear under **From Code** in the rail, one entry per `setId`. Their table is read-only and shows each scenario with its last run. Edit them in your repository; the platform shows them so their results land next to the test suites written here.
+
+<Frame>
+<img className="block" src="/images/agent-testing/from-code-suite.png" alt="A From Code test suite, with its scenarios and their last runs" />
+</Frame>
+
+Also check: [Write scenarios in code](/agent-testing/scenarios-in-code), [Scenarios](/agent-testing/scenarios), [Run plans](/agent-testing/run-plans).

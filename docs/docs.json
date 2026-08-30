@@ -16,7 +16,7 @@
     "dark": "/logo/light.svg"
   },
   "favicon": "/favicon.svg",
-  "description": "LangWatch is an open-source LLMOps platform for observability, evaluations, prompt optimization, and agent simulations.",
+  "description": "LangWatch is an open-source LLMOps platform for observability, evaluations, prompt optimization, and agent testing.",
   "seo": {
     "indexing": "navigable",
     "organization": {
@@ -98,24 +98,45 @@
             ]
           },
           {
-            "group": "Agent Simulations",
+            "group": "Agent Testing",
             "pages": [
-              "agent-simulations/introduction",
+              "agent-testing/overview",
+              {
+                "group": "Get started",
+                "pages": [
+                  "agent-testing/test-from-the-platform",
+                  "agent-testing/scenarios-in-code"
+                ]
+              },
               {
                 "group": "Connect your agent",
                 "pages": [
-                  "agent-simulations/connect-your-agent",
-                  "agent-simulations/remote-traces",
-                  "agent-simulations/local-development",
-                  "agent-simulations/scenario-parameters",
-                  "agent-simulations/authenticated-agents"
+                  "agent-testing/connect-your-agent",
+                  "agent-testing/targets",
+                  "agent-testing/local-development",
+                  "agent-testing/linking-your-traces",
+                  "agent-testing/authenticated-agents"
                 ]
               },
-              "agent-simulations/testing-your-agent",
-              "agent-simulations/getting-started",
-              "agent-simulations/run-suites-from-ci",
-              "agent-simulations/voice-agents",
-              "agent-simulations/red-teaming"
+              {
+                "group": "Scenarios",
+                "pages": [
+                  "agent-testing/scenarios",
+                  "agent-testing/test-suites",
+                  "agent-testing/run-parameters"
+                ]
+              },
+              {
+                "group": "Runs and results",
+                "pages": [
+                  "agent-testing/run-plans",
+                  "agent-testing/results",
+                  "agent-testing/compare-agents",
+                  "agent-testing/run-from-ci"
+                ]
+              },
+              "agent-testing/voice-agents",
+              "agent-testing/red-teaming"
             ]
           },
           {
@@ -1758,43 +1779,43 @@
     },
     {
       "source": "/agent-simulations/overview",
-      "destination": "/agent-simulations/introduction"
+      "destination": "/agent-testing/overview"
     },
     {
       "source": "/agent-simulations/set-overview",
-      "destination": "/agent-simulations/introduction"
+      "destination": "/agent-testing/overview"
     },
     {
       "source": "/agent-simulations/batch-runs",
-      "destination": "/agent-simulations/introduction"
+      "destination": "/agent-testing/overview"
     },
     {
       "source": "/agent-simulations/individual-run",
-      "destination": "/agent-simulations/introduction"
+      "destination": "/agent-testing/overview"
     },
     {
       "source": "/simulations/overview",
-      "destination": "/agent-simulations/introduction"
+      "destination": "/agent-testing/overview"
     },
     {
       "source": "/simulations/set-overview",
-      "destination": "/agent-simulations/introduction"
+      "destination": "/agent-testing/overview"
     },
     {
       "source": "/simulations/batch-runs",
-      "destination": "/agent-simulations/introduction"
+      "destination": "/agent-testing/overview"
     },
     {
       "source": "/simulations/individual-run",
-      "destination": "/agent-simulations/introduction"
+      "destination": "/agent-testing/overview"
     },
     {
       "source": "/simulations/getting-started",
-      "destination": "/agent-simulations/getting-started"
+      "destination": "/agent-testing/scenarios-in-code"
     },
     {
       "source": "/simulations/introduction",
-      "destination": "/agent-simulations/introduction"
+      "destination": "/agent-testing/overview"
     },
     {
       "source": "/features/prompt-versioning",
@@ -1947,6 +1968,50 @@
     {
       "source": "/api-reference/endpoint/:path*",
       "destination": "/api-reference/introduction"
+    },
+    {
+      "source": "/agent-simulations/introduction",
+      "destination": "/agent-testing/overview"
+    },
+    {
+      "source": "/agent-simulations/testing-your-agent",
+      "destination": "/agent-testing/test-from-the-platform"
+    },
+    {
+      "source": "/agent-simulations/getting-started",
+      "destination": "/agent-testing/scenarios-in-code"
+    },
+    {
+      "source": "/agent-simulations/remote-traces",
+      "destination": "/agent-testing/linking-your-traces"
+    },
+    {
+      "source": "/agent-simulations/scenario-parameters",
+      "destination": "/agent-testing/run-parameters"
+    },
+    {
+      "source": "/agent-simulations/run-suites-from-ci",
+      "destination": "/agent-testing/run-from-ci"
+    },
+    {
+      "source": "/agent-simulations/connect-your-agent",
+      "destination": "/agent-testing/connect-your-agent"
+    },
+    {
+      "source": "/agent-simulations/local-development",
+      "destination": "/agent-testing/local-development"
+    },
+    {
+      "source": "/agent-simulations/authenticated-agents",
+      "destination": "/agent-testing/authenticated-agents"
+    },
+    {
+      "source": "/agent-simulations/voice-agents",
+      "destination": "/agent-testing/voice-agents"
+    },
+    {
+      "source": "/agent-simulations/red-teaming",
+      "destination": "/agent-testing/red-teaming"
     }
   ]
 }

@@ -1,15 +1,17 @@
 ---
 title: Write Scenarios in Code
 sidebarTitle: Scenarios in code
+keywords: langwatch, agent testing, scenario sdk, python, typescript, setId, batchId, code-first
+description: Write scenarios with the Scenario SDK in Python or TypeScript, run them with your test runner, and see every run in LangWatch.
 ---
 
 <Tip>
-  **Quick setup?** [Copy the scenarios prompt](/skills/code-prompts#add-scenario-tests) into your coding agent to add simulation tests automatically.
+  **Quick setup?** [Copy the scenarios prompt](/skills/code-prompts#add-scenario-tests) into your coding agent to add scenario tests automatically.
 </Tip>
 
-Scenarios in code run with the open-source Scenario SDK, inside your own test suite and CI. To run scenarios from the platform against your agent's HTTP endpoint instead, with no test code, see [Connect your agent](/agent-simulations/connect-your-agent).
+The Scenario SDK is open source and runs inside your own test runner and CI. To run scenarios from the platform against your agent's HTTP endpoint instead, with no test code, see [Connect your agent](/agent-testing/connect-your-agent).
 
-This guide will walk you through the basic setup required to run your first simulation and see the results in LangWatch.
+This guide will walk you through the basic setup required to run your first scenario and see the results in LangWatch.
 
 For more in-depth information and advanced use cases, please refer to the official [`scenario` library documentation](https://github.com/langwatch/scenario).
 
@@ -182,13 +184,17 @@ First, you need to create an agent adapter that implements your agent logic. For
 
 Once you run this code, you will see a new scenario run appear under **Agent Testing > Results** in your LangWatch project.
 
-## 4. Grouping Your Sets and Batches
+## 4. Grouping Your Scenarios into Test Suites and Batches
 
-While optional, we strongly recommend setting stable identifiers for your scenarios, sets, and batches for better organization and tracking in LangWatch.
+Set stable identifiers for your scenarios, test suites and batches, so LangWatch groups the runs the same way every time:
 
-- **`id`**: A unique and stable identifier for your scenario. If not provided, it's often generated from the `name`, which can be brittle if you rename the test.
-- **`setId`**: Groups related scenarios into a set. The set appears under **Agent Testing > Results**.
-- **`batchId`**: Groups all scenarios that were run together in a single execution (e.g., a single CI job). You can use a CI environment variable like `process.env.GITHUB_RUN_ID` for this.
+- **`id`**: A unique and stable identifier for your scenario. Without it, the id comes from the `name`, and renaming the test starts a new history.
+- **`setId`**: The test suite the scenario belongs to. It appears under **From Code** on the **Scenarios** tab, and its runs go under a run plan of the same name on the **Results** tab.
+- **`batchId`**: Groups every scenario run together in one execution, for example one CI job. A CI variable such as `process.env.GITHUB_RUN_ID` is a good value.
+
+<Frame>
+<img className="block" src="/images/agent-testing/from-code-suite.png" alt="A From Code test suite on the Scenarios tab, with the scenarios of the setId and their last run" />
+</Frame>
 
 <Tabs>
   <Tab title="Python">
@@ -263,4 +269,4 @@ When your adapter calls an agent that runs as a separate service, the judge cann
   </Tab>
 </Tabs>
 
-Spread `input.propagation_headers` (Python) or `input.propagationHeaders` (TypeScript) onto your adapter's outgoing HTTP request, so the remote service joins each turn's trace. [Linking your traces](/agent-simulations/remote-traces) covers the mechanism, the wait behavior, and how to write trace-aware criteria.
+Spread `input.propagation_headers` (Python) or `input.propagationHeaders` (TypeScript) onto your adapter's outgoing HTTP request, so the remote service joins each turn's trace. [Linking your traces](/agent-testing/linking-your-traces) covers the mechanism, the wait behavior, and how to write trace-aware criteria.

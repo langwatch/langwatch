@@ -1,0 +1,55 @@
+---
+title: Compare Agents
+sidebarTitle: Compare agents
+keywords: langwatch, agent testing, compare agents, comparison run, targets, a/b, prod vs staging, parameters per target
+description: A comparison run sends every scenario to two or more targets in one run, so you read the pass rate, the cost and the latency of each side by side.
+---
+
+## What a comparison run is
+
+A target is an agent or a prompt together with the parameters it runs with. A comparison run has several targets, and the same scenarios run against each. The same agent twice with different parameters is a comparison too: `checkout-prod` with `plan=free` against `checkout-prod` with `plan=pro`.
+
+## From the run dialog
+
+**Compare agents** in the run dialog turns the single agent into rows. Each row is one target with its own parameter line, and **Add a target to compare** adds another, up to four. The footer counts the scenarios times the targets: `Run 3 scenarios × 2 targets`.
+
+<Frame>
+<img className="block" src="/images/agent-testing/run-dialog-compare.png" alt="The run dialog with two targets, checkout-prod and checkout-staging, and the Run button counting both" />
+</Frame>
+
+The run name is prefilled after the targets, for example `Refunds checkout-prod vs checkout-staging`. Every run under that name joins the same comparison history.
+
+Secret parameters stay at the run level and are shared by every target.
+
+## Read the results
+
+The run detail of a comparison shows one column per target, each with its own pass rate, duration and cost, and every scenario as a row across them. Four charts are above the table: **Pass rate**, **Total cost**, **Average reply latency** and **Pass rate over runs**. The runs sidebar shows `33% vs 67% · 2 targets` for a comparison run.
+
+<Frame>
+<img className="block" src="/images/agent-testing/comparison-run-detail.png" alt="A comparison run with one column per target, the four charts and the matrix of results" />
+</Frame>
+
+**Show run settings** lists every target under **Targets**, with the parameters of each.
+
+## Group by target on the Results tab
+
+**Group by: Target** on the Results tab gives every target its own row across every plan it ran in. A parameter variant is its own target, so `checkout-prod · plan=free` and `checkout-prod · plan=pro` are two rows with two pass rates.
+
+<Frame>
+<img className="block" src="/images/agent-testing/results-group-by-target.png" alt="The Results tab grouped by target, with the two parameter variants of checkout-prod as separate rows" />
+</Frame>
+
+## From the CLI and the API
+
+Name each target once, and put the parameters of one target after a question mark:
+
+```bash
+langwatch test-suite run "Refunds" \
+  --target 'http:agent_abc123?plan=free' \
+  --target 'http:agent_abc123?plan=pro' \
+  --wait
+```
+
+On the REST API the same values go in `runParameters` on each target, and `parameters` at the run level holds what every target shares. See [Run from CI](/agent-testing/run-from-ci#compare-two-agents-or-one-agent-on-two-settings) for the request body.
+
+Also check: [Run plans](/agent-testing/run-plans), [Results](/agent-testing/results), [Run parameters](/agent-testing/run-parameters).

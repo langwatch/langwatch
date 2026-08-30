@@ -19,23 +19,38 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [LangWatch MCP Server](https://langwatch.ai/docs/integration/mcp.md): Use the LangWatch MCP Server to extend your coding assistant with deep LangWatch insights for tracing, testing, and agent evaluations.
 - [Better Agents](https://langwatch.ai/docs/better-agents/overview.md): Build reliable, testable, production-grade AI agents with Better Agents CLI - the reliability layer for agent development
 
-## Agent Simulations
+## Agent Testing
 
-- [Introduction to Agent Testing](https://langwatch.ai/docs/agent-simulations/introduction.md)
+- [Agent Testing](https://langwatch.ai/docs/agent-testing/overview.md): Agent testing runs your agent through multi-turn conversations with a simulated user and judges each conversation against the criteria you write.
+
+### Get started
+
+- [Test Your Agent from the Platform](https://langwatch.ai/docs/agent-testing/test-from-the-platform.md): Create scenarios, run them against your agent, and read the verdict of each one, all from the LangWatch interface. Written for product managers and domain experts, no code involved.
+- [Write Scenarios in Code](https://langwatch.ai/docs/agent-testing/scenarios-in-code.md): Write scenarios with the Scenario SDK in Python or TypeScript, run them with your test runner, and see every run in LangWatch.
 
 ### Connect your agent
 
-- [Connect Your Agent](https://langwatch.ai/docs/agent-simulations/connect-your-agent.md): Register your agent's HTTP endpoint as a simulation target, so your team runs scenario suites from the platform and the judge verifies behavior against the agent's own traces.
-- [Linking Your Traces](https://langwatch.ai/docs/agent-simulations/remote-traces.md): Judge scenario criteria against what your agent did, tool calls, writes and retrievals, read from its own traces rather than from its reply text.
-- [Local Development](https://langwatch.ai/docs/agent-simulations/local-development.md): Run platform test suites against the agent on your machine, edit the code, and run them again, with no deployment in between.
-- [Scenario Run Parameters](https://langwatch.ai/docs/agent-simulations/scenario-parameters.md): Run the same scenario with different parameters, to set different setup conditions or fixtures for your agent.
-- [Testing Agents Behind Authentication](https://langwatch.ai/docs/agent-simulations/authenticated-agents.md): Reference project secrets from an HTTP target, and connect an API protected by OAuth2 client-credentials (Auth0 machine-to-machine) to LangWatch simulations using a custom code agent.
+- [Connect Your Agent](https://langwatch.ai/docs/agent-testing/connect-your-agent.md): Register your agent's HTTP endpoint as a target, so your team runs test suites from the platform and the judge verifies behavior against the agent's own traces.
+- [Targets](https://langwatch.ai/docs/agent-testing/targets.md): A target is the agent, prompt, code agent or workflow a run sends the conversation to, together with the parameters it runs with.
+- [Local Development](https://langwatch.ai/docs/agent-testing/local-development.md): Run platform test suites against the agent on your machine, edit the code, and run them again, with no deployment in between.
+- [Linking Your Traces](https://langwatch.ai/docs/agent-testing/linking-your-traces.md): Judge scenario criteria against what your agent did, tool calls, writes and retrievals, read from its own traces rather than from its reply text.
+- [Testing Agents Behind Authentication](https://langwatch.ai/docs/agent-testing/authenticated-agents.md): Reference project secrets from an HTTP target, and connect an API protected by OAuth2 client-credentials (Auth0 machine-to-machine) to LangWatch agent testing using a custom code agent.
 
-- [Testing Your Agent](https://langwatch.ai/docs/agent-simulations/testing-your-agent.md): Create scenarios, run them against your agent, and read the results, all from the LangWatch interface. Written for product managers and domain experts, no code involved.
-- [Write Scenarios in Code](https://langwatch.ai/docs/agent-simulations/getting-started.md)
-- [Run Test Suites from CI](https://langwatch.ai/docs/agent-simulations/run-suites-from-ci.md): Start a test suite from a CI job and wait for every run of the batch to finish.
-- [Voice Agent Testing](https://langwatch.ai/docs/agent-simulations/voice-agents.md)
-- [Red Teaming](https://langwatch.ai/docs/agent-simulations/red-teaming.md)
+### Scenarios
+
+- [Scenarios](https://langwatch.ai/docs/agent-testing/scenarios.md): A scenario is a situation a simulated user acts out against your agent, and the criteria a judge scores the conversation against.
+- [Test Suites](https://langwatch.ai/docs/agent-testing/test-suites.md): A test suite is a named group of scenarios that you run together. It holds no targets, no models and no repeat count; those belong to the run plan.
+- [Run Parameters](https://langwatch.ai/docs/agent-testing/run-parameters.md): Run the same scenario with different parameters, to set different setup conditions or fixtures for your agent.
+
+### Runs and results
+
+- [Run Plans](https://langwatch.ai/docs/agent-testing/run-plans.md): A run plan is a name and a configuration, and the name is its identity. Every run under the same name joins one history on the Results tab.
+- [Results](https://langwatch.ai/docs/agent-testing/results.md): The Results tab lists every run plan of the project with its pass rate and trend. Open a plan for its runs, and a run for every conversation and verdict.
+- [Compare Agents](https://langwatch.ai/docs/agent-testing/compare-agents.md): A comparison run sends every scenario to two or more targets in one run, so you read the pass rate, the cost and the latency of each side by side.
+- [Run from CI](https://langwatch.ai/docs/agent-testing/run-from-ci.md): Start a test suite from a CI job and wait for every run of the batch to finish.
+
+- [Voice Agent Testing](https://langwatch.ai/docs/agent-testing/voice-agents.md): Scenario tests voice agents end to end over real audio, with the same scenario.run() and the same judge you use for text.
+- [Red Teaming](https://langwatch.ai/docs/agent-testing/red-teaming.md): RedTeamAgent replaces the user simulator with a multi-turn attacker, in the same scenario.run() loop and the same judge as your functional tests.
 
 ## Observability
 

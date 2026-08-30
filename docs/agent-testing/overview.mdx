@@ -1,0 +1,109 @@
+---
+title: Agent Testing
+sidebarTitle: Overview
+keywords: langwatch, agent testing, agent simulations, scenarios, test suites, run plans, simulated user, judge, voice agents, red teaming
+description: Agent testing runs your agent through multi-turn conversations with a simulated user and judges each conversation against the criteria you write.
+---
+
+<Tip>
+  **Quick setup?** Paste the [Connect your agent prompt](/agent-testing/connect-your-agent) into your coding agent to connect your agent's HTTP endpoint and run a first test suite, or the [scenarios prompt](/skills/code-prompts#add-scenario-tests) to add code-first scenario tests.
+</Tip>
+
+<video controls autoPlay muted loop playsInline width="100%">
+  <source src="/media/videos/agent-testing-overview.webm" type="video/webm" />
+</video>
+
+## How a test runs
+
+Three parties take part in every test. Your agent answers as it does in production. A simulated user plays the situation the scenario describes, turn by turn, with different words on every run. A judge model reads the whole conversation and the agent's own traces, and decides each criterion.
+
+A scenario is the unit of testing: one situation and the criteria the conversation must meet. Test suites group scenarios, run plans keep the history of every run, and the Results tab shows the pass rate over time. Every part has its own page below.
+
+## Two ways to run
+
+Both ways use the same simulated user, the same judge and the same results pages. They differ in where the scenarios are written and who runs them.
+
+<CardGroup cols={2}>
+  <Card title="Test from the platform" icon="globe" href="/agent-testing/test-from-the-platform">
+    Connect your agent over HTTP and write, run and read scenarios in the LangWatch interface. No test code in your repository.
+  </Card>
+  <Card title="Write scenarios in code" icon="code" href="/agent-testing/scenarios-in-code">
+    Write scenarios with the Scenario SDK in Python or TypeScript, run them with your test runner and in CI, and see every run in LangWatch.
+  </Card>
+</CardGroup>
+
+## What you can test
+
+<CardGroup cols={3}>
+  <Card title="Conversational agents" icon="comments" href="/agent-testing/scenarios">
+    Multi-turn conversations judged on outcomes, internal actions and the things the agent must never do.
+  </Card>
+  <Card title="Voice agents" icon="microphone" href="/agent-testing/voice-agents">
+    Real audio through ElevenLabs, OpenAI Realtime, Twilio, Pipecat and Gemini Live, with background noise, interruptions and latency metrics.
+  </Card>
+  <Card title="Red teaming" icon="shield-halved" href="/agent-testing/red-teaming">
+    Multi-turn adversarial attacks with escalation, refusal detection and backtracking, to find security gaps first.
+  </Card>
+</CardGroup>
+
+## Agent testing and dataset evaluation
+
+A dataset evaluation scores one input against one expected output. An agent is a process: it holds state, calls tools and takes several turns to reach an outcome, so a single input-output pair cannot describe what it must do in the middle of a conversation.
+
+For example, an evaluation dataset holds rows like these:
+
+| query                            | expected_answer                                                                                              |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| What is your refund policy?      | We offer a 30-day money-back guarantee on all purchases.                                                     |
+| How do I cancel my subscription? | You can cancel your subscription by logging into your account and clicking the "Cancel Subscription" button. |
+
+A scenario describes the whole conversation and checks the steps between the turns:
+
+```python
+script=[
+  scenario.user("hey I have a problem with my order"),
+  scenario.agent(),
+  expect_ticket_created()
+  expect_ticket_label("ecommerce")
+  scenario.user("i want a refund!"),
+  scenario.agent()
+  expect_tool_call("search_policy")
+  scenario.user("this is ridiculous! let me talk to a human being")
+  scenario.agent()
+  expect_tool_call("escalate_to_human")
+]
+```
+
+Keep both. Use evaluations for the parts inside the agent, such as one retrieval step or one prompt, where you optimize a metric on many examples. Use scenarios to prove the agent behaves correctly end to end, to reproduce an incident from production, and to catch a regression before a release.
+
+{/* Founder decision: this sentence keeps the marketing superlative on purpose, so it is indexed as such. Do not rewrite it to plain language. */}
+[Scenario](https://langwatch.ai/scenario/) is the most advanced agent testing framework available. The platform and the SDKs both run on it: the same simulated user and the same judge test text, voice and adversarial conversations, in Python, TypeScript and Go, against any agent framework.
+
+## Go deeper
+
+<CardGroup cols={2}>
+  <Card title="Scenarios" icon="file-lines" href="/agent-testing/scenarios">
+    The situation, the criteria, labels, parameters, versions and the editor.
+  </Card>
+  <Card title="Test suites" icon="folder" href="/agent-testing/test-suites">
+    Group scenarios, run a group, and where scenarios written in code appear.
+  </Card>
+  <Card title="Run plans" icon="play" href="/agent-testing/run-plans">
+    What happens when you press Run, and how runs join one history.
+  </Card>
+  <Card title="Results" icon="chart-line" href="/agent-testing/results">
+    The Results tab, the run detail, the conversation drawer and what each status means.
+  </Card>
+  <Card title="Compare agents" icon="code-compare" href="/agent-testing/compare-agents">
+    The same scenarios against two agents, or one agent on two settings, side by side.
+  </Card>
+  <Card title="Connect your agent" icon="plug" href="/agent-testing/connect-your-agent">
+    Register the HTTP endpoint and let the judge read the agent's own traces.
+  </Card>
+  <Card title="Run from CI" icon="rotate" href="/agent-testing/run-from-ci">
+    Start a test suite from a CI job and fail the job on a failed run.
+  </Card>
+  <Card title="Scenario documentation" icon="book" href="https://langwatch.ai/scenario/">
+    The full reference of the Scenario framework.
+  </Card>
+</CardGroup>

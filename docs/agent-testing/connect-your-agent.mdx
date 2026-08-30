@@ -1,13 +1,13 @@
 ---
 title: Connect Your Agent
 sidebarTitle: Overview
-keywords: langwatch, agent simulations, http agent, black box testing, traceparent, trace propagation, scenario suite, coding agent prompt
-description: Register your agent's HTTP endpoint as a simulation target, so your team runs scenario suites from the platform and the judge verifies behavior against the agent's own traces.
+keywords: langwatch, agent testing, agent simulations, http agent, black box testing, traceparent, trace propagation, test suite, coding agent prompt
+description: Register your agent's HTTP endpoint as a target, so your team runs test suites from the platform and the judge verifies behavior against the agent's own traces.
 ---
 
 ## Getting Started
 
-The fastest path is the connect-agent skill. Install it in your coding agent (Claude Code, Cursor, or any agent with shell access), or copy the full prompt, and the agent performs the whole setup, from finding the endpoint to running the first suite:
+The fastest path is the connect-agent skill. Install it in your coding agent (Claude Code, Cursor, or any agent with shell access), or copy the full prompt, and the agent performs the whole setup, from finding the endpoint to running the first test suite:
 
 {/* lw-generated:connect-agent:start */}
 
@@ -282,7 +282,7 @@ The steps below are the same setup by hand, and what to check when the skill's r
 
 Scenario runs call your agent from the LangWatch backend, so the agent needs a URL that backend can reach. A staging deployment is the recommended target: it exercises the real system without touching production data. Any reachable URL works.
 
-For the agent running on your own machine, `langwatch agent dev` opens a tunnel to a local port and points the registered agent at it for the session. See [Local development](/agent-simulations/local-development).
+For the agent running on your own machine, `langwatch agent dev` opens a tunnel to a local port and points the registered agent at it for the session. See [Local development](/agent-testing/local-development).
 
 The endpoint receives one HTTP request per conversation turn and returns the agent's reply. It does not need to know anything about LangWatch: you configure the request body and the response parsing on the LangWatch side, in step 3.
 
@@ -293,7 +293,7 @@ Your endpoint's existing authentication passes through the HTTP agent's header r
 When the normal authentication is built for human users (sessions, OAuth redirects), add a dedicated API key for scenario traffic instead: your server reads the expected key from an environment variable and checks it on each request, and the HTTP agent sends it from a secret. A dedicated key is also the one you revoke to close the testing path.
 
 <Note>
-  **Also check:** [Testing agents behind authentication](/agent-simulations/authenticated-agents) lists exactly which fields resolve secret references, and covers OAuth2 client-credentials exchange with a code agent.
+  **Also check:** [Testing agents behind authentication](/agent-testing/authenticated-agents) lists exactly which fields resolve secret references, and covers OAuth2 client-credentials exchange with a code agent.
 </Note>
 
 ## 3. Define the request and the response contract
@@ -312,8 +312,8 @@ The body template renders as a Liquid template on every turn, and `outputPath` i
 | `{{ messages }}` | The whole conversation as a raw JSON array of `{role, content}` messages |
 | `{{ input }}` | The text of the last user message |
 | `{{ threadId }}` | A conversation id, the same on every turn of a run |
-| `{{ params.NAME }}` | A [run parameter](/agent-simulations/scenario-parameters) |
-| `{{ traceId }}`, `{{ traceparent }}` | The turn's trace identifiers, see [Linking your traces](/agent-simulations/remote-traces) |
+| `{{ params.NAME }}` | A [run parameter](/agent-testing/run-parameters) |
+| `{{ traceId }}`, `{{ traceparent }}` | The turn's trace identifiers, see [Linking your traces](/agent-testing/linking-your-traces) |
 
 The URL and the header values render the same variables.
 
@@ -359,7 +359,7 @@ With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens 
 The agent must report its traces to the same LangWatch project that runs the scenarios. Traces sent to another project, or to another observability backend only, are invisible to the judge.
 
 <Note>
-  **Also check:** [Linking your traces](/agent-simulations/remote-traces) explains what the judge sees, how long it waits for traces, and what happens when they do not arrive.
+  **Also check:** [Linking your traces](/agent-testing/linking-your-traces) explains what the judge sees, how long it waits for traces, and what happens when they do not arrive.
 </Note>
 
 ## 5. Register the agent and run the first scenario
@@ -367,13 +367,13 @@ The agent must report its traces to the same LangWatch project that runs the sce
 In the platform, create the agent on the **Agents** page: type **HTTP**, then the URL, authentication, body template and output path from the steps above. The same registration is available as `POST /api/agents`.
 
 <Frame>
-<img className="block" src="/images/agent-simulations/register-http-agent.png" alt="The HTTP agent editor with the endpoint URL, request body template and output path" />
+<img className="block" src="/images/agent-testing/register-http-agent.png" alt="The HTTP agent editor with the endpoint URL, request body template and output path" />
 </Frame>
 
 The **Test** tab of the agent editor sends one real request to your endpoint with the current configuration. Use it to confirm the endpoint answers and the output path extracts the reply text before you run any scenario:
 
 <Frame>
-<img className="block" src="/images/agent-simulations/agent-test-request.png" alt="The Test tab showing a 200 response from the agent endpoint and the extracted reply" />
+<img className="block" src="/images/agent-testing/agent-test-request.png" alt="The Test tab showing a 200 response from the agent endpoint and the extracted reply" />
 </Frame>
 
 With the CLI:
@@ -407,21 +407,17 @@ langwatch test-suite run 'Smoke' --target http:<agent-id> --wait
 Open the run in **Agent Testing > Results**. A connected setup shows:
 
 - The conversation transcript, with the reply text your `outputPath` extracted.
-- A trace link on each turn in the run detail, opening the agent's own spans for that turn.
+- **View trace** on each turn of the conversation, opening the agent's own spans for that turn.
 - Judge reasoning that cites spans, naming the tool call or lookup that satisfied a criterion.
 
 <Frame>
-<img className="block" src="/images/agent-simulations/run-detail-conversation.png" alt="The run detail with the conversation transcript and a View trace link on the turn" />
+<img className="block" src="/images/agent-testing/run-drawer-trace-link.png" alt="The conversation drawer with View trace on a turn and the judge reasoning citing a tool call span" />
 </Frame>
 
-<Frame>
-<img className="block" src="/images/agent-simulations/run-detail-verdict.png" alt="The run results with the verdict and the judge reasoning citing a tool call span from the trace" />
-</Frame>
-
-The trace link on a turn opens the full trace: the simulation's own steps first, then your agent's spans for that turn, adopted through the `traceparent` header. This is the evidence the judge reads:
+**View trace** on a turn opens the full trace: the simulation's own steps first, then your agent's spans for that turn, adopted through the `traceparent` header. This is the evidence the judge reads:
 
 <Frame>
-<img className="block" src="/images/agent-simulations/run-trace.png" alt="The trace waterfall with the simulation spans and the agent's own spans in one trace" />
+<img className="block" src="/images/agent-testing/run-trace.png" alt="The trace waterfall with the simulation spans and the agent's own spans in one trace" />
 </Frame>
 
 A trace-dependent criterion that comes back inconclusive means the traces did not arrive; see the failures below.
@@ -430,7 +426,7 @@ A trace-dependent criterion that comes back inconclusive means the traces did no
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| The run fails with a connection error | The URL is not reachable from the LangWatch backend: an internal hostname, a firewall, or a stopped service. | Deploy the endpoint to a reachable URL, or use [`langwatch agent dev`](/agent-simulations/local-development) for a local process. |
+| The run fails with a connection error | The URL is not reachable from the LangWatch backend: an internal hostname, a firewall, or a stopped service. | Deploy the endpoint to a reachable URL, or use [`langwatch agent dev`](/agent-testing/local-development) for a local process. |
 | Every turn fails with 401 or 403 | The credential is missing or wrong: no header row or `auth` block, or the `{{ secrets.NAME }}` reference names a secret the project does not have. | Add the header row or `auth` block, and check the secret's name and project in **Settings → Secrets**. |
 | The transcript shows empty replies or raw JSON | `outputPath` does not match the response shape, so no reply text is found. | Set `outputPath` to the JSONPath of the reply text in your endpoint's real response. |
 | Trace-dependent criteria come back inconclusive, and turns have no trace link | The server does not adopt the incoming `traceparent`, or it reports traces to a different LangWatch project. | Adopt the context as in step 4, and point the agent's tracing at the same project's API key. |

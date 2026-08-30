@@ -1,7 +1,7 @@
 ---
-title: Run Test Suites from CI
+title: Run from CI
 sidebarTitle: Run from CI
-keywords: langwatch, agent simulations, ci, test suite, run plan, batch, batchRunId, isComplete, poll, wait
+keywords: langwatch, agent testing, agent simulations, ci, test suite, run plan, batch, batchRunId, isComplete, poll, wait
 description: Start a test suite from a CI job and wait for every run of the batch to finish.
 ---
 
@@ -17,7 +17,7 @@ langwatch test-suite run "Checkout regression" --target http:agent_abc123 --wait
 
 `--wait` polls until the batch is complete and exits non-zero when a run failed, which is what fails the job. The test suite is named by its id or by its name.
 
-Add `--format json` (or `-o json`) to get one final document on stdout instead of the progress lines. It carries `outcome`, `tallies` and the per-run `results`, so a job step can read the verdict without parsing prose.
+Add `--format json` (or `-o json`) to get one final document on stdout instead of the progress lines. It holds `outcome`, `tallies` and the per-run `results`, so a job step can read the verdict without parsing prose.
 
 ## From the REST API
 
@@ -35,7 +35,7 @@ curl -X POST "https://app.langwatch.ai/api/v1/test-suites/suite_abc123/run" \
 
 The body takes `targets` and, when you want them, `name`, `repeatCount`, `simulatorModel`, `judgeModel`, `parameters`, `note` and `idempotencyKey`. Without `name`, the run goes under the run plan named after the test suite and the target, so every run of the same test suite against the same agent joins one history. Repeat the same `idempotencyKey` to make a retried job join the first run instead of starting a second one.
 
-The response carries the values the CI job needs:
+The response has the values the CI job needs:
 
 ```json
 {
@@ -106,11 +106,9 @@ console.log(result.batchRunId);
 
 `langwatch.runPlans.run({ ... })` takes the same body as `POST /api/v1/run-plans/run`.
 
-## Compare two agents, or one agent on two models
+## Compare two agents, or one agent on two settings
 
-A run goes against every target you name, so naming two targets runs each scenario twice and files both under one batch. That is how you compare a candidate against what is in production.
-
-A target may also carry the parameter values it alone runs with. Name the same agent twice with different values and you compare that agent on two models in the same run.
+A run goes against every target you name, so naming two targets runs each scenario against both and files the results under one batch, one column per target on the results page. A target may also carry the parameter values it alone runs with, so the same agent named twice with different values is a comparison of that agent on two settings. [Compare agents](/agent-testing/compare-agents) covers how the platform shows them.
 
 ```bash
 langwatch test-suite run "Checkout regression" \
@@ -145,8 +143,6 @@ curl -X POST "https://app.langwatch.ai/api/v1/test-suites/suite_abc123/run" \
 ```
 
 `runParameters` are merged over the run-level `parameters`, and the target wins. Use `parameters` for what every target shares, such as a fixture id or a tenant, and `runParameters` for what tells the targets apart.
-
-The results page shows one column per target, each with its own pass rate, duration and cost, so you read the two side by side rather than as one fused number.
 
 ## Poll the batch
 
@@ -222,13 +218,13 @@ echo "The batch did not finish before the timeout."
 exit 1
 ```
 
-The request carries its own time limits, so a read that hangs cannot hold the job open. The deadline is read between requests, so the job stops within one request and one sleep of it, which is 40 seconds with the values above.
+The request has its own time limits, so a read that hangs cannot hold the job open. The deadline is read between requests, so the job stops within one request and one sleep of it, which is 40 seconds with the values above.
 
 `langwatch test-suite run ... --wait` does the same poll, and its exit code follows the results.
 
 ## Give the batch a note
 
-`--note` keeps one short line with the batch: why it was run, or what changed. Every run in the batch carries it, and the platform shows it beside the run.
+`--note` keeps one short line with the batch: why it was run, or what changed. Every run in the batch keeps it, and the platform shows it beside the run.
 
 ```bash
 langwatch test-suite run suite_abc123 --target http:agent_abc123 \

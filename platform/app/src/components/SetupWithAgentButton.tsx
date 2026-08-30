@@ -86,7 +86,7 @@ export const SETUP_SURFACES = {
     trigger: "Add scenario tests for my agent",
     langyPrompt:
       "Add scenario tests for my agent. Connect to my repository and open a pull request with the first simulation suite.",
-    docsUrl: "https://docs.langwatch.ai/agent-simulations/introduction",
+    docsUrl: "https://docs.langwatch.ai/agent-testing/overview",
     docsLabel: "simulations documentation",
   },
   simulationRuns: {
@@ -94,7 +94,7 @@ export const SETUP_SURFACES = {
     trigger: "Add scenario tests for my agent",
     langyPrompt:
       "Add scenario tests for my agent. Connect to my repository and open a pull request with the first simulation suite.",
-    docsUrl: "https://docs.langwatch.ai/agent-simulations/introduction",
+    docsUrl: "https://docs.langwatch.ai/agent-testing/overview",
     docsLabel: "simulations documentation",
   },
   prompts: {

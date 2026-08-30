@@ -1,0 +1,47 @@
+---
+title: Targets
+sidebarTitle: Targets
+keywords: langwatch, agent testing, target, http agent, prompt, code agent, workflow, from code, local tunnel
+description: A target is the agent, prompt, code agent or workflow a run sends the conversation to, together with the parameters it runs with.
+---
+
+## The target types
+
+Every turn of a scenario goes to the target, which answers as the agent under test. Each type receives the conversation in its own way.
+
+| Type | Where it is created | What it receives |
+|---|---|---|
+| **HTTP Agent** | **Agents**, **New Agent**, **HTTP Agent** | An HTTP request built from the URL, the headers and the body template you configure, with `{{ messages }}`, `{{ input }}`, `{{ threadId }}` and `{{ params.NAME }}` rendered in. |
+| **Prompt** | **Prompts** | The prompt template of the project, with its inputs bound by name and `{{ messages }}` as the transcript. |
+| **Code Agent** | **Agents**, **New Agent**, **Code Agent** | A Python `__call__(message)` run by the platform, with `params` and `secrets` injected. |
+| **Workflow Agent** | **Agents**, **New Agent**, **Workflow Agent** | The workflow's entry inputs, one per parameter. |
+
+<Frame>
+<img className="block" src="/images/agent-testing/agent-type-selector.png" alt="The Choose Agent Type dialog with HTTP Agent, Code Agent and Workflow Agent" />
+</Frame>
+
+An HTTP agent is the target for an agent that runs in your own infrastructure; [Connect your agent](/agent-testing/connect-your-agent) registers one. A prompt is the target when the agent is one model call with a prompt you keep in LangWatch.
+
+## How a run picks the target
+
+The run dialog asks for the **Agent to be tested**. **Run against a prompt** in **Customize your run** swaps it for **Prompt to be tested** and lists the prompts of the project.
+
+<Frame>
+<img className="block" src="/images/agent-testing/run-dialog-prompt-target.png" alt="The run dialog with Prompt to be tested selected" />
+</Frame>
+
+**Setup agent**, the first step on an empty Scenarios tab, creates the first HTTP agent of the project.
+
+## Parameters of a target
+
+The parameters of a run reach the target: an HTTP agent reads them as `{{ params.NAME }}` in its URL, headers and body template, a prompt in its template, a code agent as `params.NAME`, a workflow as entry inputs. A comparison run gives each target its own values. See [Run parameters](/agent-testing/run-parameters).
+
+## Local tunnel
+
+While `langwatch agent dev` runs, the HTTP agent points at a developer's machine, and the agents list and the run dialog show a **Local tunnel** mark on it. See [Local development](/agent-testing/local-development).
+
+## Targets of scenarios written in code
+
+A scenario that runs in your own test runner calls the agent itself, through the adapter you write, so the platform has no target to configure. The results still report to the project, under a **From Code** test suite named after the `setId`, and the **Targets** column of the Results tab shows the name of your agent adapter. A run from an older SDK that reported no name shows `default`.
+
+Also check: [Connect your agent](/agent-testing/connect-your-agent), [Testing agents behind authentication](/agent-testing/authenticated-agents), [Linking your traces](/agent-testing/linking-your-traces), [Write scenarios in code](/agent-testing/scenarios-in-code).

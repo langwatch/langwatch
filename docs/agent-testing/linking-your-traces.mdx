@@ -1,7 +1,7 @@
 ---
 title: Linking Your Traces
 sidebarTitle: Linking your traces
-keywords: langwatch, agent simulations, linked traces, traceparent, trace propagation, judge, tool calls, opentelemetry
+keywords: langwatch, agent testing, agent simulations, linked traces, traceparent, trace propagation, judge, tool calls, opentelemetry
 description: Judge scenario criteria against what your agent did, tool calls, writes and retrievals, read from its own traces rather than from its reply text.
 ---
 
@@ -15,7 +15,7 @@ For example, a support agent replies "your order ships Tuesday". The reply alone
 
 Each turn of a simulation runs as one LangWatch trace, grouped under the run's thread. On every call to an HTTP agent, the platform sends that turn's W3C `traceparent` header. When the agent's server adopts the header, the spans it produces during the turn land in the same trace, in the same project.
 
-Adoption is one change on the agent's side, and no change at all when the server runs OpenTelemetry HTTP auto-instrumentation. The snippets are in [Connect your agent](/agent-simulations/connect-your-agent#4-adopt-the-trace-context).
+Adoption is one change on the agent's side, and no change at all when the server runs OpenTelemetry HTTP auto-instrumentation. The snippets are in [Connect your agent](/agent-testing/connect-your-agent#4-adopt-the-trace-context).
 
 The agent must report its traces to the same LangWatch project that runs the scenarios. Traces in another project are invisible to the judge.
 
@@ -56,7 +56,7 @@ When the wait ends with a trace that is still incomplete, the judge keeps every 
 
 When no trace of the run ever arrived, an inconclusive verdict ends the run instead of continuing the conversation: more turns cannot produce trace evidence, so the run does not stretch to the turn cap waiting for traces that will not come.
 
-An inconclusive behavior criterion is the signal to check propagation and the project key; the [common failures](/agent-simulations/connect-your-agent#common-failures) table covers the causes.
+An inconclusive behavior criterion is the signal to check propagation and the project key; the [common failures](/agent-testing/connect-your-agent#common-failures) table covers the causes.
 
 ## Writing trace-aware criteria
 
@@ -140,10 +140,10 @@ For the full SDK reference, see the [Scenario documentation](https://langwatch.a
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Connect your agent" icon="plug" href="/agent-simulations/connect-your-agent">
+  <Card title="Connect your agent" icon="plug" href="/agent-testing/connect-your-agent">
     Register your agent's HTTP endpoint and adopt the trace context
   </Card>
-  <Card title="Local development" icon="laptop-code" href="/agent-simulations/local-development">
+  <Card title="Local development" icon="laptop-code" href="/agent-testing/local-development">
     Run platform test suites against the agent on your machine with a tunnel
   </Card>
 </CardGroup>

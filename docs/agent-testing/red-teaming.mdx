@@ -1,16 +1,17 @@
 ---
 title: Red Teaming
 sidebarTitle: Red Teaming
-keywords: langwatch, red teaming, adversarial testing, agent security, crescendo, goat, prompt injection, jailbreak
+keywords: langwatch, agent testing, red teaming, adversarial testing, agent security, crescendo, goat, prompt injection, jailbreak
+description: RedTeamAgent replaces the user simulator with a multi-turn attacker, in the same scenario.run() loop and the same judge as your functional tests.
 ---
 
 <Warning>
   Use red teaming only on agents you own or have explicit permission to test.
 </Warning>
 
-# Red Teaming Your Agent
+## How an attack runs
 
-`RedTeamAgent` is a **drop-in replacement for the [user simulator](/agent-simulations/getting-started)** that runs structured, multi-turn adversarial attacks against your agent. It plugs into the same `scenario.run()` loop, the same `JudgeAgent`, and the same CI pipeline, so your security tests live right next to your functional ones.
+The attacker takes the place of the [user simulator](/agent-testing/scenarios-in-code) and pursues a target you describe, such as extracting the system prompt, across many turns. The judge scores the conversation against your criteria, so a security test is a scenario like any other and runs in the same CI job.
 
 <img src="/images/red-teaming-hero.png" alt="Red Teaming" width="100%" />
 
@@ -23,7 +24,7 @@ Single-turn red-teaming tools fire thousands of prompts and score each in isolat
     A planner tailors an attack to your target, then escalates across phases instead of firing blind.
   </Card>
   <Card title="Per-turn scoring" icon="gauge">
-    Each response is scored 0–10 and the next turn adapts, pushing harder or switching technique.
+    Each response is scored 0 to 10 and the next turn adapts, pushing harder or switching technique.
   </Card>
   <Card title="Refusal detection + backtracking" icon="arrow-rotate-left">
     Hard refusals are caught and the attacker drops the dead end and retries a new angle.
@@ -37,16 +38,16 @@ Single-turn red-teaming tools fire thousands of prompts and score each in isolat
 
 | Phase | Turns | Approach |
 | --- | --- | --- |
-| **Warmup** | 0–20% | Rapport-building. Maps capabilities without revealing intent. |
-| **Probing** | 20–45% | Hypothetical framing, "what if" scenarios, academic curiosity. |
-| **Escalation** | 45–75% | Authority claims, roleplay, urgency, social engineering. |
-| **Direct** | 75–100% | Encoding tricks (Base64, ROT13), prompt injection, multi-vector. |
+| **Warmup** | 0 to 20% | Rapport-building. Maps capabilities without revealing intent. |
+| **Probing** | 20 to 45% | Hypothetical framing, "what if" scenarios, academic curiosity. |
+| **Escalation** | 45 to 75% | Authority claims, roleplay, urgency, social engineering. |
+| **Direct** | 75 to 100% | Encoding tricks (Base64, ROT13), prompt injection, multi-vector. |
 
 Need maximum adaptability against a hardened agent? [**GOAT**](https://langwatch.ai/scenario/advanced/red-teaming/goat) is a drop-in alternative that picks a technique *per turn* instead of following fixed phases (based on Meta's [GOAT paper](https://arxiv.org/abs/2410.01606), ICML 2025).
 
 ## Get it running
 
-New to Scenario? Start with [Getting Started](/agent-simulations/getting-started) to write your agent's `call()` adapter, then swap in an attacker instead of the user simulator.
+New to Scenario? Start with [Getting Started](/agent-testing/scenarios-in-code) to write your agent's `call()` adapter, then swap in an attacker instead of the user simulator.
 
 <Steps>
   <Step title="Install Scenario">
@@ -125,7 +126,7 @@ New to Scenario? Start with [Getting Started](/agent-simulations/getting-started
     </Tabs>
   </Step>
   <Step title="Run it">
-    Run it alongside your test suite. We recommend **50 turns** for thorough coverage. Agents that hold early often break under sustained pressure. With `LANGWATCH_API_KEY` set, every adversarial turn shows up in the [Simulations dashboard](https://langwatch.ai/scenario/visualizations), and `scenario redteam-report` opens the findings dashboard with severity and prioritized fixes.
+    Run it alongside your test suite. We recommend **50 turns** for thorough coverage. Agents that hold early often break under sustained pressure. With `LANGWATCH_API_KEY` set, every adversarial turn appears under **Agent Testing > Results**, and `scenario redteam-report` opens the findings dashboard with severity and prioritized fixes.
   </Step>
 </Steps>
 

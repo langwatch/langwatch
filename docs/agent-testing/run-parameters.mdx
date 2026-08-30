@@ -1,7 +1,7 @@
 ---
-title: Scenario Run Parameters
+title: Run Parameters
 sidebarTitle: Run parameters
-keywords: langwatch, agent simulations, scenario parameters, run parameters, params, test suite, run plan, tenant, fixture, test account
+keywords: langwatch, agent testing, agent simulations, scenario parameters, run parameters, params, test suite, run plan, tenant, fixture, test account
 description: Run the same scenario with different parameters, to set different setup conditions or fixtures for your agent.
 ---
 
@@ -41,18 +41,20 @@ Each run records the values it used, so every result shows which plan it tested.
 
 ## Declare the parameters on the scenario
 
-Open the scenario and click **Parameters**, next to **Labels** at the bottom of the editor. Add one row per parameter: a name, an optional description, and an optional default value.
+Open the scenario and press **Add parameters** under **Customize scenario**. The block takes one line of `name=default` pairs, separated by commas:
 
-<img src="/images/simulations/scenario-parameters-form.png" alt="The scenario editor with the parameters dialog open over it, declaring a fixture parameter with a description and a default value, referenced as params.fixture in the situation and criteria" width="100%" />
+```text title="Parameters"
+plan=free, locale=de
+```
+
+<img src="/images/agent-testing/scenario-parameters-editor.png" alt="The scenario editor with the parameters block open, declaring plan and locale with their defaults, and params.plan read in the situation" width="100%" />
 
 - **Name** is what `{{ params.NAME }}` reads. Letters, digits and underscores, and the first character is a letter or an underscore.
-- **Description** appears beside the field when someone starts a run.
-- **Default value** applies when the run does not set the value. `42` is a number, `true` is a boolean, and everything else is text. Quote a value to force text: `"007"`.
-- **Secret** makes the value a credential. See [Secret parameters](#secret-parameters).
+- **Default value** applies when the run does not set the value. `42` is a number, `true` is a boolean, and everything else is text. Quote a value to force text: `"007"`. A name with an empty value after `=` has no default.
 
 A scenario can declare up to 20 parameters.
 
-The API accepts the same declarations: `POST /api/scenarios` and `PATCH /api/scenarios/{id}` take a `parameters` array of `{ name, description, defaultValue, secret }` objects.
+The API accepts the same declarations with a description and the secret flag: `POST /api/scenarios` and `PATCH /api/scenarios/{id}` take a `parameters` array of `{ name, description, defaultValue, secret }` objects. A [secret parameter](#secret-parameters) is declared through the API, since the editor line holds plain values only.
 
 ## Use the values in the scenario text
 
@@ -85,11 +87,11 @@ https://api.your-company.internal/{{ params.region }}/chat
 }
 ```
 
-<img src="/images/simulations/scenario-parameters-body-template.png" alt="The HTTP agent body template editor referencing params.fixture, with the available variables hint listing params.NAME" width="100%" />
+<img src="/images/agent-testing/http-agent-body-template.png" alt="The HTTP agent body template with plan read from params.plan, and the variables hint listing params.NAME" width="100%" />
 
-Auth fields read project secrets, not parameters. See [Testing agents behind authentication](/agent-simulations/authenticated-agents#referencing-project-secrets-from-an-http-target).
+Auth fields read project secrets, not parameters. See [Testing agents behind authentication](/agent-testing/authenticated-agents#referencing-project-secrets-from-an-http-target).
 
-Next to `params`, the same fields render `{{ messages }}`, `{{ input }}` and `{{ threadId }}` from the conversation, and `{{ traceId }}` and `{{ traceparent }}` from the turn's trace context. See [Linking your traces](/agent-simulations/remote-traces) for what the trace variables carry.
+Next to `params`, the same fields render `{{ messages }}`, `{{ input }}` and `{{ threadId }}` from the conversation, and `{{ traceId }}` and `{{ traceparent }}` from the turn's trace context. See [Linking your traces](/agent-testing/linking-your-traces) for what the trace variables carry.
 
 ### Prompt targets
 
@@ -136,97 +138,17 @@ A value set at run time overrides the scenario's default. A parameter with no ru
 
 ### In the platform
 
-Running a test suite opens a confirmation dialog with one field per parameter, prefilled with the defaults. Edit a field to change the value for that run; the scenario keeps its defaults.
+**Add parameters** in the run dialog opens the same kind of line, prefilled with the defaults the scenarios in scope declare. Edit a value to change it for this run; the scenario keeps its defaults. A name left with an empty value falls back to the default.
 
-<img src="/images/simulations/scenario-parameters-run-dialog.png" alt="The test suite run confirmation dialog with a Parameters block, the fixture field prefilled from the scenario's default value" width="100%" />
+<img src="/images/agent-testing/run-dialog-parameters.png" alt="The run dialog with the parameters line set to plan=pro and the Secret parameters switch" width="100%" />
 
-The **Save and Run** button in the scenario editor skips the dialog and runs with the defaults. To change a value, start the run from the test suite in **Agent Testing > Scenarios**.
+The **Secret parameters** switch turns the line into rows, one per parameter, with a lock on each secret one. The secret parameters the scenarios declare are in the list already, with an empty field for the value. Once a row holds a secret value the rows stay; a secret cannot be written on one line.
 
-### With the CLI
-
-`--param key=value` repeats once per parameter:
-
-```bash
-langwatch test-suite run <test-suite-id> --target http:<agent-id> --param plan=enterprise --param region=eu-central
-langwatch scenario run <scenario-id> --target http:<agent-id> --param plan=free
-langwatch run-plan run --target http:<agent-id> --all --param plan=free
-```
-
-`true` and `false` become booleans. A plain number like `42` becomes a number. `007` and `1.50` stay text, because their number form would change the digits. Repeat a name and the last value wins.
-
-### With the API
-
-`POST /api/v1/test-suites/{id}/run` takes a `parameters` object. Values are strings, numbers or booleans:
-
-```bash
-curl -X POST "https://app.langwatch.ai/api/v1/test-suites/suite_abc123/run" \
-  -H "X-Auth-Token: ${LANGWATCH_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "targets": [{ "type": "http", "referenceId": "agent_abc123" }],
-    "parameters": {
-      "plan": "enterprise",
-      "region": "eu-central",
-      "seed_fixtures": true
-    }
-  }'
-```
-
-`POST /api/v1/run-plans/run` takes the same `parameters` object beside its `config`.
-
-The response carries the batch id that the scheduled runs share:
-
-```json
-{
-  "scheduled": true,
-  "batchRunId": "batch_xyz789",
-  "setId": "set_abc123",
-  "jobCount": 6,
-  "runPlanId": "plan_abc123",
-  "planName": "Cancellation Support Agent",
-  "created": false,
-  "skippedArchived": { "scenarios": [], "targets": [] },
-  "items": []
-}
-```
-
-See [Run from CI](/agent-simulations/run-suites-from-ci) for the full request and response, and for the poll that waits on the batch.
-
-### With the SDKs
-
-<Tabs>
-  <Tab title="Python">
-```python
-import langwatch
-
-langwatch.setup()
-
-result = langwatch.test_suites.run(
-    "suite_abc123",
-    targets=[{"type": "http", "referenceId": "agent_abc123"}],
-    parameters={"plan": "enterprise", "region": "eu-central"},
-)
-print(result["batchRunId"])
-```
-  </Tab>
-  <Tab title="TypeScript">
-```typescript
-import { LangWatch } from "langwatch";
-
-const langwatch = new LangWatch();
-
-const result = await langwatch.testSuites.run("suite_abc123", {
-  targets: [{ type: "http", referenceId: "agent_abc123" }],
-  parameters: { plan: "enterprise", region: "eu-central" },
-});
-console.log(result.batchRunId);
-```
-  </Tab>
-</Tabs>
+**Save & Run** in the scenario editor opens the same dialog.
 
 ## Secret parameters
 
-A secret parameter is a run parameter that carries a credential. The platform encrypts the value before it writes anything down, and keeps it out of the stored run, the APIs, the exports, the audit log and everything it displays. The target under test reads the value while the run executes, which is the purpose of the parameter. Use one for an API key, a bearer token, or a password that changes per run.
+A secret parameter is a run parameter that holds a credential. The platform encrypts the value before it writes anything down, and keeps it out of the stored run, the APIs, the exports, the audit log and everything it displays. The target under test reads the value while the run executes, which is the purpose of the parameter. Use one for an API key, a bearer token, or a password that changes per run.
 
 Declare it in the same editor: add the row, then turn on the **Secret** switch. A secret parameter takes no default value, so the field for it is empty and disabled.
 
@@ -254,7 +176,7 @@ A run value takes the place of a project secret of the same name, for that run o
   A secret is hidden in the record of the run, not in the conversation. When the agent under test repeats the value in its own answer, that answer is conversation content and the run stores it.
 </Warning>
 
-Also check: [Testing agents behind authentication](/agent-simulations/authenticated-agents), for a credential that stays the same across runs.
+Also check: [Testing agents behind authentication](/agent-testing/authenticated-agents), for a credential that stays the same across runs.
 
 ## Limits
 
@@ -285,21 +207,21 @@ The platform runs these checks before it schedules any jobs. A rejected run sche
 - The run detail drawer shows the values under **Parameters**, one row per name. A secret parameter appears as its name with a masked value.
 - The CSV export writes them as one JSON object per run: the `parameters` column in a criteria export, the `run_parameters` column in a full export. Secret parameters are left out.
 
-<img src="/images/simulations/scenario-parameters-run-drawer.png" alt="The simulation run detail drawer with the Parameters section showing the resolved value the run used, next to the rendered criteria and the judge's verdict" width="100%" />
+<img src="/images/agent-testing/run-drawer-parameters.png" alt="The conversation drawer with the Parameters block showing the value the run used and a masked secret" width="100%" />
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Authenticated agents" icon="key" href="/agent-simulations/authenticated-agents">
+  <Card title="Authenticated agents" icon="key" href="/agent-testing/authenticated-agents">
     Reference project secrets from an HTTP target or a code agent
   </Card>
-  <Card title="Simulations getting started" icon="rocket" href="/agent-simulations/getting-started">
-    Create a scenario, add a target, and run your first simulation
+  <Card title="Compare agents" icon="code-compare" href="/agent-testing/compare-agents">
+    One agent on two parameter sets in one run, side by side
   </Card>
   <Card title="Command line interface" icon="terminal" href="/integration/cli">
     Every run command and its flags
   </Card>
-  <Card title="Run from CI" icon="code" href="/agent-simulations/run-suites-from-ci">
+  <Card title="Run from CI" icon="code" href="/agent-testing/run-from-ci">
     Start a test suite from a CI job and wait for the batch
   </Card>
 </CardGroup>
