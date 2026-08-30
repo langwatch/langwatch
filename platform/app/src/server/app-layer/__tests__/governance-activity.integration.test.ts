@@ -10,10 +10,7 @@ import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import {
-  clearClickHouseTestApp,
-  installClickHouseTestApp,
-} from "~/test-utils/clickhouseTestApp";
+import { clearClickHouseTestApp, installClickHouseTestApp } from "~/test-utils/clickhouseTestApp";
 import { PROJECT_KIND, type InternalProject } from "@langwatch/project-contract";
 import type { App } from "~/server/app-layer/app";
 
@@ -205,11 +202,11 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
       },
     });
 
-    primaryGovProject = await app.projects.ensureInternal({
+    primaryGovProject = await app.projects.projectService.ensureInternal({
       organizationId: primaryOrg.id,
       kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
     });
-    crossGovProject = await app.projects.ensureInternal({
+    crossGovProject = await app.projects.projectService.ensureInternal({
       organizationId: crossOrg.id,
       kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
     });
@@ -358,8 +355,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
     await clearClickHouseTestApp();
     await ch
       .command({
-        query:
-          "DELETE FROM governance_ocsf_events WHERE TenantId IN ({tenantIds:Array(String)})",
+        query: "DELETE FROM governance_ocsf_events WHERE TenantId IN ({tenantIds:Array(String)})",
         query_params: {
           tenantIds: [primaryGovProject.id, crossGovProject.id],
         },
@@ -399,16 +395,14 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
       });
       try {
         const service = activity(app);
-        const summary = await service.summary({
+        const summary = await service.activitySummary({
           organizationId: orphanOrg.id,
           windowDays: 7,
         });
         expect(summary.spentThisWindowUsd).toBe(0);
         expect(summary.activeUsersThisWindow).toBe(0);
       } finally {
-        await prisma.organization
-          .delete({ where: { id: orphanOrg.id } })
-          .catch(() => undefined);
+        await prisma.organization.delete({ where: { id: orphanOrg.id } }).catch(() => undefined);
       }
     });
   });
@@ -416,7 +410,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
   describe("when querying summary() with governance-origin traces seeded", () => {
     it("returns spend rolled up from governance-origin traces in the window", async () => {
       const service = activity(app);
-      const summary = await service.summary({
+      const summary = await service.activitySummary({
         organizationId: primaryOrg.id,
         windowDays: 7,
       });
@@ -428,7 +422,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
     it("rolls up active users from langwatch.user_id in governance traces only", async () => {
       const service = activity(app);
-      const summary = await service.summary({
+      const summary = await service.activitySummary({
         organizationId: primaryOrg.id,
         windowDays: 7,
       });
@@ -439,7 +433,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
     it("excludes cross-org governance traces (TenantId isolation)", async () => {
       const service = activity(app);
-      const summary = await service.summary({
+      const summary = await service.activitySummary({
         organizationId: primaryOrg.id,
         windowDays: 30,
       });
@@ -452,7 +446,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
   describe("when querying spendByUser()", () => {
     it("returns per-user spend rollup sorted by spend desc", async () => {
       const service = activity(app);
-      const rows = await service.spendByUser({
+      const rows = await service.activitySpendByUser({
         organizationId: primaryOrg.id,
         windowDays: 7,
       });
@@ -480,7 +474,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
       // wall-clock vs query wall-clock) flipped it from the current
       // window into the prior window, dropping the Org-wide row from
       // the result entirely.
-      const rows = await service.spendByTeam({
+      const rows = await service.activitySpendByTeam({
         organizationId: primaryOrg.id,
         windowDays: 15,
       });
@@ -513,7 +507,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
     it("excludes cross-org governance traces (TenantId isolation)", async () => {
       const service = activity(app);
-      const rows = await service.spendByTeam({
+      const rows = await service.activitySpendByTeam({
         organizationId: primaryOrg.id,
         windowDays: 30,
       });
@@ -534,7 +528,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
         },
       });
       const service = activity(app);
-      const rows = await service.spendByTeam({
+      const rows = await service.activitySpendByTeam({
         organizationId: orgNoGov.id,
         windowDays: 30,
       });
@@ -546,7 +540,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
   describe("when querying spendByUser() with pagination + sort args (v2 spec line 157)", () => {
     it("limit + offset paginate the same ordering — sortBy='spend' desc returns bob ($1.50) on page 0, alice ($0.50) on page 1", async () => {
       const service = activity(app);
-      const page0 = await service.spendByUser({
+      const page0 = await service.activitySpendByUser({
         organizationId: primaryOrg.id,
         windowDays: 30,
         limit: 1,
@@ -554,7 +548,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
         sortBy: "spend",
         sortDir: "desc",
       });
-      const page1 = await service.spendByUser({
+      const page1 = await service.activitySpendByUser({
         organizationId: primaryOrg.id,
         windowDays: 30,
         limit: 1,
@@ -570,7 +564,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
     it("sortDir='asc' inverts the ordering — carol ($0.25) is the smallest spender so she comes first", async () => {
       const service = activity(app);
-      const rows = await service.spendByUser({
+      const rows = await service.activitySpendByUser({
         organizationId: primaryOrg.id,
         windowDays: 30,
         limit: 50,
@@ -584,7 +578,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
     it("sortBy='lastActivity' desc puts the recently-active users before carol's 14d-old row", async () => {
       const service = activity(app);
-      const rows = await service.spendByUser({
+      const rows = await service.activitySpendByUser({
         organizationId: primaryOrg.id,
         windowDays: 30,
         limit: 50,
@@ -601,7 +595,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
     it("legacy callers (no pagination/sort args) still get the v1 default — top-N by spend desc", async () => {
       const service = activity(app);
-      const rows = await service.spendByUser({
+      const rows = await service.activitySpendByUser({
         organizationId: primaryOrg.id,
         windowDays: 30,
       });
@@ -618,7 +612,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
   describe("when querying spendByTeam() with pagination + sort args (v2 spec line 157)", () => {
     it("limit caps the page; offset paginates — limit=1 offset=0 gets primary team, offset=1 gets Org-wide", async () => {
       const service = activity(app);
-      const page0 = await service.spendByTeam({
+      const page0 = await service.activitySpendByTeam({
         organizationId: primaryOrg.id,
         windowDays: 30,
         limit: 1,
@@ -626,7 +620,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
         sortBy: "spend",
         sortDir: "desc",
       });
-      const page1 = await service.spendByTeam({
+      const page1 = await service.activitySpendByTeam({
         organizationId: primaryOrg.id,
         windowDays: 30,
         limit: 1,
@@ -642,7 +636,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
     it("sortDir='asc' inverts the ordering — Org-wide ($0.25) before primary team ($2.00)", async () => {
       const service = activity(app);
-      const rows = await service.spendByTeam({
+      const rows = await service.activitySpendByTeam({
         organizationId: primaryOrg.id,
         windowDays: 30,
         limit: 10,
@@ -655,7 +649,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
     it("sortBy='lastActivity' desc puts the team with the recent activity first", async () => {
       const service = activity(app);
-      const rows = await service.spendByTeam({
+      const rows = await service.activitySpendByTeam({
         organizationId: primaryOrg.id,
         windowDays: 30,
         limit: 10,
@@ -670,7 +664,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
     it("sortBy='requests' desc orders by raw request count, not spend", async () => {
       const service = activity(app);
-      const rows = await service.spendByTeam({
+      const rows = await service.activitySpendByTeam({
         organizationId: primaryOrg.id,
         windowDays: 30,
         limit: 10,
@@ -684,7 +678,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
     it("legacy callers (no pagination/sort args) still get the v1 default — top-N by spend desc", async () => {
       const service = activity(app);
-      const rows = await service.spendByTeam({
+      const rows = await service.activitySpendByTeam({
         organizationId: primaryOrg.id,
         windowDays: 30,
       });
@@ -698,7 +692,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
   describe("when querying ingestionSourcesHealth()", () => {
     it("returns per-source eventsLast24h across pushed and pulled event stores", async () => {
       const service = activity(app);
-      const rows = await service.ingestionSourcesHealth({
+      const rows = await service.activityIngestionSourcesHealth({
         organizationId: primaryOrg.id,
       });
       const primary = rows.find((r) => r.id === primarySourceId);
@@ -713,7 +707,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
   describe("when querying sourceHealthMetrics() for a single source", () => {
     it("returns 24h/7d/30d event counts + lastSuccessIso", async () => {
       const service = activity(app);
-      const metrics = await service.sourceHealthMetrics({
+      const metrics = await service.activitySourceHealthMetrics({
         organizationId: primaryOrg.id,
         sourceId: primarySourceId,
       });
@@ -728,7 +722,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
   describe("when querying eventsForSource() for the trace drill-down list", () => {
     it("returns governance-origin traces matching the sourceId filter", async () => {
       const service = activity(app);
-      const rows = await service.eventsForSource({
+      const rows = await service.activityEventsForSource({
         organizationId: primaryOrg.id,
         sourceId: primarySourceId,
         limit: 50,
@@ -758,7 +752,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
   describe("when querying spendOverTime() for the bird's-eye stacked-area chart", () => {
     it("returns dense daily buckets covering windowDays — empty days emit `points: []` so the X axis has no gaps", async () => {
       const service = activity(app);
-      const result = await service.spendOverTime({
+      const result = await service.activitySpendOverTime({
         organizationId: primaryOrg.id,
         windowDays: 30,
         groupBy: "team",
@@ -788,7 +782,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
     it("groups by team — primary team appears in the recent bucket; Org-wide in the 14d-ago bucket", async () => {
       const service = activity(app);
-      const result = await service.spendOverTime({
+      const result = await service.activitySpendOverTime({
         organizationId: primaryOrg.id,
         windowDays: 30,
         groupBy: "team",
@@ -804,10 +798,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
       const primaryTeamPoints = result.buckets
         .flatMap((b) => b.points)
         .filter((p) => p.key === primaryTeamId);
-      const primarySpend = primaryTeamPoints.reduce(
-        (sum, p) => sum + Number(p.spendUsd),
-        0,
-      );
+      const primarySpend = primaryTeamPoints.reduce((sum, p) => sum + Number(p.spendUsd), 0);
       expect(primarySpend).toBeCloseTo(2.0, 2);
 
       const orgWidePoints = result.buckets
@@ -820,7 +811,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
     it("groups by user — alice + bob in recent bucket, carol in 14d-ago bucket", async () => {
       const service = activity(app);
-      const result = await service.spendOverTime({
+      const result = await service.activitySpendOverTime({
         organizationId: primaryOrg.id,
         windowDays: 30,
         groupBy: "user",
@@ -840,22 +831,18 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
       // 'should-not-count@example.com' came from a non-governance-origin trace
       // — it MUST NOT appear in any bucket.
-      expect(
-        flatPoints.find((p) => p.key === "should-not-count@example.com"),
-      ).toBeUndefined();
+      expect(flatPoints.find((p) => p.key === "should-not-count@example.com")).toBeUndefined();
     });
 
     it("groups by model — claude-sonnet-4 only; app-model is excluded by origin filter", async () => {
       const service = activity(app);
-      const result = await service.spendOverTime({
+      const result = await service.activitySpendOverTime({
         organizationId: primaryOrg.id,
         windowDays: 30,
         groupBy: "model",
       });
 
-      const distinctModels = new Set(
-        result.buckets.flatMap((b) => b.points.map((p) => p.key)),
-      );
+      const distinctModels = new Set(result.buckets.flatMap((b) => b.points.map((p) => p.key)));
       expect(distinctModels.has("claude-sonnet-4")).toBe(true);
       // app-model is on a non-governance-origin trace → excluded.
       expect(distinctModels.has("app-model")).toBe(false);
@@ -863,7 +850,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
     it("honors TenantId isolation — cross-org $50 spend never appears in primary org's series", async () => {
       const service = activity(app);
-      const result = await service.spendOverTime({
+      const result = await service.activitySpendOverTime({
         organizationId: primaryOrg.id,
         windowDays: 30,
         groupBy: "user",
@@ -880,7 +867,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
     it("orders points within a bucket by spend desc — largest contributor first for stable Recharts stack rendering", async () => {
       const service = activity(app);
-      const result = await service.spendOverTime({
+      const result = await service.activitySpendOverTime({
         organizationId: primaryOrg.id,
         windowDays: 30,
         groupBy: "user",
@@ -904,7 +891,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
       });
       try {
         const service = activity(app);
-        const result = await service.spendOverTime({
+        const result = await service.activitySpendOverTime({
           organizationId: orphan.id,
           windowDays: 7,
           groupBy: "team",
@@ -914,9 +901,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
           expect(bucket.points).toEqual([]);
         }
       } finally {
-        await prisma.organization
-          .delete({ where: { id: orphan.id } })
-          .catch(() => undefined);
+        await prisma.organization.delete({ where: { id: orphan.id } }).catch(() => undefined);
       }
     });
   });

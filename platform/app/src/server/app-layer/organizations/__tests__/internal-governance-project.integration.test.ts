@@ -130,9 +130,7 @@ describe("ensureHiddenGovernanceProject — lazy-ensure invariants for the hidde
       await prisma.organizationUser
         .deleteMany({ where: { organizationId: orgId } })
         .catch(() => undefined);
-      await prisma.team
-        .deleteMany({ where: { organizationId: orgId } })
-        .catch(() => undefined);
+      await prisma.team.deleteMany({ where: { organizationId: orgId } }).catch(() => undefined);
       await prisma.organization.delete({ where: { id: orgId } }).catch(() => undefined);
     }
     if (primaryUser?.id) {
@@ -150,7 +148,7 @@ describe("ensureHiddenGovernanceProject — lazy-ensure invariants for the hidde
       });
       expect(before).toHaveLength(0);
 
-      const project = await app.projects.ensureInternal({
+      const project = await app.projects.projectService.ensureInternal({
         organizationId: primaryOrg.id,
         kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
       });
@@ -177,15 +175,15 @@ describe("ensureHiddenGovernanceProject — lazy-ensure invariants for the hidde
 
   describe("given a Governance Project already exists for the org", () => {
     it("returns the same Project (idempotent — no duplicate row)", async () => {
-      const first = await app.projects.ensureInternal({
+      const first = await app.projects.projectService.ensureInternal({
         organizationId: primaryOrg.id,
         kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
       });
-      const second = await app.projects.ensureInternal({
+      const second = await app.projects.projectService.ensureInternal({
         organizationId: primaryOrg.id,
         kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
       });
-      const third = await app.projects.ensureInternal({
+      const third = await app.projects.projectService.ensureInternal({
         organizationId: primaryOrg.id,
         kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
       });
@@ -208,7 +206,7 @@ describe("ensureHiddenGovernanceProject — lazy-ensure invariants for the hidde
       const concurrent = 5;
       const results = await Promise.all(
         Array.from({ length: concurrent }, () =>
-          app.projects.ensureInternal({
+          app.projects.projectService.ensureInternal({
             organizationId: secondaryOrg.id,
             kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
           }),
@@ -233,7 +231,7 @@ describe("ensureHiddenGovernanceProject — lazy-ensure invariants for the hidde
   describe("given an org with no team (fresh-admin pre-team state)", () => {
     it("throws — a real governance entity mint cannot precede team creation", async () => {
       await expect(
-        app.projects.ensureInternal({
+        app.projects.projectService.ensureInternal({
           organizationId: teamlessOrg.id,
           kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
         }),
@@ -243,11 +241,11 @@ describe("ensureHiddenGovernanceProject — lazy-ensure invariants for the hidde
 
   describe("given two orgs each with a Governance Project (cross-tenant isolation)", () => {
     it("returns the calling org's Project, never the other org's", async () => {
-      const primaryProject = await app.projects.ensureInternal({
+      const primaryProject = await app.projects.projectService.ensureInternal({
         organizationId: primaryOrg.id,
         kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
       });
-      const secondaryProject = await app.projects.ensureInternal({
+      const secondaryProject = await app.projects.projectService.ensureInternal({
         organizationId: secondaryOrg.id,
         kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
       });
@@ -267,7 +265,7 @@ describe("ensureHiddenGovernanceProject — lazy-ensure invariants for the hidde
 
   describe("composition with PrismaOrganizationRepository.getAllForUser (Alexis Layer-1 filter)", () => {
     it("never includes the helper-minted Governance Project in the user-visible org/team/project tree", async () => {
-      const governanceProject = await app.projects.ensureInternal({
+      const governanceProject = await app.projects.projectService.ensureInternal({
         organizationId: primaryOrg.id,
         kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
       });
@@ -295,7 +293,7 @@ describe("ensureHiddenGovernanceProject — lazy-ensure invariants for the hidde
 
   describe("schema invariants on the helper-minted Project", () => {
     it("traceSharingEnabled is false (governance data must not leak via public-share links)", async () => {
-      const project = await app.projects.ensureInternal({
+      const project = await app.projects.projectService.ensureInternal({
         organizationId: primaryOrg.id,
         kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
       });
@@ -303,7 +301,7 @@ describe("ensureHiddenGovernanceProject — lazy-ensure invariants for the hidde
     });
 
     it("slug is org-scoped + stable (governance-${organizationId})", async () => {
-      const project = await app.projects.ensureInternal({
+      const project = await app.projects.projectService.ensureInternal({
         organizationId: primaryOrg.id,
         kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
       });
