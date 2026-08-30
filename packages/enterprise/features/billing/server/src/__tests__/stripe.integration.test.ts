@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   BillingPriceCatalogue,
   PlanTypes,
@@ -13,9 +13,7 @@ const calculator = SubscriptionItemCalculatorService.create(prices);
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 
 if (!STRIPE_SECRET_KEY) {
-  console.warn(
-    "Skipping Stripe billing integration tests because STRIPE_SECRET_KEY is not set",
-  );
+  console.warn("Skipping Stripe billing integration tests because STRIPE_SECRET_KEY is not set");
 }
 
 if (STRIPE_SECRET_KEY && !STRIPE_SECRET_KEY.startsWith("sk_test_")) {
@@ -130,7 +128,12 @@ describeIfStripeKey("Stripe billing integration", () => {
     let customerId: string;
     let subscriptionId: string;
 
-    it("sets up customer with payment method", async () => {
+    // Setup, not a test: it asserts nothing, and every case below depends on
+    // the ids it leaves behind. As an `it` a failure here reported one red test
+    // and let the rest run on an undefined customer id, which fails four more
+    // times and says nothing about the cause. As a `beforeAll` it fails the
+    // block once, where the failure is.
+    beforeAll(async () => {
       const customer = await createTrackedCustomer("lifecycle");
       customerId = customer.id;
       await attachTestPaymentMethod(customerId);
@@ -170,9 +173,7 @@ describeIfStripeKey("Stripe billing integration", () => {
       expect(priceIds).toContain(prices.LAUNCH_USERS);
       expect(priceIds).toContain(prices.LAUNCH_TRACES_10K);
 
-      const usersItem = updated.items.data.find(
-        (item) => item.price.id === prices.LAUNCH_USERS,
-      );
+      const usersItem = updated.items.data.find((item) => item.price.id === prices.LAUNCH_USERS);
       const tracesItem = updated.items.data.find(
         (item) => item.price.id === prices.LAUNCH_TRACES_10K,
       );
@@ -185,9 +186,10 @@ describeIfStripeKey("Stripe billing integration", () => {
       const currentItems = current.items.data;
 
       // Delete all current items and add ACCELERATE base
-      const itemUpdates: Stripe.SubscriptionUpdateParams.Item[] = currentItems.map(
-        (item) => ({ id: item.id, deleted: true }),
-      );
+      const itemUpdates: Stripe.SubscriptionUpdateParams.Item[] = currentItems.map((item) => ({
+        id: item.id,
+        deleted: true,
+      }));
       itemUpdates.push({ price: prices.ACCELERATE, quantity: 1 });
 
       const updated = await stripe.subscriptions.update(subscriptionId, {
@@ -286,9 +288,7 @@ describeIfStripeKey("Stripe billing integration", () => {
       const tracesItem = updated.items.data.find(
         (item) => item.price.id === prices.LAUNCH_TRACES_10K,
       );
-      const usersItem = updated.items.data.find(
-        (item) => item.price.id === prices.LAUNCH_USERS,
-      );
+      const usersItem = updated.items.data.find((item) => item.price.id === prices.LAUNCH_USERS);
       // 50_000 total - 20_000 included = 30_000 extra / 10_000 = 3
       expect(tracesItem!.quantity).toBe(3);
       // 8 total - 3 included = 5
