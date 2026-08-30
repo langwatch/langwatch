@@ -44,6 +44,8 @@ dependencies = [
     # Progress bars for experiment loop()/aloop(); pure-python and tiny, so a
     # declared dependency rather than an optional (it always runs there).
     "tqdm>=4.62.0",
+    # The outbound relay of connected agents (langwatch.agent), pure Python.
+    "websockets>=12",
 ]
 
 [project.optional-dependencies]
