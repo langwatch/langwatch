@@ -28,8 +28,13 @@ above IS covered. The check exists.
 
 ```
 $ pnpm --filter @langwatch/web typecheck:tests
-1817 errors across 1123 distinct files
+1817 errors across 487 distinct files
 ```
+
+(Count only lines carrying an `error TSxxxx` code. `tsc` also emits indented
+"related information" lines naming other files, and counting those inflates
+both the per-file totals and the file count — 1123 rather than 487, with
+production modules appearing as top offenders when they are only being cited.)
 
 Top codes: TS2339 (317), TS2740 (183), TS2304 (176), TS7006 (172).
 
@@ -51,6 +56,11 @@ the branch is mid-migration, so the count is not a surprise.
    reasons. The first framing suggests adding coverage that already exists.
 
 The biggest single contributors are worth knowing before starting:
-`governance-activity.integration` (81), `model-provider.app.ts` (73 — not a
-test file, pulled in as a dependency), `gateway-platform-api.integration` (42),
-`budgetsEveryDimension.integration` (38), `inventory.enterprise.tsx` (38).
+`governance-activity.integration` (81), `gateway-platform-api.integration`
+(42), `budgetsEveryDimension.integration` (38), `inventory.enterprise.tsx`
+(38), `dslAdapter.unit` (35), `savedWorkbenchChartsRestApi.integration` (30),
+`budget.service.unit` (28).
+
+Five of the top seven are gateway or governance suites, which suggests the
+count is concentrated rather than uniform — a handful of subsystems mid-move,
+not 487 independent problems.
