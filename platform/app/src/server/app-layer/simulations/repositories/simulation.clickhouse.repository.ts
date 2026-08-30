@@ -1125,13 +1125,20 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     };
   }
 
-  /** The newest UpdatedAt across every live run, for the cheap change check. */
+  /**
+   * The newest UpdatedAt across every live run, for the cheap change check.
+   *
+   * Reads the same rows the page reads. An agent test run is left out here
+   * too: it never reaches the page, so counting it would report a change the
+   * page cannot show and hold the caller's freshness cursor still.
+   */
   private async readMaxUpdatedAt(projectId: string): Promise<number> {
     const tsRows = await this.queryRows<{ LastUpdatedAt: string }>(
       `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
        FROM ${TABLE_NAME}
        WHERE TenantId = {tenantId:String}
-         AND ArchivedAt IS NULL`,
+         AND ArchivedAt IS NULL
+         ${AGENT_TEST_SET_EXCLUSION}`,
       { tenantId: projectId },
     );
     return Number(tsRows[0]?.LastUpdatedAt ?? "0");

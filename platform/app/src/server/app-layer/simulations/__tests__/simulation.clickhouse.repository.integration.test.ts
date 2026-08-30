@@ -1025,6 +1025,48 @@ describe("SimulationClickHouseRepository (integration)", () => {
     });
   });
 
+  describe("given an agent test batch newer than every other run", () => {
+    const freshnessTenantId = `test-sim-freshness-${nanoid()}`;
+    const lastRealUpdatedAt = now;
+    const agentTestUpdatedAt = now + 60_000;
+
+    beforeAll(async () => {
+      await insertRow(
+        ch,
+        makeInsertRow({
+          TenantId: freshnessTenantId,
+          ScenarioSetId: "default",
+          Status: "SUCCESS",
+          CreatedAt: new Date(lastRealUpdatedAt),
+          UpdatedAt: new Date(lastRealUpdatedAt),
+        }),
+      );
+      await insertRow(
+        ch,
+        makeInsertRow({
+          TenantId: freshnessTenantId,
+          ScenarioSetId: `__internal__${freshnessTenantId}__agent-test`,
+          ScenarioId: "__internal__agent-test",
+          Status: "SUCCESS",
+          CreatedAt: new Date(agentTestUpdatedAt),
+          UpdatedAt: new Date(agentTestUpdatedAt),
+        }),
+      );
+    });
+
+    /** @scenario "A test run does not make the results page look stale" */
+    it("answers that nothing changed, so the freshness cursor stays where it is", async () => {
+      const result = await repo.getRunDataForAllSuites({
+        projectId: freshnessTenantId,
+        limit: 100,
+        sinceTimestamp: lastRealUpdatedAt,
+      });
+
+      expect(result.changed).toBe(false);
+      expect(result.lastUpdatedAt).toBe(lastRealUpdatedAt);
+    });
+  });
+
   describe("getDistinctExternalSetIds()", () => {
     describe("when rows exist with empty ScenarioSetId and 'default' ScenarioSetId", () => {
       it("merges empty-string and 'default' into a single entry", async () => {

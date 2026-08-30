@@ -3,8 +3,8 @@
  *
  * No scenario row exists for it. The run carries a fixed scenario id, a fixed
  * conversation and its own internal set, so the execution path treats it
- * like any other run while nothing is saved and the results lists leave it
- * out.
+ * like any other run while the project gains no scenario, run plan or test
+ * suite, and the results lists leave the run out.
  *
  * Pattern of the set id: __internal__${projectId}__agent-test
  *

@@ -2,8 +2,10 @@
  * `langwatch/agent`: connect the function that runs an agent to LangWatch
  * so simulations run against it with no public URL.
  *
- * Node only: the connection is an outbound WebSocket that carries the API
- * key in its headers.
+ * Node only, and outbound only. The default transport is a WebSocket that
+ * carries the API key in its request headers. It falls back to HTTP long
+ * polling when a proxy refuses the upgrade, and
+ * `LANGWATCH_AGENT_TRANSPORT=http` selects HTTP long polling from the start.
  *
  * @see dev/docs/adr/128-connected-agents.md
  */

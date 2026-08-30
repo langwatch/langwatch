@@ -65,6 +65,8 @@ interface Session {
   /** Calls the socket is working on; used to fail them on close. */
   activeCallIds: Set<string>;
   isAlive: boolean;
+  /** Pongs seen so far, so each ping can tell whether its own was answered. */
+  pongs: number;
   refresh: NodeJS.Timeout | null;
   ping: NodeJS.Timeout | null;
 }
@@ -199,6 +201,7 @@ export class ConnectGateway {
       unsubscribe: null,
       activeCallIds: new Set(frame.instance.inFlightCallIds),
       isAlive: true,
+      pongs: 0,
       refresh: null,
       ping: null,
     };
@@ -211,12 +214,21 @@ export class ConnectGateway {
     ws.on("message", (data) => void this.onFrame(session, data));
     ws.on("pong", () => {
       session.isAlive = true;
+      session.pongs += 1;
     });
     ws.on("close", () => void this.onClose(session));
     ws.on("error", (error) => {
       logger.warn({ error, instanceId: info.instanceId }, "socket error");
     });
     this.startClocks(session);
+
+    // The socket may have gone while the registration was still running, with
+    // no close listener on it yet. Retire the session rather than leave its
+    // presence refreshing for a peer that is not there.
+    if (ws.readyState !== WebSocket.OPEN) {
+      await this.onClose(session);
+      return;
+    }
 
     this.send(ws, registered);
 
@@ -296,20 +308,20 @@ export class ConnectGateway {
   /** Presence refresh on the SDK's pongs, and the ping that asks for them. */
   private startClocks(session: Session): void {
     session.ping = setInterval(() => {
-      if (!session.isAlive) {
+      // Each ping carries its own deadline, so a pong that lands inside the
+      // wait keeps the socket even when the next ping already went out, and
+      // an earlier deadline can never retire a socket that has answered since.
+      const pongsBefore = session.pongs;
+      session.isAlive = false;
+      session.socket.ping();
+      setTimeout(() => {
+        if (session.pongs !== pongsBefore) return;
+        if (session.socket.readyState !== WebSocket.OPEN) return;
         logger.warn(
           { instanceId: session.info.instanceId },
           "no pong inside the wait, closing the socket",
         );
         session.socket.terminate();
-        return;
-      }
-      session.isAlive = false;
-      session.socket.ping();
-      setTimeout(() => {
-        if (!session.isAlive && session.socket.readyState === WebSocket.OPEN) {
-          session.socket.terminate();
-        }
       }, this.pongWaitMs).unref();
     }, this.pingIntervalMs);
     session.ping.unref();

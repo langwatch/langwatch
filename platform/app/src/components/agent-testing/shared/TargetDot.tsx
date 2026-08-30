@@ -38,7 +38,7 @@ export function TargetLegend({
   label,
   fontSize = "12px",
   testId,
-  wrap = false,
+  isWrapped = false,
 }: {
   color: string;
   label: string;
@@ -49,17 +49,17 @@ export function TargetLegend({
    * by default, which is what a row of a rail wants; a column header asks for
    * the whole name, because a cut name is what the reader picks a column by.
    */
-  wrap?: boolean;
+  isWrapped?: boolean;
 }) {
   return (
     <HStack gap={1.5} minWidth={0} alignItems="flex-start" data-testid={testId}>
-      <TargetDot color={color} marginTop={wrap ? "5px" : undefined} />
+      <TargetDot color={color} marginTop={isWrapped ? "5px" : undefined} />
       <Text
         fontSize={fontSize}
         fontWeight="semibold"
-        truncate={!wrap}
-        whiteSpace={wrap ? "normal" : undefined}
-        wordBreak={wrap ? "break-word" : undefined}
+        truncate={!isWrapped}
+        whiteSpace={isWrapped ? "normal" : undefined}
+        wordBreak={isWrapped ? "break-word" : undefined}
       >
         {label}
       </Text>

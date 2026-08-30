@@ -379,8 +379,8 @@ const registry = {
   },
   agent_call_timeout: {
     tips: [
-      "Raise `timeout` on the decorated function, up to the platform cap of 300 seconds",
-      "Check the process logs for the turn that did not finish",
+      "Raise the agent's timeout, up to the platform cap of 300 seconds",
+      "Check the agent logs for the turn that did not finish",
     ],
   },
   agent_call_failed: {
@@ -429,7 +429,7 @@ const registry = {
   },
   agent_payload_too_large: {
     tips: [
-      "Read `meta.what`, `meta.sizeBytes` and `meta.limitBytes`",
+      "Read `meta.what` and `meta.limitBytes`, and `meta.sizeBytes` when the payload was measured",
       "On a self-hosted deployment raise the cap with LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB",
     ],
   },

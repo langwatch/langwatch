@@ -107,7 +107,6 @@ function withOpenList({
   return next;
 }
 
-/** The title bar of the dialog. */
 function RunDialogHeader({ subject }: { subject: RunDialogSubject }) {
   return (
     <Dialog.Header

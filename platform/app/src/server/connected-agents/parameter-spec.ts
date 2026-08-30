@@ -177,10 +177,13 @@ function propertyObjectOf(raw: unknown): Record<string, unknown> {
 }
 
 /** A secret belongs to the scenario, so the agent may not declare one. */
-function assertNotSecret(
-  name: string,
-  property: Record<string, unknown>,
-): void {
+function assertNotSecret({
+  name,
+  property,
+}: {
+  name: string;
+  property: Record<string, unknown>;
+}): void {
   if (property.secret === true || property["x-langwatch-secret"] === true) {
     throw new AgentParameterInvalidError({
       name,
@@ -204,7 +207,7 @@ function normalizeProperty({
 }): ParameterSpec {
   assertUsableName(name);
   const property = propertyObjectOf(raw);
-  assertNotSecret(name, property);
+  assertNotSecret({ name, property });
 
   const { type, isDowngraded } = scalarTypeOf(property);
   if (isDowngraded) {

@@ -775,6 +775,24 @@ describe("agent_payload_too_large", () => {
   });
 });
 
+describe("agent_test_refused", () => {
+  describe("when the reason is longer than a sentence", () => {
+    /** @scenario "Technical detail stops at the trace id" */
+    it("clamps it, the way every server-supplied sentence here is clamped", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "agent_test_refused",
+          httpStatus: 400,
+          meta: { reason: "a".repeat(400) },
+        }),
+      );
+
+      expect(description).toContain("\u2026");
+      expect(description.length).toBeLessThan(300);
+    });
+  });
+});
+
 describe("UNKNOWN_ERROR_PRESENTATION", () => {
   /** @scenario "An unhandled failure says nothing, but stays traceable" */
   it("says nothing about what actually failed", () => {

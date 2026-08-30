@@ -26,7 +26,10 @@ import {
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
-import { PRESENCE_TTL_SECONDS } from "~/server/connected-agents/constants";
+import {
+  PRESENCE_TTL_SECONDS,
+  relayPayloadCaps,
+} from "~/server/connected-agents/constants";
 import { LongPollTransport } from "~/server/connected-agents/long-poll.transport";
 import {
   PROTOCOL_VERSION,
@@ -44,7 +47,8 @@ import { createAgentsApp } from "../[[...route]]/app";
 
 const ns = `longpoll-${nanoid(8)}`;
 
-let connection: RedisConnection;
+let connection: RedisConnection | null = null;
+let isSetupComplete = false;
 let organization: Organization;
 let team: Team;
 let projectId: string;
@@ -63,10 +67,16 @@ let podB: Pod;
 
 const POLL_WAIT_MS = 300;
 
-async function startPod(podId: string): Promise<Pod> {
+async function startPod({
+  podId,
+  redis,
+}: {
+  podId: string;
+  redis: RedisConnection;
+}): Promise<Pod> {
   const runtime = createConnectedAgentRuntime({
     podId,
-    store: createRedisStateStore(connection),
+    store: createRedisStateStore(redis),
     firstTurnGraceMs: 1_000,
     firstTurnPollMs: 50,
     resultPollMs: 100,
@@ -244,7 +254,7 @@ beforeAll(async () => {
     url: process.env.REDIS_URL,
     clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
     dbIndex: process.env.REDIS_DB_INDEX,
-  })!;
+  });
   if (!connection) throw new Error("These tests need a real Redis");
   await resetApp();
   globalForApp.__langwatch_app = createTestApp({ redis: connection });
@@ -329,11 +339,16 @@ beforeAll(async () => {
     })
   ).token;
 
-  podA = await startPod("pod_a");
-  podB = await startPod("pod_b");
+  podA = await startPod({ podId: "pod_a", redis: connection });
+  podB = await startPod({ podId: "pod_b", redis: connection });
+  isSetupComplete = true;
 });
 
 afterAll(async () => {
+  if (!isSetupComplete) {
+    connection?.disconnect();
+    return;
+  }
   await stopPod(podA);
   await stopPod(podB);
   await cleanupTestRows(prisma, [
@@ -348,7 +363,7 @@ afterAll(async () => {
     ["user", { id: userId }],
   ]);
   await resetApp();
-  connection.disconnect();
+  connection?.disconnect();
 });
 
 describe("register over HTTP", () => {
@@ -493,6 +508,58 @@ describe("poll", () => {
       await expect(
         dispatchFrom(podB, agentId, { now: () => Date.now() + offset }),
       ).rejects.toMatchObject({ code: "agent_offline" });
+    });
+  });
+});
+
+describe("frames", () => {
+  describe("when the body carries no frame the endpoint takes", () => {
+    /** @scenario "A frames body the endpoint does not take is refused as a protocol frame" */
+    it("answers a refused frame with protocol_invalid", async () => {
+      const { instanceToken } = await registered(podA);
+
+      const response = await podA.app.request("/api/v1/agents/connect/frames", {
+        method: "POST",
+        headers: headers(projectApiKey, {
+          "X-Agent-Instance-Token": instanceToken,
+        }),
+        body: JSON.stringify({ frames: [{ type: "register" }] }),
+      });
+      const body = (await response.json()) as Json;
+
+      expect(response.status).toBe(422);
+      expect(body.frame).toMatchObject({
+        type: "refused",
+        code: "protocol_invalid",
+      });
+    });
+  });
+
+  describe("when the body is above the frame cap", () => {
+    /** @scenario "A frames body above the cap names the limit alone" */
+    it("names the limit and no size, since nothing measured one", async () => {
+      const capMb = 0.001;
+      const limitBytes = relayPayloadCaps(capMb).frameBytes;
+      process.env.LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB = String(capMb);
+      try {
+        const app = createAgentsApp({ transport: () => podA.transport });
+
+        const response = await app.request("/api/v1/agents/connect/frames", {
+          method: "POST",
+          headers: headers(projectApiKey, {
+            "X-Agent-Instance-Token": "ait_whatever",
+          }),
+          body: JSON.stringify({
+            frames: [{ type: "ack", callId: "x".repeat(limitBytes) }],
+          }),
+        });
+        const body = (await response.json()) as Json;
+
+        expect(response.status).toBe(413);
+        expect(body.meta).toEqual({ what: "result", limitBytes });
+      } finally {
+        delete process.env.LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB;
+      }
     });
   });
 });

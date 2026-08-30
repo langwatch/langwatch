@@ -15,7 +15,11 @@ export const agentCallParamsSchema = z.record(
 
 export type AgentCallParams = z.infer<typeof agentCallParamsSchema>;
 
-/** One run parameter an agent declares, as the platform lists it. */
+/**
+ * One run parameter an agent declares, as the platform lists it. An agent
+ * never declares a secret parameter: a secret belongs to the scenario and is
+ * supplied per run.
+ */
 export interface AgentParameterSpec {
   name: string;
   type: "string" | "number" | "boolean";
@@ -23,7 +27,6 @@ export interface AgentParameterSpec {
   default?: string | number | boolean;
   description?: string;
   required?: boolean;
-  secret?: boolean;
 }
 
 /** One process connected as an instance of a connected agent. */
@@ -154,8 +157,9 @@ export interface AgentTestRunResponse {
 
 /**
  * Runs one scripted scenario against an agent: the user sends "ping", the
- * agent answers, and the run succeeds when the answer arrives. Nothing is
- * saved; the answer carries the run ids to follow.
+ * agent answers, and the run succeeds when the answer arrives. The project
+ * gains no scenario, run plan or test suite, and the answer carries the run
+ * ids to follow.
  */
 export async function testAgent(id: string): Promise<AgentTestRunResponse> {
   return makeRequest(

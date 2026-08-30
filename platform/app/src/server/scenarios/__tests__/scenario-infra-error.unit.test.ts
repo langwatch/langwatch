@@ -646,6 +646,15 @@ describe("classifyScenarioInfraError session cap", () => {
       expect(result.code).toBe(ScenarioInfraErrorCode.AgentCallFailed);
       expect(result.message).toContain("the API key is invalid");
     });
+
+    it("classifies a handler whose words match the session rule as a connected agent failure", () => {
+      const result = classifyScenarioInfraError(
+        "Connected agent call failed (agent_call_failed): Agent session too large, the agent returned a session of 70002 bytes, above the limit of 65536 bytes.",
+      );
+
+      expect(result.code).toBe(ScenarioInfraErrorCode.AgentCallFailed);
+      expect(result.message).toContain("Agent session too large");
+    });
   });
 });
 

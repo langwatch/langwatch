@@ -262,6 +262,14 @@ Feature: Python SDK connect_agent decorator
     Then the socket URL is wss://app.langwatch.ai/api/v1/agents/connect
     And http://localhost:5560 becomes ws://localhost:5560/api/v1/agents/connect
 
+  # Every connection carries the API key in an Authorization header.
+  @unit
+  Scenario: The API key never travels over a cleartext connection
+    Given an endpoint that is not encrypted and is not loopback
+    When the client builds its connection URL
+    Then it refuses, naming https as what the endpoint needs
+    And a loopback endpoint is still allowed, since it never leaves the machine
+
   @unit
   Scenario: The connection carries the API key and the SDK version
     When the client connects

@@ -428,7 +428,7 @@ export function registerAgentTestEndpoint({
       params: idParamsSchema,
       output: agentTestRunResponseSchema,
       description:
-        'Run one scripted scenario against an agent: the user sends "ping", the agent answers, and the run succeeds when the answer arrives. No model is used and nothing is saved. Answers at once with the run ids; the run itself is asynchronous.',
+        'Run one scripted scenario against an agent: the user sends "ping", the agent answers, and the run succeeds when the answer arrives. No model is used, and no scenario, run plan or test suite is added to the project. Answers at once with the run ids; the run itself is asynchronous.',
       docs: {
         operationId: "testAgent",
         tags: ["Agents"],

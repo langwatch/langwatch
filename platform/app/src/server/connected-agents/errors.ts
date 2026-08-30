@@ -244,16 +244,26 @@ export class AgentPayloadTooLargeError extends HandledError {
     limitBytes,
   }: {
     what: "envelope" | "result" | "session";
-    sizeBytes: number;
+    /**
+     * What the payload weighed, when it was measured; absent when the cap
+     * stopped the read before the whole body arrived.
+     */
+    sizeBytes?: number;
     limitBytes: number;
   }) {
     super(
       "agent_payload_too_large",
-      `The ${what} is ${sizeBytes} bytes, above the limit of ${limitBytes} bytes.`,
+      sizeBytes === undefined
+        ? `The ${what} is above the limit of ${limitBytes} bytes.`
+        : `The ${what} is ${sizeBytes} bytes, above the limit of ${limitBytes} bytes.`,
       {
         httpStatus: 413,
         fault: "customer",
-        meta: { what, sizeBytes, limitBytes },
+        meta: {
+          what,
+          limitBytes,
+          ...(sizeBytes === undefined ? {} : { sizeBytes }),
+        },
         ...remediation("agent_payload_too_large"),
       },
     );

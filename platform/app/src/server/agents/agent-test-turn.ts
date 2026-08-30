@@ -19,6 +19,7 @@ import {
   DEFAULT_CALL_TIMEOUT_MS,
   MAX_CALL_TIMEOUT_MS,
 } from "~/server/connected-agents/constants";
+import { AgentCallTimeoutError } from "~/server/connected-agents/errors";
 import { getConnectedAgentRuntime } from "~/server/connected-agents/runtime";
 import {
   AGENT_TEST_SCENARIO_ID,
@@ -73,6 +74,31 @@ function oneTurnInput({
     scenarioState: {} as AgentInput["scenarioState"],
     scenarioConfig: {} as AgentInput["scenarioConfig"],
   };
+}
+
+/**
+ * The ceiling every kind of agent answers inside, the same one the connected
+ * path clamps its call budget to. An adapter carries a timeout of its own,
+ * and an HTTP agent carries none at all, so without this a turn could park
+ * the request for as long as the agent takes. The adapters take no signal,
+ * so the work continues in the background and its answer is dropped.
+ */
+async function withinCallDeadline<T>(work: Promise<T>): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          void work.catch(() => undefined);
+          reject(new AgentCallTimeoutError({ timeoutMs: MAX_CALL_TIMEOUT_MS }));
+        }, MAX_CALL_TIMEOUT_MS);
+        timer.unref();
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 /**
@@ -196,8 +222,8 @@ export async function sendAgentTestTurn({
     parameters: params ?? {},
   });
   const startedAt = Date.now();
-  const output = await adapter.call(
-    oneTurnInput({ threadId: crypto.randomUUID(), message }),
+  const output = await withinCallDeadline(
+    adapter.call(oneTurnInput({ threadId: crypto.randomUUID(), message })),
   );
   return { output, durationMs: Date.now() - startedAt, instance: null };
 }

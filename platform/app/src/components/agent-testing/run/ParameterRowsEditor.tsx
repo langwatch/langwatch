@@ -250,7 +250,6 @@ function rowLockLabel({
   return `Hide the value of parameter ${index + 1}`;
 }
 
-/** The x that takes one row away. */
 function RemoveRowButton({
   index,
   disabled,

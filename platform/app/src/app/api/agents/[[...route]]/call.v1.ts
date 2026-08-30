@@ -243,11 +243,11 @@ export function registerCallEndpoint({
         bodyLimit({
           maxSize: relayPayloadCaps().envelopeBytes,
           onError: () => {
-            const caps = relayPayloadCaps();
+            // The cap stopped the read, so no size was measured; the message
+            // names the limit alone rather than a number nothing weighed.
             throw new AgentPayloadTooLargeError({
               what: "envelope",
-              sizeBytes: caps.envelopeBytes + 1,
-              limitBytes: caps.envelopeBytes,
+              limitBytes: relayPayloadCaps().envelopeBytes,
             });
           },
         }),

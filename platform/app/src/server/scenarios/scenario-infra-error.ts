@@ -469,17 +469,20 @@ function connectedAgentRules(): ClassificationRule[] {
 }
 
 const CLASSIFICATION_RULES: ClassificationRule[] = [
-  sessionTooLargeRule(),
   // Connected agent failures. The child's adapter writes
   // `Connected agent call failed (<code>): <message>`, so the code between
   // the brackets is the classification and the message after it is what the
   // customer reads: the relay's own sentence, or the function's own error.
   //
-  // Ahead of the generic text rules below: the function's own error travels
-  // inside the message, so a handler that says it timed out or that a key is
-  // invalid would otherwise read as a platform timeout or a model-provider
-  // rejection.
+  // Ahead of every other rule: the function's own error travels inside the
+  // message, so a handler that says it timed out, that a key is invalid, or
+  // that a session is too large would otherwise read as a platform timeout, a
+  // model-provider rejection, or a session the platform itself refused.
   ...connectedAgentRules(),
+  // A session the adapter itself refused. The connected relay writes its own
+  // `agent_payload_too_large` envelope, so this rule only ever sees the text
+  // an adapter wrote, never a connected agent's own words.
+  sessionTooLargeRule(),
   {
     // Untrusted TLS certificate — the local-dev self-signed-cert case.
     needles: [

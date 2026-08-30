@@ -108,7 +108,7 @@ export function serializeTypedScalarValue({
   return serializeScalarValue(raw);
 }
 
-/** The text of a string parameter. A quoted string is unquoted by display. */
+/** The text of a string parameter; a quoted one loses its quotes here. */
 function asDeclaredString(raw: string): string {
   const parsed = serializeValue(raw);
   return typeof parsed === "string" ? parsed : raw;

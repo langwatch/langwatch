@@ -102,8 +102,40 @@ def resolve_transport(explicit: str | None = None) -> str:
     return "websocket"
 
 
+_LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]"})
+
+
+def _is_loopback(host: str) -> bool:
+    """Whether a host never leaves the machine the process runs on."""
+    name = host.split(":")[0].strip().lower()
+    return name in _LOOPBACK_HOSTS or name.endswith(".localhost")
+
+
+def assert_endpoint_is_encrypted(endpoint: str) -> None:
+    """Refuses to carry the API key over a connection that is not encrypted.
+
+    Every connection sends `Authorization: Bearer <api key>`, so a cleartext
+    scheme would put the key on the wire. A loopback address is allowed,
+    because it never leaves the machine and it is what a local platform is
+    reached with.
+
+    Raises:
+        ValueError: the endpoint is cleartext and is not loopback.
+    """
+    parts = urlsplit(endpoint.strip())
+    scheme = parts.scheme.lower()
+    if scheme in ("https", "wss"):
+        return
+    if _is_loopback(parts.netloc):
+        return
+    raise ValueError(
+        f"connect_agent needs an https endpoint to send its API key, got {scheme or 'no'} scheme"
+    )
+
+
 def http_url(endpoint: str) -> str:
     """`https://app.langwatch.ai` becomes `https://app.langwatch.ai/api/v1/agents/connect`."""
+    assert_endpoint_is_encrypted(endpoint)
     return endpoint.strip().rstrip("/") + CONNECT_PATH
 
 
@@ -155,6 +187,7 @@ def refusal_advice(code: str, message: str, meta: dict[str, Any] | None) -> str:
 
 def socket_url(endpoint: str) -> str:
     """`https://app.langwatch.ai` becomes `wss://app.langwatch.ai/api/v1/agents/connect`."""
+    assert_endpoint_is_encrypted(endpoint)
     parts = urlsplit(endpoint.strip().rstrip("/"))
     scheme = {"https": "wss", "http": "ws", "wss": "wss", "ws": "ws"}.get(
         parts.scheme.lower(), "wss"

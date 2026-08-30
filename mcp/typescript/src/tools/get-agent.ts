@@ -1,6 +1,6 @@
 import { getAgent as apiGetAgent, type AgentParameterSpec } from "../langwatch-api-agents.js";
 
-/** One parameter on one line: name, type, options, default, required and secret. */
+/** One parameter on one line: name, type, options, default and required. */
 export const describeParameter = ({
   name,
   type,
@@ -8,13 +8,11 @@ export const describeParameter = ({
   default: defaultValue,
   description,
   required,
-  secret,
 }: AgentParameterSpec): string => {
   const parts: string[] = [type];
   if (options?.length) parts.push(`one of ${options.join(", ")}`);
   if (defaultValue !== undefined) parts.push(`default ${JSON.stringify(defaultValue)}`);
   if (required) parts.push("required");
-  if (secret) parts.push("secret");
   const suffix = description ? `: ${description}` : "";
   return `- **${name}** (${parts.join(", ")})${suffix}`;
 };

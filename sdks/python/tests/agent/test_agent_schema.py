@@ -345,3 +345,41 @@ def test_dict_annotation_falls_back_to_pydantic_schema():
         return ""
 
     assert analyze(agent).json_schema()["properties"]["extra"]["type"] == "object"
+
+
+def test_object_enum_without_a_type_keeps_its_values():
+    def agent(messages):
+        return ""
+
+    signature = analyze(agent, parameters={"plan": {"enum": [{"tier": "pro"}]}})
+
+    assert signature.json_schema()["properties"]["plan"] == {"enum": [{"tier": "pro"}]}
+    assert signature.resolve_parameters({"plan": {"tier": "pro"}}) == {
+        "plan": {"tier": "pro"}
+    }
+
+
+def test_array_enum_without_a_type_keeps_its_values():
+    def agent(messages):
+        return ""
+
+    signature = analyze(agent, parameters={"tags": {"enum": [["a"], ["b"]]}})
+
+    assert signature.json_schema()["properties"]["tags"] == {"enum": [["a"], ["b"]]}
+    assert signature.resolve_parameters({"tags": ["b"]}) == {"tags": ["b"]}
+    with pytest.raises(AgentParameterInvalid):
+        signature.resolve_parameters({"tags": ["c"]})
+
+
+def test_an_object_default_without_a_type_accepts_an_object_value():
+    def agent(messages):
+        return ""
+
+    signature = analyze(agent, parameters={"filters": {"default": {"tier": "pro"}}})
+
+    assert signature.json_schema()["properties"]["filters"] == {
+        "default": {"tier": "pro"}
+    }
+    assert signature.resolve_parameters({"filters": {"tier": "free"}}) == {
+        "filters": {"tier": "free"}
+    }

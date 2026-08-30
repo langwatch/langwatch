@@ -137,11 +137,11 @@ const payloadGuard = () =>
   bodyLimit({
     maxSize: relayPayloadCaps().frameBytes,
     onError: () => {
-      const caps = relayPayloadCaps();
+      // The cap stopped the read, so no size was measured; the message names
+      // the limit alone rather than a number nothing weighed.
       throw new AgentPayloadTooLargeError({
         what: "result",
-        sizeBytes: caps.frameBytes + 1,
-        limitBytes: caps.frameBytes,
+        limitBytes: relayPayloadCaps().frameBytes,
       });
     },
   });
@@ -286,15 +286,15 @@ function registerFramesEndpoint({ v, transport }: ConnectEndpoint): void {
       },
     },
     async (c) => {
-      const parsed = postedFramesSchema.safeParse(await jsonBodyOf(c));
-      if (!parsed.success) {
-        throw new AgentRegisterRefusedError({
-          reason: "protocol_invalid",
-          message:
-            "The body must carry ack, result and deregister frames under frames.",
-        });
-      }
       try {
+        const parsed = postedFramesSchema.safeParse(await jsonBodyOf(c));
+        if (!parsed.success) {
+          throw new AgentRegisterRefusedError({
+            reason: "protocol_invalid",
+            message:
+              "The body must carry ack, result and deregister frames under frames.",
+          });
+        }
         const answer = await transport().frames({
           credentials: credentialsOf(c),
           token: c.req.header(INSTANCE_TOKEN_HEADER),

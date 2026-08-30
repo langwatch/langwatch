@@ -64,6 +64,24 @@ describe("connect snippets", () => {
     });
   });
 
+  describe("given an agent name a keyword of one language alone", () => {
+    /** @scenario "A snippet declares a name the language accepts" */
+    it("declares the fallback name in both snippets", () => {
+      for (const name of [
+        "async",
+        "interface",
+        "assert",
+        "nonlocal",
+        "static",
+        "true",
+        "null",
+      ]) {
+        expect(pythonSnippet({ name })).toContain("def my_agent(");
+        expect(typescriptSnippet({ name })).toContain("export const myAgent =");
+      }
+    });
+  });
+
   describe("given an ordinary agent name", () => {
     /** @scenario "A snippet carries the agent name as written" */
     it("declares it and names it unchanged", () => {

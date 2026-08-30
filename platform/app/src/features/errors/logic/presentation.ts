@@ -484,7 +484,7 @@ const presentations = {
   agent_test_refused: {
     title: "This agent cannot be tested as it is set up",
     describe: (error) => {
-      const reason = str(error, "reason", "");
+      const reason = safeProse(str(error, "reason", ""));
       return reason
         ? `${reason}. Fix the agent and test it again.`
         : "Check the agent's configuration and test it again.";
@@ -514,7 +514,7 @@ const presentations = {
   agent_call_timeout: {
     title: "The agent did not answer in time",
     describe: () =>
-      "The connected agent took longer than its call budget to answer a turn. Check the process for slow work, or raise the timeout on the decorated function.",
+      "The agent took longer than its call budget to answer a turn. Check it for slow work, or raise its timeout.",
   },
   agent_call_failed: {
     title: "The agent raised an error",

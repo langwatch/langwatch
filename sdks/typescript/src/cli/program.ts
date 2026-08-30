@@ -1845,7 +1845,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     agentCmd
       .command("test <id>")
-      .description("Test an agent with one scripted scenario run on the platform: the user sends \"ping\", the agent answers, and the run succeeds when the answer arrives. No model is used and nothing is saved")
+      .description("Test an agent with one scripted scenario run on the platform: the user sends \"ping\", the agent answers, and the run succeeds when the answer arrives. No model is used, and no scenario, run plan or test suite is added to the project")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
       const { testAgentCommand: impl } = await import("./commands/agents/test.js");

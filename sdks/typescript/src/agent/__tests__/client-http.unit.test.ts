@@ -30,6 +30,14 @@ class FakeHttpPlatform {
   upgrades = 0;
   /** What the next polls answer with, by status; 200 waits for frames. */
   pollStatus = 200;
+  /** The frame a poll answered with a status carries, if any. */
+  pollStatusFrame: Json | null = null;
+  /** Whether the register answer carries the instance token. */
+  willSendInstanceToken = true;
+  /** Whether a poll waits for a frame, the way a proxy in the way would not. */
+  willHoldPolls = true;
+  /** How many polls arrived, counted before the answer is chosen. */
+  polls = 0;
   private readonly waitingPolls: Array<(frames: Json[]) => void> = [];
   private readonly queuedFrames: Json[] = [];
   private readonly requestWaiters: Array<{ match: (seen: Seen) => boolean; resolve: (seen: Seen) => void }> = [];
@@ -79,8 +87,8 @@ class FakeHttpPlatform {
     });
   }
 
-  nextRegister(): Promise<Seen> {
-    return this.next((seen) => seen.path === "/api/v1/agents/connect/register");
+  nextRegister(timeoutMs = 3000): Promise<Seen> {
+    return this.next((seen) => seen.path === "/api/v1/agents/connect/register", timeoutMs);
   }
 
   nextPoll(): Promise<Seen> {
@@ -130,17 +138,22 @@ class FakeHttpPlatform {
           heartbeatIntervalMs: POLL_WAIT_MS,
           instanceId: register.instance.id,
         },
-        instanceToken: `ait_${this.nextToken++}`,
+        ...(this.willSendInstanceToken ? { instanceToken: `ait_${this.nextToken++}` } : {}),
       });
       return;
     }
     if (seen.path.startsWith("/api/v1/agents/connect/poll")) {
+      this.polls += 1;
       if (this.pollStatus !== 200) {
-        answer(this.pollStatus, { error: "agent_session_unknown" });
+        answer(this.pollStatus, this.pollStatusFrame ? { frame: this.pollStatusFrame } : { error: "agent_session_unknown" });
         return;
       }
       if (this.queuedFrames.length > 0) {
         answer(200, { frames: this.queuedFrames.splice(0) });
+        return;
+      }
+      if (!this.willHoldPolls) {
+        answer(200, { frames: [] });
         return;
       }
       const timer = setTimeout(() => {
@@ -334,6 +347,46 @@ describe("the agent client over HTTP long polling, given a fake platform", () =>
       platform.pollStatus = 200;
       release();
       await platform.nextFrame("result");
+    });
+  });
+
+  describe("when the register is answered with no instance token", () => {
+    /** @scenario "A register answered with no instance token ends the connection" */
+    it("ends the connection so the client registers again", async () => {
+      platform.willSendInstanceToken = false;
+      define(async () => "hello", { transport: "http" });
+
+      await platform.nextRegister();
+
+      await expect(platform.nextRegister(1500)).resolves.toBeTruthy();
+    });
+  });
+
+  describe("when a poll is answered with a status and a frame that is not a refusal", () => {
+    /** @scenario "A poll answered with a status and a frame that is not a refusal ends the connection" */
+    it("ends the connection so the client registers again", async () => {
+      platform.pollStatus = 500;
+      platform.pollStatusFrame = { type: "cancel", protocol: PROTOCOL_VERSION, callId: "call_gone" };
+      define(async () => "hello", { transport: "http" });
+
+      await platform.nextRegister();
+
+      await expect(platform.nextRegister(1500)).resolves.toBeTruthy();
+    });
+  });
+
+  describe("when a proxy answers every poll at once", () => {
+    /** @scenario "A poll answered at once is followed by a floor before the next one" */
+    it("keeps a floor between the polls instead of spinning", async () => {
+      platform.willHoldPolls = false;
+      define(async () => "hello", { transport: "http" });
+      await platform.nextRegister();
+      platform.polls = 0;
+
+      await wait(700);
+
+      expect(platform.polls).toBeGreaterThan(0);
+      expect(platform.polls).toBeLessThan(8);
     });
   });
 

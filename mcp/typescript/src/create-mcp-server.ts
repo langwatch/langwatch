@@ -17,6 +17,7 @@ import { handleExperimentResults } from "./tools/get-experiment-results.js";
 import { handleExperimentListRuns } from "./tools/list-experiment-runs.js";
 import { handleExperimentList } from "./tools/list-experiments.js";
 import { handleRunExperiment, handleExperimentStatus } from "./tools/run-experiment.js";
+import { handleTestAgent } from "./tools/test-agent.js";
 
 const modelSchema = z
   .string()
@@ -1259,13 +1260,12 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_test_agent",
-    "Test an agent with one scripted scenario run: the user sends \"ping\", the agent answers, and the run succeeds when the answer arrives. No model is used and nothing is saved. Answers at once with the scenario run id to follow with platform_get_simulation_run; the run itself is asynchronous.",
+    "Test an agent with one scripted scenario run: the user sends \"ping\", the agent answers, and the run succeeds when the answer arrives. No model is used, and no scenario, run plan or test suite is added to the project. Answers at once with the scenario run id to follow with platform_get_simulation_run; the run itself is asynchronous.",
     {
       id: z.string().describe("The agent ID to test"),
     },
     withToolLogging("platform_test_agent", async (params) => {
       requireApiKey();
-      const { handleTestAgent } = await import("./tools/test-agent.js");
       return {
         content: [{ type: "text", text: await handleTestAgent(params) }],
       };

@@ -23,6 +23,18 @@ Feature: connectAgent turns a function into a simulation target
       Then the client opens a new socket
       And the register frame on it lists both agents
 
+    Scenario: An agent defined after the registration is answered still reaches the platform
+      Given an agent was defined and its register frame is answered
+      When a second agent is defined
+      Then the client opens a new socket
+      And the register frame on it lists both agents
+
+    Scenario: An agent that disconnects leaves the platform with the remaining list
+      Given two agents were defined and their register frame is answered
+      When one of them disconnects
+      Then the client opens a new socket
+      And the register frame on it lists the agent that stayed
+
     Scenario: Nothing happens without an API key
       Given no API key is configured
       When an agent is defined
@@ -347,6 +359,21 @@ Feature: connectAgent turns a function into a simulation target
       When disconnect is called
       Then a deregister frame is posted to the frames route
       And no poll is made after that
+
+    Scenario: A register answered with no instance token ends the connection
+      Given a register answered with a registered frame and no instance token
+      When the client reads the answer
+      Then the connection ends and the client registers again
+
+    Scenario: A poll answered with a status and a frame that is not a refusal ends the connection
+      Given a poll answered with a status and a frame that is not a refusal
+      When the client reads the answer
+      Then the connection ends and the client registers again
+
+    Scenario: A poll answered at once is followed by a floor before the next one
+      Given a proxy that answers every poll at once with no frame
+      When the client polls
+      Then the polls are spaced by the poll floor instead of spinning
 
   Rule: The traceparent of a call is the parent context of the handler
 

@@ -100,20 +100,6 @@ describe("handleGetAgent()", () => {
     });
   });
 
-  describe("when the agent declares a secret parameter", () => {
-    /** @scenario "A secret parameter is marked secret" */
-    it("marks the parameter secret", async () => {
-      mockRequest.mockResolvedValueOnce(
-        connectedAgent({
-          parameters: [{ name: "api_key", type: "string", required: true, secret: true }],
-        }),
-      );
-
-      const output = await handleGetAgent({ id: "agent_conn" });
-
-      expect(output).toContain("- **api_key** (string, required, secret)");
-    });
-  });
 });
 
 describe("handleTestAgent()", () => {
@@ -205,6 +191,18 @@ describe("handleRunAgent()", () => {
         }),
       ).rejects.toThrow(/flat object of string, number or boolean values/);
       expect(mockRequest).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the input is JSON that is not an object", () => {
+    /** @scenario "An input that is not a JSON object is refused" */
+    it("refuses a scalar, an array and null before the agent is read", async () => {
+      for (const input of ["5", '"hi"', "[1,2]", "null"]) {
+        expect(await handleRunAgent({ id: "agent_conn", input })).toBe(
+          "Error: `input` must be a valid JSON object.",
+        );
+      }
+      expect(mockRequest).not.toHaveBeenCalled();
     });
   });
 

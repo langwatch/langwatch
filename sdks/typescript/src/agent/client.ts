@@ -217,22 +217,18 @@ export class AgentClient {
     return this.connectTimer ? this.connectTimer.hasRef() : this.socket !== null;
   }
 
-  /** Adds an agent and connects on the next tick, or re-registers when already connected. */
+  /** Adds an agent and connects on the next tick, or reconnects when a socket is already open. */
   addAgent(runtime: AgentRuntime): void {
     this.agents.push(runtime);
-    if (this.registered) {
-      this.send(this.registerFrame());
-      return;
-    }
     if (this.gaveUp) {
       this.logger.debug(`agent "${runtime.name}" ${NOT_CONNECTED}: the connection gave up earlier in this process`);
       return;
     }
     this.stopped = false;
     if (this.socket) {
-      // The register frame of the earlier agents is already on its way, and
-      // the platform ignores a second register on an open socket. A fresh
-      // socket carries the complete list.
+      // The platform ignores a second register on an open socket, whether the
+      // first one is still on its way or already answered. A fresh socket
+      // carries the complete list.
       this.restartSocket();
       return;
     }
@@ -262,7 +258,10 @@ export class AgentClient {
       await this.disconnect();
       return;
     }
-    if (this.registered) this.send(this.registerFrame());
+    // The open socket registered the agent that just left, and the platform
+    // ignores a second register on it. A fresh socket carries the list as it
+    // stands now.
+    this.restartSocket();
   }
 
   /** Sends deregister, closes the socket and stops reconnecting. */

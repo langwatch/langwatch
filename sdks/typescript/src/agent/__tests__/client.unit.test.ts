@@ -253,6 +253,41 @@ describe("the agent client, given a fake platform", () => {
     });
   });
 
+  describe("when an agent is defined after the register is answered", () => {
+    /** @scenario "An agent defined after the registration is answered still reaches the platform" */
+    it("opens a new socket whose register lists both agents", async () => {
+      define(async () => "a", { name: "alpha" });
+      const first = await platform.nextConnection();
+      const firstRegister = await first.nextFrame<RegisterFrame>("register");
+      first.accept(firstRegister);
+      await until(() => sharedClientForTests()?.isRegistered === true);
+
+      define(async () => "b", { name: "beta" });
+
+      const second = await platform.nextConnection();
+      const register = await second.nextFrame<RegisterFrame>("register");
+      expect(register.agents.map((agent) => agent.name)).toEqual(["alpha", "beta"]);
+    });
+  });
+
+  describe("when one of two registered agents disconnects", () => {
+    /** @scenario "An agent that disconnects leaves the platform with the remaining list" */
+    it("opens a new socket whose register lists the agent that stayed", async () => {
+      define(async () => "a", { name: "alpha" });
+      const beta = define(async () => "b", { name: "beta" });
+      const first = await platform.nextConnection();
+      const firstRegister = await first.nextFrame<RegisterFrame>("register");
+      first.accept(firstRegister);
+      await until(() => sharedClientForTests()?.isRegistered === true);
+
+      await beta.disconnect();
+
+      const second = await platform.nextConnection();
+      const register = await second.nextFrame<RegisterFrame>("register");
+      expect(register.agents.map((agent) => agent.name)).toEqual(["alpha"]);
+    });
+  });
+
   describe("when the register frame is inspected", () => {
     /** @scenario "The register frame carries the instance identity and the parameter schema" */
     /** @scenario "The socket carries the API key, the project id and the SDK user agent" */

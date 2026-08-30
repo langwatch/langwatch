@@ -263,6 +263,22 @@ Feature: Connected agents
     Then the socket is closed
     And the instance is no longer live
 
+  # Every ping carries its own pong deadline, so a slow pong that still lands
+  # inside that wait keeps the socket even when the next ping already went out.
+  @integration
+  Scenario: A pong that lands inside its own wait keeps the socket
+    Given a connected instance whose pong arrives after the next ping went out
+    When the pong lands inside the wait of its own ping
+    Then the socket stays open
+    And the instance is still live
+
+  @integration
+  Scenario: A socket that goes away during registration retires its instance
+    Given a process whose socket closes while its registration is still running
+    When the registration finishes
+    Then the pod holds no session for it
+    And the instance is no longer live
+
   # ---------------------------------------------------------------------------
   # No inbound access
   # ---------------------------------------------------------------------------
@@ -599,3 +615,16 @@ Feature: Connected agents
       Given no Redis and LANGWATCH_APP_REPLICAS set to 3
       When a process posts a register frame
       Then the answer is a refused frame with "replica_count_unsupported"
+
+    @integration
+    Scenario: A frames body the endpoint does not take is refused as a protocol frame
+      Given an instance registered over HTTP
+      When it posts a body that carries no ack, result or deregister frame
+      Then the answer is a refused frame with "protocol_invalid"
+
+    @integration
+    Scenario: A frames body above the cap names the limit alone
+      Given an instance registered over HTTP
+      When it posts a body above the frame cap
+      Then it is refused with "agent_payload_too_large"
+      And the message names the limit and no measured size

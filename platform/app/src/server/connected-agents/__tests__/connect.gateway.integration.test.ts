@@ -36,14 +36,14 @@ import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { CONNECT_PATH, ConnectGateway } from "../connect.gateway";
 import { PRESENCE_TTL_SECONDS } from "../constants";
-import { instanceSetKey } from "../keys";
+import { instanceChannel, instanceSetKey } from "../keys";
 import { touchAgentLastSeen } from "../presence.projection";
 import { PROTOCOL_VERSION, type RegisterFrame } from "../protocol";
 import {
   type ConnectedAgentRuntime,
   createConnectedAgentRuntime,
 } from "../runtime";
-import { createRedisStateStore } from "../state-store";
+import { type AgentStateStore, createRedisStateStore } from "../state-store";
 
 const ns = `connected-${nanoid(8)}`;
 
@@ -68,10 +68,20 @@ type Pod = {
 let podA: Pod;
 let podB: Pod;
 
-async function startPod(podId: string): Promise<Pod> {
+async function startPod({
+  podId,
+  store,
+  pingIntervalMs = 200,
+  pongWaitMs = 150,
+}: {
+  podId: string;
+  store?: AgentStateStore;
+  pingIntervalMs?: number;
+  pongWaitMs?: number;
+}): Promise<Pod> {
   const runtime = createConnectedAgentRuntime({
     podId,
-    store: createRedisStateStore(connection),
+    store: store ?? createRedisStateStore(connection),
     firstTurnGraceMs: 1_000,
     firstTurnPollMs: 50,
     resultPollMs: 100,
@@ -86,8 +96,8 @@ async function startPod(podId: string): Promise<Pod> {
     runtime,
     prisma,
     replicaCount: 2,
-    pingIntervalMs: 200,
-    pongWaitMs: 150,
+    pingIntervalMs,
+    pongWaitMs,
   });
   gateway.mount(router);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -374,8 +384,8 @@ beforeAll(async () => {
     })
   ).token;
 
-  podA = await startPod("pod_a");
-  podB = await startPod("pod_b");
+  podA = await startPod({ podId: "pod_a" });
+  podB = await startPod({ podId: "pod_b" });
 });
 
 afterAll(async () => {
@@ -513,6 +523,97 @@ describe("presence", () => {
       expect(row?.lastSeenAt?.getTime()).toBe(base + 61_000);
       sdk.close();
       await sdk.closed();
+    });
+  });
+
+  describe("when a pong lands after the next ping went out", () => {
+    /** @scenario "A pong that lands inside its own wait keeps the socket" */
+    it("keeps the socket open while the pong is inside its own wait", async () => {
+      const pod = await startPod({
+        podId: "pod_slow_pong",
+        pingIntervalMs: 100,
+        pongWaitMs: 1_000,
+      });
+      const { sdk } = await connectAndRegister({ pod, token: projectApiKey });
+
+      // `ws` answers a ping the moment it reads one, so pausing the socket
+      // holds every pong past the next ping and still inside the first
+      // ping's own wait.
+      sdk.socket.pause();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      sdk.socket.resume();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      expect(sdk.socket.readyState).toBe(WebSocket.OPEN);
+      expect(pod.gateway.sessionCount).toBe(1);
+      sdk.close();
+      await sdk.closed();
+      await stopPod(pod);
+    });
+  });
+
+  describe("when the socket goes away while the registration is running", () => {
+    /** @scenario "A socket that goes away during registration retires its instance" */
+    it("holds no session and retires the instance", async () => {
+      let enterSubscribe: () => void = () => undefined;
+      const subscribing = new Promise<void>((resolve) => {
+        enterSubscribe = resolve;
+      });
+      let releaseSubscribe: () => void = () => undefined;
+      const subscribeGate = new Promise<void>((resolve) => {
+        releaseSubscribe = resolve;
+      });
+      const store = createRedisStateStore(connection);
+      const instanceId = `inst_${nanoid(6)}`;
+      const pod = await startPod({
+        podId: "pod_gated",
+        store: {
+          ...store,
+          subscribe: async (channel, listener) => {
+            if (channel !== instanceChannel(instanceId)) {
+              return store.subscribe(channel, listener);
+            }
+            enterSubscribe();
+            await subscribeGate;
+            return store.subscribe(channel, listener);
+          },
+        },
+      });
+      const agentName = `gated-agent-${nanoid(6)}`;
+      const sdk = new FakeSdk({
+        url: pod.url,
+        token: projectApiKey,
+        headers: { "X-Project-Id": projectId },
+      });
+      await sdk.open();
+      sdk.register({
+        instance: {
+          id: instanceId,
+          hostname: "laptop",
+          username: "dev",
+          pid: 4242,
+          startedAt: new Date().toISOString(),
+          inFlightCallIds: [],
+        },
+        agents: [
+          { name: agentName, environment: "production", parameters: {} },
+        ],
+      });
+
+      await subscribing;
+      sdk.socket.terminate();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      releaseSubscribe();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      const row = await prisma.agent.findFirst({
+        where: { projectId, name: agentName },
+      });
+      expect(pod.gateway.sessionCount).toBe(0);
+      expect(
+        await podB.runtime.registry.listLive({ projectId, agentId: row!.id }),
+      ).toEqual([]);
+      await stopPod(pod);
     });
   });
 

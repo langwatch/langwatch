@@ -24,7 +24,7 @@ describe("<TargetLegend />", () => {
   describe("given a long label in a column header", () => {
     /** @scenario "A long target name keeps its own column" */
     it("reads the whole label and wraps rather than cutting it", () => {
-      render(<TargetLegend color="#3b82f6" label={LONG_LABEL} wrap />, {
+      render(<TargetLegend color="#3b82f6" label={LONG_LABEL} isWrapped />, {
         wrapper: Wrapper,
       });
       const wrapped = screen.getByText(LONG_LABEL);

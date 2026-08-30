@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  chakra,
   Field,
   Heading,
   HStack,
@@ -444,20 +445,23 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                 {/* Code editor */}
                 <Box>
                   <Field.Root>
-                    <Field.Label>
-                      <HStack gap={1}>
-                        <Text>Python Code</Text>
-                        <Tooltip
-                          content="Return a session key beside the outputs to keep a value for the conversation, such as a conversation id. Map an input to the scenario session to receive it on the next turn of the same conversation; it is None on the first turn."
-                          positioning={{ placement: "top" }}
-                          showArrow
+                    <HStack gap={1}>
+                      <Field.Label>Python Code</Field.Label>
+                      <Tooltip
+                        content="Return a session key beside the outputs to keep a value for the conversation, such as a conversation id. Map an input to the scenario session to receive it on the next turn of the same conversation; it is None on the first turn."
+                        positioning={{ placement: "top" }}
+                        showArrow
+                      >
+                        <chakra.button
+                          type="button"
+                          aria-label="More about session keys"
+                          display="flex"
+                          color="fg.muted"
                         >
-                          <Box>
-                            <HelpCircle width="14px" />
-                          </Box>
-                        </Tooltip>
-                      </HStack>
-                    </Field.Label>
+                          <HelpCircle width="14px" />
+                        </chakra.button>
+                      </Tooltip>
+                    </HStack>
                     <Text fontSize="sm" color="fg.muted" marginBottom={2}>
                       Define a Python class with a `__call__` method that takes
                       inputs and returns outputs.

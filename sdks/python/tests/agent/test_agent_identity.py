@@ -8,7 +8,7 @@ import os
 import pytest
 
 from langwatch.agent import identity
-from langwatch.agent.client import connection_headers, socket_url
+from langwatch.agent.client import connection_headers, http_url, socket_url
 
 
 @pytest.fixture(autouse=True)
@@ -146,6 +146,28 @@ def test_socket_url_from_endpoint():
     assert (
         socket_url("https://lw.example.com/base/")
         == "wss://lw.example.com/base/api/v1/agents/connect"
+    )
+
+
+# @scenario "The API key never travels over a cleartext connection"
+def test_a_cleartext_endpoint_is_refused():
+    import pytest
+
+    # Every connection carries `Authorization: Bearer <api key>`.
+    for endpoint in ("http://app.langwatch.ai", "ws://lw.example.com"):
+        with pytest.raises(ValueError, match="https"):
+            socket_url(endpoint)
+        with pytest.raises(ValueError, match="https"):
+            http_url(endpoint)
+
+
+# @scenario "The API key never travels over a cleartext connection"
+def test_a_loopback_endpoint_stays_allowed():
+    # It never leaves the machine, and it is how a local platform is reached.
+    assert socket_url("http://localhost:5560").startswith("ws://localhost:5560")
+    assert socket_url("http://127.0.0.1:5560").startswith("ws://127.0.0.1:5560")
+    assert http_url("http://app.langwatch.localhost").startswith(
+        "http://app.langwatch.localhost"
     )
 
 

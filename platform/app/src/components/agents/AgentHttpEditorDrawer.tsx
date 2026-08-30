@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  chakra,
   Field,
   Heading,
   HStack,
@@ -322,6 +323,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       setMethod(DEFAULT_METHOD);
       setBodyTemplate(DEFAULT_BODY_TEMPLATE);
       setOutputPath(DEFAULT_OUTPUT_PATH);
+      setSessionPath("");
       setHeaders([]);
       setAuth({ type: "none" });
       setScenarioMappings(
@@ -600,20 +602,23 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                         />
                       </Field.Root>
                       <Field.Root>
-                        <Field.Label>
-                          <HStack gap={1}>
-                            <Text>Session path</Text>
-                            <Tooltip
-                              content="JSONPath of a value your endpoint returns for the conversation, such as a conversation id. It is sent back as {{ session }} in the url, the headers and the body on the next turn of the same conversation, and is empty on the first turn."
-                              positioning={{ placement: "top" }}
-                              showArrow
+                        <HStack gap={1}>
+                          <Field.Label>Session path</Field.Label>
+                          <Tooltip
+                            content="JSONPath of a value your endpoint returns for the conversation, such as a conversation id. It is sent back as {{ session }} in the url, the headers and the body on the next turn of the same conversation, and is empty on the first turn."
+                            positioning={{ placement: "top" }}
+                            showArrow
+                          >
+                            <chakra.button
+                              type="button"
+                              aria-label="More about the session path"
+                              display="flex"
+                              color="fg.muted"
                             >
-                              <Box>
-                                <HelpCircle width="14px" />
-                              </Box>
-                            </Tooltip>
-                          </HStack>
-                        </Field.Label>
+                              <HelpCircle width="14px" />
+                            </chakra.button>
+                          </Tooltip>
+                        </HStack>
                         <Input
                           value={sessionPath}
                           onChange={(e) => {

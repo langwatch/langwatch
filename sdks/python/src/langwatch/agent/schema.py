@@ -218,10 +218,13 @@ def _spec_from_definition(*, name: str, definition: Mapping[str, Any]) -> Parame
     default = definition.get("default", MISSING)
     declared_type = definition.get("type")
     if declared_type is None and options:
+        # An `enum` of objects, arrays or mixed scalars carries no single JSON
+        # type. The parameter stays untyped rather than claiming "string",
+        # which would refuse every value the list holds.
         declared_type = _type_of_values(list(options))
-    if declared_type is None and default is not MISSING:
+    elif declared_type is None and default is not MISSING:
         declared_type = _JSON_TYPES.get(type(default))
-    if declared_type is None:
+    elif declared_type is None:
         declared_type = "string"
     python_type = _PYTHON_TYPES.get(str(declared_type), Any)
     annotation: Any = python_type
@@ -229,12 +232,13 @@ def _spec_from_definition(*, name: str, definition: Mapping[str, Any]) -> Parame
         try:
             annotation = Literal[tuple(options)]  # type: ignore[valid-type]
         except TypeError:
-            # A JSON Schema `enum` can hold objects or arrays, and `Literal`
-            # takes hashable values only. The declared type stays, and the
+            # `Literal` refuses a value it cannot take as a parameter. The
             # membership check against `options` still rejects a value that
             # the list does not hold.
             annotation = python_type
-    schema: dict[str, Any] = {"type": declared_type}
+    schema: dict[str, Any] = {}
+    if declared_type is not None:
+        schema["type"] = declared_type
     if options:
         schema["enum"] = list(options)
     if definition.get("description"):

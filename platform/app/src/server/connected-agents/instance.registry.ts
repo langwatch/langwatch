@@ -63,7 +63,7 @@ export class InstanceRegistry {
   }): Promise<void> {
     await this.store.hset(
       instanceMetaKey(meta.instanceId),
-      fieldsOf(meta, agentIds),
+      fieldsOf({ meta, agentIds }),
       PRESENCE_TTL_SECONDS,
     );
     await this.refresh({
@@ -118,7 +118,7 @@ export class InstanceRegistry {
     meta: InstanceMeta | undefined;
   }): Promise<void> {
     const current = await this.store.hgetall(instanceMetaKey(instanceId));
-    const fields = current ?? (meta ? fieldsOf(meta, agentIds) : null);
+    const fields = current ?? (meta ? fieldsOf({ meta, agentIds }) : null);
     if (fields) {
       await this.store.hset(
         instanceMetaKey(instanceId),
@@ -218,10 +218,13 @@ export class InstanceRegistry {
   }
 }
 
-function fieldsOf(
-  meta: InstanceMeta,
-  agentIds: string[],
-): Record<string, string> {
+function fieldsOf({
+  meta,
+  agentIds,
+}: {
+  meta: InstanceMeta;
+  agentIds: string[];
+}): Record<string, string> {
   return {
     instanceId: meta.instanceId,
     projectId: meta.projectId,
@@ -240,25 +243,34 @@ function fieldsOf(
 }
 
 /** One field of the hash as text, empty when the hash misses it. */
-function textOf(fields: Record<string, string>, name: string): string {
+function textOf({
+  fields,
+  name,
+}: {
+  fields: Record<string, string>;
+  name: string;
+}): string {
   return fields[name] ?? "";
 }
 
 function metaFromFields(fields: Record<string, string>): InstanceMeta {
   return {
-    instanceId: textOf(fields, "instanceId"),
-    projectId: textOf(fields, "projectId"),
-    hostname: textOf(fields, "hostname"),
-    username: textOf(fields, "username"),
-    pid: Number(textOf(fields, "pid")),
+    instanceId: textOf({ fields, name: "instanceId" }),
+    projectId: textOf({ fields, name: "projectId" }),
+    hostname: textOf({ fields, name: "hostname" }),
+    username: textOf({ fields, name: "username" }),
+    pid: Number(textOf({ fields, name: "pid" })),
     sdk: {
-      name: textOf(fields, "sdkName"),
-      version: textOf(fields, "sdkVersion"),
-      language: textOf(fields, "sdkLanguage"),
+      name: textOf({ fields, name: "sdkName" }),
+      version: textOf({ fields, name: "sdkVersion" }),
+      language: textOf({ fields, name: "sdkLanguage" }),
     },
     label: fields.label ? fields.label : null,
-    podId: textOf(fields, "podId"),
-    connectedAt: Number(textOf(fields, "connectedAt")),
-    maxConcurrency: Math.max(1, Number(textOf(fields, "maxConcurrency"))),
+    podId: textOf({ fields, name: "podId" }),
+    connectedAt: Number(textOf({ fields, name: "connectedAt" })),
+    maxConcurrency: Math.max(
+      1,
+      Number(textOf({ fields, name: "maxConcurrency" })),
+    ),
   };
 }

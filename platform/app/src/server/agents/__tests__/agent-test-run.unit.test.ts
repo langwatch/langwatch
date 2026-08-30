@@ -194,7 +194,7 @@ describe("scheduleAgentTestRun", () => {
         }),
       ).rejects.toMatchObject({
         code: "agent_test_refused",
-        meta: { reason: "HTTP agent agent_http not found" },
+        meta: { reason: expect.stringContaining("agent_http") },
       });
       expect(deps.queueRun).not.toHaveBeenCalled();
     });

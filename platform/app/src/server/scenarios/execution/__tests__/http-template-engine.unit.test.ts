@@ -307,6 +307,34 @@ describe("trace variables in the template context", () => {
     });
   });
 
+  describe("given a session that names another host", () => {
+    /** @scenario "The held session cannot decide the host a turn is sent to" */
+    it("refuses to render the url", () => {
+      expect(() =>
+        renderUrlTemplate({
+          template: "https://{{ session }}/chat",
+          context: buildTemplateContext({
+            input: inputWith("hi"),
+            session: "attacker.example.com",
+          }),
+        }),
+      ).toThrow(/host/);
+    });
+
+    /** @scenario "The held session cannot decide the host a turn is sent to" */
+    it("still renders a session inside the path", () => {
+      const url = renderUrlTemplate({
+        template: "https://api.example.com/chat/{{ session }}",
+        context: buildTemplateContext({
+          input: inputWith("hi"),
+          session: "thread-7",
+        }),
+      });
+
+      expect(url).toBe("https://api.example.com/chat/thread-7");
+    });
+  });
+
   describe("given a data mapping named traceId", () => {
     it("keeps the mapping, so an existing target is unchanged", () => {
       const context = buildTemplateContext({

@@ -146,6 +146,13 @@ export const SESSION_LOST_CLOSE_CODE = 1012;
 /** How a failed post of a frame is retried before the session is dropped. */
 const POST_RETRY_DELAYS_MS = [250, 500, 1000];
 
+/**
+ * The shortest gap between a poll that answered no frames and the next one.
+ * The platform holds a poll for its own wait, so this costs nothing there; it
+ * bounds a proxy that answers at once, which would otherwise spin.
+ */
+const EMPTY_POLL_FLOOR_MS = 250;
+
 const describe = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms).unref());
@@ -281,12 +288,20 @@ export class HttpLongPollSocket implements SocketLike {
     if (typeof body?.instanceToken === "string") this.token = body.instanceToken;
     this.settleRegistered();
     this.emitMessage(JSON.stringify(frame));
-    if ((frame as { type?: unknown }).type === "registered" && this.token) void this.pollLoop();
+    if ((frame as { type?: unknown }).type !== "registered") return;
+    if (!this.token) {
+      // Registered with no token: no poll can be addressed, so the connection
+      // is finished here. The close is what makes the client register again.
+      this.fail("the register answer carried no instance token", 1006);
+      return;
+    }
+    void this.pollLoop();
   }
 
   private async pollLoop(): Promise<void> {
     while (!this.closed && this.token) {
       const query = this.inFlight.size > 0 ? `?inFlight=${encodeURIComponent([...this.inFlight].join(","))}` : "";
+      const startedAt = Date.now();
       let response: Response;
       try {
         response = await this.fetchImpl(`${this.url}/poll${query}`, {
@@ -305,10 +320,11 @@ export class HttpLongPollSocket implements SocketLike {
       }
       const body = await this.jsonOf(response);
       if (!response.ok) {
-        const refused = body && typeof body.frame === "object" && body.frame !== null ? body.frame : null;
-        if (refused) {
-          // The platform refused the credential: the client prints and gives up.
-          this.emitMessage(JSON.stringify(refused));
+        const answered = body && typeof body.frame === "object" && body.frame !== null ? body.frame : null;
+        if (answered) this.emitMessage(JSON.stringify(answered));
+        if ((answered as { type?: unknown } | null)?.type === "refused") {
+          // The platform refused the credential: the client prints and gives
+          // up, and closes the connection itself.
           return;
         }
         this.fail(`the poll was answered with HTTP ${response.status}`, 1006);
@@ -321,6 +337,10 @@ export class HttpLongPollSocket implements SocketLike {
         this.emitMessage(JSON.stringify(frame));
       }
       for (const listener of this.pingListeners) listener();
+      if (frames.length === 0) {
+        const elapsedMs = Date.now() - startedAt;
+        if (elapsedMs < EMPTY_POLL_FLOOR_MS) await wait(EMPTY_POLL_FLOOR_MS - elapsedMs);
+      }
     }
   }
 

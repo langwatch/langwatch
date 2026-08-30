@@ -9,9 +9,10 @@ Feature: Test agent with one scripted run
   # "ping", the agent answers, and the run succeeds when the answer arrives.
   # No user simulator and no judge take part, so no model is resolved.
   #
-  # Nothing is saved. The run carries a fixed scenario id with no row behind
-  # it, and its batch lands in the project's agent test set,
-  # __internal__<projectId>__agent-test, which the results lists leave out.
+  # No scenario, run plan or test suite is saved. The run carries a fixed
+  # scenario id with no row behind it, and the run and its batch land in the
+  # project's agent test set, __internal__<projectId>__agent-test, which the
+  # results lists leave out and the run drawer still opens by id.
 
   Background:
     Given a project with an HTTP agent, a code agent and a connected agent
@@ -20,7 +21,7 @@ Feature: Test agent with one scripted run
   # Scheduling
   # ---------------------------------------------------------------------------
 
-  Rule: A test run is a real run with nothing saved
+  Rule: A test run is a real run that adds nothing to the project
 
     @unit
     Scenario: A test run is queued with no scenario saved
@@ -126,6 +127,12 @@ Feature: Test agent with one scripted run
       Then the agent test batch is in none of them
 
     @integration
+    Scenario: A test run does not make the results page look stale
+      Given a batch in the project's agent test set newer than every other run
+      When the results page asks whether anything changed since its last read
+      Then the answer is that nothing changed
+
+    @integration
     Scenario: The run drawer opens a test run by its id
       Given a queued test run
       When the run drawer is opened with its scenario run id
@@ -176,3 +183,16 @@ Feature: Test agent with one scripted run
     Scenario: A draft has no test panel
       Given the HTTP agent editor drawer open for a new agent
       Then no "Test agent" panel is shown
+
+  Rule: A turn answers inside the platform call deadline
+
+    # Every kind of agent answers inside the same ceiling the connected path
+    # clamps its call budget to. An HTTP agent carries no timeout of its own,
+    # and a code agent can carry one far above the cap, so the deadline is
+    # held here rather than left to the agent.
+
+    @unit
+    Scenario: A turn that outlives the call deadline is failed
+      Given an HTTP agent that never answers
+      When a test turn is sent to it
+      Then the turn fails with agent_call_timeout at the platform cap

@@ -220,6 +220,46 @@ export function buildTemplateContext({
   return { ...base, params: parameters ?? {}, ...mapped };
 }
 
+/** The origin of a rendered URL, or null when it names none. */
+function originOf(url: string): string | null {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Refuses a URL whose host the held session decided.
+ *
+ * The session is the agent's own answer handed back on the next turn, so it
+ * is the one value in the context the agent fully controls. The request
+ * carries the configured headers, the authentication among them, so a
+ * session that moves the host would send those credentials wherever it
+ * named. Every other variable still reaches `ssrfSafeFetch`, which is what
+ * refuses a private or link-local address.
+ */
+function assertSessionDidNotChooseTheHost({
+  template,
+  context,
+  rendered,
+}: {
+  template: string;
+  context: Record<string, unknown>;
+  rendered: string;
+}): void {
+  if (!("session" in context)) return;
+  const withoutSession = urlLiquid.parseAndRenderSync(template, {
+    ...context,
+    session: "",
+  });
+  if (originOf(rendered) !== originOf(withoutSession)) {
+    throw new Error(
+      "the session of the agent cannot decide the host the turn is sent to",
+    );
+  }
+}
+
 export function renderUrlTemplate({
   template,
   context,
@@ -228,7 +268,9 @@ export function renderUrlTemplate({
   context: Record<string, unknown>;
 }): string {
   try {
-    return urlLiquid.parseAndRenderSync(template, context);
+    const rendered = urlLiquid.parseAndRenderSync(template, context);
+    assertSessionDidNotChooseTheHost({ template, context, rendered });
+    return rendered;
   } catch (cause) {
     throw new TemplateRenderError({ field: "url", cause });
   }

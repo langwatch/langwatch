@@ -72,7 +72,7 @@ function TargetColumnHeader({
         color={target.color}
         label={target.label}
         fontSize="11.5px"
-        wrap
+        isWrapped
       />
       <RunMetricsSummary summary={summary} size="sm" />
     </Box>

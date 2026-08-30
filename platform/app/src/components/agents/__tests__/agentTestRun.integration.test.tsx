@@ -13,6 +13,8 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TypedAgent } from "~/server/agents/agent.repository";
+import { AgentCard } from "../AgentCard";
+import { useAgentTestRun } from "../useAgentTestRun";
 
 const openDrawer = vi.fn();
 const testRunMutate = vi.fn();
@@ -73,9 +75,7 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 );
 
 /** The agents page wiring in miniature: the card hands its id to the hook. */
-async function renderCardWithTestRun() {
-  const { AgentCard } = await import("../AgentCard");
-  const { useAgentTestRun } = await import("../useAgentTestRun");
+function renderCardWithTestRun() {
   function Page() {
     const { testAgent } = useAgentTestRun({ projectId: "project_1" });
     return (
@@ -98,7 +98,7 @@ describe("Test agent from the agents page", () => {
     /** @scenario "The card menu offers Test agent and opens the run drawer" */
     it("requests a test run for the agent and opens the run drawer on the run it answered", async () => {
       const user = userEvent.setup();
-      await renderCardWithTestRun();
+      renderCardWithTestRun();
 
       await user.click(screen.getByLabelText("Actions for ACME Support Agent"));
       await user.click(await screen.findByTestId("agent-test-agent_http"));
@@ -120,7 +120,7 @@ describe("Test agent from the agents page", () => {
     /** @scenario "A refused test run is explained in the words of the registry" */
     it("hands a refusal to the error toast, never a raw message", async () => {
       const user = userEvent.setup();
-      await renderCardWithTestRun();
+      renderCardWithTestRun();
 
       await user.click(screen.getByLabelText("Actions for ACME Support Agent"));
       await user.click(await screen.findByTestId("agent-test-agent_http"));

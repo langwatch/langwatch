@@ -10,6 +10,7 @@
  * - Tests can inject mocks without vi.mock
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
@@ -604,16 +605,26 @@ export async function prefetchScenarioData({
         deps.modelResolver.resolve(featureKey, context.projectId),
     }));
   } catch (err) {
-    const message =
-      err instanceof Error
-        ? err.message
-        : "No default model configured for this project";
     // A project with no model set for scenarios is the customer's to fix and
     // carries its own remediation message, so it is named rather than left
     // reasonless — otherwise the caller cannot tell it from a fault of ours.
+    //
+    // Any other failure here is ours. `error` reaches the customer as the
+    // reason a run or an agent test was refused, so only a message LangWatch
+    // authored may go in it. A HandledError carries a customer-safe message by
+    // contract; everything else is logged and named in one sentence.
+    if (!(err instanceof HandledError)) {
+      logger.error(
+        { projectId: context.projectId, error: err },
+        "Model resolution failed for a scenario run",
+      );
+    }
     return {
       success: false,
-      error: message,
+      error:
+        err instanceof HandledError
+          ? err.message
+          : "The models this run needs could not be resolved",
       ...(err instanceof ModelNotConfiguredError
         ? { reason: "model_not_configured" as const }
         : {}),

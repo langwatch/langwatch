@@ -46,19 +46,24 @@ export function isConnectedAgentStale({
 /**
  * The Prisma fragment that keeps a stale connected agent out of a read.
  *
- * Spread it into a `where` that declares no `OR` of its own. Every other
+ * Spread it into a `where`. The alternatives travel under `AND` so a call
+ * site that declares an `OR` of its own does not drop them. Every other
  * agent type has no presence, so only connected rows are filtered.
  */
 export function connectedAgentVisibleWhere({
   now = new Date(),
 }: {
   now?: Date;
-} = {}): Pick<Prisma.AgentWhereInput, "OR"> {
+} = {}): Pick<Prisma.AgentWhereInput, "AND"> {
   return {
-    OR: [
-      { type: { not: "connected" } },
-      { lastSeenAt: null },
-      { lastSeenAt: { gte: connectedAgentSeenCutoff(now) } },
+    AND: [
+      {
+        OR: [
+          { type: { not: "connected" } },
+          { lastSeenAt: null },
+          { lastSeenAt: { gte: connectedAgentSeenCutoff(now) } },
+        ],
+      },
     ],
   };
 }

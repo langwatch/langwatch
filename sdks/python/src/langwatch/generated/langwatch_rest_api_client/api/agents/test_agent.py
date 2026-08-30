@@ -69,8 +69,8 @@ def sync_detailed(
     client: AuthenticatedClient,
 ) -> Response[Any | TestAgentResponse200]:
     r"""Run one scripted scenario against an agent: the user sends \"ping\", the agent answers, and the run
-    succeeds when the answer arrives. No model is used and nothing is saved. Answers at once with the
-    run ids; the run itself is asynchronous.
+    succeeds when the answer arrives. No model is used, and no scenario, run plan or test suite is added
+    to the project. Answers at once with the run ids; the run itself is asynchronous.
 
     Args:
         id (str):
@@ -100,8 +100,8 @@ def sync(
     client: AuthenticatedClient,
 ) -> Any | TestAgentResponse200 | None:
     r"""Run one scripted scenario against an agent: the user sends \"ping\", the agent answers, and the run
-    succeeds when the answer arrives. No model is used and nothing is saved. Answers at once with the
-    run ids; the run itself is asynchronous.
+    succeeds when the answer arrives. No model is used, and no scenario, run plan or test suite is added
+    to the project. Answers at once with the run ids; the run itself is asynchronous.
 
     Args:
         id (str):
@@ -126,8 +126,8 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
 ) -> Response[Any | TestAgentResponse200]:
     r"""Run one scripted scenario against an agent: the user sends \"ping\", the agent answers, and the run
-    succeeds when the answer arrives. No model is used and nothing is saved. Answers at once with the
-    run ids; the run itself is asynchronous.
+    succeeds when the answer arrives. No model is used, and no scenario, run plan or test suite is added
+    to the project. Answers at once with the run ids; the run itself is asynchronous.
 
     Args:
         id (str):
@@ -155,8 +155,8 @@ async def asyncio(
     client: AuthenticatedClient,
 ) -> Any | TestAgentResponse200 | None:
     r"""Run one scripted scenario against an agent: the user sends \"ping\", the agent answers, and the run
-    succeeds when the answer arrives. No model is used and nothing is saved. Answers at once with the
-    run ids; the run itself is asynchronous.
+    succeeds when the answer arrives. No model is used, and no scenario, run plan or test suite is added
+    to the project. Answers at once with the run ids; the run itself is asynchronous.
 
     Args:
         id (str):

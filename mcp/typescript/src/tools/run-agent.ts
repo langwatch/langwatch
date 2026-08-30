@@ -23,11 +23,18 @@ export async function handleRunAgent({
 }): Promise<string> {
   let parsedInput: Record<string, unknown> = {};
   if (input) {
+    let parsed: unknown;
     try {
-      parsedInput = JSON.parse(input) as Record<string, unknown>;
+      parsed = JSON.parse(input);
     } catch {
       return "Error: `input` must be a valid JSON object.";
     }
+    // A scalar and an array both parse, and either one reaches the agent as a
+    // body it cannot read.
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      return "Error: `input` must be a valid JSON object.";
+    }
+    parsedInput = parsed as Record<string, unknown>;
   }
 
   const { agentType, result } = await apiRunAgent({

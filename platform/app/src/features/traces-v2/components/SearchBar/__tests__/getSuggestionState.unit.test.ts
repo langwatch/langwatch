@@ -10,41 +10,49 @@ describe("getSuggestionState with the parameter line grammar", () => {
     getSuggestionState(text, cursor, PARAMETER_LINE_GRAMMAR);
 
   describe("given a line with one pair and a second name in progress", () => {
-    /** @scenario "The equals sign and the comma separate the tokens of a parameter line" */
-    it("opens key mode on the token after the comma, spaces skipped", () => {
-      expect(read({ text: "model=gpt-5, loc", cursor: 16 })).toEqual({
-        open: true,
-        mode: "field",
-        query: "loc",
-        tokenStart: 13,
+    describe("when the cursor sits on the name after the comma", () => {
+      /** @scenario "The equals sign and the comma separate the tokens of a parameter line" */
+      it("opens key mode on that token, spaces skipped", () => {
+        expect(read({ text: "model=gpt-5, loc", cursor: 16 })).toEqual({
+          open: true,
+          mode: "field",
+          query: "loc",
+          tokenStart: 13,
+        });
       });
     });
 
-    it("opens value mode for the name before the equals sign", () => {
-      expect(read({ text: "model=gpt-5, loc", cursor: 6 })).toEqual({
-        open: true,
-        mode: "value",
-        field: "model",
-        query: "",
-        tokenStart: 0,
-      });
-      expect(read({ text: "model=gpt-5, loc", cursor: 11 })).toMatchObject({
-        mode: "value",
-        field: "model",
-        query: "gpt-5",
+    describe("when the cursor sits after the equals sign of the first pair", () => {
+      it("opens value mode for the name before that equals sign", () => {
+        expect(read({ text: "model=gpt-5, loc", cursor: 6 })).toEqual({
+          open: true,
+          mode: "value",
+          field: "model",
+          query: "",
+          tokenStart: 0,
+        });
+        expect(read({ text: "model=gpt-5, loc", cursor: 11 })).toMatchObject({
+          mode: "value",
+          field: "model",
+          query: "gpt-5",
+        });
       });
     });
 
-    it("keeps a value holding a colon or a space in value mode", () => {
-      expect(read({ text: "greeting=hello there", cursor: 20 })).toMatchObject({
-        mode: "value",
-        field: "greeting",
-        query: "hello there",
-      });
-      expect(read({ text: "url=http://a", cursor: 12 })).toMatchObject({
-        mode: "value",
-        field: "url",
-        query: "http://a",
+    describe("when the value holds a colon or a space", () => {
+      it("keeps the whole value in value mode", () => {
+        expect(
+          read({ text: "greeting=hello there", cursor: 20 }),
+        ).toMatchObject({
+          mode: "value",
+          field: "greeting",
+          query: "hello there",
+        });
+        expect(read({ text: "url=http://a", cursor: 12 })).toMatchObject({
+          mode: "value",
+          field: "url",
+          query: "http://a",
+        });
       });
     });
   });

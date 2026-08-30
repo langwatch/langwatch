@@ -8,7 +8,7 @@ import { failSpinner } from "../../utils/spinnerError";
 /**
  * Schedules one scripted scenario run against the agent and returns its ids:
  * the user sends "ping", the agent answers, and the run succeeds when the
- * answer arrives. Nothing is saved on the platform.
+ * answer arrives. The project gains no scenario, run plan or test suite.
  *
  * @see specs/agents/agent-test-run.feature
  */
