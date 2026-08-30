@@ -2,39 +2,33 @@
 
 import { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import type { AnomalyRuleService } from "./anomaly-rule.service";
-import type { GovernanceDepartmentService } from "./governance-department.service";
 import type { PostgresGovernancePolicyService } from "./governance-policy.service";
-import type { GovernanceAiToolsService } from "./governance-ai-tools.service";
+import type { DepartmentService } from "./department.service";
+import type { DefaultGovernanceAiToolCatalogService } from "./ai-tool-catalog.service";
 
 /** Private cohesive collaborator for the rules operation set. */
 export class GovernanceRulesOperationsService {
   private constructor(
     private readonly anomalyRules: AnomalyRuleService,
-    private readonly departments: GovernanceDepartmentService,
+    private readonly departments: DepartmentService,
     private readonly policy: PostgresGovernancePolicyService,
-    private readonly aiTools: GovernanceAiToolsService,
+    private readonly aiTools: DefaultGovernanceAiToolCatalogService,
   ) {}
 
   static create(
     anomalyRules: AnomalyRuleService,
-    departments: GovernanceDepartmentService,
+    departments: DepartmentService,
     policy: PostgresGovernancePolicyService,
-    aiTools: GovernanceAiToolsService,
+    aiTools: DefaultGovernanceAiToolCatalogService,
   ): GovernanceRulesOperationsService {
-    return new GovernanceRulesOperationsService(
-      anomalyRules,
-      departments,
-      policy,
-      aiTools,
-    );
+    return new GovernanceRulesOperationsService(anomalyRules, departments, policy, aiTools);
   }
 
   readonly anomalyRuleList: GovernanceService["anomalyRuleList"] = (...args) =>
     this.anomalyRules.list(...args);
 
-  readonly tryFindAnomalyRuleById: GovernanceService["tryFindAnomalyRuleById"] = (
-    ...args
-  ) => this.anomalyRules.tryFindById(...args);
+  readonly tryFindAnomalyRuleById: GovernanceService["tryFindAnomalyRuleById"] = (...args) =>
+    this.anomalyRules.tryFindById(...args);
 
   readonly anomalyRuleGetById: GovernanceService["anomalyRuleGetById"] = (...args) =>
     this.anomalyRules.getById(...args);
@@ -49,17 +43,17 @@ export class GovernanceRulesOperationsService {
     this.anomalyRules.archive(...args);
 
   readonly departmentList: GovernanceService["departmentList"] = (...args) =>
-    this.departments.list(...args);
+    this.departments.getAll({ organizationId: args[0] });
 
-  readonly departmentAssignments: GovernanceService["departmentAssignments"] = (
-    ...args
-  ) => this.departments.assignments(...args);
+  readonly departmentAssignments: GovernanceService["departmentAssignments"] = (...args) =>
+    this.departments.getAssignments({ organizationId: args[0] });
 
   readonly departmentCreate: GovernanceService["departmentCreate"] = (...args) =>
     this.departments.create(...args);
 
-  readonly departmentResolveByNameOrCreate: GovernanceService["departmentResolveByNameOrCreate"] =
-    (...args) => this.departments.resolveByNameOrCreate(...args);
+  readonly departmentResolveByNameOrCreate: GovernanceService["departmentResolveByNameOrCreate"] = (
+    ...args
+  ) => this.departments.resolveByNameOrCreate(...args);
 
   readonly departmentRename: GovernanceService["departmentRename"] = (...args) =>
     this.departments.rename(...args);
@@ -73,17 +67,14 @@ export class GovernanceRulesOperationsService {
   readonly departmentAssignTeam: GovernanceService["departmentAssignTeam"] = (...args) =>
     this.departments.assignTeam(...args);
 
-  readonly departmentAssignProject: GovernanceService["departmentAssignProject"] = (
-    ...args
-  ) => this.departments.assignProject(...args);
+  readonly departmentAssignProject: GovernanceService["departmentAssignProject"] = (...args) =>
+    this.departments.assignProject(...args);
 
-  readonly resolveSourceNonBillable: GovernanceService["resolveSourceNonBillable"] = (
-    ...args
-  ) => this.policy.resolveSourceNonBillable(...args);
+  readonly resolveSourceNonBillable: GovernanceService["resolveSourceNonBillable"] = (...args) =>
+    this.policy.resolveSourceNonBillable(...args);
 
-  readonly resolveTraceDepartment: GovernanceService["resolveTraceDepartment"] = (
-    ...args
-  ) => this.policy.resolveTraceDepartment(...args);
+  readonly resolveTraceDepartment: GovernanceService["resolveTraceDepartment"] = (...args) =>
+    this.policy.resolveTraceDepartment(...args);
 
   readonly aiToolListForUser: GovernanceService["aiToolListForUser"] = (...args) =>
     this.aiTools.listForUser(...args);
@@ -110,9 +101,8 @@ export class GovernanceRulesOperationsService {
     ...args
   ) => this.aiTools.ensureDefaultCatalog(...args);
 
-  readonly aiToolSeedStarterPack: GovernanceService["aiToolSeedStarterPack"] = (
-    ...args
-  ) => this.aiTools.seedStarterPack(...args);
+  readonly aiToolSeedStarterPack: GovernanceService["aiToolSeedStarterPack"] = (...args) =>
+    this.aiTools.seedStarterPack(...args);
 
   readonly aiToolListConfiguredProvidersForUser: GovernanceService["aiToolListConfiguredProvidersForUser"] =
     (...args) => this.aiTools.listConfiguredProvidersForUser(...args);
@@ -126,16 +116,17 @@ export class GovernanceRulesOperationsService {
   readonly aiToolReorder: GovernanceService["aiToolReorder"] = (...args) =>
     this.aiTools.reorder(...args);
 
-  readonly aiToolResolvePolicyOverrides: GovernanceService["aiToolResolvePolicyOverrides"] =
-    (...args) => this.aiTools.resolveToolPolicyOverrides(...args);
-
-  readonly aiToolResolvePolicyMap: GovernanceService["aiToolResolvePolicyMap"] = (
+  readonly aiToolResolvePolicyOverrides: GovernanceService["aiToolResolvePolicyOverrides"] = (
     ...args
-  ) => this.aiTools.resolveToolPolicyMap(...args);
+  ) => this.aiTools.resolveToolPolicyOverrides(...args);
+
+  readonly aiToolResolvePolicyMap: GovernanceService["aiToolResolvePolicyMap"] = (...args) =>
+    this.aiTools.resolveToolPolicyMap(...args);
 
   readonly aiToolResolvePolicy: GovernanceService["aiToolResolvePolicy"] = (...args) =>
     this.aiTools.resolveToolPolicy(...args);
 
-  readonly aiToolResolveCliCatalogForUser: GovernanceService["aiToolResolveCliCatalogForUser"] =
-    (...args) => this.aiTools.resolveCliCatalogForUser(...args);
+  readonly aiToolResolveCliCatalogForUser: GovernanceService["aiToolResolveCliCatalogForUser"] = (
+    ...args
+  ) => this.aiTools.resolveCliCatalogForUser(...args);
 }

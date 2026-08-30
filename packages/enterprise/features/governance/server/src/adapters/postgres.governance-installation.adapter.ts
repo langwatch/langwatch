@@ -7,9 +7,6 @@ import type {
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import { CanonicalCostExtractorService } from "../services/canonical-cost-extractor.service";
-import { GovernanceActivityService } from "../services/governance-activity.service";
-import { GovernanceAiToolsService } from "../services/governance-ai-tools.service";
-import { GovernanceDepartmentService } from "../services/governance-department.service";
 import { PostgresAnomalyRuleAdapter } from "./postgres.anomaly-rule.adapter";
 import { PostgresDepartmentAdapter } from "./postgres.department.adapter";
 import { DefaultGovernanceCliBootstrapService } from "../services/cli-bootstrap.service";
@@ -30,10 +27,7 @@ import {
 import { PullDestinationService } from "../services/pull-destination.service";
 import { PostgresAdminWorkspaceViewAuditAdapter } from "./postgres.admin-workspace-view-audit.adapter";
 import { PostgresAiToolCatalogAdapter } from "./postgres.ai-tool-catalog.adapter";
-import {
-  PostgresGovernanceAdapter,
-  type GovernanceDatabase,
-} from "./postgres.governance.adapter";
+import { PostgresGovernanceAdapter, type GovernanceDatabase } from "./postgres.governance.adapter";
 import { PostgresGovernanceOcsfExportAdapter } from "./postgres.ocsf-export.adapter";
 import { PostgresGovernanceSetupStateAdapter } from "./postgres.governance-setup-state.adapter";
 import { PostgresIngestionTemplateAdapter } from "./postgres.ingestion-template.adapter";
@@ -42,10 +36,7 @@ import { PostgresIngestionSourceAdapter } from "./postgres.ingestion-source.adap
 import { PostgresPersonalVirtualKeyAdapter } from "./postgres.governance-personal-key.adapter";
 import { PostgresRoutingPolicyAdapter } from "./postgres.governance-routing.adapter";
 import type { AdminWorkspaceViewOcsfPort } from "../ports/admin-workspace-view-audit.port";
-import type {
-  AiToolProviderCatalogPort,
-  AiToolSlugPort,
-} from "../ports/ai-tool-catalog.port";
+import type { AiToolProviderCatalogPort, AiToolSlugPort } from "../ports/ai-tool-catalog.port";
 import type { CliAdminContactPort } from "../ports/cli-bootstrap.port";
 import type { CliTokenStorePort } from "../ports/cli-token-store.port";
 import { GovernanceBudgetOverviewPort } from "../ports/governance-budget-overview.port";
@@ -112,9 +103,7 @@ export type GovernanceInstallationOptions = {
 export class PostgresGovernanceInstallationAdapter {
   private constructor(private readonly options: GovernanceInstallationOptions) {}
 
-  static create(
-    options: GovernanceInstallationOptions,
-  ): PostgresGovernanceInstallationAdapter {
+  static create(options: GovernanceInstallationOptions): PostgresGovernanceInstallationAdapter {
     return new PostgresGovernanceInstallationAdapter(options);
   }
 
@@ -163,9 +152,6 @@ export class PostgresGovernanceInstallationAdapter {
     }).build();
 
     const canonicalCost = CanonicalCostExtractorService.create();
-    const governanceActivity = GovernanceActivityService.create(activity);
-    const governanceAiTools = GovernanceAiToolsService.create(aiTools);
-    const governanceDepartments = GovernanceDepartmentService.create(departments);
     const policy = PostgresGovernanceAdapter.create({
       database: this.options.database,
     }).build().policy;
@@ -213,9 +199,9 @@ export class PostgresGovernanceInstallationAdapter {
 
     const rules = GovernanceRulesOperationsService.create(
       anomalyRules,
-      governanceDepartments,
+      departments,
       policy,
-      governanceAiTools,
+      aiTools,
     );
     const ingestion = GovernanceIngestionOperationsService.create(
       canonicalCost,
@@ -227,7 +213,7 @@ export class PostgresGovernanceInstallationAdapter {
       this.options.ottl,
     );
     const activityOperations = GovernanceActivityOperationsService.create(
-      governanceActivity,
+      activity,
       personalUsage,
       this.options.budgetOverview,
     );
@@ -242,11 +228,6 @@ export class PostgresGovernanceInstallationAdapter {
       setupState,
     );
 
-    return DefaultGovernanceService.create(
-      rules,
-      ingestion,
-      activityOperations,
-      lifecycle,
-    );
+    return DefaultGovernanceService.create(rules, ingestion, activityOperations, lifecycle);
   }
 }
