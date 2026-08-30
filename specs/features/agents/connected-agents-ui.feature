@@ -130,6 +130,7 @@ Feature: Connected agents in the product
     Given a connected agent that declares "model" with two options and a default
     When its drawer is open
     Then the parameters table names the parameter, its type, its options and its default
+    And the table has no description column, as the description reads in the code
 
   @integration
   Scenario: The drawer lists the instances that hold the agent
@@ -138,11 +139,17 @@ Feature: Connected agents in the product
     Then the instances table names the hostname, the label, the process id and the time it connected
 
   @integration
-  Scenario: The drawer edits the description and nothing else
+  Scenario: The drawer edits nothing the process registered
     Given a connected agent
     When its drawer is open
-    Then the description can be edited
-    And the name, the environment and the parameters cannot
+    Then no field for the name, the environment or the parameters is offered
+    And a Close button sits at the bottom right of the drawer
+
+  @integration
+  Scenario: An offline agent says on hover why it cannot be tested
+    Given an offline connected agent
+    When the pointer rests on the Test button
+    Then a tooltip says the agent is offline and to start the process that runs it
 
   @integration
   Scenario: The drawer sends one test turn to the agent

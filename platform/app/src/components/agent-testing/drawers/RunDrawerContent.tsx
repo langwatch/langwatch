@@ -12,21 +12,15 @@
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  */
 
-import {
-  Accordion,
-  Box,
-  Grid,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Accordion, Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
+import { nextSpeakerOf } from "~/components/simulations/next-speaker";
 import { RunDetailSection } from "~/components/simulations/RunDetailSection";
 import { ScenarioMessageRenderer } from "~/components/simulations/ScenarioMessageRenderer";
 import {
   ParameterRow,
   SECRET_VALUE_MASK,
 } from "~/components/simulations/ScenarioRunDetailDrawer";
+import { TypingBubble } from "~/components/simulations/TypingBubble";
 import { ConversationExpandContext } from "~/features/traces-v2/components/TraceDrawer/conversationView/expandContext";
 import {
   isTerminalStatus,
@@ -72,13 +66,22 @@ function ConversationSection({ detail }: { detail: RunDetail }) {
     );
   }
 
+  const typingRole = nextSpeakerOf({
+    messages: scenarioState.messages ?? [],
+    streamingMessages: detail.streamingMessages,
+    status: scenarioState.status,
+  });
+
   if (!detail.hasConversation) {
     return (
       <ConversationBox>
-        <HStack gap={2} color="fg.muted" paddingY={6} justify="center">
-          <Spinner size="xs" />
-          <Text fontSize="sm">Waiting for the first message</Text>
-        </HStack>
+        {typingRole ? (
+          <TypingBubble role={typingRole} />
+        ) : (
+          <HStack gap={2} color="fg.muted" paddingY={6} justify="center">
+            <Text fontSize="sm">Waiting for the first message</Text>
+          </HStack>
+        )}
       </ConversationBox>
     );
   }
@@ -93,6 +96,7 @@ function ConversationSection({ detail }: { detail: RunDetail }) {
           streamingMessages={detail.streamingMessages}
           variant="drawer"
           projectId={project?.id ?? ""}
+          typingRole={typingRole}
         />
       </ConversationExpandContext.Provider>
     </ConversationBox>
@@ -109,8 +113,9 @@ function ConversationBox({ children }: { children: React.ReactNode }) {
 }
 
 /** What the results column says while a run has not reached a verdict. */
-const CONVERSATION_RUNNING_MESSAGE = "The conversation is running…";
-const JUDGE_READING_MESSAGE = "The judge is reading the conversation…";
+const CONVERSATION_RUNNING_MESSAGE =
+  "Waiting for the conversation to end, then the judge reads it";
+const JUDGE_READING_MESSAGE = "The judge is reading the conversation";
 
 /**
  * The statuses a run reaches once the judge has spoken. The verdict itself is
@@ -157,17 +162,23 @@ function hasVerdict(scenarioState: RunScenarioState): boolean {
 }
 
 /**
- * What the run is doing, where its results will be. It reads as one quiet line
- * rather than an empty column, so a live run says what it is waiting on.
+ * What the run is doing, where its results will be. The conversation beside it
+ * already moves, so this reads as one quiet line in the middle of the column
+ * rather than a second thing that spins.
  */
 function PendingVerdictLine({ message }: { message: string }) {
   return (
-    <HStack align="start" gap={2} data-testid="run-verdict-pending">
-      <Spinner size="xs" color="blue.solid" flexShrink={0} marginTop="1px" />
-      <Text fontSize="12px" color="fg.muted">
+    <VStack
+      align="center"
+      justify="flex-start"
+      paddingTop="64px"
+      paddingX={2}
+      data-testid="run-verdict-pending"
+    >
+      <Text fontSize="12px" color="fg.muted" textAlign="center">
         {message}
       </Text>
-    </HStack>
+    </VStack>
   );
 }
 

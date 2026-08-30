@@ -3,9 +3,7 @@
  * a way to call it once (ADR-128).
  *
  * The name, the environment and the parameters come from the process that
- * registered them, so they are read here and never edited. Only the
- * description belongs to the platform, so it is the one field the drawer
- * writes.
+ * registered them, so the drawer reads them and writes nothing.
  *
  * @see specs/features/agents/connected-agents-ui.feature
  */
@@ -15,18 +13,15 @@ import {
   Button,
   Heading,
   HStack,
+  Spacer,
   Spinner,
   Table,
   Text,
-  Textarea,
   VStack,
 } from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
-import { useEffect, useState } from "react";
 import { AgentTestPanel } from "~/components/agents/AgentTestPanel";
 import { Drawer } from "~/components/ui/drawer";
-import { toaster } from "~/components/ui/toaster";
-import { showErrorToast } from "~/features/errors";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -71,6 +66,18 @@ export function ConnectedAgentDrawer(props: ConnectedAgentDrawerProps) {
             projectId={projectId}
           />
         </Drawer.Body>
+        <Drawer.Footer>
+          <HStack width="full">
+            <Spacer />
+            <Button
+              colorPalette="blue"
+              onClick={closeDrawer}
+              data-testid="connected-agent-close"
+            >
+              Close
+            </Button>
+          </HStack>
+        </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
   );
@@ -116,7 +123,6 @@ function AgentBody({
 
   return (
     <VStack align="stretch" gap={6} paddingBottom={6}>
-      <DescriptionField agent={agent} projectId={projectId} />
       <ParametersTable agent={agent} />
       <InstancesTable agent={agent} />
       <AgentTestPanel
@@ -156,66 +162,6 @@ function PresenceLine({ agent }: { agent: ConnectedAgentView }) {
   );
 }
 
-/** The one field of a connected agent the platform owns. */
-function DescriptionField({
-  agent,
-  projectId,
-}: {
-  agent: ConnectedAgentView;
-  projectId: string;
-}) {
-  const utils = api.useUtils();
-  const [description, setDescription] = useState(
-    agent.config.description ?? "",
-  );
-
-  useEffect(() => {
-    setDescription(agent.config.description ?? "");
-  }, [agent.id, agent.config.description]);
-
-  const update = api.agents.update.useMutation({
-    onSuccess: () => {
-      void utils.agents.getById.invalidate({ id: agent.id, projectId });
-      void utils.agents.getAll.invalidate({ projectId });
-      toaster.create({ title: "Description saved", type: "success" });
-    },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't save the description" }),
-  });
-
-  return (
-    <VStack align="stretch" gap={2} data-testid="connected-agent-description">
-      <SectionTitle
-        title="Description"
-        hint="The name, the environment and the parameters come from the code that registered this agent."
-      />
-      <Textarea
-        value={description}
-        rows={2}
-        onChange={(event) => setDescription(event.target.value)}
-        placeholder="What this agent does"
-      />
-      <HStack>
-        <Button
-          size="xs"
-          colorPalette="blue"
-          loading={update.isPending}
-          onClick={() =>
-            update.mutate({
-              id: agent.id,
-              projectId,
-              config: { description },
-            })
-          }
-          data-testid="connected-agent-save-description"
-        >
-          Save
-        </Button>
-      </HStack>
-    </VStack>
-  );
-}
-
 /** What the agent can be called with. */
 function ParametersTable({ agent }: { agent: ConnectedAgentView }) {
   return (
@@ -233,7 +179,6 @@ function ParametersTable({ agent }: { agent: ConnectedAgentView }) {
               <Table.ColumnHeader>Type</Table.ColumnHeader>
               <Table.ColumnHeader>Options</Table.ColumnHeader>
               <Table.ColumnHeader>Default</Table.ColumnHeader>
-              <Table.ColumnHeader>Description</Table.ColumnHeader>
             </Table.Row>
           </Table.Header>
           <Table.Body>
@@ -251,7 +196,6 @@ function ParametersTable({ agent }: { agent: ConnectedAgentView }) {
                     ? "none"
                     : String(parameter.defaultValue)}
                 </Table.Cell>
-                <Table.Cell>{parameter.description ?? ""}</Table.Cell>
               </Table.Row>
             ))}
           </Table.Body>
@@ -300,17 +244,10 @@ function InstancesTable({ agent }: { agent: ConnectedAgentView }) {
   );
 }
 
-function SectionTitle({ title, hint }: { title: string; hint?: string }) {
+function SectionTitle({ title }: { title: string }) {
   return (
-    <VStack align="start" gap={0}>
-      <Text fontSize="sm" fontWeight="medium">
-        {title}
-      </Text>
-      {hint ? (
-        <Text fontSize="11.5px" color="fg.muted">
-          {hint}
-        </Text>
-      ) : null}
-    </VStack>
+    <Text fontSize="sm" fontWeight="medium">
+      {title}
+    </Text>
   );
 }

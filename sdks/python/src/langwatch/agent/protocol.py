@@ -50,7 +50,6 @@ class InstanceInfo(TypedDict):
 class AgentRegistration(TypedDict):
     name: str
     environment: str
-    description: NotRequired[str]
     parameters: dict[str, Any]
     concurrency: NotRequired[int]
     timeoutMs: NotRequired[int]

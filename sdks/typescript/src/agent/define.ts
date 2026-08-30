@@ -79,7 +79,6 @@ export interface ConnectAgentOptions<P extends ParameterInput = ParameterDefinit
   name: string;
   /** Resolved from LANGWATCH_AGENT_ENVIRONMENT, APP_ENV, ENVIRONMENT, NODE_ENV, else development. */
   environment?: string;
-  description?: string;
   /** A definition map, a Standard JSON Schema object, or a JSON Schema object. */
   parameters?: P;
   /** Default true, except when CI is truthy. LANGWATCH_AGENT_CONNECT=0 always disables. */
@@ -227,7 +226,6 @@ export function connectAgent(
     register: {
       name,
       environment,
-      ...(options.description ? { description: options.description } : {}),
       parameters,
       concurrency,
       timeoutMs,

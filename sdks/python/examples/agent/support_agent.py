@@ -31,10 +31,7 @@ def _openai() -> OpenAI:
     return OpenAI()
 
 
-@langwatch.connect_agent(
-    name="support-agent",
-    description="Answers support questions for the ACME shop",
-)
+@langwatch.connect_agent(name="support-agent")
 @langwatch.trace(name="support_agent")
 def support_agent(
     messages: list[langwatch.Message],

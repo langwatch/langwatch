@@ -29,9 +29,9 @@ Feature: Connected agents
   @integration
   Scenario: A second register of the same identity updates the same row
     Given a connected agent row registered from a process
-    When another process registers the same name and environment with a new description
+    When another process registers the same name and environment with new parameters
     Then no second row is created
-    And the row carries the new description
+    And the row carries the new parameters
 
   # Several instances of one agent normally start together, so two of them can
   # read no row and both go on to write one.
@@ -524,11 +524,11 @@ Feature: Connected agents
     And no copied row is written
 
   @integration
-  Scenario: A connected agent can be archived and its description edited
+  Scenario: A connected agent can be archived, and nothing else edited
     Given a registered connected agent
     When a caller archives it through the REST agents API
     Then the row is archived
-    And an update that only edits the description is accepted
+    And an update of its configuration is refused with "agent_register_only"
     And an update that changes the type is refused with "agent_register_only"
 
   # ---------------------------------------------------------------------------

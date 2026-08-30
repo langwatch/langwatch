@@ -396,9 +396,17 @@ describe("the wide run detail drawer", () => {
     const view = renderWide();
 
     expect(screen.getByTestId("run-verdict-pending")).toHaveTextContent(
-      "The conversation is running",
+      "Waiting for the conversation to end",
+    );
+    expect(screen.getByTestId("run-verdict-pending")).not.toContainElement(
+      screen.queryByRole("progressbar"),
     );
     expect(screen.getByText("I want my money back")).toBeInTheDocument();
+    // The user has spoken, so the agent is the one being waited for.
+    expect(screen.getByTestId("conversation-typing")).toHaveAttribute(
+      "data-typing-role",
+      "assistant",
+    );
 
     setRunState(
       makeRunState({
@@ -418,6 +426,11 @@ describe("the wide run detail drawer", () => {
 
     expect(screen.getByText("Let me check the order")).toBeInTheDocument();
     expect(screen.getByTestId("run-verdict-pending")).toBeInTheDocument();
+    // The judge reads the agent's answer next, and it writes no message, so
+    // nothing is drawn for it.
+    expect(
+      screen.queryByTestId("conversation-typing"),
+    ).not.toBeInTheDocument();
   });
 
   /** @scenario "A run that is still going shows the conversation growing beside empty results" */

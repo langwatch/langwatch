@@ -55,7 +55,6 @@ export const registerInstanceSchema = z.object({
 export const registerAgentSchema = z.object({
   name: z.string().min(1).max(255),
   environment: z.string().min(1).max(64),
-  description: z.string().max(2000).optional(),
   /** A JSON Schema object the gateway normalizes into parameter definitions. */
   parameters: z.record(z.unknown()).default({}),
   concurrency: z.number().int().positive().max(1000).optional(),

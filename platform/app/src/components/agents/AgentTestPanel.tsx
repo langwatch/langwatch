@@ -11,11 +11,16 @@
 import { Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Play } from "lucide-react";
 import { useState } from "react";
+import { Tooltip } from "~/components/ui/tooltip";
 import { HandledErrorAlert, readHandledError } from "~/features/errors";
 import { api } from "~/utils/api";
 
 /** The message the panel sends when nothing else is typed. */
 export const AGENT_TEST_DEFAULT_MESSAGE = "ping";
+
+/** Why the Test button is disabled, read on hover over it. */
+export const OFFLINE_TEST_HINT =
+  "This agent is offline. Start the process that runs it to test it.";
 
 export type AgentTestPanelProps = {
   agentId: string;
@@ -50,25 +55,24 @@ export function AgentTestPanel({
           placeholder="A message to send"
           data-testid="agent-test-message"
         />
-        <Button
-          size="sm"
-          colorPalette="blue"
-          loading={test.isPending}
-          disabled={offline || message.trim().length === 0}
-          onClick={() =>
-            test.mutate({ id: agentId, projectId, message: message.trim() })
-          }
-          data-testid="agent-test-run"
-        >
-          <Play size={13} />
-          Test
-        </Button>
+        <Tooltip content={OFFLINE_TEST_HINT} disabled={!offline}>
+          <Box>
+            <Button
+              size="sm"
+              colorPalette="blue"
+              loading={test.isPending}
+              disabled={offline || message.trim().length === 0}
+              onClick={() =>
+                test.mutate({ id: agentId, projectId, message: message.trim() })
+              }
+              data-testid="agent-test-run"
+            >
+              <Play size={13} />
+              Test
+            </Button>
+          </Box>
+        </Tooltip>
       </HStack>
-      {offline ? (
-        <Text fontSize="12px" color="fg.muted">
-          Start the process that runs this agent to test it.
-        </Text>
-      ) : null}
       <TestError error={test.error} />
       {test.data ? (
         <VStack

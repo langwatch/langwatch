@@ -338,7 +338,7 @@ const registry = {
   agent_register_only: {
     tips: [
       "A connected agent is created and updated by the SDK when the decorated function's process starts; change the code and start the process again",
-      "Only `config.description` can be edited through this API; the agent can also be archived",
+      "This API can archive the agent; every other field is the SDK's to write",
     ],
     docsPath: "/agent-simulations/connect-your-agent",
   },

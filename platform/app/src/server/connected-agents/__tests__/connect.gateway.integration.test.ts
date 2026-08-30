@@ -194,7 +194,6 @@ class FakeSdk {
         {
           name: "support-agent",
           environment: "production",
-          description: "Answers support questions",
           parameters: {
             type: "object",
             properties: { model: { type: "string", default: "gpt-5-mini" } },

@@ -349,7 +349,7 @@ function registerItemEndpoints({ v, guard, docs }: RegisterAgents): void {
         input: updateAgentSchema,
         output: agentResponseSchema,
         description:
-          "Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes only a new description; anything else answers 422 agent_register_only.",
+          "Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes no edit and answers 422 agent_register_only.",
         docs: docsOf({
           docs,
           operationId: verb === "patch" ? "updateAgent" : "replaceAgent",

@@ -295,7 +295,6 @@ describe("the agent client, given a fake platform", () => {
     it("carries protocol 1, the SDK, the instance, the agents and the schema; the key rides in the header only", async () => {
       vi.stubEnv("LANGWATCH_PROJECT_ID", "proj_1");
       define(async () => "ok", {
-        description: "Answers support questions",
         timeoutMs: 30_000,
         parameters: { model: { options: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" } },
         instanceLabel: "blue",
@@ -317,7 +316,6 @@ describe("the agent client, given a fake platform", () => {
         {
           name: "support",
           environment: "development",
-          description: "Answers support questions",
           parameters: {
             type: "object",
             properties: { model: { type: "string", enum: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" } },

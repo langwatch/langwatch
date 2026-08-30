@@ -91,7 +91,6 @@ class ConnectedAgent:
         *,
         name: str,
         environment: str | None = None,
-        description: str | None = None,
         parameters: Mapping[str, Any] | None = None,
         enabled: bool | None = None,
         instance_label: str | None = None,
@@ -116,7 +115,6 @@ class ConnectedAgent:
         self.func = func
         self.name = name.strip()
         self.environment = resolve_environment(environment)
-        self.description = description
         self.enabled = enabled
         self.instance_label = instance_label
         self.timeout = float(min(max(timeout, 1), MAX_TIMEOUT_SECONDS))
@@ -163,8 +161,6 @@ class ConnectedAgent:
             "timeoutMs": self.timeout_ms,
             "sticky": self.sticky,
         }
-        if self.description:
-            frame["description"] = self.description
         return frame
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
@@ -258,7 +254,6 @@ def connect_agent(
     name: str,
     *,
     environment: str | None = None,
-    description: str | None = None,
     parameters: Mapping[str, Any] | None = None,
     enabled: bool | None = None,
     instance_label: str | None = None,
@@ -281,7 +276,6 @@ def connect_agent(
         name: The agent name shown on the platform.
         environment: Overrides `LANGWATCH_AGENT_ENVIRONMENT`, `APP_ENV`,
             `ENVIRONMENT` and `NODE_ENV`; defaults to `development`.
-        description: Shown next to the agent.
         parameters: Replaces the run parameters read from the signature.
         enabled: Defaults to true, except when `CI` is truthy;
             `LANGWATCH_AGENT_CONNECT=0` always disables.
@@ -299,7 +293,6 @@ def connect_agent(
             func,
             name=name,
             environment=environment,
-            description=description,
             parameters=parameters,
             enabled=enabled,
             instance_label=instance_label,

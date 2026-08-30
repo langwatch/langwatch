@@ -46,7 +46,6 @@ const agentRow = {
     },
   ],
   config: {
-    description: "Answers support questions",
     sdk: { name: "langwatch-python", version: "1.2.3", language: "python" },
   },
 };
@@ -112,6 +111,7 @@ describe("<ConnectedAgentDrawer />", () => {
     testState.data = undefined;
     testState.error = null;
     testMutate.mockClear();
+    agentRow.status = "online";
   });
   afterEach(cleanup);
 
@@ -130,7 +130,15 @@ describe("<ConnectedAgentDrawer />", () => {
       expect(table).toHaveTextContent("string");
       expect(table).toHaveTextContent("gpt-5, gpt-5-mini");
       expect(table).toHaveTextContent("gpt-5-mini");
-      expect(table).toHaveTextContent("Which model answers");
+    });
+
+    /** @scenario "The drawer lists the parameters the agent declares" */
+    it("leaves the description of a parameter to the code that declares it", async () => {
+      await renderDrawer();
+
+      const table = await screen.findByTestId("connected-agent-parameters");
+      expect(table).not.toHaveTextContent("Description");
+      expect(table).not.toHaveTextContent("Which model answers");
     });
   });
 
@@ -147,17 +155,33 @@ describe("<ConnectedAgentDrawer />", () => {
   });
 
   describe("given the agent was registered from code", () => {
-    /** @scenario "The drawer edits the description and nothing else" */
-    it("offers the description and no field for the name, the environment or the parameters", async () => {
+    /** @scenario "The drawer edits nothing the process registered" */
+    it("offers no field of its own and closes from the bottom right", async () => {
       await renderDrawer();
 
       expect(
-        await screen.findByTestId("connected-agent-save-description"),
-      ).toBeInTheDocument();
-      const textboxes = screen.getAllByRole("textbox");
-      // The description and the test message are the only two fields; the
-      // name, the environment and the parameters are read from the code.
-      expect(textboxes).toHaveLength(2);
+        await screen.findByTestId("connected-agent-close"),
+      ).toHaveTextContent("Close");
+      // The test message is the only field; the name, the environment and the
+      // parameters are read from the code.
+      expect(screen.getAllByRole("textbox")).toHaveLength(1);
+    });
+  });
+
+  describe("given no process holds the agent", () => {
+    /** @scenario "An offline agent says on hover why it cannot be tested" */
+    it("says on hover over the Test button that the agent is offline", async () => {
+      const user = userEvent.setup();
+      agentRow.status = "offline";
+      await renderDrawer();
+
+      const test = await screen.findByTestId("agent-test-run");
+      expect(test).toBeDisabled();
+      await user.hover(test);
+
+      expect(await screen.findByRole("tooltip")).toHaveTextContent(
+        "This agent is offline",
+      );
     });
   });
 

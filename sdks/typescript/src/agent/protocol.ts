@@ -44,7 +44,6 @@ export interface RegisterInstance {
 export interface RegisterAgent {
   name: string;
   environment: string;
-  description?: string;
   parameters: JsonSchemaObject;
   concurrency?: number;
   timeoutMs?: number;

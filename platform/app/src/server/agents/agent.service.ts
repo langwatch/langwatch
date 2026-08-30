@@ -224,12 +224,12 @@ export class AgentService {
   /**
    * Updates an existing agent.
    *
-   * On a connected agent only the description may change; the rest of the
-   * row is what the SDK registered and is refused with `agent_register_only`.
+   * A connected agent takes no edit at all: the row is what the SDK
+   * registered, so an edit is refused with `agent_register_only`.
    */
   async update(input: UpdateAgentInput): Promise<AgentWithFields> {
-    const narrowed = await this.narrowConnectedUpdate(input);
-    const agent = await this.repository.update(narrowed);
+    await this.refuseConnectedUpdate(input);
+    const agent = await this.repository.update(input);
     const [enriched] = await this.withFields({
       agents: [agent],
       projectId: input.projectId,
@@ -302,13 +302,11 @@ export class AgentService {
   }
 
   /**
-   * The update a connected agent accepts: its description, merged into the
-   * config the SDK registered. Any other field, or an update that changes the
-   * type of any agent to connected, is refused.
+   * Refuses an edit of a connected agent. Its type, name, environment and
+   * parameters are what the process that runs it declared, so the only way to
+   * change them is to change the code and register again.
    */
-  private async narrowConnectedUpdate(
-    input: UpdateAgentInput,
-  ): Promise<UpdateAgentInput> {
+  private async refuseConnectedUpdate(input: UpdateAgentInput): Promise<void> {
     if (input.data.type === "connected") throw new AgentRegisterOnlyError();
     // Archived rows included: an archived connected agent is still the SDK's
     // to change, and it comes back on the next register.
@@ -316,22 +314,7 @@ export class AgentService {
       id: input.id,
       projectId: input.projectId,
     });
-    if (existing?.type !== "connected") return input;
-
-    const { config, ...rest } = input.data;
-    const editsOtherFields = Object.keys(rest).length > 0;
-    const configKeys = Object.keys(config ?? {});
-    const editsOtherConfig = configKeys.some((key) => key !== "description");
-    if (editsOtherFields || editsOtherConfig) {
-      throw new AgentRegisterOnlyError();
-    }
-    if (!config) return input;
-    return {
-      ...input,
-      data: {
-        config: { ...existing.config, description: config.description },
-      },
-    };
+    if (existing?.type === "connected") throw new AgentRegisterOnlyError();
   }
 
   /**
@@ -435,7 +418,8 @@ export class AgentService {
     if (!existing) {
       throw new AgentNotFoundError();
     }
-    return this.repository.update(await this.narrowConnectedUpdate(input));
+    await this.refuseConnectedUpdate(input);
+    return this.repository.update(input);
   }
 
   /**

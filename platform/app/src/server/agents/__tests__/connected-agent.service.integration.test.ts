@@ -25,7 +25,6 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const service = AgentService.create(prisma);
 
 const config: ConnectedComponentConfig = {
-  description: "Answers support questions",
   parameters: [],
   sdk: { name: "langwatch", version: "1.0.0", language: "python" },
 };
@@ -126,14 +125,17 @@ describe("connected agent rows", () => {
         id: `agent_${nanoid()}`,
         projectId,
         name: "support-agent",
-        config: { ...config, description: "Answers billing questions" },
+        config: {
+          ...config,
+          parameters: [{ name: "plan", type: "string", defaultValue: "free" }],
+        },
         identity,
       });
 
       expect(second.id).toBe(first.id);
-      expect((second.config as ConnectedComponentConfig).description).toBe(
-        "Answers billing questions",
-      );
+      expect((second.config as ConnectedComponentConfig).parameters).toEqual([
+        { name: "plan", type: "string", defaultValue: "free" },
+      ]);
       const rows = await prisma.agent.findMany({
         where: { projectId, identityKey: identity.identityKey },
       });
@@ -310,7 +312,7 @@ describe("connected agent rows", () => {
   });
 
   describe("when a connected agent is edited by hand", () => {
-    it("accepts a description edit and refuses the rest", async () => {
+    it("refuses every edit", async () => {
       const agent = await service.registerConnected({
         id: `agent_${nanoid()}`,
         projectId,
@@ -319,17 +321,13 @@ describe("connected agent rows", () => {
         identity: { ...identity, identityKey: `edited-agent@production` },
       });
 
-      const edited = await service.update({
-        id: agent.id,
-        projectId,
-        data: { config: { description: "Edited by hand" } as never },
-      });
-      expect((edited.config as ConnectedComponentConfig).description).toBe(
-        "Edited by hand",
-      );
-      expect((edited.config as ConnectedComponentConfig).sdk).toEqual(
-        config.sdk,
-      );
+      await expect(
+        service.update({
+          id: agent.id,
+          projectId,
+          data: { config: { parameters: [] } as never },
+        }),
+      ).rejects.toMatchObject({ code: "agent_register_only" });
 
       await expect(
         service.update({

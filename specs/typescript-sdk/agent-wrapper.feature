@@ -52,10 +52,10 @@ Feature: connectAgent turns a function into a simulation target
       Then no socket is opened
 
     Scenario: The register frame carries the instance identity and the parameter schema
-      When an agent is defined with a description and parameters
+      When an agent is defined with parameters
       Then the register frame carries protocol 1, the SDK name and version
       And the instance id, hostname, username, pid and start time
-      And the agent name, environment, description, concurrency and timeout
+      And the agent name, environment, concurrency and timeout
       And the parameters as a JSON Schema object
 
   Rule: The handler receives the turn fields and returns one of four shapes

@@ -2,7 +2,7 @@
  * @vitest-environment node
  *
  * The REST agents API on connected agents: they are registered from code, so
- * a caller may archive one and edit its description, and nothing else.
+ * a caller may archive one, and nothing else.
  *
  * @see specs/agents/connected-agents.feature
  */
@@ -18,7 +18,6 @@ import { app } from "../[[...route]]/app";
 wireDefaultTestApp();
 
 const connectedConfig = {
-  description: "Answers support questions",
   parameters: [{ name: "model", type: "string", defaultValue: "gpt-5-mini" }],
   sdk: { name: "langwatch", version: "1.0.0", language: "python" },
 };
@@ -98,8 +97,8 @@ describe("Feature: connected agents on the REST agents API", () => {
   });
 
   describe("when a caller archives and edits a registered agent", () => {
-    /** @scenario "A connected agent can be archived and its description edited" */
-    it("archives, accepts a description edit, refuses a type change", async () => {
+    /** @scenario "A connected agent can be archived, and nothing else edited" */
+    it("archives, refuses a configuration edit, refuses a type change", async () => {
       const agent = await registeredAgent();
 
       const read = await app.request(`/api/v1/agents/${agent.id}`, {
@@ -112,22 +111,20 @@ describe("Feature: connected agents on the REST agents API", () => {
         ownerUserId: null,
         hostLabel: null,
         parameters: [{ name: "model", type: "string" }],
+        owner: null,
+        status: "offline",
+        instances: [],
       });
 
-      const described = await app.request(`/api/v1/agents/${agent.id}`, {
+      const edited = await app.request(`/api/v1/agents/${agent.id}`, {
         method: "PATCH",
         headers: headers(),
-        body: JSON.stringify({ config: { description: "Edited by hand" } }),
+        body: JSON.stringify({ config: { parameters: [] } }),
       });
-      expect(described.status).toBe(200);
-      const body = (await described.json()) as {
-        config: { description: string; sdk: unknown };
-        owner: unknown;
-        status: string;
-        instances: unknown[];
-      };
-      expect(body.config.description).toBe("Edited by hand");
-      expect(body.config.sdk).toEqual(connectedConfig.sdk);
+      expect(edited.status).toBe(422);
+      expect(await edited.json()).toMatchObject({
+        code: "agent_register_only",
+      });
 
       const retyped = await app.request(`/api/v1/agents/${agent.id}`, {
         method: "PATCH",
@@ -140,12 +137,6 @@ describe("Feature: connected agents on the REST agents API", () => {
       expect(retyped.status).toBe(422);
       expect(await retyped.json()).toMatchObject({
         code: "agent_register_only",
-      });
-
-      expect(body).toMatchObject({
-        owner: null,
-        status: "offline",
-        instances: [],
       });
 
       const archived = await app.request(`/api/v1/agents/${agent.id}`, {

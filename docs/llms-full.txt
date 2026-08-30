@@ -36787,7 +36787,6 @@ The decorator never stops the application from starting. Every problem is one wa
     |---|---|---|
     | `name` | required | The agent's name, and the first half of a `connected:<name>@<environment>` target. |
     | `environment` | resolved, see above | Which environment row this process registers under. |
-    | `description` | none | One line about the agent, shown on the agents page. |
     | `parameters` | read from the signature | An explicit parameter declaration that replaces what the signature declares. |
     | `enabled` | `True`, `False` under `CI` | Whether this process connects at all. |
     | `instance_label` | none | A name for this instance in the instances table. |
@@ -36808,7 +36807,6 @@ The decorator never stops the application from starting. Every problem is one wa
     |---|---|---|
     | `name` | required | The agent's name, and the first half of a `connected:<name>@<environment>` target. |
     | `environment` | resolved, see above | Which environment row this process registers under. |
-    | `description` | none | One line about the agent, shown on the agents page. |
     | `parameters` | none | A zod schema, a definition map, or a JSON Schema object. |
     | `enabled` | `true`, `false` under `CI` | Whether this process connects at all. |
     | `instanceLabel` | none | A name for this instance in the instances table. |

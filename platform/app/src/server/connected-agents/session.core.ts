@@ -307,7 +307,6 @@ export class AgentSessionCore {
         projectId,
         name: agent.name,
         config: {
-          description: agent.description,
           parameters: normalized.parameters,
           timeoutMs: Math.min(
             agent.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,

@@ -479,7 +479,7 @@ const presentations = {
   agent_register_only: {
     title: "This agent is registered from code",
     describe: () =>
-      "Its name, environment and parameters come from the process that runs it. Edit the description here, or change the code and start the process again.",
+      "Its name, environment and parameters come from the process that runs it. Change the code and start the process again.",
   },
   agent_test_refused: {
     title: "This agent cannot be tested as it is set up",

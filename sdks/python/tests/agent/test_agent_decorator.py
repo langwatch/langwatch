@@ -396,7 +396,6 @@ def test_registration_frame_carries_the_agent_options():
         agent,
         name="support-agent",
         environment="production",
-        description="Answers support questions",
         timeout=900,
         sticky=True,
     )
@@ -404,7 +403,6 @@ def test_registration_frame_carries_the_agent_options():
     assert connected.registration() == {
         "name": "support-agent",
         "environment": "production",
-        "description": "Answers support questions",
         "parameters": {
             "type": "object",
             "properties": {"plan": {"type": "string", "default": "free"}},

@@ -20,7 +20,6 @@ const SYSTEM_PROMPT = (plan: string) =>
 export const supportAgent = connectAgent(
   {
     name: "support-agent",
-    description: "Answers ACME support questions",
     // The zod schema types `params` below, and the SDK validates the values a
     // run supplies against it. `z.enum` becomes a closed option list in the run
     // dialog, `.default()` the default, `.describe()` the description.

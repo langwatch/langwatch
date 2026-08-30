@@ -142,14 +142,29 @@ Feature: The wide run detail drawer
     Given a running run open in the wide drawer
     When messages arrive
     Then the conversation grows on the left
-    And the results side reads "The conversation is running…" beside a spinner
+    And the results side says it waits for the conversation to end
+    And that line reads in the middle of the column, with no spinner
     And it never reads a score of 0 out of 0
+
+  @unit
+  Scenario: A run waiting for the agent shows it writing
+    Given a running run whose last message is from the simulated user
+    When the conversation is read
+    Then a bubble of three moving dots stands where the agent's answer will be
+    And the same bubble is drawn while the agent works through its tools
+
+  @unit
+  Scenario: A run waiting for the judge shows nothing writing
+    Given a running run whose last message is from the agent
+    When the conversation is read
+    Then no bubble of dots is drawn, as the judge writes no message
+    And the run may already be over
 
   @integration
   Scenario: A finished conversation with no verdict yet says the judge is reading it
     Given a run open in the wide drawer whose conversation has ended
     When the verdict has not been written yet
-    Then the results side reads "The judge is reading the conversation…" beside a spinner
+    Then the results side reads that the judge is reading the conversation
     And the criteria replace that line as soon as the verdict lands
 
   @integration

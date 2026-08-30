@@ -663,20 +663,22 @@ export const httpComponentSchema = baseComponentSchema.extend({
  * function declares and nothing about the runtime: presence lives in
  * `Agent.lastSeenAt` and in Redis.
  */
-export const connectedComponentSchema = baseComponentSchema.extend({
-  parameters: z.array(scenarioParameterDefinitionSchema).default([]),
-  /** Per-call budget in milliseconds, capped by the platform. */
-  timeoutMs: z.number().int().positive().optional(),
-  /** Calls one instance takes at once; the SDK's default applies when absent. */
-  concurrency: z.number().int().positive().optional(),
-  /** Whether a thread is pinned to the instance that served its first turn. */
-  sticky: z.boolean().optional(),
-  sdk: z.object({
-    name: z.string(),
-    version: z.string(),
-    language: z.string(),
-  }),
-});
+export const connectedComponentSchema = baseComponentSchema
+  .omit({ description: true })
+  .extend({
+    parameters: z.array(scenarioParameterDefinitionSchema).default([]),
+    /** Per-call budget in milliseconds, capped by the platform. */
+    timeoutMs: z.number().int().positive().optional(),
+    /** Calls one instance takes at once; the SDK's default applies when absent. */
+    concurrency: z.number().int().positive().optional(),
+    /** Whether a thread is pinned to the instance that served its first turn. */
+    sticky: z.boolean().optional(),
+    sdk: z.object({
+      name: z.string(),
+      version: z.string(),
+      language: z.string(),
+    }),
+  });
 
 /**
  * Union type for all valid agent config types
