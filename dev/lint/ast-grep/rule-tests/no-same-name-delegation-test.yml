@@ -20,6 +20,14 @@ valid:
         return this.rows.archive(input);
       }
     }
+  - |
+    class Service {
+      listRules = (input: ListInput): Promise<Rule[]> => this.rules.findAll(input);
+    }
+  - |
+    class Service {
+      readonly other: GovernanceService["other"] = (...args) => this.rules.findOther(...args);
+    }
 invalid:
   - |
     class Facade {
@@ -38,4 +46,17 @@ invalid:
       getDatasetPage(input: PageInput): Promise<DatasetPage> {
         return this.dependencies.dataset.getDatasetPage(input);
       }
+    }
+  - |
+    class Facade {
+      listRules = (input: ListInput): Promise<Rule[]> => this.rules.listRules(input);
+    }
+  - |
+    class Facade {
+      activitySummary = async (input: SummaryInput) => this.operations.activitySummary(input);
+    }
+  - |
+    class Facade {
+      readonly anomalyRuleList: GovernanceService["anomalyRuleList"] = (...args) =>
+        this.rules.anomalyRuleList(...args);
     }

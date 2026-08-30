@@ -48,30 +48,61 @@ function lineOf(source: ts.SourceFile, node: ts.Node): number {
   return source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
 }
 
-function methodName(member: ts.MethodDeclaration): string | undefined {
-  return member.name && ts.isIdentifier(member.name) ? member.name.text : undefined;
+/**
+ * A class member that behaves like a method: a method declaration, or a
+ * property initialised with an arrow. Facades that bind `this` by field — or
+ * that type each member off the interface they re-state — are written the
+ * second way, and counting only the first missed two governance layers of 99
+ * delegations each.
+ */
+type MethodLike = { name: string; body: ts.Node | undefined; declaration: ts.ClassElement };
+
+function methodLike(member: ts.ClassElement): MethodLike | undefined {
+  if (!member.name || !ts.isIdentifier(member.name)) return undefined;
+  if (isPrivate(member)) return undefined;
+  if (ts.isMethodDeclaration(member)) {
+    return member.body
+      ? { name: member.name.text, body: member.body, declaration: member }
+      : undefined;
+  }
+  if (ts.isPropertyDeclaration(member) && member.initializer) {
+    const initializer = member.initializer;
+    return ts.isArrowFunction(initializer)
+      ? { name: member.name.text, body: initializer.body, declaration: member }
+      : undefined;
+  }
+  return undefined;
 }
 
-function isPrivate(member: ts.MethodDeclaration): boolean {
-  return (member.modifiers ?? []).some(
-    (modifier: ts.ModifierLike) =>
+function isPrivate(member: ts.ClassElement): boolean {
+  const modifiers = ts.canHaveModifiers(member) ? (ts.getModifiers(member) ?? []) : [];
+  return modifiers.some(
+    (modifier) =>
       modifier.kind === ts.SyntaxKind.PrivateKeyword ||
       modifier.kind === ts.SyntaxKind.ProtectedKeyword,
   );
 }
 
 /**
- * True when the body is nothing but `return this.<a>.<b>...<name>(...)`, where
- * the final property is the method's own name. `await` in front counts; a
+ * True when the body is nothing but `this.<a>.<b>...<name>(...)`, where the
+ * final property is the member's own name — whether that body is a block with
+ * one `return`, or an arrow's expression body. `await` in front counts; a
  * guard, a mapping or a second statement does not.
  */
-function isSameNameDelegation(method: ts.MethodDeclaration, name: string): boolean {
-  const statements = method.body?.statements;
-  if (!statements || statements.length !== 1) return false;
-  const [only] = statements;
-  if (!only || !ts.isReturnStatement(only) || !only.expression) return false;
+function isSameNameDelegation(member: MethodLike): boolean {
+  const { name, body } = member;
+  if (!body) return false;
 
-  let expression: ts.Expression = only.expression;
+  let expression: ts.Expression;
+  if (ts.isBlock(body)) {
+    const statements = body.statements;
+    if (statements.length !== 1) return false;
+    const [only] = statements;
+    if (!only || !ts.isReturnStatement(only) || !only.expression) return false;
+    expression = only.expression;
+  } else {
+    expression = body as ts.Expression;
+  }
   if (ts.isAwaitExpression(expression)) expression = expression.expression;
   if (!ts.isCallExpression(expression)) return false;
 
@@ -116,15 +147,11 @@ function lintFile(root: string, path: string): ArchitectureViolation[] {
 
   const visit = (node: ts.Node): void => {
     if (ts.isClassDeclaration(node) && !isExemptFromLayerRule(path)) {
-      const methods = node.members.filter(
-        (member): member is ts.MethodDeclaration =>
-          ts.isMethodDeclaration(member) && !isPrivate(member) && member.body !== undefined,
-      );
+      const methods = node.members
+        .map(methodLike)
+        .filter((member): member is MethodLike => member !== undefined);
       if (methods.length >= MIN_METHODS_FOR_LAYER) {
-        const delegating = methods.filter((method) => {
-          const name = methodName(method);
-          return name !== undefined && isSameNameDelegation(method, name);
-        });
+        const delegating = methods.filter(isSameNameDelegation);
         const ratio = delegating.length / methods.length;
         if (ratio >= LAYER_DELEGATION_RATIO) {
           violations.push({

@@ -64,6 +64,24 @@ describe("lintOverengineering", () => {
       expect(violation?.message).toContain("5 of its 5");
     });
 
+    it("counts the arrow-property spelling a binding facade uses", () => {
+      write(
+        "packages/features/example/server/src/services/example.service.ts",
+        `export class ExampleFacade {
+  readonly a: Contract["a"] = (...args) => this.inner.a(...args);
+  readonly b: Contract["b"] = (...args) => this.inner.b(...args);
+  readonly c: Contract["c"] = (...args) => this.inner.c(...args);
+  readonly d: Contract["d"] = (...args) => this.inner.d(...args);
+  e = (input: In): Out => this.inner.e(input);
+}`,
+      );
+
+      const [violation] = lint();
+
+      expect(violation?.policy).toBe("layer-class");
+      expect(violation?.message).toContain("5 of its 5");
+    });
+
     it("counts an awaited forward too", () => {
       write(
         "packages/features/example/server/src/services/example.service.ts",
@@ -90,6 +108,21 @@ describe("lintOverengineering", () => {
   c(input: In): Out { return this.inner.c(input); }
   d(input: In): Out { return transform(this.inner.d(input)); }
   e(input: In): Out { return this.inner.e(input); }
+}`,
+      );
+
+      expect(policies()).toEqual([]);
+    });
+
+    it("does not count an arrow property that renames the call", () => {
+      write(
+        "packages/features/example/server/src/services/example.service.ts",
+        `export class ExampleService {
+  readonly a: Contract["a"] = (...args) => this.inner.findA(...args);
+  readonly b: Contract["b"] = (...args) => this.inner.findB(...args);
+  readonly c: Contract["c"] = (...args) => this.inner.findC(...args);
+  readonly d: Contract["d"] = (...args) => this.inner.findD(...args);
+  readonly e: Contract["e"] = (...args) => this.inner.findE(...args);
 }`,
       );
 

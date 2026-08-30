@@ -7,6 +7,7 @@
     "layer-class|packages/enterprise/features/governance/server/src/services/governance-activity.service.ts",
     "layer-class|packages/enterprise/features/governance/server/src/services/governance-ai-tools.service.ts",
     "layer-class|packages/enterprise/features/governance/server/src/services/governance-department.service.ts",
+    "layer-class|packages/enterprise/features/governance/server/src/services/governance-facade.service.ts",
     "layer-class|packages/enterprise/features/governance/server/src/services/ingestion-source-activity.service.ts",
     "layer-class|packages/features/agent/server/src/transport/api-rest/agent-legacy-facade.api.ts",
     "layer-class|packages/features/api-key/server/src/services/api-key.service.ts",
