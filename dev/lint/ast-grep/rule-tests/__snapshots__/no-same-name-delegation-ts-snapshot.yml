@@ -1,0 +1,44 @@
+id: no-same-name-delegation-ts
+snapshots:
+  ? |
+    class Facade {
+      async finalizeUpload(input: FinalizeInput): Promise<Result> {
+        return this.uploads.finalizeUpload(input);
+      }
+    }
+  : labels:
+    - source: |-
+        async finalizeUpload(input: FinalizeInput): Promise<Result> {
+            return this.uploads.finalizeUpload(input);
+          }
+      style: primary
+      start: 17
+      end: 129
+  ? |
+    class Facade {
+      getDatasetPage(input: PageInput): Promise<DatasetPage> {
+        return this.dependencies.dataset.getDatasetPage(input);
+      }
+    }
+  : labels:
+    - source: |-
+        getDatasetPage(input: PageInput): Promise<DatasetPage> {
+            return this.dependencies.dataset.getDatasetPage(input);
+          }
+      style: primary
+      start: 17
+      end: 137
+  ? |
+    class Facade {
+      listRecords(input: PageInput): Promise<Page> {
+        return this.dataset.listRecords(input);
+      }
+    }
+  : labels:
+    - source: |-
+        listRecords(input: PageInput): Promise<Page> {
+            return this.dataset.listRecords(input);
+          }
+      style: primary
+      start: 17
+      end: 111

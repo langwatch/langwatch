@@ -12,6 +12,7 @@ import { lintFrontendUiBoundaries } from "./frontend-ui-boundaries";
 import { lintGlobalAppAccess } from "./global-app-access";
 import { lintLegacyFeatureFragments } from "./legacy-feature-fragments";
 import { lintManifests } from "./manifests";
+import { lintOverengineering } from "./overengineering";
 import { lintPrismaBoundaries } from "./prisma-boundaries";
 import { lintStrictPortModules } from "./port-modules";
 import { lintServiceResultContracts } from "./service-results";
@@ -70,6 +71,11 @@ export {
   formatGlobalAppAccessBaseline,
   lintGlobalAppAccess,
 } from "./global-app-access";
+export {
+  collectOverengineering,
+  formatOverengineeringBaseline,
+  lintOverengineering,
+} from "./overengineering";
 export { lintStrictPortModules } from "./port-modules";
 export { lintStrictPortBaseline } from "./port-modules";
 export { readStrictPortBaselineFile } from "./port-modules";
@@ -103,6 +109,7 @@ export function lintWorkspace(
     ...lintStrictContractBuildConfigs(root, discovery.packages),
     ...lintStrictPortModules(root, discovery.packages),
     ...lintManifests(discovery.packages),
+    ...lintOverengineering(root, discovery.packages),
     ...lintApplicationBoundaries(root, discovery.packages, {
       legacyMigration: options.legacyApplicationMigration !== false,
     }),

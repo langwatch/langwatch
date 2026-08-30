@@ -24,6 +24,8 @@ rules that apply to both file types are split into `_ts` / `_tsx` siblings.
 | Rule                                    | Forbids                                                                                            | Scope                                                    |
 | --------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | `no-explicit-any` + `-tsx`              | `: any`, `as any`                                                                                  | `platform/app/src/**/*.{ts,tsx}`                         |
+| `no-identity-function`                  | a named function or `const` arrow that returns its own argument                                     | `packages/**`, `apps/**`, `platform/app/src/**` `*.ts`   |
+| `no-same-name-delegation`               | a method whose whole body forwards to the same name on a collaborator (skips `app/*.app.ts`)        | `packages/**`, `apps/**` `*.ts`                          |
 | `no-inline-dynamic-import` + `-tsx`     | inline `import(...)` outside `routes.tsx` / `pages/**`                                             | `platform/app/src/**/*.{ts,tsx}`                         |
 | `no-form-watch-in-child`                | `$form.watch()` in a child receiving `form` as a prop                                              | `platform/app/src/components/**/*.tsx`                   |
 | `no-export-star-shim` + `-tsx`          | `export * from "..."`. Disable inline with `// ast-grep-ignore: no-export-star-shim-{ts,tsx}`      | `platform/app/src/**/*.{ts,tsx}`                         |

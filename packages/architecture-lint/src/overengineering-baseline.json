@@ -1,0 +1,21 @@
+{
+  "version": 0,
+  "sites": [
+    "conditional-type-depth|packages/config/src/index.ts",
+    "layer-class|packages/enterprise/composition/api/src/governance/personal-usage.adapter.ts",
+    "layer-class|packages/enterprise/features/billing/server/src/services/seat-event-subscription.service.ts",
+    "layer-class|packages/enterprise/features/governance/server/src/services/governance-activity.service.ts",
+    "layer-class|packages/enterprise/features/governance/server/src/services/governance-ai-tools.service.ts",
+    "layer-class|packages/enterprise/features/governance/server/src/services/governance-department.service.ts",
+    "layer-class|packages/enterprise/features/governance/server/src/services/ingestion-source-activity.service.ts",
+    "layer-class|packages/features/agent/server/src/transport/api-rest/agent-legacy-facade.api.ts",
+    "layer-class|packages/features/api-key/server/src/services/api-key.service.ts",
+    "layer-class|packages/features/coding-agent/server/src/services/coding-agent.service.ts",
+    "layer-class|packages/features/evaluation/server/src/repositories/clickhouse/evaluation.repository.ts",
+    "layer-class|packages/features/gateway/server/src/services/gateway-cache-rule.service.ts",
+    "layer-class|packages/features/github/server/src/services/github-pull-request-mapping.service.ts",
+    "layer-class|packages/features/langy/web/src/langy-client.ts",
+    "layer-class|packages/features/ops/server/src/services/queue.service.ts",
+    "overload-by-literal|packages/config/src/index.ts"
+  ]
+}

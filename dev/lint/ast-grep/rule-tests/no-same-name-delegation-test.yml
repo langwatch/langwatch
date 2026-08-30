@@ -1,0 +1,41 @@
+id: no-same-name-delegation-ts
+valid:
+  - |
+    class Service {
+      listRecords(input: PageInput): Promise<Page> {
+        this.assertReady(input);
+        return this.records.list(input);
+      }
+    }
+  - |
+    class Service {
+      getById(input: Lookup): Promise<Row> {
+        return this.rows.findById(input);
+      }
+    }
+  - |
+    class Service {
+      async archive(input: Lookup): Promise<void> {
+        await this.audit.record(input);
+        return this.rows.archive(input);
+      }
+    }
+invalid:
+  - |
+    class Facade {
+      listRecords(input: PageInput): Promise<Page> {
+        return this.dataset.listRecords(input);
+      }
+    }
+  - |
+    class Facade {
+      async finalizeUpload(input: FinalizeInput): Promise<Result> {
+        return this.uploads.finalizeUpload(input);
+      }
+    }
+  - |
+    class Facade {
+      getDatasetPage(input: PageInput): Promise<DatasetPage> {
+        return this.dependencies.dataset.getDatasetPage(input);
+      }
+    }
