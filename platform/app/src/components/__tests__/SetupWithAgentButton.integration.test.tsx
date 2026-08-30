@@ -159,7 +159,7 @@ describe("SetupWithAgentButton", () => {
         "Copy a prompt for your coding agent",
       );
       const langy = screen.getByText("Ask Langy to set it up");
-      screen.getByText(/read the simulations documentation/i);
+      screen.getByText(/read the agent testing documentation/i);
 
       // Copy comes first, Langy second.
       expect(
