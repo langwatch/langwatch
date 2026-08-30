@@ -3,6 +3,7 @@ import {
   OrganizationNotFoundError,
   PersonalProjectNotFoundError,
   type OrganizationBillingProfile,
+  type OrganizationSettings,
   type UpdateOrganizationSettingsInput,
   type PersonalFeatures,
   type PersonalWorkspace,
@@ -32,7 +33,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     return new PrismaOrganizationRepository(database as PrismaClient, settingsSecrets);
   }
 
-  async tryFindStoredSettings(organizationId: string) {
+  async tryFindStoredSettings(organizationId: string): Promise<OrganizationSettings | null> {
     return this.database.organization.findUnique({
       where: { id: organizationId },
       select: {
@@ -52,7 +53,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     });
   }
 
-  async tryFindSettings(organizationId: string) {
+  async tryFindSettings(organizationId: string): Promise<OrganizationSettings | null> {
     const settings = await this.tryFindStoredSettings(organizationId);
     if (!settings) return null;
     return {
