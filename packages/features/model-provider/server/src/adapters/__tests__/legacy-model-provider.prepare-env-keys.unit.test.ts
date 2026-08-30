@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
+import type { LegacyModelProviderExecution } from "../legacy-model-provider.adapter";
 import { prepareEnvKeys } from "../legacy-model-provider.adapter";
 
 // prepareEnvKeys reads the credential names off the provider's keysSchema.
@@ -9,11 +9,14 @@ import { prepareEnvKeys } from "../legacy-model-provider.adapter";
 // that does not unwrap it returns no keys at all and the provider dispatches
 // with no credentials.
 describe("prepareEnvKeys", () => {
+  // Typed as what `prepareEnvKeys` takes, not as the editor value it was
+  // aliased to: the two are different shapes, and the cast was hiding that the
+  // row handed to the function under test could never be one it accepts.
   const providerRow = (
     provider: string,
     customKeys: Record<string, string>,
-  ): MaybeStoredModelProvider =>
-    ({ provider, customKeys }) as unknown as MaybeStoredModelProvider;
+  ): LegacyModelProviderExecution =>
+    ({ provider, customKeys }) as unknown as LegacyModelProviderExecution;
 
   describe("given a provider whose credentials allow either a key or a base URL", () => {
     it("returns the anthropic credentials stored on the row", () => {
@@ -31,9 +34,9 @@ describe("prepareEnvKeys", () => {
     });
 
     it("returns the openai credentials stored on the row", () => {
-      expect(
-        prepareEnvKeys(providerRow("openai", { OPENAI_API_KEY: "sk-openai-row" })),
-      ).toEqual({ OPENAI_API_KEY: "sk-openai-row" });
+      expect(prepareEnvKeys(providerRow("openai", { OPENAI_API_KEY: "sk-openai-row" }))).toEqual({
+        OPENAI_API_KEY: "sk-openai-row",
+      });
     });
   });
 

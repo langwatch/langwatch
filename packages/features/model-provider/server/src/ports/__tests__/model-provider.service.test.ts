@@ -329,6 +329,10 @@ class Projects extends ProjectService {
     return this.notUsed();
   }
 
+  tryGetOrganizationId() {
+    return this.notUsed();
+  }
+
   ensureInternal() {
     return this.notUsed();
   }
@@ -393,6 +397,11 @@ class Projects extends ProjectService {
         slug: project.slug,
         teamId: project.teamId,
         organizationId: project.team.organizationId,
+        // Part of the identity `listNamesByIds` answers with. Omitting them
+        // made this fake describe a project that cannot be personal, which is
+        // a distinction the model-provider paths do draw.
+        isPersonal: false,
+        ownerUserId: null,
       },
     ]);
   }
@@ -445,6 +454,14 @@ class Projects extends ProjectService {
 class Organizations extends OrganizationService {
   private notUsed(): never {
     throw new Error("Organization method is not used by this test");
+  }
+
+  getSettings() {
+    return this.notUsed();
+  }
+
+  updateSettings() {
+    return this.notUsed();
   }
 
   getBillingProfile() {
