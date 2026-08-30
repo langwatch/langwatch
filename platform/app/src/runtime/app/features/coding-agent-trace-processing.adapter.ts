@@ -6,7 +6,7 @@ import type {
   OtlpSpan,
   TraceCanonicalisationService,
 } from "@langwatch/trace-contract";
-import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
+import { SpanNormalizationPipelineService } from "@langwatch/trace-server";
 import type { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 
 export class AppCodingAgentTraceProcessingAdapter extends CodingAgentTraceProcessingPort {

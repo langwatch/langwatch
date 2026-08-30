@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { describe, expect, it } from "vitest";
-import { generateDocumentId } from "../span-normalization.service";
+import { generateDocumentId } from "@langwatch/trace-server";
 
 describe("generateDocumentId", () => {
   describe("when content is a plain string", () => {

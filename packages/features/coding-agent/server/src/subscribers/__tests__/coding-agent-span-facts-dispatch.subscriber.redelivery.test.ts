@@ -12,11 +12,8 @@ import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 import { TraceCanonicalisationService } from "@langwatch/trace-server/testing";
-import {
-  mapChRowToNormalized,
-  serializeAttributes,
-} from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
-import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
+import { mapChRowToNormalized, serializeAttributes } from "@langwatch/trace-server";
+import { SpanNormalizationPipelineService } from "@langwatch/trace-server";
 import {
   makeSpanReferencedPayload,
   type NormalizedSpan,

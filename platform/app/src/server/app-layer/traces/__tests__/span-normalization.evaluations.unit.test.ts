@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
-import { SpanNormalizationPipelineService } from "../span-normalization.service";
+import { SpanNormalizationPipelineService } from "@langwatch/trace-server";
 
 const service = new SpanNormalizationPipelineService(TraceCanonicalisationService.create());
 

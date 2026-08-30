@@ -1,11 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  deserializeAttributes,
   mapSpanSummaryRow,
   SpanStorageClickHouseRepository,
   type SpanSummaryQueryRow,
-  serializeAttributes,
 } from "../span-storage.clickhouse.repository";
+import { deserializeAttributes, serializeAttributes } from "@langwatch/trace-server";
 import {
   clampSpanReadLimit,
   MAX_DERIVATION_SPANS,

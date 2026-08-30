@@ -24,10 +24,7 @@ import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { OtlpSpanCostEnrichmentService } from "~/server/app-layer/traces/span-cost-enrichment.service";
 import { OtlpSpanPiiRedactionService } from "~/server/app-layer/traces/span-pii-redaction.service";
 import { OtlpSpanTokenEstimationService } from "~/server/app-layer/traces/span-token-estimation.service";
-import {
-  enrichRagContextIds,
-  SpanNormalizationPipelineService,
-} from "~/server/app-layer/traces/span-normalization.service";
+import { enrichRagContextIds, SpanNormalizationPipelineService } from "@langwatch/trace-server";
 import type { TokenizerClient } from "~/server/app-layer/clients/tokenizer/tokenizer.client";
 import { applyOtlpSpanContentDropWithPolicy } from "~/server/data-privacy/applyOtlpSpanContentDrop";
 

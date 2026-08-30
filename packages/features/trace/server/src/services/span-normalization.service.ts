@@ -11,7 +11,8 @@ import type {
   NormalizedEvent,
   NormalizedSpan,
 } from "@langwatch/trace-contract";
-import { IdUtils, TraceRequestUtils } from "@langwatch/trace-server";
+import { TraceRequestUtils } from "./otlp-trace-request.rules";
+import { IdUtils } from "./span-record-identity.rules";
 
 export class SpanNormalizationPipelineService {
   private readonly logger = createLogger(

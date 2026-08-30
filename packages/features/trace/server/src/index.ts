@@ -290,7 +290,11 @@ export {
   type TracesV2SessionGroupsReader,
   type TracesV2SpanReader,
 } from "./app/trace.app";
-export { SpansTrpcApi, type SpansTrpcContext, type SpansTrpcPorts } from "./transport/api-trpc/spans.api";
+export {
+  SpansTrpcApi,
+  type SpansTrpcContext,
+  type SpansTrpcPorts,
+} from "./transport/api-trpc/spans.api";
 export {
   TraceEditOverlayTrpcApi,
   type TraceEditOverlayTrpcContext,
@@ -367,3 +371,15 @@ export {
   type TraceExportRequestFields,
   type TraceExportRestPorts,
 } from "./transport/api-rest/trace-export.api";
+export {
+  deserializeAttributes,
+  ensureStringRecord,
+  type FullSpanRow,
+  mapChRowToNormalized,
+  serializeAttributes,
+} from "./repositories/clickhouse/stored-span-row.codec";
+export {
+  enrichRagContextIds,
+  generateDocumentId,
+  SpanNormalizationPipelineService,
+} from "./services/span-normalization.service";

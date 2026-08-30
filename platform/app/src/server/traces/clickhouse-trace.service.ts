@@ -13,10 +13,7 @@ import {
   DEFAULT_PARTITION_WINDOW_MS,
   queryWindowed,
 } from "~/server/app-layer/clients/clickhouse/windowed-read";
-import {
-  deserializeAttributes,
-  ensureStringRecord,
-} from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
+import { deserializeAttributes, ensureStringRecord } from "@langwatch/trace-server";
 import type { ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { prisma as defaultPrisma } from "~/server/db";
