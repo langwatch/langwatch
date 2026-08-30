@@ -13,12 +13,8 @@
  * `input === undefined`, and every one of those three then silently passes
  * while reporting green.
  */
-import {
-  DatasetConflictError,
-  DatasetNotFoundError,
-  type DatasetService,
-} from "@langwatch/dataset-contract";
-import { DatasetConflictError as DiscriminatedDatasetConflictError } from "../../services/errors";
+import { type DatasetService } from "@langwatch/dataset-contract";
+import { DatasetConflictError, DatasetNotFoundError } from "../../services/errors";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -207,7 +203,7 @@ describe("DatasetTrpcApi", () => {
       const staleColumns = harness({
         dataset: {
           validateDatasetName: async () => {
-            throw new DiscriminatedDatasetConflictError("stale", { reason: "stale_columns" });
+            throw new DatasetConflictError("stale", { reason: "stale_columns" });
           },
         },
       });
