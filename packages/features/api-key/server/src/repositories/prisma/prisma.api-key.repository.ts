@@ -1,12 +1,11 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { HIDDEN_SYSTEM_KEY_NAMES } from "@langwatch/api-key-contract";
 import {
   ApiKeyRepository,
   type ApiKeyCreateRecord,
   type ApiKeyUpdateRecord,
   type StoredApiKey,
 } from "../api-key.repository";
-
-const HIDDEN_SYSTEM_KEY_NAMES = ["Langy session"] as const;
 
 export type PrismaApiKeyDatabase = Pick<PrismaClient, "apiKey" | "team" | "project">;
 
@@ -60,10 +59,7 @@ export class PrismaApiKeyRepository extends ApiKeyRepository {
       include: { roleBindings: true },
     });
   }
-  listForUser(input: {
-    organizationId: string;
-    userId: string;
-  }): Promise<StoredApiKey[]> {
+  listForUser(input: { organizationId: string; userId: string }): Promise<StoredApiKey[]> {
     return this.database.apiKey.findMany({
       where: {
         organizationId: input.organizationId,
@@ -141,10 +137,7 @@ export class PrismaApiKeyRepository extends ApiKeyRepository {
     });
     return row?.id ?? null;
   }
-  async rotateLegacyProjectKey(input: {
-    projectId: string;
-    token: string;
-  }): Promise<boolean> {
+  async rotateLegacyProjectKey(input: { projectId: string; token: string }): Promise<boolean> {
     const result = await this.database.project.updateMany({
       where: { id: input.projectId, archivedAt: null },
       data: { apiKey: input.token },
