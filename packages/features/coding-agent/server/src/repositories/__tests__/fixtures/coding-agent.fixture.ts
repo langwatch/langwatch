@@ -559,7 +559,15 @@ export class TestGithubService extends GithubService {
     return this.pullRequests;
   }
 
-  async findAllByBranches(): Promise<readonly GithubPullRequest[]> {
+  // Declares the input the contract passes, so a test that replaces this with
+  // a mock and then asserts the lookup key is asserting against the real
+  // signature rather than a zero-argument stand-in.
+  async findAllByBranches(_input: {
+    organizationId: string;
+    repositoryHost: string;
+    repositoryFullName: string;
+    headBranches: readonly string[];
+  }): Promise<readonly GithubPullRequest[]> {
     return this.pullRequests;
   }
 

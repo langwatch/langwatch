@@ -7,12 +7,12 @@
  *
  * @see specs/coding-agent/pull-request-linkage.feature
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, type Mock } from "vitest";
 import type {
   CodingAgentSession,
   CodingAgentSessionBranchRecord,
 } from "@langwatch/coding-agent-contract";
-import type { GithubPullRequest } from "@langwatch/github-contract";
+import type { GithubPullRequest, GithubService } from "@langwatch/github-contract";
 import { CodingAgentBillingPolicyPort } from "../coding-agent-billing.port";
 import { CodingAgentFeatureService } from "../../services/coding-agent.service";
 import type { SessionModelTotalsRow } from "../../repositories/coding-agent-session-event.repository";
@@ -94,9 +94,7 @@ function personalSessionRow(over: Partial<CodingAgentSession> = {}): CodingAgent
 }
 
 /** One (session, model) total, as the per-call fact table returns it. */
-function modelTotalsRow(
-  over: Partial<SessionModelTotalsRow> = {},
-): SessionModelTotalsRow {
+function modelTotalsRow(over: Partial<SessionModelTotalsRow> = {}): SessionModelTotalsRow {
   return {
     tenantId: "project-1",
     sessionId: "session-a",
@@ -142,9 +140,7 @@ function findAllByBranchesLike(rows: GithubPullRequest[]) {
 }
 
 class FunctionBillingPolicy extends CodingAgentBillingPolicyPort {
-  constructor(
-    private readonly isNonBillable: (input: { sourceType: string }) => Promise<boolean>,
-  ) {
+  constructor(private readonly isNonBillable: (input: { sourceType: string }) => Promise<boolean>) {
     super();
   }
 
@@ -240,7 +236,7 @@ function personalServiceWith({
   organizationSessions = [],
   modelTotals = [],
   isSourceNonBillable = allBilled,
-  findAllByBranches = vi.fn().mockResolvedValue(pullRequests),
+  findAllByBranches = vi.fn<GithubService["findAllByBranches"]>().mockResolvedValue(pullRequests),
 }: {
   pullRequests: GithubPullRequest[];
   personalSessions: CodingAgentSession[];
@@ -250,7 +246,10 @@ function personalServiceWith({
     organizationId: string;
     sourceType: string;
   }) => Promise<boolean>;
-  findAllByBranches?: ReturnType<typeof vi.fn>;
+  // Typed from the contract, not `ReturnType<typeof vi.fn>`: the assertions
+  // below name the exact lookup input, and an untyped mock would accept any
+  // call shape at all.
+  findAllByBranches?: Mock<GithubService["findAllByBranches"]>;
 }) {
   const sessionRepository = new TestSessions();
   sessionRepository.recentRowsByTenant.set("project-1", personalSessions);
@@ -370,9 +369,7 @@ describe("PullRequestUsageService", () => {
         ["Riley Chase", "claude_code"],
         ["Riley Chase", "codex"],
       ]);
-      expect(usage.rows.find((row) => row.agent === "claude_code")?.sessionsCount).toBe(
-        3,
-      );
+      expect(usage.rows.find((row) => row.agent === "claude_code")?.sessionsCount).toBe(3);
       expect(JSON.stringify(usage)).not.toContain("user-abc");
       expect(usage.totals.sessionsCount).toBe(4);
       expect(usage.totals.totalTokens).toBe(4 * 180);
@@ -516,10 +513,7 @@ describe("PullRequestUsageService", () => {
             repositoryName: "Widgets",
           }),
         ],
-        organizationSessions: [
-          sessionRow({ sessionId: "s1" }),
-          sessionRow({ sessionId: "s2" }),
-        ],
+        organizationSessions: [sessionRow({ sessionId: "s1" }), sessionRow({ sessionId: "s2" })],
       });
 
       const usage = await service.getForPersonalProject(PERSONAL_QUERY);
@@ -598,9 +592,7 @@ describe("PullRequestUsageService", () => {
       const { service } = personalServiceWith({
         pullRequests: [pullRequestRow()],
         personalSessions: [personalSessionRow({ sessionId: "mine" })],
-        organizationSessions: [
-          sessionRow({ sessionId: "mine", models: ["claude-opus-5"] }),
-        ],
+        organizationSessions: [sessionRow({ sessionId: "mine", models: ["claude-opus-5"] })],
         modelTotals: [modelTotalsRow({ sessionId: "mine", model: "claude-opus-5" })],
       });
 
@@ -783,13 +775,9 @@ describe("PullRequestUsageService", () => {
     it("reports only the viewer's own sessions", async () => {
       const { service } = personalServiceWith({
         pullRequests: [],
-        personalSessions: [
-          personalSessionRow({ sessionId: "mine", gitBranch: "feat/orphan" }),
-        ],
+        personalSessions: [personalSessionRow({ sessionId: "mine", gitBranch: "feat/orphan" })],
         // Would be counted if the branch rollup went organization-wide.
-        organizationSessions: [
-          sessionRow({ sessionId: "theirs", tenantId: "project-2" }),
-        ],
+        organizationSessions: [sessionRow({ sessionId: "theirs", tenantId: "project-2" })],
       });
 
       const usage = await service.getForPersonalProject({
@@ -1076,10 +1064,7 @@ describe("PullRequestUsageService", () => {
       expect(detail.totals.sessionsCount).toBe(2);
       expect(detail.contributors[0]?.contributorLabel).toBe("Riley Chase");
       expect(detail.modelBreakdown[0]?.model).toBe("claude-fable-5");
-      expect(detail.sessions.map((session) => session.sessionId)).toEqual([
-        "newer",
-        "older",
-      ]);
+      expect(detail.sessions.map((session) => session.sessionId)).toEqual(["newer", "older"]);
     });
 
     /** @scenario "The sessions list names each session by its generated title" */
