@@ -45,7 +45,9 @@ import { VirtualKeyRepository } from "@langwatch/gateway-server";
 
 const suffix = nanoid(8);
 const testApp = createTestApp();
-const projects = testApp.projects;
+// The SERVICE, not the app facade: `GatewayConfigMaterialiser` takes a
+// `ProjectService`, and `app.projects` is the narrower `ProjectApp`.
+const projects = testApp.projects.projectService;
 const monitors = testApp.monitors;
 const ORG_ID = `org-mat-${suffix}`;
 const TEAM_ID = `team-mat-${suffix}`;

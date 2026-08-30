@@ -26,16 +26,16 @@ import {
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { GatewayBudgetClickHouseRepository } from "@langwatch/gateway-server";
 import { GatewayService } from "@langwatch/gateway-server";
-import {
-  budgetAppliesToProvider,
-  resolveApplicableBudgets,
-} from "@langwatch/gateway-server";
+import { budgetAppliesToProvider, resolveApplicableBudgets } from "@langwatch/gateway-server";
 import { GatewayConfigMaterialiser } from "../config.materialiser";
 import { VirtualKeyRepository } from "@langwatch/gateway-server";
 import { VirtualKeyService } from "../virtualKey.service";
 
 const suffix = nanoid(8);
-const projects = createTestApp().projects;
+// The SERVICE, not the app facade: `GatewayConfigMaterialiser` takes a
+// `ProjectService`, and `app.projects` is the narrower `ProjectApp`. This is
+// the same seam production uses when it needs the service whole.
+const projects = createTestApp().projects.projectService;
 const ORG_ID = `org-nxn-${suffix}`;
 const TEAM_ID = `team-nxn-${suffix}`;
 const PROJECT_ID = `proj-nxn-${suffix}`;
@@ -210,13 +210,11 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     const ch = getTestClickHouseClient();
     if (ch) {
       await ch.command({
-        query:
-          "DELETE FROM gateway_budget_ledger_events WHERE TenantId = {tenantId:String}",
+        query: "DELETE FROM gateway_budget_ledger_events WHERE TenantId = {tenantId:String}",
         query_params: { tenantId: PROJECT_ID },
       });
       await ch.command({
-        query:
-          "DELETE FROM gateway_budget_scope_totals WHERE TenantId = {tenantId:String}",
+        query: "DELETE FROM gateway_budget_scope_totals WHERE TenantId = {tenantId:String}",
         query_params: { tenantId: PROJECT_ID },
       });
     }
@@ -360,9 +358,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     it("creates a GROUP budget when the ClickHouse spend path is wired, per member", async () => {
       const ch = getTestClickHouseClient();
       expect(ch).not.toBeNull();
-      const chRepo = new GatewayBudgetClickHouseRepository(
-        async () => ch as ClickHouseClient,
-      );
+      const chRepo = new GatewayBudgetClickHouseRepository(async () => ch as ClickHouseClient);
       const service = GatewayService.create(prisma, chRepo);
       const row = await service.create({
         organizationId: ORG_ID,
@@ -407,9 +403,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
         },
       });
       const ch = getTestClickHouseClient();
-      const chRepo = new GatewayBudgetClickHouseRepository(
-        async () => ch as ClickHouseClient,
-      );
+      const chRepo = new GatewayBudgetClickHouseRepository(async () => ch as ClickHouseClient);
       const service = GatewayService.create(prisma, chRepo);
       await expect(
         service.create({
@@ -448,9 +442,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     it("keeps a filtered and an unfiltered budget on the same target apart", async () => {
       const ch = getTestClickHouseClient();
       expect(ch).not.toBeNull();
-      const chRepo = new GatewayBudgetClickHouseRepository(
-        async () => ch as ClickHouseClient,
-      );
+      const chRepo = new GatewayBudgetClickHouseRepository(async () => ch as ClickHouseClient);
 
       const resolved = await resolveApplicableBudgets({
         client: prisma,
@@ -528,11 +520,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     it("ships provider_key, the group bucket and routing_mode", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_PERSONAL_ID, ORG_ID);
-      const bundle = await new GatewayConfigMaterialiser(
-        prisma,
-        projects,
-        null,
-      ).materialise(vk!);
+      const bundle = await new GatewayConfigMaterialiser(prisma, projects, null).materialise(vk!);
 
       const openAiBudget = bundle.budgets.find((b) => b.id === BUDGET_PROJECT_OPENAI_ID);
       expect(openAiBudget?.provider_key).toBe(MP_OPENAI_ID);
@@ -554,9 +542,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     it("ships the member's own bucket spend, not the group total", async () => {
       const ch = getTestClickHouseClient();
       expect(ch).not.toBeNull();
-      const chRepo = new GatewayBudgetClickHouseRepository(
-        async () => ch as ClickHouseClient,
-      );
+      const chRepo = new GatewayBudgetClickHouseRepository(async () => ch as ClickHouseClient);
 
       // Two members spend against the same GROUP budget row, each in their
       // own bucket.
@@ -585,11 +571,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
 
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_PERSONAL_ID, ORG_ID);
-      const bundle = await new GatewayConfigMaterialiser(
-        prisma,
-        projects,
-        chRepo,
-      ).materialise(vk!);
+      const bundle = await new GatewayConfigMaterialiser(prisma, projects, chRepo).materialise(vk!);
 
       const groupBudget = bundle.budgets.find((b) => b.id === BUDGET_GROUP_ID);
       // The gateway enforces spent >= limit on exactly this bucket. Reading
@@ -603,9 +585,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     it("keeps a provider-filtered group budget and its unfiltered sibling out of each other's totals", async () => {
       const ch = getTestClickHouseClient();
       expect(ch).not.toBeNull();
-      const chRepo = new GatewayBudgetClickHouseRepository(
-        async () => ch as ClickHouseClient,
-      );
+      const chRepo = new GatewayBudgetClickHouseRepository(async () => ch as ClickHouseClient);
 
       const filteredBudgetId = `gb-nxn-grp-openai-${suffix}`;
       const filteredBudget = await prisma.gatewayBudget.create({
@@ -671,11 +651,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     it("pins max_attempts to 1 when routing mode is NONE", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_PERSONAL_ID, ORG_ID);
-      const bundle = await new GatewayConfigMaterialiser(
-        prisma,
-        projects,
-        null,
-      ).materialise(vk!);
+      const bundle = await new GatewayConfigMaterialiser(prisma, projects, null).materialise(vk!);
       expect(bundle.fallback.max_attempts).toBe(1);
 
       await prisma.virtualKey.update({
@@ -697,11 +673,9 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     it("filters providers[] by providers_allowed and keeps All open-ended", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const openVk = await repo.findById(VK_SHARED_ID, ORG_ID);
-      const openBundle = await new GatewayConfigMaterialiser(
-        prisma,
-        projects,
-        null,
-      ).materialise(openVk!);
+      const openBundle = await new GatewayConfigMaterialiser(prisma, projects, null).materialise(
+        openVk!,
+      );
       expect(openBundle.providers_allowed).toBeNull();
       expect(openBundle.providers.map((p) => p.id).sort()).toEqual(
         [MP_ANTHROPIC_ID, MP_OPENAI_ID].sort(),
@@ -740,11 +714,9 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       // The key was created before this provider existed and was never
       // edited: leaving the list open has to mean future providers too,
       // otherwise "all" is only ever a snapshot of creation day.
-      const openBundle = await new GatewayConfigMaterialiser(
-        prisma,
-        projects,
-        null,
-      ).materialise((await repo.findById(VK_SHARED_ID, ORG_ID))!);
+      const openBundle = await new GatewayConfigMaterialiser(prisma, projects, null).materialise(
+        (await repo.findById(VK_SHARED_ID, ORG_ID))!,
+      );
       expect(openBundle.providers.map((p) => p.id)).toContain(lateProviderId);
 
       await prisma.virtualKey.update({
@@ -785,11 +757,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       expect(budget!.window).toBe("DAY");
       expect(budget!.archivedAt).toBeNull();
       // The cap has to reach the gateway, not just the database.
-      const bundle = await new GatewayConfigMaterialiser(
-        prisma,
-        projects,
-        null,
-      ).materialise(
+      const bundle = await new GatewayConfigMaterialiser(prisma, projects, null).materialise(
         (await new VirtualKeyRepository(prisma).findById(virtualKey.id, ORG_ID))!,
       );
       expect(bundle.budgets.map((b) => b.id)).toContain(budget!.id);

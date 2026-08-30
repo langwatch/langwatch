@@ -27,7 +27,10 @@ import { VirtualKeyRepository } from "@langwatch/gateway-server";
 import { VirtualKeyService } from "../virtualKey.service";
 
 const suffix = nanoid(8);
-const projects = createTestApp().projects;
+// The SERVICE, not the app facade: `GatewayConfigMaterialiser` takes a
+// `ProjectService`, and `app.projects` is the narrower `ProjectApp`. This is
+// the same seam production uses when it needs the service whole.
+const projects = createTestApp().projects.projectService;
 
 // An org with no governance project: nothing above a project can resolve
 // a trace destination here.
@@ -251,13 +254,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
 
   afterAll(async () => {
     const orgIds = [ORG_BARE_ID, ORG_GOV_ID, ORG_CHOICE_ID, ORG_ARCH_ID, ORG_GOVARCH_ID];
-    const teamIds = [
-      TEAM_BARE_ID,
-      TEAM_GOV_ID,
-      TEAM_CHOICE_ID,
-      TEAM_ARCH_ID,
-      TEAM_GOVARCH_ID,
-    ];
+    const teamIds = [TEAM_BARE_ID, TEAM_GOV_ID, TEAM_CHOICE_ID, TEAM_ARCH_ID, TEAM_GOVARCH_ID];
     await prisma.auditLog.deleteMany({
       where: { organizationId: { in: orgIds } },
     });
