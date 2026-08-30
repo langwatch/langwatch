@@ -24,16 +24,23 @@ function appWith({
 }): App {
   const shutdownResources = new AppShutdownResources();
   for (const closeable of closeables) {
-    shutdownResources.register(
-      closeable.phase ?? "database",
-      closeable.name,
-      closeable.close,
-    );
+    shutdownResources.register(closeable.phase ?? "database", closeable.name, closeable.close);
   }
 
   return new App({
     commands: emptyCommands,
     evaluations: {},
+    // Nothing here is exercised by a shutdown test. They are present because
+    // `App`'s constructor reaches a level in — `deps.traces.spans`,
+    // `deps.gateway.webhookEvents` and so on — while composing the feature
+    // apps it holds, and an absent branch is a TypeError before any test body
+    // runs. The cast below is what lets this stay a shutdown fixture rather
+    // than a whole composition root; it is also why the fixture went stale
+    // silently as the constructor grew.
+    traces: {},
+    filters: {},
+    gateway: {},
+    codingAgents: {},
     _eventSourcing: eventSourcingClose ? { close: eventSourcingClose } : void 0,
     _shutdownResources: shutdownResources,
   } as unknown as AppDependencies);
