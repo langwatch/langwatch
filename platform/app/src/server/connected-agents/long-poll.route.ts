@@ -17,6 +17,7 @@ import { env } from "~/env.mjs";
 import { createProjectApp, handlerManagedAuth } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { bodyLimit } from "~/server/routes/_lib/body-limit";
+import { requestBodySchema } from "~/server/routes/misc.schemas";
 import { POLL_WAIT_MS, relayPayloadCaps } from "./constants";
 import { AgentPayloadTooLargeError, AgentRegisterRefusedError } from "./errors";
 import {
@@ -174,7 +175,9 @@ function mountRegister({ secured, transport, payloadGuard }: Mount): void {
         "Register the connected agents of a process over HTTP, for a network that blocks WebSockets. The body is the register frame of the connect protocol. Answers with the registered frame and the instance token the poll and frames routes are addressed with, or with a refused frame.",
       requestBody: {
         content: {
-          "application/json": { schema: resolver(registerFrameSchema) },
+          "application/json": {
+            schema: requestBodySchema(registerFrameSchema),
+          },
         },
       },
       responses: {
@@ -259,7 +262,7 @@ function mountFrames({ secured, transport, payloadGuard }: Mount): void {
         "Post the ack, result and deregister frames of a registered instance. Addressed with the instance token in the X-Agent-Instance-Token header.",
       requestBody: {
         content: {
-          "application/json": { schema: resolver(postedFramesSchema) },
+          "application/json": { schema: requestBodySchema(postedFramesSchema) },
         },
       },
       responses: {

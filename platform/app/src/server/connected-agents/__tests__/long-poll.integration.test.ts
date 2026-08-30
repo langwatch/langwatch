@@ -14,7 +14,6 @@ import {
   type RedisConnection,
   RedisConnectionService,
 } from "@langwatch/redis-client";
-import type { Hono } from "hono";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -54,7 +53,7 @@ let ingestToken: string;
 type Pod = {
   runtime: ConnectedAgentRuntime;
   transport: LongPollTransport;
-  app: Hono;
+  app: ReturnType<typeof createLongPollApp>;
 };
 let podA: Pod;
 let podB: Pod;

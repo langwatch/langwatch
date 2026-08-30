@@ -3457,7 +3457,156 @@
           "content": {
             "application/json": {
               "schema": {
-                "vendor": "zod"
+                "type": "object",
+                "properties": {
+                  "protocol": {
+                    "type": "number",
+                    "enum": [
+                      1
+                    ]
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "register"
+                    ]
+                  },
+                  "sdk": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "version": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "language": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 32
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "version",
+                      "language"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "instance": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "hostname": {
+                        "type": "string",
+                        "maxLength": 255
+                      },
+                      "username": {
+                        "type": "string",
+                        "maxLength": 255
+                      },
+                      "pid": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "startedAt": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "label": {
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "inFlightCallIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 128
+                        },
+                        "maxItems": 1000,
+                        "default": []
+                      },
+                      "maxConcurrency": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "minimum": 0,
+                        "maximum": 1000
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "hostname",
+                      "username",
+                      "pid",
+                      "startedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "agents": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 255
+                        },
+                        "environment": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "description": {
+                          "type": "string",
+                          "maxLength": 2000
+                        },
+                        "parameters": {
+                          "type": "object",
+                          "additionalProperties": {},
+                          "default": {}
+                        },
+                        "concurrency": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0,
+                          "maximum": 1000
+                        },
+                        "timeoutMs": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        },
+                        "sticky": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "environment"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1,
+                    "maxItems": 100
+                  }
+                },
+                "required": [
+                  "protocol",
+                  "type",
+                  "sdk",
+                  "instance",
+                  "agents"
+                ],
+                "additionalProperties": false
               }
             }
           }
@@ -3789,7 +3938,155 @@
           "content": {
             "application/json": {
               "schema": {
-                "vendor": "zod"
+                "type": "object",
+                "properties": {
+                  "frames": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "protocol": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "ack"
+                              ]
+                            },
+                            "callId": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "protocol",
+                            "type",
+                            "callId"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "protocol": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "result"
+                              ]
+                            },
+                            "callId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "output": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "role": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "role"
+                                  ],
+                                  "additionalProperties": true
+                                },
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "role": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "role"
+                                    ],
+                                    "additionalProperties": true
+                                  }
+                                }
+                              ]
+                            },
+                            "session": {},
+                            "error": {
+                              "type": "object",
+                              "properties": {
+                                "code": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "message": {
+                                  "type": "string",
+                                  "maxLength": 4000
+                                }
+                              },
+                              "required": [
+                                "code",
+                                "message"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "protocol",
+                            "type",
+                            "callId"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "protocol": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "deregister"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "protocol",
+                            "type"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "description": "Ack, result and deregister frames, in order."
+                  }
+                },
+                "required": [
+                  "frames"
+                ],
+                "additionalProperties": false
               }
             }
           }
