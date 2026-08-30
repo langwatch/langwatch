@@ -278,13 +278,25 @@ function namesThatDiffer(sets: readonly RunParameterValues[]): Set<string> {
  * carries: the parameters that tell it from the other targets of the same
  * agent, and none of the ones they share. A target that carries none of them
  * keeps its bare name.
+ *
+ * A connected agent reads with its environment, `name · production`, and a
+ * personal one with its owner's name after it, `name · development (Ana)`,
+ * since one name can be several agents and the environment and the owner are
+ * what tell them apart. The caller passes the owner's display name: this
+ * module reads no user record.
  */
 export function targetLabelOf({
   name,
+  environment,
+  ownerName,
   runParameters,
   differingNames,
 }: {
   name: string;
+  /** The environment of a connected agent; nothing for any other target. */
+  environment?: string | null;
+  /** The owner's display name of a personal connected agent. */
+  ownerName?: string | null;
   runParameters?: RunParameterValues;
   differingNames: ReadonlySet<string>;
 }): string {
@@ -292,9 +304,12 @@ export function targetLabelOf({
     runParameters,
     names: differingNames,
   });
+  const agent = environment
+    ? `${name}${TARGET_LABEL_SEPARATOR}${environment}${ownerName ? ` (${ownerName})` : ""}`
+    : name;
   return parameters === ""
-    ? name
-    : `${name}${TARGET_LABEL_SEPARATOR}${parameters}`;
+    ? agent
+    : `${agent}${TARGET_LABEL_SEPARATOR}${parameters}`;
 }
 
 /**
@@ -307,14 +322,22 @@ export function targetLabelOf({
 export function targetLabels<T extends LabelledTarget>({
   targets,
   nameOf,
+  environmentOf,
+  ownerNameOf,
 }: {
   targets: readonly T[];
   nameOf: (target: T) => string;
+  /** The environment of a connected agent target; nothing for the rest. */
+  environmentOf?: (target: T) => string | null | undefined;
+  /** The owner's display name of a personal connected agent target. */
+  ownerNameOf?: (target: T) => string | null | undefined;
 }): string[] {
   const differing = differingParameterNames(targets);
   return targets.map((target) =>
     targetLabelOf({
       name: nameOf(target),
+      environment: environmentOf?.(target),
+      ownerName: ownerNameOf?.(target),
       runParameters: target.runParameters,
       differingNames: differing.get(target.referenceId) ?? new Set(),
     }),

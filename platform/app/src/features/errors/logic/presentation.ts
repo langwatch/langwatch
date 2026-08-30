@@ -1747,6 +1747,21 @@ const presentations = {
       return `${subject} ${scenarioFieldLabel(error)} reads ${plural ? "them" : "it"}. ${remedy}`;
     },
   },
+  scenario_parameter_option_invalid: {
+    // The name and the options are declared configuration, not free text:
+    // the dialog shows what the parameter accepts next to the refused value.
+    title: "This value is not one of the parameter's options",
+    describe: (error) => {
+      const name = str(error, "name", "");
+      const options = strList(error, "options");
+      const subject = name
+        ? `The value supplied for ${name} is not one it accepts.`
+        : "The value supplied is not one the parameter accepts.";
+      return options.length > 0
+        ? `${subject} Choose one of ${listLabels(options)}.`
+        : `${subject} Choose one of its declared options.`;
+    },
+  },
   scenario_parameter_template_invalid: {
     title: "This scenario's text couldn't be filled in",
     describe: (error) =>

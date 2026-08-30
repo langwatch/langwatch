@@ -342,6 +342,13 @@ const registry = {
     ],
     docsPath: "/agent-simulations/connect-your-agent",
   },
+  scenario_parameter_option_invalid: {
+    tips: [
+      "A parameter with options accepts only the values it lists; pick one of them for this run",
+      "To accept another value, widen the options on the scenario, or on the decorated function of a connected agent",
+    ],
+    docsPath: "/agent-simulations/run-parameters",
+  },
   agent_offline: {
     tips: [
       "Start the process that runs the decorated function; the agent shows Online in the agents list once it connects",

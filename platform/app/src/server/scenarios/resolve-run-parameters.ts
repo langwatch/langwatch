@@ -18,6 +18,7 @@
 
 import {
   ScenarioParameterMissingError,
+  ScenarioParameterOptionInvalidError,
   ScenarioParameterTemplateInvalidError,
   ScenarioParameterUnknownError,
   ScenarioSecretParameterConflictError,
@@ -69,6 +70,38 @@ function assertEveryNameIsDeclared({
     unknownKeys,
     declaredNames: [...declaredNames],
   });
+}
+
+/**
+ * Refuses the run when a supplied value is outside the closed option list a
+ * parameter declares.
+ *
+ * Checked on the supplied values alone: a default is one of the options by
+ * construction, and a value the run never named cannot be wrong. The first
+ * declaration of a name that lists options is the one that decides.
+ */
+function assertEveryValueIsAnOption({
+  definitions,
+  values,
+}: {
+  definitions: readonly ScenarioParameterDefinition[];
+  values?: RunParameterValues;
+}): void {
+  if (!values) return;
+  const optionsByName = new Map<
+    string,
+    ScenarioParameterDefinition["options"]
+  >();
+  for (const definition of definitions) {
+    if (definition.options && !optionsByName.has(definition.name)) {
+      optionsByName.set(definition.name, definition.options);
+    }
+  }
+  for (const [name, value] of Object.entries(values)) {
+    const options = optionsByName.get(name);
+    if (!options || options.includes(value)) continue;
+    throw new ScenarioParameterOptionInvalidError({ name, value, options });
+  }
 }
 
 /**
@@ -191,29 +224,57 @@ function secretValuesFor({
  */
 export async function resolveRunParameters({
   scenarios,
+  targetDefinitions = [],
   values,
 }: {
   scenarios: readonly ScenarioRunConfig[];
+  /**
+   * The parameters the run's target declares on its own, a connected agent's
+   * function parameters. Every scenario of the run reads them after its own
+   * declarations, so a scenario's default wins over the agent's. They are
+   * never secret: a secret stays scenario-declared and run-level.
+   */
+  targetDefinitions?: readonly ScenarioParameterDefinition[];
   values?: RunParameterValues;
 }): Promise<Map<string, ResolvedScenarioParameters>> {
+  const targetPlain = targetDefinitions.filter(
+    (definition) => definition.secret !== true,
+  );
   const definitionsByScenarioId = new Map(
-    scenarios.map((scenario) => [
-      scenario.id,
-      partitionParameterDefinitions(
+    scenarios.map((scenario) => {
+      const own = partitionParameterDefinitions(
         parseScenarioParameterDefinitions(scenario.parameters),
-      ),
-    ]),
+      );
+      // The agent's definitions sit before the scenario's own, and a later
+      // default overwrites an earlier one in the merge, so the scenario's
+      // own default is the one the run reads.
+      return [
+        scenario.id,
+        {
+          plain: [...targetPlain, ...own.plain],
+          secret: own.secret,
+          own: [...own.plain, ...own.secret],
+        },
+      ];
+    }),
   );
 
   const secretNames = new Set<string>();
   const plainNames = new Set<string>();
-  for (const { plain, secret } of definitionsByScenarioId.values()) {
+  const allDefinitions: ScenarioParameterDefinition[] = [];
+  for (const { plain, secret, own } of definitionsByScenarioId.values()) {
     for (const definition of plain) plainNames.add(definition.name);
     for (const definition of secret) secretNames.add(definition.name);
+    allDefinitions.push(...own);
   }
+  for (const definition of targetPlain) plainNames.add(definition.name);
   const declaredNames = new Set([...plainNames, ...secretNames]);
 
   assertEveryNameIsDeclared({ declaredNames, values });
+  assertEveryValueIsAnOption({
+    definitions: [...allDefinitions, ...targetPlain],
+    values,
+  });
   assertNoSecretConflict({ secretNames, plainNames });
   assertEverySecretHasAValue({ secretNames, values });
 

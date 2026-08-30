@@ -12,6 +12,7 @@ import {
 import type { AppErrorCode } from "~/features/errors/logic/codes";
 import { remediation } from "~/server/app-layer/error-remediation";
 import type { ScenarioContentField } from "./execution/scenario-content-template";
+import type { ScenarioParameterValue } from "./parameters";
 
 export class ScenarioNotFoundError extends Error {
   constructor(message = "Scenario not found") {
@@ -169,6 +170,37 @@ export class ScenarioParameterUnknownError extends ScenarioParameterError {
       meta: { unknownKeys, declaredNames },
     });
     this.name = "ScenarioParameterUnknownError";
+  }
+}
+
+/**
+ * Thrown when a run supplies a value outside the closed option list a
+ * parameter declares.
+ *
+ * The options are on `meta` because the run dialog renders them: the customer
+ * reads what the parameter accepts next to the value that was refused.
+ */
+export class ScenarioParameterOptionInvalidError extends ScenarioParameterError {
+  declare readonly code: "scenario_parameter_option_invalid";
+
+  constructor({
+    name,
+    value,
+    options,
+  }: {
+    name: string;
+    value: ScenarioParameterValue;
+    options: ScenarioParameterValue[];
+  }) {
+    super({
+      message: `The value of "${name}" is not one of its options: ${options
+        .map((option) => String(option))
+        .join(", ")}`,
+      code: "scenario_parameter_option_invalid",
+      httpStatus: 422,
+      meta: { name, value, options },
+    });
+    this.name = "ScenarioParameterOptionInvalidError";
   }
 }
 

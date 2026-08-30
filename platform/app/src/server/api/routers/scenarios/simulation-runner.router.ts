@@ -7,6 +7,7 @@ import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { AgentRepository } from "~/server/agents/agent.repository";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { ScenarioReservedSetIdError } from "~/server/scenarios/errors";
@@ -21,6 +22,7 @@ import {
 import {
   type RunParameterValues,
   runParameterValuesSchema,
+  type ScenarioParameterDefinition,
 } from "~/server/scenarios/parameters";
 import { resolveRunParameters } from "~/server/scenarios/resolve-run-parameters";
 import { type RunActor, withActor } from "~/server/scenarios/run-actor";
@@ -35,6 +37,11 @@ import {
 } from "~/server/scenarios/run-secret-values";
 import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
+import {
+  agentParameterDefinitionsOf,
+  assertConnectedAgentsRunnable,
+  resolveConnectedReferences,
+} from "~/server/suites/connected-targets";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { projectSchema } from "./schemas";
 
@@ -100,9 +107,60 @@ export function assertWritableSetId(params: {
 }
 
 /**
+ * The target with a `<name>@<environment>` connected reference replaced by
+ * the agent's id, checked to be runnable by the actor, and what the agent
+ * declares on its own.
+ *
+ * A connected agent that the reference names nothing for is left as written:
+ * the validation prefetch refuses it the way it refuses any unknown target.
+ *
+ * @throws {AgentOwnerOnlyError} when the agent is a personal development
+ *   agent of someone else.
+ */
+async function resolveConnectedTarget({
+  prisma,
+  projectId,
+  target,
+  actor,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+  target: SimulationTarget;
+  actor: RunActor;
+}): Promise<{
+  target: SimulationTarget;
+  targetDefinitions: ScenarioParameterDefinition[];
+}> {
+  if (target.type !== "connected") return { target, targetDefinitions: [] };
+  const agents = new AgentRepository(prisma);
+  const [resolved] = await resolveConnectedReferences({
+    targets: [target],
+    projectId,
+    actor,
+    agents,
+  });
+  const named = resolved ?? target;
+  const rows = await agents.findManyIncludingArchived({
+    ids: [named.referenceId],
+    projectId,
+  });
+  const agent = rows.find((row) => row.archivedAt === null);
+  await assertConnectedAgentsRunnable({
+    agents: agent ? [agent] : [],
+    actor,
+    users: prisma,
+  });
+  return {
+    target: { type: named.type, referenceId: named.referenceId },
+    targetDefinitions: agentParameterDefinitionsOf(agent),
+  };
+}
+
+/**
  * Resolves what the run reads as `params.NAME` and what it reads as
- * `secrets.NAME`: the scenario's declared defaults, with the supplied values
- * over the top, and the secret values split out and encrypted.
+ * `secrets.NAME`: the scenario's declared defaults and the target agent's
+ * own, with the supplied values over the top, and the secret values split
+ * out and encrypted.
  *
  * Runs before anything is queued, the same way a suite run does, so an unknown
  * name, a secret with no value, a reference with no value, or unrenderable text
@@ -112,11 +170,13 @@ async function resolveParametersForRun({
   prisma,
   projectId,
   scenarioId,
+  targetDefinitions,
   values,
 }: {
   prisma: PrismaClient;
   projectId: string;
   scenarioId: string;
+  targetDefinitions: ScenarioParameterDefinition[];
   values?: RunParameterValues;
 }): Promise<{
   parameters: RunParameterValues;
@@ -132,7 +192,11 @@ async function resolveParametersForRun({
     ids: [scenarioId],
     projectId,
   });
-  const resolved = await resolveRunParameters({ scenarios, values });
+  const resolved = await resolveRunParameters({
+    scenarios,
+    targetDefinitions,
+    values,
+  });
   const forScenario = resolved.get(scenarioId);
   return {
     parameters: forScenario?.parameters ?? {},
@@ -251,12 +315,20 @@ export const simulationRunnerRouter = createTRPCRouter({
       const setId = input.setId ?? getOnPlatformSetId(input.projectId);
       assertWritableSetId({ setId, projectId: input.projectId });
       const batchRunId = input.batchRunId ?? generateBatchRunId();
+      const actor: RunActor = { id: ctx.session.user.id, label: "user" };
 
+      const { target, targetDefinitions } = await resolveConnectedTarget({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+        target: input.target,
+        actor,
+      });
       const { parameters, secretParameters, scenarioVersion } =
         await resolveParametersForRun({
           prisma: ctx.prisma,
           projectId: input.projectId,
           scenarioId: input.scenarioId,
+          targetDefinitions,
           values: input.parameters,
         });
 
@@ -271,7 +343,7 @@ export const simulationRunnerRouter = createTRPCRouter({
           parameters,
           secretParameters,
         },
-        target: input.target,
+        target,
         deps,
       });
 
@@ -309,12 +381,12 @@ export const simulationRunnerRouter = createTRPCRouter({
         batchRunId,
         setId,
         name: prefetchResult.data.scenario.name,
-        target: input.target,
+        target,
         parameters,
         secretParameters,
         note: input.note,
         scenarioVersion,
-        actor: { id: ctx.session.user.id, label: "user" },
+        actor,
         resolvedModels: prefetchResult.resolvedModels,
       });
 

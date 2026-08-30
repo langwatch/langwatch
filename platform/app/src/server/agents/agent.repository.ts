@@ -155,24 +155,26 @@ export class AgentRepository {
   async findManyIncludingArchived(input: {
     ids: string[];
     projectId: string;
-  }): Promise<{ id: string; archivedAt: Date | null }[]> {
-    return this.prisma.agent.findMany({
+  }): Promise<AgentIdentityRow[]> {
+    const rows = await this.prisma.agent.findMany({
       where: { id: { in: input.ids }, projectId: input.projectId },
-      select: { id: true, archivedAt: true },
+      select: IDENTITY_SELECT,
     });
+    return rows.map((row) => ({ ...row, type: row.type as AgentType }));
   }
 
   /**
-   * Find agent names by IDs regardless of archived status.
+   * Find agent names by IDs regardless of archived status, with the
+   * environment and owner a connected agent's label reads.
    * Used for displaying human-readable names in UI warnings.
    */
   async findNamesByIds(input: {
     ids: string[];
     projectId: string;
-  }): Promise<{ id: string; name: string }[]> {
+  }): Promise<AgentNameRow[]> {
     return this.prisma.agent.findMany({
       where: { id: { in: input.ids }, projectId: input.projectId },
-      select: { id: true, name: true },
+      select: { id: true, name: true, environment: true, ownerUserId: true },
     });
   }
 
@@ -372,34 +374,6 @@ export class AgentRepository {
   }
 
   /**
-   * The identity of each agent by id, archived or not, for the checks a run
-   * makes before it schedules: the scope a personal agent belongs to, and the
-   * parameters a connected agent declares.
-   */
-  async findIdentityByIds(input: {
-    ids: string[];
-    projectId: string;
-  }): Promise<AgentIdentityRow[]> {
-    const rows = await this.prisma.agent.findMany({
-      where: { id: { in: input.ids }, projectId: input.projectId },
-      select: {
-        id: true,
-        name: true,
-        type: true,
-        config: true,
-        environment: true,
-        ownerUserId: true,
-        hostLabel: true,
-        archivedAt: true,
-      },
-    });
-    return rows.map((row) => ({
-      ...row,
-      type: agentTypeSchema.parse(row.type),
-    }));
-  }
-
-  /**
    * Updates an existing agent.
    * Validates that the agent belongs to the specified project.
    * Validates config if provided.
@@ -565,9 +539,29 @@ export class AgentRepository {
 
 /**
  * What a run reads off an agent before it schedules. Returned by
- * findIdentityByIds; the config is raw so an archived or malformed row still
- * classifies instead of failing the read.
+ * findManyIncludingArchived; the config is raw so an archived or malformed
+ * row still classifies instead of failing the read.
  */
+const IDENTITY_SELECT = {
+  id: true,
+  name: true,
+  type: true,
+  config: true,
+  environment: true,
+  ownerUserId: true,
+  hostLabel: true,
+  archivedAt: true,
+} as const;
+
+/** What a label reads off an agent: its name, and for a connected one its
+ *  environment and owner. */
+export type AgentNameRow = {
+  id: string;
+  name: string;
+  environment: string | null;
+  ownerUserId: string | null;
+};
+
 export type AgentIdentityRow = {
   id: string;
   name: string;
