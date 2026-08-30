@@ -813,10 +813,26 @@ export class CopilotStudioDataversePuller
     // environment with no new conversations never price its bill, or a bill
     // that cannot be read stall the transcripts.
     const advanced = walk.last?.createdon ? walk.last : previous.transcript;
-    const moved =
-      advanced !== previous.transcript ||
+    const transcriptMoved =
+      advanced !== null &&
+      (advanced.createdon !== previous.transcript?.createdon ||
+        advanced.conversationtranscriptid !==
+          previous.transcript?.conversationtranscriptid);
+    const costMoved =
       cost.pricedThroughDay !== previous.cost.pricedThroughDay ||
       cost.heldSinceMs !== previous.cost.heldSinceMs;
+
+    // On a run that reported errors, ONLY the transcript half may signal
+    // progress. The worker reads a changed cursor as "advanced past input it
+    // could not read" and downgrades the failure to a warning — and the cost
+    // watermark moves on the first run of every UTC day, so letting it count
+    // would quietly excuse a stuck transcript walk once a day, every day. The
+    // loudest case is `refusesNextLink`: a next-page link pointing away from
+    // the customer's environment is meant to fail the run, not be absorbed by
+    // an unrelated bill being read successfully. The cost advance is simply
+    // dropped and re-earned next run, which costs one request.
+    const moved =
+      walk.errorCount > 0 ? transcriptMoved : transcriptMoved || costMoved;
 
     return {
       events: walk.events,
@@ -965,6 +981,17 @@ export class CopilotStudioDataversePuller
       }
 
       const read = readAzureCostRows({ response: await response.json() });
+      if (read.malformed) {
+        // An HTTP 200 whose body is not the shape this reads. Held, not
+        // recorded: taken as an empty window it would read as a genuinely
+        // free week and be marked priced, which is the exact confusion the
+        // row-level count below exists to prevent one level down.
+        logger.warn(
+          { subscriptionId },
+          "copilot studio dataverse: Azure answered the cost read with an unrecognised body; holding the window for the next run",
+        );
+        return null;
+      }
       days.push(...read.days);
       if (read.unreadableRows > 0) {
         // Counted here and nowhere else. It must never reach the run's own
@@ -975,12 +1002,34 @@ export class CopilotStudioDataversePuller
         );
       }
 
-      url = read.nextLink?.startsWith("https://management.azure.com/")
-        ? read.nextLink
-        : null;
+      if (read.nextLink === null) return days;
+
+      // A next page the run will not follow means the window was read in
+      // part, and a partial window must never be reported as priced: the
+      // meters that live on the pages behind it would keep their previous
+      // figures with nothing marking them stale. Held instead, so the next
+      // run asks again from the top.
+      if (!read.nextLink.startsWith("https://management.azure.com/")) {
+        // The refused link carries the ARM token if followed. Logged like the
+        // transcript walk's own refusal, because a silent stall here is
+        // indistinguishable from a permissions problem.
+        logger.error(
+          { refusedHost: hostOf(read.nextLink), subscriptionId },
+          "copilot studio dataverse: refusing an Azure cost next-page link that is not Azure Resource Manager; holding the window",
+        );
+        return null;
+      }
+      url = read.nextLink;
     }
 
-    return days;
+    // Fell out of the loop with a page still owed — the page cap, the run's
+    // deadline, or the abort signal. Same reasoning as the refused link: a
+    // partial window is not a priced one.
+    logger.warn(
+      { pageCount, subscriptionId },
+      "copilot studio dataverse: the Azure cost read ran out of run before it ran out of pages; holding the window",
+    );
+    return null;
   }
 
   /**

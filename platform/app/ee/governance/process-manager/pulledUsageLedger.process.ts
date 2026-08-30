@@ -52,7 +52,15 @@ export const writePulledUsageSchema = z.object({
   organization_id: z.string(),
   team_id: z.string().nullable().default(null),
   model: z.string().default(""),
-  cost_nano_usd: z.number().int().min(0),
+  /**
+   * SIGNED. A provider that credits or refunds a period reports it as a
+   * negative figure, and the ledger has to take it or the charge it reverses
+   * stands alone. Refusing it here would fail the intent's own schema and the
+   * credit would die in the outbox after its retries, silently, while the
+   * charge stayed on the customer's books. The quantities below stay
+   * nonnegative: a negative count of tokens is not something that happened.
+   */
+  cost_nano_usd: z.number().int(),
   tokens_input: z.number().int().min(0).default(0),
   tokens_output: z.number().int().min(0).default(0),
   tokens_cache_read: z.number().int().min(0).default(0),

@@ -12,7 +12,10 @@
  * Spec: specs/governance/pulled-usage-cost-reporting.feature
  * Decision: ADR-128 §3.
  */
-import { pulledUsageObservedEventDataSchema } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
+import {
+  pulledUsageObservedEventDataSchema,
+  readPulledUsageMoney,
+} from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -120,9 +123,16 @@ describe("currency on a pulled usage record", () => {
 
   describe("when a record was written before money carried a currency", () => {
     /** @scenario "Records already on the durable log still read after the change" */
-    it("still parses, and reads as dollars with no biller conversion", () => {
-      // Verbatim shape of an event already on the durable log: the money under
-      // its old name, and neither of the two new fields present.
+    it("reads its money as dollars with no biller conversion", () => {
+      // The VERBATIM shape of an event already on the durable log: the money
+      // under its old name `costNanoUsd`, no `costNanoMinor`, no
+      // `currencyCode`. This build reuses `costNanoUsd` for the biller's
+      // dollar conversion, so read literally this event's money would be
+      // taken for a conversion of an amount that is not there.
+      //
+      // Read through `readPulledUsageMoney` rather than the schema, because
+      // that is where the read path actually goes: the fold and the drift
+      // comparator take the data object directly and never parse it.
       const onTheLog = {
         itemKey: "usage_report:2026-08-01:1d",
         restatementKey: "b".repeat(64),
@@ -136,7 +146,7 @@ describe("currency on a pulled usage record", () => {
         tokensOutput: 200,
         tokensCacheRead: 0,
         tokensCacheWrite: 0,
-        costNanoMinor: 12_340_000_000,
+        costNanoUsd: 12_340_000_000,
         rateVersion: null,
         costBasis: "provider_reported",
         costStatus: "exact",
@@ -144,11 +154,52 @@ describe("currency on a pulled usage record", () => {
         observedAtMs: Date.parse("2026-08-02T04:00:00.000Z"),
       };
 
-      const parsed = pulledUsageObservedEventDataSchema.parse(onTheLog);
+      const money = readPulledUsageMoney(onTheLog);
 
-      expect(parsed.currencyCode).toBe("USD");
-      expect(parsed.costNanoUsd).toBe(null);
-      expect(parsed.costNanoMinor).toBe(12_340_000_000);
+      // The old money becomes the amount, in dollars, with no biller
+      // conversion — never a biller conversion of a missing amount.
+      expect(money.costNanoMinor).toBe(12_340_000_000);
+      expect(money.currencyCode).toBe("USD");
+      expect(money.costNanoUsd).toBe(null);
+    });
+
+    /** @scenario "Records already on the durable log still read after the change" */
+    it("does not rewrite an event this build wrote, which means both fields", () => {
+      const written = {
+        itemKey: "azure_cost:2026-08-23:Foundry Models",
+        restatementKey: "d".repeat(64),
+        source: "copilot_studio_dataverse",
+        ingestionSourceId: "src_1",
+        organizationId: "org_acme",
+        teamId: null,
+        projectId: "proj_governance_acme",
+        model: "Foundry Models",
+        tokensInput: 0,
+        tokensOutput: 0,
+        tokensCacheRead: 0,
+        tokensCacheWrite: 0,
+        costNanoMinor: 1_533_525_880,
+        currencyCode: "EUR",
+        costNanoUsd: 1_745_382_480,
+        rateVersion: null,
+        costBasis: "provider_reported",
+        costStatus: "exact",
+        occurredAtMs: Date.parse("2026-08-23T00:00:00.000Z"),
+        observedAtMs: Date.parse("2026-08-30T09:00:00.000Z"),
+      };
+
+      // The guard on the guard: the legacy translation must fire ONLY when
+      // the amount is missing, or it would overwrite a real biller conversion
+      // with the amount it converts.
+      expect(readPulledUsageMoney(written)).toEqual({
+        costNanoMinor: 1_533_525_880,
+        currencyCode: "EUR",
+        costNanoUsd: 1_745_382_480,
+      });
+      // And the schema still accepts what this build writes.
+      expect(() =>
+        pulledUsageObservedEventDataSchema.parse(written),
+      ).not.toThrow();
     });
 
     /** @scenario "Records already on the durable log still read after the change" */

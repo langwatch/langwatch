@@ -120,6 +120,53 @@ export const pulledUsageObservedEventDataSchema = z.object({
   observedAtMs: z.number().int().positive(),
 });
 
+/** The currency every producer reported before money carried one. */
+const LEGACY_CURRENCY_CODE = "USD";
+
+/**
+ * The money on one observation, whether or not it predates currencies.
+ *
+ * Events already on the durable log name the money `costNanoUsd` and mean
+ * "the amount", full stop. This build names the amount `costNanoMinor` and
+ * reuses `costNanoUsd` for something else entirely — the BILLER's own dollar
+ * conversion — so the rename cannot be read literally: a legacy event's money
+ * would be taken for a conversion of an amount that is not there, leaving the
+ * amount `undefined` and every total downstream `NaN`.
+ *
+ * That matters because nothing on the read path parses these events: the fold
+ * and the drift comparator both read the data object directly, so a rebuild
+ * or a re-derivation over history goes through here rather than through the
+ * schema above. The log is append-only and nothing rewrites it, so this is
+ * permanent rather than a migration window.
+ *
+ * Every producer that predates the currency field reported dollars, which is
+ * what makes the fallback correct rather than a guess.
+ */
+export function readPulledUsageMoney(data: {
+  costNanoMinor?: number;
+  currencyCode?: string;
+  costNanoUsd?: number | null;
+}): {
+  costNanoMinor: number;
+  currencyCode: string;
+  costNanoUsd: number | null;
+} {
+  if (typeof data.costNanoMinor === "number") {
+    return {
+      costNanoMinor: data.costNanoMinor,
+      currencyCode: data.currencyCode ?? LEGACY_CURRENCY_CODE,
+      costNanoUsd: data.costNanoUsd ?? null,
+    };
+  }
+  return {
+    // A legacy event: its `costNanoUsd` IS the amount, in dollars, and there
+    // is no separate biller conversion to carry.
+    costNanoMinor: data.costNanoUsd ?? 0,
+    currencyCode: LEGACY_CURRENCY_CODE,
+    costNanoUsd: null,
+  };
+}
+
 export type PulledUsageObservedEventData = z.infer<
   typeof pulledUsageObservedEventDataSchema
 >;

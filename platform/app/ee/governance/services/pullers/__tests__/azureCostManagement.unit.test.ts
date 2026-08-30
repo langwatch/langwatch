@@ -211,6 +211,31 @@ describe("reading an Azure Cost Management daily reply", () => {
     });
   });
 
+  describe("when the reply is not the shape this reads at all", () => {
+    /** @scenario "A re-read day the bill has not landed for emits no figure at all" */
+    it("says so, rather than reading as a window that cost nothing", () => {
+      const read = readAzureCostRows({ response: { error: "unauthorized" } });
+
+      // An HTTP 200 carrying an error body. Reported as malformed, because
+      // "no days" alone would let the caller mark the window priced and
+      // publish a genuinely free week.
+      expect(read.malformed).toBe(true);
+      expect(read.days).toEqual([]);
+    });
+
+    /** @scenario "A re-read day the bill has not landed for emits no figure at all" */
+    it("does not confuse a real but empty window with a malformed one", () => {
+      const read = readAzureCostRows({
+        response: replyOf({ columns: ["Cost", "UsageDate"], rows: [] }),
+      });
+
+      // Azure answering "this window cost nothing" is a real answer and has
+      // to stay distinguishable from a reply nobody could parse.
+      expect(read.malformed).toBe(false);
+      expect(read.days).toEqual([]);
+    });
+  });
+
   describe("the window a run asks about", () => {
     /** @scenario "The first cost read asks about a window that covers the settling days" */
     it("reaches back over the settling days on a first read", () => {

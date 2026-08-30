@@ -225,7 +225,9 @@ describe("the Azure cost read inside the Dataverse source", () => {
       const cursor = JSON.parse(String(result.cursor));
 
       expect(cursor.costPricedThroughDay).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-      expect(cursor.costHeldSinceMs ?? null).toBe(null);
+      // Written as an explicit null, not merely absent: a build that stopped
+      // writing the field would read identical under `?? null`.
+      expect(cursor).toHaveProperty("costHeldSinceMs", null);
       // The transcript position is still there and unchanged in shape.
       expect(cursor.conversationtranscriptid).toBe(TRANSCRIPT_ID);
     });
@@ -243,7 +245,7 @@ describe("the Azure cost read inside the Dataverse source", () => {
 
       expect(costEvents(result.events)).toHaveLength(0);
       expect(result.errorCount).toBe(0);
-      expect(cursor.costPricedThroughDay ?? null).toBe(null);
+      expect(cursor).toHaveProperty("costPricedThroughDay", null);
       expect(typeof cursor.costHeldSinceMs).toBe("number");
     });
 
@@ -364,23 +366,81 @@ describe("the Azure cost read inside the Dataverse source", () => {
       expect(result.cursor).toBe(previous);
     });
 
-    /** @scenario "Being asked to slow down leaves the window unpriced rather than priced at nothing" */
-    it("hands back the same string when only the cost read was held", async () => {
+    /** @scenario "Conversations failing after cost was read discards both" */
+    it("does not let a cost advance stand in for transcript progress", async () => {
+      // The nastiest shape of all. The transcript walk raised an error WITHOUT
+      // throwing, so it made no progress — but the cost read succeeded and
+      // moved its own watermark. A cursor that changed for the cost's sake
+      // reads to the worker as "advanced past input it could not read", and it
+      // would log a warning and persist a run that read no conversations at
+      // all. Worst case, the error is `refusesNextLink` — a next-page link
+      // pointing away from the customer's environment — and that refusal is
+      // meant to fail the run loudly, not once a day quietly.
+      transcriptRows = [{ conversationtranscriptid: "not-a-uuid" }];
       const previous = JSON.stringify({
         createdon: "2026-08-20T10:00:00.000Z",
         conversationtranscriptid: "22222222-2222-4222-8222-222222222222",
-        costPricedThroughDay: "2026-08-29",
-        costHeldSinceMs: 1_756_000_000_000,
       });
-      costReplies = [{ status: 429, body: {} }];
-      transcriptStatus = 503;
 
       const result = await runPull({
         azureSubscriptionId: SUBSCRIPTION_ID,
         cursor: previous,
       });
 
+      expect(result.errorCount).toBeGreaterThan(0);
       expect(result.cursor).toBe(previous);
+    });
+
+    /** @scenario "Being asked to slow down leaves the window unpriced rather than priced at nothing" */
+    it("hands back the same string when only the cost read was held", async () => {
+      // No transcript rows and no failure, so the walk genuinely makes no
+      // progress without throwing — this has to reach the `moved` check
+      // rather than the catch, or it proves nothing about it. The hold is
+      // recent, so the cost cursor keeps the instant it already had instead
+      // of taking the give-up branch and moving.
+      const heldSinceMs = Date.now() - 60_000;
+      const previous = JSON.stringify({
+        createdon: "2026-08-20T10:00:00.000Z",
+        conversationtranscriptid: "22222222-2222-4222-8222-222222222222",
+        costPricedThroughDay: "2026-08-29",
+        costHeldSinceMs: heldSinceMs,
+      });
+      costReplies = [{ status: 429, body: {} }];
+      transcriptRows = [];
+
+      const result = await runPull({
+        azureSubscriptionId: SUBSCRIPTION_ID,
+        cursor: previous,
+      });
+
+      expect(result.errorCount).toBe(0);
+      expect(result.cursor).toBe(previous);
+    });
+
+    /** @scenario "A window held for too long is given up rather than held forever" */
+    it("does move the cursor when a long-held window is finally given up", async () => {
+      // The other side of the rule above: an unchanged cursor must not be the
+      // answer to everything, or the give-up would never be persisted and the
+      // window would be held forever.
+      const previous = JSON.stringify({
+        createdon: "2026-08-20T10:00:00.000Z",
+        conversationtranscriptid: "22222222-2222-4222-8222-222222222222",
+        costPricedThroughDay: "2026-07-01",
+        costHeldSinceMs: 1_000,
+      });
+      costReplies = [{ status: 429, body: {} }];
+      transcriptRows = [];
+
+      const result = await runPull({
+        azureSubscriptionId: SUBSCRIPTION_ID,
+        cursor: previous,
+      });
+
+      expect(result.errorCount).toBe(0);
+      expect(result.cursor).not.toBe(previous);
+      const cursor = JSON.parse(String(result.cursor));
+      expect(cursor).toHaveProperty("costHeldSinceMs", null);
+      expect(cursor.costPricedThroughDay).not.toBe("2026-07-01");
     });
   });
 

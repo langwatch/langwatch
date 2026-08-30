@@ -228,6 +228,52 @@ describe("the daily rollup and the currency a day was billed in", () => {
     });
   });
 
+  describe("when the event predates money carrying a currency", () => {
+    /** @scenario "Records already on the durable log still read after the change" */
+    it("folds its amount as dollars rather than as nothing at all", () => {
+      // The verbatim shape on the durable log: money under `costNanoUsd`, no
+      // `costNanoMinor`, no `currencyCode`. Nothing parses these on the way
+      // into the fold, so read literally the amount is `undefined` and every
+      // total from here on is NaN — while the assertions still pass, because
+      // Object.is says NaN equals NaN.
+      const legacy = observedEvent({ costNanoMinor: 0 }) as unknown as {
+        data: Record<string, unknown>;
+      };
+      const { costNanoMinor, currencyCode, ...rest } = legacy.data;
+      const onTheLog = {
+        ...legacy,
+        data: { ...rest, costNanoUsd: 12_340_000_000 },
+      };
+
+      const state = fold([onTheLog]);
+      const totals = governanceCostRollupTotals(state);
+
+      expect(totals.amountNanoMinor).toBe(12_340_000_000);
+      expect(totals.amountNanoUsd).toBe(12_340_000_000);
+      expect(state.currencyCode).toBe("USD");
+    });
+
+    /** @scenario "Records already on the durable log still read after the change" */
+    it("addresses it under the same key a stored row would carry", () => {
+      const legacy = observedEvent({ costNanoMinor: 0 }) as unknown as {
+        data: Record<string, unknown>;
+      };
+      const { costNanoMinor, currencyCode, ...rest } = legacy.data;
+
+      // A key carrying an undefined currency would send a rebuild to a cell
+      // the stored row does not occupy, and the drift watchdog would report
+      // every historical cell twice.
+      expect(
+        decodeGovernanceCostRollupKey(
+          governanceCostRollupKey({
+            ...legacy,
+            data: { ...rest, costNanoUsd: 1 },
+          } as never),
+        ).currencyCode,
+      ).toBe("USD");
+    });
+  });
+
   describe("when the gateway lane contributes", () => {
     /** @scenario "A pulled event in another currency is summarized under that currency" */
     it("stays in dollars, since the gateway prices in dollars", () => {
