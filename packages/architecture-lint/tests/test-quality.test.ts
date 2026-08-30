@@ -27,6 +27,102 @@ describe("test quality", () => {
     expect(policies(root, file)).toEqual(["test-quality"]);
   });
 
+  it("accepts a helper declared inside its describe", () => {
+    const root = mkdtempSync(join(tmpdir(), "test-quality-nested-helper-"));
+    // An assertion helper belongs inside the suite whose fixtures it reads —
+    // that is why `assertCorrectFinalState` and `expectCanonicalError` are
+    // written there. Collecting only top-level declarations reported every test
+    // calling one as having no assertion.
+    const file = writeFixture(
+      root,
+      "src/example.test.ts",
+      [
+        'describe("suite", () => {',
+        "  const store = makeStore();",
+        "  function assertSettled(state) { expect(state.done).toBe(true); }",
+        '  it("settles", () => { assertSettled(fold(store)); });',
+        "});",
+      ].join("\n"),
+    );
+
+    expect(policies(root, file)).toEqual([]);
+  });
+
+  it("accepts expect.fail as the assertion it is", () => {
+    const root = mkdtempSync(join(tmpdir(), "test-quality-expect-fail-"));
+    const file = writeFixture(
+      root,
+      "src/example.test.ts",
+      'it("stays within budget", async () => { try { await run(); } catch (error) { expect.fail(String(error)); } });',
+    );
+
+    expect(policies(root, file)).toEqual([]);
+  });
+
+  it("does not accept a matcher argument as an assertion", () => {
+    const root = mkdtempSync(join(tmpdir(), "test-quality-matcher-argument-"));
+    // `expect.any` and friends construct a matcher; they assert nothing on
+    // their own. Counting every `expect.*` would let a test satisfy this rule
+    // by building a matcher it never compares against.
+    const file = writeFixture(
+      root,
+      "src/example.test.ts",
+      'it("does nothing", () => { record(expect.any(String)); });',
+    );
+
+    expect(policies(root, file)).toEqual(["test-quality"]);
+  });
+
+  it("accepts a throwing TypeScript assertion function", () => {
+    const root = mkdtempSync(join(tmpdir(), "test-quality-asserts-fn-"));
+    // `asserts x is T` narrows by throwing, so its body holds no matcher for
+    // the body scan to find. The language has already said what it is.
+    const file = writeFixture(
+      root,
+      "src/example.test.ts",
+      [
+        "function assertExceeded(result): asserts result is Exceeded {",
+        '  if (!result.exceeded) throw new Error("expected exceeded");',
+        "}",
+        'it("exceeds", () => { assertExceeded(check()); });',
+      ].join("\n"),
+    );
+
+    expect(policies(root, file)).toEqual([]);
+  });
+
+  it("accepts an imported expectX helper by name", () => {
+    const root = mkdtempSync(join(tmpdir(), "test-quality-imported-helper-"));
+    // Its body lives in another module, so the name is the only signal there
+    // is without cross-file analysis.
+    const file = writeFixture(
+      root,
+      "src/example.test.ts",
+      [
+        'import { expectCanonicalError } from "~/test-utils/expectCanonicalError";',
+        'it("refuses", async () => { await expectCanonicalError(res, { code: "nope" }); });',
+      ].join("\n"),
+    );
+
+    expect(policies(root, file)).toEqual([]);
+  });
+
+  it("does not accept an imported binding that is merely called", () => {
+    const root = mkdtempSync(join(tmpdir(), "test-quality-imported-nonhelper-"));
+    // The convention is `expectX`/`assertX`. An imported `buildThing` is not
+    // an assertion just because a test calls it.
+    const file = writeFixture(
+      root,
+      "src/example.test.ts",
+      [
+        'import { buildThing } from "~/test-utils/buildThing";',
+        'it("does nothing", () => { buildThing(); });',
+      ].join("\n"),
+    );
+
+    expect(policies(root, file)).toEqual(["test-quality"]);
+  });
+
   it("does not accept an unfinished expect call as an assertion", () => {
     const root = mkdtempSync(join(tmpdir(), "test-quality-unfinished-expect-"));
     const file = writeFixture(

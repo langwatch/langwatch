@@ -8,6 +8,28 @@ const TEST_CALLBACKS = new Set(["it", "test"]);
 const SUITE_CALLBACKS = new Set(["describe", "suite"]);
 const EXPECTATION_CALLEES = new Set(["expect", "expectTypeOf"]);
 const ASSERTION_NAMESPACES = new Set(["assert", "chai"]);
+/**
+ * `expect.<name>()` forms that ARE an assertion on their own.
+ *
+ * Deliberately not every static on `expect`: `expect.any`,
+ * `expect.objectContaining` and friends are matcher ARGUMENTS, and counting
+ * them would let a test satisfy this rule by constructing a matcher it never
+ * asserts against. These four either fail the test outright or state how many
+ * assertions must have run.
+ */
+const EXPECT_STATIC_ASSERTIONS = new Set(["assertions", "fail", "hasAssertions", "unreachable"]);
+/**
+ * An IMPORTED binding named this way is taken to assert.
+ *
+ * Only imported ones. A helper declared in the file is judged by its body,
+ * which is stricter and costs nothing; a helper from another module has no body
+ * to read without cross-file analysis, so the name is the whole signal —
+ * `~/test-utils/expectCanonicalError` is the case, and eight REST tests calling
+ * it read as empty. The repo already treats `expectX`/`assertX` as the name an
+ * assertion helper carries, so this reads a convention rather than inventing
+ * one.
+ */
+const IMPORTED_ASSERTION_HELPER = /^(?:expect|assert)[A-Z]/;
 const STATIC_MATCHERS = new Set([
   "toBe",
   "toEqual",
@@ -104,9 +126,14 @@ function isAssertionCall(node: ts.CallExpression): boolean {
   if (matcherCall(node)) return true;
   if (ts.isIdentifier(node.expression)) return node.expression.text === "assert";
   if (!ts.isPropertyAccessExpression(node.expression)) return false;
+  if (!ts.isIdentifier(node.expression.expression)) return false;
+  const namespace = node.expression.expression.text;
+  if (ASSERTION_NAMESPACES.has(namespace)) return true;
+  // `expect.fail(...)` in a catch branch is how a test says "reaching here is
+  // the failure". It asserts as surely as a matcher does, and reading it as
+  // absent reported two real memory-budget tests as empty.
   return (
-    ts.isIdentifier(node.expression.expression) &&
-    ASSERTION_NAMESPACES.has(node.expression.expression.text)
+    EXPECTATION_CALLEES.has(namespace) && EXPECT_STATIC_ASSERTIONS.has(node.expression.name.text)
   );
 }
 
@@ -126,25 +153,55 @@ function containsAssertion(callback: TestCallback, assertionHelpers: ReadonlySet
   return assertion;
 }
 
+/**
+ * A function TypeScript itself calls an assertion: `asserts x is T`, or the
+ * bare `asserts x`. Such a helper narrows by THROWING rather than by calling a
+ * matcher, so its body holds no `expect` for `nodeContainsAssertion` to find —
+ * `assertExceeded` in the usage service tests is exactly that, and every test
+ * calling it read as empty.
+ */
+function assertsType(node: ts.SignatureDeclaration): boolean {
+  return (
+    node.type !== void 0 &&
+    ts.isTypePredicateNode(node.type) &&
+    node.type.assertsModifier !== void 0
+  );
+}
+
+/**
+ * Every assertion helper in the file, at any depth.
+ *
+ * This used to read `source.statements` alone, so it saw only helpers declared
+ * at the top level — and the idiomatic place for one is INSIDE its `describe`,
+ * where it can close over the store, projection or app the suite built.
+ * `assertCorrectFinalState`, `expectCanonicalError` and `assertExceeded` are all
+ * written that way, and twelve tests calling them were reported as having no
+ * assertion at all.
+ *
+ * Collecting by name across the whole file is slightly generous — two helpers
+ * of the same name in sibling scopes are one entry — but a name collision
+ * between two assertion helpers costs nothing here, while missing a scope costs
+ * a false report on every test that uses it.
+ */
 function collectAssertionHelpers(source: ts.SourceFile): Set<string> {
   const helpers = new Set<string>();
 
-  for (const statement of source.statements) {
-    if (ts.isFunctionDeclaration(statement) && statement.name && statement.body) {
-      if (nodeContainsAssertion(statement.body)) helpers.add(statement.name.text);
-      continue;
-    }
-
-    if (!ts.isVariableStatement(statement)) continue;
-    for (const declaration of statement.declarationList.declarations) {
-      if (!ts.isIdentifier(declaration.name) || !declaration.initializer) continue;
-      const initializer = declaration.initializer;
-      if (!ts.isArrowFunction(initializer) && !ts.isFunctionExpression(initializer)) {
-        continue;
+  const visit = (node: ts.Node): void => {
+    if (ts.isFunctionDeclaration(node) && node.name && node.body) {
+      if (assertsType(node) || nodeContainsAssertion(node.body)) helpers.add(node.name.text);
+    } else if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+      const initializer = node.initializer;
+      if (
+        initializer &&
+        (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)) &&
+        (assertsType(initializer) || nodeContainsAssertion(initializer.body))
+      ) {
+        helpers.add(node.name.text);
       }
-      if (nodeContainsAssertion(initializer.body)) helpers.add(declaration.name.text);
     }
-  }
+    ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(source, visit);
 
   return helpers;
 }
@@ -350,6 +407,9 @@ function lintTestFile(file: string): ArchitectureViolation[] {
   const imports = collectImportBindings(source);
   const mockedModules = collectMockedModules(source);
   const assertionHelpers = collectAssertionHelpers(source);
+  for (const binding of imports) {
+    if (IMPORTED_ASSERTION_HELPER.test(binding.name)) assertionHelpers.add(binding.name);
+  }
   const duplicateBodies = new Map<string, TestCall>();
 
   for (const test of collectTestCalls(source)) {
