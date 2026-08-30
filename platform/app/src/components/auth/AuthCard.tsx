@@ -32,7 +32,20 @@ import { FullLogo } from "../icons/FullLogo";
  *     because a log-in form is a short list of short fields and stretching it
  *     across a desktop makes each row a journey.
  */
-export function AuthCard({ title, children }: { title: string; children: ReactNode }) {
+export function AuthCard({
+  title,
+  intro,
+  finePrint,
+  children,
+}: {
+  title: string;
+  /** One quiet line answering the heading. Part of the identity block:
+   *  centred and balanced with it, never a row of the form below. */
+  intro?: string;
+  /** The small print under everything: terms, privacy, nothing louder. */
+  finePrint?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <Container
       maxW={{ base: "100%", sm: "408px" }}

@@ -38,6 +38,12 @@ import {
 } from "@langwatch/analytics-web/validation";
 import type { CustomGraph, Prisma } from "~/generated/prisma/client";
 
+import type {
+  LangWatchQLBudgetOverflowMode,
+  LangWatchQLCaller,
+  LangWatchQLQueryResult,
+  LangWatchQLTimeWindow,
+} from "@langwatch/analytics-contract";
 import type { Protections } from "@langwatch/trace-server";
 import { isUniqueConstraintError } from "../../utils/prismaErrors";
 import type { LangWatchQLService } from "../lwql/lwql.service";

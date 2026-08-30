@@ -6,6 +6,7 @@ import {
   HStack,
   Input,
   SimpleGrid,
+  Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -15,10 +16,7 @@ import { useEffect, useState } from "react";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { QuarantineFillAlert } from "~/components/governance/QuarantineFillAlert";
 import { SpendByTeamBar } from "~/components/governance/SpendByTeamBar";
-import {
-  type GroupBy,
-  SpendOverTimeChart,
-} from "~/components/governance/SpendOverTimeChart";
+import { type GroupBy, SpendOverTimeChart } from "~/components/governance/SpendOverTimeChart";
 import { InstallCliCard } from "~/components/me/InstallCliCard";
 import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import { Link } from "~/components/ui/link";
@@ -156,10 +154,7 @@ function GovernanceOverviewPage() {
     anomaliesQuery.error ??
     spendOverTimeQuery.error;
   const setupError =
-    sourcesQuery.error ??
-    policiesQuery.error ??
-    anomalyRulesQuery.error ??
-    catalogQuery.error;
+    sourcesQuery.error ?? policiesQuery.error ?? anomalyRulesQuery.error ?? catalogQuery.error;
 
   const sources = sourcesQuery.data ?? [];
   const policies = policiesQuery.data ?? [];
@@ -194,8 +189,8 @@ function GovernanceOverviewPage() {
               </Badge>
             </HStack>
             <Text color="fg.muted" fontSize="sm">
-              Spend, users, anomalies, and ingestion-source health for the organization.
-              Window: last 30 days.
+              Spend, users, anomalies, and ingestion-source health for the organization. Window:
+              last 30 days.
             </Text>
           </VStack>
           <Spacer />
@@ -203,10 +198,7 @@ function GovernanceOverviewPage() {
 
         {orgId && <QuarantineFillAlert organizationId={orgId} />}
 
-        <HandledErrorAlert
-          error={setupError}
-          fallbackTitle="Couldn't load the setup state"
-        />
+        <HandledErrorAlert error={setupError} fallbackTitle="Couldn't load the setup state" />
 
         {canReadActivity && !hasTraffic && (
           <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={5}>
@@ -215,11 +207,10 @@ function GovernanceOverviewPage() {
                 Setup checklist
               </Heading>
               <Text fontSize="sm" color="fg.muted">
-                Complete each step to start collecting governance data. Live metrics
-                replace this checklist once your first ingestion source is reporting
-                events. (AI Gateway traffic shows in{" "}
-                <Link href="/gateway/usage">Gateway → Usage</Link>; this dashboard rolls
-                up signals from ingestion sources beyond the gateway.)
+                Complete each step to start collecting governance data. Live metrics replace this
+                checklist once your first ingestion source is reporting events. (AI Gateway traffic
+                shows in <Link href="/gateway/usage">Gateway → Usage</Link>; this dashboard rolls up
+                signals from ingestion sources beyond the gateway.)
               </Text>
             </VStack>
             <VStack align="stretch" gap={2}>
@@ -355,9 +346,7 @@ function GovernanceOverviewPage() {
               <SectionCard
                 title="Spend over time"
                 subline="Daily UTC buckets, last 30 days. Toggle the breakdown to see which dimension is driving the trend."
-                actions={
-                  <GroupByToggle value={chartGroupBy} onChange={setChartGroupBy} />
-                }
+                actions={<GroupByToggle value={chartGroupBy} onChange={setChartGroupBy} />}
               >
                 <SpendOverTimeChart
                   buckets={spendOverTimeQuery.data?.buckets}
@@ -478,10 +467,7 @@ function GovernanceOverviewPage() {
                   </Text>
                   {/* An invitation to write, so only for whoever can. */}
                   {canManageSources && (
-                    <Link
-                      href="/governance/inventory?tab=sources"
-                      color="blue.600"
-                    >
+                    <Link href="/governance/inventory?tab=sources" color="blue.600">
                       + Add a source
                     </Link>
                   )}
@@ -624,8 +610,8 @@ function SessionPolicyForm({
       </HStack>
       <Text fontSize="xs" color="fg.muted">
         Suggested presets: <code>7</code> (high-security) · <code>30</code> (standard) ·{" "}
-        <code>0</code> (open-source / small teams). Values higher than the natural
-        refresh-token life (~30d) cap at the refresh-token expiry.
+        <code>0</code> (open-source / small teams). Values higher than the natural refresh-token
+        life (~30d) cap at the refresh-token expiry.
       </Text>
       {isInvalid && (
         <Text fontSize="xs" color="red.600">
@@ -742,13 +728,7 @@ function SummaryCard({
   );
 }
 
-function GroupByToggle({
-  value,
-  onChange,
-}: {
-  value: GroupBy;
-  onChange: (next: GroupBy) => void;
-}) {
+function GroupByToggle({ value, onChange }: { value: GroupBy; onChange: (next: GroupBy) => void }) {
   const options: GroupBy[] = ["team", "user", "model"];
   return (
     <HStack
@@ -794,13 +774,7 @@ function SectionCard({
   [key: string]: unknown;
 }) {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={5}
-      {...rest}
-    >
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={5} {...rest}>
       <HStack align="start" justify="space-between" marginBottom={3} gap={4}>
         <VStack align="start" gap={1} flex={1}>
           <Heading as="h3" size="sm">
@@ -998,9 +972,7 @@ function DepartmentRowHeader() {
 
 function DepartmentRow({ department }: { department: SpendByDepartment }) {
   const isUnassigned = department.departmentId === null;
-  const dotColor = isUnassigned
-    ? "#94a3b8"
-    : getHexColorForString(department.departmentName);
+  const dotColor = isUnassigned ? "#94a3b8" : getHexColorForString(department.departmentName);
   return (
     <HStack
       paddingY={2}

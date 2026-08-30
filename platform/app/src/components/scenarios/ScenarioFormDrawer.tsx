@@ -40,8 +40,10 @@ import {
   ScenarioForm,
   type ScenarioFormController,
   type ScenarioFormData,
+  type ScenarioFolderOption,
   type ScenarioInitialData,
 } from "@langwatch/scenario-web";
+import { CaseVersionChip } from "../agent-testing/shared/CaseVersionChip";
 import { api } from "../../utils/api";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
@@ -79,8 +81,7 @@ export type ScenarioFormDrawerProps = {
 export type ScenarioEditorVariant = "agent-testing";
 
 /** What the Agent Testing editor says a test case is for. */
-export const AGENT_TESTING_EDITOR_DESCRIPTION =
-  "Test your agent on a critical path or edge case";
+export const AGENT_TESTING_EDITOR_DESCRIPTION = "Test your agent on a critical path or edge case";
 
 /** Why Run is off on a test case that has never run. */
 export const NO_REMEMBERED_TARGET_HINT =
@@ -118,9 +119,7 @@ function savedToastTitle({
  * Reads scenarioId from drawer URL params and passes it as a prop.
  * Use this when rendering via the drawer registry / URL navigation.
  */
-export function ScenarioFormDrawerFromUrl(
-  props: Omit<ScenarioFormDrawerProps, "scenarioId">,
-) {
+export function ScenarioFormDrawerFromUrl(props: Omit<ScenarioFormDrawerProps, "scenarioId">) {
   const params = useDrawerParams();
   const { drawerOpen } = useDrawer();
   // When rendered from the drawer registry (CurrentDrawer), no `open` prop is
@@ -164,8 +163,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const [reloadNonce, setReloadNonce] = useState(0);
 
   // Target selection with localStorage persistence
-  const { target: persistedTarget, setTarget: persistTarget } =
-    useScenarioTarget(scenarioId);
+  const { target: persistedTarget, setTarget: persistTarget } = useScenarioTarget(scenarioId);
   const [selectedTarget, setSelectedTarget] = useState<TargetValue>(null);
   const [promptDrawerOpen, setPromptDrawerOpen] = useState(false);
   const [agentTypeSelectorOpen, setAgentTypeSelectorOpen] = useState(false);
@@ -274,10 +272,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       // it. `loadedVersion` reads from here, and a person who saves twice in
       // a row would otherwise send the version of the save before and be
       // refused for a conflict with their own write.
-      utils.scenarios.getById.setData(
-        { projectId: project?.id ?? "", id: data.id },
-        data,
-      );
+      utils.scenarios.getById.setData({ projectId: project?.id ?? "", id: data.id }, data);
       void utils.scenarios.getById.invalidate({
         projectId: project?.id ?? "",
         id: data.id,
@@ -344,6 +339,10 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           id: scenarioId,
           ...data,
           ...models,
+          // Only the Agent Testing editor guards against a lost race; the
+          // other write surfaces save over whatever is there, as they always
+          // did.
+          ...(isAgentTesting && loadedVersion !== null ? { expectedVersion: loadedVersion } : {}),
         });
       } catch {
         // Error toast already surfaced by updateMutation.onError; return null
@@ -644,12 +643,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         <Drawer.Body padding={0} overflow="hidden">
           <Grid templateColumns="1fr 320px" height="full" overflow="hidden">
             {/* Left: Form */}
-            <GridItem
-              overflowY="auto"
-              padding={6}
-              borderRightWidth="1px"
-              borderColor="border"
-            >
+            <GridItem overflowY="auto" padding={6} borderRightWidth="1px" borderColor="border">
               {hasReadFailed ? (
                 <ScenarioReadError
                   error={scenarioReadError}
@@ -660,20 +654,39 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               ) : (
                 <>
                   {formInstance && <FormServerError form={formInstance} />}
-                  <ScenarioForm
-                    key={scenarioId ?? "new"}
-                    defaultValues={defaultValues}
-                    onControllerChange={setFormController}
-                  />
+                  {staleVersion !== null && (
+                    <StaleVersionNotice
+                      currentVersion={staleVersion}
+                      onReload={() => {
+                        void (async () => {
+                          await refetchScenario();
+                          setStaleVersion(null);
+                          setReloadNonce((nonce) => nonce + 1);
+                        })();
+                      }}
+                    />
+                  )}
+                  {/* Only the Agent Testing editor offers the test suite
+                      field, and only it pays for the folder query behind it. */}
+                  {isAgentTesting ? (
+                    <ScenarioFormWithSuites
+                      key={`${scenarioId ?? "new"}-${reloadNonce}`}
+                      defaultValues={defaultValues}
+                      onControllerChange={setFormController}
+                    />
+                  ) : (
+                    <ScenarioForm
+                      key={`${scenarioId ?? "new"}-${reloadNonce}`}
+                      defaultValues={defaultValues}
+                      onControllerChange={setFormController}
+                    />
+                  )}
                 </>
               )}
             </GridItem>
             {/* Right: Help Sidebar */}
             <GridItem overflowY="auto" padding={4} bg="bg.muted">
-              <ScenarioEditorSidebar
-                form={formInstance}
-                variant={props.variant}
-              />
+              <ScenarioEditorSidebar form={formInstance} variant={props.variant} />
             </GridItem>
           </Grid>
         </Drawer.Body>
@@ -682,10 +695,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           {formInstance && !isHydrating && !hasReadFailed && (
             <HStack gap={6} flex={1} overflow="hidden" flexWrap="wrap">
               <FooterLabels form={formInstance} />
-              <FooterParameters
-                form={formInstance}
-                onOpen={() => setParametersDialogOpen(true)}
-              />
+              <FooterParameters form={formInstance} onOpen={() => setParametersDialogOpen(true)} />
             </HStack>
           )}
           <HStack gap={2} flexShrink={0}>
@@ -812,10 +822,10 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
  */
 function ScenarioFormWithSuites({
   defaultValues,
-  formRef,
+  onControllerChange,
 }: {
   defaultValues?: Partial<ScenarioFormData>;
-  formRef: (form: UseFormReturn<ScenarioFormData> | null) => void;
+  onControllerChange: (controller: ScenarioFormController | null) => void;
 }) {
   const { project } = useOrganizationTeamProject();
   const { data: folders } = api.suites.folders.getAll.useQuery(
@@ -823,15 +833,14 @@ function ScenarioFormWithSuites({
     { enabled: !!project?.id },
   );
   const folderOptions: ScenarioFolderOption[] = useMemo(
-    () =>
-      (folders ?? []).map((folder) => ({ id: folder.id, name: folder.name })),
+    () => (folders ?? []).map((folder) => ({ id: folder.id, name: folder.name })),
     [folders],
   );
 
   return (
     <ScenarioForm
       defaultValues={defaultValues}
-      formRef={formRef}
+      onControllerChange={onControllerChange}
       folderOptions={folderOptions}
     />
   );
@@ -869,11 +878,9 @@ function StaleVersionNotice({
         This test case changed since it was opened
       </Text>
       <Text fontSize="xs" color="fg.muted">
-        Somebody else saved{" "}
-        {currentVersion > 0 ? `version ${currentVersion}` : "a newer version"}{" "}
-        while this one was open. Nothing was written, so your edits are still
-        here. Reloading replaces them with the newer version, so copy anything
-        you want to keep first.
+        Somebody else saved {currentVersion > 0 ? `version ${currentVersion}` : "a newer version"}{" "}
+        while this one was open. Nothing was written, so your edits are still here. Reloading
+        replaces them with the newer version, so copy anything you want to keep first.
       </Text>
       <Button size="xs" variant="outline" onClick={onReload}>
         Discard my edits and reload
@@ -961,13 +968,7 @@ function FooterLabels({ form }: { form: ScenarioFormController }) {
  * the situation, the criteria and the target, so removing one is a decision
  * taken in the editor with the rest of the declaration in view.
  */
-function FooterParameters({
-  form,
-  onOpen,
-}: {
-  form: ScenarioFormController;
-  onOpen: () => void;
-}) {
+function FooterParameters({ form, onOpen }: { form: ScenarioFormController; onOpen: () => void }) {
   const parameters = useWatch({ control: form.control, name: "parameters" });
   const { errors } = useFormState({ control: form.control });
   const invalid = !!errors.parameters;

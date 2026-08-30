@@ -1,13 +1,4 @@
-import {
-  Badge,
-  Box,
-  Card,
-  Heading,
-  HStack,
-  IconButton,
-  Table,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Card, Heading, HStack, IconButton, Table, VStack } from "@chakra-ui/react";
 import { Mail, MoreVertical, RefreshCw, Trash2 } from "lucide-react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { Link } from "~/components/ui/link";
@@ -15,8 +6,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import type { RouterOutputs } from "~/utils/api";
 import { orgRoleOptions } from "../settings/OrganizationUserRoleField";
 
-type OrganizationInvite =
-  RouterOutputs["organization"]["getOrganizationPendingInvites"][number];
+type OrganizationInvite = RouterOutputs["organization"]["getOrganizationPendingInvites"][number];
 
 interface InvitesTableProps {
   invites: OrganizationInvite[];
@@ -32,14 +22,13 @@ interface InvitesTableProps {
  * REVOKED are all visible, with expiry dates — an expired invitation is a
  * resendable state, not a row that silently vanished.
  */
-const STATUS_BADGES: Record<string, { label: string; colorPalette?: string }> =
-  {
-    PENDING: { label: "Invited" },
-    EXPIRED: { label: "Expired", colorPalette: "orange" },
-    REVOKED: { label: "Revoked", colorPalette: "gray" },
-    ACCEPTED: { label: "Accepted", colorPalette: "green" },
-    PAYMENT_PENDING: { label: "Awaiting payment", colorPalette: "orange" },
-  };
+const STATUS_BADGES: Record<string, { label: string; colorPalette?: string }> = {
+  PENDING: { label: "Invited" },
+  EXPIRED: { label: "Expired", colorPalette: "orange" },
+  REVOKED: { label: "Revoked", colorPalette: "gray" },
+  ACCEPTED: { label: "Accepted", colorPalette: "green" },
+  PAYMENT_PENDING: { label: "Awaiting payment", colorPalette: "orange" },
+};
 
 export function InvitesTable({
   invites,
@@ -72,81 +61,17 @@ export function InvitesTable({
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {orderedInvites.map((invite) => {
-                const isWaitingApproval = invite.status === "WAITING_APPROVAL";
-                const roleLabel =
-                  orgRoleOptions.find((o) => o.value === invite.role)?.label ??
-                  invite.role;
-
-                return (
-                  <Table.Row key={invite.id}>
-                    <Table.Cell>
-                      <RandomColorAvatar size="2xs" name={invite.email} />
-                    </Table.Cell>
-                    <Table.Cell>{invite.email}</Table.Cell>
-                    <Table.Cell>
-                      {isWaitingApproval ? (
-                        <Badge size="sm" variant="surface" colorPalette="orange">
-                          Pending Approval
-                        </Badge>
-                      ) : (
-                        <Badge size="sm" variant="surface">
-                          Invited
-                        </Badge>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>{roleLabel}</Table.Cell>
-                    <Table.Cell>
-                      <TeamIdsDisplay teamIds={invite.teamIds} teams={teams} />
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Box width="full" height="full" display="flex" justifyContent="end">
-                        {isWaitingApproval ? (
-                          <WaitingApprovalActions
-                            isAdmin={isAdmin}
-                            inviteId={invite.id}
-                            onApprove={onApprove}
-                            onReject={onReject}
-                          />
-                        ) : (
-                          <Menu.Root>
-                            <Menu.Trigger asChild>
-                              <IconButton
-                                aria-label="Invite actions"
-                                variant="ghost"
-                                size="sm"
-                              >
-                                <MoreVertical size={16} />
-                              </IconButton>
-                            </Menu.Trigger>
-                            <Menu.Content>
-                              <Menu.Item
-                                value="view-link"
-                                onClick={() =>
-                                  onViewInviteLink(invite.inviteCode, invite.email)
-                                }
-                              >
-                                <Mail size={16} />
-                                View invite link
-                              </Menu.Item>
-                              {isAdmin && (
-                                <Menu.Item
-                                  value="delete"
-                                  color="red.500"
-                                  onClick={() => onDeleteInvite(invite.id)}
-                                >
-                                  <Trash2 size={16} />
-                                  Delete
-                                </Menu.Item>
-                              )}
-                            </Menu.Content>
-                          </Menu.Root>
-                        )}
-                      </Box>
-                    </Table.Cell>
-                  </Table.Row>
-                );
-              })}
+              {invites.map((invite) => (
+                <InviteRow
+                  key={invite.id}
+                  invite={invite}
+                  isAdmin={isAdmin}
+                  teams={teams}
+                  onViewInviteLink={onViewInviteLink}
+                  onResendInvite={onResendInvite}
+                  onRevokeInvite={onRevokeInvite}
+                />
+              ))}
             </Table.Body>
           </Table.Root>
         </Card.Body>
@@ -169,8 +94,7 @@ const InviteRow = ({
 }: InviteRowProps) => {
   const displayStatus = invite.displayStatus;
   const badge = STATUS_BADGES[displayStatus] ?? STATUS_BADGES.PENDING!;
-  const roleLabel =
-    orgRoleOptions.find((o) => o.value === invite.role)?.label ?? invite.role;
+  const roleLabel = orgRoleOptions.find((o) => o.value === invite.role)?.label ?? invite.role;
   const isOpen = displayStatus === "PENDING" || displayStatus === "EXPIRED";
   const canResend = isAdmin && isOpen;
   const canViewLink = displayStatus === "PENDING";
@@ -187,9 +111,7 @@ const InviteRow = ({
         </Badge>
       </Table.Cell>
       <Table.Cell>
-        {isOpen && invite.expiration
-          ? new Date(invite.expiration).toLocaleDateString()
-          : "\u2014"}
+        {isOpen && invite.expiration ? new Date(invite.expiration).toLocaleDateString() : "\u2014"}
       </Table.Cell>
       <Table.Cell>{roleLabel}</Table.Cell>
       <Table.Cell>
@@ -218,10 +140,7 @@ const InviteRowActions = ({
   onViewInviteLink,
   onResendInvite,
   onRevokeInvite,
-}: Pick<
-  InvitesTableProps,
-  "onViewInviteLink" | "onResendInvite" | "onRevokeInvite"
-> & {
+}: Pick<InvitesTableProps, "onViewInviteLink" | "onResendInvite" | "onRevokeInvite"> & {
   invite: OrganizationInvite;
   canViewLink: boolean;
   canResend: boolean;
@@ -251,11 +170,7 @@ const InviteRowActions = ({
           </Menu.Item>
         )}
         {canResend && (
-          <Menu.Item
-            value="revoke"
-            color="red.500"
-            onClick={() => onRevokeInvite(invite.id)}
-          >
+          <Menu.Item value="revoke" color="red.500" onClick={() => onRevokeInvite(invite.id)}>
             <Trash2 size={16} />
             Revoke
           </Menu.Item>

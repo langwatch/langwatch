@@ -19,10 +19,7 @@ import { useEffect, useMemo, useState } from "react";
 import { OverflownTextWithTooltip } from "~/components/OverflownText";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import {
-  type OrganizationUserRole,
-  RoleBindingScopeType,
-} from "~/generated/prisma/client";
+import { type OrganizationUserRole, RoleBindingScopeType } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useMemberDisableAction } from "~/hooks/useMemberDisableAction";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -57,14 +54,13 @@ type Binding = RouterOutputs["roleBinding"]["listForOrg"][number];
 function Members() {
   const { organization } = useOrganizationTeamProject();
 
-  const organizationWithMembers =
-    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-      {
-        organizationId: organization?.id ?? "",
-        includeDeactivated: true,
-      },
-      { enabled: !!organization },
-    );
+  const organizationWithMembers = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+    {
+      organizationId: organization?.id ?? "",
+      includeDeactivated: true,
+    },
+    { enabled: !!organization },
+  );
   const activePlan = api.plan.getActivePlan.useQuery(
     {
       organizationId: organization?.id ?? "",
@@ -74,8 +70,7 @@ function Members() {
     },
   );
 
-  if (!organization || !organizationWithMembers.data || !activePlan.data)
-    return <SettingsLayout />;
+  if (!organization || !organizationWithMembers.data || !activePlan.data) return <SettingsLayout />;
 
   return (
     <MembersList
@@ -133,9 +128,9 @@ function MembersList({
   );
   const deleteMemberMutation = api.organization.deleteMember.useMutation();
 
-  const [selectedInvites, setSelectedInvites] = useState<
-    { inviteCode: string; email: string }[]
-  >([]);
+  const [selectedInvites, setSelectedInvites] = useState<{ inviteCode: string; email: string }[]>(
+    [],
+  );
 
   // Watch for changes in selectedInvites and open popup when it changes
   useEffect(() => {
@@ -252,17 +247,13 @@ function MembersList({
   const sortedMembers = useMemo(
     () =>
       [...organization.members].sort((a, b) =>
-        (a.user.name ?? a.user.email ?? "").localeCompare(
-          b.user.name ?? b.user.email ?? "",
-        ),
+        (a.user.name ?? a.user.email ?? "").localeCompare(b.user.name ?? b.user.email ?? ""),
       ),
     [organization.members],
   );
 
   const canDeleteMember = (memberId: string) =>
-    hasOrganizationManagePermission &&
-    organization.members.length > 1 &&
-    memberId !== user?.id;
+    hasOrganizationManagePermission && organization.members.length > 1 && memberId !== user?.id;
 
   // Unlike deleting, disabling is reversible and is how an organization gets
   // back within its licensed seats, so it stays available down to the last
@@ -271,10 +262,7 @@ function MembersList({
   const canDisableMember = (memberId: string) =>
     hasOrganizationManagePermission && memberId !== user?.id;
 
-  const sentInvites = useMemo(
-    () => (pendingInvites.data ?? []).filter((invite) => invite.status === "PENDING"),
-    [pendingInvites.data],
-  );
+  const invites = useMemo(() => pendingInvites.data ?? [], [pendingInvites.data]);
 
   // One panel, two directions (D12): an invitation is the organization
   // reaching out, a request is somebody reaching in, and an admin answers
@@ -383,9 +371,7 @@ function MembersList({
                         </HStack>
                       </Table.Cell>
                       <Table.Cell maxWidth="280px">
-                        <OverflownTextWithTooltip>
-                          {member.user.email}
-                        </OverflownTextWithTooltip>
+                        <OverflownTextWithTooltip>{member.user.email}</OverflownTextWithTooltip>
                       </Table.Cell>
                       {hasOrganizationManagePermission && (
                         <Table.Cell>
@@ -408,12 +394,7 @@ function MembersList({
                         </Table.Cell>
                       )}
                       <Table.Cell>
-                        <Box
-                          width="full"
-                          height="full"
-                          display="flex"
-                          justifyContent="end"
-                        >
+                        <Box width="full" height="full" display="flex" justifyContent="end">
                           <MemberRowActions
                             member={member}
                             canDisable={canDisableMember(member.userId)}
@@ -485,8 +466,7 @@ function MembersList({
           <Dialog.Body paddingBottom={6}>
             <VStack align="start" gap={4}>
               <Text>
-                Send the link below to the users you want to invite to join the
-                organization.
+                Send the link below to the users you want to invite to join the organization.
               </Text>
 
               <VStack align="start" gap={4} width="full">
@@ -587,11 +567,7 @@ function MemberRowActions({
             </Menu.Item>
           ))}
         {canDelete && (
-          <Menu.Item
-            value="delete"
-            color="red.500"
-            onClick={() => onDelete(member.userId)}
-          >
+          <Menu.Item value="delete" color="red.500" onClick={() => onDelete(member.userId)}>
             <Trash2 size={16} />
             Delete
           </Menu.Item>
@@ -668,11 +644,7 @@ function MemberAccessDisplay({
             {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId.slice(0, 8) + "…"}
           </Badge>
           {b.groupId && (
-            <Text
-              color="fg.subtle"
-              fontSize="xs"
-              title={`via group: ${b.groupName ?? b.groupId}`}
-            >
+            <Text color="fg.subtle" fontSize="xs" title={`via group: ${b.groupName ?? b.groupId}`}>
               via {b.groupName ?? "group"}
             </Text>
           )}

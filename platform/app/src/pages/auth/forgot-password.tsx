@@ -26,6 +26,7 @@ const forgotPasswordSchema = z.object({ email: z.string().email() });
 
 export default function ForgotPassword() {
   const publicEnv = usePublicEnv({ includeCapabilities: true });
+  const frontDoor = useIdentityFrontDoor();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
 
   if (!publicEnv.data) {
@@ -55,8 +56,8 @@ export default function ForgotPassword() {
     return (
       <AuthCard title="Forgot password">
         <Text>
-          Your password is managed by your identity provider. Use your organization single
-          sign-on to access LangWatch.
+          Your password is managed by your identity provider. Use your organization single sign-on
+          to access LangWatch.
         </Text>
         <BackToSignInLink />
       </AuthCard>
@@ -71,9 +72,8 @@ export default function ForgotPassword() {
     return (
       <AuthCard title="Forgot password">
         <Text>
-          This deployment cannot send email, so it cannot send you a reset link. Ask
-          whoever operates it to reset your password for you, or to configure an email
-          provider.
+          This deployment cannot send email, so it cannot send you a reset link. Ask whoever
+          operates it to reset your password for you, or to configure an email provider.
         </Text>
         <BackToSignInLink />
       </AuthCard>
@@ -112,8 +112,8 @@ function ForgotPasswordForm() {
     return (
       <AuthCard title="Check your email">
         <Text>
-          If an account exists for <b>{submittedEmail}</b>, we have sent a link to reset
-          your password. The link expires in 1 hour.
+          If an account exists for <b>{submittedEmail}</b>, we have sent a link to reset your
+          password. The link expires in 1 hour.
         </Text>
         <BackToSignInLink />
       </AuthCard>
@@ -136,8 +136,7 @@ function ForgotPasswordForm() {
           <Card.Body>
             <VStack width="full">
               <Text width="full" color="gray.600">
-                Enter the email for your account and we will send you a link to reset your
-                password.
+                Enter the email for your account and we will send you a link to reset your password.
               </Text>
               <HorizontalFormControl
                 label="Email"

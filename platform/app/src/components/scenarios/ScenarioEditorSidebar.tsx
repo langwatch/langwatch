@@ -5,12 +5,11 @@ import { ScenarioAIGeneration } from "./ScenarioAIGeneration";
 
 type ScenarioEditorSidebarProps = {
   form?: ScenarioFormController | null;
+  /** Agent Testing calls the thing being written a test case, not a scenario. */
+  variant?: "agent-testing";
 };
 
-export function ScenarioEditorSidebar({
-  form,
-  variant,
-}: ScenarioEditorSidebarProps) {
+export function ScenarioEditorSidebar({ form, variant }: ScenarioEditorSidebarProps) {
   const isAgentTesting = variant === "agent-testing";
 
   return (
@@ -23,9 +22,7 @@ export function ScenarioEditorSidebar({
         <Card.Body>
           <VStack align="stretch" gap={3}>
             <Text fontWeight="semibold" fontSize="sm">
-              {isAgentTesting
-                ? "Writing great test cases"
-                : "Writing Great Scenarios"}
+              {isAgentTesting ? "Writing great test cases" : "Writing Great Scenarios"}
             </Text>
 
             <VStack align="stretch" gap={3}>
@@ -38,8 +35,7 @@ export function ScenarioEditorSidebar({
                     Define Success Clearly
                   </Text>
                   <Text fontSize="xs" color="fg.muted">
-                    What does &apos;good&apos; look like? Be specific about expected
-                    outcomes.
+                    What does &apos;good&apos; look like? Be specific about expected outcomes.
                   </Text>
                 </VStack>
               </HStack>

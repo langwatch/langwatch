@@ -7,7 +7,11 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { LangWatchQLQueryResult, LangWatchQLSchema } from "@langwatch/analytics-contract";
+import type {
+  LangWatchQLBudgetOverflowMode,
+  LangWatchQLQueryResult,
+  LangWatchQLSchema,
+} from "@langwatch/analytics-contract";
 import type { Protections } from "@langwatch/trace-server";
 import { lwqlTenantCapability } from "./capability";
 import { LWQL_VIEW_CATALOG } from "./catalog/lwqlViews";
@@ -28,6 +32,7 @@ import {
 } from "./executor";
 import {
   assertLangWatchQLGranularityDeclaration,
+  type LangWatchQLGranularityResolution,
   resolveLangWatchQLGranularity,
   resolveLangWatchQLTimeWindow,
 } from "./resolveTimeWindow";

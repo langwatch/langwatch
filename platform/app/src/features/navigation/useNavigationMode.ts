@@ -35,15 +35,17 @@ export type { NavigationModeResolution };
  */
 export function useNavigationMode(): NavigationModeResolution {
   const storedMode = useNavigationModeStore((state) => state.storedMode);
-  const isLastKnownFlagEnabled = useNavigationModeStore(
-    (state) => state.isLastKnownFlagEnabled,
-  );
+  const isLastKnownFlagEnabled = useNavigationModeStore((state) => state.isLastKnownFlagEnabled);
   const rememberFlag = useNavigationModeStore((state) => state.rememberFlag);
   const isFlagNeeded = storedMode !== "legacy";
 
   // The same organization queries the dashboard layout itself runs; react-query
   // dedupes them, so the opted-out path stays at zero extra requests.
-  const { organization, isLoading: isOrganizationLoading } = useOrganizationTeamProject({
+  const {
+    project,
+    organization,
+    isLoading: isOrganizationLoading,
+  } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
@@ -72,8 +74,6 @@ export function useNavigationMode(): NavigationModeResolution {
   return resolveNavigationMode({
     storedMode,
     isLastKnownFlagEnabled,
-    flag: isFlagAnswered
-      ? { status: "answered", isEnabled: isFlagEnabled }
-      : { status: "pending" },
+    flag: isFlagAnswered ? { status: "answered", isEnabled: isFlagEnabled } : { status: "pending" },
   });
 }
