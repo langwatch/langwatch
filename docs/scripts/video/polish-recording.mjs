@@ -1,31 +1,40 @@
 #!/usr/bin/env node
 /**
- * Adds a synthetic mouse cursor and focus zooms to a screen recording.
+ * Screen Studio style polish for a docs screen recording.
  *
  *   node docs/scripts/video/polish-recording.mjs <timeline.json> [options]
  *
- * A screen recorder driven by Playwright captures no mouse cursor and no zoom,
- * so a raw take is flat and hard to follow. This script reads a timeline of
- * click beats and renders the two things that make the take readable:
+ * READ THE GUIDE BEFORE YOU AUTHOR A TIMELINE:
+ * https://nexus.langwatch.ai/wiki/recording-video-for-docs
  *
- *   1. A cursor that travels to each click target on a curved, eased path,
- *      turns into a pointing hand when it arrives, and dips on the click.
- *   2. A zoom that eases in on the target just before the click, holds while
- *      the result appears, and eases back out.
+ * That page carries the rules this script cannot enforce: how many zooms a
+ * video can take before it is unwatchable, which targets earn one, when to pan
+ * instead of zooming out and back in, and how to record a take that the polish
+ * step can use. `README.md` next to this file is the format reference. The
+ * guide is the judgement.
  *
- * It reads the raw take through ffmpeg, composites every frame in plain
+ * What it renders, per frame:
+ *
+ *   background image  ->  soft shadow  ->  the recording, as a rounded window
+ *                     ->  the click ripple  ->  the cursor
+ *
+ * The camera puts the click target at the centre of the frame and zooms
+ * uniformly around it, so the window slides off the canvas and the background
+ * fills what is left. That is the point of the background: it is what lets the
+ * camera track the cursor instead of being pinned inside the recording.
+ *
+ * It reads the take through ffmpeg, composites every frame in plain
  * JavaScript, and writes the result back through ffmpeg. The only external
  * programs are `ffmpeg`, `ffprobe` and `rsvg-convert`, so there is nothing to
- * install from npm and the script keeps working after any dependency bump.
+ * install from npm.
  *
  * Options:
  *   --out PATH          write here instead of the timeline's `output`
+ *   --background PATH   override the background image
  *   --preview A:B       render only seconds A to B of the result (fast loop)
  *   --stills "1,4,8.5"  after encoding, write a PNG per listed second
  *   --stills-dir DIR    where those PNGs go (default: next to the output)
  *   --crf N             override the encoder quality (lower is better)
- *
- * See README.md in this directory for the timeline format.
  */
 
 import { spawn } from "node:child_process";
@@ -38,12 +47,13 @@ import path from "node:path";
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (x) => x * x * (3 - 2 * x);
 
 /** Slow at both ends, quick through the middle. The default for everything. */
 const easeInOutCubic = (x) =>
   x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
 
-/** Quick start, long settle. Used for the click dip. */
+/** Quick start, long settle. Used for the click dip and the ripple. */
 const easeOutCubic = (x) => 1 - Math.pow(1 - x, 3);
 
 // ------------------------------------------------------------- child processes
@@ -94,30 +104,41 @@ async function probe(file) {
   };
 }
 
+/** Decodes any still image ffmpeg can read into an RGBA buffer of exactly w x h. */
+async function loadImageCover(file, w, h) {
+  const data = await run("ffmpeg", [
+    "-v", "error",
+    "-i", file,
+    "-vf", `scale=${w}:${h}:force_original_aspect_ratio=increase:flags=lanczos,crop=${w}:${h}`,
+    "-frames:v", "1",
+    "-f", "rawvideo",
+    "-pix_fmt", "rgba",
+    "-",
+  ]);
+  if (data.length !== w * h * 4) {
+    throw new Error(`background decoded to ${data.length} bytes, expected ${w * h * 4}`);
+  }
+  return data;
+}
+
 // ------------------------------------------------------------------- cursors
 
 /**
  * Renders an SVG to an RGBA bitmap of the requested height.
  *
- * rsvg-convert writes PNG, and Node cannot decode PNG on its own, so ffmpeg
+ * rsvg-convert writes PNG, and node cannot decode PNG on its own, so ffmpeg
  * turns the PNG into raw RGBA. Both are already required by the rest of the
  * script, which is why this takes two processes instead of a library.
  */
 async function rasterize(svgPath, height) {
-  const tmp = path.join(
-    fs.mkdtempSync(path.join(os.tmpdir(), "polish-cursor-")),
-    "c.png",
-  );
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "polish-cursor-"));
+  const tmp = path.join(dir, "c.png");
   await run("rsvg-convert", ["-h", String(Math.round(height)), svgPath, "-o", tmp]);
   const meta = await probe(tmp);
   const rgba = await run("ffmpeg", [
-    "-v", "error",
-    "-i", tmp,
-    "-f", "rawvideo",
-    "-pix_fmt", "rgba",
-    "-",
+    "-v", "error", "-i", tmp, "-f", "rawvideo", "-pix_fmt", "rgba", "-",
   ]);
-  fs.rmSync(path.dirname(tmp), { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true });
   return { width: meta.width, height: meta.height, data: rgba };
 }
 
@@ -127,7 +148,6 @@ function blurAlpha(src, w, h, radius) {
   let a = src;
   let b = new Float32Array(w * h);
   for (let pass = 0; pass < 3; pass++) {
-    // horizontal
     for (let y = 0; y < h; y++) {
       const row = y * w;
       let sum = 0;
@@ -139,7 +159,6 @@ function blurAlpha(src, w, h, radius) {
         sum -= a[row + clamp(x - radius, 0, w - 1)];
       }
     }
-    // vertical
     const t = a;
     a = new Float32Array(w * h);
     for (let x = 0; x < w; x++) {
@@ -160,16 +179,13 @@ function blurAlpha(src, w, h, radius) {
 /**
  * Builds the drawable cursor: a blurred black copy of its own alpha channel
  * underneath the cursor itself, on a canvas padded enough to hold the blur.
- *
- * The result is premultiplied so that scaling it with bilinear sampling does
- * not bleed background colour through the soft edges.
+ * Premultiplied, so bilinear sampling does not bleed through the soft edges.
  */
 function buildSprite(bitmap, hotspot, shadow) {
   const { width: cw, height: ch, data } = bitmap;
   const pad =
     Math.ceil(shadow.blur * 2) +
-    Math.ceil(Math.abs(shadow.offsetX) + Math.abs(shadow.offsetY)) +
-    2;
+    Math.ceil(Math.abs(shadow.offsetX) + Math.abs(shadow.offsetY)) + 2;
   const w = cw + pad * 2;
   const h = ch + pad * 2;
 
@@ -184,44 +200,24 @@ function buildSprite(bitmap, hotspot, shadow) {
       shadowAlpha[ty * w + tx] = data[(y * cw + x) * 4 + 3] / 255;
     }
   }
-  const blurred = blurAlpha(
-    shadowAlpha,
-    w,
-    h,
-    Math.max(1, Math.round(shadow.blur / 2)),
-  );
+  const blurred = blurAlpha(shadowAlpha, w, h, Math.max(1, Math.round(shadow.blur / 2)));
 
-  // Premultiplied RGB in 0..255, alpha in 0..1.
   const out = new Float32Array(w * h * 4);
-  for (let i = 0; i < w * h; i++) {
-    const sa = clamp(blurred[i] * shadow.opacity, 0, 1);
-    out[i * 4 + 0] = 0;
-    out[i * 4 + 1] = 0;
-    out[i * 4 + 2] = 0;
-    out[i * 4 + 3] = sa;
-  }
+  for (let i = 0; i < w * h; i++) out[i * 4 + 3] = clamp(blurred[i] * shadow.opacity, 0, 1);
   for (let y = 0; y < ch; y++) {
     for (let x = 0; x < cw; x++) {
       const s = (y * cw + x) * 4;
       const ca = data[s + 3] / 255;
       if (ca === 0) continue;
       const d = ((y + pad) * w + (x + pad)) * 4;
-      const da = out[d + 3];
-      const na = ca + da * (1 - ca);
       out[d + 0] = data[s + 0] * ca + out[d + 0] * (1 - ca);
       out[d + 1] = data[s + 1] * ca + out[d + 1] * (1 - ca);
       out[d + 2] = data[s + 2] * ca + out[d + 2] * (1 - ca);
-      out[d + 3] = na;
+      out[d + 3] = ca + out[d + 3] * (1 - ca);
     }
   }
 
-  return {
-    w,
-    h,
-    data: out,
-    hotX: pad + hotspot.x * cw,
-    hotY: pad + hotspot.y * ch,
-  };
+  return { w, h, data: out, hotX: pad + hotspot.x * cw, hotY: pad + hotspot.y * ch };
 }
 
 function drawSprite(dst, dw, dh, sprite, px, py, scale, alpha) {
@@ -241,35 +237,29 @@ function drawSprite(dst, dw, dh, sprite, px, py, scale, alpha) {
     const v = (y + 0.5 - top) * inv - 0.5;
     const vy = Math.floor(v);
     const fy = v - vy;
-    const y0i = clamp(vy, 0, sh - 1);
-    const y1i = clamp(vy + 1, 0, sh - 1);
+    const ra = clamp(vy, 0, sh - 1) * sw;
+    const rb = clamp(vy + 1, 0, sh - 1) * sw;
     for (let x = x0; x < x1; x++) {
       const u = (x + 0.5 - left) * inv - 0.5;
       const ux = Math.floor(u);
       const fx = u - ux;
-      const x0i = clamp(ux, 0, sw - 1);
-      const x1i = clamp(ux + 1, 0, sw - 1);
+      const ca = clamp(ux, 0, sw - 1);
+      const cb = clamp(ux + 1, 0, sw - 1);
 
-      const iA = (y0i * sw + x0i) * 4;
-      const iB = (y0i * sw + x1i) * 4;
-      const iC = (y1i * sw + x0i) * 4;
-      const iD = (y1i * sw + x1i) * 4;
+      const iA = (ra + ca) * 4;
+      const iB = (ra + cb) * 4;
+      const iC = (rb + ca) * 4;
+      const iD = (rb + cb) * 4;
       const wA = (1 - fx) * (1 - fy);
       const wB = fx * (1 - fy);
       const wC = (1 - fx) * fy;
       const wD = fx * fy;
 
-      const sa =
-        (s[iA + 3] * wA + s[iB + 3] * wB + s[iC + 3] * wC + s[iD + 3] * wD) *
-        alpha;
+      const sa = (s[iA + 3] * wA + s[iB + 3] * wB + s[iC + 3] * wC + s[iD + 3] * wD) * alpha;
       if (sa <= 0.002) continue;
       const sr = (s[iA] * wA + s[iB] * wB + s[iC] * wC + s[iD] * wD) * alpha;
-      const sg =
-        (s[iA + 1] * wA + s[iB + 1] * wB + s[iC + 1] * wC + s[iD + 1] * wD) *
-        alpha;
-      const sb =
-        (s[iA + 2] * wA + s[iB + 2] * wB + s[iC + 2] * wC + s[iD + 2] * wD) *
-        alpha;
+      const sg = (s[iA + 1] * wA + s[iB + 1] * wB + s[iC + 1] * wC + s[iD + 1] * wD) * alpha;
+      const sb = (s[iA + 2] * wA + s[iB + 2] * wB + s[iC + 2] * wC + s[iD + 2] * wD) * alpha;
 
       const d = (y * dw + x) * 4;
       const keep = 1 - sa;
@@ -291,20 +281,18 @@ function kernel(x) {
 }
 
 /**
- * Precomputes the tap indices and weights for one axis. The filter widens when
- * the image is being made smaller, which is what keeps a downscale from
- * aliasing.
+ * Precomputes tap indices and weights for one axis. The filter widens when the
+ * image is being made smaller, which keeps a downscale from aliasing.
  */
-function planAxis(outN, srcStart, srcSpan, srcLimit) {
-  const step = srcSpan / outN;
-  const support = Math.max(1, step) * 2;
+function planAxis(outN, srcStart, srcStep, srcLimit) {
+  const support = Math.max(1, srcStep) * 2;
   const taps = Math.ceil(support) * 2;
   const idx = new Int32Array(outN * taps);
   const wgt = new Float32Array(outN * taps);
-  const invSupport = 1 / Math.max(1, step);
+  const invSupport = 1 / Math.max(1, srcStep);
 
   for (let i = 0; i < outN; i++) {
-    const center = srcStart + (i + 0.5) * step - 0.5;
+    const center = srcStart + (i + 0.5) * srcStep - 0.5;
     const first = Math.floor(center - support + 0.5);
     let sum = 0;
     for (let k = 0; k < taps; k++) {
@@ -322,16 +310,89 @@ function planAxis(outN, srcStart, srcSpan, srcLimit) {
   return { idx, wgt, taps };
 }
 
-/**
- * Resamples the rectangle (cropX, cropY, cropW, cropH) of an RGBA source into
- * a full RGBA destination, separably: rows first into a float scratch buffer,
- * then columns.
- */
-function resample(src, sw, sh, cropX, cropY, cropW, cropH, dst, dw, dh, scratch) {
-  const xs = planAxis(dw, cropX, cropW, sw);
-  const ys = planAxis(dh, cropY, cropH, sh);
+// --------------------------------------------------------------- window shape
 
-  // Only the source rows the vertical pass will read need a horizontal pass.
+/** Signed distance to a rounded rectangle. Negative inside. */
+function sdRoundRect(px, py, cx, cy, hw, hh, r) {
+  const qx = Math.abs(px - cx) - (hw - r);
+  const qy = Math.abs(py - cy) - (hh - r);
+  const ax = qx > 0 ? qx : 0;
+  const ay = qy > 0 ? qy : 0;
+  const outside = Math.sqrt(ax * ax + ay * ay);
+  const inside = Math.min(Math.max(qx, qy), 0);
+  return outside + inside - r;
+}
+
+/**
+ * The horizontal span of a row that the window covers completely. The shadow
+ * pass skips it, because an opaque window hides whatever is behind it.
+ */
+function opaqueSpan(y, cy, cx, hw, hh, r) {
+  const dy = Math.abs(y - cy);
+  if (dy >= hh) return null;
+  if (dy <= hh - r) return [cx - hw, cx + hw];
+  const k = dy - (hh - r);
+  const inset = r - Math.sqrt(Math.max(0, r * r - k * k));
+  return [cx - hw + inset, cx + hw - inset];
+}
+
+/** A soft shadow behind the window, drawn straight from the distance field. */
+function drawShadow(dst, dw, dh, win, cfg) {
+  const cx = win.cx + cfg.offsetX;
+  const cy = win.cy + cfg.offsetY;
+  const hw = win.hw + cfg.spread;
+  const hh = win.hh + cfg.spread;
+  const r = win.r + cfg.spread;
+  const reach = cfg.blur + 2;
+
+  const y0 = Math.max(0, Math.floor(cy - hh - reach));
+  const y1 = Math.min(dh, Math.ceil(cy + hh + reach));
+  const x0 = Math.max(0, Math.floor(cx - hw - reach));
+  const x1 = Math.min(dw, Math.ceil(cx + hw + reach));
+  const inv = 1 / (2 * cfg.blur);
+
+  for (let y = y0; y < y1; y++) {
+    const py = y + 0.5;
+    const skip = opaqueSpan(py, win.cy, win.cx, win.hw, win.hh, win.r);
+    const sk0 = skip ? Math.ceil(skip[0]) + 1 : Infinity;
+    const sk1 = skip ? Math.floor(skip[1]) - 1 : -Infinity;
+    for (let x = x0; x < x1; x++) {
+      if (x >= sk0 && x <= sk1) {
+        x = sk1;
+        continue;
+      }
+      const sd = sdRoundRect(x + 0.5, py, cx, cy, hw, hh, r);
+      if (sd >= cfg.blur) continue;
+      const u = sd <= -cfg.blur ? 1 : smooth(clamp((cfg.blur - sd) * inv, 0, 1));
+      const a = cfg.opacity * u;
+      if (a <= 0.002) continue;
+      const d = (y * dw + x) * 4;
+      const keep = 1 - a;
+      dst[d + 0] *= keep;
+      dst[d + 1] *= keep;
+      dst[d + 2] *= keep;
+    }
+  }
+}
+
+/**
+ * Resamples the recording into the window rectangle, masks it to rounded
+ * corners and lays a hairline on the edge. Separable: rows first into a float
+ * scratch buffer, then columns straight into the destination.
+ */
+function drawWindow(dst, dw, dh, src, sw, sh, win, border, scratchRef) {
+  const step = 1 / win.scale;
+  const x0 = Math.max(0, Math.floor(win.left));
+  const y0 = Math.max(0, Math.floor(win.top));
+  const x1 = Math.min(dw, Math.ceil(win.left + sw * win.scale));
+  const y1 = Math.min(dh, Math.ceil(win.top + sh * win.scale));
+  if (x1 <= x0 || y1 <= y0) return;
+
+  const outW = x1 - x0;
+  const outH = y1 - y0;
+  const xs = planAxis(outW, (x0 - win.left) * step, step, sw);
+  const ys = planAxis(outH, (y0 - win.top) * step, step, sh);
+
   let rowMin = sh;
   let rowMax = 0;
   for (let i = 0; i < ys.idx.length; i++) {
@@ -340,14 +401,15 @@ function resample(src, sw, sh, cropX, cropY, cropW, cropH, dst, dw, dh, scratch)
     if (r > rowMax) rowMax = r;
   }
   const rows = rowMax - rowMin + 1;
-  const need = rows * dw * 4;
-  if (scratch.length < need) scratch = new Float32Array(need);
+  const need = rows * outW * 3;
+  if (scratchRef.buf.length < need) scratchRef.buf = new Float32Array(need);
+  const scratch = scratchRef.buf;
 
   const xt = xs.taps;
   for (let r = 0; r < rows; r++) {
     const srow = (rowMin + r) * sw * 4;
-    const drow = r * dw * 4;
-    for (let x = 0; x < dw; x++) {
+    const drow = r * outW * 3;
+    for (let x = 0; x < outW; x++) {
       let a = 0;
       let b = 0;
       let c = 0;
@@ -360,7 +422,7 @@ function resample(src, sw, sh, cropX, cropY, cropW, cropH, dst, dw, dh, scratch)
         b += src[p + 1] * w;
         c += src[p + 2] * w;
       }
-      const d = drow + x * 4;
+      const d = drow + x * 3;
       scratch[d] = a;
       scratch[d + 1] = b;
       scratch[d + 2] = c;
@@ -368,57 +430,105 @@ function resample(src, sw, sh, cropX, cropY, cropW, cropH, dst, dw, dh, scratch)
   }
 
   const yt = ys.taps;
-  for (let y = 0; y < dh; y++) {
+  const bw = border ? border.width : 0;
+  for (let y = 0; y < outH; y++) {
     const base = y * yt;
-    const drow = y * dw * 4;
-    for (let x = 0; x < dw; x++) {
+    const py = y0 + y + 0.5;
+    const drow = (y0 + y) * dw;
+    for (let x = 0; x < outW; x++) {
+      const px = x0 + x + 0.5;
+      const sd = sdRoundRect(px, py, win.cx, win.cy, win.hw, win.hh, win.r);
+      const cov = clamp(0.5 - sd, 0, 1);
+      if (cov <= 0.002) continue;
+
       let a = 0;
       let b = 0;
       let c = 0;
       for (let k = 0; k < yt; k++) {
         const w = ys.wgt[base + k];
         if (w === 0) continue;
-        const p = (ys.idx[base + k] - rowMin) * dw * 4 + x * 4;
+        const p = (ys.idx[base + k] - rowMin) * outW * 3 + x * 3;
         a += scratch[p] * w;
         b += scratch[p + 1] * w;
         c += scratch[p + 2] * w;
       }
-      const d = drow + x * 4;
-      dst[d] = clamp(a, 0, 255);
-      dst[d + 1] = clamp(b, 0, 255);
-      dst[d + 2] = clamp(c, 0, 255);
-      dst[d + 3] = 255;
+
+      if (bw > 0) {
+        const ring = (cov - clamp(0.5 - (sd + bw), 0, 1)) * border.opacity;
+        if (ring > 0.002) {
+          a = lerp(a, border.color[0], ring);
+          b = lerp(b, border.color[1], ring);
+          c = lerp(c, border.color[2], ring);
+        }
+      }
+
+      const d = (drow + x0 + x) * 4;
+      const keep = 1 - cov;
+      dst[d + 0] = clamp(clamp(a, 0, 255) * cov + dst[d + 0] * keep, 0, 255);
+      dst[d + 1] = clamp(clamp(b, 0, 255) * cov + dst[d + 1] * keep, 0, 255);
+      dst[d + 2] = clamp(clamp(c, 0, 255) * cov + dst[d + 2] * keep, 0, 255);
     }
   }
-  return scratch;
+}
+
+/** The expanding ring a click leaves behind: faint fill, visible edge, fades. */
+function drawRipple(dst, dw, dh, px, py, radius, fillA, strokeA, strokeW, color) {
+  const reach = radius + strokeW + 2;
+  const x0 = Math.max(0, Math.floor(px - reach));
+  const y0 = Math.max(0, Math.floor(py - reach));
+  const x1 = Math.min(dw, Math.ceil(px + reach));
+  const y1 = Math.min(dh, Math.ceil(py + reach));
+  const half = strokeW / 2;
+
+  for (let y = y0; y < y1; y++) {
+    const ddy = y + 0.5 - py;
+    for (let x = x0; x < x1; x++) {
+      const ddx = x + 0.5 - px;
+      const dist = Math.sqrt(ddx * ddx + ddy * ddy);
+      const inside = clamp(0.5 - (dist - radius), 0, 1);
+      const ring = clamp(0.5 - (Math.abs(dist - radius) - half), 0, 1);
+      const a = inside * fillA + ring * strokeA * (1 - inside * fillA);
+      if (a <= 0.002) continue;
+      const d = (y * dw + x) * 4;
+      const keep = 1 - a;
+      dst[d + 0] = clamp(color[0] * a + dst[d + 0] * keep, 0, 255);
+      dst[d + 1] = clamp(color[1] * a + dst[d + 1] * keep, 0, 255);
+      dst[d + 2] = clamp(color[2] * a + dst[d + 2] * keep, 0, 255);
+    }
+  }
 }
 
 // -------------------------------------------------------------------- tracks
 
 /**
- * Turns the beats into a list of zoom keyframes and returns a lookup.
+ * Turns the beats into camera keyframes and returns a lookup.
  *
  * Each zoomed beat contributes four keyframes: leave 1x, reach the target zoom
- * just before the click, hold, return to 1x. When two beats are close enough
- * that the second starts before the first has returned, both 1x keyframes are
- * dropped so the view pans straight from one focus point to the next.
+ * before the click, hold, return to 1x. At 1x the camera sits on the middle of
+ * the recording; zoomed, it sits on the focus point, so zooming in and panning
+ * to the target are one movement.
+ *
+ * When two beats are close enough that the second starts before the first has
+ * returned, both 1x keyframes are dropped and the camera pans straight from
+ * one focus point to the next. That is the rule for a corner target followed
+ * by a central one: zoom once, then move.
  */
-function buildZoomTrack(beats, cfg, duration) {
+function buildCameraTrack(beats, cfg, duration, midX, midY) {
   const groups = [];
   for (const b of beats) {
     if (b.x == null || b.y == null) continue;
     const z = b.zoom == null ? cfg.default : b.zoom;
     if (!(z > 1.0001)) continue;
-    const peak = b.t - cfg.lead;
+    const lead = b.lead == null ? cfg.lead : b.lead;
+    const rampIn = b.in == null ? cfg.in : b.in;
+    const peak = b.t - lead;
     const holdEnd = b.t + (b.hold == null ? cfg.hold : b.hold);
     groups.push({
-      rampIn: peak - cfg.in,
+      rampIn: peak - rampIn,
       peak,
       holdEnd,
-      rampOut: holdEnd + cfg.out,
+      rampOut: holdEnd + (b.out == null ? cfg.out : b.out),
       z,
-      // `zoomAt` frames something wider than the click, such as the dialog the
-      // button belongs to. Without it the click point is the centre.
       cx: b.zoomAt ? b.zoomAt.x : b.x,
       cy: b.zoomAt ? b.zoomAt.y : b.y,
     });
@@ -432,24 +542,23 @@ function buildZoomTrack(beats, cfg, duration) {
     const joinBefore = prev && prev.rampOut > g.rampIn;
     const joinAfter = next && g.rampOut > next.rampIn;
 
-    if (!joinBefore) kf.push({ t: g.rampIn, z: 1, cx: g.cx, cy: g.cy });
+    if (!joinBefore) kf.push({ t: g.rampIn, z: 1, cx: midX, cy: midY });
     kf.push({ t: g.peak, z: g.z, cx: g.cx, cy: g.cy });
-    // A hold that would run past the next zoom's peak is cut short.
     let holdEnd = g.holdEnd;
     if (joinAfter) holdEnd = Math.min(holdEnd, next.peak - 0.08);
     kf.push({ t: Math.max(holdEnd, g.peak + 0.02), z: g.z, cx: g.cx, cy: g.cy });
-    if (!joinAfter) kf.push({ t: g.rampOut, z: 1, cx: g.cx, cy: g.cy });
+    if (!joinAfter) kf.push({ t: g.rampOut, z: 1, cx: midX, cy: midY });
   }
 
-  if (kf.length === 0) return () => ({ z: 1, cx: 0, cy: 0 });
+  if (kf.length === 0) return () => ({ z: 1, cx: midX, cy: midY });
 
   kf.sort((a, b) => a.t - b.t);
   for (let i = 1; i < kf.length; i++) {
     if (kf[i].t <= kf[i - 1].t) kf[i].t = kf[i - 1].t + 0.001;
   }
-  kf.unshift({ t: Math.min(-1, kf[0].t - 1), z: 1, cx: kf[0].cx, cy: kf[0].cy });
+  kf.unshift({ t: Math.min(-1, kf[0].t - 1), z: 1, cx: midX, cy: midY });
   const last = kf[kf.length - 1];
-  kf.push({ t: Math.max(duration + 1, last.t + 1), z: 1, cx: last.cx, cy: last.cy });
+  kf.push({ t: Math.max(duration + 1, last.t + 1), z: 1, cx: midX, cy: midY });
 
   let cursor = 0;
   return (t) => {
@@ -460,7 +569,7 @@ function buildZoomTrack(beats, cfg, duration) {
     const u = clamp((t - a.t) / (b.t - a.t), 0, 1);
     const e = easeInOutCubic(u);
     return {
-      // Zoom reads as constant speed to the eye when interpolated in log space.
+      // Zoom reads as constant speed when interpolated in log space.
       z: Math.exp(lerp(Math.log(a.z), Math.log(b.z), e)),
       cx: lerp(a.cx, b.cx, e),
       cy: lerp(a.cy, b.cy, e),
@@ -470,7 +579,7 @@ function buildZoomTrack(beats, cfg, duration) {
 
 /**
  * Turns the beats into the cursor's path, its arrow-or-hand state, the click
- * dip and its visibility.
+ * dip, the click ripples and its visibility.
  */
 function buildCursorTrack(beats, cfg) {
   const moves = [];
@@ -498,9 +607,11 @@ function buildCursorTrack(beats, cfg) {
     // The hand only appears where there is something to click.
     const handAfter = b.click !== false;
     moves.push({ depart, arrive, from: at, to: { x: b.x, y: b.y }, handAfter });
-    if (handAfter) clicks.push(b.t);
+    if (handAfter) clicks.push({ t: b.t, x: b.x, y: b.y });
     at = { x: b.x, y: b.y };
-    freeFrom = b.t;
+    // The hand stays down for the whole press. Leaving earlier turns it back
+    // into an arrow while the ripple is still expanding under it.
+    freeFrom = b.t + (handAfter ? cfg.press.duration : 0);
   }
 
   const posAt = (t) => {
@@ -515,10 +626,11 @@ function buildCursorTrack(beats, cfg) {
         const u = span <= 0 ? 1 : easeInOutCubic((t - m.depart) / span);
         const dx = m.to.x - m.from.x;
         const dy = m.to.y - m.from.y;
+        const len = Math.hypot(dx, dy) || 1;
         // A slight perpendicular bow keeps the path from looking mechanical.
-        const bow = cfg.arc * Math.hypot(dx, dy);
-        const mx = (m.from.x + m.to.x) / 2 - (dy / (Math.hypot(dx, dy) || 1)) * bow;
-        const my = (m.from.y + m.to.y) / 2 + (dx / (Math.hypot(dx, dy) || 1)) * bow;
+        const bow = cfg.arc * len;
+        const mx = (m.from.x + m.to.x) / 2 - (dy / len) * bow;
+        const my = (m.from.y + m.to.y) / 2 + (dx / len) * bow;
         const iu = 1 - u;
         return {
           p: {
@@ -554,19 +666,36 @@ function buildCursorTrack(beats, cfg) {
 
   const scaleAt = (t) => {
     for (const c of clicks) {
-      if (t >= c && t <= c + cfg.press.duration) {
-        const u = (t - c) / cfg.press.duration;
+      if (t >= c.t && t <= c.t + cfg.press.duration) {
+        const u = (t - c.t) / cfg.press.duration;
         // Dip in fast, come back gently.
-        const dip = Math.sin(Math.PI * easeOutCubic(u));
-        return 1 - (1 - cfg.press.scale) * dip;
+        return 1 - (1 - cfg.press.scale) * Math.sin(Math.PI * easeOutCubic(u));
       }
     }
     return 1;
   };
 
-  return (t) => {
-    const { p, hand } = posAt(t);
-    return { x: p.x, y: p.y, hand, scale: scaleAt(t), alpha: alphaAt(t) };
+  return {
+    at: (t) => {
+      const { p, hand } = posAt(t);
+      return { x: p.x, y: p.y, hand, scale: scaleAt(t), alpha: alphaAt(t) };
+    },
+    ripples: (t, cfg2) => {
+      const out = [];
+      for (const c of clicks) {
+        const u = (t - c.t) / cfg2.duration;
+        if (u < 0 || u > 1) continue;
+        const e = easeOutCubic(u);
+        out.push({
+          x: c.x,
+          y: c.y,
+          radius: lerp(cfg2.radius[0], cfg2.radius[1], e),
+          fill: cfg2.fill * (1 - u),
+          stroke: cfg2.stroke * (1 - u),
+        });
+      }
+      return out;
+    },
   };
 }
 
@@ -631,26 +760,51 @@ function parseArgs(argv) {
 
 const DEFAULTS = {
   fps: 30,
+  frame: {
+    background: "backgrounds/light.webp",
+    // "native" draws the recording at one output pixel per source pixel at 1x,
+    // which is the sharpest the take can be. A number is a fraction of the
+    // output width instead.
+    fit: "native",
+    radius: 13,
+    // How far the camera is allowed to follow the focus point. 1 puts the
+    // focus dead centre and shows a lot of background on a corner target; 0
+    // keeps the window covering the frame and never follows. Blending the two
+    // moves both axes by the same proportion, which is what stops a corner
+    // zoom from reading as a tilt.
+    follow: 0.5,
+    shadow: { blur: 44, offsetX: 0, offsetY: 20, spread: 2, opacity: 0.3 },
+    border: { width: 1, color: [255, 255, 255], opacity: 0.45 },
+  },
   cursor: {
     arrow: "cursors/arrow.svg",
     pointer: "cursors/pointer.svg",
-    size: 64,
+    size: 128,
     hotspot: { arrow: { x: 0.293, y: 0.175 }, pointer: { x: 0.383, y: 0.243 } },
-    shadow: { blur: 10, offsetX: 1, offsetY: 4, opacity: 0.4 },
-    travel: 0.75,
+    shadow: { blur: 14, offsetX: 1, offsetY: 6, opacity: 0.38 },
+    travel: 0.9,
     settle: 0.14,
     arc: 0.08,
     fade: 0.3,
     press: { scale: 0.84, duration: 0.16 },
     start: { x: null, y: null, hidden: false },
   },
-  zoom: { default: 1.5, lead: 0.16, in: 0.62, out: 0.8, hold: 1.0 },
-  quality: { crf: 32, cpuUsed: 2 },
+  click: {
+    radius: [12, 84],
+    duration: 0.55,
+    fill: 0.05,
+    stroke: 0.3,
+    strokeWidth: 2,
+    color: [86, 86, 86],
+  },
+  // `lead` puts the camera at full zoom before the click, never during it.
+  zoom: { default: 1.45, lead: 0.5, in: 0.62, out: 0.8, hold: 0.8 },
+  quality: { crf: 38, cpuUsed: 2 },
 };
 
 function merge(base, over) {
   if (over == null) return base;
-  if (Array.isArray(base) || typeof base !== "object") return over;
+  if (Array.isArray(base) || Array.isArray(over) || typeof base !== "object") return over;
   const out = { ...base };
   for (const k of Object.keys(over)) out[k] = merge(base[k], over[k]);
   return out;
@@ -666,6 +820,14 @@ async function main() {
 
   const here = path.dirname(new URL(import.meta.url).pathname);
   const base = path.dirname(path.resolve(timelinePath));
+  // A bare `cursors/...`, `backgrounds/...` path means the assets shipped next
+  // to this script; anything else resolves against the timeline.
+  const asset = (p) =>
+    /^(cursors|backgrounds)\//.test(p)
+      ? path.join(here, p)
+      : path.isAbsolute(p)
+        ? p
+        : path.resolve(base, p);
   const rel = (p) => (path.isAbsolute(p) ? p : path.resolve(base, p));
   const cfg = merge(DEFAULTS, JSON.parse(fs.readFileSync(timelinePath, "utf8")));
 
@@ -673,8 +835,6 @@ async function main() {
   const output = args.out ? path.resolve(args.out) : rel(cfg.output);
   const meta = await probe(input);
 
-  // The recording's own pixels. Beat coordinates are page pixels, which differ
-  // when the take was recorded at a device scale factor above 1.
   const srcW = meta.width;
   const srcH = meta.height;
   const pageW = cfg.page?.width ?? srcW;
@@ -685,6 +845,7 @@ async function main() {
   const outW = cfg.size?.width ?? srcW;
   const outH = cfg.size?.height ?? srcH;
   const fps = cfg.fps;
+  if (outW % 2 || outH % 2) throw new Error("output width and height must be even");
 
   // Beats may be timed against the raw take or against the finished cut.
   const beats = cfg.beats
@@ -706,9 +867,11 @@ async function main() {
     },
   };
 
-  const [arrowBmp, pointerBmp] = await Promise.all([
-    rasterize(rel(cfg.cursor.arrow.startsWith("cursors/") ? path.join(here, cfg.cursor.arrow) : cfg.cursor.arrow), cfg.cursor.size),
-    rasterize(rel(cfg.cursor.pointer.startsWith("cursors/") ? path.join(here, cfg.cursor.pointer) : cfg.cursor.pointer), cfg.cursor.size),
+  const bgPath = args.background ? path.resolve(args.background) : asset(cfg.frame.background);
+  const [background, arrowBmp, pointerBmp] = await Promise.all([
+    loadImageCover(bgPath, outW, outH),
+    rasterize(asset(cfg.cursor.arrow), cfg.cursor.size),
+    rasterize(asset(cfg.cursor.pointer), cfg.cursor.size),
   ]);
   const arrow = buildSprite(arrowBmp, cfg.cursor.hotspot.arrow, cfg.cursor.shadow);
   const pointer = buildSprite(pointerBmp, cfg.cursor.hotspot.pointer, cfg.cursor.shadow);
@@ -717,13 +880,14 @@ async function main() {
     ? cfg.cut.segments.reduce((a, [s, e]) => a + (e - s), 0) / (cfg.cut.speed || 1)
     : meta.duration;
 
-  const zoomAt = buildZoomTrack(beats, cfg.zoom, duration);
-  const cursorAt = buildCursorTrack(beats, cursorCfg);
+  const cameraAt = buildCameraTrack(beats, cfg.zoom, duration, srcW / 2, srcH / 2);
+  const cursor = buildCursorTrack(beats, cursorCfg);
+
+  const baseScale = cfg.frame.fit === "native" ? 1 : (outW * cfg.frame.fit) / srcW;
+  const follow = cfg.frame.follow;
 
   // ------------------------------------------------------------- ffmpeg pair
-  const preview = args.preview
-    ? args.preview.split(":").map(Number)
-    : null;
+  const preview = args.preview ? args.preview.split(":").map(Number) : null;
   const clockOffset = preview ? preview[0] : 0;
 
   // The graph always ends in `fps`, and the output always states `-r`. A bare
@@ -787,45 +951,61 @@ async function main() {
   // -------------------------------------------------------------- frame loop
   const srcBytes = srcW * srcH * 4;
   const outBytes = outW * outH * 4;
-  let scratch = new Float32Array(1);
+  const scratchRef = { buf: new Float32Array(1) };
   let n = 0;
   const started = Date.now();
 
   for await (const frame of readFrames(dec.stdout, srcBytes)) {
     const t = clockOffset + n / fps;
-    const { z, cx, cy } = zoomAt(t);
+    const cam = cameraAt(t);
+    const scale = baseScale * cam.z;
+    const winW = srcW * scale;
+    const winH = srcH * scale;
+
+    // Two candidate positions: the focus dead centre of the frame, and the
+    // window pushed back until it covers the frame. `follow` blends them, and
+    // because the same fraction applies to both axes the camera never drifts
+    // in one axis while it is pinned in the other.
+    const wantLeft = outW / 2 - cam.cx * scale;
+    const wantTop = outH / 2 - cam.cy * scale;
+    const insideLeft =
+      winW >= outW ? clamp(wantLeft, outW - winW, 0) : (outW - winW) / 2;
+    const insideTop =
+      winH >= outH ? clamp(wantTop, outH - winH, 0) : (outH - winH) / 2;
+    const left = lerp(insideLeft, wantLeft, follow);
+    const top = lerp(insideTop, wantTop, follow);
+
+    const win = {
+      left,
+      top,
+      scale,
+      cx: left + winW / 2,
+      cy: top + winH / 2,
+      hw: winW / 2,
+      hh: winH / 2,
+      r: cfg.frame.radius * scale,
+    };
 
     const dst = Buffer.allocUnsafe(outBytes);
-    if (z <= 1.0001 && outW === srcW && outH === srcH) {
-      frame.copy(dst);
-    } else {
-      const cropW = srcW / z;
-      const cropH = srcH / z;
-      const cropX = clamp(cx - cropW / 2, 0, srcW - cropW);
-      const cropY = clamp(cy - cropH / 2, 0, srcH - cropH);
-      scratch = resample(
-        frame, srcW, srcH,
-        cropX, cropY, cropW, cropH,
+    background.copy(dst);
+    drawShadow(dst, outW, outH, win, cfg.frame.shadow);
+    drawWindow(dst, outW, outH, frame, srcW, srcH, win, cfg.frame.border, scratchRef);
+
+    for (const r of cursor.ripples(t, cfg.click)) {
+      drawRipple(
         dst, outW, outH,
-        scratch,
+        left + r.x * scale, top + r.y * scale,
+        r.radius, r.fill, r.stroke, cfg.click.strokeWidth, cfg.click.color,
       );
     }
 
-    const c = cursorAt(t);
+    const c = cursor.at(t);
     if (c.alpha > 0.002) {
-      // The cursor lives in page space, so the zoom has to carry it too.
-      const cropW = srcW / z;
-      const cropH = srcH / z;
-      const cropX = clamp(cx - cropW / 2, 0, srcW - cropW);
-      const cropY = clamp(cy - cropH / 2, 0, srcH - cropH);
-      const px = ((c.x - cropX) * outW) / cropW;
-      const py = ((c.y - cropY) * outH) / cropH;
       drawSprite(
         dst, outW, outH,
         c.hand ? pointer : arrow,
-        px, py,
-        c.scale,
-        c.alpha,
+        left + c.x * scale, top + c.y * scale,
+        c.scale, c.alpha,
       );
     }
 
