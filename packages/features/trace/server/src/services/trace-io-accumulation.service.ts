@@ -14,22 +14,6 @@ export const OUTPUT_SOURCE = {
   INFERRED: "inferred",
 } as const;
 
-export const SPRING_AI_SCOPE_NAMES = new Set([
-  "org.springframework.ai.chat.observation.ChatModelCompletionObservationHandler",
-  "org.springframework.ai.chat.observation.ChatModelPromptContentObservationHandler",
-]);
-
-export const CLAUDE_CODE_SCOPE_NAMES = new Set(["com.anthropic.claude_code.events"]);
-
-/**
- * Codex's instrumentation scope varies across versions (codex_exec
- * service.name in 0.131, just `codex` in some 0.13x builds), so we
- * gate on the event.name prefix instead — every cost-bearing event
- * codex emits is named `codex.<thing>` and that's stable across
- * builds.
- */
-const CODEX_EVENT_NAME_PREFIX = "codex.";
-
 /**
  * Priority: root (latest-finishing among roots) > explicit > last-finishing.
  * @internal Exported for unit testing
@@ -69,116 +53,6 @@ export function shouldOverrideOutput({
     return true;
   }
   return false;
-}
-
-/**
- * Extracts I/O from log records (Spring AI and Claude Code).
- */
-export function extractIOFromLogRecord(
-  data: LogRecordReceivedEventData,
-  traceCanonicalisation: TraceCanonicalisationService,
-): {
-  input: string | null;
-  output: string | null;
-} {
-  if (SPRING_AI_SCOPE_NAMES.has(data.scopeName)) {
-    const [identifier, ...contentParts] = data.body.split("\n");
-    const content = contentParts.join("\n");
-    if (!identifier || !content) {
-      return { input: null, output: null };
-    }
-    if (identifier === "Chat Model Prompt Content:") {
-      return { input: content, output: null };
-    }
-    if (identifier === "Chat Model Completion:") {
-      return { input: null, output: content };
-    }
-  }
-
-  if (CLAUDE_CODE_SCOPE_NAMES.has(data.scopeName)) {
-    // Gate on event.name === "user_prompt" specifically. Without this
-    // gate ANY claude_code log record with a `prompt` attribute wins,
-    // including internal subagent calls (e.g. a Bash tool subagent
-    // emitting `prompt:"env"`) which pollute the trace input with the
-    // shell command instead of the user's real prompt. The
-    // OTEL_LOG_USER_PROMPTS=1 env (set by the langwatch wrapper) is
-    // what gets the user prompt onto the wire — and it lands on the
-    // user_prompt event, never on tool/subagent events.
-    if (data.attributes["event.name"] === "user_prompt") {
-      const prompt = data.attributes.prompt;
-      if (prompt && typeof prompt === "string") {
-        return { input: prompt, output: null };
-      }
-    }
-
-    // OTEL_LOG_RAW_API_BODIES=1 emits a `claude_code.api_response_body`
-    // log record per turn carrying the FULL anthropic /v1/messages
-    // response body. The assistant's reply text lives in
-    // `body.content[]` where `type === "text"`. We extract the
-    // concatenated text and return it as ComputedOutput so trace
-    // summaries render real assistant replies instead of NULL.
-    //
-    // Gate on query_source: claude emits api_response_body for its
-    // non-conversational utility calls too (prompt_suggestion autosuggest,
-    // generate_session_title), whose text is NOT the assistant's reply.
-    // Because ComputedOutput is last-write-wins, an unfiltered title or
-    // autosuggest clobbers the real reply — so only lift from genuine
-    // conversation turns. This mirrors the gate in claudeCode.ts's
-    // liftApiResponseBody (the canonical span path); both reuse the same
-    // isConversationalQuerySource allowlist so the two output paths agree.
-    if (
-      data.attributes["event.name"] === "api_response_body" &&
-      traceCanonicalisation.classifyClaudeCall({
-        querySource:
-          typeof data.attributes.query_source === "string" ? data.attributes.query_source : null,
-      }).conversational
-    ) {
-      const responseText = traceCanonicalisation.deriveClaudeResponseContent({
-        body: data.attributes.body,
-      }).assistantText;
-      if (responseText !== null) {
-        return { input: null, output: responseText };
-      }
-    }
-
-    // LIGHT path: without OTEL_LOG_RAW_API_BODIES the reply text arrives on an
-    // `assistant_response` event (attribute `response`) and no
-    // api_response_body exists in the session — the two events are
-    // per-session alternatives carrying the same reply text, so accepting
-    // both at the same rank cannot double-lift. Same conversational gate as
-    // above: utility replies (autosuggest, session titles) must not clobber
-    // the headline output.
-    if (
-      data.attributes["event.name"] === "assistant_response" &&
-      traceCanonicalisation.classifyClaudeCall({
-        querySource:
-          typeof data.attributes.query_source === "string" ? data.attributes.query_source : null,
-      }).conversational
-    ) {
-      const response = data.attributes.response;
-      if (typeof response === "string" && response.length > 0) {
-        return { input: null, output: response };
-      }
-    }
-  }
-
-  // Codex emits the user's text on a separate codex.user_prompt event.
-  // Cost-bearing codex.sse_event events carry no prompt — input lift
-  // happens here so the fold can pair it with the model/token lift
-  // from extractCodexSseEventMetrics on the same trace.
-  const codexEventName = data.attributes["event.name"];
-  if (
-    typeof codexEventName === "string" &&
-    codexEventName.startsWith(CODEX_EVENT_NAME_PREFIX) &&
-    codexEventName === "codex.user_prompt"
-  ) {
-    const prompt = data.attributes.prompt;
-    if (typeof prompt === "string" && prompt.length > 0) {
-      return { input: prompt, output: null };
-    }
-  }
-
-  return { input: null, output: null };
 }
 
 /**
@@ -234,6 +108,48 @@ function accumulateMediaRefs({
 }
 
 /**
+ * One span's contribution to the trace's headline input and output.
+ *
+ * `accumulateIO` returns this whole shape every time rather than mutating the
+ * summary, so each rule below is a value a caller can read, and none of them
+ * depend on the order the others ran in.
+ */
+export type TraceIOAccumulation = {
+  computedInput: string | null;
+  computedOutput: string | null;
+  outputFromRootSpan: boolean;
+  outputSpanEndTimeMs: number;
+  outputSource: string;
+  blockedByGuardrail: boolean;
+  inputIsFallback: boolean;
+  outputIsFallback: boolean;
+  /** Compact JSON media refs for the winning input/output, or null. */
+  inputMediaRefs: string | null;
+  outputMediaRefs: string | null;
+};
+
+/**
+ * The trace's answer so far, before this span is folded in.
+ *
+ * Several of these live in `attributes` rather than as columns, so reading them
+ * in one place keeps the string keys out of the accumulation rules.
+ */
+function carriedForward(state: TraceSummaryData): TraceIOAccumulation {
+  return {
+    computedInput: state.computedInput,
+    computedOutput: state.computedOutput,
+    outputFromRootSpan: state.outputFromRootSpan,
+    outputSpanEndTimeMs: state.outputSpanEndTimeMs,
+    outputSource: state.attributes["langwatch.reserved.output_source"] ?? OUTPUT_SOURCE.INFERRED,
+    blockedByGuardrail: state.blockedByGuardrail,
+    inputIsFallback: state.attributes["langwatch.reserved.input_is_fallback"] === "true",
+    outputIsFallback: state.attributes["langwatch.reserved.output_is_fallback"] === "true",
+    inputMediaRefs: state.attributes[TRACE_INPUT_MEDIA_REFERENCE_ATTRIBUTE] ?? null,
+    outputMediaRefs: state.attributes[TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE] ?? null,
+  };
+}
+
+/**
  * Accumulates computed input/output across spans using priority rules:
  * root > explicit (langwatch) > last-finishing inferred (gen_ai).
  */
@@ -256,210 +172,198 @@ export class TraceIOAccumulationService {
     );
   }
 
-  accumulateIO({ state, span }: { state: TraceSummaryData; span: NormalizedSpan }): {
-    computedInput: string | null;
-    computedOutput: string | null;
-    outputFromRootSpan: boolean;
-    outputSpanEndTimeMs: number;
-    outputSource: string;
-    blockedByGuardrail: boolean;
-    inputIsFallback: boolean;
-    outputIsFallback: boolean;
-    /** Compact JSON media refs for the winning input/output, or null. */
-    inputMediaRefs: string | null;
-    outputMediaRefs: string | null;
-  } {
-    const spanType = span.spanAttributes[ATTR_KEYS.SPAN_TYPE];
-    const currentOutputSource =
-      state.attributes["langwatch.reserved.output_source"] ?? OUTPUT_SOURCE.INFERRED;
-    const currentInputIsFallback =
-      state.attributes["langwatch.reserved.input_is_fallback"] === "true";
-    const currentOutputIsFallback =
-      state.attributes["langwatch.reserved.output_is_fallback"] === "true";
+  accumulateIO({
+    state,
+    span,
+  }: {
+    state: TraceSummaryData;
+    span: NormalizedSpan;
+  }): TraceIOAccumulation {
+    const carried = carriedForward(state);
+    const blockedByGuardrail = carried.blockedByGuardrail || this.blocksOnGuardrail(span);
 
-    let computedInput = state.computedInput;
-    let computedOutput = state.computedOutput;
-    let outputFromRootSpan = state.outputFromRootSpan;
-    let outputSpanEndTimeMs = state.outputSpanEndTimeMs;
-    let outputSource = currentOutputSource;
-    let blockedByGuardrail = state.blockedByGuardrail;
-    let inputIsFallback = currentInputIsFallback;
-    let outputIsFallback = currentOutputIsFallback;
-    // Media refs accumulate across EVERY span of the trace, unlike the computed
-    // text, which belongs to one winning span. Those are two different
-    // questions (which span names the trace, and where its media is), and
-    // tying the refs to the text's winner answered only the first. A wrapper
-    // span that sets the headline text almost never holds the picture; the
-    // model call underneath it does. That is the shape every framework
-    // integration produces, and it left the trace list and the drawer summary
-    // with nothing to draw, since ComputedInput is flattened text and these
-    // refs are the only way either surface learns the trace has media at all.
-    //
-    // The winning span keeps precedence, so when it does carry media that media
-    // is the trace's thumbnail. Each ref keeps the role of the chat message it
-    // was found under (one payload can hold both the caller's recording and the
-    // agent's reply), which is what lets the summary strips show each side only
-    // its own media.
-    let inputMediaRefs = state.attributes[TRACE_INPUT_MEDIA_REFERENCE_ATTRIBUTE] ?? null;
-    let outputMediaRefs = state.attributes[TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE] ?? null;
-
-    if (spanType === "guardrail") {
-      const rawOutput = span.spanAttributes[ATTR_KEYS.LANGWATCH_OUTPUT];
-      if (
-        rawOutput &&
-        typeof rawOutput === "object" &&
-        !Array.isArray(rawOutput) &&
-        (rawOutput as Record<string, unknown>).passed === false
-      ) {
-        blockedByGuardrail = true;
-      }
-    }
-
-    // Claude Code utility model calls (prompt_suggestion autosuggest,
-    // generate_session_title) are not the conversation — their reply is now
-    // attached to the span (so the span detail shows it) but must NOT become
-    // the trace's headline I/O. Like tool spans, they're parentless (= root),
-    // so without this skip a utility reply could win the headline by end-time.
-    // Mirrors the log-path gate in extractIOFromLogRecord so both agree.
-    const claudeQuerySource = span.spanAttributes["claude_code.query_source"];
-    const isClaudeUtilitySpan =
-      typeof claudeQuerySource === "string" &&
-      !this.traceCanonicalisation.classifyClaudeCall({
-        querySource: claudeQuerySource,
-      }).conversational;
-
-    // Tool spans never define the trace's headline I/O: they are
-    // sub-operations (a Bash run, an Edit), not the conversation. This is
-    // load-bearing for synthesized claude_code tool spans, which are
-    // parentless (= root) so their langwatch.input would otherwise hijack the
-    // trace input. Skipping them lets a tool span carry its own input/output
-    // for the span detail without polluting the trace summary.
-    if (
-      spanType === "evaluation" ||
-      spanType === "guardrail" ||
-      spanType === "tool" ||
-      isClaudeUtilitySpan
-    ) {
-      return {
-        computedInput,
-        computedOutput,
-        outputFromRootSpan,
-        outputSpanEndTimeMs,
-        outputSource,
-        blockedByGuardrail,
-        inputIsFallback,
-        outputIsFallback,
-        inputMediaRefs,
-        outputMediaRefs,
-      };
+    if (this.cannotDefineHeadlineIO(span)) {
+      return { ...carried, blockedByGuardrail };
     }
 
     const isRoot = span.parentSpanId === null;
 
-    const inputResult = this.traceIOExtractionService.tryExtractRichIOFromSpan(span, "input");
-    let inputWins = false;
-    if (inputResult) {
-      inputWins = isRoot || computedInput === null || currentInputIsFallback;
-      if (inputWins) {
-        // Use the EXTRACTED text: extractRichIOFromSpan already runs
-        // messagesToText / extractTextFromPlainJson to pull the clean
-        // human-readable string out of common wrappers (e.g. unwrap
-        // `{"output":"Hey there"}` → `"Hey there"`). Discarding that and
-        // re-stringifying `raw` is what caused the 2026-05-14 prod UX
-        // regression where trace summaries showed the wrapper JSON
-        // instead of the actual text.
-        computedInput = preferText(inputResult.text, inputResult.raw);
-        inputIsFallback = false;
-      }
-    } else if (computedInput === null) {
-      // Semantic heuristics didn't find anything. Fall back to the
-      // service's `text` (best-effort stringification of the wrapper)
-      // so ComputedInput is non-null when the span has real data,
-      // but ONLY if no prior span already contributed a semantic match.
-      const inputFallback = this.traceIOExtractionService.tryExtractFallbackIOFromSpan(
-        span,
-        "input",
-      );
-      if (inputFallback) {
-        computedInput = preferText(inputFallback.text, inputFallback.raw);
-        inputIsFallback = true;
-        inputWins = true;
-      }
+    return {
+      ...carried,
+      ...this.accumulateInput({ carried, span, isRoot }),
+      ...this.accumulateOutput({ carried, span, isRoot }),
+      blockedByGuardrail,
+    };
+  }
+
+  /** A guardrail that reports it did not pass blocks the whole trace. */
+  private blocksOnGuardrail(span: NormalizedSpan): boolean {
+    if (span.spanAttributes[ATTR_KEYS.SPAN_TYPE] !== "guardrail") {
+      return false;
     }
+    const rawOutput = span.spanAttributes[ATTR_KEYS.LANGWATCH_OUTPUT];
 
-    inputMediaRefs = accumulateMediaRefs({
-      serialized: inputMediaRefs,
-      span,
-      side: "input",
-      winning: inputWins,
-      mediaReferences: this.mediaReferences,
-    });
+    return (
+      typeof rawOutput === "object" &&
+      rawOutput !== null &&
+      !Array.isArray(rawOutput) &&
+      (rawOutput as Record<string, unknown>).passed === false
+    );
+  }
 
-    const outputResult = this.traceIOExtractionService.tryExtractRichIOFromSpan(span, "output");
-    let outputWins = false;
-    if (outputResult) {
-      const isExplicit = outputResult.source === "langwatch";
-      // Semantic output must always override a prior fallback, regardless of
-      // end-time ordering. The fallback span's endTime can be later than a
-      // real semantic gen_ai span that arrives afterward; without this bypass,
-      // `shouldOverrideOutput`'s endTime comparison would keep the fallback.
-      outputWins =
-        currentOutputIsFallback ||
-        shouldOverrideOutput({
-          isRoot,
-          outputFromRoot: outputFromRootSpan,
-          isExplicit,
-          currentIsExplicit: currentOutputSource === OUTPUT_SOURCE.EXPLICIT,
-          endTime: span.endTimeUnixMs,
-          currentEndTime: outputSpanEndTimeMs,
-        });
-      if (outputWins) {
-        // Use the extracted text (unwrapped from common JSON wrappers
-        // like `{"output":"..."}`), not the raw payload. See input
-        // branch above for the full rationale.
-        computedOutput = preferText(outputResult.text, outputResult.raw);
-        outputFromRootSpan = isRoot;
-        outputSpanEndTimeMs = span.endTimeUnixMs;
-        outputSource = isExplicit ? OUTPUT_SOURCE.EXPLICIT : OUTPUT_SOURCE.INFERRED;
-        outputIsFallback = false;
-      }
-    } else if (computedOutput === null) {
-      // No semantic match on any span so far. A stringified-payload fallback
-      // is strictly better than leaving ComputedOutput NULL. Tracked via
-      // outputIsFallback so a later-arriving semantic match can override it
-      // regardless of span end-time ordering. outputFromRootSpan stays unset
-      // so the next semantic root-span match still wins.
-      const outputFallback = this.traceIOExtractionService.tryExtractFallbackIOFromSpan(
-        span,
-        "output",
-      );
-      if (outputFallback) {
-        computedOutput = preferText(outputFallback.text, outputFallback.raw);
-        outputSpanEndTimeMs = span.endTimeUnixMs;
-        outputIsFallback = true;
-        outputWins = true;
-      }
-    }
+  /**
+   * Span kinds that carry their own input and output but must never become the
+   * trace's headline text.
+   *
+   * Tool spans are the load-bearing case: synthesized claude_code tool spans are
+   * parentless, so they read as roots, and without this a Bash run's input would
+   * hijack the trace's. Skipping them lets a tool span keep its own I/O for the
+   * span detail without reaching the summary.
+   */
+  private cannotDefineHeadlineIO(span: NormalizedSpan): boolean {
+    const spanType = span.spanAttributes[ATTR_KEYS.SPAN_TYPE];
 
-    outputMediaRefs = accumulateMediaRefs({
-      serialized: outputMediaRefs,
-      span,
-      side: "output",
-      winning: outputWins,
-      mediaReferences: this.mediaReferences,
-    });
+    return (
+      spanType === "evaluation" ||
+      spanType === "guardrail" ||
+      spanType === "tool" ||
+      this.isClaudeUtilityCall(span)
+    );
+  }
+
+  /**
+   * Claude Code's utility model calls — autosuggest, session titles — are not
+   * the conversation. They are parentless like tool spans, so a title could
+   * otherwise win the headline on end time. Mirrors the log-path gate in
+   * `TraceLogRecordIOService` so both agree.
+   */
+  private isClaudeUtilityCall(span: NormalizedSpan): boolean {
+    const querySource = span.spanAttributes["claude_code.query_source"];
+
+    return (
+      typeof querySource === "string" &&
+      !this.traceCanonicalisation.classifyClaudeCall({ querySource }).conversational
+    );
+  }
+
+  private accumulateInput({
+    carried,
+    span,
+    isRoot,
+  }: {
+    carried: TraceIOAccumulation;
+    span: NormalizedSpan;
+    isRoot: boolean;
+  }): Pick<TraceIOAccumulation, "computedInput" | "inputIsFallback" | "inputMediaRefs"> {
+    const rich = this.traceIOExtractionService.tryExtractRichIOFromSpan(span, "input");
+
+    // A root restates the whole trace's input, so it always wins. A child only
+    // fills a gap, or replaces a stringified fallback with a semantic match.
+    const richWins =
+      rich !== null && (isRoot || carried.computedInput === null || carried.inputIsFallback);
+
+    // Only reached when nothing semantic has been found on any span so far: a
+    // best-effort stringification beats leaving ComputedInput null, and the
+    // flag is what lets a later semantic match take over.
+    const fallback =
+      rich === null && carried.computedInput === null
+        ? this.traceIOExtractionService.tryExtractFallbackIOFromSpan(span, "input")
+        : null;
+
+    const winner = richWins ? rich : fallback;
 
     return {
-      computedInput,
-      computedOutput,
-      outputFromRootSpan,
-      outputSpanEndTimeMs,
-      outputSource,
-      blockedByGuardrail,
-      inputIsFallback,
-      outputIsFallback,
-      inputMediaRefs,
-      outputMediaRefs,
+      // The EXTRACTED text, not the raw payload: extraction already unwraps
+      // `{"output":"Hey"}` to `Hey`. Re-stringifying `raw` here is what put
+      // wrapper JSON in trace summaries in the 2026-05-14 regression.
+      computedInput: winner === null ? carried.computedInput : preferText(winner.text, winner.raw),
+      inputIsFallback: winner === null ? carried.inputIsFallback : winner === fallback,
+      inputMediaRefs: accumulateMediaRefs({
+        serialized: carried.inputMediaRefs,
+        span,
+        side: "input",
+        winning: winner !== null,
+        mediaReferences: this.mediaReferences,
+      }),
+    };
+  }
+
+  private accumulateOutput({
+    carried,
+    span,
+    isRoot,
+  }: {
+    carried: TraceIOAccumulation;
+    span: NormalizedSpan;
+    isRoot: boolean;
+  }): Omit<
+    TraceIOAccumulation,
+    "computedInput" | "inputIsFallback" | "inputMediaRefs" | "blockedByGuardrail"
+  > {
+    const rich = this.traceIOExtractionService.tryExtractRichIOFromSpan(span, "output");
+    const isExplicit = rich?.source === "langwatch";
+
+    // A semantic match always displaces a fallback, whatever the end times say:
+    // the fallback span often finishes AFTER the real gen_ai span, so the
+    // end-time comparison on its own would keep the fallback forever.
+    const richWins =
+      rich !== null &&
+      (carried.outputIsFallback ||
+        shouldOverrideOutput({
+          isRoot,
+          outputFromRoot: carried.outputFromRootSpan,
+          isExplicit,
+          currentIsExplicit: carried.outputSource === OUTPUT_SOURCE.EXPLICIT,
+          endTime: span.endTimeUnixMs,
+          currentEndTime: carried.outputSpanEndTimeMs,
+        }));
+
+    const fallback =
+      rich === null && carried.computedOutput === null
+        ? this.traceIOExtractionService.tryExtractFallbackIOFromSpan(span, "output")
+        : null;
+
+    const mediaRefs = (winning: boolean): string | null =>
+      accumulateMediaRefs({
+        serialized: carried.outputMediaRefs,
+        span,
+        side: "output",
+        winning,
+        mediaReferences: this.mediaReferences,
+      });
+
+    if (richWins && rich !== null) {
+      return {
+        computedOutput: preferText(rich.text, rich.raw),
+        outputFromRootSpan: isRoot,
+        outputSpanEndTimeMs: span.endTimeUnixMs,
+        outputSource: isExplicit ? OUTPUT_SOURCE.EXPLICIT : OUTPUT_SOURCE.INFERRED,
+        outputIsFallback: false,
+        outputMediaRefs: mediaRefs(true),
+      };
+    }
+
+    if (fallback !== null) {
+      return {
+        computedOutput: preferText(fallback.text, fallback.raw),
+        // Deliberately NOT set from `isRoot`, and the source is left alone: a
+        // fallback must not claim the root slot, so the next semantic
+        // root-span match still wins.
+        outputFromRootSpan: carried.outputFromRootSpan,
+        outputSpanEndTimeMs: span.endTimeUnixMs,
+        outputSource: carried.outputSource,
+        outputIsFallback: true,
+        outputMediaRefs: mediaRefs(true),
+      };
+    }
+
+    return {
+      computedOutput: carried.computedOutput,
+      outputFromRootSpan: carried.outputFromRootSpan,
+      outputSpanEndTimeMs: carried.outputSpanEndTimeMs,
+      outputSource: carried.outputSource,
+      outputIsFallback: carried.outputIsFallback,
+      outputMediaRefs: mediaRefs(false),
     };
   }
 }

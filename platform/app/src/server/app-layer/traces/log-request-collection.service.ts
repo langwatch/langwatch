@@ -9,7 +9,7 @@ import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
 import type { DeepPartial } from "~/utils/types";
-import { extractIOFromLogRecord } from "@langwatch/trace-server";
+import { TraceLogRecordIOService } from "@langwatch/trace-server";
 import { piiRedactionLevelSchema } from "@langwatch/trace-contract";
 import type { LogRecordReceivedEventData } from "@langwatch/trace-contract";
 import { IO_PREVIEW_BYTES, utf8Preview } from "./lean-for-projection";
@@ -215,7 +215,7 @@ function makeTraceContribution(
       liftedAttributes[key] = value;
     }
   }
-  const io = extractIOFromLogRecord(legacyView, traceCanonicalisation);
+  const io = TraceLogRecordIOService.create(traceCanonicalisation).extractIO(legacyView);
   const input = io.input === null ? null : utf8Preview(io.input, IO_PREVIEW_BYTES);
   const output = io.output === null ? null : utf8Preview(io.output, IO_PREVIEW_BYTES);
   if (input !== io.input || output !== io.output) {

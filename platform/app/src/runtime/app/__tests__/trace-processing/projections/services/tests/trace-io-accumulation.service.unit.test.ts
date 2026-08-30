@@ -20,10 +20,11 @@ import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-i
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type { LogRecordReceivedEventData } from "@langwatch/trace-contract";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
-import { extractIOFromLogRecord, TraceIOAccumulationService } from "@langwatch/trace-server";
+import { TraceIOAccumulationService, TraceLogRecordIOService } from "@langwatch/trace-server";
 import { AppTraceProjectionsAdapter } from "~/runtime/app/trace-projections.adapter";
 
 const traceCanonicalisation = TraceCanonicalisationService.create();
+const logRecordIO = TraceLogRecordIOService.create(traceCanonicalisation);
 
 function createAccumulator(extractor: TraceIOExtractionService): TraceIOAccumulationService {
   return AppTraceProjectionsAdapter.createIoAccumulationService({
@@ -297,7 +298,7 @@ describe("TraceIOAccumulationService — claude utility spans", () => {
   });
 });
 
-describe("extractIOFromLogRecord — claude assistant_response fallback", () => {
+describe("TraceLogRecordIOService — claude assistant_response fallback", () => {
   function claudeLog(attributes: Record<string, string>): LogRecordReceivedEventData {
     return {
       traceId: "t1",
@@ -316,13 +317,12 @@ describe("extractIOFromLogRecord — claude assistant_response fallback", () => 
 
   describe("given a conversational assistant_response event (light path, no raw bodies)", () => {
     it("lifts the reply text as the trace output", () => {
-      const result = extractIOFromLogRecord(
+      const result = logRecordIO.extractIO(
         claudeLog({
           "event.name": "assistant_response",
           query_source: "repl_main_thread",
           response: "E aí! Tudo bem?",
         }),
-        traceCanonicalisation,
       );
 
       expect(result).toEqual({ input: null, output: "E aí! Tudo bem?" });
@@ -331,13 +331,12 @@ describe("extractIOFromLogRecord — claude assistant_response fallback", () => 
 
   describe("given a non-conversational assistant_response event", () => {
     it("does not let a utility reply become the trace output", () => {
-      const result = extractIOFromLogRecord(
+      const result = logRecordIO.extractIO(
         claudeLog({
           "event.name": "assistant_response",
           query_source: "generate_session_title",
           response: "Telemetry chat",
         }),
-        traceCanonicalisation,
       );
 
       expect(result).toEqual({ input: null, output: null });
@@ -346,13 +345,12 @@ describe("extractIOFromLogRecord — claude assistant_response fallback", () => 
 
   describe("given an assistant_response event with an empty response", () => {
     it("returns no output", () => {
-      const result = extractIOFromLogRecord(
+      const result = logRecordIO.extractIO(
         claudeLog({
           "event.name": "assistant_response",
           query_source: "repl_main_thread",
           response: "",
         }),
-        traceCanonicalisation,
       );
 
       expect(result).toEqual({ input: null, output: null });

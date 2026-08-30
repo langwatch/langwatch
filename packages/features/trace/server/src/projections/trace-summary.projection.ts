@@ -32,11 +32,8 @@ import {
   METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
 } from "@langwatch/trace-contract";
-import {
-  extractIOFromLogRecord,
-  OUTPUT_SOURCE,
-  shouldOverrideOutput,
-} from "../services/trace-io-accumulation.service";
+import { OUTPUT_SOURCE, shouldOverrideOutput } from "../services/trace-io-accumulation.service";
+import { TraceLogRecordIOService } from "../services/trace-log-record-io.service";
 import { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service";
 import { anchorStorageTime } from "../services/trace-storage-anchor.rules";
 
@@ -435,6 +432,7 @@ export class TraceSummaryFoldProjection
   implements FoldEventHandlers<typeof traceSummaryEvents, TraceSummaryData>
 {
   private readonly traceCanonicalisation: TraceCanonicalisationService;
+  private readonly logRecordIO: TraceLogRecordIOService;
   private readonly runtime: TraceProjectionRuntimeService;
   readonly name = "traceSummary";
   readonly version = TRACE_SUMMARY_PROJECTION_VERSION_LATEST;
@@ -517,6 +515,7 @@ export class TraceSummaryFoldProjection
     });
     this.store = deps.store;
     this.traceCanonicalisation = deps.traceCanonicalisation;
+    this.logRecordIO = TraceLogRecordIOService.create(deps.traceCanonicalisation);
     this.runtime = deps.runtime;
   }
 
@@ -665,7 +664,7 @@ export class TraceSummaryFoldProjection
       return state;
     }
 
-    const logIO = extractIOFromLogRecord(event.data, this.traceCanonicalisation);
+    const logIO = this.logRecordIO.extractIO(event.data);
 
     const liftedAttributes = this.traceCanonicalisation.canonicalizeLogRecord({
       scopeName: event.data.scopeName,

@@ -11,7 +11,9 @@ import {
 } from "../claude-code-call-policy.rules";
 import { extractCacheCreationTtlSplit } from "../claude-code-response.rules";
 
-const CLAUDE_CODE_SCOPE_NAMES: ReadonlySet<string> = new Set(["com.anthropic.claude_code.events"]);
+export const CLAUDE_CODE_SCOPE_NAMES: ReadonlySet<string> = new Set([
+  "com.anthropic.claude_code.events",
+]);
 
 const asString = (raw: unknown): string | null =>
   typeof raw === "string" && raw.length > 0 ? raw : null;
@@ -77,7 +79,7 @@ export class ClaudeCodeCanonicaliser implements CanonicalAttributesPort {
     const eventName = ctx.bag.attrs.get("event.name");
 
     // The model-call events' I/O text is folded downstream from the log path
-    // itself (extractIOFromLogRecord), not lifted here, this extractor lifts
+    // itself (TraceLogRecordIOService), not lifted here, this extractor lifts
     // only scalar canonical attributes.
     if (eventName === "user_prompt") {
       this.liftUserPrompt(ctx);
