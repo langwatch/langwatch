@@ -67,8 +67,6 @@ export class EnterpriseApiComposition {
  * package is FOR: an API-role Enterprise composition, named as such, and the
  * only enterprise thing an api-role application is allowed to see.
  */
-export type { GovernanceService } from "@langwatch/enterprise-governance-contract";
-export type { ScimService } from "@langwatch/enterprise-scim-contract";
 export { createScimTokensRestApp, ScimApp } from "@langwatch/enterprise-scim-server";
 export { eventMatches } from "@langwatch/enterprise-webhook-contract";
 export {
