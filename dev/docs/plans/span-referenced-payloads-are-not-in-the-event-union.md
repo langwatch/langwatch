@@ -55,9 +55,29 @@ shapes do not overlap: eleven `TS2352`s, all one assertion repeated.
    and states the truth where the truth is, but it makes one subscriber's
    event type differ from every other trace subscriber's.
 
-(2) has the smaller blast radius and is probably right, but it changes what the
-eventing framework is told a subscriber handles, so it is written down rather
-than taken.
+**(2) was tried, and does not work.** Two things were established:
+
+- **Widening has no routing consequence.** `withEventSubscriber` stores the
+  definition in a `Map` keyed by subscriber name, and delivery is driven by
+  `definition.eventTypes` — a runtime array of event-type strings, here
+  `[SPAN_RECEIVED_EVENT_TYPE]`. The type parameter reaches no dispatch
+  decision, and widening it broke no registration site.
+- **But one type parameter types four hooks that sit on opposite sides of
+  staging.** `enqueue.filter` and `enqueue.stage` run at INGRESS and can only
+  ever see a `span_received` event — `stage` is what *produces* the reference
+  payload. `deduplication.makeId` and `handle` run on DELIVERY and see whatever
+  `stage` returned. Declaring the subscriber over the union therefore mistypes
+  the two ingress hooks: three fresh errors inside the subscriber, each
+  `"lw.obs.trace.span_referenced" is not assignable to …`, because
+  `isCodingAgentSpan` and `makeSpanFactsLiftedPayload` correctly accept events
+  only. Trading ten test errors for three production ones is not a fix.
+
+So neither recorded option is right as written. The shape the code actually has
+is two types, not one: the event a subscriber is delivered, and the payload its
+own `stage` hands to `makeId` and `handle`. `EventSubscriberDefinition` collapses
+them. Separating them is an eventing-framework change affecting every
+subscriber's declaration, which is a decision to take deliberately rather than
+as a side effect of clearing ten `TS2352`s.
 
 **Not resolved with a double cast.** `as unknown as TraceProcessingEvent` would
 make the eleven errors go away and leave the contradiction in place, which is
