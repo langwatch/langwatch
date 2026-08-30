@@ -5,6 +5,7 @@
  * into complete ClickHouse SQL queries.
  */
 
+import type { FilterField } from "@langwatch/analytics-contract";
 import { MAX_PROCESSED_SPANS } from "../query-builders/trace-signal";
 import { snakeCase } from "../string-casing";
 import { isZeroWhenAbsentSeries, type AnalyticsSeries } from "@langwatch/analytics-contract";
@@ -584,7 +585,10 @@ export interface TimeseriesQueryInput {
   previousPeriodStartDate: Date;
   series: AnalyticsSeries[];
   filters?: Partial<
-    Record<string, string[] | Record<string, string[]> | Record<string, Record<string, string[]>>>
+    Record<
+      FilterField,
+      string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
+    >
   >;
   groupBy?: string;
   groupByKey?: string;
@@ -2683,7 +2687,10 @@ export function buildDataForFilterQuery(
   subkey?: string,
   searchQuery?: string,
   filters?: Partial<
-    Record<string, string[] | Record<string, string[]> | Record<string, Record<string, string[]>>>
+    Record<
+      FilterField,
+      string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
+    >
   >,
 ): BuiltQuery {
   const ts = tableAliases.trace_summaries;
@@ -2916,7 +2923,10 @@ export function buildTopDocumentsQuery(
   startDate: Date,
   endDate: Date,
   filters?: Partial<
-    Record<string, string[] | Record<string, string[]> | Record<string, Record<string, string[]>>>
+    Record<
+      FilterField,
+      string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
+    >
   >,
 ): BuiltQuery {
   const ts = tableAliases.trace_summaries;
@@ -3007,7 +3017,10 @@ export function buildFeedbacksQuery(
   startDate: Date,
   endDate: Date,
   filters?: Partial<
-    Record<string, string[] | Record<string, string[]> | Record<string, Record<string, string[]>>>
+    Record<
+      FilterField,
+      string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
+    >
   >,
 ): BuiltQuery {
   const ts = tableAliases.trace_summaries;
