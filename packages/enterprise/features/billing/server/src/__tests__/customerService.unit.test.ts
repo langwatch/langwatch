@@ -9,7 +9,6 @@ const createMockStripe = () => ({
 });
 
 const createMockOrganizations = () => ({
-  getOldestTeamId: vi.fn(),
   getBillingProfile: vi.fn(),
   claimBillingCustomerId: vi.fn(),
 });

@@ -1,6 +1,6 @@
 import { initTRPC } from "@trpc/server";
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
-import type { Role, RoleService } from "@langwatch/role-contract";
+import type { CustomRolePermissionSchema, Role, RoleService } from "@langwatch/role-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
@@ -31,12 +31,10 @@ const role: Role = {
 type Call = { method: string; input: unknown };
 
 function recordingRoles(calls: Call[]) {
-  const record =
-    (method: string, result: unknown) =>
-    async (input: unknown) => {
-      calls.push({ method, input });
-      return result;
-    };
+  const record = (method: string, result: unknown) => async (input: unknown) => {
+    calls.push({ method, input });
+    return result;
+  };
 
   return {
     list: record("list", [role]),
@@ -50,9 +48,20 @@ function recordingRoles(calls: Call[]) {
   } as unknown as RoleService;
 }
 
-function roleCaller(calls: Call[]) {
+/**
+ * @param customRolePermission the process's permission vocabulary. Defaults to
+ *   one that accepts anything, so a test that is not about the vocabulary does
+ *   not have to state it.
+ */
+function roleCaller({
+  calls,
+  customRolePermission = z.string(),
+}: {
+  calls: Call[];
+  customRolePermission?: CustomRolePermissionSchema;
+}) {
   const trpc = initTRPC.context<RoleTrpcContext>().create();
-  const inputs = roleTrpcInputSchemas({ customRolePermission: z.string() });
+  const inputs = roleTrpcInputSchemas({ customRolePermission });
   const procedure = trpc.procedure;
 
   const router = RoleTrpcApi.create(trpc, {
@@ -84,23 +93,23 @@ describe("Feature: role app tRPC adapter", () => {
     it("lists an organization's roles through the service", async () => {
       const calls: Call[] = [];
 
-      await expect(roleCaller(calls).getAll({ organizationId: ORGANIZATION_ID })).resolves.toEqual([
-        role,
-      ]);
+      await expect(
+        roleCaller({ calls }).getAll({ organizationId: ORGANIZATION_ID }),
+      ).resolves.toEqual([role]);
       expect(calls).toEqual([{ method: "list", input: { organizationId: ORGANIZATION_ID } }]);
     });
 
     it("reads one role by its id", async () => {
       const calls: Call[] = [];
 
-      await expect(roleCaller(calls).getById({ roleId: role.id })).resolves.toEqual(role);
+      await expect(roleCaller({ calls }).getById({ roleId: role.id })).resolves.toEqual(role);
       expect(calls).toEqual([{ method: "get", input: { roleId: role.id } }]);
     });
 
     it("attributes a created role to the calling member", async () => {
       const calls: Call[] = [];
 
-      await roleCaller(calls).create({
+      await roleCaller({ calls }).create({
         organizationId: ORGANIZATION_ID,
         name: "Reviewer",
         permissions: ["traces:view"],
@@ -125,7 +134,7 @@ describe("Feature: role app tRPC adapter", () => {
     it("passes only the fields an update names", async () => {
       const calls: Call[] = [];
 
-      await roleCaller(calls).update({ roleId: role.id, name: "Auditor" });
+      await roleCaller({ calls }).update({ roleId: role.id, name: "Auditor" });
 
       expect(calls).toEqual([
         {
@@ -142,7 +151,7 @@ describe("Feature: role app tRPC adapter", () => {
     it("removes a role", async () => {
       const calls: Call[] = [];
 
-      await expect(roleCaller(calls).delete({ roleId: role.id })).resolves.toEqual({
+      await expect(roleCaller({ calls }).delete({ roleId: role.id })).resolves.toEqual({
         success: true,
       });
       expect(calls).toEqual([{ method: "remove", input: { roleId: role.id, actor: ACTOR } }]);
@@ -151,7 +160,7 @@ describe("Feature: role app tRPC adapter", () => {
     it("assigns a role to a team member", async () => {
       const calls: Call[] = [];
 
-      await roleCaller(calls).assignToUser({
+      await roleCaller({ calls }).assignToUser({
         userId: "user_2",
         teamId: "team_1",
         customRoleId: role.id,
@@ -173,7 +182,7 @@ describe("Feature: role app tRPC adapter", () => {
     it("removes a team member's role without reading the role id back", async () => {
       const calls: Call[] = [];
 
-      await roleCaller(calls).removeFromUser({
+      await roleCaller({ calls }).removeFromUser({
         userId: "user_2",
         teamId: "team_1",
         customRoleId: role.id,
@@ -191,23 +200,9 @@ describe("Feature: role app tRPC adapter", () => {
   describe("given a permission the process's vocabulary refuses", () => {
     it("rejects the create before the service is reached", async () => {
       const calls: Call[] = [];
-      const trpc = initTRPC.context<RoleTrpcContext>().create();
-      const inputs = roleTrpcInputSchemas({
+      const caller = roleCaller({
+        calls,
         customRolePermission: z.string().refine((value) => value === "traces:view"),
-      });
-      const procedure = trpc.procedure;
-      const router = RoleTrpcApi.create(trpc, {
-        getAll: procedure.input(inputs.getAll),
-        getById: procedure.input(inputs.getById),
-        create: procedure.input(inputs.create),
-        update: procedure.input(inputs.update),
-        delete: procedure.input(inputs.delete),
-        assignToUser: procedure.input(inputs.assignToUser),
-        removeFromUser: procedure.input(inputs.removeFromUser),
-      });
-      const caller = router.createCaller({
-        app: { roles: recordingRoles(calls) },
-        actor: () => ({ id: USER_ID }),
       });
 
       await expect(
@@ -237,12 +232,10 @@ function bindingCaller(calls: Call[]) {
     applyMemberBindings: procedure.input(inputs.applyMemberBindings),
   });
 
-  const record =
-    (method: string, result: unknown) =>
-    async (input: unknown) => {
-      calls.push({ method, input });
-      return result;
-    };
+  const record = (method: string, result: unknown) => async (input: unknown) => {
+    calls.push({ method, input });
+    return result;
+  };
 
   return router.createCaller({
     app: {
