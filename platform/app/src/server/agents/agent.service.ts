@@ -77,6 +77,18 @@ export function toAgentListRow(agent: TypedAgent): AgentListRow {
  *
  * Framework-agnostic - no tRPC dependencies.
  */
+/**
+ * Whether Prisma refused a write because a unique index already holds the
+ * value. The row the caller wanted exists, written by somebody else.
+ */
+function isUniqueConstraintViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: unknown }).code === "P2002"
+  );
+}
+
 export class AgentService {
   constructor(
     private readonly prisma: PrismaClient,
@@ -230,6 +242,11 @@ export class AgentService {
    * names. The re-register writes `lastSeenAt`, so a row unseen for too long
    * is listed again, and it clears `archivedAt`, so a row deleted by hand
    * comes back when the process connects again.
+   *
+   * Several instances of one agent normally start together, so two of them
+   * can read no row and both go on to create one. `(projectId, identityKey)`
+   * is unique, so the loser of that race is answered with the row the winner
+   * wrote rather than with a constraint violation.
    */
   async registerConnected(input: {
     id: string;
@@ -243,20 +260,44 @@ export class AgentService {
       identityKey: input.identity.identityKey,
     });
     if (existing) {
-      return this.repository.reregisterConnected({
-        id: existing.id,
+      return this.reregister({ existingId: existing.id, input });
+    }
+    try {
+      return await this.repository.create({
+        id: input.id,
         projectId: input.projectId,
         name: input.name,
+        type: "connected",
         config: input.config,
+        identity: input.identity,
       });
+    } catch (error) {
+      if (!isUniqueConstraintViolation(error)) throw error;
+      const raced = await this.repository.findByIdentityKey({
+        projectId: input.projectId,
+        identityKey: input.identity.identityKey,
+      });
+      if (!raced) throw error;
+      return this.reregister({ existingId: raced.id, input });
     }
-    return this.repository.create({
-      id: input.id,
+  }
+
+  private reregister({
+    existingId,
+    input,
+  }: {
+    existingId: string;
+    input: {
+      projectId: string;
+      name: string;
+      config: ConnectedComponentConfig;
+    };
+  }): Promise<TypedAgent> {
+    return this.repository.reregisterConnected({
+      id: existingId,
       projectId: input.projectId,
       name: input.name,
-      type: "connected",
       config: input.config,
-      identity: input.identity,
     });
   }
 

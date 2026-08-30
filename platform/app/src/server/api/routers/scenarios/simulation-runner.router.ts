@@ -7,9 +7,9 @@ import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { AgentRepository } from "~/server/agents/agent.repository";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import { resolveConnectedTarget } from "~/server/scenarios/connected-target.service";
 import { ScenarioReservedSetIdError } from "~/server/scenarios/errors";
 import {
   createDataPrefetcherDependencies,
@@ -39,25 +39,13 @@ import {
 import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import {
-  agentParameterDefinitionsOf,
-  assertConnectedAgentsRunnable,
-  resolveConnectedReferences,
-} from "~/server/suites/connected-targets";
+  type SimulationTarget,
+  simulationTargetSchema,
+} from "~/server/scenarios/simulation-target";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { projectSchema } from "./schemas";
 
 const logger = createLogger("SimulationRunnerRouter");
-
-/**
- * Target for scenario simulation.
- * Extensible: add new types as needed (llm, workflow, etc.)
- */
-export const simulationTargetSchema = z.object({
-  type: z.enum(["prompt", "http", "code", "workflow", "connected"]),
-  referenceId: z.string(),
-});
-
-export type SimulationTarget = z.infer<typeof simulationTargetSchema>;
 
 const runScenarioSchema = projectSchema.extend({
   scenarioId: z.string(),
@@ -105,56 +93,6 @@ export function assertWritableSetId(params: {
   if (!isInternalSetId(params.setId)) return;
   if (params.setId === getOnPlatformSetId(params.projectId)) return;
   throw new ScenarioReservedSetIdError();
-}
-
-/**
- * The target with a `<name>@<environment>` connected reference replaced by
- * the agent's id, checked to be runnable by the actor, and what the agent
- * declares on its own.
- *
- * A connected agent that the reference names nothing for is left as written:
- * the validation prefetch refuses it the way it refuses any unknown target.
- *
- * @throws {AgentOwnerOnlyError} when the agent is a personal development
- *   agent of someone else.
- */
-async function resolveConnectedTarget({
-  prisma,
-  projectId,
-  target,
-  actor,
-}: {
-  prisma: PrismaClient;
-  projectId: string;
-  target: SimulationTarget;
-  actor: RunActor;
-}): Promise<{
-  target: SimulationTarget;
-  targetDefinitions: ScenarioParameterDefinition[];
-}> {
-  if (target.type !== "connected") return { target, targetDefinitions: [] };
-  const agents = new AgentRepository(prisma);
-  const [resolved] = await resolveConnectedReferences({
-    targets: [target],
-    projectId,
-    actor,
-    agents,
-  });
-  const named = resolved ?? target;
-  const rows = await agents.findManyIncludingArchived({
-    ids: [named.referenceId],
-    projectId,
-  });
-  const agent = rows.find((row) => row.archivedAt === null);
-  await assertConnectedAgentsRunnable({
-    agents: agent ? [agent] : [],
-    actor,
-    users: prisma,
-  });
-  return {
-    target: { type: named.type, referenceId: named.referenceId },
-    targetDefinitions: agentParameterDefinitionsOf(agent),
-  };
 }
 
 /**

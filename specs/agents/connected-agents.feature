@@ -33,6 +33,15 @@ Feature: Connected agents
     Then no second row is created
     And the row carries the new description
 
+  # Several instances of one agent normally start together, so two of them can
+  # read no row and both go on to write one.
+  @integration
+  Scenario: Two instances registering together settle on one row
+    Given two processes registering the same name and environment at once
+    When one of them writes the row first
+    Then the other is answered with that row
+    And no second row is created
+
   @integration
   Scenario: A reconnect of an unseen identity lists the row again
     Given a connected agent row last seen thirty one days ago

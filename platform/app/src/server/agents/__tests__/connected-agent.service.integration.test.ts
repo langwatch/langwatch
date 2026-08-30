@@ -12,7 +12,10 @@ import type { ConnectedComponentConfig } from "~/optimization_studio/types/dsl";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestUser } from "~/utils/testUtils";
-import type { ConnectedAgentIdentity } from "../agent.repository";
+import {
+  AgentRepository,
+  type ConnectedAgentIdentity,
+} from "../agent.repository";
 import { AgentService } from "../agent.service";
 
 const projectId = `test-connected-agent-${nanoid(8)}`;
@@ -63,6 +66,52 @@ afterAll(async () => {
 });
 
 describe("connected agent rows", () => {
+  describe("when another instance wrote the row between the read and the create", () => {
+    /** @scenario "Two instances registering together settle on one row" */
+    it("answers with the row that landed instead of a constraint error", async () => {
+      const raceIdentity: ConnectedAgentIdentity = {
+        ...identity,
+        identityKey: `race-agent@production-${nanoid()}`,
+      };
+
+      const winner = await service.registerConnected({
+        id: `agent_${nanoid()}`,
+        projectId,
+        name: "race-agent",
+        config,
+        identity: raceIdentity,
+      });
+
+      // The losing instance read before the winner wrote, so its lookup finds
+      // nothing and it goes on to create a row that the unique index refuses.
+      const repository = new AgentRepository(prisma);
+      const realLookup = repository.findByIdentityKey.bind(repository);
+      let isFirstLookup = true;
+      repository.findByIdentityKey = async (params) => {
+        if (isFirstLookup) {
+          isFirstLookup = false;
+          return null;
+        }
+        return realLookup(params);
+      };
+      const racing = new AgentService(prisma, repository);
+
+      const loser = await racing.registerConnected({
+        id: `agent_${nanoid()}`,
+        projectId,
+        name: "race-agent",
+        config,
+        identity: raceIdentity,
+      });
+
+      expect(loser.id).toBe(winner.id);
+      const rows = await prisma.agent.findMany({
+        where: { projectId, identityKey: raceIdentity.identityKey },
+      });
+      expect(rows).toHaveLength(1);
+    });
+  });
+
   describe("when the same identity registers twice", () => {
     /** @scenario "A second register of the same identity updates the same row" */
     it("updates the same row instead of creating a second one", async () => {

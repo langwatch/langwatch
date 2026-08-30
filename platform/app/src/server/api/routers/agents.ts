@@ -6,7 +6,7 @@ import { probeProjectPermission } from "~/server/app-layer/permissions/imperativ
 import {
   type AgentInstanceView,
   type AgentPresenceStatus,
-  NO_PRESENCE,
+  agentPresenceView,
   readAgentPresence,
 } from "~/server/connected-agents/presence.read";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
@@ -56,22 +56,11 @@ async function withConnectedAgentViews<T extends AgentWithFields>({
     agentService.ownersOf(agents),
     readAgentPresence({ projectId, agents }),
   ]);
-  return agents.map((agent) => {
-    const owner = agent.ownerUserId
-      ? (owners.get(agent.ownerUserId) ?? {
-          userId: agent.ownerUserId,
-          name: null,
-        })
-      : null;
-    const { status, instances } = presence.get(agent.id) ?? NO_PRESENCE;
-    return {
-      ...agent,
-      parameters: declaredAgentParameters(agent),
-      owner,
-      status,
-      instances,
-    };
-  });
+  return agents.map((agent) => ({
+    ...agent,
+    parameters: declaredAgentParameters(agent),
+    ...agentPresenceView({ agent, owners, presence }),
+  }));
 }
 
 /**

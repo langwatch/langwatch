@@ -10,8 +10,7 @@ import {
 import { toAgentListRow } from "../../../../server/agents/agent.service";
 import { AgentRegisterOnlyError } from "../../../../server/agents/errors";
 import {
-  type AgentPresence,
-  NO_PRESENCE,
+  agentPresenceView,
   readAgentPresence,
 } from "../../../../server/connected-agents/presence.read";
 import { scenarioParameterDefinitionSchema } from "../../../../server/scenarios/parameters";
@@ -212,28 +211,6 @@ secured.access(requires("project:view")).get(
 );
 
 /** The presence and owner fields every agent read carries (ADR-128). */
-function agentPresenceView({
-  agent,
-  owners,
-  presence,
-}: {
-  agent: { id: string; ownerUserId: string | null };
-  owners: Map<string, { userId: string; name: string | null }>;
-  presence: Map<string, AgentPresence>;
-}) {
-  const { status, instances } = presence.get(agent.id) ?? NO_PRESENCE;
-  return {
-    owner: agent.ownerUserId
-      ? (owners.get(agent.ownerUserId) ?? {
-          userId: agent.ownerUserId,
-          name: null,
-        })
-      : null,
-    status,
-    instances,
-  };
-}
-
 const agentInstanceSchema = z.object({
   instanceId: z.string(),
   hostname: z.string(),
