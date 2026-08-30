@@ -41,14 +41,9 @@ import type {
   AuthzBindingForSynthesis,
   AuthzDeclaration,
   AuthzPermission,
-} from "@langwatch/authz-contract";
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
   TeamUserRole,
-  type Organization,
-  type OrganizationInvite,
-} from "@langwatch/prisma-client/generated";
+} from "@langwatch/authz-contract";
+import { type Organization, type OrganizationInvite } from "@langwatch/prisma-client/generated";
 import {
   organizationApiAcceptInviteInputSchema,
   organizationApiAuditLogsInputSchema,
@@ -63,6 +58,7 @@ import {
   organizationApiUpdateTeamMemberRoleInputSchema,
   organizationApiWithMembersInputSchema,
   organizationIntentSchema,
+  type OrganizationApiMemberRole,
 } from "@langwatch/organization-contract";
 import {
   TRPCError,
@@ -285,7 +281,7 @@ export type OrganizationTrpcPorts<TSignUpDataSchema extends z.ZodTypeAny = z.Zod
     ): Promise<void>;
     /** Whether an organization role permits a given team role at all. */
     isTeamRoleAllowedForOrganizationRole(
-      input: Readonly<{ organizationRole: OrganizationUserRole; teamRole: string }>,
+      input: Readonly<{ organizationRole: OrganizationApiMemberRole; teamRole: string }>,
     ): boolean;
     /**
      * Refuses a built-in team-role change that would push the organization
@@ -313,7 +309,7 @@ export type OrganizationTrpcPorts<TSignUpDataSchema extends z.ZodTypeAny = z.Zod
     tryGetOrganizationMemberRole(
       ctx: OrganizationTrpcContext,
       input: Readonly<{ organizationId: string; userId: string }>,
-    ): Promise<OrganizationUserRole | null>;
+    ): Promise<OrganizationApiMemberRole | null>;
 
     // -- invitations ---------------------------------------------------------
     createInvites(
@@ -324,7 +320,7 @@ export type OrganizationTrpcPorts<TSignUpDataSchema extends z.ZodTypeAny = z.Zod
           email: string;
           teamIds?: string;
           teams?: { teamId: string; role: string; customRoleId?: string }[];
-          role: OrganizationUserRole;
+          role: OrganizationApiMemberRole;
         }[];
       }>,
     ): Promise<{
@@ -740,8 +736,8 @@ export class OrganizationTrpcApi {
             const isOrgAdminViaBinding = userRoleBindings.some(
               (b) =>
                 b.organizationId === organization.id &&
-                b.scopeType === RoleBindingScopeType.ORGANIZATION &&
-                b.role === TeamUserRole.ADMIN,
+                b.scopeType === "ORGANIZATION" &&
+                b.role === "ADMIN",
             );
             // RoleBinding(scope=ORGANIZATION, role=ADMIN) is authoritative when present:
             // promote the user's exposed role so the frontend hook
@@ -753,13 +749,13 @@ export class OrganizationTrpcApi {
             // `requireApiKeyPermission`); this closes the page-guard / SSR-only drift.
             if (isOrgAdminViaBinding) {
               if (organization.members[0]) {
-                organization.members[0].role = OrganizationUserRole.ADMIN;
+                organization.members[0].role = "ADMIN";
               } else {
                 organization.members = [
                   {
                     userId,
                     organizationId: organization.id,
-                    role: OrganizationUserRole.ADMIN,
+                    role: "ADMIN",
                   } as (typeof organization.members)[number],
                 ];
               }
@@ -1243,10 +1239,10 @@ export class OrganizationTrpcApi {
             userId: input.userId,
           });
 
-          if (organizationRole === OrganizationUserRole.EXTERNAL) {
+          if (organizationRole === "EXTERNAL") {
             if (
               !ports.isTeamRoleAllowedForOrganizationRole({
-                organizationRole: OrganizationUserRole.EXTERNAL,
+                organizationRole: "EXTERNAL",
                 teamRole: input.role,
               })
             ) {

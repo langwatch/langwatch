@@ -22,7 +22,6 @@ import { timingSafeEqual } from "node:crypto";
 
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
-import { RoleBindingScopeType, TeamUserRole } from "@langwatch/prisma-client/generated";
 import type { Context, Env, Next } from "hono";
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
@@ -221,8 +220,8 @@ export function createOrganizationsRestApp(options: {
             permissionMode: "all",
             bindings: [
               {
-                role: TeamUserRole.ADMIN,
-                scopeType: RoleBindingScopeType.ORGANIZATION,
+                role: "ADMIN",
+                scopeType: "ORGANIZATION",
                 scopeId: created.organization.id,
               },
             ],

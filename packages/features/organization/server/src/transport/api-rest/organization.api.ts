@@ -29,17 +29,27 @@
  * that follows a settings change, the Enterprise plan gate and the audit sink —
  * is the process's, and arrives as a port.
  */
-import type { AuthzService } from "@langwatch/authz-contract";
+// The role and scope vocabularies come from the authz contract, which
+// publishes them for the wire. They matched the generated Prisma enums
+// member for member; taking them from storage meant the database decided
+// what this door accepts.
+import {
+  roleBindingScopeTypeSchema,
+  teamUserRoleSchema,
+  type AuthzService,
+  type TeamUserRole,
+} from "@langwatch/authz-contract";
 import type {
   OrganizationSettings,
   UpdateOrganizationSettingsInput,
   UpdateOrganizationSettingsResult,
 } from "@langwatch/organization-contract";
 import {
-  OrganizationIntent,
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
+  organizationApiMemberRoleSchema,
+  organizationIntentSchema,
+  type OrganizationApiMemberRole,
+} from "@langwatch/organization-contract";
+import {
   type Organization,
   type OrganizationInvite,
   type OrganizationUser,
@@ -67,7 +77,7 @@ import {
 export interface OrganizationRestMemberSummary {
   userId: string;
   organizationId: string;
-  role: OrganizationUserRole;
+  role: OrganizationApiMemberRole;
   disabledAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -111,7 +121,7 @@ export interface OrganizationRestService {
   changeMemberRole(input: {
     organizationId: string;
     userId: string;
-    role: OrganizationUserRole;
+    role: OrganizationApiMemberRole;
     /** Null when the actor is a service credential; self checks never match. */
     currentUserId: string | null;
     planUser?: { id: string };
@@ -144,7 +154,7 @@ export interface OrganizationRestInviteService {
     organizationId: string;
     invites: {
       email: string;
-      role: OrganizationUserRole;
+      role: OrganizationApiMemberRole;
       teams: { teamId: string; role: TeamUserRole; customRoleId?: string }[];
     }[];
     user?: { id: string };
@@ -173,7 +183,7 @@ export interface OrganizationRestPorts {
    * The team role an invitation's organization role implies, for the legacy
    * storage form that carries comma-separated team ids and no roles at all.
    */
-  defaultTeamRoleFor(role: OrganizationUserRole): TeamUserRole | undefined;
+  defaultTeamRoleFor(role: OrganizationApiMemberRole): TeamUserRole | undefined;
   /**
    * The acceptance link an invite carries, so a provisioning run with no email
    * provider configured still has something to hand the person.
@@ -212,7 +222,7 @@ const organizationSettingsSchema = z.object({
   supportContact: z.string().nullable(),
   presenceEnabled: z.boolean(),
   traceSharingEnabled: z.boolean(),
-  primaryIntent: z.nativeEnum(OrganizationIntent).nullable(),
+  primaryIntent: organizationIntentSchema.nullable(),
   s3Endpoint: z.string().nullable(),
   s3AccessKeyId: z.string().nullable(),
   s3Bucket: z.string().nullable(),
@@ -225,7 +235,7 @@ const updateOrganizationSchema = z.object({
   supportContact: z.string().max(255).nullable().optional(),
   presenceEnabled: z.boolean().optional(),
   traceSharingEnabled: z.boolean().optional(),
-  primaryIntent: z.nativeEnum(OrganizationIntent).nullable().optional(),
+  primaryIntent: organizationIntentSchema.nullable().optional(),
   s3Endpoint: z.string().max(2048).nullable().optional(),
   s3AccessKeyId: z.string().max(1024).nullable().optional(),
   /** Write-only: accepted here, never read back. */
@@ -235,7 +245,7 @@ const updateOrganizationSchema = z.object({
 
 const memberSchema = z.object({
   userId: z.string(),
-  role: z.nativeEnum(OrganizationUserRole),
+  role: organizationApiMemberRoleSchema,
   disabled: z.boolean(),
   disabledAt: z.date().nullable(),
   createdAt: z.date(),
@@ -250,14 +260,14 @@ const memberSchema = z.object({
 const memberTeamSchema = z.object({
   teamId: z.string(),
   teamName: z.string(),
-  role: z.nativeEnum(TeamUserRole),
+  role: teamUserRoleSchema,
   customRoleId: z.string().nullable(),
   customRoleName: z.string().nullable(),
 });
 
 const updateMemberSchema = z
   .object({
-    role: z.nativeEnum(OrganizationUserRole).optional(),
+    role: organizationApiMemberRoleSchema.optional(),
     disabled: z.boolean().optional(),
   })
   .superRefine((value, ctx) => {
@@ -282,7 +292,7 @@ const accessBindingSchema = z.object({
   id: z.string(),
   role: z.string(),
   customRoleName: z.string().nullable(),
-  scopeType: z.nativeEnum(RoleBindingScopeType),
+  scopeType: roleBindingScopeTypeSchema,
   scopeId: z.string(),
   scopeName: z.string().nullable(),
   permissions: z.array(z.string()),
@@ -317,7 +327,7 @@ const inviteTeamSchema = z.object({
 const inviteSchema = z.object({
   id: z.string(),
   email: z.string(),
-  role: z.nativeEnum(OrganizationUserRole),
+  role: organizationApiMemberRoleSchema,
   status: z.string(),
   expiration: z.date().nullable(),
   inviteCode: z.string(),
@@ -331,12 +341,12 @@ const createInvitesSchema = z.object({
     .array(
       z.object({
         email: z.string().trim().min(1).email(),
-        role: z.nativeEnum(OrganizationUserRole),
+        role: organizationApiMemberRoleSchema,
         teams: z
           .array(
             z.object({
               teamId: z.string().min(1),
-              role: z.nativeEnum(TeamUserRole),
+              role: teamUserRoleSchema,
               customRoleId: z.string().min(1).optional(),
             }),
           )
@@ -548,7 +558,7 @@ export function createOrganizationRestApp(options: {
     service: OrganizationRestService;
     organizationId: string;
     userId: string;
-    role: OrganizationUserRole;
+    role: OrganizationApiMemberRole;
     actorUserId: string | null;
   }): Promise<Array<{ id: string; name: string }> | undefined> => {
     try {
