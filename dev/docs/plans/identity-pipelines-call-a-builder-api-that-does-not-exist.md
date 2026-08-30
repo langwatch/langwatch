@@ -1,7 +1,21 @@
 # The four identity pipelines call a `definePipeline` head that was never built
 
-**On the boot path, and it throws.** Needs a design decision — two coherent
-resolutions, and picking the wrong one sends the identity wave sideways.
+**RESOLVED** in "Build the four identity pipelines the way every working
+pipeline builds" — resolution (2) below, the config form. All four construct;
+the package suite went from 20 failed / 18 passed to 3 failed / 35 passed. The
+rest of this page is kept because it records what the two options cost, which
+is the part that is expensive to rediscover.
+
+Resolution (2) won on a rule, not a preference: it needed no new builder
+surface, and (1) would have meant inventing one and deciding where a
+pipeline's event list comes from. The five `.withProjection(NAME, instance)`
+calls went the same way — `withPostgresProjection(definition)` takes one
+argument because an `AbstractFoldProjection` already carries its own `name`.
+Each of the five name arguments was checked against the class's own
+`readonly name` before being dropped: a projection's name is its cursor key,
+so a mismatch would have silently repointed a cursor. All five agreed.
+
+Still open, and untouched by this: the zod split described at the bottom.
 
 ## The fact
 
