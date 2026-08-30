@@ -114,7 +114,7 @@ function ConversationBox({ children }: { children: React.ReactNode }) {
 
 /** What the results column says while a run has not reached a verdict. */
 const CONVERSATION_RUNNING_MESSAGE =
-  "Waiting for the conversation to end, then the judge reads it";
+  "Waiting for more turns to define a verdict";
 const JUDGE_READING_MESSAGE = "The judge is reading the conversation";
 
 /**
@@ -130,10 +130,10 @@ const JUDGED_STATUSES = new Set<string>([
 /**
  * What the run is still doing, while it has no verdict to show.
  *
- * The conversation runs first and the judge reads it afterwards, so the status
- * of the run is what separates the two: the judge speaks only once the run has
- * finished, and a finished run whose verdict has not landed yet is one the
- * judge has just read.
+ * The judge reads the conversation after every turn and is what ends the run,
+ * so a run that is still going is one whose turns have not settled a verdict
+ * yet, and a run that has settled but carries no verdict is one whose written
+ * verdict has not landed.
  *
  * A verdict is a verdict even with no criteria under it: a scripted run, such
  * as the ping an agent test sends, is judged by its script and answers with a
@@ -172,7 +172,7 @@ function PendingVerdictLine({ message }: { message: string }) {
       align="center"
       justify="flex-start"
       paddingTop="64px"
-      paddingX={2}
+      paddingX={14}
       data-testid="run-verdict-pending"
     >
       <Text fontSize="12px" color="fg.muted" textAlign="center">

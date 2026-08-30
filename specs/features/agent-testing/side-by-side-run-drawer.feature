@@ -142,7 +142,7 @@ Feature: The wide run detail drawer
     Given a running run open in the wide drawer
     When messages arrive
     Then the conversation grows on the left
-    And the results side says it waits for the conversation to end
+    And the results side says it waits for more turns to define a verdict
     And that line reads in the middle of the column, with no spinner
     And it never reads a score of 0 out of 0
 

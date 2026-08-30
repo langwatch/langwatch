@@ -396,7 +396,7 @@ describe("the wide run detail drawer", () => {
     const view = renderWide();
 
     expect(screen.getByTestId("run-verdict-pending")).toHaveTextContent(
-      "Waiting for the conversation to end",
+      "Waiting for more turns to define a verdict",
     );
     expect(screen.getByTestId("run-verdict-pending")).not.toContainElement(
       screen.queryByRole("progressbar"),
