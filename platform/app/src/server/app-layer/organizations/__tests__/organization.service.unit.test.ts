@@ -1,12 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  OrganizationUserRole,
-  type PrismaClient,
-  TeamUserRole,
-} from "~/generated/prisma/client";
+import { OrganizationUserRole, type PrismaClient, TeamUserRole } from "~/generated/prisma/client";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { ShareService } from "@langwatch/share-contract";
+import type { LicenseEnforcementService } from "~/server/license-enforcement";
 import { OrganizationService } from "../organization.service";
 import type { OrganizationRepository } from "../repositories/organization.repository";
 
@@ -15,12 +12,11 @@ vi.mock("../../tracing", () => ({
   traced: <T>(instance: T) => instance,
 }));
 
-const { mockRevokeAllTraceShares, mockCheckLimit, mockInvalidateOrganization } =
-  vi.hoisted(() => ({
-    mockInvalidateOrganization: vi.fn(),
-    mockRevokeAllTraceShares: vi.fn(),
-    mockCheckLimit: vi.fn(),
-  }));
+const { mockRevokeAllTraceShares, mockCheckLimit, mockInvalidateOrganization } = vi.hoisted(() => ({
+  mockInvalidateOrganization: vi.fn(),
+  mockRevokeAllTraceShares: vi.fn(),
+  mockCheckLimit: vi.fn(),
+}));
 
 // Disabling a seat is not a grant write, so the service retires the
 // organization's cached authorization snapshots itself.
@@ -30,11 +26,11 @@ vi.mock("../../app", () => ({
   }),
 }));
 
-// The seat check on re-enabling a membership; the service builds it from the
-// repository's client, which the double answers as a bare object.
-vi.mock("~/server/license-enforcement", () => ({
-  createLicenseEnforcementService: () => ({ checkLimit: mockCheckLimit }),
-}));
+// The seat check on re-enabling a membership. The service used to build this
+// itself from the repository's client, which is what the module mock that
+// stood here answered; it now takes one as a constructor argument, so the mock
+// was mocking a factory nobody called and `licenseEnforcement` was undefined.
+// Injected below instead.
 
 describe("OrganizationService", () => {
   const mockRepo: OrganizationRepository = {
@@ -89,7 +85,13 @@ describe("OrganizationService", () => {
     // The flows that compose raw-client helpers ask the repository for its
     // client; the double is Prisma-backed as far as they are concerned.
     vi.mocked(mockRepo.getClient!).mockReturnValue({} as unknown as PrismaClient);
-    service = new OrganizationService(mockRepo, mockPrompts, void 0, void 0, mockShares);
+    service = new OrganizationService(
+      mockRepo,
+      mockPrompts,
+      void 0,
+      { checkLimit: mockCheckLimit } as unknown as LicenseEnforcementService,
+      mockShares,
+    );
   });
 
   describe("getOrganizationIdByTeamId", () => {
@@ -193,9 +195,7 @@ describe("OrganizationService", () => {
       it("delegates to the repository with effective team role updates", async () => {
         await service.updateMemberRole({
           ...baseParams,
-          teamRoleUpdates: [
-            { teamId: "team-1", userId: "user-456", role: TeamUserRole.ADMIN },
-          ],
+          teamRoleUpdates: [{ teamId: "team-1", userId: "user-456", role: TeamUserRole.ADMIN }],
         });
 
         expect(mockRepo.updateMemberRole).toHaveBeenCalledWith(
