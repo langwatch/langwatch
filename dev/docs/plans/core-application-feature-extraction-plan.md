@@ -603,6 +603,32 @@ switches that port from structural to nominal typing — implementors must
 `extends` it, so composition has to change too. That is a decision for the
 feature that owns the port.
 
+`F-CROSS-01` — **the last `cross-feature` violation is a real UI question, not
+a misplaced import.** Five of the six were things in the wrong package and are
+closed: billing building Notification's Postgres adapter, webhook and governance
+each importing one pure function from another feature's SERVER package, Trace's
+draft store taking two domain types from `annotation-web`, and langy taking a
+clipboard hook from `trace-web` that has always lived in the design system.
+
+The sixth is `prompt/web` importing `ColorfulBlockIcon` and `ComponentIcon` from
+`workflow-web`, and prompt genuinely renders workflow component icons —
+`variable-insert-menu.tsx` does `<ComponentIcon type={type as ComponentType} />`.
+`ComponentIcon` is keyed by workflow's own `ComponentType`, so moving it to the
+Design System would drag a feature's domain vocabulary into a shared package.
+
+Three ways out, none obviously right:
+
+1. Split them. `ColorfulBlockIcon` is a coloured wrapper around any icon and is
+   Design System material on its own terms; `ComponentIcon` is the one carrying
+   workflow's vocabulary. Prompt would still need the second.
+2. Pass it in. Both call sites are inside `prompt/web/src/surfaces/`, and
+   `ui-surface-closure` already says a surface should "receive portable values
+   and controlled actions from the consuming feature" — so the icon becomes a
+   prop and the host supplies it. This is probably right, and it changes the
+   surface's published props.
+3. Accept the dependency and record why prompt may see workflow's component
+   vocabulary.
+
 `F-EXPORT-01` — **`private-runtime-export`'s 17 are one inversion, not
 seventeen deletions.** Sixteen are `packages/features/trace/server/src/index.ts`
 re-exporting its own repositories, projections and eventing stores; the
