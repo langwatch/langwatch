@@ -64,7 +64,10 @@ export const pulledUsageObservedEventDataSchema = z.object({
   tokensCacheWrite: z.number().int().nonnegative(),
 
   /**
-   * The money, priced exactly once at the ingest seam, as an integer.
+   * The money, priced exactly once at the ingest seam, as an integer of the
+   * provider's own MINOR units — nano-euros for a subscription billed in
+   * euros, nano-dollars for one billed in dollars. Which of those it is, is
+   * `currencyCode` below and nowhere else; nothing here converts.
    *
    * SIGNED, unlike the token counts above. A provider that refunds or credits
    * a period reports it as a negative figure in the same field a charge
@@ -72,7 +75,30 @@ export const pulledUsageObservedEventDataSchema = z.object({
    * reverses stands alone. A negative token count, by contrast, is not
    * something that happened, so those stay nonnegative.
    */
-  costNanoUsd: z.number().int(),
+  costNanoMinor: z.number().int(),
+  /**
+   * Which currency `costNanoMinor` is denominated in, ISO 4217.
+   *
+   * Defaulted rather than required, and the default is load-bearing: every
+   * event already on the durable log was written before money carried a
+   * currency, and every one of those producers reported dollars. A required
+   * field here would make the append-only log unreadable, which is a rebuild
+   * rather than a migration (ADR-128 §3).
+   */
+  currencyCode: z.string().length(3).default("USD"),
+  /**
+   * The BILLER's own conversion of `costNanoMinor` into nano-dollars, when it
+   * published one — Azure returns `totalCostUSD` beside `totalCost` at its own
+   * invoice-grade rate.
+   *
+   * Null means no dollar figure exists for this item, and that is a different
+   * fact from zero: zero charts as free usage, absent says we hold money here
+   * that no dollar column can honestly state. We never invent a rate to fill
+   * it, so it stays null for a non-dollar provider that published none. Null
+   * on a dollars-denominated item too, where `costNanoMinor` already IS the
+   * dollar figure and a copy would be a second number to keep in step.
+   */
+  costNanoUsd: z.number().int().nullable().default(null),
   /**
    * Which price table produced a `computed` cost. Null for
    * `provider_reported`: there was no price table, the provider said the
