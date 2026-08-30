@@ -178,7 +178,7 @@ def test_kwargs_is_detected_and_not_a_parameter():
 
     signature = analyze(agent)
 
-    assert signature.accepts_kwargs is True
+    assert signature.has_kwargs is True
     assert signature.parameters == {}
 
 

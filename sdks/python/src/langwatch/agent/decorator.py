@@ -205,7 +205,7 @@ class ConnectedAgent:
         turn_fields = call.turn_fields()
         if self.signature.call_parameter is not None:
             args.append(call)
-        if self.signature.accepts_kwargs:
+        if self.signature.has_kwargs:
             kwargs.update(turn_fields)
         else:
             for name in self.signature.turn_fields:

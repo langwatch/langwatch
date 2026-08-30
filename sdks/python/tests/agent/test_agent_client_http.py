@@ -177,8 +177,8 @@ def make_client(platform: FakeHttpPlatform, **options: Any) -> AgentClient:
     settings: dict[str, Any] = dict(
         api_key="sk-lw-test-key",
         endpoint=platform.endpoint,
-        install_process_hooks=False,
-        setup_tracing=False,
+        should_install_process_hooks=False,
+        should_setup_tracing=False,
         backoff_initial=0.05,
         backoff_max=0.2,
     )

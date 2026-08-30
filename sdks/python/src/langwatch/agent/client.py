@@ -201,8 +201,8 @@ class AgentClient:
         transport: str | None = None,
         backoff_initial: float = BACKOFF_INITIAL_SECONDS,
         backoff_max: float = BACKOFF_MAX_SECONDS,
-        install_process_hooks: bool = True,
-        setup_tracing: bool = True,
+        should_install_process_hooks: bool = True,
+        should_setup_tracing: bool = True,
     ) -> None:
         self._api_key = api_key
         self._endpoint = endpoint
@@ -211,8 +211,8 @@ class AgentClient:
         self._transport = transport
         self._backoff_initial = backoff_initial
         self._backoff_max = backoff_max
-        self._install_process_hooks = install_process_hooks
-        self._setup_tracing = setup_tracing
+        self._should_install_process_hooks = should_install_process_hooks
+        self._should_setup_tracing = should_setup_tracing
 
         self._agents: dict[str, ConnectedAgent] = {}
         self._agents_by_id: dict[str, ConnectedAgent] = {}
@@ -363,13 +363,13 @@ class AgentClient:
                 target=self._thread_main, name="langwatch-agent", daemon=True
             )
             self._thread.start()
-            if self._install_process_hooks:
+            if self._should_install_process_hooks:
                 self._install_hooks()
             return True
 
     def _ensure_tracing(self) -> None:
         """Set the SDK up so the function's spans reach the platform."""
-        if not self._setup_tracing:
+        if not self._should_setup_tracing:
             return
         try:
             ensure_setup(api_key=self.resolved_api_key)

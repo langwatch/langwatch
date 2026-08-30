@@ -264,7 +264,7 @@ class AgentSignature:
     """What the decorator learned from the function signature."""
 
     turn_fields: list[str] = field(default_factory=list)
-    accepts_kwargs: bool = False
+    has_kwargs: bool = False
     call_parameter: str | None = None
     parameters: dict[str, ParameterSpec] = field(default_factory=dict)
 
@@ -331,7 +331,7 @@ def analyze_signature(
 
     for index, (name, parameter) in enumerate(signature.parameters.items()):
         if parameter.kind is inspect.Parameter.VAR_KEYWORD:
-            result.accepts_kwargs = True
+            result.has_kwargs = True
             continue
         if parameter.kind is inspect.Parameter.VAR_POSITIONAL:
             continue

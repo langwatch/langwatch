@@ -154,8 +154,8 @@ def make_client(platform: FakePlatform, **options: Any) -> AgentClient:
     settings: dict[str, Any] = dict(
         api_key="sk-lw-test-key",
         endpoint=platform.endpoint,
-        install_process_hooks=False,
-        setup_tracing=False,
+        should_install_process_hooks=False,
+        should_setup_tracing=False,
         backoff_initial=0.05,
         backoff_max=0.2,
     )
@@ -542,8 +542,8 @@ async def test_unreachable_endpoint_warns_once_and_keeps_retrying(caplog):
     client = AgentClient(
         api_key="sk-lw-test-key",
         endpoint=f"http://127.0.0.1:{port}",
-        install_process_hooks=False,
-        setup_tracing=False,
+        should_install_process_hooks=False,
+        should_setup_tracing=False,
         backoff_initial=0.02,
         backoff_max=0.05,
     )
@@ -568,7 +568,7 @@ async def test_connectivity_warning_repeats_only_on_state_change_and_after_the_i
 ):
     caplog.set_level(logging.DEBUG, logger="langwatch.agent")
     client = AgentClient(
-        api_key="k", endpoint="http://127.0.0.1:1", install_process_hooks=False
+        api_key="k", endpoint="http://127.0.0.1:1", should_install_process_hooks=False
     )
 
     client._note_connectivity("unreachable", "down")
@@ -719,7 +719,7 @@ async def test_serve_returns_when_the_connection_thread_stops():
 
 async def test_serve_raises_when_it_cannot_connect(monkeypatch):
     monkeypatch.delenv("LANGWATCH_API_KEY", raising=False)
-    client = AgentClient(install_process_hooks=False, setup_tracing=False)
+    client = AgentClient(should_install_process_hooks=False, should_setup_tracing=False)
     client_module._default_client = client
     try:
         with pytest.raises(RuntimeError, match="no function is decorated"):
