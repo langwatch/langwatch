@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { join, sep } from "node:path";
 import ts from "typescript";
 import { walkFiles } from "./files";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types";
@@ -48,10 +48,6 @@ function scriptKind(file: string): ts.ScriptKind {
   if (file.endsWith(".jsx")) return ts.ScriptKind.JSX;
   if (file.endsWith(".mjs") || file.endsWith(".cjs")) return ts.ScriptKind.JS;
   return ts.ScriptKind.TS;
-}
-
-function workspacePath(root: string, file: string): string {
-  return relative(root, file).split(sep).join("/");
 }
 
 function transportSources(packages: readonly ClassifiedPackage[]): TransportSource[] {
@@ -684,10 +680,13 @@ function lintSource(root: string, transport: TransportSource): ArchitectureViola
     violations.push(...rawHonoViolations(transport.file, source));
   }
 
-  return violations.map((violation) => ({
-    ...violation,
-    file: workspacePath(root, violation.file),
-  }));
+  // Absolute, deliberately. `lintAll` relativises every violation once, at the
+  // end, against the same root — so doing it here too relativised twice: the
+  // second pass resolved an already-relative path against the lint package's
+  // own directory and reported all thirteen findings under
+  // `packages/architecture-lint/apps/api/...`, a path that does not exist. The
+  // reader could not open the file the rule named.
+  return violations;
 }
 
 /** Fast structural checks for strict feature APIs and the API process transport surface. */

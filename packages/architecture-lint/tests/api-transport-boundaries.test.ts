@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -84,6 +84,23 @@ describe("strict feature API transport boundaries", () => {
     );
 
     expect(violations([featureServer()])).toEqual([]);
+  });
+
+  it("reports a path that can actually be opened", () => {
+    // `lintAll` relativises every violation once, against the same root. This
+    // rule used to do it a second time, which resolved an already-relative path
+    // against the lint package's own directory and reported all thirteen real
+    // findings under `packages/architecture-lint/apps/api/...` — a path that
+    // does not exist, so the reader could not open the file the rule named.
+    write(
+      "apps/api/src/features/thing/thing.mount.ts",
+      'import type { PrismaClient } from "@langwatch/prisma-client/generated";\nexport type T = PrismaClient;',
+    );
+
+    const [violation] = violations([apiApplication()]);
+
+    expect(violation).toBeDefined();
+    expect(existsSync(violation!.file)).toBe(true);
   });
 
   it("rejects persistence, environment and application implementation imports", () => {
