@@ -23,11 +23,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+/** The five writes and reads a membership diff makes. */
+export type ScimGroupMembershipRepository = Pick<
+  ScimRepositoryPort,
+  "addGroupMember" | "groupSlugExists" | "listGroupMemberIds" | "removeGroupMembers" | "renameGroup"
+>;
+
 /** Owns SCIM Group membership diffs and their conservative PATCH interpretation. */
 export class ScimGroupMembershipService {
-  private constructor(private readonly repository: ScimRepositoryPort) {}
+  private constructor(private readonly repository: ScimGroupMembershipRepository) {}
 
-  static create(repository: ScimRepositoryPort): ScimGroupMembershipService {
+  static create(repository: ScimGroupMembershipRepository): ScimGroupMembershipService {
     return new ScimGroupMembershipService(repository);
   }
 

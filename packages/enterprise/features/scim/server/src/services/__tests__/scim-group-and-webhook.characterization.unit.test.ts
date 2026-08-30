@@ -4,11 +4,11 @@ import { describe, expect, it, vi } from "vitest";
 import { ScimWebhookApi } from "../../api/scim-webhook/scim-webhook.api";
 import { ScimDirectoryService } from "../scim-directory.service";
 import { ScimGrantsService } from "../scim-grants.service";
-import type { ScimRepositoryPort } from "../../ports/scim-repository.port";
+import type { ScimDirectoryRepository } from "../scim-directory.service";
 import { GrantsFake } from "../../__tests__/support/grants-fake";
 import { scimPatchRequestSchema } from "@langwatch/enterprise-scim-contract";
 
-function groupsRepository(): ScimRepositoryPort {
+function groupsRepository(): ScimDirectoryRepository {
   return {
     listGroupMemberIds: vi.fn(async () => ["user_1"]),
     tryFindGroup: vi.fn(async () => ({
@@ -30,7 +30,7 @@ function groupsRepository(): ScimRepositoryPort {
     renameGroup: vi.fn(),
     deleteGroup: vi.fn(),
     listGroupMembers: vi.fn(async () => []),
-  } as ScimRepositoryPort;
+  };
 }
 class ScimServiceFake extends ScimService {
   readonly tryFindOrganizationBySsoDomain = vi.fn(async () => ({ id: "org_1" }));

@@ -2,7 +2,7 @@
 
 import { scimPatchRequestSchema } from "@langwatch/enterprise-scim-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ScimRepositoryPort } from "../../ports/scim-repository.port";
+import type { ScimDirectoryRepository } from "../scim-directory.service";
 import { ScimDirectoryService } from "../scim-directory.service";
 import { ScimGrantsService } from "../scim-grants.service";
 import { GrantsFake } from "../../__tests__/support/grants-fake";
@@ -19,7 +19,7 @@ const group = {
   updatedAt: new Date("2024-01-02T00:00:00Z"),
 };
 
-function repository(): ScimRepositoryPort {
+function repository(): ScimDirectoryRepository {
   return {
     tryFindGroup: vi.fn(async () => group),
     listGroupMemberIds: vi.fn(async () => ["user-1", "user-2"]),
@@ -32,7 +32,7 @@ function repository(): ScimRepositoryPort {
     deleteGroup: vi.fn(async () => undefined),
     groupSlugExists: vi.fn(async () => false),
     listRoleBindings: vi.fn(async () => []),
-  } as ScimRepositoryPort;
+  };
 }
 
 function patch(operations: unknown[]) {

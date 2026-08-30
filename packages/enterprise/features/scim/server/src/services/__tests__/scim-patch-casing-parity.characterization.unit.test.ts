@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import type { ScimDepartmentAssignment } from "../scim-cost-center.service";
 import { EntitlementService } from "@langwatch/entitlement-contract";
 import { scimPatchRequestSchema } from "@langwatch/enterprise-scim-contract";
 import type { ScimUserProvisioning } from "../scim-provisioning.service";
@@ -11,6 +11,7 @@ import { ScimGrantsService } from "../scim-grants.service";
 import { ScimService } from "../scim.service";
 import { QuietScimSyncLifecycle } from "../../ports/__tests__/support/quiet-scim-sync-lifecycle";
 import { GrantsFake } from "../../__tests__/support/grants-fake";
+import type { ScimDirectoryRepository } from "../scim-directory.service";
 
 const patchSchema = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 const parse = (operations: unknown[]) =>
@@ -32,7 +33,7 @@ class EnterpriseEntitlements extends EntitlementService {
   }
 }
 
-function groupRepository(): ScimRepositoryPort {
+function groupRepository(): ScimDirectoryRepository {
   return {
     tryFindGroup: vi.fn(async () => ({
       id: "group-1",
@@ -54,7 +55,7 @@ function groupRepository(): ScimRepositoryPort {
     deleteGroup: vi.fn(async () => undefined),
     groupSlugExists: vi.fn(async () => false),
     listRoleBindings: vi.fn(async () => []),
-  } as ScimRepositoryPort;
+  };
 }
 
 const notReached = async (): Promise<never> => {
@@ -87,7 +88,7 @@ function userService(): ScimUserProvisioning {
   } satisfies ScimUserProvisioning;
 }
 
-function governance(): GovernanceService {
+function governance(): ScimDepartmentAssignment {
   return {
     departmentResolveByNameOrCreate: vi.fn(async () => ({
       id: "department-1",

@@ -10,7 +10,10 @@ import type {
   ScimReplaceGroupRequest,
 } from "@langwatch/enterprise-scim-contract";
 import { ScimGrantsService } from "./scim-grants.service";
-import { ScimGroupMembershipService } from "./scim-group-membership.service";
+import {
+  ScimGroupMembershipService,
+  type ScimGroupMembershipRepository,
+} from "./scim-group-membership.service";
 import type { ScimGroupRecord, ScimRepositoryPort } from "../ports/scim-repository.port";
 
 /**
@@ -18,8 +21,26 @@ import type { ScimGroupRecord, ScimRepositoryPort } from "../ports/scim-reposito
  * Groups pushed from an IdP arrive here unmapped — admins assign role bindings
  * via the Groups settings page.
  */
+/**
+ * The group half of the SCIM repository. The directory never touches users,
+ * memberships, tokens or directory identities, so asking for the whole port is
+ * what forced every group-only double in this package to cast.
+ */
+export type ScimDirectoryRepository = Pick<
+  ScimRepositoryPort,
+  | "createGroup"
+  | "deleteGroup"
+  | "listGroupMemberIds"
+  | "listGroupMembers"
+  | "listGroups"
+  | "listRoleBindings"
+  | "renameGroup"
+  | "tryFindGroup"
+> &
+  ScimGroupMembershipRepository;
+
 export class ScimDirectoryService {
-  private readonly prisma: ScimRepositoryPort;
+  private readonly prisma: ScimDirectoryRepository;
   private readonly grants: ScimGrantsService;
   private readonly membership: ScimGroupMembershipService;
 
@@ -27,7 +48,7 @@ export class ScimDirectoryService {
     prisma,
     grants,
   }: {
-    prisma: ScimRepositoryPort;
+    prisma: ScimDirectoryRepository;
     grants: ScimGrantsService;
   }) {
     this.prisma = prisma;
@@ -36,7 +57,7 @@ export class ScimDirectoryService {
   }
 
   static create(options: {
-    prisma: ScimRepositoryPort;
+    prisma: ScimDirectoryRepository;
     grants: ScimGrantsService;
   }): ScimDirectoryService {
     return new ScimDirectoryService(options);
