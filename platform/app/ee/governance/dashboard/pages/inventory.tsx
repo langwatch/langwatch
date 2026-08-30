@@ -1895,6 +1895,16 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       required: true,
       secret: true,
     },
+    {
+      // NOT a `credentials*` field, unlike the three above. A subscription id
+      // is a coordinate rather than a secret, and the adapter reads it off the
+      // config itself; naming it `credentialsAzureSubscriptionId` would bury
+      // it in the encrypted subtree where the config schema never looks.
+      key: "azureSubscriptionId",
+      label: "Azure subscription ID (optional)",
+      placeholder: "00000000-0000-0000-0000-000000000000",
+      hint: "Add this to also record what the environment costs each day. The same app registration needs the Cost Management Reader role on the subscription. Leave it empty to record conversations only.",
+    },
   ],
   openai_compliance: [
     {
@@ -2420,7 +2430,7 @@ function normalizeStartingAt(raw: string): string | null | undefined {
  * the source would save looking complete and fail every run for want of a
  * credential it did ask for.
  */
-function buildCopilotStudioDataversePullConfig(
+export function buildCopilotStudioDataversePullConfig(
   c: ComposerState,
 ): Record<string, unknown> | null {
   const p = c.parserConfig;
@@ -2428,6 +2438,7 @@ function buildCopilotStudioDataversePullConfig(
   const tenantId = (p.credentialsTenantId ?? "").trim();
   const clientId = (p.credentialsClientId ?? "").trim();
   const clientSecret = (p.credentialsClientSecret ?? "").trim();
+  const azureSubscriptionId = (p.azureSubscriptionId ?? "").trim();
 
   // All three or none: two thirds of an app registration is not a sign-in,
   // and accepting it would save a source that cannot run.
@@ -2446,6 +2457,12 @@ function buildCopilotStudioDataversePullConfig(
       c.pullSchedule.trim() ||
       PULL_SCHEDULE_DEFAULTS.copilot_studio_dataverse ||
       "*/15 * * * *",
+    // Omitted rather than sent empty, the same way Genie omits an unset
+    // warehouse: the adapter reads "no subscription named" as "do not read
+    // cost", and an empty string is a subscription id it would then ask Azure
+    // about — and the schema would refuse it as not a uuid, failing the save
+    // for a field the customer deliberately left blank.
+    ...(azureSubscriptionId ? { azureSubscriptionId } : {}),
     credentials: { tenantId, clientId, clientSecret },
   };
 }
@@ -2802,7 +2819,18 @@ const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
     // values winning the merge would leave a string where the adapter's schema
     // expects a list, and an address the destination check reads differently
     // from the one the adapter calls.
-    copilot_studio_dataverse: ["environmentUrl", "botIds"],
+    //
+    // `azureSubscriptionId` is here because the builder OMITS it when empty,
+    // exactly like Genie's `warehouseId`. An empty form value is already
+    // dropped before parserConfig, so this is not fixing a live escape — it
+    // keeps the single rule "a field a builder decides about is owned by the
+    // builder" true for this field too, so the day the builder starts
+    // normalising it there is no raw copy left to win the merge.
+    copilot_studio_dataverse: [
+      "environmentUrl",
+      "botIds",
+      "azureSubscriptionId",
+    ],
   };
 
 // Skip sentinel for a parserConfig entry that must not be persisted, kept

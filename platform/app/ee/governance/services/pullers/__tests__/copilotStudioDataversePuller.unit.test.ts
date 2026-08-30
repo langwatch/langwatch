@@ -176,6 +176,22 @@ function stringOrder(left: string, right: string): number {
   return left > right ? 1 : 0;
 }
 
+/**
+ * Where the transcript walk got to, out of the stored position.
+ *
+ * The position also carries how far the Azure bill has been priced, which is a
+ * separate watermark on a separate window. Reading only the transcript half
+ * here keeps these assertions about the thing they are testing — and stops
+ * them failing the day a second reader is added to the same source.
+ */
+function transcriptPositionOf(
+  cursor: string | null,
+): { createdon?: string; conversationtranscriptid?: string } | null {
+  if (!cursor) return null;
+  const { createdon, conversationtranscriptid } = JSON.parse(cursor);
+  return { createdon, conversationtranscriptid };
+}
+
 /** The order the adapter's `$orderby` asks for, applied by the fake server. */
 function byCursorOrder(
   a: Record<string, unknown>,
@@ -771,7 +787,7 @@ describe("given a cursor from a previous run", () => {
       adapter.validateConfig(CONFIG),
     );
 
-    expect(JSON.parse(result.cursor!)).toEqual({
+    expect(transcriptPositionOf(result.cursor)).toEqual({
       createdon: "2026-08-25T19:45:12Z",
       conversationtranscriptid: "22222222-2222-4222-8222-222222222222",
     });
@@ -869,7 +885,7 @@ describe("given several conversations written in the same instant", () => {
     for (let run = 0; run < 3; run += 1) {
       const result = await runStoppingAfterOnePage(adapter, cursor);
       cursor = result.cursor;
-      cursors.push(JSON.parse(cursor!));
+      cursors.push(transcriptPositionOf(cursor));
     }
 
     expect(cursors).toEqual([
@@ -909,7 +925,7 @@ describe("given several conversations written in the same instant", () => {
       "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
     ]);
-    expect(JSON.parse(result.cursor!)).toEqual({
+    expect(transcriptPositionOf(result.cursor)).toEqual({
       createdon: LATER,
       conversationtranscriptid: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
     });
@@ -1041,7 +1057,7 @@ describe("given the pull goes wrong", () => {
 
     expect(result.errorCount).toBe(1);
     expect(result.events).toHaveLength(1);
-    expect(JSON.parse(result.cursor ?? "null")).toEqual({
+    expect(transcriptPositionOf(result.cursor)).toEqual({
       createdon: "2026-08-25T19:45:00Z",
       conversationtranscriptid: "22222222-2222-4222-8222-222222222222",
     });
@@ -1086,7 +1102,7 @@ describe("given the pull goes wrong", () => {
 
     expect(result.events).toHaveLength(0);
     expect(result.errorCount).toBe(3);
-    expect(JSON.parse(result.cursor ?? "null")).toEqual({
+    expect(transcriptPositionOf(result.cursor)).toEqual({
       createdon: "2026-08-25T19:46:00Z",
       conversationtranscriptid: "33333333-3333-4333-8333-333333333333",
     });
@@ -1120,7 +1136,7 @@ describe("given the pull goes wrong", () => {
     );
 
     expect(result.errorCount).toBe(1);
-    expect(JSON.parse(result.cursor ?? "null")).toEqual({
+    expect(transcriptPositionOf(result.cursor)).toEqual({
       createdon: "2026-08-25T19:44:43Z",
       conversationtranscriptid: "11111111-1111-4111-8111-111111111111",
     });

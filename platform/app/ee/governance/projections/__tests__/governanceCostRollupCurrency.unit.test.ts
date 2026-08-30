@@ -114,7 +114,9 @@ describe("the daily rollup and the currency a day was billed in", () => {
     /** @scenario "A non-dollar day reports no dollar figure unless the biller gave one" */
     it("reports no dollar figure, while keeping the full billed amount", () => {
       const totals = governanceCostRollupTotals(
-        fold([observedEvent({ costNanoMinor: 1_533_525_880, currencyCode: "EUR" })]),
+        fold([
+          observedEvent({ costNanoMinor: 1_533_525_880, currencyCode: "EUR" }),
+        ]),
       );
 
       expect(totals.amountNanoUsd).toBe(null);
@@ -194,9 +196,9 @@ describe("the daily rollup and the currency a day was billed in", () => {
       expect(governanceCostRollupTotals(fold([inEuros])).amountNanoMinor).toBe(
         1_000,
       );
-      expect(governanceCostRollupTotals(fold([inDollars])).amountNanoMinor).toBe(
-        2_000,
-      );
+      expect(
+        governanceCostRollupTotals(fold([inDollars])).amountNanoMinor,
+      ).toBe(2_000);
     });
   });
 

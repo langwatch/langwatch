@@ -37,7 +37,8 @@ function replyOf({
     properties: {
       columns: columns.map((name) => ({
         name,
-        type: name === "MeterCategory" || name === "Currency" ? "String" : "Number",
+        type:
+          name === "MeterCategory" || name === "Currency" ? "String" : "Number",
       })),
       rows,
       nextLink,
@@ -107,7 +108,13 @@ describe("reading an Azure Cost Management daily reply", () => {
       // meter category and the meter category as money.
       const read = readAzureCostRows({
         response: replyOf({
-          columns: ["Currency", "MeterCategory", "UsageDate", "CostUSD", "Cost"],
+          columns: [
+            "Currency",
+            "MeterCategory",
+            "UsageDate",
+            "CostUSD",
+            "Cost",
+          ],
           rows: [["EUR", "Load Balancer", 20260823, 0.6, 0.527171286737249]],
         }),
       });
@@ -164,8 +171,16 @@ describe("reading an Azure Cost Management daily reply", () => {
     it("reads a credit as the negative amount it is", () => {
       const read = readAzureCostRows({
         response: replyOf({
-          columns: ["Cost", "CostUSD", "UsageDate", "MeterCategory", "Currency"],
-          rows: [[-1.53352588022719, -1.74538248058057, 20260823, "Storage", "EUR"]],
+          columns: [
+            "Cost",
+            "CostUSD",
+            "UsageDate",
+            "MeterCategory",
+            "Currency",
+          ],
+          rows: [
+            [-1.53352588022719, -1.74538248058057, 20260823, "Storage", "EUR"],
+          ],
         }),
       });
 
@@ -190,7 +205,9 @@ describe("reading an Azure Cost Management daily reply", () => {
 
     /** @scenario "A cost reply spread over several pages is read whole" */
     it("reports no link when the reply is complete, as the captured one is", () => {
-      expect(readAzureCostRows({ response: capturedReply }).nextLink).toBe(null);
+      expect(readAzureCostRows({ response: capturedReply }).nextLink).toBe(
+        null,
+      );
     });
   });
 

@@ -82,18 +82,20 @@ describe("signed pulled money", () => {
   describe("when the value is not money at all", () => {
     /** @scenario "Widening money to allow credits does not admit values that are not money" */
     it("records zero rather than carrying the unusable value", () => {
-      expect(normalizedPullEventSchema.parse(pullEvent("banana")).cost_usd).toBe(
-        "0",
-      );
+      expect(
+        normalizedPullEventSchema.parse(pullEvent("banana")).cost_usd,
+      ).toBe("0");
       // A lone minus sign matches the pattern's optional-digits shape and is
       // not a number. This is the case that only exists because the sign was
       // allowed, so it is the one the finite check has to catch.
-      expect(normalizedPullEventSchema.parse(pullEvent("-")).cost_usd).toBe("0");
-      // Matches the pattern, overflows to -Infinity. The check that catches it
-      // is the same one the negative clamp used to sit next to.
-      expect(normalizedPullEventSchema.parse(pullEvent("-1e999")).cost_usd).toBe(
+      expect(normalizedPullEventSchema.parse(pullEvent("-")).cost_usd).toBe(
         "0",
       );
+      // Matches the pattern, overflows to -Infinity. The check that catches it
+      // is the same one the negative clamp used to sit next to.
+      expect(
+        normalizedPullEventSchema.parse(pullEvent("-1e999")).cost_usd,
+      ).toBe("0");
     });
 
     /** @scenario "Widening money to allow credits does not admit values that are not money" */
@@ -101,7 +103,9 @@ describe("signed pulled money", () => {
       // Refused at the union rather than transformed to "0", which is the
       // pre-existing boundary. Asserted so a later widening of the union does
       // not quietly start carrying these.
-      expect(() => normalizedPullEventSchema.parse(pullEvent(Number.NaN))).toThrow();
+      expect(() =>
+        normalizedPullEventSchema.parse(pullEvent(Number.NaN)),
+      ).toThrow();
       expect(() => normalizedPullEventSchema.parse(pullEvent({}))).toThrow();
     });
   });
