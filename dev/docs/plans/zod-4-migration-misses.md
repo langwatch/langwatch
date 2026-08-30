@@ -113,3 +113,56 @@ somewhere else.
 
 The durable fix is one zod. Until then, `isZodLikeError` at any boundary that
 can receive a schema or an error it did not itself create.
+
+## The dual-major boundary is not only a runtime risk — it is 37 type errors
+
+`@langwatch/identity-eventing` does not typecheck, and the dominant reason is
+the split recorded above.
+
+It resolves zod 4.4.3, as does `@langwatch/eventing`. But it imports its command
+schemas from `@langwatch/identity-contract`, which is pinned to 3.25.76, and
+hands them to `eventing`'s pipeline API. Zod 3's `ZodEffects<…>` is not
+assignable to zod 4's `ZodType<…, $ZodTypeInternals<…>>`, so every command
+registration is rejected:
+
+```
+Type 'ZodEffects<ZodObject<…>>' is missing the following properties from type
+'ZodType<unknown, unknown, $ZodTypeInternals<unknown, unknown>>':
+_zod, def, type, toJSONSchema, and 18 more.
+```
+
+Thirty-seven of those, across `identity/commands/`, `join-requests/commands/`,
+`scim-sync/commands/` and `sso-connections/commands/`.
+
+So the two identity packages being on zod 3 is not a private choice. Any
+package on zod 4 that consumes a schema they export cannot compile against it.
+The `isZodLikeError` structural check keeps *errors* crossing the boundary
+safely; nothing does the same for *schemas*, and nothing can — a schema is
+handed to a library that reads its internals.
+
+The fix is one zod. Until then, expect this wherever a zod-4 package imports a
+schema from `identity-contract` or `identity-server`.
+
+## The rest of identity-eventing's 65
+
+Two other groups, unrelated to zod:
+
+- **`definePipeline` is called with an API that does not exist.** Four
+  pipelines (`identity`, `join-requests`, `scim-sync`, `sso-connections`) call
+  `definePipeline<T>()` with no argument and chain `.withName(...)`
+  / `.withAggregateType(...)`. Both of `definePipeline`'s overloads require a
+  `{ name, aggregate }` config, and `withName` and `withAggregateType` appear
+  nowhere in `packages/eventing`. TS2554 and TS2339 say so; at run time it is
+  `Cannot destructure property 'name' of 'config' as it is undefined`, which is
+  what fails 20 of the package's 38 tests.
+
+  All four are registered in
+  `platform/app/src/server/event-sourcing/registration/pipelineRegistry.ts`,
+  so this is worth tracing to whether the registry reaches them at boot before
+  assuming it is only a test problem.
+
+- **`TS2422` (5) and `TS2344` (10)**, in the fold projections and command
+  files, which are likely downstream of the same two causes.
+
+None of this is a loop-tick repair. It is the identity platform wave's own
+work — see [[identity-platform-wave1-state]] and [[identity-wave2-spike]].
