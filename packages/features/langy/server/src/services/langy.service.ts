@@ -1,35 +1,35 @@
 import {
-  LangyConversationNotFoundError,
-  LangyService as LangyServiceContract,
-  langyConversationInputSchema,
-  langyConversationListInputSchema,
-  langyCreateConversationInputSchema,
-  langyCredentialInputSchema,
-  langyEgressAllowlistSchema,
-  langyEgressProjectInputSchema,
-  langyRelayFrameSchema,
-  langyStopTurnInputSchema,
-  langyTurnInputSchema,
   type LangyConversation,
-  type LangyConversationInput,
-  type LangyConversationListInput,
-  type LangyConversationPage,
-  type LangyCreateConversationInput,
-  type LangyCredential,
-  type LangyCredentialInput,
-  type LangyEgressAllowlist,
-  type LangyRelayFrame,
-  type LangyStopTurnInput,
-  type LangyTurnInput,
-  type LangyCredentialSession,
   type LangyConversationDetail as ContractConversationDetail,
   type LangyConversationEventPage,
+  type LangyConversationInput,
+  langyConversationInputSchema,
   type LangyConversationListCursor as ContractConversationListCursor,
+  type LangyConversationListInput,
+  langyConversationListInputSchema,
   type LangyConversationListPage as ContractConversationListPage,
+  LangyConversationNotFoundError,
+  type LangyConversationPage,
+  type LangyCreateConversationInput,
+  langyCreateConversationInputSchema,
+  type LangyCredential,
+  type LangyCredentialInput,
+  langyCredentialInputSchema,
+  type LangyCredentialSession,
+  type LangyEgressAllowlist,
+  langyEgressProjectInputSchema,
   type LangyMessageRow as ContractMessageRow,
-  type LangyStartConversationTurnInput,
-  type LangyTurnResultInput,
   type LangyRelayConnection,
+  type LangyRelayFrame,
+  langyRelayFrameSchema,
+  LangyService as LangyServiceContract,
+  langySetEgressInputSchema,
+  type LangyStartConversationTurnInput,
+  type LangyStopTurnInput,
+  langyStopTurnInputSchema,
+  type LangyTurnInput,
+  langyTurnInputSchema,
+  type LangyTurnResultInput,
 } from "@langwatch/langy-contract";
 import {
   ConversationRepository,
@@ -48,10 +48,7 @@ import {
   type ConversationListItem,
   type ConversationListPage,
 } from "./langy-conversation.service";
-import {
-  LangyMessageService,
-  type LangyTrustedMessageReader,
-} from "./langy-message.service";
+import { LangyMessageService, type LangyTrustedMessageReader } from "./langy-message.service";
 import { LangyTurnService } from "./langy-turn.service";
 import { LangyCredentialService } from "./langy-credential.service";
 import { LangyTurnRelay, type LangyRelayRedis } from "../streaming/langy-turn-relay";
@@ -60,10 +57,7 @@ import { LangyFeedbackPromptPolicy } from "../ports/langy-feedback-prompt.port";
 export type LangyRelayCompositionOptions = {
   redis: LangyRelayRedis;
   baseHost: string;
-  resolveResourceUrl?: (input: {
-    projectId: string;
-    resourceId: string;
-  }) => Promise<string | null>;
+  resolveResourceUrl?: (input: { projectId: string; resourceId: string }) => Promise<string | null>;
   resolveCapabilityProgress?: (name: string) => { headline: string } | null;
   logger?: {
     warn(o: unknown, message: string): void;
@@ -101,10 +95,7 @@ export class LangyService extends LangyServiceContract {
     super();
   }
 
-  static create(
-    options: Repositories,
-    feedbackPrompt: LangyFeedbackPromptPolicy,
-  ): LangyService {
+  static create(options: Repositories, feedbackPrompt: LangyFeedbackPromptPolicy): LangyService {
     return new LangyService(options, feedbackPrompt);
   }
 
@@ -156,9 +147,7 @@ export class LangyService extends LangyServiceContract {
   }
 
   listConversations(input: LangyConversationListInput): Promise<LangyConversationPage> {
-    return this.persistence.conversations.list(
-      langyConversationListInputSchema.parse(input),
-    );
+    return this.persistence.conversations.list(langyConversationListInputSchema.parse(input));
   }
 
   async getConversation(input: LangyConversationInput): Promise<LangyConversation> {
@@ -171,9 +160,7 @@ export class LangyService extends LangyServiceContract {
   }
 
   createConversation(input: LangyCreateConversationInput): Promise<LangyConversation> {
-    return this.persistence.conversations.create(
-      langyCreateConversationInputSchema.parse(input),
-    );
+    return this.persistence.conversations.create(langyCreateConversationInputSchema.parse(input));
   }
 
   async archiveConversation(input: LangyConversationInput): Promise<void> {
@@ -182,9 +169,7 @@ export class LangyService extends LangyServiceContract {
     await this.persistence.conversations.archive(parsed);
   }
 
-  startTurn(
-    input: LangyTurnInput,
-  ): Promise<{ conversation: LangyConversation; turnId: string }> {
+  startTurn(input: LangyTurnInput): Promise<{ conversation: LangyConversation; turnId: string }> {
     return this.startTurnForConversation(langyTurnInputSchema.parse(input));
   }
 
@@ -215,23 +200,31 @@ export class LangyService extends LangyServiceContract {
     return this.persistence.credentials.resolve(langyCredentialInputSchema.parse(input));
   }
 
-  tryGetEgressAllowlist(input: {
-    projectId: string;
-  }): Promise<LangyEgressAllowlist | null> {
+  /**
+   * Reached from `LangyApp.egressAllowlist`, and so from the `langyEgress` tRPC
+   * door. It used to read `this.persistence`, which `createComposed` sets to
+   * null — every composed process would have answered the first caller with
+   * "Langy persistence is not configured", degraded to a generic unknown error.
+   * `LangyCredentialService` was already being passed in and never read.
+   */
+  tryGetEgressAllowlist(input: { projectId: string }): Promise<LangyEgressAllowlist | null> {
     const projectId = langyEgressProjectInputSchema.parse(input).projectId;
-    return this.persistence.credentials.tryGetEgressAllowlist(projectId);
+    return this.credentialService.tryGetEgressAllowlist({ projectId });
   }
 
+  /**
+   * The write half of the same door. It had a second fault of its own: it
+   * validated the WHOLE input against `langyEgressProjectInputSchema`, which is
+   * `.strict()` and knows only `projectId`, so every call was rejected with
+   * "Unrecognized key: allowlist" before it could reach anything. The contract
+   * publishes `langySetEgressInputSchema` for exactly this shape.
+   */
   trySetEgressAllowlist(input: {
     projectId: string;
     allowlist: LangyEgressAllowlist;
   }): Promise<LangyEgressAllowlist | null> {
-    const projectId = langyEgressProjectInputSchema.parse(input).projectId;
-    const allowlist = langyEgressAllowlistSchema.parse(input.allowlist);
-    return this.persistence.credentials.trySetEgressAllowlist(
-      projectId,
-      allowlist.length > 0 ? allowlist : null,
-    );
+    const { projectId, allowlist } = langySetEgressInputSchema.parse(input);
+    return this.credentialService.trySetEgressAllowlist({ projectId, allowlist });
   }
 
   relay(frame: LangyRelayFrame): Promise<void> {
@@ -381,10 +374,7 @@ export class LangyService extends LangyServiceContract {
     return this.conversationService.ingestAgentTurnResult(input);
   }
 
-  tryGetRunToken(input: {
-    projectId: string;
-    conversationId: string;
-  }): Promise<string | null> {
+  tryGetRunToken(input: { projectId: string; conversationId: string }): Promise<string | null> {
     return this.conversationService.tryGetRunToken(input);
   }
 
