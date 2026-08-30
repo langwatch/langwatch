@@ -47,15 +47,6 @@ describe("Stripe process configuration", () => {
 });
 
 describe("Gateway virtual-key process configuration", () => {
-  beforeEach(() => {
-    resetEnvironmentConfigForTests();
-  });
-
-  afterEach(() => {
-    resetEnvironmentConfigForTests();
-    initializeEnvironmentConfig(process.env);
-  });
-
   it("projects only LW_VIRTUAL_KEY_PEPPER into the composed app configuration", () => {
     initializeEnvironmentConfig({
       NODE_ENV: "test",
@@ -74,15 +65,6 @@ describe("Gateway virtual-key process configuration", () => {
 });
 
 describe("Mailer private process configuration", () => {
-  beforeEach(() => {
-    resetEnvironmentConfigForTests();
-  });
-
-  afterEach(() => {
-    resetEnvironmentConfigForTests();
-    initializeEnvironmentConfig(process.env);
-  });
-
   it.each(["web", "worker", "all"] as const)(
     "projects one immutable mail gateway for the %s process role",
     (processRole) => {
