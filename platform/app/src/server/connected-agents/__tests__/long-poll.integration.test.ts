@@ -217,7 +217,7 @@ function dispatchFrom(
       name: "support-agent",
       environment: "production",
       timeoutMs,
-      sticky: false,
+      isSticky: false,
     },
     call: {
       threadId,

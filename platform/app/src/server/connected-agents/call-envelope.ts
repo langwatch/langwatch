@@ -31,12 +31,33 @@ export const storedCallSchema = z.object({
 });
 export type StoredCall = z.infer<typeof storedCallSchema>;
 
+/** What the gateway measured when it refused a payload above its cap. */
+export const payloadViolationSchema = z.object({
+  what: z.enum(["envelope", "result", "session"]),
+  sizeBytes: z.number(),
+  limitBytes: z.number(),
+});
+export type PayloadViolation = z.infer<typeof payloadViolationSchema>;
+
+/**
+ * The error a stored result carries: what the instance sent, plus the fields
+ * the gateway adds when the refusal is its own.
+ *
+ * The sizes travel as fields rather than inside the message, so the
+ * dispatcher raises the same handled error without reading the copy, and an
+ * instance cannot claim a platform refusal by sending its code.
+ */
+export const storedResultErrorSchema = resultErrorSchema.extend({
+  payload: payloadViolationSchema.optional(),
+});
+export type StoredResultError = z.infer<typeof storedResultErrorSchema>;
+
 /** The value under `agent_result:v1:<callId>`. */
 export const storedResultSchema = z.object({
   instanceId: z.string(),
   output: outputSchema.optional(),
   session: sessionSchema,
-  error: resultErrorSchema.optional(),
+  error: storedResultErrorSchema.optional(),
   /** Set by the gateway when the socket closed before the instance answered. */
   disconnected: z.boolean().optional(),
   /**

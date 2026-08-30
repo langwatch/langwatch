@@ -40,7 +40,7 @@ const SCALAR_TYPES: Record<string, ScenarioParameterType> = {
 /** A property's JSON Schema `type`, as one name, or nothing usable. */
 function scalarTypeOf(property: Record<string, unknown>): {
   type: ScenarioParameterType;
-  downgraded: boolean;
+  isDowngraded: boolean;
 } {
   const declared = property.type;
   const names = Array.isArray(declared)
@@ -52,13 +52,13 @@ function scalarTypeOf(property: Record<string, unknown>): {
   const concrete = names.filter((name) => name !== "null");
   if (concrete.length === 1) {
     const mapped = SCALAR_TYPES[concrete[0]!];
-    if (mapped) return { type: mapped, downgraded: false };
+    if (mapped) return { type: mapped, isDowngraded: false };
   }
   // An enum with no type is a string list.
   if (concrete.length === 0 && Array.isArray(property.enum)) {
-    return { type: "string", downgraded: false };
+    return { type: "string", isDowngraded: false };
   }
-  return { type: "string", downgraded: true };
+  return { type: "string", isDowngraded: true };
 }
 
 /** A string the text type accepts, cut to the cap, or nothing. */
@@ -206,8 +206,8 @@ function normalizeProperty({
   const property = propertyObjectOf(raw);
   assertNotSecret(name, property);
 
-  const { type, downgraded } = scalarTypeOf(property);
-  if (downgraded) {
+  const { type, isDowngraded } = scalarTypeOf(property);
+  if (isDowngraded) {
     notes.push(
       `"${name}": the type ${describeType(property.type)} is not supported and is presented as text`,
     );
@@ -229,6 +229,27 @@ function normalizeProperty({
 }
 
 /**
+ * Our own sentence for a shape the scenario schema refused.
+ *
+ * The schema writes its messages for the person editing a scenario, and the
+ * duplicate-name one repeats the name it was given. Nothing the SDK sent is
+ * echoed back to the customer, so the reason is chosen here from the rule
+ * that failed. The name of the parameter travels beside it on `meta.name`.
+ */
+function shapeFailureReason(rule: unknown): string {
+  switch (rule) {
+    case "duplicate-name":
+      return "another parameter of this agent is declared with the same name";
+    case "secret-default":
+      return "a secret parameter cannot carry a default value";
+    case "secret-options":
+      return "a secret parameter cannot list options";
+    default:
+      return "the declaration does not match the shape a parameter takes";
+  }
+}
+
+/**
  * The scenario schema is the one source of the shape, so what the SDK
  * declared is checked against it once more, exactly as a scenario is.
  */
@@ -236,12 +257,14 @@ function assertScenarioShape(parameters: ParameterSpec[]): void {
   const parsed = scenarioParameterDefinitionsSchema.safeParse(parameters);
   if (parsed.success) return;
   const issue = parsed.error.issues[0];
+  const rule = (issue as { params?: { rule?: unknown } } | undefined)?.params
+    ?.rule;
   throw new AgentParameterInvalidError({
     name:
       typeof issue?.path[0] === "number"
         ? (parameters[issue.path[0]]?.name ?? null)
         : null,
-    reason: issue?.message ?? "the declaration is not valid",
+    reason: shapeFailureReason(rule),
   });
 }
 

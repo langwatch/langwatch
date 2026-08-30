@@ -9,7 +9,7 @@
 
 import { createContext, useContext, useEffect, useId } from "react";
 
-export type ReportOpenList = (id: string, isOpen: boolean) => void;
+export type ReportOpenList = (list: { id: string; isOpen: boolean }) => void;
 
 export const OpenListContext = createContext<ReportOpenList | null>(null);
 
@@ -19,7 +19,7 @@ export function useReportOpenList(isOpen: boolean): void {
   const id = useId();
   useEffect(() => {
     if (!report) return;
-    report(id, isOpen);
-    return () => report(id, false);
+    report({ id, isOpen });
+    return () => report({ id, isOpen: false });
   }, [report, id, isOpen]);
 }

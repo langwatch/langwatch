@@ -322,6 +322,19 @@ export type TargetConfig = z.infer<typeof TargetConfigSchema>;
 // Result Types
 // ============================================================================
 
+/**
+ * The connected agent instance that answered a run.
+ *
+ * The runner writes it on its stdout result line, so the parent parses it
+ * against this schema before it narrows the value: a line carrying no label,
+ * or a label that is not text, is not an instance.
+ */
+export const ScenarioAgentInstanceSchema = z.object({
+  hostname: z.string(),
+  label: z.string().nullable(),
+});
+export type ScenarioAgentInstance = z.infer<typeof ScenarioAgentInstanceSchema>;
+
 /** Result of scenario execution */
 export const ScenarioExecutionResultSchema = z.object({
   success: z.boolean(),
@@ -331,9 +344,7 @@ export const ScenarioExecutionResultSchema = z.object({
   /** When true, the job was cancelled by user (not a crash/error). */
   cancelled: z.boolean().optional(),
   /** The connected agent instance that answered the run, when one did. */
-  agentInstance: z
-    .object({ hostname: z.string(), label: z.string().nullable() })
-    .optional(),
+  agentInstance: ScenarioAgentInstanceSchema.optional(),
 });
 export type ScenarioExecutionResult = z.infer<
   typeof ScenarioExecutionResultSchema

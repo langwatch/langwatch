@@ -47,10 +47,13 @@ export type ParameterSuggestionRow = SuggestionRow & {
 };
 
 /** The state of the token under the cursor of a parameter line. */
-export function parameterSuggestionState(
-  text: string,
-  cursor: number,
-): SuggestionState {
+export function parameterSuggestionState({
+  text,
+  cursor,
+}: {
+  text: string;
+  cursor: number;
+}): SuggestionState {
   return getSuggestionState(text, cursor, PARAMETER_LINE_GRAMMAR);
 }
 
@@ -79,7 +82,7 @@ export function parameterFieldState({
   text: string;
   cursor: number;
 }): SuggestionState {
-  if (mode.kind === "line") return parameterSuggestionState(text, cursor);
+  if (mode.kind === "line") return parameterSuggestionState({ text, cursor });
   const query = text.slice(0, cursor);
   if (mode.kind === "name") {
     return { open: true, mode: "field", query, tokenStart: 0 };
@@ -212,7 +215,13 @@ export function valueSuggestions({
   definition: DeclaredParameter | undefined;
   query: string;
 }): ParameterSuggestionRow[] {
-  const asRow = (text: string, isTyped = false): ParameterSuggestionRow => ({
+  const asRow = ({
+    text,
+    isTyped = false,
+  }: {
+    text: string;
+    isTyped?: boolean;
+  }): ParameterSuggestionRow => ({
     kind: "value",
     value: text,
     label: text,
@@ -224,7 +233,7 @@ export function valueSuggestions({
   if (definition?.options && definition.options.length > 0) {
     const candidates = definition.options.map((option) => {
       const text = displayTypedValue({ value: option, type: definition.type });
-      return { keys: [text], row: asRow(text) };
+      return { keys: [text], row: asRow({ text }) };
     });
     return rankByMatch(candidates, query, null).map((entry) => entry.row);
   }
@@ -232,17 +241,17 @@ export function valueSuggestions({
   const rows: ParameterSuggestionRow[] = [];
   if (definition?.defaultValue !== undefined) {
     rows.push(
-      asRow(
-        displayTypedValue({
+      asRow({
+        text: displayTypedValue({
           value: definition.defaultValue,
           type: definition.type,
         }),
-      ),
+      }),
     );
   }
   const typed = query.trim();
   if (typed !== "" && !rows.some((row) => row.value === typed)) {
-    rows.push(asRow(typed, true));
+    rows.push(asRow({ text: typed, isTyped: true }));
   }
   return rows;
 }
@@ -269,8 +278,9 @@ export function parameterSuggestions({
  * The line after a row is accepted.
  *
  * A key replaces the token with `name=` and the list reopens on the values.
- * A value replaces the token with `name=value` and the list closes. Nothing
- * after the cursor is touched, so a pair further along the line stays.
+ * A value replaces the token with `name=value` and the list closes. The whole
+ * token goes, up to the comma that ends it, so a caret in the middle of
+ * `model=gp|t` leaves no "t" behind; a pair further along the line stays.
  */
 export function acceptParameterSuggestion({
   text,
@@ -286,7 +296,8 @@ export function acceptParameterSuggestion({
   const replacement =
     state.mode === "field" ? `${row.value}=` : `${state.field}=${row.value}`;
   const before = text.slice(0, state.tokenStart);
-  const after = text.slice(cursor);
+  const tokenEnd = text.indexOf(",", cursor);
+  const after = tokenEnd === -1 ? "" : text.slice(tokenEnd);
   return {
     text: `${before}${replacement}${after}`,
     cursor: before.length + replacement.length,

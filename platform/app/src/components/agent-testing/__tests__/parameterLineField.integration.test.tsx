@@ -206,6 +206,26 @@ describe("<ParameterLineField/>", () => {
     });
   });
 
+  describe("when the list is open", () => {
+    it("points the input at the list of options and at the highlighted one", async () => {
+      const user = userEvent.setup();
+      render(<Field />, { wrapper: Wrapper });
+
+      const line = screen.getByTestId("line");
+      await user.click(line);
+
+      const listbox = await screen.findByRole("listbox");
+      expect(listbox.id).not.toBe("");
+      expect(line).toHaveAttribute("aria-controls", listbox.id);
+
+      const options = within(listbox).getAllByRole("option");
+      expect(line).toHaveAttribute("aria-activedescendant", options[0]?.id);
+
+      await user.keyboard("{ArrowDown}");
+      expect(line).toHaveAttribute("aria-activedescendant", options[1]?.id);
+    });
+  });
+
   describe("when the server refused a value", () => {
     it("reads the refusal under the line", () => {
       render(

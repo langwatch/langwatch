@@ -188,6 +188,13 @@ Feature: Connected agents
     And no other instance receives it
 
   @unit
+  Scenario: A call the store cannot write gives the instance slot back
+    Given one live instance advertising a concurrency of one
+    When the store refuses the write of the call
+    Then the call fails
+    And the next call to that agent still reaches the instance
+
+  @unit
   Scenario: A call to an agent with no live instance is refused after the first-turn grace
     Given an agent with no live instance
     When a call is dispatched
@@ -428,6 +435,13 @@ Feature: Connected agents
     And the refusal names the options
 
   @unit
+  Scenario: A required parameter with no value is refused before scheduling
+    Given a target agent declaring "plan" as required with no default
+    When a run supplies no value for "plan"
+    Then the run is refused with "scenario_parameter_required"
+    And the refusal names "plan"
+
+  @unit
   Scenario: Unknown parameter names are checked per target against its agent
     Given a scenario declaring "tenant" and a target agent declaring "model"
     When a run supplies "model" for that target
@@ -469,6 +483,20 @@ Feature: Connected agents
     Given the REST agents API
     When a caller creates an agent of type "connected"
     Then the request is refused with "agent_register_only"
+
+  @integration
+  Scenario: An archived connected agent is still registered from code
+    Given a connected agent row that was archived by hand
+    When a caller renames it
+    Then the request is refused with "agent_register_only"
+    And the row keeps the name the process registered
+
+  @integration
+  Scenario: A connected agent cannot be copied
+    Given a registered connected agent
+    When a caller copies it
+    Then the copy is refused with "agent_register_only"
+    And no copied row is written
 
   @integration
   Scenario: A connected agent can be archived and its description edited

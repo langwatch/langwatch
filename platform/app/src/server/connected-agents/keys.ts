@@ -60,7 +60,7 @@ export function threadPinKey(agentId: string, threadId: string): string {
 
 /** Channel nudged when a call or a cancel is written for one instance. */
 export function instanceChannel(instanceId: string): string {
-  return `agent_call:${PREFIX}:${instanceId}`;
+  return `agent_instance_calls:${PREFIX}:${instanceId}`;
 }
 
 /** Channel nudged when an ack or a result lands for a pod's calls. */

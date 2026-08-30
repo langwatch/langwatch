@@ -46,14 +46,14 @@ function meta(instanceId: string, maxConcurrency = 1): InstanceMeta {
 }
 
 function agent(
-  overrides: Partial<{ id: string; timeoutMs: number; sticky: boolean }> = {},
+  overrides: Partial<{ id: string; timeoutMs: number; isSticky: boolean }> = {},
 ) {
   return {
     id: overrides.id ?? "agent_1",
     name: "support-agent",
     environment: "production",
     timeoutMs: overrides.timeoutMs ?? 2_000,
-    sticky: overrides.sticky ?? false,
+    isSticky: overrides.isSticky ?? false,
   };
 }
 
@@ -151,16 +151,34 @@ async function connectInstance({
   return { received, cancelled };
 }
 
-beforeEach(async () => {
-  cleanups = [];
+async function startRuntime(
+  overrides: { firstTurnGraceMs?: number } = {},
+): Promise<void> {
   runtime = createConnectedAgentRuntime({
     podId: "pod_a",
     store: createMemoryStateStore(),
     firstTurnGraceMs: 300,
     firstTurnPollMs: 20,
     resultPollMs: 50,
+    ...overrides,
   });
   await runtime.dispatcher.start();
+}
+
+/** Replaces this test's runtime with one that has other knobs. */
+async function useRuntime(overrides: {
+  firstTurnGraceMs?: number;
+}): Promise<void> {
+  for (const cleanup of cleanups) await cleanup();
+  cleanups = [];
+  await runtime.dispatcher.close();
+  await runtime.store.close();
+  await startRuntime(overrides);
+}
+
+beforeEach(async () => {
+  cleanups = [];
+  await startRuntime();
 });
 
 afterEach(async () => {
@@ -316,6 +334,9 @@ describe("CallDispatcher", () => {
 
     /** @scenario "An instance that connects inside the grace receives the call" */
     it("dispatches to an instance that appears inside the grace", async () => {
+      // A grace far wider than the wait below, so a contended runner cannot
+      // let the registration land after the grace expired.
+      await useRuntime({ firstTurnGraceMs: 10_000 });
       const pending = runtime.dispatcher.dispatch({
         projectId,
         agent: agent(),
@@ -435,7 +456,7 @@ describe("CallDispatcher", () => {
         behavior: answer("b"),
       });
 
-      const sticky = agent({ sticky: true });
+      const sticky = agent({ isSticky: true });
       const firstTurn = await runtime.dispatcher.dispatch({
         projectId,
         agent: sticky,
@@ -467,7 +488,7 @@ describe("CallDispatcher", () => {
           await reply.result({ output: "a" });
         },
       });
-      const sticky = agent({ sticky: true });
+      const sticky = agent({ isSticky: true });
       await runtime.dispatcher.dispatch({
         projectId,
         agent: sticky,
@@ -493,6 +514,100 @@ describe("CallDispatcher", () => {
           call: call("thread_lost"),
         }),
       ).rejects.toMatchObject({ code: "agent_instance_lost" });
+    });
+  });
+
+  describe("when the store refuses the write of the call", () => {
+    /** @scenario "A call the store cannot write gives the instance slot back" */
+    it("frees the slot so the next call is not refused as busy", async () => {
+      await connectInstance({
+        instanceId: "inst_1",
+        maxConcurrency: 1,
+        behavior: async (_, reply) => {
+          await reply.ack();
+          await reply.result({ output: "the call after the failure" });
+        },
+      });
+      const zadd = runtime.store.zadd.bind(runtime.store);
+      runtime.store.zadd = async () => {
+        throw new Error("the store refused the pending write");
+      };
+
+      await expect(
+        runtime.dispatcher.dispatch({
+          projectId,
+          agent: agent(),
+          call: call(),
+        }),
+      ).rejects.toThrow("the store refused the pending write");
+
+      runtime.store.zadd = zadd;
+      const outcome = await runtime.dispatcher.dispatch({
+        projectId,
+        agent: agent(),
+        call: call("thread_2"),
+      });
+
+      expect(outcome.output).toBe("the call after the failure");
+    });
+  });
+
+  describe("when the gateway refuses an oversized payload", () => {
+    it("raises agent_payload_too_large from the sizes the gateway measured", async () => {
+      await connectInstance({
+        instanceId: "inst_1",
+        behavior: async (_, reply) => {
+          await reply.ack();
+          await reply.result({
+            error: {
+              code: "agent_payload_too_large",
+              message: "copy the dispatcher never reads",
+              payload: {
+                what: "session",
+                sizeBytes: 70_002,
+                limitBytes: 65_536,
+              },
+            },
+          });
+        },
+      });
+
+      await expect(
+        runtime.dispatcher.dispatch({
+          projectId,
+          agent: agent(),
+          call: call(),
+        }),
+      ).rejects.toMatchObject({
+        code: "agent_payload_too_large",
+        meta: { what: "session", sizeBytes: 70_002, limitBytes: 65_536 },
+      });
+    });
+
+    it("keeps a payload code an instance sends itself as a function failure", async () => {
+      await connectInstance({
+        instanceId: "inst_1",
+        behavior: async (_, reply) => {
+          await reply.ack();
+          await reply.result({
+            error: {
+              code: "agent_payload_too_large",
+              message: "The session is 1 bytes, above the limit of 2 bytes.",
+            },
+          });
+        },
+      });
+
+      await expect(
+        runtime.dispatcher.dispatch({
+          projectId,
+          agent: agent(),
+          call: call(),
+        }),
+      ).rejects.toMatchObject({
+        code: "agent_call_failed",
+        meta: { remoteCode: "agent_payload_too_large" },
+      });
     });
   });
 

@@ -12,7 +12,7 @@
  */
 
 import { Badge, Box, chakra, HStack, Input, Text } from "@chakra-ui/react";
-import { useRef } from "react";
+import { useId, useRef } from "react";
 import type { DeclaredParameter } from "~/components/suites/useRunSuite";
 import { SuggestionPanel } from "~/features/traces-v2/components/SearchBar/SuggestionDropdown";
 import { DIALOG_FIELD_STYLE, FieldError } from "../shared/DialogFields";
@@ -60,6 +60,9 @@ export function ParameterLineField({
     mode,
     inputRef,
   });
+  const listboxId = useId();
+  const optionId = (index: number) => `${listboxId}-option-${index}`;
+  const activeIndex = list.ui.selectedIndex;
 
   return (
     <Box position="relative" flex={flex} minWidth={minWidth}>
@@ -75,14 +78,21 @@ export function ParameterLineField({
         aria-invalid={error ? true : undefined}
         aria-expanded={list.isListOpen}
         aria-autocomplete="list"
+        role="combobox"
+        aria-controls={list.isListOpen ? listboxId : undefined}
+        aria-activedescendant={
+          list.isListOpen && list.items[activeIndex]
+            ? optionId(activeIndex)
+            : undefined
+        }
         placeholder={placeholder}
         value={value}
         disabled={disabled}
         onChange={(event) =>
-          list.edit(
-            event.target.value,
-            event.target.selectionStart ?? event.target.value.length,
-          )
+          list.edit({
+            text: event.target.value,
+            at: event.target.selectionStart ?? event.target.value.length,
+          })
         }
         onKeyDown={list.onKeyDown}
         onKeyUp={list.syncCursor}
@@ -95,12 +105,13 @@ export function ParameterLineField({
         data-testid={testId}
       />
       {list.isListOpen && (
-        <SuggestionPanel testId={`${testId}-suggestions`}>
+        <SuggestionPanel testId={`${testId}-suggestions`} listboxId={listboxId}>
           {list.items.map((row, index) => (
             <ParameterSuggestionRowView
               key={`${row.kind}:${row.value}`}
+              id={optionId(index)}
               row={row}
-              isSelected={index === list.ui.selectedIndex}
+              isSelected={index === activeIndex}
               onSelect={list.accept}
             />
           ))}
@@ -131,16 +142,20 @@ function SourceBadge({ row }: { row: ParameterSuggestionRow }) {
 
 /** One row of the list: a key with what it is, or a value. */
 function ParameterSuggestionRowView({
+  id,
   row,
   isSelected,
   onSelect,
 }: {
+  /** What the input names in `aria-activedescendant` while this row leads. */
+  id: string;
   row: ParameterSuggestionRow;
   isSelected: boolean;
   onSelect: (row: ParameterSuggestionRow) => void;
 }) {
   return (
     <chakra.button
+      id={id}
       type="button"
       display="flex"
       alignItems="center"

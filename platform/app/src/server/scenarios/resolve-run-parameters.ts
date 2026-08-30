@@ -19,6 +19,7 @@
 import {
   ScenarioParameterMissingError,
   ScenarioParameterOptionInvalidError,
+  ScenarioParameterRequiredError,
   ScenarioParameterTemplateInvalidError,
   ScenarioParameterUnknownError,
   ScenarioSecretParameterConflictError,
@@ -102,6 +103,33 @@ function assertEveryValueIsAnOption({
     if (!options || options.includes(value)) continue;
     throw new ScenarioParameterOptionInvalidError({ name, value, options });
   }
+}
+
+/**
+ * Refuses the run when a parameter declared required resolved no value.
+ *
+ * A connected agent declares required every function parameter its own code
+ * gives no default, and the SDK refuses a call that carries none. Read on the
+ * merged values rather than on the supplied ones, so a default declared by
+ * the scenario answers the agent's requirement.
+ */
+function assertEveryRequiredHasAValue({
+  definitions,
+  parameters,
+}: {
+  definitions: readonly ScenarioParameterDefinition[];
+  parameters: RunParameterValues;
+}): void {
+  const required = new Set(
+    definitions
+      .filter((definition) => definition.required === true)
+      .map((definition) => definition.name),
+  );
+  const missing = [...required].filter(
+    (name) => parameters[name] === undefined,
+  );
+  if (missing.length === 0) return;
+  throw new ScenarioParameterRequiredError({ names: missing });
 }
 
 /**
@@ -215,6 +243,8 @@ function secretValuesFor({
  *   secret by one scenario in the run and plain by another.
  * @throws {ScenarioSecretParameterMissingError} when a declared secret has no
  *   text value for this run.
+ * @throws {ScenarioParameterRequiredError} when a parameter declared required
+ *   resolved no value for this run.
  * @throws {ScenarioSecretParameterInTextError} when a scenario's own text
  *   reads a secret parameter.
  * @throws {ScenarioParameterMissingError} when a scenario's own text reads a
@@ -292,6 +322,8 @@ export async function resolveRunParameters({
       definitions: plain,
       values: plainValues,
     });
+
+    assertEveryRequiredHasAValue({ definitions: plain, parameters });
 
     await assertScenarioTextRenders({
       scenario,

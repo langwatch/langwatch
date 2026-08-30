@@ -470,6 +470,16 @@ function connectedAgentRules(): ClassificationRule[] {
 
 const CLASSIFICATION_RULES: ClassificationRule[] = [
   sessionTooLargeRule(),
+  // Connected agent failures. The child's adapter writes
+  // `Connected agent call failed (<code>): <message>`, so the code between
+  // the brackets is the classification and the message after it is what the
+  // customer reads: the relay's own sentence, or the function's own error.
+  //
+  // Ahead of the generic text rules below: the function's own error travels
+  // inside the message, so a handler that says it timed out or that a key is
+  // invalid would otherwise read as a platform timeout or a model-provider
+  // rejection.
+  ...connectedAgentRules(),
   {
     // Untrusted TLS certificate — the local-dev self-signed-cert case.
     needles: [
@@ -567,11 +577,6 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
       hint: "The agent or model may be taking too long to respond. Try again, or simplify the scenario.",
     }),
   },
-  // Connected agent failures. The child's adapter writes
-  // `Connected agent call failed (<code>): <message>`, so the code between
-  // the brackets is the classification and the message after it is what the
-  // customer reads: the relay's own sentence, or the function's own error.
-  ...connectedAgentRules(),
   {
     // A Cloudflare quick tunnel whose local `cloudflared` process ended: the
     // edge answers HTTP 530 with the "error code: 1033" body. Named here,

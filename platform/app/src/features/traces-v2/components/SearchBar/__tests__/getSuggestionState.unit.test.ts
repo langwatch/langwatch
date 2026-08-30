@@ -6,13 +6,13 @@ import {
 } from "../getSuggestionState";
 
 describe("getSuggestionState with the parameter line grammar", () => {
-  const read = (text: string, cursor: number) =>
+  const read = ({ text, cursor }: { text: string; cursor: number }) =>
     getSuggestionState(text, cursor, PARAMETER_LINE_GRAMMAR);
 
   describe("given a line with one pair and a second name in progress", () => {
     /** @scenario "The equals sign and the comma separate the tokens of a parameter line" */
     it("opens key mode on the token after the comma, spaces skipped", () => {
-      expect(read("model=gpt-5, loc", 16)).toEqual({
+      expect(read({ text: "model=gpt-5, loc", cursor: 16 })).toEqual({
         open: true,
         mode: "field",
         query: "loc",
@@ -21,14 +21,14 @@ describe("getSuggestionState with the parameter line grammar", () => {
     });
 
     it("opens value mode for the name before the equals sign", () => {
-      expect(read("model=gpt-5, loc", 6)).toEqual({
+      expect(read({ text: "model=gpt-5, loc", cursor: 6 })).toEqual({
         open: true,
         mode: "value",
         field: "model",
         query: "",
         tokenStart: 0,
       });
-      expect(read("model=gpt-5, loc", 11)).toMatchObject({
+      expect(read({ text: "model=gpt-5, loc", cursor: 11 })).toMatchObject({
         mode: "value",
         field: "model",
         query: "gpt-5",
@@ -36,12 +36,12 @@ describe("getSuggestionState with the parameter line grammar", () => {
     });
 
     it("keeps a value holding a colon or a space in value mode", () => {
-      expect(read("greeting=hello there", 20)).toMatchObject({
+      expect(read({ text: "greeting=hello there", cursor: 20 })).toMatchObject({
         mode: "value",
         field: "greeting",
         query: "hello there",
       });
-      expect(read("url=http://a", 12)).toMatchObject({
+      expect(read({ text: "url=http://a", cursor: 12 })).toMatchObject({
         mode: "value",
         field: "url",
         query: "http://a",
@@ -51,13 +51,13 @@ describe("getSuggestionState with the parameter line grammar", () => {
 
   describe("given the cursor right after a comma", () => {
     it("opens key mode with an empty query, so the list shows at once", () => {
-      expect(read("model=gpt-5,", 12)).toEqual({
+      expect(read({ text: "model=gpt-5,", cursor: 12 })).toEqual({
         open: true,
         mode: "field",
         query: "",
         tokenStart: 12,
       });
-      expect(read("model=gpt-5, ", 13)).toEqual({
+      expect(read({ text: "model=gpt-5, ", cursor: 13 })).toEqual({
         open: true,
         mode: "field",
         query: "",
@@ -68,7 +68,7 @@ describe("getSuggestionState with the parameter line grammar", () => {
 
   describe("given a name that starts with an underscore", () => {
     it("opens key mode, since the parameter grammar allows it", () => {
-      expect(read("_region", 7)).toMatchObject({
+      expect(read({ text: "_region", cursor: 7 })).toMatchObject({
         mode: "field",
         query: "_region",
       });

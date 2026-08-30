@@ -334,6 +334,18 @@ function withRunSecrets({
 }
 
 /**
+ * How a target reads in the failure a run reports when its row is gone, one
+ * label per target type so the run names the kind the customer picked.
+ */
+const MISSING_TARGET_LABELS: Record<TargetConfig["type"], string> = {
+  prompt: "Prompt",
+  code: "Code agent",
+  workflow: "Workflow agent",
+  connected: "Connected agent",
+  http: "HTTP agent",
+};
+
+/**
  * Pre-fetch all data needed for scenario execution.
  *
  * @param context - Execution context with project/scenario IDs and the run's
@@ -522,17 +534,9 @@ export async function prefetchScenarioData({
       },
       "Target adapter not found",
     );
-    const targetLabel =
-      target.type === "prompt"
-        ? "Prompt"
-        : target.type === "code"
-          ? "Code agent"
-          : target.type === "workflow"
-            ? "Workflow agent"
-            : "HTTP agent";
     return {
       success: false,
-      error: `${targetLabel} ${target.referenceId} not found`,
+      error: `${MISSING_TARGET_LABELS[target.type]} ${target.referenceId} not found`,
     };
   }
 

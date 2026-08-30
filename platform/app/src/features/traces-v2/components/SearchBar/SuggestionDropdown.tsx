@@ -65,7 +65,14 @@ export const SuggestionPanel: React.FC<{
   footerAction?: React.ReactNode;
   anchorX?: number;
   testId?: string;
-}> = ({ children, footerAction, anchorX, testId }) => (
+  /**
+   * The id of the list of options, when the input that owns the panel points
+   * at it with `aria-controls` and `aria-activedescendant`. It lands on the
+   * box that holds the rows, not on the panel, so the footer stays out of the
+   * listbox.
+   */
+  listboxId?: string;
+}> = ({ children, footerAction, anchorX, testId, listboxId }) => (
   <Box
     position="absolute"
     top="calc(100% + 6px)"
@@ -99,7 +106,14 @@ export const SuggestionPanel: React.FC<{
       bg="bg.panel"
       position="relative"
     >
-      <VStack gap={0} align="stretch" maxHeight="320px" overflowY="auto">
+      <VStack
+        gap={0}
+        align="stretch"
+        maxHeight="320px"
+        overflowY="auto"
+        id={listboxId}
+        role={listboxId ? "listbox" : undefined}
+      >
         {children}
       </VStack>
       <DropdownFooter action={footerAction} />
@@ -136,7 +150,7 @@ const SyntaxDocsButton: React.FC = () => {
       color="blue.fg"
       onMouseDown={(event) => {
         // mouseDown so the editor's onBlur doesn't race with the click —
-        // openning the drawer needs to win even though the search loses focus.
+        // opening the drawer needs to win even though the search loses focus.
         event.preventDefault();
         setSyntaxHelpOpen(true);
       }}

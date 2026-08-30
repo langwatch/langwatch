@@ -104,7 +104,7 @@ function dispatchAgentOf({
       config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
       MAX_CALL_TIMEOUT_MS,
     ),
-    sticky: config.sticky ?? false,
+    isSticky: config.sticky ?? false,
   };
 }
 
@@ -157,6 +157,13 @@ secured.access(requires("scenarios:create")).post(
       429: {
         description:
           "Every instance is busy; Retry-After says when to try again",
+        headers: {
+          "Retry-After": {
+            description:
+              "How many seconds to wait before the turn is sent again. Rounded up from the wait the platform picked.",
+            schema: { type: "string" },
+          },
+        },
       },
       503: { description: "No instance of the agent is connected" },
     },

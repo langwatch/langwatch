@@ -49,9 +49,9 @@ export type RunDialogAgent = {
   /** The owner of a personal development agent. */
   owner?: { userId: string; name: string | null } | null;
   /** False only for a development agent of another person. */
-  runnable?: boolean;
+  isRunnable?: boolean;
   /** True when a development agent belongs to another person. */
-  belongsToTeammate?: boolean;
+  isTeammateOwned?: boolean;
   /** The parameters a connected agent declares. */
   parameters?: ScenarioParameterDefinition[];
 };
@@ -157,7 +157,7 @@ function AgentBlock({
   onSelect: (target: NonNullable<TargetValue>) => void;
 }) {
   const AgentIcon = AGENT_ICONS[agent.type];
-  const canRun = agent.runnable !== false;
+  const canRun = agent.isRunnable !== false;
 
   const card = (
     <Box

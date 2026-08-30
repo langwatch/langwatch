@@ -627,6 +627,26 @@ describe("classifyScenarioInfraError session cap", () => {
       expect(result.hint).toBeTruthy();
     });
   });
+
+  describe("when the connected agent's own error reads like a generic failure", () => {
+    it("classifies a handler that timed out as a connected agent failure", () => {
+      const result = classifyScenarioInfraError(
+        "Connected agent call failed (agent_call_failed): the upstream request timed out after 30s",
+      );
+
+      expect(result.code).toBe(ScenarioInfraErrorCode.AgentCallFailed);
+      expect(result.message).toContain("the upstream request timed out");
+    });
+
+    it("classifies a handler that reports an invalid key as a connected agent failure", () => {
+      const result = classifyScenarioInfraError(
+        "Connected agent call failed (agent_call_failed): the API key is invalid for this account",
+      );
+
+      expect(result.code).toBe(ScenarioInfraErrorCode.AgentCallFailed);
+      expect(result.message).toContain("the API key is invalid");
+    });
+  });
 });
 
 describe("scenarioErrorTitle", () => {

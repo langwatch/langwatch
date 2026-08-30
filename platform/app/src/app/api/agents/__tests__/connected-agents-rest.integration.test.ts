@@ -122,6 +122,9 @@ describe("Feature: connected agents on the REST agents API", () => {
       expect(described.status).toBe(200);
       const body = (await described.json()) as {
         config: { description: string; sdk: unknown };
+        owner: unknown;
+        status: string;
+        instances: unknown[];
       };
       expect(body.config.description).toBe("Edited by hand");
       expect(body.config.sdk).toEqual(connectedConfig.sdk);
@@ -137,6 +140,12 @@ describe("Feature: connected agents on the REST agents API", () => {
       expect(retyped.status).toBe(422);
       expect(await retyped.json()).toMatchObject({
         error: "agent_register_only",
+      });
+
+      expect(body).toMatchObject({
+        owner: null,
+        status: "offline",
+        instances: [],
       });
 
       const archived = await app.request(`/api/agents/${agent.id}`, {

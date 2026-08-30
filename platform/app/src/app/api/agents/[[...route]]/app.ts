@@ -34,16 +34,29 @@ const paginationQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(1000).optional().default(50),
 });
 
+/**
+ * The `type` a write request may carry.
+ *
+ * "connected" stays in the enum on purpose. A connected agent is registered
+ * from code by the SDK, so a write that names it is refused 422
+ * `agent_register_only`, which tells the caller why. Dropping the value from
+ * the enum would answer the same request with a plain schema rejection and no
+ * reason.
+ */
+const writableAgentTypeSchema = agentTypeSchema.describe(
+  'The kind of agent to write. A connected agent is registered from code by the SDK, so "connected" is refused with agent_register_only.',
+);
+
 const createAgentSchema = z.object({
   name: z.string().min(1, "name is required").max(255),
-  type: agentTypeSchema,
+  type: writableAgentTypeSchema,
   config: z.record(z.unknown()),
   workflowId: z.string().optional(),
 });
 
 const updateAgentSchema = z.object({
   name: z.string().min(1).max(255).optional(),
-  type: agentTypeSchema.optional(),
+  type: writableAgentTypeSchema.optional(),
   config: z.record(z.unknown()).optional(),
   workflowId: z.string().nullable().optional(),
 });
@@ -361,8 +374,14 @@ function registerUpdateAgentVerb(verb: "patch" | "put"): void {
         return mapConfigValidationError(error);
       }
 
+      const [owners, presence] = await Promise.all([
+        service.ownersOf([agent]),
+        readAgentPresence({ projectId: project.id, agents: [agent] }),
+      ]);
+
       return c.json({
         ...toAgentListRow(agent),
+        ...agentPresenceView({ agent, owners, presence }),
         platformUrl: agentPlatformUrl({
           projectSlug: project.slug,
           agentId: agent.id,

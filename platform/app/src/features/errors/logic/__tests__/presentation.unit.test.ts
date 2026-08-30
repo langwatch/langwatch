@@ -653,7 +653,9 @@ describe("explainHandledError", () => {
       const ALLOWED_PER_CODE: Record<string, Set<string>> = {
         // `reason` is the sentence parameter-spec.ts wrote for this exact
         // declaration ("it is a turn field the platform sends on every
-        // call"), authored here and never relayed from the SDK.
+        // call"), authored here and never relayed from the SDK. The shape
+        // check picks its sentence from the rule that failed rather than
+        // repeating the schema's own message, which names the parameter.
         agent_parameter_invalid: new Set(["reason"]),
         // The provider's own reason for rejecting delivery is the entire
         // value of this error — "invite the bot with /invite @LangWatch".

@@ -66,6 +66,7 @@ function createRedisChannels(
 ): Pick<AgentStateStore, "subscribe" | "close"> {
   let subscriber: RedisConnection | null = null;
   const handlers = new Map<string, Set<(message: string) => void>>();
+  const subscribing = new Map<string, Promise<void>>();
 
   const subscriberConnection = (): RedisConnection => {
     if (subscriber) return subscriber;
@@ -83,9 +84,28 @@ function createRedisChannels(
       if (!set) {
         set = new Set();
         handlers.set(channel, set);
-        await connection.subscribe(channel);
+        // Redis delivers from the moment SUBSCRIBE is acknowledged, so the
+        // command is started here and the handler is registered before it is
+        // awaited. A failed SUBSCRIBE drops the channel again, so the next
+        // caller starts a fresh one.
+        subscribing.set(
+          channel,
+          connection.subscribe(channel).then(
+            () => {
+              subscribing.delete(channel);
+            },
+            (error: unknown) => {
+              subscribing.delete(channel);
+              handlers.delete(channel);
+              throw error;
+            },
+          ),
+        );
       }
       set.add(handler);
+      // A second caller for the same channel waits for the first SUBSCRIBE
+      // rather than returning while it is still in flight.
+      await subscribing.get(channel);
       return async () => {
         const current = handlers.get(channel);
         current?.delete(handler);
@@ -97,6 +117,7 @@ function createRedisChannels(
     },
     async close() {
       handlers.clear();
+      subscribing.clear();
       if (subscriber) {
         const closing = subscriber;
         subscriber = null;
@@ -153,6 +174,10 @@ export function createRedisStateStore(redis: RedisConnection): AgentStateStore {
     async incr(key, ttlSeconds) {
       const [incremented] =
         (await redis.multi().incr(key).expire(key, ttlSeconds).exec()) ?? [];
+      // A transaction resolves with one [error, result] tuple per command.
+      // A failed INCR leaves the result empty, and a count read as zero would
+      // hand out concurrency slots the instance does not have.
+      if (incremented?.[0]) throw incremented[0];
       return Number(incremented?.[1] ?? 0);
     },
     async decr(key) {

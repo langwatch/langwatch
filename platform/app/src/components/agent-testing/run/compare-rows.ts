@@ -60,12 +60,12 @@ export function initialCompareRows({
 }): CompareRow[] {
   // A development agent of another person cannot be run by the reader, so it
   // is never what a comparison opens on.
-  const runnable = agents.filter((agent) => agent.runnable !== false);
-  const firstAgent = runnable[0];
+  const runnableAgents = agents.filter((agent) => agent.isRunnable !== false);
+  const firstAgent = runnableAgents[0];
   const first = target ?? (firstAgent ? targetOfAgent(firstAgent) : null);
   if (!first) return [];
 
-  const other = runnable.find((agent) => agent.id !== first.id);
+  const other = runnableAgents.find((agent) => agent.id !== first.id);
   const second = other ? targetOfAgent(other) : first;
   return [
     { target: first, parameterLine },

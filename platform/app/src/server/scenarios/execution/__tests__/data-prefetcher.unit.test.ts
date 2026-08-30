@@ -956,6 +956,35 @@ describe("prefetchScenarioData", () => {
       });
     });
 
+    describe("given the connected agent does not exist", () => {
+      describe("when prefetching scenario data", () => {
+        it("names the missing target as a connected agent", async () => {
+          const deps = createMockDeps({
+            agentFetcher: {
+              findById: vi.fn().mockResolvedValue(null),
+            },
+          });
+
+          const target: TargetConfig = {
+            type: "connected",
+            referenceId: "agent_connected",
+          };
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target,
+            deps,
+          });
+
+          expect(result.success).toBe(false);
+          if (!result.success) {
+            expect(result.error).toBe(
+              "Connected agent agent_connected not found",
+            );
+          }
+        });
+      });
+    });
+
     describe("given code agent does not exist", () => {
       describe("when prefetching scenario data", () => {
         it("returns failure with code agent not found error", async () => {

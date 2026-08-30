@@ -205,6 +205,30 @@ export class ScenarioParameterOptionInvalidError extends ScenarioParameterError 
 }
 
 /**
+ * Thrown when a parameter declared required resolved no value for the run.
+ *
+ * A connected agent declares one for every function parameter its own code
+ * gives no default. The SDK refuses a call that carries none, so the run
+ * would be queued only to fail on its first turn.
+ *
+ * The names are on `meta` because the run dialog renders them: the customer
+ * reads which values the run still needs.
+ */
+export class ScenarioParameterRequiredError extends ScenarioParameterError {
+  declare readonly code: "scenario_parameter_required";
+
+  constructor({ names }: { names: string[] }) {
+    super({
+      message: `No value for required scenario parameters: ${names.join(", ")}`,
+      code: "scenario_parameter_required",
+      httpStatus: 422,
+      meta: { names },
+    });
+    this.name = "ScenarioParameterRequiredError";
+  }
+}
+
+/**
  * Thrown when the scenario's own text references a parameter the run resolved
  * no value for.
  *

@@ -43,9 +43,11 @@ import type {
   ExecutionJobData,
   ScenarioExecutionPool,
 } from "./execution/execution-pool";
-import type {
-  ChildProcessJobData,
-  ScenarioExecutionResult,
+import {
+  type ChildProcessJobData,
+  type ScenarioAgentInstance,
+  ScenarioAgentInstanceSchema,
+  type ScenarioExecutionResult,
 } from "./execution/types";
 import { CHILD_PROCESS, SCENARIO_WORKER } from "./scenario.constants";
 import { ScenarioService } from "./scenario.service";
@@ -133,11 +135,15 @@ export function createProcessorDependencies(): ProcessorDependencies {
  * recorded here, after the child exits. A failure to record it is logged and
  * not raised: the run is complete, and the instance is a detail of it.
  */
-export async function handleSucceededJobResult(
-  jobData: ExecutionJobData,
-  result: ScenarioExecutionResult,
-  deps: ProcessorDependencies,
-): Promise<void> {
+export async function handleSucceededJobResult({
+  jobData,
+  result,
+  deps,
+}: {
+  jobData: ExecutionJobData;
+  result: ScenarioExecutionResult;
+  deps: ProcessorDependencies;
+}): Promise<void> {
   if (!result.agentInstance) return;
   try {
     await deps.agentInstanceRecorder.recordAgentInstance({
@@ -286,7 +292,7 @@ export interface ChildProcessResult {
   error?: string;
   reasoning?: string;
   /** The connected agent instance that answered the run, when one did. */
-  agentInstance?: { hostname: string; label: string | null };
+  agentInstance?: ScenarioAgentInstance;
 }
 
 /** Parse a single stdout line as the runner's result, or null if it isn't one. */
@@ -308,20 +314,21 @@ function parseResultLine(line: string): ChildProcessResult | null {
     ...(typeof record.reasoning === "string"
       ? { reasoning: record.reasoning }
       : {}),
-    ...(isAgentInstance(record.agentInstance)
-      ? { agentInstance: record.agentInstance }
-      : {}),
+    ...(agentInstanceOf(record.agentInstance) ?? {}),
   };
 }
 
-function isAgentInstance(
+/**
+ * The instance the line names, when the line names a whole one.
+ *
+ * Parsed against the shared schema rather than probed field by field, so the
+ * value the recorder receives is one the run's own result schema accepts.
+ */
+function agentInstanceOf(
   value: unknown,
-): value is { hostname: string; label: string | null } {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as { hostname?: unknown }).hostname === "string"
-  );
+): { agentInstance: ScenarioAgentInstance } | null {
+  const parsed = ScenarioAgentInstanceSchema.safeParse(value);
+  return parsed.success ? { agentInstance: parsed.data } : null;
 }
 
 /**
@@ -474,7 +481,7 @@ export async function executeScenarioRun(
         { success: true, totalDurationMs, childDurationMs },
         "Scenario job completed",
       );
-      await handleSucceededJobResult(jobData, result, deps);
+      await handleSucceededJobResult({ jobData, result, deps });
     } else if (result.cancelled) {
       jobLogger.info("Scenario job cancelled by user");
       await handleCancelledJobResult(jobData, result.error, deps);

@@ -40,14 +40,14 @@ describe("handleSucceededJobResult", () => {
   describe("when the child named the instance that answered", () => {
     /** @scenario "A job that ran to the end records the instance that served it" */
     it("records it on the run", async () => {
-      await handleSucceededJobResult(
-        JOB,
-        {
+      await handleSucceededJobResult({
+        jobData: JOB,
+        result: {
           success: true,
           agentInstance: { hostname: "worker-1", label: "blue" },
         },
         deps,
-      );
+      });
 
       expect(recordAgentInstance).toHaveBeenCalledWith({
         projectId: "proj_123",
@@ -60,14 +60,14 @@ describe("handleSucceededJobResult", () => {
       recordAgentInstance.mockRejectedValue(new Error("event log down"));
 
       await expect(
-        handleSucceededJobResult(
-          JOB,
-          {
+        handleSucceededJobResult({
+          jobData: JOB,
+          result: {
             success: true,
             agentInstance: { hostname: "worker-1", label: null },
           },
           deps,
-        ),
+        }),
       ).resolves.toBeUndefined();
     });
   });
@@ -75,7 +75,11 @@ describe("handleSucceededJobResult", () => {
   describe("when the child named no instance", () => {
     /** @scenario "A job served by no connected agent records nothing" */
     it("records nothing", async () => {
-      await handleSucceededJobResult(JOB, { success: true }, deps);
+      await handleSucceededJobResult({
+        jobData: JOB,
+        result: { success: true },
+        deps,
+      });
 
       expect(recordAgentInstance).not.toHaveBeenCalled();
     });

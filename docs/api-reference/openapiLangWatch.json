@@ -2379,7 +2379,8 @@
                       "workflow",
                       "http",
                       "connected"
-                    ]
+                    ],
+                    "description": "The kind of agent to write. A connected agent is registered from code by the SDK, so \"connected\" is refused with agent_register_only."
                   },
                   "config": {
                     "type": "object",
@@ -2748,7 +2749,8 @@
                       "workflow",
                       "http",
                       "connected"
-                    ]
+                    ],
+                    "description": "The kind of agent to write. A connected agent is registered from code by the SDK, so \"connected\" is refused with agent_register_only."
                   },
                   "config": {
                     "type": "object",
@@ -3103,7 +3105,8 @@
                       "workflow",
                       "http",
                       "connected"
-                    ]
+                    ],
+                    "description": "The kind of agent to write. A connected agent is registered from code by the SDK, so \"connected\" is refused with agent_register_only."
                   },
                   "config": {
                     "type": "object",
@@ -3368,7 +3371,15 @@
             }
           },
           "429": {
-            "description": "Every instance is busy; Retry-After says when to try again"
+            "description": "Every instance is busy; Retry-After says when to try again",
+            "headers": {
+              "Retry-After": {
+                "description": "How many seconds to wait before the turn is sent again. Rounded up from the wait the platform picked.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "500": {
             "description": "Internal Server Error",

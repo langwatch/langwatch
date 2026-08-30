@@ -49,9 +49,9 @@ export type ScenarioAgent<T extends AgentLike = AgentLike> = T & {
   /** What the card and the option read: the name, and the environment. */
   label: string;
   /** True when a development agent belongs to another person. */
-  belongsToTeammate: boolean;
+  isTeammateOwned: boolean;
   /** False only for a development agent of another person. */
-  runnable: boolean;
+  isRunnable: boolean;
 };
 
 /** The label of one agent: its name, and the environment of a connected one. */
@@ -65,7 +65,7 @@ export function agentTargetLabel(agent: AgentLike): string {
 }
 
 /** True when this agent is a personal development agent of another person. */
-export function belongsToTeammate({
+export function isTeammateOwned({
   agent,
   viewerUserId,
 }: {
@@ -92,12 +92,12 @@ export function scenarioAgentsOf<T extends AgentLike>({
       SCENARIO_AGENT_TYPES.has(agent.type),
     )
     .map((agent): ScenarioAgent<T> => {
-      const teammates = belongsToTeammate({ agent, viewerUserId });
+      const teammates = isTeammateOwned({ agent, viewerUserId });
       return {
         ...agent,
         label: agentTargetLabel(agent),
-        belongsToTeammate: teammates,
-        runnable: !teammates,
+        isTeammateOwned: teammates,
+        isRunnable: !teammates,
       };
     });
   const sorted = [...scenarioAgents].sort(
@@ -114,7 +114,7 @@ export function scenarioAgentsOf<T extends AgentLike>({
  * A teammate's development agent is out until the toggle asks for it, and it
  * is drawn disabled when it is in, because only its owner can run it.
  */
-export function offeredAgents<T extends { belongsToTeammate?: boolean }>({
+export function offeredAgents<T extends { isTeammateOwned?: boolean }>({
   agents,
   showTeammates,
 }: {
@@ -123,14 +123,14 @@ export function offeredAgents<T extends { belongsToTeammate?: boolean }>({
 }): T[] {
   return showTeammates
     ? [...agents]
-    : agents.filter((agent) => !agent.belongsToTeammate);
+    : agents.filter((agent) => !agent.isTeammateOwned);
 }
 
 /** True when the project holds a development agent of another person. */
 export function hasTeammateAgents(
-  agents: readonly { belongsToTeammate?: boolean }[],
+  agents: readonly { isTeammateOwned?: boolean }[],
 ): boolean {
-  return agents.some((agent) => agent.belongsToTeammate === true);
+  return agents.some((agent) => agent.isTeammateOwned === true);
 }
 
 /** Filter and sort agents to only valid scenario target types. */

@@ -18,6 +18,7 @@ import {
   instanceGoneSchema,
   replyNudgeSchema,
   type StoredCall,
+  type StoredResultError,
   storedResultSchema,
 } from "./call-envelope";
 import {
@@ -70,7 +71,7 @@ export interface DispatchAgent {
   environment: string | null;
   /** The per-call budget, already capped by the caller. */
   timeoutMs: number;
-  sticky: boolean;
+  isSticky: boolean;
 }
 
 export interface DispatchParams {
@@ -196,7 +197,7 @@ export class CallDispatcher {
         envelope,
         signal: params.signal,
         now,
-        sticky: params.agent.sticky,
+        isSticky: params.agent.isSticky,
         timeoutMs: params.agent.timeoutMs,
       });
       if (outcome.kind === "answered") {
@@ -232,7 +233,7 @@ export class CallDispatcher {
     now: () => number;
   }): Promise<LiveInstance> {
     const pinKey = threadPinKey(agent.id, call.threadId);
-    const pinned = agent.sticky ? await this.store.get(pinKey) : null;
+    const pinned = agent.isSticky ? await this.store.get(pinKey) : null;
 
     const waitUntil = now() + this.firstTurnGraceMs;
     for (;;) {
@@ -249,7 +250,7 @@ export class CallDispatcher {
       if (live.length > 0) {
         const chosen = chooseInstance(live, call.threadId);
         await this.pinThread({
-          sticky: agent.sticky,
+          isSticky: agent.isSticky,
           pinKey,
           instanceId: chosen.instanceId,
         });
@@ -290,15 +291,15 @@ export class CallDispatcher {
 
   /** Holds a sticky thread on the instance that answers it. */
   private async pinThread({
-    sticky,
+    isSticky,
     pinKey,
     instanceId,
   }: {
-    sticky: boolean;
+    isSticky: boolean;
     pinKey: string;
     instanceId: string;
   }): Promise<void> {
-    if (!sticky) return;
+    if (!isSticky) return;
     await this.store.set(pinKey, instanceId, STICKY_PIN_TTL_SECONDS);
   }
 
@@ -309,7 +310,7 @@ export class CallDispatcher {
     envelope,
     signal,
     now,
-    sticky,
+    isSticky,
     timeoutMs,
   }: {
     projectId: string;
@@ -317,7 +318,7 @@ export class CallDispatcher {
     envelope: CallEnvelope;
     signal?: AbortSignal;
     now: () => number;
-    sticky: boolean;
+    isSticky: boolean;
     timeoutMs: number;
   }): Promise<
     | { kind: "answered"; answer: Omit<CallOutcome, "durationMs"> }
@@ -328,14 +329,16 @@ export class CallDispatcher {
 
     this.instanceOfCall.set(callId, instance.instanceId);
     await this.registry.incrementInflight(instance.instanceId);
-    const receivers = await this.postCall({
-      projectId,
-      instance,
-      envelope,
-      now,
-    });
 
     try {
+      // Inside the try, so a store that refuses the write still gives the
+      // slot and the pending entry back through the finally.
+      const receivers = await this.postCall({
+        projectId,
+        instance,
+        envelope,
+        now,
+      });
       if (receivers === 0 && this.store.shared) {
         // Nothing holds that instance's socket on any pod: the presence
         // entry outlived the process. Retire it and try another.
@@ -351,7 +354,7 @@ export class CallDispatcher {
       });
       switch (outcome.kind) {
         case "result":
-          return await this.readAnswer({ instance, envelope, sticky });
+          return await this.readAnswer({ instance, envelope, isSticky });
         case "gone": {
           // The frame reached a socket. Whether the instance acknowledged it
           // or not, the function may have started, so the turn is not placed
@@ -421,11 +424,11 @@ export class CallDispatcher {
   private async readAnswer({
     instance,
     envelope,
-    sticky,
+    isSticky,
   }: {
     instance: LiveInstance;
     envelope: CallEnvelope;
-    sticky: boolean;
+    isSticky: boolean;
   }): Promise<
     | { kind: "answered"; answer: Omit<CallOutcome, "durationMs"> }
     | { kind: "retry" }
@@ -447,7 +450,7 @@ export class CallDispatcher {
       throw remoteError(result.error);
     }
     await this.pinThread({
-      sticky,
+      isSticky,
       pinKey: threadPinKey(envelope.agentId, envelope.threadId),
       instanceId: instance.instanceId,
     });
@@ -566,19 +569,12 @@ export class CallDispatcher {
 /**
  * The error a result carries, as the handled error the caller reads.
  *
- * A gateway refusing an oversized result writes the payload code, which
+ * A gateway refusing an oversized payload writes what it measured, and that
  * keeps its own class; anything else is the function's own error.
  */
-function remoteError(error: { code: string; message: string }): Error {
-  if (error.code === "agent_payload_too_large") {
-    const match = /is (\d+) bytes, above the limit of (\d+) bytes/.exec(
-      error.message,
-    );
-    return new AgentPayloadTooLargeError({
-      what: error.message.startsWith("The session") ? "session" : "result",
-      sizeBytes: Number(match?.[1] ?? 0),
-      limitBytes: Number(match?.[2] ?? 0),
-    });
+function remoteError(error: StoredResultError): Error {
+  if (error.payload) {
+    return new AgentPayloadTooLargeError(error.payload);
   }
   return new AgentCallFailedError({
     remoteCode: error.code,

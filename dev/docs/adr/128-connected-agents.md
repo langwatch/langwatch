@@ -97,7 +97,7 @@ Frames are JSON text over the socket, every frame `{ "type": ..., "protocol": 1,
 
 Error codes (`HandledError`, presentation entries in `features/errors/logic/presentation.ts`): `agent_offline`, `agent_owner_only`, `agent_call_timeout`, `agent_call_failed`, `agent_disconnected`, `agent_instance_lost`, `agent_busy`, `agent_parameter_invalid`, `agent_register_refused`, `agent_register_only` (REST create or update of a `connected` agent), `agent_payload_too_large`, `scenario_parameter_option_invalid`.
 
-Redis keys (`server/connected-agents/keys.ts`): `agent_instance:v1:<projectId>:<agentId>` (ZSET), `agent_instance_meta:v1:<instanceId>` (hash), `agent_inflight:v1:<instanceId>` (counter), `agent_call:v1:<callId>` (envelope), `agent_pending:v1:<instanceId>` (ZSET of call ids), `agent_result:v1:<callId>`, `agent_thread:v1:<agentId>:<threadId>` (sticky pin); channels `agent_call:v1:<instanceId>`, `agent_reply:v1:<podId>`, `agent_instance_gone:v1`.
+Redis keys (`server/connected-agents/keys.ts`): `agent_instance:v1:<projectId>:<agentId>` (ZSET), `agent_instance_meta:v1:<instanceId>` (hash), `agent_inflight:v1:<instanceId>` (counter), `agent_call:v1:<callId>` (envelope), `agent_pending:v1:<instanceId>` (ZSET of call ids), `agent_result:v1:<callId>`, `agent_thread:v1:<agentId>:<threadId>` (sticky pin); channels `agent_instance_calls:v1:<instanceId>`, `agent_reply:v1:<podId>`, `agent_instance_gone:v1`.
 
 ## References
 

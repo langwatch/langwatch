@@ -6,8 +6,11 @@
  * costs fifty sorted-set reads and no database round trip.
  */
 
+import { createLogger } from "@langwatch/observability";
 import type { LiveInstance } from "./instance.registry";
 import { getConnectedAgentRuntime } from "./runtime";
+
+const logger = createLogger("langwatch:connected-agents:presence");
 
 export type AgentPresenceStatus = "online" | "offline";
 
@@ -58,14 +61,24 @@ export async function readAgentPresence({
   const entries = await Promise.all(
     agents.map(async (agent): Promise<[string, AgentPresence]> => {
       if (agent.type !== "connected") return [agent.id, NO_PRESENCE];
-      const live = await registry.listLive({ projectId, agentId: agent.id });
-      return [
-        agent.id,
-        {
-          status: live.length > 0 ? "online" : "offline",
-          instances: live.map(toView),
-        },
-      ];
+      try {
+        const live = await registry.listLive({ projectId, agentId: agent.id });
+        return [
+          agent.id,
+          {
+            status: live.length > 0 ? "online" : "offline",
+            instances: live.map(toView),
+          },
+        ];
+      } catch (error) {
+        // Presence is display data: one unreadable agent shows as offline
+        // rather than taking the whole list down with it.
+        logger.warn(
+          { error, projectId, agentId: agent.id },
+          "presence read failed, reporting the agent as offline",
+        );
+        return [agent.id, NO_PRESENCE];
+      }
     }),
   );
   return new Map(entries);

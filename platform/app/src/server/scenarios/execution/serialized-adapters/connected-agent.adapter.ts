@@ -60,6 +60,7 @@ type FetchLike = (
     headers: Record<string, string>;
     body: string;
     signal: AbortSignal;
+    redirect?: "error" | "follow" | "manual";
   },
 ) => Promise<{
   ok: boolean;
@@ -205,6 +206,11 @@ export class SerializedConnectedAgentAdapter extends SerializedAgentAdapter {
         headers,
         body,
         signal,
+        // The relay answers on the same origin. A redirect would carry
+        // `X-Auth-Token` to wherever it points, because a custom header is
+        // not one the runtime strips when the origin changes, so a redirect
+        // fails the call instead.
+        redirect: "error",
       });
     } catch (error) {
       if (signal.aborted) {

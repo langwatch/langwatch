@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Input, Text } from "@chakra-ui/react";
+import { Box, Button, chakra, HStack, Input, Text } from "@chakra-ui/react";
 import {
   BookText,
   ChevronDown,
@@ -389,7 +389,13 @@ function AgentOptionMark({ agent }: { agent: ScenarioAgent }) {
   return <Globe size={14} color="var(--chakra-colors-gray-500)" />;
 }
 
-/** The row itself: the mark, the label, and the marks the state adds to it. */
+/**
+ * The row itself: the mark, the label, and the marks the state adds to it.
+ *
+ * It is a button, so the keyboard reaches it and Enter or Space picks it. A
+ * row that cannot be run keeps its focus, so the reason in its tooltip is
+ * still readable, and only drops the handler.
+ */
 function AgentOptionRow({
   agent,
   isSelected,
@@ -399,18 +405,24 @@ function AgentOptionRow({
   isSelected: boolean;
   onSelect: () => void;
 }) {
-  const runnable = agent.runnable;
+  const isRunnable = agent.isRunnable;
   return (
-    <HStack
+    <chakra.button
+      type="button"
       data-testid={`target-option-${agent.id}`}
+      display="flex"
+      alignItems="center"
+      gap={2}
+      width="full"
+      textAlign="left"
       paddingX={3}
       paddingY={2}
-      cursor={runnable ? "pointer" : "not-allowed"}
-      opacity={runnable ? 1 : 0.5}
+      cursor={isRunnable ? "pointer" : "not-allowed"}
+      opacity={isRunnable ? 1 : 0.5}
       bg={isSelected ? "blue.50" : "transparent"}
       _hover={{ bg: "bg.subtle" }}
-      onClick={runnable ? onSelect : undefined}
-      aria-disabled={!runnable}
+      onClick={isRunnable ? onSelect : undefined}
+      aria-disabled={!isRunnable}
     >
       <AgentOptionMark agent={agent} />
       <Text fontSize="sm" flex={1}>
@@ -422,7 +434,7 @@ function AgentOptionRow({
           ✓
         </Text>
       )}
-    </HStack>
+    </chakra.button>
   );
 }
 
@@ -447,7 +459,7 @@ function AgentOption({
     <AgentOptionRow agent={agent} isSelected={isSelected} onSelect={onSelect} />
   );
 
-  if (agent.runnable) return row;
+  if (agent.isRunnable) return row;
   return (
     <Tooltip content={ownerOnlyCopy(agent.owner?.name)}>
       <Box>{row}</Box>

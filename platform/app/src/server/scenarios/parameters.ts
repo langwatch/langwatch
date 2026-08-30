@@ -99,6 +99,10 @@ const parameterValueSchema = z.union([
 export const SECRET_PARAMETER_DEFAULT_MESSAGE =
   "A secret parameter cannot carry a default value";
 
+/** What a secret parameter with an option list is refused with. */
+export const SECRET_PARAMETER_OPTIONS_MESSAGE =
+  "A secret parameter cannot list options";
+
 /** One declared parameter, as authored on the scenario. */
 export const scenarioParameterDefinitionSchema = z.object({
   name: z
@@ -189,6 +193,18 @@ export const scenarioParameterDefinitionsSchema = z
           code: z.ZodIssueCode.custom,
           path: [index, "defaultValue"],
           message: SECRET_PARAMETER_DEFAULT_MESSAGE,
+          params: { rule: "secret-default" },
+        });
+      }
+      // An option list on a secret parameter is the same fault as a default:
+      // the credentials sit in clear on the scenario row, and a refusal
+      // repeats them back to the caller beside the value it rejected.
+      if (definition.secret === true && definition.options !== undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, "options"],
+          message: SECRET_PARAMETER_OPTIONS_MESSAGE,
+          params: { rule: "secret-options" },
         });
       }
       if (seen.has(definition.name)) {
@@ -196,6 +212,7 @@ export const scenarioParameterDefinitionsSchema = z
           code: z.ZodIssueCode.custom,
           path: [index, "name"],
           message: `Duplicate parameter name "${definition.name}"`,
+          params: { rule: "duplicate-name" },
         });
         return;
       }

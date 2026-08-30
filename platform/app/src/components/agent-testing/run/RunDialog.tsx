@@ -132,9 +132,12 @@ export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
   const [isNameListOpen, setIsNameListOpen] = useState(false);
   // The parameter fields report their lists the same way, by id.
   const [openLists, setOpenLists] = useState<ReadonlySet<string>>(new Set());
-  const reportOpenList = useCallback((id: string, isOpen: boolean) => {
-    setOpenLists((current) => withOpenList({ current, id, isOpen }));
-  }, []);
+  const reportOpenList = useCallback(
+    ({ id, isOpen }: { id: string; isOpen: boolean }) => {
+      setOpenLists((current) => withOpenList({ current, id, isOpen }));
+    },
+    [],
+  );
   const form = useRunDialogForm(subject);
   const controller = useRunDialogSubmit({
     subject,

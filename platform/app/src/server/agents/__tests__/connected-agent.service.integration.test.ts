@@ -195,6 +195,71 @@ describe("connected agent rows", () => {
     });
   });
 
+  describe("when an archived connected agent is edited by hand", () => {
+    /** @scenario "An archived connected agent is still registered from code" */
+    it("refuses the rename the way it refuses one on an active row", async () => {
+      const agent = await service.registerConnected({
+        id: `agent_${nanoid()}`,
+        projectId,
+        name: "archived-edit-agent",
+        config,
+        identity: {
+          ...identity,
+          identityKey: `archived-edit-agent@production-${nanoid(4)}`,
+        },
+      });
+      await service.archiveAgent({ id: agent.id, projectId });
+
+      await expect(
+        service.update({
+          id: agent.id,
+          projectId,
+          data: { name: "renamed" },
+        }),
+      ).rejects.toMatchObject({ code: "agent_register_only" });
+      const row = await prisma.agent.findFirst({
+        where: { id: agent.id, projectId },
+      });
+      expect(row?.name).toBe("archived-edit-agent");
+    });
+  });
+
+  describe("when a connected agent is copied", () => {
+    /** @scenario "A connected agent cannot be copied" */
+    it("refuses the copy, which would carry no identity", async () => {
+      const agent = await service.registerConnected({
+        id: `agent_${nanoid()}`,
+        projectId,
+        name: "copied-agent",
+        config,
+        identity: {
+          ...identity,
+          identityKey: `copied-agent@production-${nanoid(4)}`,
+        },
+      });
+
+      await expect(
+        service.copyAgent(
+          {
+            sourceAgentId: agent.id,
+            sourceProjectId: projectId,
+            targetProjectId: projectId,
+            newAgentId: `agent_${nanoid()}`,
+          },
+          {
+            copyWorkflow: () => {
+              throw new Error("a connected agent has no workflow to copy");
+            },
+          },
+        ),
+      ).rejects.toMatchObject({ code: "agent_register_only" });
+      const rows = await prisma.agent.findMany({
+        where: { projectId, copiedFromAgentId: agent.id },
+      });
+      expect(rows).toHaveLength(0);
+    });
+  });
+
   describe("when a connected agent is edited by hand", () => {
     it("accepts a description edit and refuses the rest", async () => {
       const agent = await service.registerConnected({

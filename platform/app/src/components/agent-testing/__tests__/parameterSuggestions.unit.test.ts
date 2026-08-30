@@ -196,7 +196,7 @@ describe("acceptParameterSuggestion", () => {
   describe("when a key is accepted", () => {
     it("writes name= over the token and reopens on the values", () => {
       const text = "locale=de, mo";
-      const state = parameterSuggestionState(text, text.length);
+      const state = parameterSuggestionState({ text, cursor: text.length });
       if (!state.open) throw new Error("expected an open state");
       const row = keySuggestions({ definitions: [MODEL], query: "mo" })[0]!;
 
@@ -210,9 +210,39 @@ describe("acceptParameterSuggestion", () => {
     it("writes name=value over the token and leaves the rest", () => {
       const text = "model=gpt, locale=de";
       const cursor = "model=gpt".length;
-      const state = parameterSuggestionState(text, cursor);
+      const state = parameterSuggestionState({ text, cursor });
       if (!state.open) throw new Error("expected an open state");
       const row = valueSuggestions({ definition: MODEL, query: "gpt" })[1]!;
+
+      expect(acceptParameterSuggestion({ text, cursor, state, row })).toEqual({
+        text: "model=gpt-5, locale=de",
+        cursor: "model=gpt-5".length,
+        reopens: false,
+      });
+    });
+  });
+
+  describe("when the caret sits inside the value it replaces", () => {
+    it("writes over the rest of the token instead of leaving it behind", () => {
+      const text = "model=gpt";
+      const cursor = "model=gp".length;
+      const state = parameterSuggestionState({ text, cursor });
+      if (!state.open) throw new Error("expected an open state");
+      const row = valueSuggestions({ definition: MODEL, query: "gp" })[1]!;
+
+      expect(acceptParameterSuggestion({ text, cursor, state, row })).toEqual({
+        text: "model=gpt-5",
+        cursor: "model=gpt-5".length,
+        reopens: false,
+      });
+    });
+
+    it("keeps the pairs that follow the token", () => {
+      const text = "model=gpt, locale=de";
+      const cursor = "model=gp".length;
+      const state = parameterSuggestionState({ text, cursor });
+      if (!state.open) throw new Error("expected an open state");
+      const row = valueSuggestions({ definition: MODEL, query: "gp" })[1]!;
 
       expect(acceptParameterSuggestion({ text, cursor, state, row })).toEqual({
         text: "model=gpt-5, locale=de",
@@ -226,7 +256,7 @@ describe("acceptParameterSuggestion", () => {
     /** @scenario "Free text always commits" */
     it("leaves the typed text as it is, with no suggestion to match", () => {
       const text = "model=claude";
-      const state = parameterSuggestionState(text, text.length);
+      const state = parameterSuggestionState({ text, cursor: text.length });
       expect(parameterSuggestions({ state, definitions: [MODEL] })).toEqual([]);
       expect(text).toBe("model=claude");
     });

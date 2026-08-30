@@ -102,7 +102,7 @@ async function dispatchConnectedTurn({
         config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
         MAX_CALL_TIMEOUT_MS,
       ),
-      sticky: config.sticky ?? false,
+      isSticky: config.sticky ?? false,
     },
     call: {
       threadId: crypto.randomUUID(),

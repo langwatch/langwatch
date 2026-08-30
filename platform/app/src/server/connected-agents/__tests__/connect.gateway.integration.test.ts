@@ -206,11 +206,15 @@ class FakeSdk {
   }
 }
 
-async function connectAndRegister(
-  pod: Pod,
-  token: string,
-  overrides: Partial<RegisterFrame> = {},
-): Promise<{ sdk: FakeSdk; registered: Frame; agentId: string }> {
+async function connectAndRegister({
+  pod,
+  token,
+  overrides = {},
+}: {
+  pod: Pod;
+  token: string;
+  overrides?: Partial<RegisterFrame>;
+}): Promise<{ sdk: FakeSdk; registered: Frame; agentId: string }> {
   const sdk = new FakeSdk({
     url: pod.url,
     token,
@@ -223,11 +227,15 @@ async function connectAndRegister(
   return { sdk, registered, agentId: agents[0]!.id };
 }
 
-async function refusalOf(
-  pod: Pod,
-  token: string,
-  headers: Record<string, string> = { "X-Project-Id": projectId },
-): Promise<Frame> {
+async function refusalOf({
+  pod,
+  token,
+  headers = { "X-Project-Id": projectId },
+}: {
+  pod: Pod;
+  token: string;
+  headers?: Record<string, string>;
+}): Promise<Frame> {
   const sdk = new FakeSdk({ url: pod.url, token, headers });
   await sdk.open();
   const refused = await sdk.next("refused");
@@ -392,10 +400,10 @@ describe("register", () => {
   describe("when a process registers an agent", () => {
     /** @scenario "A register frame creates one row per agent name and environment" */
     it("creates the row and answers with its id and url", async () => {
-      const { sdk, registered, agentId } = await connectAndRegister(
-        podA,
-        projectApiKey,
-      );
+      const { sdk, registered, agentId } = await connectAndRegister({
+        pod: podA,
+        token: projectApiKey,
+      });
       const row = await prisma.agent.findFirst({
         where: { id: agentId, projectId },
       });
@@ -427,7 +435,10 @@ describe("presence", () => {
   describe("when one instance is connected", () => {
     /** @scenario "An agent is online while one instance is connected" */
     it("lists the instance with its hostname and pid", async () => {
-      const { sdk, agentId } = await connectAndRegister(podA, projectApiKey);
+      const { sdk, agentId } = await connectAndRegister({
+        pod: podA,
+        token: projectApiKey,
+      });
       const live = await podB.runtime.registry.listLive({ projectId, agentId });
 
       expect(live).toEqual([
@@ -449,7 +460,10 @@ describe("presence", () => {
   describe("when the last refresh is older than the TTL", () => {
     /** @scenario "An agent goes offline after the presence TTL" */
     it("reads as offline", async () => {
-      const { sdk, agentId } = await connectAndRegister(podA, projectApiKey);
+      const { sdk, agentId } = await connectAndRegister({
+        pod: podA,
+        token: projectApiKey,
+      });
       const later = Date.now() + (PRESENCE_TTL_SECONDS + 1) * 1000;
       expect(
         await podB.runtime.registry.listLive({
@@ -469,7 +483,10 @@ describe("presence", () => {
   describe("when presence is refreshed twice inside a minute", () => {
     /** @scenario "The last seen time is written at most once a minute" */
     it("writes the row once, and again after the minute", async () => {
-      const { sdk, agentId } = await connectAndRegister(podA, projectApiKey);
+      const { sdk, agentId } = await connectAndRegister({
+        pod: podA,
+        token: projectApiKey,
+      });
       const base = Date.now() + 10 * 60 * 1000;
       expect(
         await touchAgentLastSeen({ prisma, projectId, agentId, now: base }),
@@ -502,7 +519,10 @@ describe("presence", () => {
   describe("when the instance answers no ping", () => {
     /** @scenario "A missed pong retires the instance" */
     it("closes the socket and retires the instance", async () => {
-      const { sdk, agentId } = await connectAndRegister(podA, projectApiKey);
+      const { sdk, agentId } = await connectAndRegister({
+        pod: podA,
+        token: projectApiKey,
+      });
       // `ws` answers pings by itself; pausing the socket stops the pong.
       sdk.socket.pause();
       await new Promise((resolve) => setTimeout(resolve, 800));
@@ -520,7 +540,10 @@ describe("dispatch across replicas", () => {
   describe("when the instance is on replica A and the call comes from B", () => {
     /** @scenario "A call reaches an instance connected to another app replica" */
     it("delivers the call frame and returns the result", async () => {
-      const { sdk, agentId } = await connectAndRegister(podA, projectApiKey);
+      const { sdk, agentId } = await connectAndRegister({
+        pod: podA,
+        token: projectApiKey,
+      });
       const answering = (async () => {
         const call = await sdk.next("call");
         sdk.send({ type: "ack", callId: call.callId });
@@ -540,7 +563,7 @@ describe("dispatch across replicas", () => {
           name: "support-agent",
           environment: "production",
           timeoutMs: 5_000,
-          sticky: false,
+          isSticky: false,
         },
         call: {
           threadId: "thread_1",
@@ -582,7 +605,10 @@ describe("dispatch across replicas", () => {
   describe("when the relay request is aborted", () => {
     /** @scenario "Aborting the relay request cancels the call on the instance" */
     it("sends a cancel frame for that call", async () => {
-      const { sdk, agentId } = await connectAndRegister(podA, projectApiKey);
+      const { sdk, agentId } = await connectAndRegister({
+        pod: podA,
+        token: projectApiKey,
+      });
       const controller = new AbortController();
       const pending = podB.runtime.dispatcher.dispatch({
         projectId,
@@ -591,7 +617,7 @@ describe("dispatch across replicas", () => {
           name: "support-agent",
           environment: "production",
           timeoutMs: 5_000,
-          sticky: false,
+          isSticky: false,
         },
         call: {
           threadId: "thread_abort",
@@ -618,7 +644,10 @@ describe("dispatch across replicas", () => {
 
   describe("when the instance disconnects mid-call", () => {
     it("fails the call with agent_disconnected at once", async () => {
-      const { sdk, agentId } = await connectAndRegister(podA, projectApiKey);
+      const { sdk, agentId } = await connectAndRegister({
+        pod: podA,
+        token: projectApiKey,
+      });
       const pending = podB.runtime.dispatcher.dispatch({
         projectId,
         agent: {
@@ -626,7 +655,7 @@ describe("dispatch across replicas", () => {
           name: "support-agent",
           environment: "production",
           timeoutMs: 20_000,
-          sticky: false,
+          isSticky: false,
         },
         call: {
           threadId: "thread_gone",
@@ -654,30 +683,38 @@ describe("dispatch across replicas", () => {
   describe("when a call is routed at an instance that did not register the agent", () => {
     /** @scenario "An instance never receives a call for an agent it did not register" */
     it("does not send the call to it and picks another instance", async () => {
-      const real = await connectAndRegister(podA, projectApiKey, {
-        instance: {
-          id: `inst_real_${nanoid(4)}`,
-          hostname: "real-host",
-          username: "dev",
-          pid: 1,
-          startedAt: new Date().toISOString(),
-          inFlightCallIds: [],
-          maxConcurrency: 1,
+      const real = await connectAndRegister({
+        pod: podA,
+        token: projectApiKey,
+        overrides: {
+          instance: {
+            id: `inst_real_${nanoid(4)}`,
+            hostname: "real-host",
+            username: "dev",
+            pid: 1,
+            startedAt: new Date().toISOString(),
+            inFlightCallIds: [],
+            maxConcurrency: 1,
+          },
         },
       });
-      const stranger = await connectAndRegister(podA, projectApiKey, {
-        instance: {
-          id: `inst_stranger_${nanoid(4)}`,
-          hostname: "stranger-host",
-          username: "dev",
-          pid: 2,
-          startedAt: new Date().toISOString(),
-          inFlightCallIds: [],
-          maxConcurrency: 8,
+      const stranger = await connectAndRegister({
+        pod: podA,
+        token: projectApiKey,
+        overrides: {
+          instance: {
+            id: `inst_stranger_${nanoid(4)}`,
+            hostname: "stranger-host",
+            username: "dev",
+            pid: 2,
+            startedAt: new Date().toISOString(),
+            inFlightCallIds: [],
+            maxConcurrency: 8,
+          },
+          agents: [
+            { name: "other-agent", environment: "production", parameters: {} },
+          ],
         },
-        agents: [
-          { name: "other-agent", environment: "production", parameters: {} },
-        ],
       });
       // Claim the stranger for the real agent in presence by hand, with the
       // most free slots so the dispatcher picks it first. The dispatcher
@@ -703,7 +740,7 @@ describe("dispatch across replicas", () => {
           name: "support-agent",
           environment: "production",
           timeoutMs: 5_000,
-          sticky: false,
+          isSticky: false,
         },
         call: {
           threadId: `thread_${nanoid(4)}`,
@@ -729,60 +766,82 @@ describe("dispatch across replicas", () => {
   });
 });
 
-describe("credentials", () => {
-  /** @scenario "An ingestion key cannot connect" */
-  it("refuses an ingestion key with key_type_not_allowed", async () => {
-    expect(await refusalOf(podA, ingestToken)).toMatchObject({
-      code: "key_type_not_allowed",
+describe("given a socket at the connect endpoint", () => {
+  describe("when the key is an ingestion key", () => {
+    /** @scenario "An ingestion key cannot connect" */
+    it("refuses it with key_type_not_allowed", async () => {
+      expect(await refusalOf({ pod: podA, token: ingestToken })).toMatchObject({
+        code: "key_type_not_allowed",
+      });
     });
   });
 
-  /** @scenario "A Langy session key cannot connect" */
-  it("refuses a Langy session key with key_type_not_allowed", async () => {
-    expect(await refusalOf(podA, langyToken)).toMatchObject({
-      code: "key_type_not_allowed",
+  describe("when the key is a Langy session key", () => {
+    /** @scenario "A Langy session key cannot connect" */
+    it("refuses it with key_type_not_allowed", async () => {
+      expect(await refusalOf({ pod: podA, token: langyToken })).toMatchObject({
+        code: "key_type_not_allowed",
+      });
     });
   });
 
-  /** @scenario "A key without scenarios manage cannot connect" */
-  it("refuses a viewer key with permission_denied", async () => {
-    expect(await refusalOf(podA, viewerToken)).toMatchObject({
-      code: "permission_denied",
+  describe("when the key cannot manage scenarios", () => {
+    /** @scenario "A key without scenarios manage cannot connect" */
+    it("refuses it with permission_denied", async () => {
+      expect(await refusalOf({ pod: podA, token: viewerToken })).toMatchObject({
+        code: "permission_denied",
+      });
     });
   });
 
-  /** @scenario "A key that reaches several projects must name one" */
-  it("refuses an org key without X-Project-Id and lists the projects", async () => {
-    const refused = await refusalOf(podA, orgWideToken, {});
-    expect(refused.code).toBe("project_required");
-    const projects = (
-      refused.meta as { projects: { id: string; name: string }[] }
-    ).projects;
-    expect(projects.map((project) => project.id)).toContain(projectId);
-  });
-
-  /** @scenario "An invalid key cannot connect" */
-  it("refuses a token that names no key with api_key_invalid", async () => {
-    expect(await refusalOf(podA, `sk-lw-${nanoid(48)}`)).toMatchObject({
-      code: "api_key_invalid",
+  describe("when an organization key names no project", () => {
+    /** @scenario "A key that reaches several projects must name one" */
+    it("refuses it and lists the projects it reaches", async () => {
+      const refused = await refusalOf({
+        pod: podA,
+        token: orgWideToken,
+        headers: {},
+      });
+      expect(refused.code).toBe("project_required");
+      const projects = (
+        refused.meta as { projects: { id: string; name: string }[] }
+      ).projects;
+      expect(projects.map((project) => project.id)).toContain(projectId);
     });
   });
 
-  it("accepts a personal key and scopes a development agent to its owner", async () => {
-    const { sdk, agentId } = await connectAndRegister(podA, personalToken, {
-      agents: [
-        { name: "dev-agent", environment: "development", parameters: {} },
-      ],
+  describe("when the token names no key at all", () => {
+    /** @scenario "An invalid key cannot connect" */
+    it("refuses it with api_key_invalid", async () => {
+      expect(
+        await refusalOf({ pod: podA, token: `sk-lw-${nanoid(48)}` }),
+      ).toMatchObject({
+        code: "api_key_invalid",
+      });
     });
-    const row = await prisma.agent.findFirst({
-      where: { id: agentId, projectId },
+  });
+
+  describe("when the key is personal and the agent is a development one", () => {
+    it("accepts it and scopes the agent to its owner", async () => {
+      const { sdk, agentId } = await connectAndRegister({
+        pod: podA,
+        token: personalToken,
+        overrides: {
+          agents: [
+            { name: "dev-agent", environment: "development", parameters: {} },
+          ],
+        },
+      });
+      const row = await prisma.agent.findFirst({
+        where: { id: agentId, projectId },
+      });
+      expect(row).toMatchObject({
+        environment: "development",
+        ownerUserId: userId,
+        identityKey: `dev-agent@development/user:${userId}`,
+      });
+      sdk.close();
+      await sdk.closed();
     });
-    expect(row).toMatchObject({
-      environment: "development",
-      ownerUserId: userId,
-      identityKey: `dev-agent@development/user:${userId}`,
-    });
-    sdk.close();
-    await sdk.closed();
   });
 });

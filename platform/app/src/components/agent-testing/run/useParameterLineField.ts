@@ -153,7 +153,7 @@ export function useParameterLineField({
     if (element) setCursor(element.selectionStart ?? 0);
   };
 
-  const edit = (text: string, at: number) => {
+  const edit = ({ text, at }: { text: string; at: number }) => {
     onChange(text);
     setCursor(at);
     open();

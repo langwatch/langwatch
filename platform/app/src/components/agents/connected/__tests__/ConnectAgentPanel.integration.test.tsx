@@ -20,29 +20,37 @@ describe("<ConnectAgentPanel />", () => {
   afterEach(cleanup);
 
   describe("given the project has no connected agent", () => {
-    /** @scenario "The page offers the connect snippets when no agent is connected" */
-    it("offers a Python snippet, a TypeScript snippet and a listening indicator", () => {
-      render(<ConnectAgentPanel />, { wrapper: Wrapper });
+    describe("when the panel is rendered", () => {
+      /** @scenario "The page offers the connect snippets when no agent is connected" */
+      it("offers a Python snippet, a TypeScript snippet and a listening indicator", () => {
+        render(<ConnectAgentPanel />, { wrapper: Wrapper });
 
-      expect(
-        screen.getByText("Connect an agent from code"),
-      ).toBeInTheDocument();
-      expect(screen.getByText("Python")).toBeInTheDocument();
-      expect(screen.getByText("TypeScript")).toBeInTheDocument();
-      expect(screen.getByText(/@langwatch\.connect_agent/)).toBeInTheDocument();
-      expect(screen.getByTestId("connect-agent-listening")).toBeInTheDocument();
+        expect(
+          screen.getByText("Connect an agent from code"),
+        ).toBeInTheDocument();
+        expect(screen.getByText("Python")).toBeInTheDocument();
+        expect(screen.getByText("TypeScript")).toBeInTheDocument();
+        expect(
+          screen.getByText(/@langwatch\.connect_agent/),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByTestId("connect-agent-listening"),
+        ).toBeInTheDocument();
+      });
     });
 
-    /** @scenario "The connect empty state keeps the way to the other agent kinds" */
-    it("keeps a control that opens the new agent flow", () => {
-      const onCreateOtherAgent = vi.fn();
-      render(<ConnectAgentPanel onCreateOtherAgent={onCreateOtherAgent} />, {
-        wrapper: Wrapper,
-      });
+    describe("when the other agent kinds control is clicked", () => {
+      /** @scenario "The connect empty state keeps the way to the other agent kinds" */
+      it("calls back to open the new agent flow", () => {
+        const onCreateOtherAgent = vi.fn();
+        render(<ConnectAgentPanel onCreateOtherAgent={onCreateOtherAgent} />, {
+          wrapper: Wrapper,
+        });
 
-      const control = screen.getByTestId("connect-agent-other-kinds");
-      control.click();
-      expect(onCreateOtherAgent).toHaveBeenCalled();
+        const control = screen.getByTestId("connect-agent-other-kinds");
+        control.click();
+        expect(onCreateOtherAgent).toHaveBeenCalled();
+      });
     });
   });
 });

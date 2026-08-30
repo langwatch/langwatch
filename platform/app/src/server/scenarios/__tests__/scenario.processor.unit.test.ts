@@ -35,6 +35,28 @@ describe("parseChildProcessResult", () => {
     });
   });
 
+  it("keeps the instance a result line names in full", () => {
+    const stdout =
+      '{"success":true,"agentInstance":{"hostname":"worker-1","label":"blue"}}';
+    expect(parseChildProcessResult(stdout)).toEqual({
+      success: true,
+      agentInstance: { hostname: "worker-1", label: "blue" },
+    });
+  });
+
+  it("drops an instance whose label is missing or is not text", () => {
+    expect(
+      parseChildProcessResult(
+        '{"success":true,"agentInstance":{"hostname":"worker-1"}}',
+      ),
+    ).toEqual({ success: true });
+    expect(
+      parseChildProcessResult(
+        '{"success":true,"agentInstance":{"hostname":"worker-1","label":42}}',
+      ),
+    ).toEqual({ success: true });
+  });
+
   it("returns null when no result line is present", () => {
     expect(
       parseChildProcessResult('{"level":30,"msg":"only logs"}'),

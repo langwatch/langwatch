@@ -94,6 +94,21 @@ Feature: Connected agents in the product
     And it offers a Python snippet and a TypeScript snippet
     And it shows that the page is listening for the agent
 
+  # An agent name is any text of up to 64 characters. Written into the snippet
+  # as it stands, a quote or a line break would end the literal early, and the
+  # code the reader copies would not be the code the page shows.
+  @unit
+  Scenario: A snippet carries the agent name as written
+    Given an agent whose name holds a quote, a backslash or a line break
+    When the snippet for it is built
+    Then the name stays inside its string literal in both languages
+
+  @unit
+  Scenario: A snippet declares a name the language accepts
+    Given an agent named only with digits, or named as a keyword of the language
+    When the snippet for it is built
+    Then the snippet declares the example name instead
+
   @integration
   Scenario: The connect empty state keeps the way to the other agent kinds
     Given the project has no connected agent

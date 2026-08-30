@@ -64,7 +64,7 @@ interface Session {
   unsubscribe: Unsubscribe | null;
   /** Calls the socket is working on; used to fail them on close. */
   activeCallIds: Set<string>;
-  alive: boolean;
+  isAlive: boolean;
   refresh: NodeJS.Timeout | null;
   ping: NodeJS.Timeout | null;
 }
@@ -198,7 +198,7 @@ export class ConnectGateway {
       info,
       unsubscribe: null,
       activeCallIds: new Set(frame.instance.inFlightCallIds),
-      alive: true,
+      isAlive: true,
       refresh: null,
       ping: null,
     };
@@ -210,7 +210,7 @@ export class ConnectGateway {
 
     ws.on("message", (data) => void this.onFrame(session, data));
     ws.on("pong", () => {
-      session.alive = true;
+      session.isAlive = true;
     });
     ws.on("close", () => void this.onClose(session));
     ws.on("error", (error) => {
@@ -296,7 +296,7 @@ export class ConnectGateway {
   /** Presence refresh on the SDK's pongs, and the ping that asks for them. */
   private startClocks(session: Session): void {
     session.ping = setInterval(() => {
-      if (!session.alive) {
+      if (!session.isAlive) {
         logger.warn(
           { instanceId: session.info.instanceId },
           "no pong inside the wait, closing the socket",
@@ -304,10 +304,10 @@ export class ConnectGateway {
         session.socket.terminate();
         return;
       }
-      session.alive = false;
+      session.isAlive = false;
       session.socket.ping();
       setTimeout(() => {
-        if (!session.alive && session.socket.readyState === WebSocket.OPEN) {
+        if (!session.isAlive && session.socket.readyState === WebSocket.OPEN) {
           session.socket.terminate();
         }
       }, this.pongWaitMs).unref();
@@ -315,7 +315,7 @@ export class ConnectGateway {
     session.ping.unref();
 
     session.refresh = setInterval(() => {
-      if (!session.alive) return;
+      if (!session.isAlive) return;
       void this.core.refreshPresence(session.info);
     }, PRESENCE_REFRESH_MS);
     session.refresh.unref();

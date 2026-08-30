@@ -47,11 +47,15 @@ export const PARAMETER_LINE_GRAMMAR: SuggestionGrammar = {
   opensOnEmptyToken: true,
 };
 
-function findActiveTokenStart(
-  text: string,
-  cursorPos: number,
-  grammar: SuggestionGrammar,
-): number {
+function findActiveTokenStart({
+  text,
+  cursorPos,
+  grammar,
+}: {
+  text: string;
+  cursorPos: number;
+  grammar: SuggestionGrammar;
+}): number {
   let start = 0;
   for (let i = cursorPos - 1; i >= 0; i--) {
     if (grammar.tokenTerminators.has(text[i] as string)) {
@@ -76,7 +80,7 @@ export function getSuggestionState(
     return { open: true, mode: "field", query: "", tokenStart: 0 };
   }
 
-  const wordStart = findActiveTokenStart(text, cursorPos, grammar);
+  const wordStart = findActiveTokenStart({ text, cursorPos, grammar });
 
   // Only consume chars that are actually behind the cursor. When cursor sits
   // before any input (cursorPos === wordStart), there are no token chars yet.

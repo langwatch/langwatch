@@ -1779,6 +1779,18 @@ const presentations = {
         : `${subject} Choose one of its declared options.`;
     },
   },
+  scenario_parameter_required: {
+    title: "This run is missing a required parameter value",
+    describe: (error) => {
+      const missing = strList(error, "names");
+      const plural = missing.length > 1;
+      const subject =
+        missing.length > 0
+          ? `${listLabels(missing)} ${plural ? "are required and have no values" : "is required and has no value"}.`
+          : "A required parameter has no value.";
+      return `${subject} Set ${plural ? "values" : "a value"} for this run, or give ${plural ? "them" : "it"} a default where the parameter is declared.`;
+    },
+  },
   scenario_parameter_template_invalid: {
     title: "This scenario's text couldn't be filled in",
     describe: (error) =>

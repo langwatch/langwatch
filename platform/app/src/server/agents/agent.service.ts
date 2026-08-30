@@ -269,7 +269,9 @@ export class AgentService {
     input: UpdateAgentInput,
   ): Promise<UpdateAgentInput> {
     if (input.data.type === "connected") throw new AgentRegisterOnlyError();
-    const existing = await this.repository.findById({
+    // Archived rows included: an archived connected agent is still the SDK's
+    // to change, and it comes back on the next register.
+    const existing = await this.repository.findByIdIncludingArchived({
       id: input.id,
       projectId: input.projectId,
     });

@@ -14,6 +14,7 @@ import {
   signatureComponentSchema,
 } from "~/optimization_studio/types/dsl";
 import { connectedAgentVisibleWhere } from "./connected-agent-visibility";
+import { AgentRegisterOnlyError } from "./errors";
 
 /**
  * Agent types enum - matches ComponentType for signature/code/custom(workflow)/http,
@@ -151,7 +152,8 @@ export class AgentRepository {
 
   /**
    * Find multiple agents by IDs regardless of archived status.
-   * Returns only id and archivedAt for lightweight classification.
+   * Returns what a run reads before it schedules: id, name, type, raw config,
+   * environment, ownerUserId, hostLabel, lastSeenAt and archivedAt.
    */
   async findManyIncludingArchived(input: {
     ids: string[];
@@ -209,6 +211,27 @@ export class AgentRepository {
         id: input.id,
         projectId: input.projectId,
         archivedAt: null,
+      },
+    });
+
+    if (!agent) return null;
+    return parseAgent(agent);
+  }
+
+  /**
+   * Finds a single agent by id within a project, archived rows included.
+   *
+   * Read by a rule that decides from what the row is rather than from
+   * whether it is listed: a connected agent stays SDK-owned once archived.
+   */
+  async findByIdIncludingArchived(input: {
+    id: string;
+    projectId: string;
+  }): Promise<TypedAgent | null> {
+    const agent = await this.prisma.agent.findFirst({
+      where: {
+        id: input.id,
+        projectId: input.projectId,
       },
     });
 
@@ -276,6 +299,14 @@ export class AgentRepository {
   async create(input: CreateAgentInput): Promise<TypedAgent> {
     // Validate type
     const type = agentTypeSchema.parse(input.type);
+
+    // A connected agent row is addressed by its identity key, so one written
+    // without an identity is a row the process that runs the agent can never
+    // find: it would register a second row beside it. Only a register writes
+    // one, and a register always carries the identity.
+    if (type === "connected" && !input.identity) {
+      throw new AgentRegisterOnlyError();
+    }
 
     // Validate config matches type's DSL schema
     const validatedConfig = validateConfig(type, input.config);
