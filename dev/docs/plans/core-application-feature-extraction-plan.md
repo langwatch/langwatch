@@ -603,6 +603,24 @@ switches that port from structural to nominal typing — implementors must
 `extends` it, so composition has to change too. That is a decision for the
 feature that owns the port.
 
+`F-NAMING-01` — **`try*` carries two meanings and the rule only knows one.**
+`fallible-result-naming` treats the prefix as "may answer absence", which is the
+convention CLAUDE.md documents and is right for `tryFindById`. But
+`TraceSpanDedupPort` uses it for a second thing: `tryConfirmProcessed` and
+`tryReleaseOnFailure` return `Promise<void>` and mean BEST EFFORT — the
+implementing service's docblock says "Dedup never blocks ingestion, all errors
+are swallowed and logged", and callers must not care whether Redis answered.
+
+Neither remedy the rule offers fits. Returning null would invent a result nobody
+reads; dropping the prefix would leave `confirmProcessed`, which reads as though
+it throws when the whole point is that it does not. Their own sibling
+`tryAcquireProcessingLock` returns `boolean | null` and does mean absence, so the
+port uses both senses in three adjacent lines.
+
+Two violations, and the fix is a decision about the vocabulary — either a second
+prefix for best-effort side effects, or the rule learns that `try*` returning
+`void` is a distinct, documented case. Not decided here.
+
 `F-PRISMA-02` — **`apps/api`'s two generated-Prisma imports are a Workflow
 vertical slice, not a lint fix.** `prisma-containment` reports 35, and two are in
 `apps/api` — the extraction's TARGET, so they are new debt rather than legacy.
