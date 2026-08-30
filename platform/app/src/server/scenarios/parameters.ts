@@ -151,6 +151,17 @@ export const scenarioParameterDefinitionSchema = z.object({
     .describe(
       `The values the parameter accepts, at most ${MAX_PARAMETER_OPTIONS}. A run supplying another value is refused.`,
     ),
+  /**
+   * Whether a run must supply a value. Declared by a connected agent whose
+   * function has no default for the parameter; the SDK refuses a call that
+   * carries none before the function runs.
+   */
+  required: z
+    .boolean()
+    .optional()
+    .describe(
+      "Whether the run must supply a value. Set by a connected agent for a parameter with no default.",
+    ),
 });
 
 /**

@@ -102,6 +102,32 @@ export class AgentService {
   }
 
   /**
+   * The owner of every personal development agent given, by user id.
+   *
+   * One read for the whole list: the agents page labels every personal row
+   * with its owner, and the run refusal names the owner too.
+   */
+  async ownersOf(
+    agents: readonly { ownerUserId: string | null }[],
+  ): Promise<Map<string, { userId: string; name: string | null }>> {
+    const userIds = [
+      ...new Set(
+        agents
+          .map((agent) => agent.ownerUserId)
+          .filter((id): id is string => !!id),
+      ),
+    ];
+    if (userIds.length === 0) return new Map();
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, name: true },
+    });
+    return new Map(
+      users.map((user) => [user.id, { userId: user.id, name: user.name }]),
+    );
+  }
+
+  /**
    * Gets an agent by ID only (any project). For syncFromSource source lookup.
    */
   async getByIdOnly(id: string) {

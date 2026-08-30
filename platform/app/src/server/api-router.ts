@@ -51,6 +51,7 @@ import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as userAvatarApp } from "../app/api/user-avatar/[[...route]]/app";
 import { app as webhookPlatformApp } from "../app/api/webhooks/[[...route]]/app";
 import { app as workflowsCrudApp } from "../app/api/workflows/[[...route]]/app";
+import { app as connectedAgentRelayApp } from "./connected-agents/relay.route";
 import { app as annotationsApp } from "./routes/annotations";
 import { app as apiDiscoveryApp } from "./routes/api-discovery";
 import { app as authApp } from "./routes/auth";
@@ -114,6 +115,9 @@ export function createApiRouter() {
   api.route("/", workflowsApp); // /api/workflows/code-completion, /post_event
   api.route("/", healthChecksApp); // /api/health/collector, /evaluations, etc.
 
+  // The relay route is mounted before the agents family: both serve
+  // /api/agents/:id/..., and the family's /:id verbs must not shadow /call.
+  api.route("/", connectedAgentRelayApp);
   api.route("/", agentsApp);
   api.route("/", analyticsApp);
   api.route("/", analyticsSqlApp); // /api/v1/projects/:projectId/analytics/* — governed SQL

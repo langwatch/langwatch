@@ -101,6 +101,7 @@ import type { SpanStorageService } from "../app-layer/traces/span-storage.servic
 import { TraceReadDerivationService } from "../app-layer/traces/trace-read-derivation.service";
 import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
 import type { TraceSummaryData } from "../app-layer/traces/types";
+import { archiveUnseenConnectedAgents } from "../connected-agents/presence.projection";
 import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyResolver";
 import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { createEvaluationAlertTriggerMatchHandler } from "../event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
@@ -144,6 +145,7 @@ import {
   createPullRequestMappingHandler,
   type PullRequestMappingSubscriberDeps,
 } from "./pipelines/coding-agent-processing/subscribers/pullRequestMapping.subscriber";
+import { createConnectedAgentMaintenancePipeline } from "./pipelines/connected-agent-maintenance/pipeline";
 import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
 import {
   createEvaluationProcessingPipeline,
@@ -620,6 +622,19 @@ export class PipelineRegistry {
         sandboxKeyReap: {
           reap: () =>
             reapExpiredAgentSandboxApiKeys({ prisma: this.deps.prisma }),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
+    // Connected agent maintenance, on the same footing: the daily sweep that
+    // archives connected agents no process has registered for thirty days.
+    this.deps.eventSourcing.register(
+      createConnectedAgentMaintenancePipeline({
+        archiveSweep: {
+          archive: () =>
+            archiveUnseenConnectedAgents({ prisma: this.deps.prisma }),
           deleteDispatchedBefore: (params) =>
             this.deps.repositories.processStore.deleteDispatchedBefore(params),
         },

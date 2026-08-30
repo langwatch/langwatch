@@ -651,6 +651,10 @@ describe("explainHandledError", () => {
        * the list is once again only our own words.
        */
       const ALLOWED_PER_CODE: Record<string, Set<string>> = {
+        // `reason` is the sentence parameter-spec.ts wrote for this exact
+        // declaration ("it is a turn field the platform sends on every
+        // call"), authored here and never relayed from the SDK.
+        agent_parameter_invalid: new Set(["reason"]),
         // The provider's own reason for rejecting delivery is the entire
         // value of this error — "invite the bot with /invite @LangWatch".
         // Authored server-side by `explainSlackPostError`, never relayed.

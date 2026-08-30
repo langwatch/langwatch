@@ -342,6 +342,69 @@ const registry = {
     ],
     docsPath: "/agent-simulations/connect-your-agent",
   },
+  agent_offline: {
+    tips: [
+      "Start the process that runs the decorated function; the agent shows Online in the agents list once it connects",
+      "Check that the process connects with the same project and environment as the agent you are running against",
+    ],
+    docsPath: "/agent-simulations/connect-your-agent",
+  },
+  agent_owner_only: {
+    tips: [
+      "A development agent registered with a personal key belongs to that person; connect your own process to get your own copy",
+      "To share one development agent with the team, register it with a project key or name its environment, for example dev-shared",
+    ],
+    docsPath: "/agent-simulations/connect-your-agent",
+  },
+  agent_call_timeout: {
+    tips: [
+      "Raise `timeout` on the decorated function, up to the platform cap of 300 seconds",
+      "Check the process logs for the turn that did not finish",
+    ],
+  },
+  agent_call_failed: {
+    tips: [
+      "Read `meta.message` for the error the function raised; the process logs carry the stack",
+    ],
+  },
+  agent_disconnected: {
+    tips: [
+      "The turn is never sent again once the function started, since it may have side effects; start the process again and run again",
+    ],
+  },
+  agent_instance_lost: {
+    tips: [
+      "A sticky agent pins each conversation to one instance; when that instance is gone the conversation fails rather than moving to another one",
+      "Set `sticky` to false if the agent keeps no local state per conversation",
+    ],
+  },
+  agent_busy: {
+    tips: [
+      "Wait `meta.retryAfterMs` milliseconds and send the call again",
+      "Raise `concurrency` on the decorated function, or connect more instances",
+    ],
+  },
+  agent_parameter_invalid: {
+    tips: [
+      "Parameter names start with a letter or underscore and hold only letters, digits and underscores",
+      "Declare at most 20 parameters and at most 50 options per parameter",
+      "A secret is declared on the scenario, never on the agent",
+    ],
+    docsPath: "/agent-simulations/scenario-parameters",
+  },
+  agent_register_refused: {
+    tips: [
+      "Read `meta.reason`: api_key_invalid, project_required, permission_denied, key_type_not_allowed, replica_count_unsupported, parameters_invalid or environment_invalid",
+      "The key needs `scenarios:manage`; an ingestion key or a Langy session key can never connect",
+    ],
+    docsPath: "/agent-simulations/connect-your-agent",
+  },
+  agent_payload_too_large: {
+    tips: [
+      "Read `meta.what`, `meta.sizeBytes` and `meta.limitBytes`",
+      "On a self-hosted deployment raise the cap with LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB",
+    ],
+  },
 
   // ---- agent dev tunnel ----
   agent_dev_tunnel_unreachable: {

@@ -481,6 +481,72 @@ const presentations = {
     describe: () =>
       "Its name, environment and parameters come from the process that runs it. Edit the description here, or change the code and start the process again.",
   },
+  agent_offline: {
+    title: "This agent is not running",
+    describe: (error) => {
+      const name = str(error, "agentName", "the agent");
+      const environment = str(error, "environment", "");
+      const where = environment ? ` in ${environment}` : "";
+      return `No process running ${name}${where} is connected. Start the process that runs it, then run again.`;
+    },
+  },
+  agent_owner_only: {
+    title: "This development agent belongs to someone else",
+    describe: (error) => {
+      const owner = str(error, "ownerName", "its owner");
+      return `Only ${owner} can run simulations against it. Connect your own copy of the agent, or ask them to run it.`;
+    },
+  },
+  agent_call_timeout: {
+    title: "The agent did not answer in time",
+    describe: () =>
+      "The connected agent took longer than its call budget to answer a turn. Check the process for slow work, or raise the timeout on the decorated function.",
+  },
+  agent_call_failed: {
+    title: "The agent raised an error",
+    // The function's own error text rides on `meta.message` for the CLI and
+    // the run drawer's envelope; relayed prose is never rendered here.
+    describe: () =>
+      "The decorated function raised an error. The process logs carry the stack, and the run shows what it said.",
+  },
+  agent_disconnected: {
+    title: "The agent disconnected mid-call",
+    describe: () =>
+      "The process working on this turn disconnected before it answered. The turn was not sent again, since the function may have run. Check the process, then run again.",
+  },
+  agent_instance_lost: {
+    title: "The pinned instance is gone",
+    describe: () =>
+      "This agent pins each conversation to one instance, and that instance disconnected. Start the process again, then run again.",
+  },
+  agent_busy: {
+    title: "Every instance of this agent is busy",
+    describe: () =>
+      "The connected instances are at their concurrency. Wait a moment and try again, or raise the concurrency on the decorated function.",
+  },
+  agent_parameter_invalid: {
+    title: "A declared parameter cannot be used",
+    describe: (error) => {
+      const name = str(error, "name", "");
+      const reason = safeProse(str(error, "reason", ""));
+      const subject = name ? `The parameter "${name}"` : "A parameter";
+      return reason
+        ? `${subject} cannot be declared: ${reason}.`
+        : `${subject} cannot be declared. Check its name, its type and its options.`;
+    },
+  },
+  agent_register_refused: {
+    title: "The agent could not be registered",
+    describe: () =>
+      "Check the API key, the project and the permissions the process connects with. The process prints the reason at startup.",
+  },
+  agent_payload_too_large: {
+    title: "This turn is too large",
+    describe: (error) => {
+      const what = str(error, "what", "payload");
+      return `The ${what} is above the size limit. Trim the conversation or the attachments, or raise the limit on a self-hosted deployment.`;
+    },
+  },
 
   // ---- agent-submitted reports ----
   agent_report_rate_limited: {

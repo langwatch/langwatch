@@ -9,6 +9,11 @@ import {
 } from "../../../../server/agents/agent.repository";
 import { toAgentListRow } from "../../../../server/agents/agent.service";
 import { AgentRegisterOnlyError } from "../../../../server/agents/errors";
+import {
+  type AgentPresence,
+  NO_PRESENCE,
+  readAgentPresence,
+} from "../../../../server/connected-agents/presence.read";
 import { scenarioParameterDefinitionSchema } from "../../../../server/scenarios/parameters";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import {
@@ -90,11 +95,16 @@ secured.access(requires("project:view")).get(
       page,
       limit,
     });
+    const [owners, presence] = await Promise.all([
+      service.ownersOf(result.data),
+      readAgentPresence({ projectId: project.id, agents: result.data }),
+    ]);
 
     return c.json({
       ...result,
-      data: result.data.map((a: { id: string; type: string }) => ({
+      data: result.data.map((a) => ({
         ...a,
+        ...agentPresenceView({ agent: a, owners, presence }),
         platformUrl: agentPlatformUrl({
           projectSlug: project.slug,
           agentId: a.id,
@@ -170,9 +180,14 @@ secured.access(requires("project:view")).get(
     } catch (error) {
       return mapAgentNotFoundError(error);
     }
+    const [owners, presence] = await Promise.all([
+      service.ownersOf([agent]),
+      readAgentPresence({ projectId: project.id, agents: [agent] }),
+    ]);
 
     return c.json({
       ...toAgentListRow(agent),
+      ...agentPresenceView({ agent, owners, presence }),
       platformUrl: agentPlatformUrl({
         projectSlug: project.slug,
         agentId: agent.id,
@@ -181,6 +196,45 @@ secured.access(requires("project:view")).get(
     });
   },
 );
+
+/** The presence and owner fields every agent read carries (ADR-128). */
+function agentPresenceView({
+  agent,
+  owners,
+  presence,
+}: {
+  agent: { id: string; ownerUserId: string | null };
+  owners: Map<string, { userId: string; name: string | null }>;
+  presence: Map<string, AgentPresence>;
+}) {
+  const { status, instances } = presence.get(agent.id) ?? NO_PRESENCE;
+  return {
+    owner: agent.ownerUserId
+      ? (owners.get(agent.ownerUserId) ?? {
+          userId: agent.ownerUserId,
+          name: null,
+        })
+      : null,
+    status,
+    instances,
+  };
+}
+
+const agentInstanceSchema = z.object({
+  instanceId: z.string(),
+  hostname: z.string(),
+  username: z.string(),
+  pid: z.number(),
+  label: z.string().nullable(),
+  sdk: z.object({
+    name: z.string(),
+    version: z.string(),
+    language: z.string(),
+  }),
+  connectedAt: z.date(),
+  inflight: z.number(),
+  maxConcurrency: z.number(),
+});
 
 const agentResponseSchema = z.object({
   id: z.string(),
@@ -217,6 +271,22 @@ const agentResponseSchema = z.object({
     .array(scenarioParameterDefinitionSchema)
     .describe(
       "The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind.",
+    ),
+  owner: z
+    .object({ userId: z.string(), name: z.string().nullable() })
+    .nullable()
+    .describe(
+      "The person a personal development agent belongs to. Null when the agent is shared or host-scoped.",
+    ),
+  status: z
+    .enum(["online", "offline"])
+    .describe(
+      "online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind.",
+    ),
+  instances: z
+    .array(agentInstanceSchema)
+    .describe(
+      "The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind.",
     ),
   createdAt: z.date(),
   updatedAt: z.date(),

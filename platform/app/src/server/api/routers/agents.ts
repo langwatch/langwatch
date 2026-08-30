@@ -4,17 +4,71 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import {
+  type AgentInstanceView,
+  type AgentPresenceStatus,
+  NO_PRESENCE,
+  readAgentPresence,
+} from "~/server/connected-agents/presence.read";
+import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
+import {
   type AgentComponentConfig,
   agentTypeSchema,
   getConfigSchemaForType,
 } from "../../agents/agent.repository";
-import { AgentService } from "../../agents/agent.service";
+import {
+  AgentService,
+  declaredAgentParameters,
+} from "../../agents/agent.service";
+import type { AgentWithFields } from "../../agents/agent-fields";
 import { AgentRegisterOnlyError } from "../../agents/errors";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   copyWorkflowWithDatasets,
   saveOrCommitWorkflowVersion,
 } from "./workflows";
+
+/**
+ * What every agent read carries beside the row (ADR-128): the parameters a
+ * connected agent declares, the owner of a personal one, and its presence.
+ * Other kinds read as offline with no instances and no owner.
+ */
+async function withConnectedAgentViews<T extends AgentWithFields>({
+  agents,
+  projectId,
+  agentService,
+}: {
+  agents: T[];
+  projectId: string;
+  agentService: AgentService;
+}): Promise<
+  (T & {
+    parameters: ScenarioParameterDefinition[];
+    owner: { userId: string; name: string | null } | null;
+    status: AgentPresenceStatus;
+    instances: AgentInstanceView[];
+  })[]
+> {
+  const [owners, presence] = await Promise.all([
+    agentService.ownersOf(agents),
+    readAgentPresence({ projectId, agents }),
+  ]);
+  return agents.map((agent) => {
+    const owner = agent.ownerUserId
+      ? (owners.get(agent.ownerUserId) ?? {
+          userId: agent.ownerUserId,
+          name: null,
+        })
+      : null;
+    const { status, instances } = presence.get(agent.id) ?? NO_PRESENCE;
+    return {
+      ...agent,
+      parameters: declaredAgentParameters(agent),
+      owner,
+      status,
+      instances,
+    };
+  });
+}
 
 /**
  * Agent Router - Manages agent CRUD operations
@@ -37,7 +91,12 @@ export const agentsRouter = createTRPCRouter({
     .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
-      return await agentService.getAll({ projectId: input.projectId });
+      const agents = await agentService.getAll({ projectId: input.projectId });
+      return withConnectedAgentViews({
+        agents,
+        projectId: input.projectId,
+        agentService,
+      });
     }),
 
   /**
@@ -49,10 +108,17 @@ export const agentsRouter = createTRPCRouter({
     .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
-      return await agentService.getById({
+      const agent = await agentService.getById({
         id: input.id,
         projectId: input.projectId,
       });
+      if (!agent) return null;
+      const [view] = await withConnectedAgentViews({
+        agents: [agent],
+        projectId: input.projectId,
+        agentService,
+      });
+      return view ?? null;
     }),
 
   /**
