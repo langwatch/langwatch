@@ -565,6 +565,31 @@ export type EvaluationsV3State = {
 
   // UI state (not persisted)
   ui: UIState;
+
+  /**
+   * The stored workbench counter this board was last loaded from, or
+   * `undefined` before anything has been loaded or saved.
+   *
+   * Read by the version history to mark which entry is the one on screen, and
+   * by autosave to write against the version it started from rather than
+   * whatever the server holds now.
+   */
+  workbenchVersion?: number | undefined;
+
+  /**
+   * True once someone else's save has landed on top of this board.
+   *
+   * Autosave refuses while it is set — writing then would overwrite a version
+   * this session never saw. Clearing it is what resumes autosave, so it is
+   * state rather than a derived flag.
+   */
+  staleWorkbench?: boolean | undefined;
+
+  /**
+   * Run ids this session started, so a refusal naming one can be told apart
+   * from a refusal about somebody else's run.
+   */
+  runsStartedHere?: string[] | undefined;
 };
 
 // ============================================================================
@@ -576,6 +601,15 @@ export type EvaluationsV3Actions = {
   setName: (name: string) => void;
   setExperimentId: (id: string) => void;
   setExperimentSlug: (slug: string) => void;
+
+  // Version and freshness — the three fields at the end of the state above.
+  // The store has always implemented these; they were simply never declared,
+  // so every reader of `state.workbenchVersion` and every caller of
+  // `setStaleWorkbench` was reading a property the type said was not there.
+  setWorkbenchVersion: (workbenchVersion: number | undefined) => void;
+  setStaleWorkbench: (staleWorkbench: boolean | undefined) => void;
+  /** Appends a run id, skipping one already recorded. */
+  rememberRunStartedHere: (runId: string) => void;
 
   // Dataset management actions
   addDataset: (dataset: DatasetReference) => void;
