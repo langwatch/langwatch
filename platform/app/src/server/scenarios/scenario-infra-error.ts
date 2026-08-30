@@ -42,6 +42,16 @@ export const ScenarioInfraErrorCode = {
    * identically.
    */
   AgentDevTunnelUnreachable: "agent_dev_tunnel_unreachable",
+  /**
+   * Connected agent failures (ADR-128), named with the same codes the relay
+   * route answers with so a run and a REST caller read one vocabulary.
+   */
+  AgentOffline: "agent_offline",
+  AgentCallTimeout: "agent_call_timeout",
+  AgentCallFailed: "agent_call_failed",
+  AgentDisconnected: "agent_disconnected",
+  AgentInstanceLost: "agent_instance_lost",
+  AgentBusy: "agent_busy",
   /** Anything else that failed at the infrastructure level. */
   Infra: "scenario_infra_error",
 } as const;
@@ -357,6 +367,67 @@ function isOurRunnerCrash(text: string): boolean {
  * Classification rules, ordered most-specific-first: a TLS cert failure is more
  * actionable than the generic "fetch failed" it usually rides on, so it wins.
  */
+/** `Connected agent call failed (<code>): <message>`, split. */
+const CONNECTED_CALL_FAILURE =
+  /Connected agent call failed \(([a-z_0-9]+)\):\s*([^\n]*)/;
+
+/** The connected agent codes a run can fail with, and their copy. */
+const CONNECTED_AGENT_ENVELOPES: Record<
+  string,
+  { code: ScenarioInfraErrorCode; message: string; hint: string }
+> = {
+  agent_offline: {
+    code: ScenarioInfraErrorCode.AgentOffline,
+    message: "No process running the connected agent is connected.",
+    hint: "Start the process that runs the decorated function, then run again.",
+  },
+  agent_call_timeout: {
+    code: ScenarioInfraErrorCode.AgentCallTimeout,
+    message:
+      "The connected agent did not answer a turn before its call budget.",
+    hint: "Check the process for slow work, or raise the timeout on the decorated function.",
+  },
+  agent_call_failed: {
+    code: ScenarioInfraErrorCode.AgentCallFailed,
+    message: "The connected agent raised an error on a turn.",
+    hint: "The process logs carry the stack of the error the function raised.",
+  },
+  agent_disconnected: {
+    code: ScenarioInfraErrorCode.AgentDisconnected,
+    message:
+      "The connected agent instance disconnected while it was working on a turn.",
+    hint: "Start the process again, then run again. The turn was not sent twice.",
+  },
+  agent_instance_lost: {
+    code: ScenarioInfraErrorCode.AgentInstanceLost,
+    message:
+      "The instance this conversation was pinned to is no longer connected.",
+    hint: "Start the process again, then run again, or turn off sticky on the decorated function.",
+  },
+  agent_busy: {
+    code: ScenarioInfraErrorCode.AgentBusy,
+    message:
+      "Every instance of the connected agent stayed busy for the whole retry budget.",
+    hint: "Raise the concurrency on the decorated function, or connect more instances.",
+  },
+};
+
+function connectedAgentRules(): ClassificationRule[] {
+  return Object.entries(CONNECTED_AGENT_ENVELOPES).map(([code, envelope]) => ({
+    needles: [`Connected agent call failed (${code})`],
+    build: (text) => {
+      const remote = CONNECTED_CALL_FAILURE.exec(text)?.[2]?.trim();
+      // The function's own error is the whole point of agent_call_failed;
+      // for the other codes the relay's sentence and ours say the same thing.
+      const message =
+        code === "agent_call_failed" && remote
+          ? `The connected agent raised: ${remote.slice(0, MAX_GENERIC_MESSAGE_LENGTH)}`
+          : envelope.message;
+      return { code: envelope.code, message, hint: envelope.hint };
+    },
+  }));
+}
+
 const CLASSIFICATION_RULES: ClassificationRule[] = [
   {
     // Untrusted TLS certificate — the local-dev self-signed-cert case.
@@ -455,6 +526,11 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
       hint: "The agent or model may be taking too long to respond. Try again, or simplify the scenario.",
     }),
   },
+  // Connected agent failures. The child's adapter writes
+  // `Connected agent call failed (<code>): <message>`, so the code between
+  // the brackets is the classification and the message after it is what the
+  // customer reads: the relay's own sentence, or the function's own error.
+  ...connectedAgentRules(),
   {
     // A Cloudflare quick tunnel whose local `cloudflared` process ended: the
     // edge answers HTTP 530 with the "error code: 1033" body. Named here,
@@ -636,6 +712,18 @@ export function scenarioErrorTitle(code: ScenarioInfraErrorCode): string {
       return "Simulation runner unavailable";
     case ScenarioInfraErrorCode.AgentDevTunnelUnreachable:
       return "Local tunnel not responding";
+    case ScenarioInfraErrorCode.AgentOffline:
+      return "Connected agent not running";
+    case ScenarioInfraErrorCode.AgentCallTimeout:
+      return "Connected agent did not answer in time";
+    case ScenarioInfraErrorCode.AgentCallFailed:
+      return "Connected agent raised an error";
+    case ScenarioInfraErrorCode.AgentDisconnected:
+      return "Connected agent disconnected";
+    case ScenarioInfraErrorCode.AgentInstanceLost:
+      return "Pinned instance is gone";
+    case ScenarioInfraErrorCode.AgentBusy:
+      return "Connected agent busy";
     case ScenarioInfraErrorCode.Infra:
       return "Simulation failed";
     default: {

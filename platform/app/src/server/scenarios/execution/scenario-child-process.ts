@@ -34,6 +34,7 @@ import {
 } from "./model.factory";
 import { buildRemoteTraceRunConfig } from "./remote-trace-run-config";
 import { createAdapter } from "./serialized-adapter.registry";
+import { SerializedConnectedAgentAdapter } from "./serialized-adapters/connected-agent.adapter";
 import { type ChildProcessJobData, ChildProcessJobDataSchema } from "./types";
 
 const logger = createChildProcessLogger("langwatch:scenarios:child");
@@ -206,12 +207,24 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
 
   // Output JSON result to stdout for parent process to parse
   // Only stdout contains the JSON result; all other output goes to stderr
-  const outputResult: { success: boolean; reasoning?: string; error?: string } =
-    {
-      success: result.success,
-    };
+  const outputResult: {
+    success: boolean;
+    reasoning?: string;
+    error?: string;
+    agentInstance?: { hostname: string; label: string | null };
+  } = {
+    success: result.success,
+  };
   if (result.reasoning) {
     outputResult.reasoning = result.reasoning;
+  }
+  // The connected agent instance that answered the run's turns, for the
+  // parent's record of which process served the run.
+  if (
+    adapter instanceof SerializedConnectedAgentAdapter &&
+    adapter.servedInstance
+  ) {
+    outputResult.agentInstance = adapter.servedInstance;
   }
   process.stdout.write(JSON.stringify(outputResult) + "\n");
 }

@@ -229,6 +229,8 @@ export interface ChildProcessResult {
   success: boolean;
   error?: string;
   reasoning?: string;
+  /** The connected agent instance that answered the run, when one did. */
+  agentInstance?: { hostname: string; label: string | null };
 }
 
 /** Parse a single stdout line as the runner's result, or null if it isn't one. */
@@ -250,7 +252,20 @@ function parseResultLine(line: string): ChildProcessResult | null {
     ...(typeof record.reasoning === "string"
       ? { reasoning: record.reasoning }
       : {}),
+    ...(isAgentInstance(record.agentInstance)
+      ? { agentInstance: record.agentInstance }
+      : {}),
   };
+}
+
+function isAgentInstance(
+  value: unknown,
+): value is { hostname: string; label: string | null } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { hostname?: unknown }).hostname === "string"
+  );
 }
 
 /**
@@ -552,7 +567,11 @@ async function spawnScenarioChildProcess(
         return;
       }
 
-      log("info", "Scenario completed successfully", { exitCode: code });
+      const served = parseChildProcessResult(stdout)?.agentInstance;
+      log("info", "Scenario completed successfully", {
+        exitCode: code,
+        ...(served ? { agentInstance: served } : {}),
+      });
       resolve({ success: true });
     });
 

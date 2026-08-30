@@ -15,6 +15,11 @@ import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import { normalizeToSnakeCase } from "~/optimization_studio/components/properties/llm-configs/normalizeToSnakeCase";
+import type { ConnectedComponentConfig } from "~/optimization_studio/types/dsl";
+import {
+  DEFAULT_CALL_TIMEOUT_MS,
+  MAX_CALL_TIMEOUT_MS,
+} from "~/server/connected-agents/constants";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
 import { ModelNotConfiguredError } from "../../modelProviders/modelNotConfiguredError";
@@ -60,6 +65,7 @@ import {
   AuthConfigSchema,
   type ChildProcessJobData,
   type CodeAgentData,
+  type ConnectedAgentData,
   type ExecutionContext,
   type HttpAgentData,
   type LiteLLMParams,
@@ -658,11 +664,11 @@ export async function prefetchScenarioData({
     ? modelParamsResult.params
     : undefined;
 
-  // Only an http target's judge fetches remote traces, so only it needs a
-  // wait budget. The resolver degrades to a default on any failure, so this
+  // Only an http or a connected target's judge fetches remote traces, so
+  // only those need a wait budget. The resolver degrades to a default on any failure, so this
   // never fails the prefetch.
   const traceWaitTimeoutMs =
-    target.type === "http"
+    target.type === "http" || target.type === "connected"
       ? await deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs({
           projectId: context.projectId,
         })
@@ -813,6 +819,13 @@ async function fetchAgentData(
       deps.projectSecretsFetcher,
     );
   }
+  if (target.type === "connected") {
+    return fetchConnectedAgentData({
+      projectId,
+      agentId: target.referenceId,
+      fetcher: deps.agentFetcher,
+    });
+  }
   if (target.type === "workflow") {
     return fetchWorkflowAgentData({
       projectId,
@@ -910,6 +923,34 @@ async function fetchHttpAgentData({
     outputPath: config.outputPath,
     scenarioMappings: config.scenarioMappings,
     secrets,
+  };
+}
+
+/**
+ * The child reaches a connected agent through the relay route, so the job
+ * carries the agent id, where the platform is, and the per-call budget the
+ * agent declared, capped by the platform.
+ */
+async function fetchConnectedAgentData({
+  projectId,
+  agentId,
+  fetcher,
+}: {
+  projectId: string;
+  agentId: string;
+  fetcher: AgentFetcher;
+}): Promise<ConnectedAgentData | null> {
+  const agent = await fetcher.findById({ projectId, id: agentId });
+  if (agent?.type !== "connected") return null;
+  const config = agent.config as ConnectedComponentConfig;
+  return {
+    type: "connected",
+    agentId: agent.id,
+    endpoint: env.LANGWATCH_ENDPOINT,
+    timeoutMs: Math.min(
+      config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
+      MAX_CALL_TIMEOUT_MS,
+    ),
   };
 }
 
