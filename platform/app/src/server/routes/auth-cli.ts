@@ -41,7 +41,7 @@ import {
   RoutingPolicyHasNoProvidersError,
   type GovernanceService,
 } from "@langwatch/enterprise-governance-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import type { OrganizationApp } from "@langwatch/organization-server";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { z } from "zod";
@@ -840,12 +840,14 @@ secured.access(CLI_POLICY).post("/exchange", async (c: CliContext) => {
     // extra field.
     let personalProject: { id: string; slug: string; name: string; api_key: string } | undefined;
     try {
-      const workspace = await c.var.langwatchApp.organizations.ensurePersonalWorkspace({
-        userId: user.id,
-        organizationId: organization.id,
-        displayName: user.name,
-        displayEmail: user.email,
-      });
+      const workspace = await c.var.langwatchApp.organizations.ensurePersonalWorkspace(
+        {
+          organizationId: organization.id,
+          displayName: user.name,
+          displayEmail: user.email,
+        },
+        { id: user.id },
+      );
       personalProject = {
         id: workspace.project.id,
         slug: workspace.project.slug,
@@ -1263,10 +1265,10 @@ secured.access(CLI_POLICY).get("/budget/status", async (c: CliContext) => {
   // Resolve the user's personal workspace (team + project). If none
   // exists yet (first login, hasn't activated the CLI), nothing can be
   // over budget — return 200 and let the wrapper exec normally.
-  const workspace = await c.var.langwatchApp.organizations.tryFindPersonalWorkspace({
-    userId: tokenRecord.user_id,
-    organizationId: tokenRecord.organization_id,
-  });
+  const workspace = await c.var.langwatchApp.organizations.tryFindPersonalWorkspace(
+    { organizationId: tokenRecord.organization_id },
+    { id: tokenRecord.user_id },
+  );
   if (!workspace) return c.json({ ok: true }, 200);
 
   // Resolve the user's personal VK. Same graceful-fallback rationale —
@@ -1407,12 +1409,14 @@ secured.access(CLI_POLICY).get("/personal-project", async (c: CliContext) => {
     select: { name: true, email: true },
   });
   try {
-    const workspace = await c.var.langwatchApp.organizations.ensurePersonalWorkspace({
-      userId: tokenRecord.user_id,
-      organizationId: tokenRecord.organization_id,
-      displayName: user?.name,
-      displayEmail: user?.email,
-    });
+    const workspace = await c.var.langwatchApp.organizations.ensurePersonalWorkspace(
+      {
+        organizationId: tokenRecord.organization_id,
+        displayName: user?.name,
+        displayEmail: user?.email,
+      },
+      { id: tokenRecord.user_id },
+    );
     return c.json(
       {
         project: {
@@ -1596,7 +1600,12 @@ async function issuePersonalVirtualKey({
   deviceLabel,
 }: {
   service: GovernanceService;
-  organizations: OrganizationService;
+  /**
+   * Only the one write this needs, named structurally rather than as the whole
+   * service: the route hands it the app facade, which deliberately publishes a
+   * narrower surface than `OrganizationService` does.
+   */
+  organizations: Pick<OrganizationApp, "ensurePersonalWorkspace">;
   userId: string;
   organizationId: string;
   displayName?: string | null;
@@ -1614,12 +1623,10 @@ async function issuePersonalVirtualKey({
     if (!(err instanceof PersonalVirtualKeyAlreadyExistsError)) throw err;
   }
 
-  const workspace = await organizations.ensurePersonalWorkspace({
-    userId,
-    organizationId,
-    displayName,
-    displayEmail,
-  });
+  const workspace = await organizations.ensurePersonalWorkspace(
+    { organizationId, displayName, displayEmail },
+    { id: userId },
+  );
   const suffix = deviceLabel ?? randomBytes(3).toString("hex");
   return await service.personalVirtualKeyIssue({
     userId,
@@ -2623,12 +2630,14 @@ secured.access(cliApproveAuth).post("/approve", async (c: CliContext) => {
     // best-effort: a default that cannot be resolved must not fail the
     // login, it just completes without a scoped key.
     try {
-      await c.var.langwatchApp.organizations.ensurePersonalWorkspace({
-        userId: session.user.id,
-        organizationId: organization_id,
-        displayName: session.user.name,
-        displayEmail: session.user.email,
-      });
+      await c.var.langwatchApp.organizations.ensurePersonalWorkspace(
+        {
+          organizationId: organization_id,
+          displayName: session.user.name,
+          displayEmail: session.user.email,
+        },
+        { id: session.user.id },
+      );
     } catch (err) {
       logger.warn(
         { err, userId: session.user.id, organizationId: organization_id },

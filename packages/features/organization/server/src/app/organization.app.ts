@@ -52,7 +52,10 @@ import type {
   OrganizationTeam,
   OrganizationTeamAccess,
   OrganizationTeamWithMembers,
+  EnsuredPersonalWorkspace,
+  FindPersonalWorkspaceInput,
   PersonalFeatures,
+  PersonalWorkspace,
   PersonalWorkspaceFeaturesInput,
   RemoveOrganizationGroupBindingInput,
   RemoveOrganizationTeamMemberInput,
@@ -70,11 +73,7 @@ import type {
   TeamUser,
   User,
 } from "@langwatch/prisma-client/generated";
-import type {
-  PaginatedProjects,
-  Project,
-  ProjectService,
-} from "@langwatch/project-contract";
+import type { PaginatedProjects, Project, ProjectService } from "@langwatch/project-contract";
 
 // ---------------------------------------------------------------------------
 // The rows this application hands back
@@ -205,7 +204,8 @@ type OrganizationsAppService = Readonly<{
     organizationId: string;
     displayName?: string | null;
     displayEmail?: string | null;
-  }): Promise<unknown>;
+  }): Promise<EnsuredPersonalWorkspace>;
+  tryFindPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null>;
   updateTeamMemberRole(input: {
     teamId: string;
     userId: string;
@@ -412,8 +412,20 @@ export class OrganizationApp {
   ensurePersonalWorkspace(
     input: Omit<Parameters<OrganizationsAppService["ensurePersonalWorkspace"]>[0], "userId">,
     by: OrganizationCaller,
-  ): Promise<unknown> {
+  ): Promise<EnsuredPersonalWorkspace> {
     return this.dependencies.organizations.ensurePersonalWorkspace({ ...input, userId: by.id });
+  }
+
+  /**
+   * The caller's personal workspace in this organization, or `null` when they
+   * have none. The read half of `ensurePersonalWorkspace` above, for the
+   * callers that must not create one as a side effect of asking.
+   */
+  tryFindPersonalWorkspace(
+    input: Omit<FindPersonalWorkspaceInput, "userId">,
+    by: OrganizationCaller,
+  ): Promise<PersonalWorkspace | null> {
+    return this.dependencies.organizations.tryFindPersonalWorkspace({ ...input, userId: by.id });
   }
 
   /** Changes one member's role inside one team. */
