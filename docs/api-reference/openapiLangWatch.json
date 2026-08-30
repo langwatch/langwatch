@@ -2323,1208 +2323,150 @@
         ]
       }
     },
-    "/api/agents": {
-      "get": {
-        "operationId": "getApiAgents",
-        "description": "List all non-archived agents for the project (paginated)",
-        "responses": {},
-        "parameters": [
-          {
-            "in": "query",
-            "name": "page",
-            "schema": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "default": 1
-            }
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "schema": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 1000,
-              "default": 50
-            }
-          }
-        ],
-        "security": [
-          {
-            "project_api_key": []
-          }
-        ]
-      },
+    "/api/v1/agents/connect/register": {
       "post": {
-        "operationId": "postApiAgents",
-        "description": "Create a new agent",
-        "responses": {},
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255
-                  },
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "signature",
-                      "code",
-                      "workflow",
-                      "http",
-                      "connected"
-                    ],
-                    "description": "The kind of agent to write. A connected agent is registered from code by the SDK, so \"connected\" is refused with agent_register_only."
-                  },
-                  "config": {
-                    "type": "object",
-                    "additionalProperties": {}
-                  },
-                  "workflowId": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "name",
-                  "type",
-                  "config"
-                ]
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "project_api_key": []
-          }
-        ]
-      }
-    },
-    "/api/agents/{id}": {
-      "get": {
-        "operationId": "getApiAgentsById",
-        "description": "Get an agent by its id",
-        "responses": {},
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "id",
-            "required": true
-          }
-        ],
-        "security": [
-          {
-            "project_api_key": []
-          }
-        ]
-      },
-      "patch": {
-        "operationId": "patchApiAgentsById",
-        "description": "Update an agent by its id",
+        "operationId": "registerConnectedAgentInstance",
         "responses": {
           "200": {
-            "description": "Agent updated",
+            "description": "The instance is registered",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "type": {
-                      "type": "string",
-                      "enum": [
-                        "signature",
-                        "code",
-                        "workflow",
-                        "http",
-                        "connected"
-                      ],
-                      "description": "The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API."
-                    },
-                    "config": {
-                      "type": [
-                        "object",
-                        "null"
-                      ],
-                      "additionalProperties": {}
-                    },
-                    "environment": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "description": "The environment a connected agent registered with, for example production or development. Null for every other kind."
-                    },
-                    "ownerUserId": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "description": "The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared."
-                    },
-                    "hostLabel": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "description": "The machine a development agent registered from with a project or service key. Null when the agent is personal or shared."
-                    },
-                    "lastSeenAt": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "description": "When an instance of a connected agent was last connected. Null for every other kind."
-                    },
-                    "parameters": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "name": {
-                            "type": "string",
-                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-                            "minLength": 1,
-                            "maxLength": 64
-                          },
-                          "description": {
-                            "type": "string",
-                            "maxLength": 500
-                          },
-                          "defaultValue": {
-                            "anyOf": [
-                              {
-                                "type": "string",
-                                "maxLength": 4096
-                              },
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "boolean"
-                              }
-                            ]
-                          },
-                          "secret": {
-                            "type": "boolean"
-                          },
-                          "type": {
-                            "type": "string",
-                            "enum": [
-                              "string",
-                              "number",
-                              "boolean"
-                            ]
-                          },
-                          "options": {
-                            "type": "array",
-                            "items": {
-                              "anyOf": [
-                                {
-                                  "type": "string",
-                                  "maxLength": 4096
-                                },
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "boolean"
-                                }
-                              ]
-                            },
-                            "maxItems": 50
-                          },
-                          "required": {
-                            "type": "boolean"
-                          }
-                        },
-                        "required": [
-                          "name"
-                        ]
-                      },
-                      "description": "The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind."
-                    },
-                    "owner": {
-                      "type": [
-                        "object",
-                        "null"
-                      ],
-                      "properties": {
-                        "userId": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "userId",
-                        "name"
-                      ],
-                      "description": "The person a personal development agent belongs to. Null when the agent is shared or host-scoped."
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "online",
-                        "offline"
-                      ],
-                      "description": "online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind."
-                    },
-                    "instances": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "instanceId": {
-                            "type": "string"
-                          },
-                          "hostname": {
-                            "type": "string"
-                          },
-                          "username": {
-                            "type": "string"
-                          },
-                          "pid": {
-                            "type": "number"
-                          },
-                          "label": {
-                            "type": [
-                              "string",
-                              "null"
-                            ]
-                          },
-                          "sdk": {
-                            "type": "object",
-                            "properties": {
-                              "name": {
-                                "type": "string"
-                              },
-                              "version": {
-                                "type": "string"
-                              },
-                              "language": {
-                                "type": "string"
-                              }
-                            },
-                            "required": [
-                              "name",
-                              "version",
-                              "language"
-                            ]
-                          },
-                          "connectedAt": {
-                            "type": "string"
-                          },
-                          "inflight": {
-                            "type": "number"
-                          },
-                          "maxConcurrency": {
-                            "type": "number"
-                          }
-                        },
-                        "required": [
-                          "instanceId",
-                          "hostname",
-                          "username",
-                          "pid",
-                          "label",
-                          "sdk",
-                          "connectedAt",
-                          "inflight",
-                          "maxConcurrency"
-                        ]
-                      },
-                      "description": "The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind."
-                    },
-                    "createdAt": {
-                      "type": "string"
-                    },
-                    "updatedAt": {
-                      "type": "string"
-                    },
-                    "platformUrl": {
-                      "type": "string",
-                      "format": "uri"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "name",
-                    "type",
-                    "config",
-                    "environment",
-                    "ownerUserId",
-                    "hostLabel",
-                    "lastSeenAt",
-                    "parameters",
-                    "owner",
-                    "status",
-                    "instances",
-                    "createdAt",
-                    "updatedAt",
-                    "platformUrl"
-                  ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Agent not found in this project",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The request body does not match the expected shape",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255
-                  },
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "signature",
-                      "code",
-                      "workflow",
-                      "http",
-                      "connected"
-                    ],
-                    "description": "The kind of agent to write. A connected agent is registered from code by the SDK, so \"connected\" is refused with agent_register_only."
-                  },
-                  "config": {
-                    "type": "object",
-                    "additionalProperties": {}
-                  },
-                  "workflowId": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  }
-                }
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "id",
-            "required": true
-          }
-        ],
-        "security": [
-          {
-            "project_api_key": []
-          }
-        ]
-      },
-      "put": {
-        "operationId": "putApiAgentsById",
-        "description": "Update an agent by its id",
-        "responses": {
-          "200": {
-            "description": "Agent updated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "type": {
-                      "type": "string",
-                      "enum": [
-                        "signature",
-                        "code",
-                        "workflow",
-                        "http",
-                        "connected"
-                      ],
-                      "description": "The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API."
-                    },
-                    "config": {
-                      "type": [
-                        "object",
-                        "null"
-                      ],
-                      "additionalProperties": {}
-                    },
-                    "environment": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "description": "The environment a connected agent registered with, for example production or development. Null for every other kind."
-                    },
-                    "ownerUserId": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "description": "The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared."
-                    },
-                    "hostLabel": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "description": "The machine a development agent registered from with a project or service key. Null when the agent is personal or shared."
-                    },
-                    "lastSeenAt": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "description": "When an instance of a connected agent was last connected. Null for every other kind."
-                    },
-                    "parameters": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "name": {
-                            "type": "string",
-                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-                            "minLength": 1,
-                            "maxLength": 64
-                          },
-                          "description": {
-                            "type": "string",
-                            "maxLength": 500
-                          },
-                          "defaultValue": {
-                            "anyOf": [
-                              {
-                                "type": "string",
-                                "maxLength": 4096
-                              },
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "boolean"
-                              }
-                            ]
-                          },
-                          "secret": {
-                            "type": "boolean"
-                          },
-                          "type": {
-                            "type": "string",
-                            "enum": [
-                              "string",
-                              "number",
-                              "boolean"
-                            ]
-                          },
-                          "options": {
-                            "type": "array",
-                            "items": {
-                              "anyOf": [
-                                {
-                                  "type": "string",
-                                  "maxLength": 4096
-                                },
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "boolean"
-                                }
-                              ]
-                            },
-                            "maxItems": 50
-                          },
-                          "required": {
-                            "type": "boolean"
-                          }
-                        },
-                        "required": [
-                          "name"
-                        ]
-                      },
-                      "description": "The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind."
-                    },
-                    "owner": {
-                      "type": [
-                        "object",
-                        "null"
-                      ],
-                      "properties": {
-                        "userId": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "userId",
-                        "name"
-                      ],
-                      "description": "The person a personal development agent belongs to. Null when the agent is shared or host-scoped."
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "online",
-                        "offline"
-                      ],
-                      "description": "online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind."
-                    },
-                    "instances": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "instanceId": {
-                            "type": "string"
-                          },
-                          "hostname": {
-                            "type": "string"
-                          },
-                          "username": {
-                            "type": "string"
-                          },
-                          "pid": {
-                            "type": "number"
-                          },
-                          "label": {
-                            "type": [
-                              "string",
-                              "null"
-                            ]
-                          },
-                          "sdk": {
-                            "type": "object",
-                            "properties": {
-                              "name": {
-                                "type": "string"
-                              },
-                              "version": {
-                                "type": "string"
-                              },
-                              "language": {
-                                "type": "string"
-                              }
-                            },
-                            "required": [
-                              "name",
-                              "version",
-                              "language"
-                            ]
-                          },
-                          "connectedAt": {
-                            "type": "string"
-                          },
-                          "inflight": {
-                            "type": "number"
-                          },
-                          "maxConcurrency": {
-                            "type": "number"
-                          }
-                        },
-                        "required": [
-                          "instanceId",
-                          "hostname",
-                          "username",
-                          "pid",
-                          "label",
-                          "sdk",
-                          "connectedAt",
-                          "inflight",
-                          "maxConcurrency"
-                        ]
-                      },
-                      "description": "The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind."
-                    },
-                    "createdAt": {
-                      "type": "string"
-                    },
-                    "updatedAt": {
-                      "type": "string"
-                    },
-                    "platformUrl": {
-                      "type": "string",
-                      "format": "uri"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "name",
-                    "type",
-                    "config",
-                    "environment",
-                    "ownerUserId",
-                    "hostLabel",
-                    "lastSeenAt",
-                    "parameters",
-                    "owner",
-                    "status",
-                    "instances",
-                    "createdAt",
-                    "updatedAt",
-                    "platformUrl"
-                  ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Agent not found in this project",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The request body does not match the expected shape",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255
-                  },
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "signature",
-                      "code",
-                      "workflow",
-                      "http",
-                      "connected"
-                    ],
-                    "description": "The kind of agent to write. A connected agent is registered from code by the SDK, so \"connected\" is refused with agent_register_only."
-                  },
-                  "config": {
-                    "type": "object",
-                    "additionalProperties": {}
-                  },
-                  "workflowId": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  }
-                }
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "id",
-            "required": true
-          }
-        ],
-        "security": [
-          {
-            "project_api_key": []
-          }
-        ]
-      },
-      "delete": {
-        "operationId": "deleteApiAgentsById",
-        "description": "Archive an agent (soft-delete)",
-        "responses": {},
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "id",
-            "required": true
-          }
-        ],
-        "security": [
-          {
-            "project_api_key": []
-          }
-        ]
-      }
-    },
-    "/api/agents/{id}/test": {
-      "post": {
-        "operationId": "postApiAgentsByIdTest",
-        "description": "Run one scripted scenario against an agent: the user sends \"ping\", the agent answers, and the run succeeds when the answer arrives. No model is used and nothing is saved. Answers at once with the run ids; the run itself is asynchronous.",
-        "responses": {
-          "200": {
-            "description": "The test run is scheduled",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "scenarioRunId": {
-                      "type": "string",
-                      "description": "The run to follow; open it in the simulations run drawer."
-                    },
-                    "batchRunId": {
-                      "type": "string",
-                      "description": "The batch the run belongs to."
-                    },
-                    "setId": {
-                      "type": "string",
-                      "description": "The internal set that holds agent test runs."
-                    }
-                  },
-                  "required": [
-                    "scenarioRunId",
-                    "batchRunId",
-                    "setId"
-                  ]
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "The agent is a personal development agent of someone else"
-          },
-          "404": {
-            "description": "No agent with that id in this project"
-          },
-          "422": {
-            "description": "The agent cannot be tested as it is set up"
-          }
-        },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "id",
-            "required": true
-          }
-        ],
-        "security": [
-          {
-            "project_api_key": []
-          }
-        ]
-      }
-    },
-    "/api/agents/{id}/call": {
-      "post": {
-        "operationId": "postApiAgentsByIdCall",
-        "description": "Send one conversation turn to a connected agent and get its answer. The agent must be online: a process running the decorated function must be connected.",
-        "responses": {
-          "200": {
-            "description": "The agent answered",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "output": {
+                    "frame": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "type": "object",
+                          "properties": {
+                            "protocol": {
+                              "type": "number",
+                              "const": 1
+                            },
+                            "type": {
+                              "type": "string",
+                              "const": "registered"
+                            },
+                            "agents": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "environment": {
+                                    "type": "string"
+                                  },
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "url": {
+                                    "type": "string"
+                                  },
+                                  "parameterNotes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "name",
+                                  "environment",
+                                  "id",
+                                  "url",
+                                  "parameterNotes"
+                                ]
+                              }
+                            },
+                            "heartbeatIntervalMs": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0
+                            },
+                            "instanceId": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "protocol",
+                            "type",
+                            "agents",
+                            "heartbeatIntervalMs",
+                            "instanceId"
+                          ]
                         },
                         {
                           "type": "object",
                           "properties": {
-                            "role": {
+                            "protocol": {
+                              "type": "number",
+                              "const": 1
+                            },
+                            "type": {
                               "type": "string",
-                              "minLength": 1
+                              "const": "refused"
+                            },
+                            "code": {
+                              "type": "string",
+                              "enum": [
+                                "api_key_invalid",
+                                "project_required",
+                                "permission_denied",
+                                "key_type_not_allowed",
+                                "replica_count_unsupported",
+                                "parameters_invalid",
+                                "environment_invalid",
+                                "protocol_invalid"
+                              ]
+                            },
+                            "message": {
+                              "type": "string"
+                            },
+                            "meta": {
+                              "type": "object",
+                              "additionalProperties": {}
                             }
                           },
                           "required": [
-                            "role"
-                          ],
-                          "additionalProperties": true
-                        },
-                        {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "role": {
-                                "type": "string",
-                                "minLength": 1
-                              }
-                            },
-                            "required": [
-                              "role"
-                            ],
-                            "additionalProperties": true
-                          }
-                        }
-                      ],
-                      "description": "What the function answered: text, one message, or a list of messages."
-                    },
-                    "session": {
-                      "description": "The agent's per-conversation memory, to send on the next turn."
-                    },
-                    "instance": {
-                      "type": "object",
-                      "properties": {
-                        "hostname": {
-                          "type": "string"
-                        },
-                        "label": {
-                          "type": [
-                            "string",
-                            "null"
+                            "protocol",
+                            "type",
+                            "code",
+                            "message"
                           ]
                         }
-                      },
-                      "required": [
-                        "hostname",
-                        "label"
-                      ]
+                      ],
+                      "description": "The registered frame, or the refused frame with its reason."
                     },
-                    "durationMs": {
-                      "type": "number"
+                    "instanceToken": {
+                      "type": "string",
+                      "description": "The token the poll and frames endpoints are addressed with, in the X-Agent-Instance-Token header. Present when the register was accepted."
                     }
                   },
                   "required": [
-                    "output",
-                    "instance",
-                    "durationMs"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
+                    "frame"
                   ]
                 }
               }
             }
           },
           "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
+            "description": "The API key is not valid: a refused frame"
           },
-          "404": {
-            "description": "No connected agent with that id in this project"
+          "403": {
+            "description": "The key type or its permissions cannot connect an agent: a refused frame"
           },
           "422": {
-            "description": "Unprocessable Entity",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Every instance is busy; Retry-After says when to try again",
-            "headers": {
-              "Retry-After": {
-                "description": "How many seconds to wait before the turn is sent again. Rounded up from the wait the platform picked.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
+            "description": "The body is not a register frame, or an agent of it is not valid: a refused frame"
           },
           "503": {
-            "description": "No instance of the agent is connected"
+            "description": "The deployment runs several replicas without Redis: a refused frame"
           }
         },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "messages": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "role": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": [
-                        "role"
-                      ],
-                      "additionalProperties": true
-                    },
-                    "description": "The whole conversation so far, OpenAI style."
-                  },
-                  "newMessages": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "role": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": [
-                        "role"
-                      ],
-                      "additionalProperties": true
-                    },
-                    "description": "The messages added since the agent's last turn. Defaults to the last message."
-                  },
-                  "threadId": {
-                    "type": "string",
-                    "maxLength": 255,
-                    "description": "The conversation id. Turns of one conversation share it; a new id starts a new one."
-                  },
-                  "params": {
-                    "type": "object",
-                    "propertyNames": {
-                      "type": "string",
-                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
-                    },
-                    "additionalProperties": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "number"
-                        },
-                        {
-                          "type": "boolean"
-                        }
-                      ]
-                    },
-                    "description": "Run parameter values by name, as JSON scalars."
-                  },
-                  "session": {
-                    "description": "The session the agent returned on its previous turn of this conversation, echoed back as is."
-                  },
-                  "traceparent": {
-                    "type": "string",
-                    "maxLength": 255,
-                    "description": "The W3C trace context the agent adopts, so its spans join this turn's trace."
-                  },
-                  "run": {
-                    "type": "object",
-                    "properties": {
-                      "scenarioRunId": {
-                        "type": "string"
-                      },
-                      "scenarioName": {
-                        "type": "string"
-                      },
-                      "batchRunId": {
-                        "type": "string"
-                      }
-                    },
-                    "description": "The simulation run this turn belongs to, if any."
-                  }
-                },
-                "required": [
-                  "messages"
-                ]
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "id",
-            "required": true
-          }
+        "description": "Register the connected agents of a process over HTTP, for a network that blocks WebSockets. The body is the register frame of the connect protocol. Answers with the registered frame and the instance token the poll and frames endpoints are addressed with, or with a refused frame.",
+        "tags": [
+          "Agents"
         ],
-        "security": [
-          {
-            "project_api_key": []
-          }
-        ]
-      }
-    },
-    "/api/agents/connect/register": {
-      "post": {
-        "operationId": "postApiAgentsConnectRegister",
-        "description": "Register the connected agents of a process over HTTP, for a network that blocks WebSockets. The body is the register frame of the connect protocol. Answers with the registered frame and the instance token the poll and frames routes are addressed with, or with a refused frame.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3683,143 +2625,6 @@
             }
           }
         },
-        "responses": {
-          "200": {
-            "description": "The instance is registered",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "frame": {
-                      "anyOf": [
-                        {
-                          "type": "object",
-                          "properties": {
-                            "protocol": {
-                              "type": "number",
-                              "const": 1
-                            },
-                            "type": {
-                              "type": "string",
-                              "const": "registered"
-                            },
-                            "agents": {
-                              "type": "array",
-                              "items": {
-                                "type": "object",
-                                "properties": {
-                                  "name": {
-                                    "type": "string"
-                                  },
-                                  "environment": {
-                                    "type": "string"
-                                  },
-                                  "id": {
-                                    "type": "string"
-                                  },
-                                  "url": {
-                                    "type": "string"
-                                  },
-                                  "parameterNotes": {
-                                    "type": "array",
-                                    "items": {
-                                      "type": "string"
-                                    }
-                                  }
-                                },
-                                "required": [
-                                  "name",
-                                  "environment",
-                                  "id",
-                                  "url",
-                                  "parameterNotes"
-                                ]
-                              }
-                            },
-                            "heartbeatIntervalMs": {
-                              "type": "integer",
-                              "exclusiveMinimum": 0
-                            },
-                            "instanceId": {
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "protocol",
-                            "type",
-                            "agents",
-                            "heartbeatIntervalMs",
-                            "instanceId"
-                          ]
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "protocol": {
-                              "type": "number",
-                              "const": 1
-                            },
-                            "type": {
-                              "type": "string",
-                              "const": "refused"
-                            },
-                            "code": {
-                              "type": "string",
-                              "enum": [
-                                "api_key_invalid",
-                                "project_required",
-                                "permission_denied",
-                                "key_type_not_allowed",
-                                "replica_count_unsupported",
-                                "parameters_invalid",
-                                "environment_invalid",
-                                "protocol_invalid"
-                              ]
-                            },
-                            "message": {
-                              "type": "string"
-                            },
-                            "meta": {
-                              "type": "object",
-                              "additionalProperties": {}
-                            }
-                          },
-                          "required": [
-                            "protocol",
-                            "type",
-                            "code",
-                            "message"
-                          ]
-                        }
-                      ],
-                      "description": "The registered frame, or the refused frame with its reason."
-                    },
-                    "instanceToken": {
-                      "type": "string",
-                      "description": "The token the poll and frames routes are addressed with, in the X-Agent-Instance-Token header. Present when the register was accepted."
-                    }
-                  },
-                  "required": [
-                    "frame"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "The API key is not valid: a refused frame"
-          },
-          "403": {
-            "description": "The key type or its permissions cannot connect an agent: a refused frame"
-          },
-          "422": {
-            "description": "The body is not a register frame, or an agent of it is not valid: a refused frame"
-          },
-          "503": {
-            "description": "The deployment runs several replicas without Redis: a refused frame"
-          }
-        },
         "security": [
           {
             "project_api_key": []
@@ -3827,10 +2632,9 @@
         ]
       }
     },
-    "/api/agents/connect/poll": {
+    "/api/v1/agents/connect/poll": {
       "get": {
-        "operationId": "getApiAgentsConnectPoll",
-        "description": "Wait for the next call and cancel frames of a registered instance, up to 25 seconds, then answer with what is waiting or with an empty list. Each poll refreshes the instance presence, so a process that polls reads Online. Addressed with the instance token in the X-Agent-Instance-Token header.",
+        "operationId": "pollConnectedAgentInstance",
         "responses": {
           "200": {
             "description": "The frames waiting for the instance, possibly none",
@@ -3995,6 +2799,10 @@
             "description": "The instance token is not known; register the instance again"
           }
         },
+        "description": "Wait for the next call and cancel frames of a registered instance, up to 25 seconds, then answer with what is waiting or with an empty list. Each poll refreshes the instance presence, so a process that polls reads Online. Addressed with the instance token in the X-Agent-Instance-Token header.",
+        "tags": [
+          "Agents"
+        ],
         "security": [
           {
             "project_api_key": []
@@ -4002,10 +2810,43 @@
         ]
       }
     },
-    "/api/agents/connect/frames": {
+    "/api/v1/agents/connect/frames": {
       "post": {
-        "operationId": "postApiAgentsConnectFrames",
+        "operationId": "postConnectedAgentFrames",
+        "responses": {
+          "200": {
+            "description": "The frames were taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accepted": {
+                      "type": "integer",
+                      "description": "How many frames were taken."
+                    }
+                  },
+                  "required": [
+                    "accepted"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is not valid: a refused frame"
+          },
+          "410": {
+            "description": "The instance token is not known; register the instance again"
+          },
+          "422": {
+            "description": "A frame is not one the endpoint takes"
+          }
+        },
         "description": "Post the ack, result and deregister frames of a registered instance. Addressed with the instance token in the X-Agent-Instance-Token header.",
+        "tags": [
+          "Agents"
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -4163,34 +3004,1914 @@
             }
           }
         },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agents": {
+      "get": {
+        "operationId": "listAgents",
         "responses": {
           "200": {
-            "description": "The frames were taken",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "accepted": {
-                      "type": "integer",
-                      "description": "How many frames were taken."
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "signature",
+                              "code",
+                              "workflow",
+                              "http",
+                              "connected"
+                            ],
+                            "description": "The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API."
+                          },
+                          "config": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "additionalProperties": {}
+                          },
+                          "environment": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "The environment a connected agent registered with, for example production or development. Null for every other kind."
+                          },
+                          "ownerUserId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared."
+                          },
+                          "hostLabel": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "The machine a development agent registered from with a project or service key. Null when the agent is personal or shared."
+                          },
+                          "lastSeenAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "When an instance of a connected agent was last connected. Null for every other kind."
+                          },
+                          "parameters": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "description": {
+                                  "type": "string",
+                                  "maxLength": 500
+                                },
+                                "defaultValue": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 4096
+                                    },
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "boolean"
+                                    }
+                                  ]
+                                },
+                                "secret": {
+                                  "type": "boolean"
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "string",
+                                    "number",
+                                    "boolean"
+                                  ]
+                                },
+                                "options": {
+                                  "type": "array",
+                                  "items": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 4096
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      }
+                                    ]
+                                  },
+                                  "maxItems": 50
+                                },
+                                "required": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "name"
+                              ]
+                            },
+                            "description": "The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind."
+                          },
+                          "owner": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "properties": {
+                              "userId": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "userId",
+                              "name"
+                            ],
+                            "description": "The person a personal development agent belongs to. Null when the agent is shared or host-scoped."
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "online",
+                              "offline"
+                            ],
+                            "description": "online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind."
+                          },
+                          "instances": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "instanceId": {
+                                  "type": "string"
+                                },
+                                "hostname": {
+                                  "type": "string"
+                                },
+                                "username": {
+                                  "type": "string"
+                                },
+                                "pid": {
+                                  "type": "number"
+                                },
+                                "label": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "sdk": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "version": {
+                                      "type": "string"
+                                    },
+                                    "language": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "name",
+                                    "version",
+                                    "language"
+                                  ]
+                                },
+                                "connectedAt": {
+                                  "type": "string"
+                                },
+                                "inflight": {
+                                  "type": "number"
+                                },
+                                "maxConcurrency": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "instanceId",
+                                "hostname",
+                                "username",
+                                "pid",
+                                "label",
+                                "sdk",
+                                "connectedAt",
+                                "inflight",
+                                "maxConcurrency"
+                              ]
+                            },
+                            "description": "The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind."
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          },
+                          "platformUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "type",
+                          "config",
+                          "environment",
+                          "ownerUserId",
+                          "hostLabel",
+                          "lastSeenAt",
+                          "parameters",
+                          "owner",
+                          "status",
+                          "instances",
+                          "createdAt",
+                          "updatedAt",
+                          "platformUrl"
+                        ]
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "page",
+                        "limit",
+                        "total",
+                        "totalPages"
+                      ]
                     }
                   },
                   "required": [
-                    "accepted"
+                    "data",
+                    "pagination"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "List the project's agents, paginated, with the presence and owner of each connected agent. Archived agents are left out.",
+        "tags": [
+          "Agents"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "default": 50
+            }
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createAgent",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "signature",
+                        "code",
+                        "workflow",
+                        "http",
+                        "connected"
+                      ],
+                      "description": "The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API."
+                    },
+                    "config": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "additionalProperties": {}
+                    },
+                    "environment": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The environment a connected agent registered with, for example production or development. Null for every other kind."
+                    },
+                    "ownerUserId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared."
+                    },
+                    "hostLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The machine a development agent registered from with a project or service key. Null when the agent is personal or shared."
+                    },
+                    "lastSeenAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "When an instance of a connected agent was last connected. Null for every other kind."
+                    },
+                    "parameters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 500
+                          },
+                          "defaultValue": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 4096
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          },
+                          "secret": {
+                            "type": "boolean"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "string",
+                              "number",
+                              "boolean"
+                            ]
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 4096
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            "maxItems": 50
+                          },
+                          "required": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ]
+                      },
+                      "description": "The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind."
+                    },
+                    "owner": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "userId": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "userId",
+                        "name"
+                      ],
+                      "description": "The person a personal development agent belongs to. Null when the agent is shared or host-scoped."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "online",
+                        "offline"
+                      ],
+                      "description": "online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind."
+                    },
+                    "instances": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "instanceId": {
+                            "type": "string"
+                          },
+                          "hostname": {
+                            "type": "string"
+                          },
+                          "username": {
+                            "type": "string"
+                          },
+                          "pid": {
+                            "type": "number"
+                          },
+                          "label": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "sdk": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "string"
+                              },
+                              "language": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "version",
+                              "language"
+                            ]
+                          },
+                          "connectedAt": {
+                            "type": "string"
+                          },
+                          "inflight": {
+                            "type": "number"
+                          },
+                          "maxConcurrency": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "instanceId",
+                          "hostname",
+                          "username",
+                          "pid",
+                          "label",
+                          "sdk",
+                          "connectedAt",
+                          "inflight",
+                          "maxConcurrency"
+                        ]
+                      },
+                      "description": "The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind."
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "platformUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "type",
+                    "config",
+                    "environment",
+                    "ownerUserId",
+                    "hostLabel",
+                    "lastSeenAt",
+                    "parameters",
+                    "owner",
+                    "status",
+                    "instances",
+                    "createdAt",
+                    "updatedAt",
+                    "platformUrl"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Create an agent from a name, a type and the configuration of that type. A connected agent is registered from code by the SDK and answers 422 agent_register_only here.",
+        "tags": [
+          "Agents"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "signature",
+                      "code",
+                      "workflow",
+                      "http",
+                      "connected"
+                    ],
+                    "description": "The kind of agent to write. A connected agent is registered from code by the SDK, so \"connected\" is refused with agent_register_only."
+                  },
+                  "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  },
+                  "workflowId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "type",
+                  "config"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agents/{id}": {
+      "get": {
+        "operationId": "getAgent",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "signature",
+                        "code",
+                        "workflow",
+                        "http",
+                        "connected"
+                      ],
+                      "description": "The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API."
+                    },
+                    "config": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "additionalProperties": {}
+                    },
+                    "environment": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The environment a connected agent registered with, for example production or development. Null for every other kind."
+                    },
+                    "ownerUserId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared."
+                    },
+                    "hostLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The machine a development agent registered from with a project or service key. Null when the agent is personal or shared."
+                    },
+                    "lastSeenAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "When an instance of a connected agent was last connected. Null for every other kind."
+                    },
+                    "parameters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 500
+                          },
+                          "defaultValue": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 4096
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          },
+                          "secret": {
+                            "type": "boolean"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "string",
+                              "number",
+                              "boolean"
+                            ]
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 4096
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            "maxItems": 50
+                          },
+                          "required": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ]
+                      },
+                      "description": "The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind."
+                    },
+                    "owner": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "userId": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "userId",
+                        "name"
+                      ],
+                      "description": "The person a personal development agent belongs to. Null when the agent is shared or host-scoped."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "online",
+                        "offline"
+                      ],
+                      "description": "online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind."
+                    },
+                    "instances": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "instanceId": {
+                            "type": "string"
+                          },
+                          "hostname": {
+                            "type": "string"
+                          },
+                          "username": {
+                            "type": "string"
+                          },
+                          "pid": {
+                            "type": "number"
+                          },
+                          "label": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "sdk": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "string"
+                              },
+                              "language": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "version",
+                              "language"
+                            ]
+                          },
+                          "connectedAt": {
+                            "type": "string"
+                          },
+                          "inflight": {
+                            "type": "number"
+                          },
+                          "maxConcurrency": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "instanceId",
+                          "hostname",
+                          "username",
+                          "pid",
+                          "label",
+                          "sdk",
+                          "connectedAt",
+                          "inflight",
+                          "maxConcurrency"
+                        ]
+                      },
+                      "description": "The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind."
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "platformUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "type",
+                    "config",
+                    "environment",
+                    "ownerUserId",
+                    "hostLabel",
+                    "lastSeenAt",
+                    "parameters",
+                    "owner",
+                    "status",
+                    "instances",
+                    "createdAt",
+                    "updatedAt",
+                    "platformUrl"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Read one agent with its presence, its owner and the run parameters it declares. An id the project does not hold answers 404 agent_not_found.",
+        "tags": [
+          "Agents"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The agent id."
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "updateAgent",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "signature",
+                        "code",
+                        "workflow",
+                        "http",
+                        "connected"
+                      ],
+                      "description": "The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API."
+                    },
+                    "config": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "additionalProperties": {}
+                    },
+                    "environment": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The environment a connected agent registered with, for example production or development. Null for every other kind."
+                    },
+                    "ownerUserId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared."
+                    },
+                    "hostLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The machine a development agent registered from with a project or service key. Null when the agent is personal or shared."
+                    },
+                    "lastSeenAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "When an instance of a connected agent was last connected. Null for every other kind."
+                    },
+                    "parameters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 500
+                          },
+                          "defaultValue": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 4096
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          },
+                          "secret": {
+                            "type": "boolean"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "string",
+                              "number",
+                              "boolean"
+                            ]
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 4096
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            "maxItems": 50
+                          },
+                          "required": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ]
+                      },
+                      "description": "The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind."
+                    },
+                    "owner": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "userId": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "userId",
+                        "name"
+                      ],
+                      "description": "The person a personal development agent belongs to. Null when the agent is shared or host-scoped."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "online",
+                        "offline"
+                      ],
+                      "description": "online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind."
+                    },
+                    "instances": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "instanceId": {
+                            "type": "string"
+                          },
+                          "hostname": {
+                            "type": "string"
+                          },
+                          "username": {
+                            "type": "string"
+                          },
+                          "pid": {
+                            "type": "number"
+                          },
+                          "label": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "sdk": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "string"
+                              },
+                              "language": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "version",
+                              "language"
+                            ]
+                          },
+                          "connectedAt": {
+                            "type": "string"
+                          },
+                          "inflight": {
+                            "type": "number"
+                          },
+                          "maxConcurrency": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "instanceId",
+                          "hostname",
+                          "username",
+                          "pid",
+                          "label",
+                          "sdk",
+                          "connectedAt",
+                          "inflight",
+                          "maxConcurrency"
+                        ]
+                      },
+                      "description": "The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind."
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "platformUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "type",
+                    "config",
+                    "environment",
+                    "ownerUserId",
+                    "hostLabel",
+                    "lastSeenAt",
+                    "parameters",
+                    "owner",
+                    "status",
+                    "instances",
+                    "createdAt",
+                    "updatedAt",
+                    "platformUrl"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes only a new description; anything else answers 422 agent_register_only.",
+        "tags": [
+          "Agents"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The agent id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "signature",
+                      "code",
+                      "workflow",
+                      "http",
+                      "connected"
+                    ],
+                    "description": "The kind of agent to write. A connected agent is registered from code by the SDK, so \"connected\" is refused with agent_register_only."
+                  },
+                  "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  },
+                  "workflowId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
+      "put": {
+        "operationId": "replaceAgent",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "signature",
+                        "code",
+                        "workflow",
+                        "http",
+                        "connected"
+                      ],
+                      "description": "The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API."
+                    },
+                    "config": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "additionalProperties": {}
+                    },
+                    "environment": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The environment a connected agent registered with, for example production or development. Null for every other kind."
+                    },
+                    "ownerUserId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared."
+                    },
+                    "hostLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The machine a development agent registered from with a project or service key. Null when the agent is personal or shared."
+                    },
+                    "lastSeenAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "When an instance of a connected agent was last connected. Null for every other kind."
+                    },
+                    "parameters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 500
+                          },
+                          "defaultValue": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 4096
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          },
+                          "secret": {
+                            "type": "boolean"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "string",
+                              "number",
+                              "boolean"
+                            ]
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 4096
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            "maxItems": 50
+                          },
+                          "required": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ]
+                      },
+                      "description": "The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind."
+                    },
+                    "owner": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "userId": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "userId",
+                        "name"
+                      ],
+                      "description": "The person a personal development agent belongs to. Null when the agent is shared or host-scoped."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "online",
+                        "offline"
+                      ],
+                      "description": "online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind."
+                    },
+                    "instances": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "instanceId": {
+                            "type": "string"
+                          },
+                          "hostname": {
+                            "type": "string"
+                          },
+                          "username": {
+                            "type": "string"
+                          },
+                          "pid": {
+                            "type": "number"
+                          },
+                          "label": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "sdk": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "string"
+                              },
+                              "language": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "version",
+                              "language"
+                            ]
+                          },
+                          "connectedAt": {
+                            "type": "string"
+                          },
+                          "inflight": {
+                            "type": "number"
+                          },
+                          "maxConcurrency": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "instanceId",
+                          "hostname",
+                          "username",
+                          "pid",
+                          "label",
+                          "sdk",
+                          "connectedAt",
+                          "inflight",
+                          "maxConcurrency"
+                        ]
+                      },
+                      "description": "The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind."
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "platformUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "type",
+                    "config",
+                    "environment",
+                    "ownerUserId",
+                    "hostLabel",
+                    "lastSeenAt",
+                    "parameters",
+                    "owner",
+                    "status",
+                    "instances",
+                    "createdAt",
+                    "updatedAt",
+                    "platformUrl"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes only a new description; anything else answers 422 agent_register_only.",
+        "tags": [
+          "Agents"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The agent id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "signature",
+                      "code",
+                      "workflow",
+                      "http",
+                      "connected"
+                    ],
+                    "description": "The kind of agent to write. A connected agent is registered from code by the SDK, so \"connected\" is refused with agent_register_only."
+                  },
+                  "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  },
+                  "workflowId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "archiveAgent",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "signature",
+                        "code",
+                        "workflow",
+                        "http",
+                        "connected"
+                      ]
+                    },
+                    "archivedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "type",
+                    "archivedAt"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Archive an agent. It leaves the list and its runs stay. A connected agent that registers again restores its row.",
+        "tags": [
+          "Agents"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The agent id."
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agents/{id}/test": {
+      "post": {
+        "operationId": "testAgent",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scenarioRunId": {
+                      "type": "string",
+                      "description": "The run to follow; open it in the simulations run drawer."
+                    },
+                    "batchRunId": {
+                      "type": "string",
+                      "description": "The batch the run belongs to."
+                    },
+                    "setId": {
+                      "type": "string",
+                      "description": "The internal set that holds agent test runs."
+                    }
+                  },
+                  "required": [
+                    "scenarioRunId",
+                    "batchRunId",
+                    "setId"
                   ]
                 }
               }
             }
           },
-          "401": {
-            "description": "The API key is not valid: a refused frame"
+          "403": {
+            "description": "The agent is a personal development agent of someone else"
           },
-          "410": {
-            "description": "The instance token is not known; register the instance again"
+          "404": {
+            "description": "No agent with that id in this project"
           },
           "422": {
-            "description": "A frame is not one the route takes"
+            "description": "The agent cannot be tested as it is set up"
+          }
+        },
+        "description": "Run one scripted scenario against an agent: the user sends \"ping\", the agent answers, and the run succeeds when the answer arrives. No model is used and nothing is saved. Answers at once with the run ids; the run itself is asynchronous.",
+        "tags": [
+          "Agents"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The agent id."
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agents/{id}/call": {
+      "post": {
+        "operationId": "callConnectedAgent",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "output": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "role": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "role"
+                          ],
+                          "additionalProperties": true
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "role": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "role"
+                            ],
+                            "additionalProperties": true
+                          }
+                        }
+                      ],
+                      "description": "What the function answered: text, one message, or a list of messages."
+                    },
+                    "session": {
+                      "description": "The agent's per-conversation memory, to send on the next turn."
+                    },
+                    "instance": {
+                      "type": "object",
+                      "properties": {
+                        "hostname": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "hostname",
+                        "label"
+                      ]
+                    },
+                    "durationMs": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "output",
+                    "instance",
+                    "durationMs"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No connected agent with that id in this project"
+          },
+          "429": {
+            "description": "Every instance is busy; Retry-After says when to try again",
+            "headers": {
+              "Retry-After": {
+                "description": "How many seconds to wait before the turn is sent again. Rounded up from the wait the platform picked.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No instance of the agent is connected"
+          }
+        },
+        "description": "Send one conversation turn to a connected agent and get its answer. The agent must be online: a process running the decorated function must be connected.",
+        "tags": [
+          "Agents"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The connected agent id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "messages": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "role": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "role"
+                      ],
+                      "additionalProperties": true
+                    },
+                    "description": "The whole conversation so far, OpenAI style."
+                  },
+                  "newMessages": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "role": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "role"
+                      ],
+                      "additionalProperties": true
+                    },
+                    "description": "The messages added since the agent's last turn. Defaults to the last message."
+                  },
+                  "threadId": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "description": "The conversation id. Turns of one conversation share it; a new id starts a new one."
+                  },
+                  "params": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    },
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    },
+                    "description": "Run parameter values by name, as JSON scalars."
+                  },
+                  "session": {
+                    "description": "The session the agent returned on its previous turn of this conversation, echoed back as is."
+                  },
+                  "traceparent": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "description": "The W3C trace context the agent adopts, so its spans join this turn's trace."
+                  },
+                  "run": {
+                    "type": "object",
+                    "properties": {
+                      "scenarioRunId": {
+                        "type": "string"
+                      },
+                      "scenarioName": {
+                        "type": "string"
+                      },
+                      "batchRunId": {
+                        "type": "string"
+                      }
+                    },
+                    "description": "The simulation run this turn belongs to, if any."
+                  }
+                },
+                "required": [
+                  "messages"
+                ]
+              }
+            }
           }
         },
         "security": [

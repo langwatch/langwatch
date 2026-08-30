@@ -13,6 +13,7 @@
  */
 import { createService } from "@langwatch/api";
 import type { AuthzPermission } from "@langwatch/authz";
+import type { MiddlewareHandler } from "hono";
 import { appContextMiddleware } from "~/app/api/middleware/app-context";
 import {
   canonicalAuthMiddleware,
@@ -53,17 +54,23 @@ export type ProjectEndpointMeta = ServiceEndpointMeta;
 export function createProjectService({
   name,
   basePath,
+  middleware = [],
 }: {
   name: string;
   /** Spelled out at the call site so the route-coverage gate can read it. */
   basePath: string;
+  /**
+   * Middleware every request of the family runs after the app context is set,
+   * for example the deprecation headers of an alias family.
+   */
+  middleware?: MiddlewareHandler[];
 }) {
   const family = familyFromBasePath(basePath);
 
   const service = createService<Project>({
     name,
     basePath,
-    middleware: [appContextMiddleware],
+    middleware: [appContextMiddleware, ...middleware],
     auth: canonicalAuthMiddleware,
     // The framework mounts this for every endpoint that declares a
     // `permission`, between auth and the endpoint's own middleware, so an

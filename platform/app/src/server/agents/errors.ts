@@ -25,12 +25,18 @@ export class AgentTestRefusedError extends HandledError {
 }
 
 /**
- * Domain error thrown when an agent cannot be found.
- * The route handler translates this to a 404 HTTP response.
+ * No agent with that id in the project. A caller can act on it: check the
+ * id, or list the project's agents. Answers 404 at every boundary.
  */
-export class AgentNotFoundError extends Error {
+export class AgentNotFoundError extends HandledError {
+  declare readonly code: "agent_not_found";
+
   constructor(message = "Agent not found") {
-    super(message);
+    super("agent_not_found", message, {
+      httpStatus: 404,
+      fault: "customer",
+      ...remediation("agent_not_found"),
+    });
     this.name = "AgentNotFoundError";
   }
 }

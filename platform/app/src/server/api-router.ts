@@ -8,6 +8,7 @@ import { app as webhooksApp } from "@ee/scim/webhooks";
 import { Hono } from "hono";
 import { app as adminApp } from "../../ee/admin/routes/admin";
 import { app as agentCacheApp } from "../app/api/agent-cache/[[...route]]/app";
+import { app as agentsAliasApp } from "../app/api/agents/[[...route]]/alias";
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
 import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";
@@ -51,8 +52,6 @@ import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as userAvatarApp } from "../app/api/user-avatar/[[...route]]/app";
 import { app as webhookPlatformApp } from "../app/api/webhooks/[[...route]]/app";
 import { app as workflowsCrudApp } from "../app/api/workflows/[[...route]]/app";
-import { app as connectedAgentLongPollApp } from "./connected-agents/long-poll.route";
-import { app as connectedAgentRelayApp } from "./connected-agents/relay.route";
 import { app as annotationsApp } from "./routes/annotations";
 import { app as apiDiscoveryApp } from "./routes/api-discovery";
 import { app as authApp } from "./routes/auth";
@@ -116,12 +115,8 @@ export function createApiRouter() {
   api.route("/", workflowsApp); // /api/workflows/code-completion, /post_event
   api.route("/", healthChecksApp); // /api/health/collector, /evaluations, etc.
 
-  // The relay and long-poll routes are mounted before the agents family:
-  // all serve /api/agents/..., and the family's /:id verbs must not shadow
-  // /:id/call or /connect/*.
-  api.route("/", connectedAgentLongPollApp);
-  api.route("/", connectedAgentRelayApp);
-  api.route("/", agentsApp);
+  api.route("/", agentsApp); // /api/v1/agents, connect and call included
+  api.route("/", agentsAliasApp); // deprecated alias: /api/agents
   api.route("/", analyticsApp);
   api.route("/", analyticsSqlApp); // /api/v1/projects/:projectId/analytics/* — governed SQL
   api.route("/", copilotKitApp);

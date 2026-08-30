@@ -103,7 +103,7 @@ Feature: Test agent with one scripted run
 
     @integration
     Scenario: The REST route schedules the same run
-      When "POST /api/agents/:id/test" is called with a project key
+      When "POST /api/v1/agents/:id/test" is called with a project key
       Then the answer carries the scenario run id and the batch run id
 
   # ---------------------------------------------------------------------------

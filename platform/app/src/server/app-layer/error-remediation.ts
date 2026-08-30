@@ -356,6 +356,13 @@ const registry = {
     ],
     docsPath: "/agent-simulations/scenario-parameters",
   },
+  agent_not_found: {
+    tips: [
+      "List the project's agents with `langwatch agent list` and use an id from that list",
+      "An archived agent is not found; a connected agent that registers again restores its row",
+    ],
+    docsPath: "/agent-simulations/connect-your-agent",
+  },
   agent_offline: {
     tips: [
       "Start the process that runs the decorated function; the agent shows Online in the agents list once it connects",
@@ -415,7 +422,7 @@ const registry = {
   },
   agent_session_unknown: {
     tips: [
-      "Post a new register frame to /api/agents/connect/register and use the instance token it answers with",
+      "Post a new register frame to /api/v1/agents/connect/register and use the instance token it answers with",
       "A session expires five minutes after its last poll",
     ],
     docsPath: "/agent-simulations/connect-your-agent",

@@ -259,8 +259,8 @@ Feature: Python SDK connect_agent decorator
   @unit
   Scenario: The socket URL is derived from the configured endpoint
     Given the endpoint https://app.langwatch.ai
-    Then the socket URL is wss://app.langwatch.ai/api/agents/connect
-    And http://localhost:5560 becomes ws://localhost:5560/api/agents/connect
+    Then the socket URL is wss://app.langwatch.ai/api/v1/agents/connect
+    And http://localhost:5560 becomes ws://localhost:5560/api/v1/agents/connect
 
   @unit
   Scenario: The connection carries the API key and the SDK version
@@ -356,9 +356,9 @@ Feature: Python SDK connect_agent decorator
   Scenario: The transport option selects HTTP long polling
     Given connect_agent(transport="http")
     When the client starts
-    Then it posts the register frame to /api/agents/connect/register with the API key
-    And it polls /api/agents/connect/poll with the instance token
-    And a call answered by the poll is acked and answered by a POST to /api/agents/connect/frames
+    Then it posts the register frame to /api/v1/agents/connect/register with the API key
+    And it polls /api/v1/agents/connect/poll with the instance token
+    And a call answered by the poll is acked and answered by a POST to /api/v1/agents/connect/frames
 
   @unit
   Scenario: LANGWATCH_AGENT_TRANSPORT selects the transport

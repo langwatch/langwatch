@@ -7,7 +7,7 @@ Feature: The agent commands show connected agents and run them through the relay
   # A connected agent registers itself from code (connectAgent in TypeScript,
   # connect_agent in Python). The platform reports its environment, its
   # status, its instances, its owner and the parameters it declared, and the
-  # relay route POST /api/agents/:id/call runs one turn on a live instance.
+  # relay route POST /api/v1/agents/:id/call runs one turn on a live instance.
   # See dev/docs/adr/128-connected-agents.md.
 
   Rule: The list shows where each agent runs and whether it is online

@@ -64359,10 +64359,10 @@ LangEvals and NLP make outbound calls to external LLM providers (OpenAI, Azure, 
 
 A [connected agent](/agent-simulations/connect-your-agent) is the customer's own process holding an outbound WebSocket to the App. Three requirements:
 
-- **WebSocket upgrade on `/api/agents/connect`.** The App serves it on its normal HTTP listener, next to `/api/trpc-ws`. An ingress that already passes `/api/trpc-ws` needs no change; one that terminates or rewrites upgrades must pass this path through.
+- **WebSocket upgrade on `/api/v1/agents/connect`.** The App serves it on its normal HTTP listener, next to `/api/trpc-ws`. An ingress that already passes `/api/trpc-ws` needs no change; one that terminates or rewrites upgrades must pass this path through.
 - **A read timeout above 15 seconds.** The App pings every 15 seconds to keep the connection alive. A shorter idle timeout closes the connection between pings, and the agent flaps between Online and Offline. The `access-ingress.yaml` overlay sets `proxy-read-timeout: 120`.
 - **Outbound WSS from the customer's side.** The process that runs the agent opens `wss://` to your App's public hostname. The customer's side opens no listening port and needs no inbound rule.
-- **HTTP long polling for a network that blocks WebSockets.** The same frames also travel over `POST /api/agents/connect/register`, `GET /api/agents/connect/poll` and `POST /api/agents/connect/frames`. A poll is held open for up to 25 seconds, so the ingress read timeout must be above that; the `proxy-read-timeout: 120` above covers it. The SDK switches to this path on its own when a proxy answers the upgrade with an HTTP status, or from the start with `LANGWATCH_AGENT_TRANSPORT=http`.
+- **HTTP long polling for a network that blocks WebSockets.** The same frames also travel over `POST /api/v1/agents/connect/register`, `GET /api/v1/agents/connect/poll` and `POST /api/v1/agents/connect/frames`. A poll is held open for up to 25 seconds, so the ingress read timeout must be above that; the `proxy-read-timeout: 120` above covers it. The SDK switches to this path on its own when a proxy answers the upgrade with an HTTP status, or from the start with `LANGWATCH_AGENT_TRANSPORT=http`.
 
 Redis is required for more than one App replica. Instance presence and call dispatch live in Redis; without it the registry is in memory, correct for one replica only, and the App refuses a connection when `LANGWATCH_APP_REPLICAS` is above 1. That variable defaults to `1`, and Helm scales the App with `app.replicaCount` on its own, so a Helm deployment must set `LANGWATCH_APP_REPLICAS` to the same value as `app.replicaCount`. If the two values differ, several replicas run the in-memory registry with no Redis, and an agent connected to one pod reads as Offline on the others.
 
@@ -67768,7 +67768,7 @@ openapi: "PUT /api/agent-cache/{name}"
 
 ---
 title: "Create Call"
-openapi: "POST /api/agents/{id}/call"
+openapi: "POST /api/v1/agents/{id}/call"
 ---
 
 ---
@@ -67777,7 +67777,7 @@ openapi: "POST /api/agents/{id}/call"
 
 ---
 title: "Create Test"
-openapi: "POST /api/agents/{id}/test"
+openapi: "POST /api/v1/agents/{id}/test"
 ---
 
 ---
@@ -67785,8 +67785,8 @@ openapi: "POST /api/agents/{id}/test"
 # FILE: ./api-reference/agents/create-agents.mdx
 
 ---
-title: "Create a new agent"
-openapi: "POST /api/agents"
+title: "Create Agents"
+openapi: "POST /api/v1/agents"
 ---
 
 ---
@@ -67795,7 +67795,7 @@ openapi: "POST /api/agents"
 
 ---
 title: "Create Frames"
-openapi: "POST /api/agents/connect/frames"
+openapi: "POST /api/v1/agents/connect/frames"
 ---
 
 ---
@@ -67804,7 +67804,7 @@ openapi: "POST /api/agents/connect/frames"
 
 ---
 title: "Create Register"
-openapi: "POST /api/agents/connect/register"
+openapi: "POST /api/v1/agents/connect/register"
 ---
 
 ---
@@ -67813,7 +67813,7 @@ openapi: "POST /api/agents/connect/register"
 
 ---
 title: "Archive an agent"
-openapi: "DELETE /api/agents/{id}"
+openapi: "DELETE /api/v1/agents/{id}"
 ---
 
 ---
@@ -67821,8 +67821,8 @@ openapi: "DELETE /api/agents/{id}"
 # FILE: ./api-reference/agents/get-agents.mdx
 
 ---
-title: "Get an agent by its id"
-openapi: "GET /api/agents/{id}"
+title: "Get Agents"
+openapi: "GET /api/v1/agents/{id}"
 ---
 
 ---
@@ -67830,8 +67830,8 @@ openapi: "GET /api/agents/{id}"
 # FILE: ./api-reference/agents/list-agents.mdx
 
 ---
-title: "List all non-archived agents for the project"
-openapi: "GET /api/agents"
+title: "List Agents"
+openapi: "GET /api/v1/agents"
 ---
 
 ---
@@ -67840,7 +67840,7 @@ openapi: "GET /api/agents"
 
 ---
 title: "List Poll"
-openapi: "GET /api/agents/connect/poll"
+openapi: "GET /api/v1/agents/connect/poll"
 ---
 
 ---
@@ -67861,8 +67861,8 @@ Manage AI agent configurations. Create, update, and organize agents that are tra
 # FILE: ./api-reference/agents/put-update-agents.mdx
 
 ---
-title: "Update an agent by its id"
-openapi: "PUT /api/agents/{id}"
+title: "Update Agents"
+openapi: "PUT /api/v1/agents/{id}"
 ---
 
 ---
@@ -67870,8 +67870,8 @@ openapi: "PUT /api/agents/{id}"
 # FILE: ./api-reference/agents/update-agents.mdx
 
 ---
-title: "Update an agent by its id"
-openapi: "PATCH /api/agents/{id}"
+title: "Update Agents"
+openapi: "PATCH /api/v1/agents/{id}"
 ---
 
 ---

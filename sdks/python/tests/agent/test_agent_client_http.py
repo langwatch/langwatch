@@ -83,7 +83,7 @@ class FakeHttpPlatform:
         while True:
             remaining = deadline - asyncio.get_running_loop().time()
             request = await asyncio.wait_for(self.requests.get(), max(remaining, 0.01))
-            if request.path == "/api/agents/connect/frames" and any(
+            if request.path == "/api/v1/agents/connect/frames" and any(
                 f.get("type") == kind for f in (request.json or {}).get("frames", [])
             ):
                 return request
@@ -128,7 +128,7 @@ class FakeHttpPlatform:
             writer.close()
 
     async def _answer(self, request: Request) -> tuple[int, dict[str, Any]]:
-        if request.path == "/api/agents/connect/register":
+        if request.path == "/api/v1/agents/connect/register":
             register = request.json or {}
             self._tokens += 1
             return 200, {
@@ -150,7 +150,7 @@ class FakeHttpPlatform:
                 },
                 "instanceToken": f"ait_{self._tokens}",
             }
-        if request.path.startswith("/api/agents/connect/poll"):
+        if request.path.startswith("/api/v1/agents/connect/poll"):
             if self.poll_status != 200:
                 # One refusal only. A second one would make the client register
                 # a third time, and which register the next request carries the
@@ -172,7 +172,7 @@ class FakeHttpPlatform:
                 if waiting in self._waiting:
                     self._waiting.remove(waiting)
             return 200, {"frames": frames}
-        if request.path == "/api/agents/connect/frames":
+        if request.path == "/api/v1/agents/connect/frames":
             return 200, {"accepted": len((request.json or {}).get("frames", []))}
         return 404, {"error": "not found"}
 
@@ -219,7 +219,7 @@ async def test_http_transport_registers_polls_and_answers_by_post():
         client = make_client(platform, transport="http", project_id="proj_1")
         client.register_agent(echo_agent())
         try:
-            register = await platform.expect("/api/agents/connect/register")
+            register = await platform.expect("/api/v1/agents/connect/register")
             assert register.method == "POST"
             assert register.headers["authorization"] == "Bearer sk-lw-test-key"
             assert register.headers["x-project-id"] == "proj_1"
@@ -230,7 +230,7 @@ async def test_http_transport_registers_polls_and_answers_by_post():
             assert client.transport == "http"
             assert platform.upgrades == 0
 
-            poll = await platform.expect("/api/agents/connect/poll")
+            poll = await platform.expect("/api/v1/agents/connect/poll")
             assert poll.method == "GET"
             assert poll.headers["x-agent-instance-token"] == "ait_1"
             assert poll.headers["authorization"] == "Bearer sk-lw-test-key"
@@ -267,7 +267,7 @@ async def test_transport_variable_selects_http(monkeypatch):
     assert resolve_transport() == "websocket"
     assert resolve_transport("auto") == "websocket"
     assert http_url("https://app.langwatch.ai/") == (
-        "https://app.langwatch.ai/api/agents/connect"
+        "https://app.langwatch.ai/api/v1/agents/connect"
     )
 
     monkeypatch.setenv("LANGWATCH_AGENT_TRANSPORT", "http")
@@ -275,7 +275,7 @@ async def test_transport_variable_selects_http(monkeypatch):
         client = make_client(platform)
         client.register_agent(echo_agent())
         try:
-            await platform.expect("/api/agents/connect/register")
+            await platform.expect("/api/v1/agents/connect/register")
             assert client.wait_registered(5.0)
             assert client.transport == "http"
             assert platform.upgrades == 0
@@ -290,7 +290,7 @@ async def test_refused_upgrade_falls_back_to_http_with_one_warning(caplog):
         client = make_client(platform)
         client.register_agent(echo_agent())
         try:
-            register = await platform.expect("/api/agents/connect/register")
+            register = await platform.expect("/api/v1/agents/connect/register")
             assert register.method == "POST"
             assert client.wait_registered(5.0)
             assert platform.upgrades == 1
@@ -323,13 +323,13 @@ async def test_session_unknown_registers_again_with_in_flight_ids():
         client = make_client(platform, transport="http")
         client.register_agent(ConnectedAgent(slow, name="slow", environment="development"))
         try:
-            await platform.expect("/api/agents/connect/register")
+            await platform.expect("/api/v1/agents/connect/register")
             assert client.wait_registered(5.0)
             platform.deliver(call_frame("agent_slow", "call-slow"))
             await platform.expect_frame("ack")
 
             platform.poll_status = 410
-            again = await platform.expect("/api/agents/connect/register")
+            again = await platform.expect("/api/v1/agents/connect/register")
             assert again.json is not None
             assert again.json["instance"]["inFlightCallIds"] == ["call-slow"]
             release.set()
@@ -346,9 +346,9 @@ async def test_stop_posts_deregister_over_http():
         client = make_client(platform, transport="http")
         client.register_agent(echo_agent())
         try:
-            await platform.expect("/api/agents/connect/register")
+            await platform.expect("/api/v1/agents/connect/register")
             assert client.wait_registered(5.0)
-            await platform.expect("/api/agents/connect/poll")
+            await platform.expect("/api/v1/agents/connect/poll")
         finally:
             await asyncio.to_thread(client.stop)
         deregister = await platform.expect_frame("deregister")

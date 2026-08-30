@@ -132,10 +132,10 @@ describe("buildInstance()", () => {
 
 describe("resolveConnectUrl()", () => {
   /** @scenario "The connect URL is derived from the endpoint" */
-  it("turns https into wss and http into ws, on /api/agents/connect", () => {
-    expect(resolveConnectUrl("https://app.langwatch.ai")).toBe("wss://app.langwatch.ai/api/agents/connect");
-    expect(resolveConnectUrl("http://localhost:5560")).toBe("ws://localhost:5560/api/agents/connect");
-    expect(resolveConnectUrl("http://localhost:5560/")).toBe("ws://localhost:5560/api/agents/connect");
+  it("turns https into wss and http into ws, on /api/v1/agents/connect", () => {
+    expect(resolveConnectUrl("https://app.langwatch.ai")).toBe("wss://app.langwatch.ai/api/v1/agents/connect");
+    expect(resolveConnectUrl("http://localhost:5560")).toBe("ws://localhost:5560/api/v1/agents/connect");
+    expect(resolveConnectUrl("http://localhost:5560/")).toBe("ws://localhost:5560/api/v1/agents/connect");
   });
 });
 

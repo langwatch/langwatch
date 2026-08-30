@@ -506,10 +506,10 @@ function createMockServer(): Server {
         res.end(JSON.stringify(CANNED_MODEL_PROVIDER_SET));
       }
       // --- Agent endpoints ---
-      else if (url === "/api/agents" && method === "GET") {
+      else if (url === "/api/v1/agents" && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_AGENTS_LIST));
-      } else if (url === "/api/agents" && method === "POST") {
+      } else if (url === "/api/v1/agents" && method === "POST") {
         res.writeHead(201);
         res.end(JSON.stringify(CANNED_AGENT_DETAIL));
       } else if (url?.match(/^\/api\/agents\/[^/]+$/) && method === "GET") {

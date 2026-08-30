@@ -1,5 +1,5 @@
 /**
- * The socket side of connected agents: `GET /api/agents/connect` upgrades,
+ * The socket side of connected agents: `GET /api/v1/agents/connect` upgrades,
  * authenticates, registers the process's agents and holds the socket for
  * every call the dispatcher writes for its instance (ADR-128, "Transport").
  *
@@ -39,7 +39,7 @@ import type { Unsubscribe } from "./state-store";
 
 const logger = createLogger("langwatch:connected-agents:gateway");
 
-export const CONNECT_PATH = "/api/agents/connect";
+export const CONNECT_PATH = "/api/v1/agents/connect";
 
 /** Close code for a service restart: the SDK reconnects at once. */
 const SERVICE_RESTART_CLOSE_CODE = 1012;

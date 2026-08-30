@@ -69,7 +69,7 @@ export interface AgentCallMessage {
   [key: string]: unknown;
 }
 
-/** The body `POST /api/agents/:id/call` takes. */
+/** The body `POST /api/v1/agents/:id/call` takes. */
 export interface AgentCallBody {
   messages: AgentCallMessage[];
   newMessages?: AgentCallMessage[];
@@ -95,13 +95,13 @@ export async function listAgents(params?: {
   if (params?.page) query.set("page", String(params.page));
   if (params?.limit) query.set("limit", String(params.limit));
   const qs = query.toString() ? `?${query}` : "";
-  return makeRequest("GET", `/api/agents${qs}`) as Promise<AgentListResponse>;
+  return makeRequest("GET", `/api/v1/agents${qs}`) as Promise<AgentListResponse>;
 }
 
 export async function getAgent(id: string): Promise<AgentSummary> {
   return makeRequest(
     "GET",
-    `/api/agents/${encodeURIComponent(id)}`,
+    `/api/v1/agents/${encodeURIComponent(id)}`,
   ) as Promise<AgentSummary>;
 }
 
@@ -110,7 +110,7 @@ export async function createAgent(data: {
   type: string;
   config: Record<string, unknown>;
 }): Promise<AgentSummary> {
-  return makeRequest("POST", "/api/agents", data) as Promise<AgentSummary>;
+  return makeRequest("POST", "/api/v1/agents", data) as Promise<AgentSummary>;
 }
 
 export async function updateAgent(params: {
@@ -122,7 +122,7 @@ export async function updateAgent(params: {
   const { id, ...data } = params;
   return makeRequest(
     "PATCH",
-    `/api/agents/${encodeURIComponent(id)}`,
+    `/api/v1/agents/${encodeURIComponent(id)}`,
     data,
   ) as Promise<AgentSummary>;
 }
@@ -140,12 +140,12 @@ export async function callAgent({
 }): Promise<AgentCallResponse> {
   return makeRequest(
     "POST",
-    `/api/agents/${encodeURIComponent(id)}/call`,
+    `/api/v1/agents/${encodeURIComponent(id)}/call`,
     body,
   ) as Promise<AgentCallResponse>;
 }
 
-/** The ids `POST /api/agents/:id/test` answers with. */
+/** The ids `POST /api/v1/agents/:id/test` answers with. */
 export interface AgentTestRunResponse {
   scenarioRunId: string;
   batchRunId: string;
@@ -160,7 +160,7 @@ export interface AgentTestRunResponse {
 export async function testAgent(id: string): Promise<AgentTestRunResponse> {
   return makeRequest(
     "POST",
-    `/api/agents/${encodeURIComponent(id)}/test`,
+    `/api/v1/agents/${encodeURIComponent(id)}/test`,
     {},
   ) as Promise<AgentTestRunResponse>;
 }
@@ -279,6 +279,6 @@ export async function runAgent({
 export async function deleteAgent(id: string): Promise<{ id: string; name: string }> {
   return makeRequest(
     "DELETE",
-    `/api/agents/${encodeURIComponent(id)}`,
+    `/api/v1/agents/${encodeURIComponent(id)}`,
   ) as Promise<{ id: string; name: string }>;
 }

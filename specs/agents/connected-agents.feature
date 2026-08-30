@@ -4,7 +4,7 @@ Feature: Connected agents
   So that simulations reach my running process without a public URL
 
   # A connected agent is an Agent row of type "connected". The SDK opens an
-  # outbound WebSocket to /api/agents/connect, registers the agents of the
+  # outbound WebSocket to /api/v1/agents/connect, registers the agents of the
   # process, and receives simulation turns over that socket. The platform
   # shows the agent Online while at least one instance is connected. The
   # same frames also travel over HTTP long polling for a process whose
@@ -521,11 +521,11 @@ Feature: Connected agents
 
   Rule: The same frames travel over HTTP long polling
 
-    # POST /api/agents/connect/register takes the register frame and answers
+    # POST /api/v1/agents/connect/register takes the register frame and answers
     # with the registered frame and an instance token. GET
-    # /api/agents/connect/poll waits up to the poll wait for the next call and
+    # /api/v1/agents/connect/poll waits up to the poll wait for the next call and
     # cancel frames of that instance and refreshes its presence. POST
-    # /api/agents/connect/frames takes ack, result and deregister frames. The
+    # /api/v1/agents/connect/frames takes ack, result and deregister frames. The
     # session logic behind both transports is the same.
 
     @integration

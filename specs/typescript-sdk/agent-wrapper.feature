@@ -5,7 +5,7 @@ Feature: connectAgent turns a function into a simulation target
   So that LangWatch can run simulations against it with no public URL
 
   # The wrapper registers the function in a process-wide registry, opens one
-  # outbound WebSocket per process to /api/agents/connect, sends a register
+  # outbound WebSocket per process to /api/v1/agents/connect, sends a register
   # frame with the instance identity and the parameter schema, and answers
   # call frames by running the function. See dev/docs/adr/128-connected-agents.md.
 
@@ -195,8 +195,8 @@ Feature: connectAgent turns a function into a simulation target
 
     Scenario: The connect URL is derived from the endpoint
       When the endpoint is https://app.langwatch.ai
-      Then the socket URL is wss://app.langwatch.ai/api/agents/connect
-      And http://localhost:5560 gives ws://localhost:5560/api/agents/connect
+      Then the socket URL is wss://app.langwatch.ai/api/v1/agents/connect
+      And http://localhost:5560 gives ws://localhost:5560/api/v1/agents/connect
 
     Scenario: The socket carries the API key, the project id and the SDK user agent
       Given LANGWATCH_PROJECT_ID is set
@@ -322,9 +322,9 @@ Feature: connectAgent turns a function into a simulation target
     Scenario: The transport option selects HTTP long polling
       Given an agent defined with transport "http"
       When the client connects
-      Then the register frame is posted to /api/agents/connect/register with the API key in the Authorization header
-      And the client polls /api/agents/connect/poll with the instance token
-      And a call answered by the poll is acked and answered by a POST to /api/agents/connect/frames
+      Then the register frame is posted to /api/v1/agents/connect/register with the API key in the Authorization header
+      And the client polls /api/v1/agents/connect/poll with the instance token
+      And a call answered by the poll is acked and answered by a POST to /api/v1/agents/connect/frames
 
     Scenario: LANGWATCH_AGENT_TRANSPORT selects the transport
       Given LANGWATCH_AGENT_TRANSPORT is "http"

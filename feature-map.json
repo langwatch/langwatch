@@ -645,7 +645,7 @@
               "skill": "connect-agent",
               "docs": "https://langwatch.ai/docs/agent-simulations/connect-your-agent.md"
             },
-            "api": "/api/agents",
+            "api": "/api/v1/agents",
             "docs": "https://langwatch.ai/docs/agent-simulations/connect-your-agent.md"
           },
           "sync": null,

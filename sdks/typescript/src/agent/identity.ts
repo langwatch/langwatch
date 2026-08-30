@@ -165,12 +165,12 @@ export const SDK_IDENTITY: RegisterSdk = {
 
 export const USER_AGENT = `langwatch-typescript/${LANGWATCH_SDK_VERSION}`;
 
-export const CONNECT_PATH = "/api/agents/connect";
+export const CONNECT_PATH = "/api/v1/agents/connect";
 
 /**
  * The socket URL for an endpoint: `https://app.langwatch.ai` becomes
- * `wss://app.langwatch.ai/api/agents/connect`, `http://localhost:5560`
- * becomes `ws://localhost:5560/api/agents/connect`.
+ * `wss://app.langwatch.ai/api/v1/agents/connect`, `http://localhost:5560`
+ * becomes `ws://localhost:5560/api/v1/agents/connect`.
  */
 export function resolveConnectUrl(endpoint?: string | null): string {
   const base = resolveEndpoint(endpoint);
@@ -182,7 +182,7 @@ export function resolveConnectUrl(endpoint?: string | null): string {
 
 /**
  * The base of the HTTP long-poll routes for an endpoint:
- * `https://app.langwatch.ai` becomes `https://app.langwatch.ai/api/agents/connect`.
+ * `https://app.langwatch.ai` becomes `https://app.langwatch.ai/api/v1/agents/connect`.
  */
 export function resolveHttpConnectUrl(endpoint?: string | null): string {
   return `${resolveEndpoint(endpoint)}${CONNECT_PATH}`;

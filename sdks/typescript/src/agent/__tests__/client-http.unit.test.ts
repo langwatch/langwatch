@@ -80,17 +80,17 @@ class FakeHttpPlatform {
   }
 
   nextRegister(): Promise<Seen> {
-    return this.next((seen) => seen.path === "/api/agents/connect/register");
+    return this.next((seen) => seen.path === "/api/v1/agents/connect/register");
   }
 
   nextPoll(): Promise<Seen> {
-    return this.next((seen) => seen.path.startsWith("/api/agents/connect/poll"));
+    return this.next((seen) => seen.path.startsWith("/api/v1/agents/connect/poll"));
   }
 
   nextFrame(type: string): Promise<Seen> {
     return this.next(
       (seen) =>
-        seen.path === "/api/agents/connect/frames" &&
+        seen.path === "/api/v1/agents/connect/frames" &&
         ((seen.body?.frames as Json[] | undefined) ?? []).some((frame) => frame.type === type),
     );
   }
@@ -114,7 +114,7 @@ class FakeHttpPlatform {
       response.end(JSON.stringify(body));
     };
 
-    if (seen.path === "/api/agents/connect/register") {
+    if (seen.path === "/api/v1/agents/connect/register") {
       const register = seen.body as unknown as RegisterFrame;
       answer(200, {
         frame: {
@@ -134,7 +134,7 @@ class FakeHttpPlatform {
       });
       return;
     }
-    if (seen.path.startsWith("/api/agents/connect/poll")) {
+    if (seen.path.startsWith("/api/v1/agents/connect/poll")) {
       if (this.pollStatus !== 200) {
         answer(this.pollStatus, { error: "agent_session_unknown" });
         return;
@@ -160,7 +160,7 @@ class FakeHttpPlatform {
       });
       return;
     }
-    if (seen.path === "/api/agents/connect/frames") {
+    if (seen.path === "/api/v1/agents/connect/frames") {
       answer(200, { accepted: ((seen.body?.frames as Json[] | undefined) ?? []).length });
       return;
     }
@@ -349,9 +349,9 @@ describe("the agent client over HTTP long polling, given a fake platform", () =>
 
       const deregister = await platform.nextFrame("deregister");
       expect(deregister.body?.frames).toEqual([{ type: "deregister", protocol: PROTOCOL_VERSION }]);
-      const pollsBefore = platform.requests.filter((seen) => seen.path.startsWith("/api/agents/connect/poll")).length;
+      const pollsBefore = platform.requests.filter((seen) => seen.path.startsWith("/api/v1/agents/connect/poll")).length;
       await wait(POLL_WAIT_MS * 2);
-      const pollsAfter = platform.requests.filter((seen) => seen.path.startsWith("/api/agents/connect/poll")).length;
+      const pollsAfter = platform.requests.filter((seen) => seen.path.startsWith("/api/v1/agents/connect/poll")).length;
       expect(pollsAfter).toBe(pollsBefore);
       expect(sharedClientForTests()?.isRetrying).toBe(false);
     });

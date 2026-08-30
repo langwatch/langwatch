@@ -1,5 +1,5 @@
 /**
- * One shared connection per process to `/api/agents/connect`.
+ * One shared connection per process to `/api/v1/agents/connect`.
  *
  * The client holds every agent the process defined, registers them all on
  * one socket, answers `call` frames by running the agent's function, and

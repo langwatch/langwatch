@@ -490,6 +490,11 @@ const presentations = {
         : "Check the agent's configuration and test it again.";
     },
   },
+  agent_not_found: {
+    title: "Agent not found",
+    describe: () =>
+      "No agent with that id is in this project. It may have been archived, or the id belongs to another project.",
+  },
   agent_offline: {
     title: "This agent is not running",
     describe: (error) => {

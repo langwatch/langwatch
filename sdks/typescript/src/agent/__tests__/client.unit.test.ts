@@ -292,7 +292,7 @@ describe("the agent client, given a fake platform", () => {
         },
       ]);
 
-      expect(connection.request.url).toBe("/api/agents/connect");
+      expect(connection.request.url).toBe("/api/v1/agents/connect");
       expect(connection.request.headers.authorization).toBe("Bearer sk-lw-test");
       expect(connection.request.headers["x-project-id"]).toBe("proj_1");
       expect(connection.request.headers["user-agent"]).toBe(`langwatch-typescript/${LANGWATCH_SDK_VERSION}`);
@@ -656,7 +656,7 @@ describe("the agent client, given a fake platform", () => {
 
       const warnings = logs.lines("warn", /not connected to LangWatch/);
       expect(warnings).toHaveLength(1);
-      expect(warnings[0]).toContain(`could not reach ws://127.0.0.1:${port}/api/agents/connect`);
+      expect(warnings[0]).toContain(`could not reach ws://127.0.0.1:${port}/api/v1/agents/connect`);
       expect(warnings[0]).toContain("LANGWATCH_ENDPOINT");
       expect(sharedClientForTests()?.isRetrying).toBe(true);
       expect(sharedClientForTests()?.isStopped).toBe(false);

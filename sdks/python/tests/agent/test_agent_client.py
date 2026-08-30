@@ -191,7 +191,7 @@ async def test_register_carries_sdk_instance_and_agents():
     async with FakePlatform() as platform:
         client, connection, register, _ = await connect(platform, echo_agent())
         try:
-            assert connection.path == "/api/agents/connect"
+            assert connection.path == "/api/v1/agents/connect"
             assert connection.headers["authorization"] == "Bearer sk-lw-test-key"
             assert connection.headers["user-agent"] == f"langwatch-python/{__version__}"
             assert "x-project-id" not in connection.headers

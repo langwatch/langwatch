@@ -7,7 +7,7 @@ Feature: Agent tools expose connected agents and run them through the relay
   # A connected agent registers itself from code (connectAgent in TypeScript,
   # connect_agent in Python); platform_create_agent does not create one. The
   # platform reports its environment, status, instances, owner and parameters,
-  # and POST /api/agents/:id/call runs one turn on a live instance.
+  # and POST /api/v1/agents/:id/call runs one turn on a live instance.
   # See dev/docs/adr/128-connected-agents.md.
 
   Rule: The listing and the detail expose the connected fields

@@ -48,6 +48,25 @@ function buildDocumentedApp() {
         { noPermission: { reason: "framework test endpoint" }, input: z.object({ value: z.number() }) },
         async (c) => c.json({ accepted: true }),
       );
+      // Reads its body by hand and documents it through docs.requestBody.
+      v.post(
+        "/frames",
+        {
+          noPermission: { reason: "framework test endpoint" },
+          description: "Takes frames the handler parses itself.",
+          docs: {
+            operationId: "postFrames",
+            requestBody: {
+              content: {
+                "application/json": {
+                  schema: { type: "object", properties: { frames: { type: "array" } } },
+                },
+              },
+            },
+          },
+        },
+        async (c) => c.json({ accepted: 1 }),
+      );
       // Registered after the static paths: overlapping routes stack in
       // registration order, so the param route must not shadow them.
       v.get(
@@ -76,7 +95,11 @@ describe("OpenAPI documentation", () => {
       const spec = await generateSpecs(app);
 
       const keys = Object.keys(spec.paths ?? {});
-      expect(keys.sort()).toEqual(["/api/things", "/api/things/{id}"]);
+      expect(keys.sort()).toEqual([
+        "/api/things",
+        "/api/things/frames",
+        "/api/things/{id}",
+      ]);
       for (const key of keys) {
         expect(key).not.toMatch(/\/(latest|preview|20\d{2}-\d{2}-\d{2})(\/|$)/);
       }
@@ -114,6 +137,21 @@ describe("OpenAPI documentation", () => {
         expect.objectContaining({ in: "query", name: "verbose" }),
       );
       expect(spec.paths["/api/things"]?.post?.requestBody).toBeDefined();
+    });
+
+    it("documents the request body an endpoint declares through docs.requestBody", async () => {
+      const app = buildDocumentedApp();
+      const spec = await generateSpecs(app);
+
+      const frames = spec.paths["/api/things/frames"]?.post;
+      expect(frames?.operationId).toBe("postFrames");
+      expect(frames?.requestBody).toEqual({
+        content: {
+          "application/json": {
+            schema: { type: "object", properties: { frames: { type: "array" } } },
+          },
+        },
+      });
     });
 
     it("removes docs.hide endpoints from the document while still serving them", async () => {

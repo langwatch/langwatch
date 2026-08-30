@@ -86,7 +86,7 @@ import {
 import { assertRedisReady } from "./server/app-layer/redis-readiness";
 import { assetBaseOrigin, getAssetBase } from "./server/asset-base";
 import { ConnectGateway } from "./server/connected-agents/connect.gateway";
-import { closeLongPollTransport } from "./server/connected-agents/long-poll.route";
+import { closeLongPollTransport } from "./server/connected-agents/long-poll.process";
 import {
   closeConnectedAgentRuntime,
   getConnectedAgentRuntime,

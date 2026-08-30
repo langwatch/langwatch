@@ -103,7 +103,7 @@ def resolve_transport(explicit: str | None = None) -> str:
 
 
 def http_url(endpoint: str) -> str:
-    """`https://app.langwatch.ai` becomes `https://app.langwatch.ai/api/agents/connect`."""
+    """`https://app.langwatch.ai` becomes `https://app.langwatch.ai/api/v1/agents/connect`."""
     return endpoint.strip().rstrip("/") + CONNECT_PATH
 
 
@@ -154,7 +154,7 @@ def refusal_advice(code: str, message: str, meta: dict[str, Any] | None) -> str:
 
 
 def socket_url(endpoint: str) -> str:
-    """`https://app.langwatch.ai` becomes `wss://app.langwatch.ai/api/agents/connect`."""
+    """`https://app.langwatch.ai` becomes `wss://app.langwatch.ai/api/v1/agents/connect`."""
     parts = urlsplit(endpoint.strip().rstrip("/"))
     scheme = {"https": "wss", "http": "ws", "wss": "wss", "ws": "ws"}.get(
         parts.scheme.lower(), "wss"

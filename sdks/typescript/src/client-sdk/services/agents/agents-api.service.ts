@@ -59,9 +59,9 @@ export interface AgentListResponse {
   };
 }
 
-/** The body `POST /api/agents/{id}/call` takes. */
+/** The body `POST /api/v1/agents/{id}/call` takes. */
 export type AgentCallBody = NonNullable<
-  paths["/api/agents/{id}/call"]["post"]["requestBody"]
+  paths["/api/v1/agents/{id}/call"]["post"]["requestBody"]
 >["content"]["application/json"];
 
 /** One conversation message as the relay carries it, OpenAI style. */
@@ -69,11 +69,11 @@ export type AgentCallMessage = AgentCallBody["messages"][number];
 
 /** The reply of the relay: the function's output and the instance that ran it. */
 export type AgentCallResponse =
-  paths["/api/agents/{id}/call"]["post"]["responses"][200]["content"]["application/json"];
+  paths["/api/v1/agents/{id}/call"]["post"]["responses"][200]["content"]["application/json"];
 
-/** The ids `POST /api/agents/{id}/test` answers with. */
+/** The ids `POST /api/v1/agents/{id}/test` answers with. */
 export type AgentTestRunResponse =
-  paths["/api/agents/{id}/test"]["post"]["responses"][200]["content"]["application/json"];
+  paths["/api/v1/agents/{id}/test"]["post"]["responses"][200]["content"]["application/json"];
 
 export class AgentsApiError extends Error {
   constructor(
@@ -101,7 +101,7 @@ export class AgentsApiService {
   }
 
   async list(params?: { page?: number; limit?: number }): Promise<AgentListResponse> {
-    const { data, error } = await this.apiClient.GET("/api/agents", {
+    const { data, error } = await this.apiClient.GET("/api/v1/agents", {
       params: { query: params },
     });
     if (error) this.handleApiError("list agents", error);
@@ -109,7 +109,7 @@ export class AgentsApiService {
   }
 
   async get(id: string): Promise<AgentResponse> {
-    const { data, error } = await this.apiClient.GET("/api/agents/{id}", {
+    const { data, error } = await this.apiClient.GET("/api/v1/agents/{id}", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`get agent "${id}"`, error);
@@ -122,7 +122,7 @@ export class AgentsApiService {
     config: Record<string, unknown>;
     workflowId?: string;
   }): Promise<AgentResponse> {
-    const { data, error } = await this.apiClient.POST("/api/agents", {
+    const { data, error } = await this.apiClient.POST("/api/v1/agents", {
       body: params as never,
     });
     if (error) this.handleApiError("create agent", error);
@@ -134,7 +134,7 @@ export class AgentsApiService {
     type?: string;
     config?: Record<string, unknown>;
   }): Promise<AgentResponse> {
-    const { data, error } = await this.apiClient.PATCH("/api/agents/{id}", {
+    const { data, error } = await this.apiClient.PATCH("/api/v1/agents/{id}", {
       params: { path: { id } },
       body: params as never,
     });
@@ -143,7 +143,7 @@ export class AgentsApiService {
   }
 
   async delete(id: string): Promise<{ id: string; name: string }> {
-    const { data, error } = await this.apiClient.DELETE("/api/agents/{id}", {
+    const { data, error } = await this.apiClient.DELETE("/api/v1/agents/{id}", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`delete agent "${id}"`, error);
@@ -155,7 +155,7 @@ export class AgentsApiService {
    * dispatches it to a live instance and answers with the function's output.
    */
   async call(id: string, body: AgentCallBody): Promise<AgentCallResponse> {
-    const { data, error } = await this.apiClient.POST("/api/agents/{id}/call", {
+    const { data, error } = await this.apiClient.POST("/api/v1/agents/{id}/call", {
       params: { path: { id } },
       body,
     });
@@ -169,7 +169,7 @@ export class AgentsApiService {
    * saved; the answer carries the run ids to follow.
    */
   async test(id: string): Promise<AgentTestRunResponse> {
-    const { data, error } = await this.apiClient.POST("/api/agents/{id}/test", {
+    const { data, error } = await this.apiClient.POST("/api/v1/agents/{id}/test", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`test agent "${id}"`, error);

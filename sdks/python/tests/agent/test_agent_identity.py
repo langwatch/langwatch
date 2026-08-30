@@ -134,18 +134,18 @@ def test_instance_label_resolution(monkeypatch):
 def test_socket_url_from_endpoint():
     assert (
         socket_url("https://app.langwatch.ai")
-        == "wss://app.langwatch.ai/api/agents/connect"
+        == "wss://app.langwatch.ai/api/v1/agents/connect"
     )
     assert (
         socket_url("https://app.langwatch.ai/")
-        == "wss://app.langwatch.ai/api/agents/connect"
+        == "wss://app.langwatch.ai/api/v1/agents/connect"
     )
     assert (
-        socket_url("http://localhost:5560") == "ws://localhost:5560/api/agents/connect"
+        socket_url("http://localhost:5560") == "ws://localhost:5560/api/v1/agents/connect"
     )
     assert (
         socket_url("https://lw.example.com/base/")
-        == "wss://lw.example.com/base/api/agents/connect"
+        == "wss://lw.example.com/base/api/v1/agents/connect"
     )
 
 

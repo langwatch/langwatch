@@ -13,7 +13,7 @@ from typing_extensions import NotRequired, TypedDict
 
 PROTOCOL_VERSION = 1
 
-CONNECT_PATH = "/api/agents/connect"
+CONNECT_PATH = "/api/v1/agents/connect"
 
 # Frame sizes in bytes. The socket frame cap follows the platform default; a
 # self-hosted deployment can raise it, and the client only needs to accept

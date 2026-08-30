@@ -151,7 +151,7 @@ const describe = (error: unknown): string => (error instanceof Error ? error.mes
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms).unref());
 
 export interface HttpLongPollOptions {
-  /** `https://app.langwatch.ai/api/agents/connect`, the base the three routes hang off. */
+  /** `https://app.langwatch.ai/api/v1/agents/connect`, the base the three routes hang off. */
   url: string;
   headers: Record<string, string>;
   fetch?: typeof fetch;

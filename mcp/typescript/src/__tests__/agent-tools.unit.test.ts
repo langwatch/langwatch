@@ -128,7 +128,7 @@ describe("handleTestAgent()", () => {
 
       const output = await handleTestAgent({ id: "agent_http" });
 
-      expect(mockRequest).toHaveBeenCalledWith("POST", "/api/agents/agent_http/test", {});
+      expect(mockRequest).toHaveBeenCalledWith("POST", "/api/v1/agents/agent_http/test", {});
       expect(output).toContain("**Scenario run ID:** run_1");
       expect(output).toContain("**Batch run ID:** batch_1");
       expect(output).toContain("platform_get_simulation_run");
@@ -150,7 +150,7 @@ describe("handleRunAgent()", () => {
 
       const output = await handleRunAgent({ id: "agent_conn", message: "hi", parameters: { model: "gpt-5" } });
 
-      expect(mockRequest).toHaveBeenNthCalledWith(2, "POST", "/api/agents/agent_conn/call", {
+      expect(mockRequest).toHaveBeenNthCalledWith(2, "POST", "/api/v1/agents/agent_conn/call", {
         messages: [{ role: "user", content: "hi" }],
         params: { model: "gpt-5" },
       });
@@ -172,7 +172,7 @@ describe("handleRunAgent()", () => {
 
       await handleRunAgent({ id: "agent_conn", input, threadId: "t2" });
 
-      expect(mockRequest).toHaveBeenNthCalledWith(2, "POST", "/api/agents/agent_conn/call", {
+      expect(mockRequest).toHaveBeenNthCalledWith(2, "POST", "/api/v1/agents/agent_conn/call", {
         messages: [{ role: "user", content: "again" }],
         threadId: "t2",
         session: { id: "s1" },

@@ -241,7 +241,7 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
   {
     name: "Agents",
     dirName: "agents",
-    pathPrefixes: ["/api/agents"],
+    pathPrefixes: ["/api/v1/agents"],
     overviewDescription:
       "Manage AI agent configurations. Create, update, and organize agents that are tracked and evaluated in LangWatch.",
   },

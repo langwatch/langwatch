@@ -80,7 +80,7 @@ describe("Feature: connected agents on the REST agents API", () => {
   describe("when a caller creates a connected agent by hand", () => {
     /** @scenario "A connected agent cannot be created by hand" */
     it("refuses with agent_register_only", async () => {
-      const response = await app.request("/api/agents", {
+      const response = await app.request("/api/v1/agents", {
         method: "POST",
         headers: headers(),
         body: JSON.stringify({
@@ -92,7 +92,7 @@ describe("Feature: connected agents on the REST agents API", () => {
 
       expect(response.status).toBe(422);
       expect(await response.json()).toMatchObject({
-        error: "agent_register_only",
+        code: "agent_register_only",
       });
     });
   });
@@ -102,7 +102,7 @@ describe("Feature: connected agents on the REST agents API", () => {
     it("archives, accepts a description edit, refuses a type change", async () => {
       const agent = await registeredAgent();
 
-      const read = await app.request(`/api/agents/${agent.id}`, {
+      const read = await app.request(`/api/v1/agents/${agent.id}`, {
         headers: headers(),
       });
       expect(read.status).toBe(200);
@@ -114,7 +114,7 @@ describe("Feature: connected agents on the REST agents API", () => {
         parameters: [{ name: "model", type: "string" }],
       });
 
-      const described = await app.request(`/api/agents/${agent.id}`, {
+      const described = await app.request(`/api/v1/agents/${agent.id}`, {
         method: "PATCH",
         headers: headers(),
         body: JSON.stringify({ config: { description: "Edited by hand" } }),
@@ -129,7 +129,7 @@ describe("Feature: connected agents on the REST agents API", () => {
       expect(body.config.description).toBe("Edited by hand");
       expect(body.config.sdk).toEqual(connectedConfig.sdk);
 
-      const retyped = await app.request(`/api/agents/${agent.id}`, {
+      const retyped = await app.request(`/api/v1/agents/${agent.id}`, {
         method: "PATCH",
         headers: headers(),
         body: JSON.stringify({
@@ -139,7 +139,7 @@ describe("Feature: connected agents on the REST agents API", () => {
       });
       expect(retyped.status).toBe(422);
       expect(await retyped.json()).toMatchObject({
-        error: "agent_register_only",
+        code: "agent_register_only",
       });
 
       expect(body).toMatchObject({
@@ -148,7 +148,7 @@ describe("Feature: connected agents on the REST agents API", () => {
         instances: [],
       });
 
-      const archived = await app.request(`/api/agents/${agent.id}`, {
+      const archived = await app.request(`/api/v1/agents/${agent.id}`, {
         method: "DELETE",
         headers: headers(),
       });

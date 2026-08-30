@@ -41,8 +41,6 @@ import {
   isHttpMethod,
   securityForCredentialClass,
 } from "../server/api/security";
-import { app as connectedAgentLongPollApp } from "../server/connected-agents/long-poll.route";
-import { app as connectedAgentRelayApp } from "../server/connected-agents/relay.route";
 // The two legacy route files below are wired in for the routes they describe
 // and nothing else: `generateSpecs` skips any handler without `describeRoute`,
 // so the unannotated siblings sharing these files (the stripe webhook, the demo
@@ -77,6 +75,7 @@ const generateSpecs: typeof generateSpecsUnpinned = async (hono, options, c) =>
 const APP_DERIVED_PREFIXES = [
   "/api/agent-cache",
   "/api/agents",
+  "/api/v1/agents",
   "/api/api-keys",
   "/api/analytics",
   "/api/coding-agent",
@@ -193,12 +192,6 @@ export default async function execute() {
   const agentCacheSpec = await generateSpecs(agentCacheApp);
   console.log("Building agents spec...");
   const agentsSpec = await generateSpecs(agentsApp);
-  console.log("Building connected agent relay spec...");
-  const connectedAgentRelaySpec = await generateSpecs(connectedAgentRelayApp);
-  console.log("Building connected agent long-poll spec...");
-  const connectedAgentLongPollSpec = await generateSpecs(
-    connectedAgentLongPollApp,
-  );
   console.log("Building api keys spec...");
   const apiKeysSpec = await generateSpecs(apiKeysApp);
   console.log("Building analytics spec...");
@@ -293,8 +286,6 @@ export default async function execute() {
       currentSpec,
       agentCacheSpec,
       agentsSpec,
-      connectedAgentRelaySpec,
-      connectedAgentLongPollSpec,
       apiKeysSpec,
       analyticsSpec,
       analyticsSqlSpec,
