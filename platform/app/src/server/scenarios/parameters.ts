@@ -16,6 +16,12 @@
  * @see specs/scenarios/secret-run-parameters.feature
  */
 
+// This schema module is imported by route apps and by other shared helpers. If
+// another module loads it before a route app calls `patchZodOpenapi()`, the
+// schema objects are constructed before zod-openapi patches Zod and the later
+// OpenAPI conversion drops the `defaultValue` and `secret` descriptions. Load
+// the patch here so schema construction never depends on who imported us first.
+import "zod-openapi/extend";
 import { z } from "zod";
 
 /** How many parameters one scenario may declare. */

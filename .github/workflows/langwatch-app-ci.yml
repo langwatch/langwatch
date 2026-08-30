@@ -1234,8 +1234,8 @@ jobs:
         run: bash .github/scripts/notify-slack-job-failure.sh feature-parity
 
   # The generated OpenAPI document is what external integrators compile
-  # clients from, and an operation missing its body, parameters or success
-  # response still appears in it. This turns each omission into a failure.
+  # clients from. Keep it in sync with the generator, then reject operations
+  # missing their body, parameters or success response.
   openapi-completeness:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
@@ -1257,6 +1257,19 @@ jobs:
           install: "@langwatch/web..."
 
       - uses: ./.github/actions/prepare-generated-files
+
+      # The checks below read the committed document, so on their own they can
+      # pass while the generator would write something different. Regenerate
+      # first and refuse that drift before validating the document's contents.
+      - name: Check that the generated OpenAPI document is current
+        working-directory: platform/app
+        env:
+          # Route imports validate the app environment; generation needs no
+          # live services, so use the same build-time relaxation as app builds.
+          BUILD_TIME: "true"
+        run: |
+          pnpm run task generateOpenAPISpec
+          git diff --exit-code -- src/app/api/openapiLangWatch.json
 
       - name: Check OpenAPI completeness
         working-directory: platform/app
