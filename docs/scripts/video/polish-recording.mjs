@@ -601,12 +601,20 @@ function buildCursorTrack(beats, cfg) {
     if (b.x == null || b.y == null || b.cursor === false) continue;
 
     const arrive = b.t - cfg.settle;
-    let depart = arrive - (b.travel == null ? cfg.travel : b.travel);
+    // Travel time comes from the distance, so the cursor keeps one speed
+    // across the whole video instead of racing over a long move.
+    const dist = Math.hypot(b.x - at.x, b.y - at.y);
+    const want =
+      b.travel != null
+        ? b.travel
+        : clamp(dist / cfg.speed, cfg.minTravel, cfg.maxTravel);
+    let depart = arrive - want;
     if (depart < freeFrom) depart = freeFrom;
     if (depart > arrive) depart = arrive;
     // The hand only appears where there is something to click.
     const handAfter = b.click !== false;
-    moves.push({ depart, arrive, from: at, to: { x: b.x, y: b.y }, handAfter });
+    const arc = b.arc == null ? cfg.arc : b.arc;
+    moves.push({ depart, arrive, from: at, to: { x: b.x, y: b.y }, handAfter, arc });
     if (handAfter) clicks.push({ t: b.t, x: b.x, y: b.y });
     at = { x: b.x, y: b.y };
     // The hand stays down for the whole press. Leaving earlier turns it back
@@ -628,7 +636,9 @@ function buildCursorTrack(beats, cfg) {
         const dy = m.to.y - m.from.y;
         const len = Math.hypot(dx, dy) || 1;
         // A slight perpendicular bow keeps the path from looking mechanical.
-        const bow = cfg.arc * len;
+        // A beat sets `arc: 0` when it wants a ruled line, such as a sweep
+        // along a line of text.
+        const bow = m.arc * len;
         const mx = (m.from.x + m.to.x) / 2 - (dy / len) * bow;
         const my = (m.from.y + m.to.y) / 2 + (dx / len) * bow;
         const iu = 1 - u;
@@ -699,6 +709,80 @@ function buildCursorTrack(beats, cfg) {
   };
 }
 
+/**
+ * Freezes the source frame wherever the cursor would have to move faster than
+ * a viewer can follow, and maps between the source clock and the output clock.
+ *
+ * A frozen source is what buys the camera and the cursor their time. Without
+ * it the only way to slow a move down is to cut the take differently, and the
+ * two targets that need the most room are usually the two the take runs
+ * through fastest. A beat asks for a freeze of its own with
+ * `pause: { before, after }`, or `pause: 0.6` for a wait before the click.
+ */
+function buildPacing(beats, pace, cursorCfg) {
+  const freezes = [];
+  const insert = (c, d) => {
+    if (!(d > 0.005)) return;
+    const hit = freezes.find((f) => Math.abs(f.c - c) < 1e-6);
+    if (hit) {
+      hit.d += d;
+      return;
+    }
+    freezes.push({ c, d });
+    freezes.sort((a, b) => a.c - b.c);
+  };
+  const outOf = (c) => {
+    let acc = 0;
+    for (const f of freezes) {
+      if (f.c < c - 1e-9) acc += f.d;
+      else break;
+    }
+    return c + acc;
+  };
+  const pauseOf = (b) =>
+    typeof b.pause === "number"
+      ? { before: b.pause, after: 0 }
+      : { before: b.pause?.before ?? 0, after: b.pause?.after ?? 0 };
+  // The click lands at the end of its own `before` freeze, so the frame the
+  // viewer waits on is the one before anything happened.
+  const timeOf = (b) => outOf(b.t) + (b.x == null ? 0 : pauseOf(b).before);
+
+  for (const b of beats) {
+    if (b.x == null) continue;
+    const { before, after } = pauseOf(b);
+    insert(b.t, before);
+    insert(b.t + pace.afterDelay, after);
+  }
+
+  if (pace.auto) {
+    const path = beats.filter((b) => b.x != null && b.cursor !== false);
+    for (let i = 1; i < path.length; i++) {
+      const a = path[i - 1];
+      const b = path[i];
+      const need =
+        Math.hypot(b.x - a.x, b.y - a.y) / pace.speed +
+        cursorCfg.settle +
+        (a.click === false ? 0 : cursorCfg.press.duration) +
+        pace.dwell;
+      const short = need - (timeOf(b) - timeOf(a));
+      if (short > 0.005) insert(Math.min(a.t + pace.afterDelay, b.t - 0.05), short);
+    }
+  }
+
+  const total = freezes.reduce((sum, f) => sum + f.d, 0);
+  const srcOf = (o) => {
+    let acc = 0;
+    for (const f of freezes) {
+      const start = f.c + acc;
+      if (o < start) return o - acc;
+      if (o < start + f.d) return f.c;
+      acc += f.d;
+    }
+    return o - acc;
+  };
+  return { total, freezes, outOf, srcOf, timeOf };
+}
+
 // ------------------------------------------------------------------ raw frames
 
 async function* readFrames(stream, bytes) {
@@ -761,18 +845,19 @@ function parseArgs(argv) {
 const DEFAULTS = {
   fps: 30,
   frame: {
-    background: "backgrounds/light.webp",
+    background: "backgrounds/dark.webp",
     // "native" draws the recording at one output pixel per source pixel at 1x,
     // which is the sharpest the take can be. A number is a fraction of the
     // output width instead.
     fit: "native",
     radius: 13,
-    // How far the camera is allowed to follow the focus point. 1 puts the
-    // focus dead centre and shows a lot of background on a corner target; 0
-    // keeps the window covering the frame and never follows. Blending the two
-    // moves both axes by the same proportion, which is what stops a corner
-    // zoom from reading as a tilt.
-    follow: 0.5,
+    // How far the camera follows the focus point. 1 puts the focus dead
+    // centre of the frame, which is the only setting where the camera path is
+    // a straight function of the zoom; 0 keeps the window centred and never
+    // follows. Anything between is a blend of the two, and a blend bends the
+    // path slightly, so lower it only when a corner target shows more
+    // background than you want.
+    follow: 1,
     shadow: { blur: 44, offsetX: 0, offsetY: 20, spread: 2, opacity: 0.3 },
     border: { width: 1, color: [255, 255, 255], opacity: 0.45 },
   },
@@ -782,7 +867,11 @@ const DEFAULTS = {
     size: 128,
     hotspot: { arrow: { x: 0.293, y: 0.175 }, pointer: { x: 0.383, y: 0.243 } },
     shadow: { blur: 14, offsetX: 1, offsetY: 6, opacity: 0.38 },
-    travel: 0.9,
+    // Travel time comes from the distance, so a long move is never rushed
+    // and a short one is never sluggish. A beat may override it.
+    speed: 850,
+    minTravel: 0.45,
+    maxTravel: 1.5,
     settle: 0.14,
     arc: 0.08,
     fade: 0.3,
@@ -790,7 +879,7 @@ const DEFAULTS = {
     start: { x: null, y: null, hidden: false },
   },
   click: {
-    radius: [12, 84],
+    radius: [6, 42],
     duration: 0.55,
     fill: 0.05,
     stroke: 0.3,
@@ -798,7 +887,11 @@ const DEFAULTS = {
     color: [86, 86, 86],
   },
   // `lead` puts the camera at full zoom before the click, never during it.
-  zoom: { default: 1.45, lead: 0.5, in: 0.62, out: 0.8, hold: 0.8 },
+  zoom: { default: 1.9, lead: 0.5, in: 0.62, out: 0.8, hold: 0.8 },
+  // Freezes the source frame so the camera and the cursor have time to move.
+  // `auto` inserts a freeze wherever the cursor would have to travel faster
+  // than `speed`; a beat's own `pause` block adds one on top.
+  pace: { auto: true, speed: 850, dwell: 0.3, afterDelay: 0.35 },
   quality: { crf: 38, cpuUsed: 2 },
 };
 
@@ -876,9 +969,21 @@ async function main() {
   const arrow = buildSprite(arrowBmp, cfg.cursor.hotspot.arrow, cfg.cursor.shadow);
   const pointer = buildSprite(pointerBmp, cfg.cursor.hotspot.pointer, cfg.cursor.shadow);
 
-  const duration = cfg.cut
+  const srcDuration = cfg.cut
     ? cfg.cut.segments.reduce((a, [s, e]) => a + (e - s), 0) / (cfg.cut.speed || 1)
     : meta.duration;
+
+  // Beats are authored against the source clock. Pacing freezes the source
+  // where a move would be too fast to follow, which moves every later beat.
+  const pacing = buildPacing(beats, cfg.pace, cursorCfg);
+  for (const b of beats) b.t = pacing.timeOf(b);
+  const duration = srcDuration + pacing.total;
+  if (pacing.total > 0.005) {
+    console.log(
+      `  pacing: ${pacing.freezes.length} freezes, ` +
+        `+${pacing.total.toFixed(2)}s (${srcDuration.toFixed(2)}s -> ${duration.toFixed(2)}s)`,
+    );
+  }
 
   const cameraAt = buildCameraTrack(beats, cfg.zoom, duration, srcW / 2, srcH / 2);
   const cursor = buildCursorTrack(beats, cursorCfg);
@@ -887,15 +992,21 @@ async function main() {
   const follow = cfg.frame.follow;
 
   // ------------------------------------------------------------- ffmpeg pair
+  // `--preview` is stated in seconds of the result, so the range has to be
+  // mapped back through the pacing before it becomes a trim on the source.
   const preview = args.preview ? args.preview.split(":").map(Number) : null;
-  const clockOffset = preview ? preview[0] : 0;
+  const outStart = preview ? Math.max(0, preview[0]) : 0;
+  const outEnd = preview ? Math.min(preview[1], duration) : duration;
+  const srcStart = pacing.srcOf(outStart);
+  const srcEnd = Math.min(srcDuration, pacing.srcOf(outEnd) + 2 / fps);
+  const frames = Math.max(1, Math.round((outEnd - outStart) * fps));
 
   // The graph always ends in `fps`, and the output always states `-r`. A bare
   // `setpts` before the end leaves ffmpeg guessing the rate from timestamps,
   // and it guesses the source's rate, silently dropping frames.
   let graph = cfg.cut ? cutFilter(cfg.cut) : "[0:v]null[s];";
   if (preview) {
-    graph += `[s]trim=start=${preview[0]}:end=${preview[1]},setpts=PTS-STARTPTS[p];`;
+    graph += `[s]trim=start=${srcStart}:end=${srcEnd},setpts=PTS-STARTPTS[p];`;
     graph += `[p]fps=${fps}[out]`;
   } else {
     graph += `[s]fps=${fps}[out]`;
@@ -955,25 +1066,40 @@ async function main() {
   let n = 0;
   const started = Date.now();
 
-  for await (const frame of readFrames(dec.stdout, srcBytes)) {
-    const t = clockOffset + n / fps;
+  // The source is pulled, not iterated: a frozen stretch asks for the same
+  // source frame over several output frames, so the decoder only advances
+  // when the output clock has moved past the next source frame.
+  const source = readFrames(dec.stdout, srcBytes)[Symbol.asyncIterator]();
+  let srcIdx = -1;
+  let frame = null;
+  let drained = false;
+
+  for (let i = 0; i < frames; i++) {
+    const t = outStart + i / fps;
+    const want = Math.max(0, Math.round((pacing.srcOf(t) - srcStart) * fps));
+    while (!drained && srcIdx < want) {
+      const next = await source.next();
+      if (next.done) {
+        drained = true;
+        break;
+      }
+      frame = next.value;
+      srcIdx++;
+    }
+    if (!frame) break;
     const cam = cameraAt(t);
     const scale = baseScale * cam.z;
     const winW = srcW * scale;
     const winH = srcH * scale;
 
-    // Two candidate positions: the focus dead centre of the frame, and the
-    // window pushed back until it covers the frame. `follow` blends them, and
-    // because the same fraction applies to both axes the camera never drifts
-    // in one axis while it is pinned in the other.
-    const wantLeft = outW / 2 - cam.cx * scale;
-    const wantTop = outH / 2 - cam.cy * scale;
-    const insideLeft =
-      winW >= outW ? clamp(wantLeft, outW - winW, 0) : (outW - winW) / 2;
-    const insideTop =
-      winH >= outH ? clamp(wantTop, outH - winH, 0) : (outH - winH) / 2;
-    const left = lerp(insideLeft, wantLeft, follow);
-    const top = lerp(insideTop, wantTop, follow);
+    // Two candidate positions: the window centred in the frame, and the
+    // window placed so the focus point is dead centre. `follow` blends them.
+    // Both are straight functions of the zoom, so the camera path has no kink.
+    // Clamping the window against the edge of the recording, which is what
+    // this used to do, put a kink in exactly one axis, and the eye read that
+    // as the page tilting and then snapping back.
+    const left = lerp((outW - winW) / 2, outW / 2 - cam.cx * scale, follow);
+    const top = lerp((outH - winH) / 2, outH / 2 - cam.cy * scale, follow);
 
     const win = {
       left,
@@ -1020,11 +1146,17 @@ async function main() {
   }
 
   enc.stdin.end();
+  if (!drained) {
+    dec.stdout.destroy();
+    dec.kill("SIGKILL");
+  }
   const [decCode] = await decDone;
   const [encCode] = await encDone;
   process.stderr.write("\r".padEnd(60) + "\r");
 
-  if (decCode !== 0) throw new Error(`decoder failed\n${Buffer.concat(decErr)}`);
+  if (drained && decCode !== 0) {
+    throw new Error(`decoder failed\n${Buffer.concat(decErr)}`);
+  }
   if (encCode !== 0) throw new Error(`encoder failed\n${Buffer.concat(encErr)}`);
 
   const result = await probe(output);

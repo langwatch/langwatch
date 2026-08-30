@@ -14,6 +14,8 @@ four things a Playwright recording cannot capture:
 - **A camera.** It centres the click target and eases in on it before the
   click, holds while the result appears, and eases out again. The zoom is one
   number for both axes, so it never reads as a tilt.
+- **Pacing.** It freezes the source frame wherever the cursor would have to
+  move faster than a viewer can follow, so a slow beat costs no re-cut.
 - **A mouse cursor.** It travels to each target on a curved, eased path,
   becomes a pointing hand when it arrives, dips on the click, and carries a
   soft drop shadow.
@@ -42,7 +44,7 @@ brew install ffmpeg librsvg
 |---|---|
 | `--out PATH` | write here instead of the timeline's `output` |
 | `--background PATH` | override `frame.background`, to render a second variant |
-| `--preview A:B` | render only seconds A to B, for a fast loop while you author beats |
+| `--preview A:B` | render only seconds A to B **of the result**, for a fast loop while you author beats |
 | `--stills "1,4,8.5"` | write a PNG for each listed second of the result |
 | `--stills-dir DIR` | where those PNGs go, default `stills/` next to the output |
 | `--crf N` | override the encoder quality, lower is better |
@@ -70,10 +72,10 @@ Paths are relative to the timeline file, except `cursors/*` and
   "cut": { "speed": 2, "segments": [[17.2, 29.6], [31.6, 39.2]] },
 
   "frame": {
-    "background": "backgrounds/light.webp",  // or backgrounds/dark.webp
+    "background": "backgrounds/dark.webp",   // or backgrounds/light.webp
     "fit": "native",                  // 1 output px per source px at 1x
     "radius": 13,                     // window corner radius
-    "follow": 0.5,                    // how far the camera follows the target
+    "follow": 1,                      // how far the camera follows the target
     "shadow": { "blur": 44, "offsetX": 0, "offsetY": 20, "spread": 2, "opacity": 0.3 },
     "border": { "width": 1, "color": [255, 255, 255], "opacity": 0.45 }
   },
@@ -81,7 +83,9 @@ Paths are relative to the timeline file, except `cursors/*` and
   "cursor": {
     "size": 128,                      // arrow height in output pixels
     "start": { "x": 308, "y": 264 },  // where it waits at t=0
-    "travel": 0.9,                    // seconds to reach a target
+    "speed": 850,                     // page px per second, sets the travel time
+    "minTravel": 0.45,
+    "maxTravel": 1.5,
     "settle": 0.14,                   // it arrives this long before the click
     "arc": 0.08,                      // how much the path bows, 0 is a straight line
     "fade": 0.3,
@@ -89,8 +93,11 @@ Paths are relative to the timeline file, except `cursors/*` and
     "shadow": { "blur": 14, "offsetX": 1, "offsetY": 6, "opacity": 0.38 }
   },
 
+  // Freezes the source frame where a move would be too fast to follow.
+  "pace": { "auto": true, "speed": 850, "dwell": 0.3, "afterDelay": 0.35 },
+
   "click": {
-    "radius": [12, 84],               // the ring grows between these
+    "radius": [6, 42],                // the ring grows between these
     "duration": 0.55,
     "fill": 0.05,                     // opacity of the disc inside the ring
     "stroke": 0.3,
@@ -99,7 +106,7 @@ Paths are relative to the timeline file, except `cursors/*` and
   },
 
   "zoom": {
-    "default": 1.45,   // used by a beat that names no zoom
+    "default": 1.9,    // used by a beat that names no zoom
     "lead": 0.5,       // the zoom completes this long before the click
     "in": 0.62,        // ease in
     "out": 0.8,        // ease out
@@ -124,20 +131,46 @@ downscale them: a zoom past 1x samples the background too.
 
 ### `follow`
 
-At `1` the focus point sits dead centre of the frame, so a corner target puts a
-lot of background on two sides. At `0` the window is pushed back until it
-covers the frame and the camera never follows. `0.5` is the default and blends
-the two. The same fraction applies to both axes, which is what stops a corner
-zoom from drifting in one axis while it is pinned in the other.
+At `1`, the default, the focus point sits dead centre of the frame. A corner
+target then puts a lot of background on two sides, which is the trade: the
+camera path is a straight function of the zoom, so the motion has no kink
+anywhere. At `0` the window stays centred and the camera never follows.
+Anything between blends the two, and a blend bends the path a little, so lower
+it only when a corner target shows more background than you want.
+
+An earlier version clamped the window against the edge of the recording
+instead. That clamp bent one axis and left the other straight, and the eye read
+it as the page tilting and snapping back.
+
+### Pacing
+
+`pace` freezes the source frame so the camera and the cursor have time to
+move. `auto` measures every leg of the cursor's path and inserts a freeze
+wherever the move would be faster than `pace.speed` page pixels per second.
+A beat asks for one of its own:
+
+```jsonc
+{ "t": 6.265, "x": 1361, "y": 137, "pause": { "before": 0.9, "after": 1.0 } }
+```
+
+`before` holds the frame before the click, so the camera arrives and the
+viewer sees what is about to be pressed. `after` holds it once the result is
+on screen, which is what buys a long camera pan its time. `"pause": 0.9` is
+shorthand for `before` alone.
+
+Every beat after a freeze moves later by that much, and the script reports the
+total when it runs. Beat times in the timeline are always source seconds, so
+adding a pause never means retiming the beats that follow.
 
 ### Beats
 
-One beat per click, in output seconds. Coordinates are page pixels, the same
-numbers a `boundingBox()` returns.
+One beat per click, in seconds of the cut source. Pacing moves them onto the
+output clock for you, so a `pause` on one beat never means retiming the rest.
+Coordinates are page pixels, the same numbers a `boundingBox()` returns.
 
 | Field | Meaning |
 |---|---|
-| `t` | the moment of the click, in seconds of the finished video |
+| `t` | the moment of the click, in seconds of the cut source |
 | `tRaw` | the same moment in seconds of the raw take, mapped through `cut` |
 | `x`, `y` | the click point, in page pixels |
 | `zoom` | zoom factor for this beat, `1` for no zoom |
@@ -146,6 +179,8 @@ numbers a `boundingBox()` returns.
 | `lead` | the zoom completes this long before the click |
 | `in`, `out` | ease durations for this beat |
 | `travel` | override the travel time into this beat |
+| `arc` | how much the path into this beat bows, `0` for a ruled line |
+| `pause` | `{ before, after }` seconds to freeze the source around the click |
 | `click` | `false` moves the cursor without a click, and it stays an arrow |
 | `cursor` | `false` zooms without moving the cursor |
 | `hide` / `show` | fade the cursor out or back in at `t` |
@@ -160,6 +195,12 @@ dialog it opens.
 Centring on the button pushes the dialog against an edge; centring on the
 dialog keeps it framed while the cursor still lands on the button.
 
+A run of `click: false` beats with `arc: 0` walks the cursor along a path
+without pressing anything. The overview video uses that to read the pass
+criteria back: left to right under the first one, down and back to the left
+under the second, then out. Pacing gives each leg its time, so the viewer's eye
+follows the cursor through the text.
+
 ## Choosing the zooms
 
 The full rules are on the Nexus guide. In short:
@@ -167,6 +208,9 @@ The full rules are on the Nexus guide. In short:
 - **Corners earn a zoom, centres usually do not.** A button in the top right is
   hard to find at full size. A dialog in the middle is already the only thing
   on screen.
+- **If a move looks rushed, pause it, do not shorten the path.** `pace.auto`
+  catches most of them. Add `pause` by hand where the viewer has to read
+  something before the click.
 - **Two zooms back to back are tiring.** When the next target is close in time,
   pan the camera to it at the same zoom instead of easing out and back in.
 - **A close X never earns a zoom.** Nothing is being read there.
