@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { contentToText, toolDefinitionsMessage } from "./claude-code-content.rules";
 import { salvageTruncatedRequestBody } from "./claude-code-truncated-request.rules";
-import { capPayloadString } from "./payload-cap.rules";
+import { capPayloadString } from "./trace-payload-cap.rules";
 
 const requestMessageSchema = z.looseObject({
   role: z.string().optional(),

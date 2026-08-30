@@ -1,4 +1,4 @@
-import { capPayloadString } from "./payload-cap.rules";
+import { capPayloadString } from "./trace-payload-cap.rules";
 import { isRecord } from "./canonical-guard.rules";
 
 /**
