@@ -598,7 +598,6 @@ const LEGACY_INERT: string[] = [
   "specs/studio/nlpgo-true-root-span-without-traceparent.feature",
   "specs/suites/simulations-performance.feature",
   "specs/suites/voice-agents-callout.feature",
-  "packages/features/topic/specs/event-sourced-scheduling.feature",
   "packages/features/topic/specs/run-history.feature",
   "packages/features/topic/specs/topics-source-of-truth.feature",
   "specs/trace-drawer/attribute-table.feature",
