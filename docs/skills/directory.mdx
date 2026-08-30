@@ -2205,6 +2205,8 @@ langwatch agent create 'My Agent' --type http --config '{
 }'
 ```
 
+If the endpoint creates its own conversation and returns its id, add `"sessionPath": "$.conversation_id"` (the JSONPath of that value in the response) and read it back as `{{ session }}` in the body template, the URL or a header on the next turn of the same conversation. It is empty on the first turn.
+
 The body template renders as a Liquid template on every turn. The URL and header values render the same variables:
 
 | Variable | Value |

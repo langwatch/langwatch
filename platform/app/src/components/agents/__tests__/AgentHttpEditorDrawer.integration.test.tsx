@@ -155,6 +155,21 @@ describe("AgentHttpEditorDrawer", () => {
           expect(screen.getByText("Scenario Mappings")).toBeInTheDocument();
         });
       });
+
+      /** @scenario "The HTTP agent editor offers a session path" */
+      it("renders the session path field beside the output path", async () => {
+        renderHttpDrawer();
+
+        await waitFor(() => {
+          expect(
+            screen.getByText("Output Path (JSONPath)"),
+          ).toBeInTheDocument();
+        });
+        expect(screen.getByText("Session path")).toBeInTheDocument();
+        expect(
+          screen.getByPlaceholderText("$.conversation_id"),
+        ).toBeInTheDocument();
+      });
     });
   });
 });

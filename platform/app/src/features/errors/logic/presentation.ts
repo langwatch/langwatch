@@ -544,6 +544,9 @@ const presentations = {
     title: "This turn is too large",
     describe: (error) => {
       const what = str(error, "what", "payload");
+      if (what === "session") {
+        return "The session value the agent returned is above the size limit. Return a small value, such as a conversation id or a token, not the conversation itself.";
+      }
       return `The ${what} is above the size limit. Trim the conversation or the attachments, or raise the limit on a self-hosted deployment.`;
     },
   },

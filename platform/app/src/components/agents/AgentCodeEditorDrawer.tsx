@@ -9,6 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { HelpCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 import { CodeBlockEditor } from "~/components/blocks/CodeBlockEditor";
@@ -23,6 +24,7 @@ import {
   ScenarioInputMappingSection,
 } from "~/components/suites/ScenarioInputMappingSection";
 import { Drawer } from "~/components/ui/drawer";
+import { Tooltip } from "~/components/ui/tooltip";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -441,7 +443,20 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                 {/* Code editor */}
                 <Box>
                   <Field.Root>
-                    <Field.Label>Python Code</Field.Label>
+                    <Field.Label>
+                      <HStack gap={1}>
+                        <Text>Python Code</Text>
+                        <Tooltip
+                          content="Return a session key beside the outputs to keep a value for the conversation, such as a conversation id. Map an input to the scenario session to receive it on the next turn of the same conversation; it is None on the first turn."
+                          positioning={{ placement: "top" }}
+                          showArrow
+                        >
+                          <Box>
+                            <HelpCircle width="14px" />
+                          </Box>
+                        </Tooltip>
+                      </HStack>
+                    </Field.Label>
                     <Text fontSize="sm" color="fg.muted" marginBottom={2}>
                       Define a Python class with a `__call__` method that takes
                       inputs and returns outputs.

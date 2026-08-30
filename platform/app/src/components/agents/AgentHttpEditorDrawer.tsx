@@ -10,6 +10,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { HelpCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 import {
@@ -17,6 +18,7 @@ import {
   ScenarioInputMappingSection,
 } from "~/components/suites/ScenarioInputMappingSection";
 import { Drawer } from "~/components/ui/drawer";
+import { Tooltip } from "~/components/ui/tooltip";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -86,15 +88,25 @@ function getHttpConfig(config: AgentComponentConfig): HttpComponentConfig {
 /**
  * Build DSL-compatible config for HTTP agent
  */
-function buildHttpConfig(
-  url: string,
-  method: HttpMethod,
-  bodyTemplate: string,
-  outputPath: string,
-  headers: HttpHeader[],
-  auth: HttpAuth | undefined,
-  scenarioMappings: Record<string, FieldMapping>,
-): HttpComponentConfig {
+function buildHttpConfig({
+  url,
+  method,
+  bodyTemplate,
+  outputPath,
+  sessionPath,
+  headers,
+  auth,
+  scenarioMappings,
+}: {
+  url: string;
+  method: HttpMethod;
+  bodyTemplate: string;
+  outputPath: string;
+  sessionPath: string;
+  headers: HttpHeader[];
+  auth: HttpAuth | undefined;
+  scenarioMappings: Record<string, FieldMapping>;
+}): HttpComponentConfig {
   return {
     name: "HTTP",
     description: "HTTP API endpoint",
@@ -102,6 +114,7 @@ function buildHttpConfig(
     method,
     bodyTemplate,
     outputPath,
+    sessionPath: sessionPath.trim() || undefined,
     headers: headers.length > 0 ? headers : undefined,
     auth: auth?.type === "none" ? undefined : auth,
     scenarioMappings:
@@ -208,6 +221,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const [method, setMethod] = useState<HttpMethod>(DEFAULT_METHOD);
   const [bodyTemplate, setBodyTemplate] = useState(DEFAULT_BODY_TEMPLATE);
   const [outputPath, setOutputPath] = useState(DEFAULT_OUTPUT_PATH);
+  const [sessionPath, setSessionPath] = useState("");
   const [headers, setHeaders] = useState<HttpHeader[]>([]);
   const [auth, setAuth] = useState<HttpAuth | undefined>({ type: "none" });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -287,6 +301,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       // Use || to also catch empty strings
       setBodyTemplate(config.bodyTemplate || DEFAULT_BODY_TEMPLATE);
       setOutputPath(config.outputPath || DEFAULT_OUTPUT_PATH);
+      setSessionPath(config.sessionPath ?? "");
       setHeaders(config.headers ?? []);
       setAuth(config.auth ?? { type: "none" });
       // Load persisted scenario mappings or compute best-match defaults from the
@@ -359,15 +374,16 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid) return;
 
-    const config = buildHttpConfig(
+    const config = buildHttpConfig({
       url,
       method,
       bodyTemplate,
       outputPath,
+      sessionPath,
       headers,
       auth,
       scenarioMappings,
-    );
+    });
 
     if (agentId) {
       // Editing existing agent
@@ -394,6 +410,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     method,
     bodyTemplate,
     outputPath,
+    sessionPath,
     headers,
     auth,
     scenarioMappings,
@@ -579,6 +596,32 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                             setOutputPath(v);
                             markDirty();
                           }}
+                        />
+                      </Field.Root>
+                      <Field.Root>
+                        <Field.Label>
+                          <HStack gap={1}>
+                            <Text>Session path</Text>
+                            <Tooltip
+                              content="JSONPath of a value your endpoint returns for the conversation, such as a conversation id. It is sent back as {{ session }} in the url, the headers and the body on the next turn of the same conversation, and is empty on the first turn."
+                              positioning={{ placement: "top" }}
+                              showArrow
+                            >
+                              <Box>
+                                <HelpCircle width="14px" />
+                              </Box>
+                            </Tooltip>
+                          </HStack>
+                        </Field.Label>
+                        <Input
+                          value={sessionPath}
+                          onChange={(e) => {
+                            setSessionPath(e.target.value);
+                            markDirty();
+                          }}
+                          placeholder="$.conversation_id"
+                          fontFamily="mono"
+                          fontSize="13px"
                         />
                       </Field.Root>
                       {/* Scenario input mapping — HTTP adapter reads these at runtime */}

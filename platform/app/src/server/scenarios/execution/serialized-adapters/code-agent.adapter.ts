@@ -11,14 +11,15 @@
 
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
-import { AgentAdapter, AgentRole } from "@langwatch/scenario";
+import { AgentRole } from "@langwatch/scenario";
 import { SpanKind } from "@opentelemetry/api";
 import { randomBytes } from "crypto";
 import { getLangWatchTracer } from "langwatch";
 import { LATEST_SPEC_VERSION } from "../../../../optimization_studio/types/dsl";
 import type { RunParameterValues } from "../../parameters";
-import { resolveFieldMappings } from "../resolve-field-mappings";
+import { resolveFieldMappings, sourceFieldOf } from "../resolve-field-mappings";
 import type { CodeAgentData } from "../types";
+import { SerializedAgentAdapter } from "./serialized-agent.adapter";
 
 /** Timeout for NLP service requests (2 minutes) */
 const NLP_FETCH_TIMEOUT_MS = 120_000;
@@ -116,7 +117,7 @@ const tracer = getLangWatchTracer("langwatch.scenarios.code-agent-adapter");
  * Serialized code agent adapter that uses pre-fetched configuration.
  * Sends code execution requests to the NLP service. No database access required.
  */
-export class SerializedCodeAgentAdapter extends AgentAdapter {
+export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
   role = AgentRole.AGENT;
 
   private static readonly ENTRY_NODE_ID = "entry";
@@ -164,8 +165,12 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
   async call(input: AgentInput): Promise<string> {
     const inputRecord = this.resolveInputValues(input);
     const workflow = this.buildWorkflow(inputRecord, this.turnParameters());
-    const result = await this.executeOnNlpService(workflow, inputRecord);
-    return result;
+    const { output, session } = await this.executeOnNlpService(
+      workflow,
+      inputRecord,
+    );
+    this.storeSession({ threadId: input.threadId, session });
+    return output;
   }
 
   /**
@@ -193,7 +198,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
    * an end node to capture the code node's outputs.
    */
   private buildWorkflow(
-    resolvedValues: Record<string, string>,
+    resolvedValues: Record<string, unknown>,
     params: RunParameterValues,
   ) {
     const { ENTRY_NODE_ID, CODE_NODE_ID, END_NODE_ID } =
@@ -269,7 +274,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
 
   /** Build the entry node that provides input fields to the workflow. */
   private buildEntryNode(
-    inputs: { identifier: string; type: string; value: string }[],
+    inputs: { identifier: string; type: string; value: unknown }[],
   ) {
     return {
       id: SerializedCodeAgentAdapter.ENTRY_NODE_ID,
@@ -306,7 +311,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
    * on that operator default.
    */
   private buildCodeNode(
-    inputs: { identifier: string; type: string; value: string }[],
+    inputs: { identifier: string; type: string; value: unknown }[],
     outputs: { identifier: string; type: string }[],
   ) {
     const { timeoutMs } = this.config;
@@ -403,8 +408,8 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
    */
   private async executeOnNlpService(
     workflow: ReturnType<typeof this.buildWorkflow>,
-    inputRecord: Record<string, string>,
-  ): Promise<string> {
+    inputRecord: Record<string, unknown>,
+  ): Promise<{ output: string; session: unknown }> {
     const event = {
       type: "execute_flow" as const,
       payload: {
@@ -491,12 +496,19 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
             trace_id: string;
             status: string;
             result: Record<string, unknown> | null;
+            nodes?: Record<
+              string,
+              { outputs?: Record<string, unknown> | null } | null
+            >;
           };
           span.setAttribute("nlp.status", result.status);
           if (result.trace_id) {
             span.setAttribute("nlp.trace_id", result.trace_id);
           }
-          return this.extractOutput(result.result);
+          return {
+            output: this.extractOutput(result.result),
+            session: this.extractSession(result.nodes),
+          };
         } finally {
           clearTimeout(timeout);
         }
@@ -512,26 +524,19 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
    *   Orphan mappings (for inputs that don't exist on the agent) are ignored.
    * Without scenarioMappings: first input gets the last user message, rest get "".
    */
-  private resolveInputValues(agentInput: AgentInput): Record<string, string> {
+  private resolveInputValues(agentInput: AgentInput): Record<string, unknown> {
     const declaredInputs =
       this.config.inputs.length > 0
         ? this.config.inputs
         : [{ identifier: "input", type: "str" }];
 
-    if (
-      this.config.scenarioMappings &&
-      Object.keys(this.config.scenarioMappings).length > 0
-    ) {
-      const resolved = resolveFieldMappings({
-        fieldMappings: this.config.scenarioMappings,
+    const mappings = this.config.scenarioMappings;
+    if (mappings && Object.keys(mappings).length > 0) {
+      return this.resolveMappedInputValues({
+        declaredInputs,
+        mappings,
         agentInput,
       });
-      // Only include values for inputs that exist on the agent
-      const record: Record<string, string> = {};
-      for (const inp of declaredInputs) {
-        record[inp.identifier] = resolved[inp.identifier] ?? "";
-      }
-      return record;
     }
 
     // Legacy behavior: first input = last user message, rest = ""
@@ -588,6 +593,58 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
 
     // Last resort: stringify the whole result
     return this.stringify(result);
+  }
+
+  /**
+   * One value per declared input, from its mapping. Orphan mappings, for
+   * inputs the agent does not declare, are ignored.
+   *
+   * An input mapped to the scenario session receives the JSON value the code
+   * returned, not text: the engine passes a non-string entry input through
+   * untouched, so the code reads back exactly what it returned, and None on
+   * the first turn of a thread.
+   */
+  private resolveMappedInputValues({
+    declaredInputs,
+    mappings,
+    agentInput,
+  }: {
+    declaredInputs: { identifier: string; type: string }[];
+    mappings: NonNullable<CodeAgentData["scenarioMappings"]>;
+    agentInput: AgentInput;
+  }): Record<string, unknown> {
+    const session = this.sessionOf(agentInput.threadId);
+    const resolved = resolveFieldMappings({
+      fieldMappings: mappings,
+      agentInput,
+      session,
+    });
+    const record: Record<string, unknown> = {};
+    for (const inp of declaredInputs) {
+      const mapping = mappings[inp.identifier];
+      const isSession =
+        mapping !== undefined && sourceFieldOf(mapping) === "session";
+      record[inp.identifier] = isSession
+        ? (session ?? null)
+        : (resolved[inp.identifier] ?? "");
+    }
+    return record;
+  }
+
+  /**
+   * The `session` the code returned beside its outputs, read from the code
+   * node's own state rather than the end node: the runner keeps every key the
+   * code returns, declared or not, so the session needs no declared output
+   * and no edge, and a code that returns none leaves the held value as it is.
+   */
+  private extractSession(
+    nodes:
+      | Record<string, { outputs?: Record<string, unknown> | null } | null>
+      | undefined,
+  ): unknown {
+    const outputs = nodes?.[SerializedCodeAgentAdapter.CODE_NODE_ID]?.outputs;
+    if (!outputs || typeof outputs !== "object") return undefined;
+    return "session" in outputs ? outputs.session : undefined;
   }
 
   private stringify(value: unknown): string {

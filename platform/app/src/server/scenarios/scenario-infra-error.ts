@@ -52,6 +52,12 @@ export const ScenarioInfraErrorCode = {
   AgentDisconnected: "agent_disconnected",
   AgentInstanceLost: "agent_instance_lost",
   AgentBusy: "agent_busy",
+  /**
+   * The agent answered with a session, a result or an envelope above its
+   * cap. Any target that keeps a session can fail with it, not only a
+   * connected one.
+   */
+  AgentPayloadTooLarge: "agent_payload_too_large",
   /** Anything else that failed at the infrastructure level. */
   Infra: "scenario_infra_error",
 } as const;
@@ -410,7 +416,41 @@ const CONNECTED_AGENT_ENVELOPES: Record<
       "Every instance of the connected agent stayed busy for the whole retry budget.",
     hint: "Raise the concurrency on the decorated function, or connect more instances.",
   },
+  agent_payload_too_large: {
+    code: ScenarioInfraErrorCode.AgentPayloadTooLarge,
+    message: "The connected agent answered a turn above the size limit.",
+    hint: "Trim the output or the session the function returns, or raise the limit on a self-hosted deployment.",
+  },
 };
+
+/** The marker every adapter throws a refused session with. */
+const SESSION_TOO_LARGE_NEEDLE = "Agent session too large";
+
+/** `... a session of <n> bytes, above the limit of <m> bytes`, split. */
+const SESSION_TOO_LARGE_SIZES =
+  /a session of (\d+) bytes, above the limit of (\d+) bytes/;
+
+/**
+ * A session above the cap, from any target that keeps one: the base adapter
+ * refuses it before the run reads the reply, so the agent's own words never
+ * enter the message and the sizes are the only detail to carry.
+ */
+function sessionTooLargeRule(): ClassificationRule {
+  return {
+    needles: [SESSION_TOO_LARGE_NEEDLE],
+    build: (text) => {
+      const sizes = SESSION_TOO_LARGE_SIZES.exec(text);
+      const detail = sizes
+        ? ` It is ${sizes[1]} bytes; the limit is ${sizes[2]} bytes.`
+        : "";
+      return {
+        code: ScenarioInfraErrorCode.AgentPayloadTooLarge,
+        message: `The agent returned a session value above the size limit.${detail}`,
+        hint: "Return a small value as the session, such as a conversation id or a token, not the conversation itself.",
+      };
+    },
+  };
+}
 
 function connectedAgentRules(): ClassificationRule[] {
   return Object.entries(CONNECTED_AGENT_ENVELOPES).map(([code, envelope]) => ({
@@ -429,6 +469,7 @@ function connectedAgentRules(): ClassificationRule[] {
 }
 
 const CLASSIFICATION_RULES: ClassificationRule[] = [
+  sessionTooLargeRule(),
   {
     // Untrusted TLS certificate — the local-dev self-signed-cert case.
     needles: [
@@ -724,6 +765,8 @@ export function scenarioErrorTitle(code: ScenarioInfraErrorCode): string {
       return "Pinned instance is gone";
     case ScenarioInfraErrorCode.AgentBusy:
       return "Connected agent busy";
+    case ScenarioInfraErrorCode.AgentPayloadTooLarge:
+      return "Agent answer too large";
     case ScenarioInfraErrorCode.Infra:
       return "Simulation failed";
     default: {

@@ -635,6 +635,8 @@ export const httpComponentSchema = baseComponentSchema.extend({
   auth: httpAuthSchema.optional(),
   bodyTemplate: z.string().optional(),
   outputPath: z.string().optional(),
+  /** JSONPath of the conversation value the endpoint returns, sent back as `{{ session }}`. */
+  sessionPath: z.string().optional(),
   timeoutMs: z.number().positive().optional(),
   /** Maps agent input field identifiers to scenario data sources or static values. */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),

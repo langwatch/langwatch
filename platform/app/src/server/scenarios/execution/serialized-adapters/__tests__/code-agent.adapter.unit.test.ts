@@ -1178,4 +1178,125 @@ describe("SerializedCodeAgentAdapter", () => {
       expect(armedFetchTimeoutMs()).toBe(600_000);
     });
   });
+
+  describe("given a code agent with an input mapped to the scenario session", () => {
+    const sessionConfig: CodeAgentData = {
+      ...defaultConfig,
+      inputs: [
+        { identifier: "input", type: "str" },
+        { identifier: "session", type: "dict" },
+      ],
+      scenarioMappings: {
+        input: { type: "source", sourceId: "scenario", path: ["input"] },
+        session: { type: "source", sourceId: "scenario", path: ["session"] },
+      },
+    };
+
+    /** A success reply whose code node returned `outputs` beside the end result. */
+    const replyWith = (codeOutputs: Record<string, unknown>) => ({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        trace_id: "trace_abc123",
+        status: "success",
+        result: { output: codeOutputs.output },
+        nodes: {
+          entry: { id: "entry", status: "success" },
+          code_agent: {
+            id: "code_agent",
+            status: "success",
+            outputs: codeOutputs,
+          },
+          end: { id: "end", status: "success" },
+        },
+      }),
+      text: vi.fn().mockResolvedValue(""),
+    });
+
+    /** The `session` input of the nth request the adapter sent. */
+    const sentSession = (call: number): unknown => {
+      const body = JSON.parse(mockFetch.mock.calls[call]?.[1]?.body as string);
+      return body.payload.inputs[0].session;
+    };
+
+    const turn = (threadId: string, text: string): AgentInput => ({
+      ...defaultInput,
+      threadId,
+      messages: [{ role: "user", content: text }],
+      newMessages: [{ role: "user", content: text }],
+    });
+
+    describe("when the code returns a session beside its reply", () => {
+      /** @scenario "A code agent that returns a session receives it on the next turn" */
+      /** @scenario "A code agent receives no session on the first turn of a thread" */
+      /** @scenario "Two threads of one code agent run do not share a session" */
+      it("sends null on the first turn, the value on the next turn, and nothing to another thread", async () => {
+        mockFetch
+          .mockResolvedValueOnce(
+            replyWith({ output: "one", session: { cursor: 7 } }),
+          )
+          .mockResolvedValueOnce(
+            replyWith({ output: "two", session: { cursor: 8 } }),
+          )
+          .mockResolvedValueOnce(replyWith({ output: "other" }));
+        const adapter = new SerializedCodeAgentAdapter({
+          config: sessionConfig,
+          nlpServiceUrl,
+          projectApiKey: apiKey,
+        });
+
+        await expect(adapter.call(turn("thread_a", "first"))).resolves.toBe(
+          "one",
+        );
+        await expect(adapter.call(turn("thread_a", "second"))).resolves.toBe(
+          "two",
+        );
+        await expect(adapter.call(turn("thread_b", "hello"))).resolves.toBe(
+          "other",
+        );
+
+        expect(sentSession(0)).toBeNull();
+        expect(sentSession(1)).toEqual({ cursor: 7 });
+        expect(sentSession(2)).toBeNull();
+      });
+
+      it("keeps the held value when a later turn returns no session", async () => {
+        mockFetch
+          .mockResolvedValueOnce(
+            replyWith({ output: "one", session: "conv_1" }),
+          )
+          .mockResolvedValueOnce(replyWith({ output: "two" }))
+          .mockResolvedValueOnce(replyWith({ output: "three" }));
+        const adapter = new SerializedCodeAgentAdapter({
+          config: sessionConfig,
+          nlpServiceUrl,
+          projectApiKey: apiKey,
+        });
+
+        await adapter.call(turn("thread_a", "first"));
+        await adapter.call(turn("thread_a", "second"));
+        await adapter.call(turn("thread_a", "third"));
+
+        expect(sentSession(2)).toBe("conv_1");
+      });
+    });
+
+    describe("when the code returns a session above the cap", () => {
+      /** @scenario "A code agent session above the cap fails the turn" */
+      it("fails the turn with the payload code", async () => {
+        mockFetch.mockResolvedValueOnce(
+          replyWith({ output: "one", session: "x".repeat(70_000) }),
+        );
+        const adapter = new SerializedCodeAgentAdapter({
+          config: sessionConfig,
+          nlpServiceUrl,
+          projectApiKey: apiKey,
+        });
+
+        await expect(adapter.call(turn("thread_a", "first"))).rejects.toThrow(
+          /agent_payload_too_large/,
+        );
+      });
+    });
+  });
 });

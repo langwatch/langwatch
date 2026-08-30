@@ -36353,6 +36353,8 @@ langwatch agent create 'My Agent' --type http --config '{
 }'
 ```
 
+If the endpoint creates its own conversation and returns its id, add `"sessionPath": "$.conversation_id"` (the JSONPath of that value in the response) and read it back as `{{ session }}` in the body template, the URL or a header on the next turn of the same conversation. It is empty on the first turn.
+
 The body template renders as a Liquid template on every turn. The URL and header values render the same variables:
 
 | Variable | Value |
@@ -37484,12 +37486,28 @@ The body template renders as a Liquid template on every turn, and `outputPath` i
 | `{{ messages }}` | The whole conversation as a raw JSON array of `{role, content}` messages |
 | `{{ input }}` | The text of the last user message |
 | `{{ threadId }}` | A conversation id, the same on every turn of a run |
+| `{{ session }}` | What the endpoint returned at `sessionPath` on the previous turn of the conversation, empty on the first turn |
 | `{{ params.NAME }}` | A [run parameter](/agent-simulations/scenario-parameters) |
 | `{{ traceId }}`, `{{ traceparent }}` | The turn's trace identifiers, see [Linking your traces](/agent-simulations/remote-traces) |
 
 The URL and the header values render the same variables.
 
 For the response, set `outputPath` to where the reply text lives. If the endpoint answers `{"reply": "It ships on Tuesday."}`, set `outputPath` to `$.reply`. The platform reads the reply text at that path; the response needs no other fields.
+
+### Keep a value between turns
+
+Many agents create their own conversation on their side and cannot accept an id from outside. `sessionPath` covers that: a JSONPath to a value in the response that the platform keeps for the conversation and sends back as `{{ session }}` on the next turn, in the URL, the headers and the body.
+
+If the endpoint answers `{"reply": "...", "conversation_id": "conv_8f2"}`, set `sessionPath` to `$.conversation_id` and read it back from the body template:
+
+```json title="Body template"
+{
+  "conversation_id": "{{ session }}",
+  "message": "{{ input }}"
+}
+```
+
+The first turn of a conversation renders `{{ session }}` as an empty string. A response with nothing at the path keeps the value from the previous turn. Any JSON value works: a string renders as text, an object or a list renders as raw JSON. The value is capped at 64 KB; a larger one fails the turn with `agent_payload_too_large`.
 
 ### 4. Adopt the trace context
 
@@ -37555,11 +37573,14 @@ langwatch agent create 'My Agent' --type http --config '{
   "url": "https://staging.example.com/chat",
   "bodyTemplate": "{\"thread_id\": \"{{ threadId }}\", \"messages\": {{ messages }}}",
   "outputPath": "$.reply",
+  "sessionPath": "$.conversation_id",
   "auth": {"type": "bearer", "token": "{{ secrets.SCENARIO_API_KEY }}"}
 }'
 
 langwatch test-suite run 'Smoke' --target http:<agent-id> --wait
 ```
+
+`sessionPath` is optional; leave it out when the endpoint keeps nothing between turns.
 
 ### Common failures
 
@@ -37641,6 +37662,33 @@ class Code:
 ```
 
 The declared output key must match the key the Python returns, or the run fails with `missing_output`. Run it with `--target code:<agent-id>`.
+
+### Keep a value between turns
+
+A code agent can keep one value per conversation. Return a `session` key beside the output, and the platform sends it back on the next turn of the same conversation. To receive it, declare an input (here `session`) and map it to the scenario source **session** in the agent's scenario mappings; an input named `session` is mapped to it by default.
+
+```python
+import requests
+
+
+class Code:
+    def __call__(self, message: str, session: dict | None = None):
+        conversation_id = (session or {}).get("conversation_id")
+        response = requests.post(
+            "https://api.your-company.internal/chat",
+            json={"message": message, "conversation_id": conversation_id},
+            headers={"Authorization": f"Bearer {secrets.API_TOKEN}"},
+            timeout=30,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return {
+            "output": data["reply"],
+            "session": {"conversation_id": data["conversation_id"]},
+        }
+```
+
+The mapped input is `None` on the first turn of a conversation, and afterwards exactly the value the code returned, with its JSON types: a dict stays a dict, a string stays a string. `session` needs no declared output. A turn that returns no `session` key keeps the previous value. The value is capped at 64 KB; a larger one fails the turn with `agent_payload_too_large`.
 
 [Testing agents behind authentication](/agent-simulations/authenticated-agents) carries the worked OAuth2 client-credentials example, the secret rules and the runtime's limits.
 
@@ -53906,6 +53954,8 @@ langwatch agent create 'My Agent' --type http --config '{
   "auth": {"type": "bearer", "token": "{{ secrets.SCENARIO_API_KEY }}"}
 }'
 ```
+
+If the endpoint creates its own conversation and returns its id, add `"sessionPath": "$.conversation_id"` (the JSONPath of that value in the response) and read it back as `{{ session }}` in the body template, the URL or a header on the next turn of the same conversation. It is empty on the first turn.
 
 The body template renders as a Liquid template on every turn. The URL and header values render the same variables:
 

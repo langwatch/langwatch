@@ -884,6 +884,7 @@ const HttpAgentConfigSchema = z.object({
   auth: AuthConfigSchema.optional(),
   bodyTemplate: z.string().optional(),
   outputPath: z.string().optional(),
+  sessionPath: z.string().optional(),
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
 });
 
@@ -921,6 +922,7 @@ async function fetchHttpAgentData({
     auth: config.auth,
     bodyTemplate: config.bodyTemplate,
     outputPath: config.outputPath,
+    sessionPath: config.sessionPath,
     scenarioMappings: config.scenarioMappings,
     secrets,
   };

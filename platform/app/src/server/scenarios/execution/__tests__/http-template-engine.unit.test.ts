@@ -456,3 +456,82 @@ describe("header template rendering", () => {
     });
   });
 });
+
+describe("buildTemplateContext session", () => {
+  describe("when no session is held for the thread", () => {
+    /** @scenario "An HTTP agent renders an empty session on the first turn" */
+    it("renders session as an empty string in the body, the url and a header", () => {
+      const context = buildTemplateContext({ input: inputWith("hi") });
+
+      expect(
+        renderBodyTemplate({ template: '{"s": "{{ session }}"}', context }),
+      ).toBe('{"s": ""}');
+      expect(
+        renderUrlTemplate({
+          template: "https://a.test/{{ session }}",
+          context,
+        }),
+      ).toBe("https://a.test/");
+      expect(
+        renderHeaderTemplate({
+          template: "{{ session }}",
+          context,
+          headerKey: "X-Session",
+        }),
+      ).toBe("");
+    });
+  });
+
+  describe("when a string session is held", () => {
+    it("renders it as a scalar, escaped in the body and encoded in the url", () => {
+      const context = buildTemplateContext({
+        input: inputWith("hi"),
+        session: 'conv "1"/x',
+      });
+
+      expect(
+        renderBodyTemplate({ template: '{"s": "{{ session }}"}', context }),
+      ).toBe('{"s": "conv \\"1\\"/x"}');
+      expect(
+        renderUrlTemplate({
+          template: "https://a.test/{{ session }}",
+          context,
+        }),
+      ).toBe("https://a.test/conv%20%221%22%2Fx");
+    });
+  });
+
+  describe("when a structured session is held", () => {
+    /** @scenario "A structured session renders as raw JSON in the body" */
+    it("renders it as raw JSON in the body", () => {
+      const context = buildTemplateContext({
+        input: inputWith("hi"),
+        session: { step: 2, seen: ["a"] },
+      });
+
+      const body = renderBodyTemplate({
+        template: '{"state": {{ session }}}',
+        context,
+      });
+
+      expect(JSON.parse(body)).toEqual({ state: { step: 2, seen: ["a"] } });
+    });
+
+    it("renders a data mapping of the session the same way", () => {
+      const context = buildTemplateContext({
+        input: inputWith("hi"),
+        session: { step: 2 },
+        scenarioMappings: {
+          memory: { type: "source", sourceId: "scenario", path: ["session"] },
+        },
+      });
+
+      const body = renderBodyTemplate({
+        template: '{"memory": {{ memory }}}',
+        context,
+      });
+
+      expect(JSON.parse(body)).toEqual({ memory: { step: 2 } });
+    });
+  });
+});
