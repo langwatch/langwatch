@@ -105,3 +105,23 @@ count overstates its difficulty.
 change to them cannot be verified by running them the way the unit-lane fixes
 in this session were. Whoever takes it on should be able to run the datastore
 lane, or the fix is being made blind.
+
+## The other "exists nowhere" claims, re-checked
+
+After getting two wrong the same way, every other such claim made while working
+through this was re-run with a pattern that matches declaration forms
+(`abstract`, `async`, `class`, `function`, `const`, a bare method) rather than
+the export keyword. The rest hold:
+
+| claim | verdict |
+| --- | --- |
+| `assertCanWriteScope` (model defaults) | Holds. The five hits are all data-retention's own port method and its callers; nothing model-defaults. |
+| `ModelDefaultsRepository` | Holds. Nothing outside the test that names it. |
+| `MigrationRollbackRequiresMigratedOrFinalizedError` | Holds. Nothing anywhere; the test invented it. |
+| `withName` / `withAggregateType` | Holds. Every hit is one of the four identity pipelines CALLING them; `packages/eventing` declares neither. |
+| `getEvaluatorModelSettingFields` | Holds. Nothing outside its own test. |
+| `liveTraceProjectIds` | Holds. Only the parameter and the call inside `ingestionSources.ts`. |
+
+Two wrong out of eight, both in the same file, both from the same pattern.
+Worth the re-run: the two wrong ones had been written up as a subsystem
+decision when they are a wrong-object reach.
