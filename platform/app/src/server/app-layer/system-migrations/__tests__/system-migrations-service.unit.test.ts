@@ -1,7 +1,4 @@
-import type {
-  MigrationPassSummary,
-  TenantMigrationRecord,
-} from "@langwatch/system-migrations";
+import type { MigrationPassSummary, TenantMigrationRecord } from "@langwatch/system-migrations";
 import { describe, expect, it, vi } from "vitest";
 import {
   MigrationDrainProofRequiresMigratedError,
@@ -49,9 +46,7 @@ function enrollmentStoreStub() {
     findOrganizationById: vi
       .fn<SystemMigrationEnrollmentStore["findOrganizationById"]>()
       .mockResolvedValue({ id: "org_acme", name: "Acme" }),
-    isEnrolled: vi
-      .fn<SystemMigrationEnrollmentStore["isEnrolled"]>()
-      .mockResolvedValue(true),
+    isEnrolled: vi.fn<SystemMigrationEnrollmentStore["isEnrolled"]>().mockResolvedValue(true),
     countEnrolledByMigration: vi
       .fn<SystemMigrationEnrollmentStore["countEnrolledByMigration"]>()
       .mockResolvedValue(new Map()),
@@ -61,28 +56,21 @@ function enrollmentStoreStub() {
     searchOrganizations: vi
       .fn<SystemMigrationEnrollmentStore["searchOrganizations"]>()
       .mockResolvedValue([]),
-    create: vi
-      .fn<SystemMigrationEnrollmentStore["create"]>()
-      .mockResolvedValue(undefined),
+    create: vi.fn<SystemMigrationEnrollmentStore["create"]>().mockResolvedValue(undefined),
     findCohortEligibleOrganizations: vi
       .fn<SystemMigrationEnrollmentStore["findCohortEligibleOrganizations"]>()
       .mockResolvedValue([]),
     createMany: vi
       .fn<SystemMigrationEnrollmentStore["createMany"]>()
       .mockResolvedValue({ insertedCount: 0 }),
-    delete: vi
-      .fn<SystemMigrationEnrollmentStore["delete"]>()
-      .mockResolvedValue(undefined),
+    delete: vi.fn<SystemMigrationEnrollmentStore["delete"]>().mockResolvedValue(undefined),
   };
 }
 
 function targetedPassStub() {
   return vi
     .fn<
-      (args: {
-        organizationId: string;
-        migrationName: string;
-      }) => Promise<MigrationPassSummary>
+      (args: { organizationId: string; migrationName: string }) => Promise<MigrationPassSummary>
     >()
     .mockResolvedValue({
       tenantsSeen: 1,
@@ -116,10 +104,7 @@ function serviceWith({
   >;
   rollbackGuards?: Record<
     string,
-    (args: {
-      tenantId: string;
-      record: TenantMigrationRecord | null;
-    }) => Promise<void>
+    (args: { tenantId: string; record: TenantMigrationRecord | null }) => Promise<void>
   >;
   isSaaS?: boolean;
   enrollments?: ReturnType<typeof enrollmentStoreStub>;
@@ -420,8 +405,10 @@ describe("SystemMigrationsService.rollBack", () => {
 
         expect(decisions).toHaveLength(2);
         expect(decisions[1]).toBe(decisions[0]);
-        const pinned = (upserts[0]?.report as Record<string, unknown>)
-          .rolledBack as Record<string, unknown>;
+        const pinned = (upserts[0]?.report as Record<string, unknown>).rolledBack as Record<
+          string,
+          unknown
+        >;
         expect(pinned.at).toBe(decisions[0]);
       });
     });
@@ -485,14 +472,21 @@ describe("SystemMigrationsService.rollBack", () => {
         tenantId: TENANT,
         actorUserId: "user_alex",
       });
-      await expect(attempt).rejects.toThrow(
-        MigrationRollbackRequiresMigratedOrFinalizedError,
-      );
-      await attempt.catch((error: MigrationRollbackRequiresMigratedOrFinalizedError) => {
-        expect(error.code).toBe("migration_rollback_requires_migrated_or_finalized");
-        expect(error.meta).toMatchObject({ status: "parked" });
-      });
-      expect(upserts).toHaveLength(0);
+
+      // The pin is the whole point: a parked organization is one the pass
+      // keeps picking up and failing on, and rolling it back is how an
+      // operator makes later passes leave it alone.
+      expect(upserts).toHaveLength(1);
+      const written = upserts[0]!;
+      expect(written.status).toBe("rolled_back");
+      const report = written.report as Record<string, unknown>;
+      expect(report.rolledBack).toMatchObject({ by: "user_alex" });
+      // The error it parked on is kept rather than overwritten by the pin.
+      expect(report.message).toBe("ledger unreachable");
+
+      // It never cut over, so there is nothing to undo. Running the effect
+      // here would undo a cutover that never happened.
+      expect(effect).not.toHaveBeenCalled();
     });
   });
 });
@@ -552,9 +546,7 @@ describe("SystemMigrationsService enrollment", () => {
           actorUserId: "user_alex",
         });
 
-        await expect(attempt).rejects.toThrow(
-          MigrationEnrollmentOrganizationNotFoundError,
-        );
+        await expect(attempt).rejects.toThrow(MigrationEnrollmentOrganizationNotFoundError);
         await attempt.catch((error: MigrationEnrollmentOrganizationNotFoundError) => {
           expect(error.code).toBe("organization_not_found");
         });
@@ -613,9 +605,7 @@ describe("SystemMigrationsService enrollment", () => {
             }),
         ]) {
           const rejection = attempt();
-          await expect(rejection).rejects.toBeInstanceOf(
-            MigrationEnrollmentCloudOnlyError,
-          );
+          await expect(rejection).rejects.toBeInstanceOf(MigrationEnrollmentCloudOnlyError);
           await expect(rejection).rejects.toMatchObject({
             code: "migration_enrollment_cloud_only",
           });
@@ -824,8 +814,7 @@ describe("SystemMigrationsService.runForOrganization", () => {
           report: { kind: "cutover_waiting", awaiting: ["earlier-step"] },
         },
         waitingReports: {
-          [MIGRATION]: (report) =>
-            (report as { kind?: string } | null)?.kind === "cutover_waiting",
+          [MIGRATION]: (report) => (report as { kind?: string } | null)?.kind === "cutover_waiting",
         },
       });
 
