@@ -53,6 +53,27 @@ export class ScenarioExecutionPoolService extends ScenarioExecutionPoolPort {
     this.runner = runner;
   }
 
+  /**
+   * The runner, or a throw naming the job that could not be served.
+   *
+   * `connect` is late — `ScenarioProcessorService.create` calls it during
+   * worker boot, so a job submitted before that lands on an unconnected pool.
+   * `startJob` has always thrown there on purpose: the execute intent's outbox
+   * retries, which is what `startWorkers.ts` relies on. The two CANCELLED
+   * branches used `this.runner?.skipCancelled(...)` and then returned, so the
+   * same window silently dropped the terminal event and left the run at QUEUED
+   * — the exact outcome `inFlightJobs` exists to prevent. One field, one
+   * policy, and it is the loud one.
+   */
+  private requireRunner(scenarioRunId: string): ScenarioExecutionRunnerPort {
+    if (!this.runner) {
+      throw new Error(
+        `Scenario execution pool is not connected for scenarioRunId=${scenarioRunId}`,
+      );
+    }
+    return this.runner;
+  }
+
   /** Number of active jobs, including the child-registration window. */
   get activeCount(): number {
     return this._active.size;
@@ -79,10 +100,7 @@ export class ScenarioExecutionPoolService extends ScenarioExecutionPoolPort {
    * instead of orphaning at QUEUED.
    */
   get inFlightJobs(): ExecutionJobData[] {
-    return [
-      ...[...this._active.values()].map((execution) => execution.job),
-      ...this._pending,
-    ];
+    return [...[...this._active.values()].map((execution) => execution.job), ...this._pending];
   }
 
   /**
@@ -106,9 +124,7 @@ export class ScenarioExecutionPoolService extends ScenarioExecutionPoolPort {
   registerChild(scenarioRunId: string, child: ChildProcess): void {
     const execution = this._active.get(scenarioRunId);
     if (!execution) {
-      throw new Error(
-        `Cannot register a child for inactive scenarioRunId=${scenarioRunId}`,
-      );
+      throw new Error(`Cannot register a child for inactive scenarioRunId=${scenarioRunId}`);
     }
 
     execution.child = child;
@@ -144,7 +160,7 @@ export class ScenarioExecutionPoolService extends ScenarioExecutionPoolPort {
         { scenarioRunId: jobData.scenarioRunId },
         "Skipping cancelled job, dispatching finished(CANCELLED)",
       );
-      this.runner?.skipCancelled(jobData);
+      this.requireRunner(jobData.scenarioRunId).skipCancelled(jobData);
       return;
     }
     if (this._active.size < this._concurrency) {
@@ -180,12 +196,7 @@ export class ScenarioExecutionPoolService extends ScenarioExecutionPoolPort {
     // Track in-flight job data immediately — before the child is registered —
     // so a draining worker can emit a terminal failure even if shutdown lands
     // in the spawn window (child exists but is not registered yet).
-    const runner = this.runner;
-    if (!runner) {
-      throw new Error(
-        `Scenario execution pool is not connected for scenarioRunId=${jobData.scenarioRunId}`,
-      );
-    }
+    const runner = this.requireRunner(jobData.scenarioRunId);
     this._active.set(jobData.scenarioRunId, { job: jobData });
 
     logger.info(
@@ -222,7 +233,7 @@ export class ScenarioExecutionPoolService extends ScenarioExecutionPoolPort {
           { scenarioRunId: next.scenarioRunId },
           "Skipping cancelled pending job, dispatching finished(CANCELLED)",
         );
-        this.runner?.skipCancelled(next);
+        this.requireRunner(next.scenarioRunId).skipCancelled(next);
         continue;
       }
 

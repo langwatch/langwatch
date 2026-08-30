@@ -65,6 +65,43 @@ describe("ScenarioExecutionPoolService", () => {
     pool.connect(runner);
   });
 
+  describe("when a job arrives before the processor has connected", () => {
+    /**
+     * `connect` is late — `ScenarioProcessorService.create` calls it during
+     * worker boot — so a job can land on an unconnected pool. `startJob` has
+     * always thrown there, which is what lets the execute intent's outbox
+     * retry (`startWorkers.ts`). The two CANCELLED branches used to reach for
+     * `this.runner?.skipCancelled(...)` and return, so the same window
+     * silently dropped the terminal event and left the run at QUEUED.
+     */
+    it("refuses a cancelled submission loudly rather than dropping its terminal event", () => {
+      const unconnected = ScenarioExecutionPoolService.create({ concurrency: 2 });
+      unconnected.markCancelled("run-early");
+
+      expect(() => unconnected.submit(makeJob("run-early"))).toThrow(
+        /not connected for scenarioRunId=run-early/,
+      );
+    });
+
+    it("refuses an ordinary submission the same way", () => {
+      const unconnected = ScenarioExecutionPoolService.create({ concurrency: 2 });
+
+      expect(() => unconnected.submit(makeJob("run-early"))).toThrow(
+        /not connected for scenarioRunId=run-early/,
+      );
+    });
+  });
+
+  describe("when a cancelled job is submitted to a connected pool", () => {
+    it("dispatches the terminal skip through the runner", () => {
+      pool.markCancelled("run-cancelled");
+
+      pool.submit(makeJob("run-cancelled"));
+
+      expect(runner.skipped.map((job) => job.scenarioRunId)).toEqual(["run-cancelled"]);
+    });
+  });
+
   describe("when pool has capacity", () => {
     it("starts the job immediately", () => {
       pool.submit(makeJob("run-1"));
