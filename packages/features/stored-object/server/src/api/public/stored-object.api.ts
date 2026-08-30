@@ -48,8 +48,9 @@ export class StoredObjectsPublicApi {
         .withRateLimit()
         .withMiddleware(this.noStore),
     );
-    group.register(
-      "createUpload",
+    group.registerRoute(
+      "post",
+      "/storedObjects.createUpload",
       STORED_OBJECTS_PUBLIC_API_VERSION,
       async (context, input: StoredObjectsCreateUploadInput) => {
         return context.app.storedObjects.createUpload(input);
@@ -64,8 +65,9 @@ export class StoredObjectsPublicApi {
             summary: "Create a stored-object upload",
           }),
     );
-    group.register(
-      "confirmUpload",
+    group.registerRoute(
+      "post",
+      "/storedObjects.confirmUpload",
       STORED_OBJECTS_PUBLIC_API_VERSION,
       async (context, input: StoredObjectsConfirmUploadInput) => {
         return context.app.storedObjects.confirmUpload(input);
@@ -80,8 +82,9 @@ export class StoredObjectsPublicApi {
             summary: "Confirm a stored-object upload",
           }),
     );
-    group.register(
-      "get",
+    group.registerRoute(
+      "post",
+      "/storedObjects.get",
       STORED_OBJECTS_PUBLIC_API_VERSION,
       async (context, input: StoredObjectsGetInput) => {
         await context.authorize(input.audience);
@@ -97,8 +100,9 @@ export class StoredObjectsPublicApi {
             summary: "Resolve a fresh stored-object capability",
           }),
     );
-    group.register(
-      "delete",
+    group.registerRoute(
+      "post",
+      "/storedObjects.delete",
       STORED_OBJECTS_PUBLIC_API_VERSION,
       async (context, input: StoredObjectsDeleteInput) => {
         return context.app.storedObjects.delete(input);
