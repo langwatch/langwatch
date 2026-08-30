@@ -16,12 +16,13 @@ import {
   type RunParameterValues,
   type ScenarioParameterDefinition,
 } from "~/server/scenarios/parameters";
+import { targetLabelOf } from "~/server/suites/target-key";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { api } from "~/utils/api";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
-  displayOptionalValue,
-  serializeOptionalScalarValue,
+  displayTypedValue,
+  serializeOptionalTypedScalarValue,
 } from "~/utils/jsonValueText";
 import { toaster } from "../ui/toaster";
 import { showSuiteRunError } from "./showSuiteRunError";
@@ -37,13 +38,36 @@ export interface UseRunSuiteOptions {
   onViewRun?: (suiteId: string) => void;
 }
 
+/** Where a declared parameter comes from. */
+export type ParameterSource = "scenario" | "agent";
+
+/**
+ * One parameter a run can carry, with where it is declared: on a scenario of
+ * the run, or by an agent the run goes against.
+ */
+export type DeclaredParameter = ScenarioParameterDefinition & {
+  source: ParameterSource;
+  /** The label of the agent that declares it. Nothing for a scenario one. */
+  agentLabel?: string;
+};
+
+/** An agent of the run, with the parameters it declares. */
+export type ParameterDeclaringAgent = {
+  id: string;
+  name: string;
+  environment?: string | null;
+  owner?: { name: string | null } | null;
+  parameters?: readonly ScenarioParameterDefinition[];
+};
+
 /**
  * Every parameter the run can carry: the union of what the scenarios in it
- * declare.
+ * declare, then what its agents declare.
  *
  * Two scenarios can declare the same name and only one of them describe it or
  * default it, so a name keeps the first description and the first default any
- * of them gives it rather than the last one read.
+ * of them gives it rather than the last one read. A scenario declaration wins
+ * over an agent's on a name both declare, the way the server resolves it.
  *
  * Secret is the one field that is not first-wins: a name any scenario in the
  * run declares secret is offered as secret. The run refuses that pair anyway,
@@ -53,10 +77,13 @@ export interface UseRunSuiteOptions {
 export function unionParameterDefinitions({
   scenarioIds,
   scenarios,
+  agents = [],
 }: {
   scenarioIds: string[];
   scenarios: readonly { id: string; parameters: unknown }[];
-}): ScenarioParameterDefinition[] {
+  /** The agents the run goes against, for the parameters they declare. */
+  agents?: readonly ParameterDeclaringAgent[];
+}): DeclaredParameter[] {
   const inRun = new Set(scenarioIds);
   const declared = scenarios
     .filter((scenario) => inRun.has(scenario.id))
@@ -64,15 +91,33 @@ export function unionParameterDefinitions({
       parseScenarioParameterDefinitions(scenario.parameters),
     );
 
-  const union = new Map<string, ScenarioParameterDefinition>();
+  const union = new Map<string, DeclaredParameter>();
   for (const definition of declared) {
     const seen = union.get(definition.name);
     union.set(definition.name, {
+      ...(seen ?? definition),
       name: definition.name,
       description: seen?.description ?? definition.description,
       defaultValue: seen?.defaultValue ?? definition.defaultValue,
       secret: seen?.secret === true || definition.secret === true,
+      source: "scenario",
     });
+  }
+  for (const agent of agents) {
+    const agentLabel = targetLabelOf({
+      name: agent.name,
+      environment: agent.environment,
+      ownerName: agent.owner?.name,
+      differingNames: new Set(),
+    });
+    for (const definition of agent.parameters ?? []) {
+      if (union.has(definition.name)) continue;
+      union.set(definition.name, {
+        ...definition,
+        source: "agent",
+        agentLabel,
+      });
+    }
   }
   return [...union.values()];
 }
@@ -102,7 +147,10 @@ export function toRunParameters({
       if (typed !== "") parameters[definition.name] = typed;
       continue;
     }
-    const value = serializeOptionalScalarValue(typed);
+    const value = serializeOptionalTypedScalarValue({
+      raw: typed,
+      type: definition.type,
+    });
     if (value === undefined) continue;
     parameters[definition.name] = value;
   }
@@ -219,7 +267,10 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
     for (const definition of parameterDefinitions) {
       values[definition.name] =
         parameterOverrides[definition.name] ??
-        displayOptionalValue(definition.defaultValue);
+        displayTypedValue({
+          value: definition.defaultValue,
+          type: definition.type,
+        });
     }
     return values;
   }, [parameterDefinitions, parameterOverrides]);

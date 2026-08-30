@@ -209,6 +209,20 @@ describe("runAgentCommand()", () => {
       expect(errors).toMatch(/give --message <text>, or --input with a messages list/);
       expect(buildRelayBody({ input: {}, options: {} })).toMatch(/--message/);
     });
+
+    /** @scenario "A typed value reaches the run as the declared type" */
+    it("reads each --param as the type the agent declares for it", () => {
+      const body = buildRelayBody({
+        input: {},
+        options: { message: "hi", param: ["order_id=007", "seats=5"] },
+        parameters: [
+          { name: "order_id", type: "string" },
+          { name: "seats", type: "number" },
+        ],
+      });
+
+      expect(body).toMatchObject({ params: { order_id: "007", seats: 5 } });
+    });
   });
 
   describe("when the agent is connected and offline", () => {

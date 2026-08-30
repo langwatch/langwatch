@@ -5,6 +5,7 @@ import {
   AgentsApiService,
   type AgentCallBody,
   type AgentCallMessage,
+  type AgentParameterSpec,
 } from "@/client-sdk/services/agents/agents-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
@@ -29,16 +30,23 @@ const isMessageList = (value: unknown): value is AgentCallMessage[] =>
 /**
  * The relay body for a connected agent: `--message` is one user turn,
  * `--input` is the body itself (it must carry `messages`), `--param` gives
- * the run parameters and `--thread-id` continues a conversation.
+ * the run parameters and `--thread-id` continues a conversation. A `--param`
+ * value is read as the type the agent declares for it.
  */
 export function buildRelayBody({
   input,
   options,
+  parameters = [],
 }: {
   input: Record<string, unknown>;
   options: RunAgentOptions;
+  /** The parameters the agent declares, for the type each value is read as. */
+  parameters?: readonly AgentParameterSpec[];
 }): AgentCallBody | string {
-  const params = parseRunParameterFlags({ pairs: options.param });
+  const params = parseRunParameterFlags({
+    pairs: options.param,
+    types: new Map(parameters.map((spec) => [spec.name, spec.type])),
+  });
   const fromInput = input.messages;
   let messages: AgentCallMessage[];
   if (options.message !== undefined) {
@@ -106,7 +114,7 @@ export const runAgentCommand = async (
   const config = agent.config;
 
   if (agent.type === "connected") {
-    const body = buildRelayBody({ input, options });
+    const body = buildRelayBody({ input, options, parameters: agent.parameters });
     if (typeof body === "string") {
       console.error(chalk.red(`Error: ${body}`));
       process.exit(1);

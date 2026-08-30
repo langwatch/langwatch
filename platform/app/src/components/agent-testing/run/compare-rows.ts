@@ -11,6 +11,7 @@
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import type {
   RunParameterValues,
+  ScenarioParameterDefinition,
   ScenarioParameterValue,
 } from "~/server/scenarios/parameters";
 import {
@@ -82,6 +83,14 @@ export function addCompareRow(rows: readonly CompareRow[]): CompareRow[] {
 /** The declared default of each parameter the run's scenarios name. */
 export type ParameterDefaults = ReadonlyMap<string, ScenarioParameterValue>;
 
+/** What the rows read their values against: the defaults and the types. */
+type RowContext = {
+  /** The declared defaults, which a typed value equal to does not override. */
+  defaults: ParameterDefaults;
+  /** The declarations in scope, for the type each value is read as. */
+  definitions?: readonly ScenarioParameterDefinition[];
+};
+
 /**
  * What a row sends as its own overrides, or nothing for an empty line.
  *
@@ -92,14 +101,13 @@ export type ParameterDefaults = ReadonlyMap<string, ScenarioParameterValue>;
 export function compareRowParameters({
   row,
   defaults,
-}: {
-  row: CompareRow;
-  defaults: ParameterDefaults;
-}): RunParameterValues | undefined {
+  definitions,
+}: { row: CompareRow } & RowContext): RunParameterValues | undefined {
   return canonicalOverrides({
     runParameters: toLineRunParameters({
       line: row.parameterLine,
       secretValues: {},
+      definitions,
     }),
     defaults,
   });
@@ -113,14 +121,12 @@ export function compareRowParameters({
 export function compareRowKey({
   row,
   defaults,
-}: {
-  row: CompareRow;
-  defaults: ParameterDefaults;
-}): string {
+  definitions,
+}: { row: CompareRow } & RowContext): string {
   return targetIdentityKey({
     type: row.target.type,
     referenceId: row.target.id,
-    runParameters: compareRowParameters({ row, defaults }),
+    runParameters: compareRowParameters({ row, defaults, definitions }),
   });
 }
 
@@ -136,17 +142,15 @@ export function compareRowKey({
 export function compareRowColorIndexes({
   rows,
   defaults,
-}: {
-  rows: readonly CompareRow[];
-  defaults: ParameterDefaults;
-}): number[] {
+  definitions,
+}: { rows: readonly CompareRow[] } & RowContext): number[] {
   const sorted = rows
     .map((row, index) => ({
       index,
       sortKey: targetSortKey({
         type: row.target.type,
         referenceId: row.target.id,
-        runParameters: compareRowParameters({ row, defaults }),
+        runParameters: compareRowParameters({ row, defaults, definitions }),
       }),
     }))
     .sort((left, right) => left.sortKey.localeCompare(right.sortKey));
@@ -165,10 +169,8 @@ export function compareRowColorIndexes({
 export function hasDuplicateCompareRows({
   rows,
   defaults,
-}: {
-  rows: readonly CompareRow[];
-  defaults: ParameterDefaults;
-}): boolean {
-  const keys = rows.map((row) => compareRowKey({ row, defaults }));
+  definitions,
+}: { rows: readonly CompareRow[] } & RowContext): boolean {
+  const keys = rows.map((row) => compareRowKey({ row, defaults, definitions }));
   return new Set(keys).size !== keys.length;
 }

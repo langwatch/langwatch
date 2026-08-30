@@ -11,12 +11,14 @@ import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
 import { Check, Code, Globe, Plug, Workflow } from "lucide-react";
 import { agentHasDevTunnel } from "~/components/agents/LocalTunnelBadge";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
+import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 
 const AGENT_ICONS = {
   http: Globe,
   code: Code,
   workflow: Workflow,
+  connected: Plug,
 } as const;
 
 /**
@@ -34,8 +36,14 @@ const AGENT_GRID_COLUMNS = "repeat(3, 1fr)";
 export type RunDialogAgent = {
   id: string;
   name: string;
-  type: "http" | "code" | "workflow";
+  type: "http" | "code" | "workflow" | "connected";
   config?: unknown;
+  /** The environment of a connected agent. */
+  environment?: string | null;
+  /** The owner of a personal connected agent. */
+  owner?: { name: string | null } | null;
+  /** The parameters a connected agent declares. */
+  parameters?: ScenarioParameterDefinition[];
 };
 
 /** The agents of the project as cards, the selected one marked. */

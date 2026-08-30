@@ -6,6 +6,7 @@ const SCENARIO_AGENT_TYPES: ReadonlySet<string> = new Set([
   "http",
   "code",
   "workflow",
+  "connected",
 ]);
 
 type AgentLike = {
@@ -16,16 +17,22 @@ type AgentLike = {
   config?: unknown;
 };
 
-type ScenarioAgent = AgentLike & { type: "http" | "code" | "workflow" };
+type ScenarioAgentType = "http" | "code" | "workflow" | "connected";
 
-/** Filter and sort agents to only valid scenario target types. */
-export function useFilteredAgents(
-  agents: AgentLike[] | undefined,
+/**
+ * Filter and sort agents to only valid scenario target types.
+ *
+ * Generic over the row, so what the caller read beside the agent, the
+ * parameters it declares or its environment, comes back with it.
+ */
+export function useFilteredAgents<T extends AgentLike>(
+  agents: T[] | undefined,
   searchValue: string,
-): ScenarioAgent[] {
+): (T & { type: ScenarioAgentType })[] {
   return useMemo(() => {
-    const scenarioAgents = (agents ?? []).filter((a): a is ScenarioAgent =>
-      SCENARIO_AGENT_TYPES.has(a.type),
+    const scenarioAgents = (agents ?? []).filter(
+      (a): a is T & { type: ScenarioAgentType } =>
+        SCENARIO_AGENT_TYPES.has(a.type),
     );
     const sorted = [...scenarioAgents].sort(
       (a, b) =>
@@ -41,8 +48,6 @@ export function useFilteredAgents(
 /** Type guard: is this target value an agent (HTTP, code, or workflow)? */
 export function isAgentTarget(
   target: TargetValue,
-): target is NonNullable<TargetValue> & {
-  type: "http" | "code" | "workflow";
-} {
+): target is NonNullable<TargetValue> & { type: ScenarioAgentType } {
   return target !== null && SCENARIO_AGENT_TYPES.has(target.type);
 }

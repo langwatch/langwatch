@@ -6,6 +6,8 @@
  * definitions. Both need the same rule, so both read it from here.
  */
 
+import type { ScenarioParameterType } from "~/server/scenarios/parameters";
+
 /**
  * Parse the text in a value input back into a JSON value.
  *
@@ -82,4 +84,66 @@ export function serializeOptionalScalarValue(
  */
 export function displayOptionalValue(v: unknown): string {
   return v === undefined ? "" : displayValue(v);
+}
+
+/**
+ * Parse the text in a value input as the type its parameter declares.
+ *
+ * A declared type settles what the JSON rule has to guess: "007" stays the
+ * text "007" for a string parameter, "5" becomes the number 5 for a number
+ * parameter, and "true" becomes a boolean for a boolean one. Text that cannot
+ * be read as the declared type stays text, and the server refuses it by name.
+ * Without a declared type the JSON rule of {@link serializeScalarValue} runs.
+ */
+export function serializeTypedScalarValue({
+  raw,
+  type,
+}: {
+  raw: string;
+  type?: ScenarioParameterType;
+}): string | number | boolean {
+  if (type === "string") {
+    // A quoted string was quoted by display to keep it text; unquote it.
+    const parsed = serializeValue(raw);
+    return typeof parsed === "string" ? parsed : raw;
+  }
+  if (type === "number") {
+    const asNumber = Number(raw);
+    return raw.trim() !== "" && Number.isFinite(asNumber) ? asNumber : raw;
+  }
+  if (type === "boolean") {
+    if (raw === "true") return true;
+    if (raw === "false") return false;
+    return raw;
+  }
+  return serializeScalarValue(raw);
+}
+
+/** {@link serializeTypedScalarValue} for an optional input: empty is absent. */
+export function serializeOptionalTypedScalarValue({
+  raw,
+  type,
+}: {
+  raw: string;
+  type?: ScenarioParameterType;
+}): string | number | boolean | undefined {
+  return raw === "" ? undefined : serializeTypedScalarValue({ raw, type });
+}
+
+/**
+ * Render an optional stored value as editable text, given its declared type.
+ *
+ * A string parameter shows its value bare, "007" rather than "\"007\"": the
+ * type already says it is text, so nothing has to be quoted to keep it so.
+ * Every other case reads as {@link displayOptionalValue}.
+ */
+export function displayTypedValue({
+  value,
+  type,
+}: {
+  value: unknown;
+  type?: ScenarioParameterType;
+}): string {
+  if (type === "string" && typeof value === "string") return value;
+  return displayOptionalValue(value);
 }

@@ -71,6 +71,40 @@ describe("coerceParameterValue()", () => {
       expect(coerceParameterValue("Infinity")).toBe("Infinity");
     });
   });
+
+  describe("given the declared type of the parameter", () => {
+    /** @scenario "A typed value reaches the run as the declared type" */
+    it("keeps a string parameter as text whatever it looks like", () => {
+      expect(coerceParameterValue("007", "string")).toBe("007");
+      expect(coerceParameterValue("5", "string")).toBe("5");
+      expect(coerceParameterValue("true", "string")).toBe("true");
+    });
+
+    it("reads a number parameter as a number when it can", () => {
+      expect(coerceParameterValue("5", "number")).toBe(5);
+      expect(coerceParameterValue("007", "number")).toBe(7);
+      expect(coerceParameterValue("many", "number")).toBe("many");
+    });
+
+    it("reads a boolean parameter as true or false when it can", () => {
+      expect(coerceParameterValue("true", "boolean")).toBe(true);
+      expect(coerceParameterValue("yes", "boolean")).toBe("yes");
+    });
+  });
+});
+
+describe("parseRunParameterFlags() with declared types", () => {
+  it("reads each flag as the type declared for its name", () => {
+    expect(
+      parseRunParameterFlags({
+        pairs: ["order_id=007", "seats=5", "other=7"],
+        types: new Map([
+          ["order_id", "string"],
+          ["seats", "number"],
+        ]),
+      }),
+    ).toEqual({ order_id: "007", seats: 5, other: 7 });
+  });
 });
 
 describe("parseRunParameterFlags()", () => {
