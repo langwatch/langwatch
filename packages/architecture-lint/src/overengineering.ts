@@ -33,6 +33,12 @@ import { walkFiles } from "./files";
 const MIN_METHODS_FOR_LAYER = 5;
 const LAYER_DELEGATION_RATIO = 0.6;
 const MAX_CONDITIONAL_TYPE_DEPTH = 3;
+/**
+ * How many distinct collaborators a mostly-delegating class may forward to
+ * before it counts as composition rather than a layer. One receiver is a layer;
+ * several is a class assembling specialists behind one published interface.
+ */
+const MAX_DELEGATION_RECEIVERS = 1;
 
 /** The one facade the feature layout requires, and the routed repositories
  *  whose whole job is to pick a backend by the same verb. */
@@ -84,36 +90,45 @@ function isPrivate(member: ts.ClassElement): boolean {
 }
 
 /**
- * True when the body is nothing but `this.<a>.<b>...<name>(...)`, where the
- * final property is the member's own name — whether that body is a block with
- * one `return`, or an arrow's expression body. `await` in front counts; a
- * guard, a mapping or a second statement does not.
+ * The receiver of a same-name delegation, as a dotted path — `dependencies.dataset`
+ * for `return this.dependencies.dataset.listRecords(input)` — or undefined when
+ * the body is anything else.
+ *
+ * The body must be nothing but `this.<a>.<b>...<name>(...)`, where the final
+ * property is the member's own name, whether written as a block with one
+ * `return` or as an arrow's expression body. `await` in front counts; a guard,
+ * a mapping or a second statement does not.
  */
-function isSameNameDelegation(member: MethodLike): boolean {
+function delegationReceiver(member: MethodLike): string | undefined {
   const { name, body } = member;
-  if (!body) return false;
+  if (!body) return undefined;
 
   let expression: ts.Expression;
   if (ts.isBlock(body)) {
     const statements = body.statements;
-    if (statements.length !== 1) return false;
+    if (statements.length !== 1) return undefined;
     const [only] = statements;
-    if (!only || !ts.isReturnStatement(only) || !only.expression) return false;
+    if (!only || !ts.isReturnStatement(only) || !only.expression) return undefined;
     expression = only.expression;
   } else {
     expression = body as ts.Expression;
   }
   if (ts.isAwaitExpression(expression)) expression = expression.expression;
-  if (!ts.isCallExpression(expression)) return false;
+  if (!ts.isCallExpression(expression)) return undefined;
 
   const callee = expression.expression;
-  if (!ts.isPropertyAccessExpression(callee)) return false;
-  if (callee.name.text !== name) return false;
+  if (!ts.isPropertyAccessExpression(callee)) return undefined;
+  if (callee.name.text !== name) return undefined;
 
   // The receiver must be a `this.…` chain, not a free function or an import.
+  const path: string[] = [];
   let receiver: ts.Expression = callee.expression;
-  while (ts.isPropertyAccessExpression(receiver)) receiver = receiver.expression;
-  return receiver.kind === ts.SyntaxKind.ThisKeyword;
+  while (ts.isPropertyAccessExpression(receiver)) {
+    path.unshift(receiver.name.text);
+    receiver = receiver.expression;
+  }
+  if (receiver.kind !== ts.SyntaxKind.ThisKeyword) return undefined;
+  return path.join(".");
 }
 
 function conditionalDepth(node: ts.TypeNode): number {
@@ -151,14 +166,24 @@ function lintFile(root: string, path: string): ArchitectureViolation[] {
         .map(methodLike)
         .filter((member): member is MethodLike => member !== undefined);
       if (methods.length >= MIN_METHODS_FOR_LAYER) {
-        const delegating = methods.filter(isSameNameDelegation);
-        const ratio = delegating.length / methods.length;
-        if (ratio >= LAYER_DELEGATION_RATIO) {
+        const receivers = methods
+          .map(delegationReceiver)
+          .filter((receiver): receiver is string => receiver !== undefined);
+        const ratio = receivers.length / methods.length;
+        // Fanning out to several collaborators is COMPOSITION, and it is what a
+        // class implementing a published contract from specialist services does:
+        // `ApiKeyService` forwards 30 of 32 methods, but to seven different
+        // fields, each the specialist for that verb. Deleting it would hand
+        // every consumer seven objects instead of one. A pass-through LAYER
+        // forwards everything to the same collaborator, and that is the one
+        // this policy is looking for.
+        const distinct = new Set(receivers);
+        if (ratio >= LAYER_DELEGATION_RATIO && distinct.size <= MAX_DELEGATION_RECEIVERS) {
           violations.push({
             policy: "layer-class",
             file: path,
             line: lineOf(source, node),
-            message: `${node.name?.text ?? "This class"} forwards ${delegating.length} of its ${methods.length} public methods to a method of the same name on a collaborator.`,
+            message: `${node.name?.text ?? "This class"} forwards ${receivers.length} of its ${methods.length} public methods to a method of the same name on \`this.${[...distinct].join("`, `this.")}\`.`,
             allowed:
               "Hold the collaborator at the caller and delete the class, or give it the rules that justify it. `app/<feature>.app.ts` and routed repositories are exempt.",
           });

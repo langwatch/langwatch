@@ -104,9 +104,7 @@ function relativeModuleTarget(file: string, specifier: string): string | undefin
   if (!specifier.startsWith(".")) return void 0;
   const base = resolve(dirname(file), specifier);
   const javascriptExtension = specifier.match(/\.(?:m?js|cjs)$/)?.[0];
-  const extensionless = javascriptExtension
-    ? base.slice(0, -javascriptExtension.length)
-    : base;
+  const extensionless = javascriptExtension ? base.slice(0, -javascriptExtension.length) : base;
   const candidates = [
     ...(javascriptExtension ? [] : [base]),
     ...[".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"].map(
@@ -158,7 +156,8 @@ function selfReferenceTarget(input: {
     if (existsSync(resolved) && statSync(resolved).isFile()) return resolved;
   }
 
-  const base = subpath === "." ? `${packageRoot}/src/index` : `${packageRoot}/src/${subpath.slice(2)}`;
+  const base =
+    subpath === "." ? `${packageRoot}/src/index` : `${packageRoot}/src/${subpath.slice(2)}`;
   for (const candidate of [
     base,
     ...[".ts", ".tsx", ".mts", ".cts"].map((extension) => `${base}${extension}`),
@@ -207,9 +206,7 @@ export function chooseSubject(
 
   const mirrorDirectory = dirname(mirrorPath);
   if (mirrorDirectory !== ".") {
-    const agreeing = sorted.filter((target) =>
-      dirname(target).endsWith(`/${mirrorDirectory}`),
-    );
+    const agreeing = sorted.filter((target) => dirname(target).endsWith(`/${mirrorDirectory}`));
     if (agreeing.length > 0) return agreeing[0];
   }
 
@@ -281,6 +278,51 @@ export function rewriteRelativeSpecifiers(input: {
 }
 
 /**
+ * The `src` modules a test reaches, THROUGH its helpers as well as directly.
+ *
+ * A whole directory of tests commonly imports nothing but a shared
+ * `./test-helpers`, which is the file that imports the subject. Stopping at the
+ * first hop reports every one of them as naming no subject, which is both
+ * wrong and the opposite of useful — those are exactly the tests whose home is
+ * least obvious from the mirror. So a relative import that lands inside
+ * `tests/` is followed, once per file, with a `seen` set because helpers
+ * import each other.
+ */
+function sourceImports(input: {
+  file: string;
+  sourceRoot: string;
+  packageName: string;
+  packageRoot: string;
+  exportsMap: Record<string, unknown> | undefined;
+  seen: Set<string>;
+}): string[] {
+  const { file, sourceRoot, packageName, packageRoot, exportsMap, seen } = input;
+  if (seen.has(file)) return [];
+  seen.add(file);
+
+  const source = readFileSync(file, "utf8");
+  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+  const testsRoot = `${resolve(packageRoot)}/tests`;
+  const found: string[] = [];
+
+  for (const literal of moduleSpecifierNodes(sourceFile)) {
+    const target =
+      relativeModuleTarget(file, literal.text) ??
+      selfReferenceTarget({ specifier: literal.text, packageName, packageRoot, exportsMap });
+    if (!target) continue;
+    const resolved = resolve(target);
+    if (resolved.startsWith(`${sourceRoot}${sep}`)) {
+      found.push(target);
+      continue;
+    }
+    if (resolved.startsWith(`${testsRoot}${sep}`)) {
+      found.push(...sourceImports({ ...input, file: target, seen }));
+    }
+  }
+  return found;
+}
+
+/**
  * Where one file under a package's `tests/` tree belongs.
  *
  * Every file moves, not only the `*.test.ts` ones: a helper left behind in
@@ -302,20 +344,14 @@ function planPackage(
 
   for (const file of walkFiles(testsRoot, (path) => SOURCE_FILE.test(path))) {
     const mirrorPath = workspacePath(testsRoot, file);
-    const source = readFileSync(file, "utf8");
-    const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
-    const imports: string[] = [];
-    for (const literal of moduleSpecifierNodes(sourceFile)) {
-      const target =
-        relativeModuleTarget(file, literal.text) ??
-        selfReferenceTarget({
-          specifier: literal.text,
-          packageName,
-          packageRoot,
-          exportsMap,
-        });
-      if (target && resolve(target).startsWith(`${sourceRoot}${sep}`)) imports.push(target);
-    }
+    const imports = sourceImports({
+      file,
+      sourceRoot,
+      packageName,
+      packageRoot,
+      exportsMap,
+      seen: new Set<string>(),
+    });
 
     const subject = chooseSubject(file, mirrorPath, imports);
     if (subject) {
