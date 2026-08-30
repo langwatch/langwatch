@@ -603,6 +603,26 @@ switches that port from structural to nominal typing — implementors must
 `extends` it, so composition has to change too. That is a decision for the
 feature that owns the port.
 
+`F-EXPORT-01` — **`private-runtime-export`'s 17 are one inversion, not
+seventeen deletions.** Sixteen are `packages/features/trace/server/src/index.ts`
+re-exporting its own repositories, projections and eventing stores; the
+seventeenth is webhook's ClickHouse events repository. Checked every exported
+NAME rather than the module path — searching the path suggests two are unused,
+searching the names shows all sixteen are imported by `platform/app`, several
+dozens of times (`applySpanToSummary` alone, 252).
+
+They are exported because the app CONSTRUCTS them. `EventingTracePipelineAdapter`
+already exists as the composition seam, but it takes the stores as options
+(`summaryStore`, `spanStore`, `derivedStore`, `rollupStore`), so the app has to
+build them first, which is why the index publishes them. Making them private
+means the adapter constructs its own stores and takes their ClickHouse
+dependencies instead — an inversion of who owns construction, not a change to
+the export list.
+
+Webhook's is the same shape and much smaller: 17 references, all in
+`platform/app` composition and tests. It is the natural first one to do, and
+doing it establishes the pattern the trace sixteen would follow.
+
 `F-NAMING-01` — **`try*` carries two meanings and the rule only knows one.**
 `fallible-result-naming` treats the prefix as "may answer absence", which is the
 convention CLAUDE.md documents and is right for `tryFindById`. But
