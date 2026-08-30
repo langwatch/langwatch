@@ -68,20 +68,33 @@ not 487 independent problems.
 ## The top file, looked at
 
 `governance-activity.integration.test.ts` — 81 errors, the largest single
-contributor — is not a stub drift and will not fall to a rename.
+contributor. Its 30 `TS2339`s name two methods, and both exist. An earlier
+version of this note said neither did; that was wrong, and the way it was
+wrong is worth keeping.
 
-Its 30 `TS2339`s name two methods:
+- `app.projects.ensureInternal(...)` — declared on `ProjectService`
+  (`project.service.ts:26`), implemented in the server package, and called
+  **in production** four times from `ingestionRoutes.ts` through the
+  documented `projectService` escape hatch. It is not on the `ProjectApp`
+  facade, which is what `app.projects` is. So the test reaches for a door the
+  facade does not open, while production goes through the seam beside it.
+- `governanceService.summary(...)` — exists on
+  `IngestionSourceActivityPort`, on its Prisma repository, and on
+  `PersonalUsageService`. Not on `GovernanceService`, which is what the test
+  holds.
 
-- `app.projects.ensureInternal(...)` — `ProjectApp` has seven methods and this
-  is not among them. The name appears nowhere in production code: only in this
-  suite, in `internal-governance-project.integration.test.ts`, and in
-  `test-utils/annotation-test-services.ts`, where it is stubbed as
-  `unavailable`.
-- `governanceService.summary(...)` — appears only in this suite.
+So this is not the absorbed-or-dropped question: it is two tests reaching
+through the wrong object, which is more tractable than "governance's own
+work". Either the suite goes through `projectService` the way production does,
+or the facade grows a door — and that second one is a decision about the
+facade's surface, not about whether a capability survived.
 
-So both are capabilities the tests expect and no class provides. That is the
-absorbed-or-dropped question again, and answering it is governance's own work,
-not a mechanical fix.
+**The methodological point.** Both wrong readings came from grepping
+`export .*name`. Neither member is written that way: one is
+`abstract ensureInternal(...)` on a contract class, the other
+`async summary(...)` on an implementation. A "does this exist anywhere" sweep
+has to match declaration forms, not the export keyword, or it reports
+capabilities as deleted when they are one indirection away.
 
 The remaining 50 errors are `TS7006` (implicitly-any parameters) and are almost
 certainly downstream: a callback passed to a method that does not exist has no
