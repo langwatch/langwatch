@@ -14,18 +14,6 @@
       "24a54e562090c6a9"
     ],
     [
-      "platform/app/src/app/api/gateway-spend/[[...route]]/app.ts",
-      "getApp",
-      "import",
-      "76f1251c03b899a6"
-    ],
-    [
-      "platform/app/src/app/api/gateway-spend/[[...route]]/app.ts",
-      "getApp",
-      "reference",
-      "ff5c04f138198550"
-    ],
-    [
       "platform/app/src/mcp/handler.ts",
       "getApp",
       "import",
@@ -108,12 +96,6 @@
       "getApp",
       "import",
       "d59b078976e45023"
-    ],
-    [
-      "platform/app/src/server/api-key/auth-middleware.ts",
-      "getApp",
-      "reference",
-      "ca323265a5b6186c"
     ],
     [
       "platform/app/src/server/api/rbac.ts",
@@ -326,12 +308,6 @@
       "76f1251c03b899a6"
     ],
     [
-      "platform/app/src/server/app-layer/events/track-event.service.ts",
-      "getApp",
-      "reference",
-      "f9e5cabe36b52307"
-    ],
-    [
       "platform/app/src/server/app-layer/index.ts",
       "getApp",
       "import",
@@ -422,12 +398,6 @@
       "76f1251c03b899a6"
     ],
     [
-      "platform/app/src/server/auth/permissions.ts",
-      "getApp",
-      "reference",
-      "a3d8d8be7c30e2d7"
-    ],
-    [
       "platform/app/src/server/better-auth/hooks.ts",
       "getApp",
       "import",
@@ -462,18 +432,6 @@
       "getApp",
       "reference",
       "75fd45381f5ee2d6"
-    ],
-    [
-      "platform/app/src/server/event-sourcing/pipelines/gateway-spend-processing/repositories/openAdmissions.clickhouse.repository.ts",
-      "getApp",
-      "import",
-      "76f1251c03b899a6"
-    ],
-    [
-      "platform/app/src/server/event-sourcing/pipelines/gateway-spend-processing/repositories/openAdmissions.clickhouse.repository.ts",
-      "getApp",
-      "reference",
-      "85cce3702bdd6098"
     ],
     [
       "platform/app/src/server/event-sourcing/registration/global/orgBillableEventsMeter.store.ts",
@@ -734,24 +692,6 @@
       "c122207fcb6ea8b2"
     ],
     [
-      "platform/app/src/server/license-enforcement/usage-stats.service.ts",
-      "getApp",
-      "reference",
-      "065d19a8055ed70a"
-    ],
-    [
-      "platform/app/src/server/license-enforcement/usage-stats.service.ts",
-      "getApp",
-      "reference",
-      "0d5ba35459cafe54"
-    ],
-    [
-      "platform/app/src/server/license-enforcement/usage-stats.service.ts",
-      "getApp",
-      "reference",
-      "b725f7f63d1f9ed5"
-    ],
-    [
       "platform/app/src/server/middleware/rate-limit-langy-github-prs.ts",
       "tryGetApp",
       "import",
@@ -872,12 +812,6 @@
       "25eafbba911d1d66"
     ],
     [
-      "platform/app/src/server/routes/gateway-internal.ts",
-      "getApp",
-      "reference",
-      "ff5c04f138198550"
-    ],
-    [
       "platform/app/src/server/routes/ingest/rateLimit.ts",
       "tryGetApp",
       "import",
@@ -974,12 +908,6 @@
       "9e04a021b96cd45c"
     ],
     [
-      "platform/app/src/server/traces/event-usage.service.ts",
-      "tryGetApp",
-      "reference",
-      "fed2b58e1f470378"
-    ],
-    [
       "platform/app/src/server/traces/trace-blob-resolution.deps.ts",
       "getApp",
       "import",
@@ -1008,18 +936,6 @@
       "getApp",
       "import",
       "76f1251c03b899a6"
-    ],
-    [
-      "platform/app/src/server/traces/trace-usage.service.ts",
-      "getApp",
-      "reference",
-      "47738e1cad2365fc"
-    ],
-    [
-      "platform/app/src/server/traces/trace-usage.service.ts",
-      "getApp",
-      "reference",
-      "5d844c5a991f00ac"
     ],
     [
       "platform/app/src/server/traces/trace.service.ts",
