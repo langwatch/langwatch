@@ -90,7 +90,7 @@ function runBlockedReason({
   return null;
 }
 
-/** The set of open lists with one list added or taken away. */
+/** `isOpen` decides whether the id joins the set or leaves it. */
 function withOpenList({
   current,
   id,

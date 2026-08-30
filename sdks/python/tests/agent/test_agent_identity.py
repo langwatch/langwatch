@@ -164,14 +164,27 @@ def test_a_cleartext_endpoint_is_refused():
 # @scenario "The API key never travels over a cleartext connection"
 def test_a_loopback_endpoint_stays_allowed():
     # It never leaves the machine, and it is how a local platform is reached.
-    assert socket_url("http://localhost:5560").startswith("ws://localhost:5560")
-    assert socket_url("http://127.0.0.1:5560").startswith("ws://127.0.0.1:5560")
-    assert http_url("http://app.langwatch.localhost").startswith(
-        "http://app.langwatch.localhost"
+    # These assert the whole URL rather than a prefix: a prefix test on a URL
+    # is the shape CodeQL reads as a host check, and the exact value is the
+    # stronger assertion anyway.
+    assert (
+        socket_url("http://localhost:5560")
+        == "ws://localhost:5560/api/v1/agents/connect"
+    )
+    assert (
+        socket_url("http://127.0.0.1:5560")
+        == "ws://127.0.0.1:5560/api/v1/agents/connect"
+    )
+    assert (
+        http_url("http://app.langwatch.localhost")
+        == "http://app.langwatch.localhost/api/v1/agents/connect"
     )
     # Userinfo and a port belong to the netloc, not to the host, so the parsed
     # hostname is what decides. A loopback host with userinfo stays allowed.
-    assert socket_url("http://user@localhost:5560").startswith("ws://")
+    assert (
+        socket_url("http://user@localhost:5560")
+        == "ws://user@localhost:5560/api/v1/agents/connect"
+    )
 
 
 # @scenario "The API key never travels over a cleartext connection"

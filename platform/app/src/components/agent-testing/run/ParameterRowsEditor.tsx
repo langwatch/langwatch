@@ -233,7 +233,7 @@ function RowValueField({
   );
 }
 
-/** What the lock of one row says, given whether the row can be made plain. */
+/** A locked row still reads differently when it can be made plain again. */
 function rowLockLabel({
   index,
   isSecret,
