@@ -46,6 +46,16 @@ const governanceCostRollupEvents = [
  */
 export interface PulledContribution {
   amountNanoMinor: number;
+  /**
+   * The biller's own dollar figure for this item, or null when it published
+   * none. Per item rather than per cell because the cell's dollar total may
+   * only be stated when EVERY item in it can state one — a partial total
+   * reads as the day's whole spend while silently omitting the rest.
+   *
+   * Absent on contributions written before this existed, which is why it is
+   * optional: the map round-trips through `PulledItemsJson` on the stored row.
+   */
+  amountNanoUsd?: number | null;
   /** Monotonic pull time. The ONLY field a restatement can be ordered by. */
   observedAtMs: number;
   tokensInput: number;
@@ -153,7 +163,10 @@ function dimensionsOf(event: {
       provider: d.source,
       model: d.model,
       agentId: "",
-      currencyCode: GOVERNANCE_COST_CURRENCY_USD,
+      // The currency the PROVIDER billed in, carried from the event. A cell is
+      // keyed by it, so a day billed in two currencies is two rows and nothing
+      // can sum across them (ADR-128 §3).
+      currencyCode: d.currencyCode,
       rawActorId: "",
     };
   }
@@ -166,6 +179,8 @@ function dimensionsOf(event: {
     provider: d.model_provider_id,
     model: d.model,
     agentId: "",
+    // The gateway prices every outcome off its own dollar-denominated rate
+    // table, so this lane has one currency and it is not read off the event.
     currencyCode: GOVERNANCE_COST_CURRENCY_USD,
     // The spender is the key's principal; the caller's own end user is the
     // fallback for a key with no resolved principal.
@@ -266,12 +281,51 @@ export function decodeGovernanceCostRollupKey(
 }
 
 /**
+ * The dollar figure for a cell, or null when nobody can honestly state one.
+ *
+ * Three cases, and the order matters. A cell nothing has contributed to has no
+ * figure at all. A cell billed in dollars needs no conversion — the amount IS
+ * the dollar amount, for either lane. A cell billed in anything else can only
+ * be stated in dollars by the BILLER, so it is the sum of the biller's own
+ * per-item figures, and only when every item carries one: a partial sum reads
+ * as the day's whole spend while silently omitting the part nobody converted.
+ *
+ * No rate is applied here or anywhere else (ADR-128 §3). Null, never 0: zero
+ * is a real amount and charts as free usage, while the absence of a figure is
+ * a different fact and has to say so.
+ */
+function amountNanoUsdOf({
+  state,
+  amountNanoMinor,
+  contributed,
+}: {
+  state: GovernanceCostRollupState;
+  amountNanoMinor: number;
+  contributed: boolean;
+}): number | null {
+  if (!contributed) return null;
+  if (state.currencyCode === GOVERNANCE_COST_CURRENCY_USD) {
+    return amountNanoMinor;
+  }
+  // Below here the cell is not in dollars. The gateway lane never is, so a
+  // gateway contribution in a non-dollar cell is a cell we cannot state.
+  if (state.gatewayRequestCount > 0) return null;
+
+  const items = Object.values(state.pulledItems);
+  let total = 0;
+  for (const item of items) {
+    const billerUsd = item.amountNanoUsd ?? null;
+    if (billerUsd === null) return null;
+    total += billerUsd;
+  }
+  return total;
+}
+
+/**
  * The cell's figures, derived from the two lanes' contributions.
  *
- * `amountNanoUsd` is NULL, never 0, when the cell holds no USD figure — a
- * non-USD provider figure we carry without a rate, or a cell nothing has
- * contributed to yet. Zero is a real amount and charts as free usage; the
- * absence of a figure is a different fact and says so.
+ * `amountNanoUsd` is NULL, never 0, when the cell holds no USD figure — see
+ * `amountNanoUsdOf` for the three cases.
  */
 export function governanceCostRollupTotals(state: GovernanceCostRollupState): {
   amountNanoUsd: number | null;
@@ -288,10 +342,7 @@ export function governanceCostRollupTotals(state: GovernanceCostRollupState): {
     items.reduce((sum, item) => sum + item.amountNanoMinor, 0);
   const contributed = state.gatewayRequestCount > 0 || items.length > 0;
   return {
-    amountNanoUsd:
-      contributed && state.currencyCode === GOVERNANCE_COST_CURRENCY_USD
-        ? amountNanoMinor
-        : null,
+    amountNanoUsd: amountNanoUsdOf({ state, amountNanoMinor, contributed }),
     amountNanoMinor,
     tokensInput:
       state.gatewayTokensInput +
@@ -462,7 +513,8 @@ export class GovernanceCostRollupFoldProjection
       pulledItems: {
         ...state.pulledItems,
         [d.restatementKey]: {
-          amountNanoMinor: d.costNanoUsd,
+          amountNanoMinor: d.costNanoMinor,
+          amountNanoUsd: d.costNanoUsd,
           observedAtMs: d.observedAtMs,
           tokensInput: d.tokensInput,
           tokensOutput: d.tokensOutput,

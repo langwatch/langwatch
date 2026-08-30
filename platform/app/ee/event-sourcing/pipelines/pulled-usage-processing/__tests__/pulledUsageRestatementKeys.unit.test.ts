@@ -23,10 +23,10 @@ const RESTATEMENT_KEY = "sha256-of-the-bucket-coordinates";
 
 /** One observation of one bucket, as the puller seam mints it. */
 function observation({
-  costNanoUsd,
+  costNanoMinor,
   observedAtMs,
 }: {
-  costNanoUsd: number;
+  costNanoMinor: number;
   observedAtMs: number;
 }): PulledUsageObservedEventData & {
   tenantId: string;
@@ -49,7 +49,7 @@ function observation({
     tokensOutput: 200,
     tokensCacheRead: 0,
     tokensCacheWrite: 0,
-    costNanoUsd,
+    costNanoMinor,
     rateVersion: "registry@2026-08-01",
     costBasis: "computed",
     costStatus: "estimate",
@@ -96,13 +96,13 @@ describe("recording successive observations of one provider bucket", () => {
     it("mints a distinct command key per observation, so the revert is not deduped", async () => {
       const keys = await Promise.all([
         idempotencyKeyFor(
-          observation({ costNanoUsd: 10_000_000_000, observedAtMs: 1_000 }),
+          observation({ costNanoMinor: 10_000_000_000, observedAtMs: 1_000 }),
         ),
         idempotencyKeyFor(
-          observation({ costNanoUsd: 12_000_000_000, observedAtMs: 2_000 }),
+          observation({ costNanoMinor: 12_000_000_000, observedAtMs: 2_000 }),
         ),
         idempotencyKeyFor(
-          observation({ costNanoUsd: 10_000_000_000, observedAtMs: 3_000 }),
+          observation({ costNanoMinor: 10_000_000_000, observedAtMs: 3_000 }),
         ),
       ]);
 
@@ -117,13 +117,13 @@ describe("recording successive observations of one provider bucket", () => {
     it("keeps all three versions on one stream, so newest-wins has a stream to win on", async () => {
       const ids = await Promise.all([
         aggregateIdFor(
-          observation({ costNanoUsd: 10_000_000_000, observedAtMs: 1_000 }),
+          observation({ costNanoMinor: 10_000_000_000, observedAtMs: 1_000 }),
         ),
         aggregateIdFor(
-          observation({ costNanoUsd: 12_000_000_000, observedAtMs: 2_000 }),
+          observation({ costNanoMinor: 12_000_000_000, observedAtMs: 2_000 }),
         ),
         aggregateIdFor(
-          observation({ costNanoUsd: 10_000_000_000, observedAtMs: 3_000 }),
+          observation({ costNanoMinor: 10_000_000_000, observedAtMs: 3_000 }),
         ),
       ]);
 
@@ -138,7 +138,7 @@ describe("recording successive observations of one provider bucket", () => {
   describe("when the identical observation is replayed", () => {
     it("mints the identical key, so an at-least-once redelivery is a no-op", async () => {
       const once = observation({
-        costNanoUsd: 10_000_000_000,
+        costNanoMinor: 10_000_000_000,
         observedAtMs: 1_000,
       });
 
@@ -153,11 +153,11 @@ describe("recording successive observations of one provider bucket", () => {
 
       expect(
         await idempotencyKeyFor(
-          observation({ costNanoUsd: 10_000_000_000, observedAtMs: at }),
+          observation({ costNanoMinor: 10_000_000_000, observedAtMs: at }),
         ),
       ).not.toBe(
         await idempotencyKeyFor(
-          observation({ costNanoUsd: 12_000_000_000, observedAtMs: at }),
+          observation({ costNanoMinor: 12_000_000_000, observedAtMs: at }),
         ),
       );
     });

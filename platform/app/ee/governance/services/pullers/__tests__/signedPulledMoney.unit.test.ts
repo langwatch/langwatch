@@ -44,7 +44,7 @@ function usageEventData(money: number): Record<string, unknown> {
     tokensOutput: 0,
     tokensCacheRead: 0,
     tokensCacheWrite: 0,
-    costNanoUsd: money,
+    costNanoMinor: money,
     rateVersion: null,
     costBasis: "provider_reported",
     costStatus: "exact",
@@ -75,7 +75,7 @@ describe("signed pulled money", () => {
         usageEventData(-1_533_525_880),
       );
 
-      expect(parsed.costNanoUsd).toBe(-1_533_525_880);
+      expect(parsed.costNanoMinor).toBe(-1_533_525_880);
     });
   });
 
