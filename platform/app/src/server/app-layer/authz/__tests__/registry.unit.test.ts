@@ -1,14 +1,7 @@
-import {
-  ALL_PERMISSIONS,
-  isRegistryPermission,
-  permissionIndex,
-} from "@langwatch/authz-contract";
+import { ALL_PERMISSIONS, isRegistryPermission, permissionIndex } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
-import {
-  getValidActionsForResource,
-  orderedResources,
-} from "../../../../utils/permissionsConfig";
+import { getValidActionsForResource, orderedResources } from "../../../../utils/permissionsConfig";
 import {
   EXTERNAL_MEMBER_PERMISSIONS,
   getOrganizationRolePermissions,
@@ -39,9 +32,7 @@ describe("authz registry", () => {
         ...category.readPermissions,
         ...category.writePermissions,
       ]);
-      const missing = categoryStrings.filter(
-        (permission) => !isRegistryPermission(permission),
-      );
+      const missing = categoryStrings.filter((permission) => !isRegistryPermission(permission));
       expect(missing).toEqual([]);
     });
 
@@ -69,9 +60,7 @@ describe("authz registry", () => {
       const missing = uiStrings.filter((permission) => !isRegistryPermission(permission));
       // Only NEW drift fails: retiring a pair from the UI catalogue is the
       // progress the comment above promises, so a shrunk list passes.
-      expect(missing.filter((permission) => !KNOWN_DRIFT.includes(permission))).toEqual(
-        [],
-      );
+      expect(missing.filter((permission) => !KNOWN_DRIFT.includes(permission))).toEqual([]);
     });
   });
 
@@ -101,9 +90,12 @@ describe("authz registry", () => {
       // without moving IT — that is the append-only contract working.
       expect(permissionIndex("aiTools:manage")).toBe(116);
       expect(permissionIndex("langy:manage")).toBe(125);
-      expect(permissionIndex("agentCache:manage")).toBe(
-        ALL_PERMISSIONS.length - 1,
-      );
+      // agentCache:manage was the tail at count 128; the featureFlags append
+      // moved the tail without moving IT, the same way the langy append moved
+      // it off aiTools:manage above. Pinned at its own index now, so the next
+      // append has to prove the same thing again.
+      expect(permissionIndex("agentCache:manage")).toBe(127);
+      expect(permissionIndex("featureFlags:manageExperiments")).toBe(ALL_PERMISSIONS.length - 1);
     });
 
     it("pins the FULL serialization order (bitset indices ship inside signed passports — edit only by appending)", () => {
@@ -242,6 +234,7 @@ describe("authz registry", () => {
         "langy:manage",
         "agentCache:view",
         "agentCache:manage",
+        "featureFlags:manageExperiments",
       ]);
     });
 
