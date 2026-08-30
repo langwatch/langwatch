@@ -17,6 +17,7 @@ import {
   type GithubPullRequest,
 } from "@langwatch/github-contract";
 import {
+  type PaginatedProjects,
   ProjectService,
   projectWithTeamSchema,
   type ProjectWithTeam,
@@ -643,6 +644,13 @@ export class TestProjectService extends ProjectService {
     throw new Error("not used by Coding Agent tests");
   }
 
+  // Never implemented, and the class-wide assignability failure was hiding it:
+  // an abstract member left off a fake is a method the real service has and
+  // nothing here would notice going wrong.
+  async tryGetOrganizationId(): Promise<never> {
+    throw new Error("not used by Coding Agent tests");
+  }
+
   async tryGetIdentity(): Promise<never> {
     throw new Error("not used by Coding Agent tests");
   }
@@ -675,8 +683,19 @@ export class TestProjectService extends ProjectService {
     throw new Error("not used by Coding Agent tests");
   }
 
-  async listByOrganization(): Promise<{ data: Array<{ id: string }> }> {
-    return { data: this.projects };
+  /**
+   * The contract's shape, not a convenient subset. The one service that calls
+   * this reads `.data[].id` and nothing else, so the rows stay id-only — but
+   * the envelope around them is real, because a consumer that starts reading
+   * `pagination` should fail here rather than against an object that never
+   * had it. The narrowing is at this single boundary instead of spread across
+   * the tests that assign `projects`.
+   */
+  async listByOrganization(): Promise<PaginatedProjects> {
+    return {
+      data: this.projects as unknown as PaginatedProjects["data"],
+      pagination: { page: 1, limit: this.projects.length, total: this.projects.length },
+    };
   }
 
   async listByTeam(): Promise<never> {

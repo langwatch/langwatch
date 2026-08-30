@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { NoopCodingAgentReadMetricsPort } from "../coding-agent-read-metrics.adapter";
-import { TestClickHouseEndpoint, TestClock, session } from "../../repositories/__tests__/fixtures/coding-agent.fixture";
+import {
+  TestClickHouseEndpoint,
+  TestClock,
+  session,
+} from "../../repositories/__tests__/fixtures/coding-agent.fixture";
 import { CodingAgentSessionClickHouseRepository } from "../../repositories/coding-agent-session/clickhouse.repository";
 
 const endpoints: TestClickHouseEndpoint[] = [];
@@ -57,8 +61,10 @@ describe("Coding Agent session ClickHouse repository", () => {
     const second = endpoint.requests[1];
     expect(first).toBeDefined();
     expect(second).toBeDefined();
-    const firstUpdated = /"UpdatedAt":"([^"]+)"/.exec(first?.body)?.[1];
-    const secondUpdated = /"UpdatedAt":"([^"]+)"/.exec(second?.body)?.[1];
+    // `!` rather than `?.`: the two assertions above are what establish these
+    // are present, and TypeScript does not narrow through `expect`.
+    const firstUpdated = /"UpdatedAt":"([^"]+)"/.exec(first!.body)?.[1];
+    const secondUpdated = /"UpdatedAt":"([^"]+)"/.exec(second!.body)?.[1];
     expect(firstUpdated).toBeDefined();
     expect(secondUpdated).toBeDefined();
     expect(Date.parse(secondUpdated ?? "")).toBeGreaterThan(Date.parse(firstUpdated ?? ""));
