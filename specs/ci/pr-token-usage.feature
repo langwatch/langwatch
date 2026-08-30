@@ -89,6 +89,13 @@ Feature: PR token usage comment
     And an unknown agent identifier falls back to a readable form of itself, without a broken image
 
   @unit
+  Scenario: A gap between session totals and per-model rows is called out
+    Given a usage rollup whose model rows cover far fewer tokens than the totals
+    When the comment body is built
+    Then a note states how many of the total tokens the model rows cover
+    And a rollup whose model rows match the totals carries no such note
+
+  @unit
   Scenario: An unmapped pull request reads as no usage
     Given the LangWatch API answers that the pull request is not mapped
     When the response is interpreted

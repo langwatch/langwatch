@@ -239,6 +239,24 @@ export const buildCommentBody = ({
     details.push(...tokenDetailTable(usage.rows, usage.totals));
     if (usage.modelBreakdown.length > 0) {
       details.push("", ...modelTable(usage.modelBreakdown));
+      // The contributor totals come from session-level counters; the model
+      // rows come from stored per-turn events. A session whose turns were
+      // never stored (an outage, a client too old to send them) still counts
+      // in the totals, so the model rows can legitimately cover less. Say so
+      // rather than leave two tables that appear to contradict each other.
+      const modelSum = usage.modelBreakdown.reduce(
+        (sum, row) => sum + row.totalTokens,
+        0,
+      );
+      if (modelSum < usage.totals.totalTokens * 0.95) {
+        details.push(
+          "",
+          `> The per-model rows cover ${humanizeCount(modelSum)} of the ` +
+            `${humanizeCount(usage.totals.totalTokens)} total tokens. The rest ` +
+            "belongs to session turns whose per-call events were not stored, " +
+            "so only their session totals are known.",
+        );
+      }
     }
     details.push("", "</details>");
     parts.push(...details);

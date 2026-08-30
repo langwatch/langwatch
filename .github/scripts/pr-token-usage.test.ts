@@ -179,6 +179,30 @@ describe("given a usage row's agent identifier", () => {
   });
 });
 
+describe("given a usage rollup whose model rows cover far fewer tokens than the totals", () => {
+  describe("when the comment body is built", () => {
+    /** @scenario "A gap between session totals and per-model rows is called out" */
+    it("states how many of the total tokens the model rows cover", () => {
+      const body = build(
+        usage({
+          rows: [row({ totalTokens: 2_600_000_000 })],
+          totals: { ...usage().totals, totalTokens: 2_600_000_000 },
+          // modelBreakdown from the fixture covers only 37,000 tokens.
+        }),
+      );
+      assert.match(
+        body,
+        /> The per-model rows cover 37 thousand of the 2\.6 billion total tokens\./,
+      );
+    });
+
+    it("carries no note when the model rows match the totals", () => {
+      const body = build(usage());
+      assert.ok(!body.includes("per-model rows cover"));
+    });
+  });
+});
+
 describe("given the LangWatch API's answer", () => {
   describe("when the pull request is not mapped", () => {
     /** @scenario "An unmapped pull request reads as no usage" */
