@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { LangWatchQLTimeWindow } from "./analytics.lwql-time-window";
 
 /** One column in a LangWatchQL result. */
 export const langWatchQLColumnSchema = z
@@ -90,41 +91,6 @@ export const langWatchQLSchema = z
   .strict();
 export type LangWatchQLSchema = z.infer<typeof langWatchQLSchema>;
 
-export const LWQL_PERIOD_START_PARAMETER = "period_start";
-export const LWQL_PERIOD_END_PARAMETER = "period_end";
-export const LWQL_TIME_WINDOW_PARAMETERS = [
-  LWQL_PERIOD_START_PARAMETER,
-  LWQL_PERIOD_END_PARAMETER,
-] as const;
-export type LangWatchQLTimeWindowParameter = (typeof LWQL_TIME_WINDOW_PARAMETERS)[number];
-
-export function isLangWatchQLTimeWindowParameter(
-  name: string,
-): name is LangWatchQLTimeWindowParameter {
-  return LWQL_TIME_WINDOW_PARAMETERS.some((parameter) => parameter === name);
-}
-
-const LWQL_DATE_TIME_TYPE =
-  /^(?:DateTime(?:\(\s*'UTC'\s*\))?|DateTime64(?:\(\s*\d+\s*(?:,\s*'UTC'\s*)?\))?)$/;
-
-export function isLangWatchQLDateTimeParameterType(type: string): boolean {
-  return LWQL_DATE_TIME_TYPE.test(type.trim());
-}
-
-function pad(value: number, width = 2): string {
-  return String(value).padStart(width, "0");
-}
-
-export function formatLangWatchQLDateTimeParameter(date: Date): string {
-  if (Number.isNaN(date.getTime())) {
-    throw new Error("A LangWatchQL time window cannot carry an invalid date.");
-  }
-  return (
-    `${pad(date.getUTCFullYear(), 4)}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ` +
-    `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`
-  );
-}
-
 const MIN_UTC_YEAR = 0;
 const MAX_UTC_YEAR = 9999;
 const lwqlTimeWindowBound = z
@@ -138,13 +104,19 @@ const lwqlTimeWindowBound = z
     { message: `UTC year must be between ${MIN_UTC_YEAR} and ${MAX_UTC_YEAR}.` },
   );
 
-export const lwqlTimeWindowSchema = z
+export const lwqlTimeWindowSchema: z.ZodType<LangWatchQLTimeWindow> = z
   .object({
     start: lwqlTimeWindowBound,
     end: lwqlTimeWindowBound,
   })
   .strict();
-export type LangWatchQLTimeWindow = z.infer<typeof lwqlTimeWindowSchema>;
+/**
+ * Deliberately NOT a second `LangWatchQLTimeWindow`. The name belongs to
+ * `./analytics.lwql-time-window`, which is import-free and is what the browser
+ * loads; this module only adds the zod validator for the same shape. The
+ * annotation on the schema above is what stops the two drifting — change one
+ * side's shape and it stops compiling here rather than at a call site.
+ */
 
 /** The tenant identity a restricted LangWatchQL execution runs as. */
 export type LangWatchQLCaller = Readonly<{
