@@ -10,7 +10,7 @@ import { AppGovernanceOcsfEventsAdapter } from "@langwatch/enterprise-api/govern
 import { AppGovernanceTraceActivityAdapter } from "@langwatch/enterprise-api/governance/governance-trace-activity.adapter";
 import { AppPersonalUsageReadAdapter } from "@langwatch/enterprise-api/governance/personal-usage-read.adapter";
 import {
-  WebhookEventsClickHouseRepository,
+  WebhookEventsAdapter,
   WebhookEventsService,
 } from "~/runtime/app/features/webhooks";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -261,7 +261,7 @@ export function installClickHouseTestApp({
       ),
       webhookEvents: WebhookEventsService.create({
         prisma,
-        repository: WebhookEventsClickHouseRepository.create(required),
+        repository: WebhookEventsAdapter.create(required),
       }),
     },
     governance,

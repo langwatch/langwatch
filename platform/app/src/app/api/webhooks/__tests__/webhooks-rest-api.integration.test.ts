@@ -1,7 +1,7 @@
 import { createEnterpriseWebhookEndpointService } from "~/server/webhooks/enterpriseWebhookEndpointService";
 import { createServer, type Server } from "node:http";
 import {
-  WebhookEventsClickHouseRepository,
+  WebhookEventsAdapter,
   WebhookEventsService,
 } from "~/runtime/app/features/webhooks";
 import { generate } from "@langwatch/ksuid";
@@ -50,7 +50,7 @@ vi.mock("~/server/app-layer/app", async () => {
       gateway: {
         webhookEvents: WebhookEventsService.create({
           prisma: dbForPermissions,
-          repository: WebhookEventsClickHouseRepository.create(async (tenantId) => {
+          repository: WebhookEventsAdapter.create(async (tenantId) => {
             const client = await getClickHouseClientForTenant(tenantId);
             if (!client) throw new Error("ClickHouse is not configured");
             return client;

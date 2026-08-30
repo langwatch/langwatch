@@ -72,7 +72,7 @@ import { AppGovernanceOcsfEventsAdapter } from "@langwatch/enterprise-api/govern
 import { AppGovernanceTraceActivityAdapter } from "@langwatch/enterprise-api/governance/governance-trace-activity.adapter";
 import { AppPersonalUsageReadAdapter } from "@langwatch/enterprise-api/governance/personal-usage-read.adapter";
 import {
-  WebhookEventsClickHouseRepository,
+  WebhookEventsAdapter,
   WebhookDeliveryService,
   WebhookEventsService,
   WebhookHealthService,
@@ -1932,7 +1932,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     ? GatewayVirtualKeySpendAdapter.create(gatewayClickHouseResolver.resolve)
     : undefined;
   const gatewayWebhookEventsRepository = clickhouseEnabled
-    ? WebhookEventsClickHouseRepository.create(resolveClickHouseClient)
+    ? WebhookEventsAdapter.create(resolveClickHouseClient)
     : undefined;
   const webhookEvents = gatewayWebhookEventsRepository
     ? WebhookEventsService.create({ prisma, repository: gatewayWebhookEventsRepository })

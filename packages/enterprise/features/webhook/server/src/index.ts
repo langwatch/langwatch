@@ -27,12 +27,11 @@ export {
 } from "./adapters/webhook-endpoint.webhook-endpoint.adapter";
 export { WebhookIdPort } from "./ports/webhook-id.port";
 export { WebhookSecretPort } from "./ports/webhook-secret.port";
-export {
-  WebhookEventsClickHouseRepository,
-  type WebhookClickHouseClient,
-  type WebhookClickHouseClientResolver,
-  type WebhookEventsCursor,
-} from "./repositories/clickhouse/clickhouse.webhook-events.repository";
+// Webhook event reads are composed through the adapter and held as the port.
+// The ClickHouse repository, its client shape and its cursor codec are private
+// to the feature: nothing outside it names them any more.
+export { WebhookEventsAdapter } from "./adapters/clickhouse.webhook-events.adapter";
+export { WebhookEventsRepository } from "./ports/webhook-events.port";
 export {
   WebhookEndpointConfiguration,
   WebhookEndpointPolicyService,

@@ -4,7 +4,7 @@ import {
   type ListWebhookEventsResult,
   type WebhookEnvelope,
 } from "@langwatch/enterprise-webhook-contract";
-import type { WebhookEventsRepository } from "../repositories/webhook-events.repository";
+import type { WebhookEventsRepository } from "../ports/webhook-events.port";
 import { WebhookTenantsRepository } from "../repositories/webhook-tenants.repository";
 import { WebhookEnvelopeService } from "./webhook-envelope.service";
 

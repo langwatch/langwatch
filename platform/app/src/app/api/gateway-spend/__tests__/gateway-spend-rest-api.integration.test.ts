@@ -7,7 +7,7 @@ import { createEnterpriseWebhookEndpointService } from "~/server/webhooks/enterp
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import {
-  WebhookEventsClickHouseRepository,
+  WebhookEventsAdapter,
   WebhookEventsService,
 } from "~/runtime/app/features/webhooks";
 import { generate } from "@langwatch/ksuid";
@@ -72,7 +72,7 @@ vi.mock("~/server/app-layer/app", async () => {
         ),
         webhookEvents: WebhookEventsService.create({
           prisma: dbForPermissions,
-          repository: WebhookEventsClickHouseRepository.create(resolveTestClickHouseClient),
+          repository: WebhookEventsAdapter.create(resolveTestClickHouseClient),
         }),
       },
     }),

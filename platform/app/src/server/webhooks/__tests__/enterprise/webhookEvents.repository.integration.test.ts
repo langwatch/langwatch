@@ -9,14 +9,15 @@ import {
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import type { GatewaySpendState } from "@langwatch/gateway-server";
 import { GatewaySpendEventsRepository } from "@langwatch/gateway-server";
-import { WebhookEventsClickHouseRepository } from "~/runtime/app/features/webhooks";
+import { WebhookEventsAdapter } from "~/runtime/app/features/webhooks";
+import type { WebhookEventsRepository } from "@langwatch/enterprise-webhook-server";
 
 const tenantId = `test-webhook-events-${nanoid(8)}`;
 const baseTime = Date.UTC(2026, 6, 20, 12, 0, 0);
 
 let client: ClickHouseClient;
 let spendRepo: GatewaySpendEventsRepository;
-let eventsRepo: WebhookEventsClickHouseRepository;
+let eventsRepo: WebhookEventsRepository;
 
 function state(occurredAtMs: number): GatewaySpendState {
   return {
@@ -64,7 +65,7 @@ beforeAll(async () => {
   client = containers.clickHouseClient;
   const resolve = async () => client;
   spendRepo = new GatewaySpendEventsRepository(resolve);
-  eventsRepo = WebhookEventsClickHouseRepository.create(resolve);
+  eventsRepo = WebhookEventsAdapter.create(resolve);
 }, 120_000);
 
 afterAll(async () => {

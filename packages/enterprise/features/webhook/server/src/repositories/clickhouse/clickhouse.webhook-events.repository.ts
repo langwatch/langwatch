@@ -1,7 +1,7 @@
 import {
   WebhookEventsRepository,
   type WebhookEventsPage,
-} from "../webhook-events.repository";
+} from "../../ports/webhook-events.port";
 import type {
   WebhookSpendEventRow,
   WebhookSpendEventStatus,
