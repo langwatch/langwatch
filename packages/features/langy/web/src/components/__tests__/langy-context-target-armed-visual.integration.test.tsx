@@ -22,9 +22,7 @@ import { useLangyStore } from "../../langy.store";
 
 function press(key: string, target: EventTarget = document.body) {
   act(() => {
-    target.dispatchEvent(
-      new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
-    );
+    target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
   });
 }
 
@@ -66,7 +64,12 @@ describe("armed context targets", () => {
 
         press("#");
 
-        expect(screen.getByTestId("langy-armed-hint")).toBeInTheDocument();
+        // `isConnected`, not `toBeInTheDocument`: this package carries no
+        // jest-dom, so that matcher was an unknown Chai property and the
+        // assertion threw however the hint rendered. It checks the same thing
+        // — attached to the document — and the hint is portalled to
+        // `document.body`, so being attached is the part worth stating.
+        expect(screen.getByTestId("langy-armed-hint").isConnected).toBe(true);
       });
     });
 
@@ -86,9 +89,9 @@ describe("armed context targets", () => {
       it("takes the ring marker off again", () => {
         renderPage();
         press("#");
-        expect(
-          screen.getByTestId("trace-card").getAttribute("data-langy-target-state"),
-        ).toBe("near");
+        expect(screen.getByTestId("trace-card").getAttribute("data-langy-target-state")).toBe(
+          "near",
+        );
 
         press("Escape");
 
