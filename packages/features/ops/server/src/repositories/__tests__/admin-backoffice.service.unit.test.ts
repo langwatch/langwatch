@@ -19,6 +19,10 @@ const user: UserProfile = {
   deactivatedAt: null,
 };
 
+const notReached = async (): Promise<never> => {
+  throw new Error("not used by the admin backoffice");
+};
+
 class UserFake extends UserService {
   getProfiles = vi.fn(async () => []);
   tryFindById = vi.fn(async () => user);
@@ -39,6 +43,13 @@ class UserFake extends UserService {
   reactivate = vi.fn(async () => user);
   setAvatar = vi.fn(async () => ({ image: "" }));
   removeAvatar = vi.fn(async () => undefined);
+
+  // The backoffice reads and deactivates users; it has no business setting a
+  // first password or touching the passkey nudge. These throw rather than
+  // answer an invented shape, so if it ever reaches one the test says so.
+  setFirstPassword = vi.fn(notReached);
+  getPasskeyNudgeStatus = vi.fn(notReached);
+  dismissPasskeyNudge = vi.fn(notReached);
 }
 
 class AuthFake extends AuthService {

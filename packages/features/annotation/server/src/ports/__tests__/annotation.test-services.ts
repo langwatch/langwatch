@@ -28,9 +28,14 @@ export function createAnnotationTestProjects(organizationId = "organization-1") 
     touchCodingAgentSessionSeen: unavailable,
     touchCodingAgentPullRequestSeen: unavailable,
     searchByQuery: unavailable,
-    isFeatureEnabled: unavailable,
     tryGetTraceSharingConfig: unavailable,
     resolveOrgAdmin: unavailable,
+    tryGetIdentity: unavailable,
+    tryGetOrganizationId: unavailable,
+    listIdsByOrganization: unavailable,
+    resolveTraceDestination: unavailable,
+    listTraceDestinations: unavailable,
+    tryGetTraceDestination: unavailable,
   } satisfies ProjectService;
 }
 
@@ -72,5 +77,7 @@ export function createAnnotationTestOrganizations() {
     addGroupBinding: unavailable,
     removeGroupBinding: unavailable,
     applyGroupEdits: unavailable,
+    getSettings: unavailable,
+    updateSettings: unavailable,
   } satisfies OrganizationService;
 }

@@ -18,23 +18,31 @@ import {
 } from "../../transport/api-trpc/ops.api";
 import { OpsApp, type OpsCapability } from "../ops.app";
 
+/**
+ * Every mock is typed from the port itself. The port's own comment explains
+ * why the shapes there stopped being `unknown` — a tRPC procedure publishes
+ * what its handler returns — and a stub typed `(...args: unknown[])` opts back
+ * out of exactly that: it accepts any call and resolves any value, so this
+ * suite would keep passing while the browser read fields off nothing.
+ */
+type SystemMigrations = OpsTrpcPorts["systemMigrations"];
+
 const service = {
-  enroll: vi.fn<(...args: unknown[]) => Promise<void>>(),
-  enrollCohort: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
-  withdraw: vi.fn<(...args: unknown[]) => Promise<void>>(),
-  getEnrollments: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
-  getOverview: vi.fn(),
-  startPass: vi.fn(),
-  rollBack: vi.fn(),
-  assertLegacyWritersDrained: vi.fn(),
-  runForOrganization: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
-  searchOrganizations: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  enroll: vi.fn<SystemMigrations["enroll"]>(),
+  enrollCohort: vi.fn<SystemMigrations["enrollCohort"]>(),
+  withdraw: vi.fn<SystemMigrations["withdraw"]>(),
+  getEnrollments: vi.fn<SystemMigrations["getEnrollments"]>(),
+  getOverview: vi.fn<SystemMigrations["getOverview"]>(),
+  startPass: vi.fn<SystemMigrations["startPass"]>(),
+  rollBack: vi.fn<SystemMigrations["rollBack"]>(),
+  assertLegacyWritersDrained: vi.fn<SystemMigrations["assertLegacyWritersDrained"]>(),
+  runForOrganization: vi.fn<SystemMigrations["runForOrganization"]>(),
+  searchOrganizations: vi.fn<SystemMigrations["searchOrganizations"]>(),
   // Declared by the migration itself in production, so the stub answers the way
   // the registered migrations do: only the cutover changes how the fleet
   // behaves, and only it takes the typed confirmation.
   requiresOperatorConfirmation: vi.fn(
-    ({ migrationName }: { migrationName: string }) =>
-      migrationName === "authz-grants-cutover",
+    ({ migrationName }: { migrationName: string }) => migrationName === "authz-grants-cutover",
   ),
 };
 
@@ -303,9 +311,7 @@ describe("ops migration enrollment procedures", () => {
         migrationName: "authz-team-user-backfill",
         actorUserId: "user_alex",
       });
-      expect(demandedPermissions.get("runSystemMigrationForOrganization")).toBe(
-        "ops:manage",
-      );
+      expect(demandedPermissions.get("runSystemMigrationForOrganization")).toBe("ops:manage");
     });
 
     /** @scenario "A targeted cutover run takes the typed confirmation" */
@@ -338,9 +344,7 @@ describe("ops migration enrollment procedures", () => {
   describe("when an operator searches organizations", () => {
     /** @scenario "An operator finds an organization by name to act on it" */
     it("delegates to the service and demands ops:view", async () => {
-      service.searchOrganizations.mockResolvedValue([
-        { id: "org_acme", name: "Acme Corporation" },
-      ]);
+      service.searchOrganizations.mockResolvedValue([{ id: "org_acme", name: "Acme Corporation" }]);
       const caller = buildCaller();
 
       const result = await caller.searchMigrationOrganizations({ query: "acme" });
