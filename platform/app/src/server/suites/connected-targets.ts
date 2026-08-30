@@ -18,6 +18,7 @@ import type {
   AgentIdentityRow,
   AgentRepository,
 } from "../agents/agent.repository";
+import { isConnectedAgentStale } from "../agents/connected-agent-visibility";
 import { AgentOwnerOnlyError } from "../connected-agents/errors";
 import { parseConnectedReference } from "../connected-agents/identity";
 import {
@@ -74,6 +75,22 @@ export async function resolveConnectedReferences({
       const picked = own ?? (shared.length === 1 ? shared[0] : undefined);
       return picked ? { ...target, referenceId: picked.id } : target;
     }),
+  );
+}
+
+/**
+ * Whether a target's agent is a connected agent whose process has not been
+ * seen for too long.
+ *
+ * Such a target is refused the way an archived one is: the run reports it as
+ * skipped rather than reaching a process that is gone.
+ */
+export function isAgentUnseen(
+  agent: Pick<AgentIdentityRow, "type" | "lastSeenAt">,
+): boolean {
+  return (
+    agent.type === "connected" &&
+    isConnectedAgentStale({ lastSeenAt: agent.lastSeenAt })
   );
 }
 

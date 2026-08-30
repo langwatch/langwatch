@@ -32,10 +32,10 @@ Feature: Connected agents
     And the row carries the new description
 
   @integration
-  Scenario: A reconnect of an archived identity restores the row
-    Given a connected agent row that was archived
+  Scenario: A reconnect of an unseen identity lists the row again
+    Given a connected agent row last seen thirty one days ago
     When a process registers the same identity again
-    Then the same row is active again
+    Then the row is listed again
 
   @unit
   Scenario: The environment is sanitized before it becomes part of the identity
@@ -131,12 +131,17 @@ Feature: Connected agents
     And a refresh after the minute writes the row
 
   @integration
-  Scenario: The daily sweep archives connected agents unseen for thirty days
+  Scenario: A connected agent unseen for thirty days is not listed
     Given a connected agent last seen thirty one days ago
     And a connected agent last seen yesterday
-    When the archive sweep runs
-    Then the first agent is archived
-    And the second agent is still active
+    When the agents of the project are listed
+    Then only the second agent is listed
+
+  @unit
+  Scenario: A connected agent unseen for thirty days is refused as a run target
+    Given a suite that targets a connected agent last seen thirty one days ago
+    When the run is started
+    Then the target is skipped the way an archived target is
 
   # ---------------------------------------------------------------------------
   # Dispatch

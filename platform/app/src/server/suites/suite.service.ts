@@ -45,6 +45,7 @@ import {
 import {
   agentParameterDefinitionsOf,
   assertConnectedAgentsRunnable,
+  isAgentUnseen,
   ownerNamesOf,
   resolveConnectedReferences,
 } from "./connected-targets";
@@ -2032,7 +2033,7 @@ export class SuiteService {
       const row = agentMap.get(target.referenceId);
       if (!row) {
         missing.push(target);
-      } else if (row.archivedAt) {
+      } else if (row.archivedAt || isAgentUnseen(row)) {
         archived.push(target);
       } else {
         active.push(target);

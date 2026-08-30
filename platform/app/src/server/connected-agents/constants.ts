@@ -99,9 +99,6 @@ export const CALL_KEY_SLACK_SECONDS = 60;
 /** How long a sticky pin outlives the last call of its thread. */
 export const STICKY_PIN_TTL_SECONDS = 10 * 60;
 
-/** A connected agent unseen this long is archived by the daily sweep. */
-export const ARCHIVE_AFTER_DAYS = 30;
-
 /** `Agent.lastSeenAt` is written at most once per agent in this window. */
 export const LAST_SEEN_WRITE_INTERVAL_MS = 60_000;
 

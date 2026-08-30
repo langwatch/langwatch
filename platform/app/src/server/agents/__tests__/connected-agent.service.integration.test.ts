@@ -17,6 +17,8 @@ import { AgentService } from "../agent.service";
 
 const projectId = `test-connected-agent-${nanoid(8)}`;
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 const service = AgentService.create(prisma);
 
 const config: ConnectedComponentConfig = {
@@ -90,10 +92,10 @@ describe("connected agent rows", () => {
     });
   });
 
-  describe("when an archived identity registers again", () => {
-    /** @scenario "A reconnect of an archived identity restores the row" */
-    it("restores the same row", async () => {
-      const archivedIdentity = {
+  describe("when an identity unseen for thirty one days registers again", () => {
+    /** @scenario "A reconnect of an unseen identity lists the row again" */
+    it("lists the same row again", async () => {
+      const unseenIdentity = {
         ...identity,
         identityKey: `billing-agent@staging-${nanoid(4)}`,
         environment: "staging",
@@ -103,23 +105,61 @@ describe("connected agent rows", () => {
         projectId,
         name: "billing-agent",
         config,
-        identity: archivedIdentity,
+        identity: unseenIdentity,
       });
-      await service.archiveAgent({ id: created.id, projectId });
+      await prisma.agent.update({
+        where: { id: created.id, projectId },
+        data: { lastSeenAt: new Date(Date.now() - 31 * DAY_MS) },
+      });
+      const whileUnseen = await service.getAll({ projectId });
+      expect(whileUnseen.map((agent) => agent.id)).not.toContain(created.id);
 
-      const restored = await service.registerConnected({
+      const registered = await service.registerConnected({
         id: `agent_${nanoid()}`,
         projectId,
         name: "billing-agent",
         config,
-        identity: archivedIdentity,
+        identity: unseenIdentity,
       });
 
-      expect(restored.id).toBe(created.id);
-      expect(restored.archivedAt).toBeNull();
-      expect(await service.getById({ id: created.id, projectId })).not.toBe(
-        null,
+      expect(registered.id).toBe(created.id);
+      const listed = await service.getAll({ projectId });
+      expect(listed.map((agent) => agent.id)).toContain(created.id);
+    });
+  });
+
+  describe("when one agent was seen thirty one days ago and one yesterday", () => {
+    /** @scenario "A connected agent unseen for thirty days is not listed" */
+    it("lists only the agent seen yesterday", async () => {
+      const unseen = await service.registerConnected({
+        id: `agent_${nanoid()}`,
+        projectId,
+        name: `unseen-agent-${nanoid(4)}`,
+        config,
+        identity: { ...identity, identityKey: `unseen-agent-${nanoid(6)}` },
+      });
+      const recent = await service.registerConnected({
+        id: `agent_${nanoid()}`,
+        projectId,
+        name: `recent-agent-${nanoid(4)}`,
+        config,
+        identity: { ...identity, identityKey: `recent-agent-${nanoid(6)}` },
+      });
+      await prisma.agent.update({
+        where: { id: unseen.id, projectId },
+        data: { lastSeenAt: new Date(Date.now() - 31 * DAY_MS) },
+      });
+      await prisma.agent.update({
+        where: { id: recent.id, projectId },
+        data: { lastSeenAt: new Date(Date.now() - DAY_MS) },
+      });
+
+      const ids = (await service.getAll({ projectId })).map(
+        (agent) => agent.id,
       );
+
+      expect(ids).not.toContain(unseen.id);
+      expect(ids).toContain(recent.id);
     });
   });
 

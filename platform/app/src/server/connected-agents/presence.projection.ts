@@ -1,16 +1,16 @@
 /**
  * The Postgres projection of presence (ADR-128, "Presence").
  *
- * Presence itself lives in Redis and dies with the socket. Two things reach
+ * Presence itself lives in Redis and dies with the socket. One thing reaches
  * the row: `lastSeenAt`, written at most once a minute per agent so the list
- * can say "last seen 2 hours ago" after every instance is gone, and the daily
- * sweep that archives a connected agent unseen for thirty days.
+ * can say "last seen 2 hours ago" after every instance is gone, and so a
+ * read knows which connected agents are still real.
  */
 
 import { createLogger } from "@langwatch/observability";
-import { Prisma, type PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { AgentRepository } from "~/server/agents/agent.repository";
-import { ARCHIVE_AFTER_DAYS, LAST_SEEN_WRITE_INTERVAL_MS } from "./constants";
+import { LAST_SEEN_WRITE_INTERVAL_MS } from "./constants";
 
 const logger = createLogger("langwatch:connected-agents:presence");
 
@@ -58,42 +58,4 @@ export async function touchAgentLastSeen({
 /** Forgets every throttle mark, for tests that reuse the process. */
 export function resetLastSeenThrottle(): void {
   lastWrites.clear();
-}
-
-/**
- * Archives every connected agent unseen for {@link ARCHIVE_AFTER_DAYS}.
- *
- * One statement across every project, by design: the sweep is a platform
- * chore, not a tenant read, and the tenancy guard is told so.
- */
-export async function archiveUnseenConnectedAgents({
-  prisma,
-  now = new Date(),
-  archiveAfterDays = ARCHIVE_AFTER_DAYS,
-}: {
-  prisma: PrismaClient;
-  now?: Date;
-  archiveAfterDays?: number;
-}): Promise<number> {
-  const cutoff = new Date(
-    now.getTime() - archiveAfterDays * 24 * 60 * 60 * 1000,
-  );
-  const count = await prisma.$executeRaw(
-    Prisma.sql`
-      -- @tenancy: daily sweep over every project; archives connected agents unseen for ${Prisma.raw(String(archiveAfterDays))} days
-      UPDATE "Agent"
-      SET "archivedAt" = ${now}
-      WHERE "type" = 'connected'
-        AND "archivedAt" IS NULL
-        AND "lastSeenAt" IS NOT NULL
-        AND "lastSeenAt" < ${cutoff}
-    `,
-  );
-  if (count > 0) {
-    logger.info(
-      { count, cutoff },
-      "archived connected agents unseen for too long",
-    );
-  }
-  return count;
 }
