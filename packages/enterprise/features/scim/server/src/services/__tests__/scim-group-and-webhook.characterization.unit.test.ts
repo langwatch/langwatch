@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { ScimService } from "@langwatch/enterprise-scim-contract";
+import {
+  ScimService,
+  type ScimListResponse,
+  type ScimUser,
+} from "@langwatch/enterprise-scim-contract";
 import { describe, expect, it, vi } from "vitest";
 import { ScimWebhookApi } from "../../api/scim-webhook/scim-webhook.api";
 import { ScimDirectoryService } from "../scim-directory.service";
@@ -32,10 +36,38 @@ function groupsRepository(): ScimDirectoryRepository {
     listGroupMembers: vi.fn(async () => []),
   };
 }
+/**
+ * The user the webhook finds when it looks `ada@example.com` up: the deactivate
+ * event carries only a userName, so the id the fake answers here is the one the
+ * assertion expects `deleteUser` to be called with.
+ */
+const scimUser: ScimUser = {
+  schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+  id: "user_1",
+  userName: "ada@example.com",
+  name: { givenName: "Ada", familyName: "Lovelace" },
+  emails: [{ primary: true, value: "ada@example.com", type: "work" }],
+  active: true,
+  meta: {
+    resourceType: "User",
+    created: "2024-01-01T00:00:00.000Z",
+    lastModified: "2024-01-02T00:00:00.000Z",
+  },
+};
+
+/** The one-result listing the userName lookup answers with. */
+const scimUserList: ScimListResponse<ScimUser> = {
+  schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+  totalResults: 1,
+  startIndex: 1,
+  itemsPerPage: 1,
+  Resources: [scimUser],
+};
+
 class ScimServiceFake extends ScimService {
   readonly tryFindOrganizationBySsoDomain = vi.fn(async () => ({ id: "org_1" }));
-  readonly createUser = vi.fn(async () => ({}));
-  readonly listUsers = vi.fn(async () => ({ Resources: [{ id: "user_1" }] }));
+  readonly createUser: ScimService["createUser"] = vi.fn(async () => scimUser);
+  readonly listUsers: ScimService["listUsers"] = vi.fn(async () => scimUserList);
   readonly deleteUser = vi.fn(async () => {});
   // `ScimService` grew this and the fake did not follow.
   readonly revokeTokensForConnection: ScimService["revokeTokensForConnection"] = vi.fn();

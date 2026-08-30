@@ -6,8 +6,9 @@ import {
   type ScimCreateUserRequest,
 } from "@langwatch/enterprise-scim-contract";
 import type { ScimRepositoryPort } from "../scim-repository.port";
+import { scimRepositoryFixture as repository } from "../../__tests__/support/scim-repository-fixture";
 import { ScimService } from "../../services/scim.service";
-import type { UserProfile } from "@langwatch/user-contract";
+import type { UpdateUserProfileInput, UserProfile } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle";
 import { GrantsFake } from "../../__tests__/support/grants-fake";
@@ -27,41 +28,6 @@ function user(overrides: Partial<UserProfile> = {}): UserProfile {
     updatedAt: new Date("2024-01-02T00:00:00Z"),
     lastLoginAt: null,
     deactivatedAt: null,
-    ...overrides,
-  };
-}
-
-function repository(overrides: Partial<ScimRepositoryPort> = {}): ScimRepositoryPort {
-  return {
-    tryFindOrganizationBySsoDomain: vi.fn(async () => null),
-    createToken: vi.fn(async () => ({ id: "token-1" })),
-    listTokens: vi.fn(async () => []),
-    tryFindToken: vi.fn(async () => null),
-    revokeToken: vi.fn(async () => false),
-    revokeTokensForConnection: vi.fn(async () => 0),
-    tryFindTokenByHash: vi.fn(async () => null),
-    recordTokenUse: vi.fn(async () => undefined),
-    tryFindMembership: vi.fn(async () => null),
-    listMemberships: vi.fn(async () => ({ rows: [], total: 0 })),
-    addMembership: vi.fn(async () => undefined),
-    removeMembership: vi.fn(async () => undefined),
-    tryFindGroup: vi.fn(async () => null),
-    listGroups: vi.fn(async () => ({ rows: [], total: 0 })),
-    createGroup: vi.fn(),
-    renameGroup: vi.fn(async () => undefined),
-    deleteGroup: vi.fn(async () => undefined),
-    listGroupMembers: vi.fn(async () => []),
-    listGroupMemberIds: vi.fn(async () => []),
-    addGroupMember: vi.fn(async () => undefined),
-    removeGroupMembers: vi.fn(async () => undefined),
-    groupSlugExists: vi.fn(async () => false),
-    listRoleBindings: vi.fn(async () => []),
-    scimConnectionExists: vi.fn(async () => true),
-    tryFindDirectoryUserId: vi.fn(async () => null),
-    rememberDirectoryIdentity: vi.fn(async () => undefined),
-    forgetDirectoryIdentity: vi.fn(async () => undefined),
-    forgetDirectoryIdentitiesForUser: vi.fn(async () => undefined),
-    listDirectoryConnectionsForUser: vi.fn(async () => []),
     ...overrides,
   };
 }
@@ -96,7 +62,7 @@ function harness(
     tryFindByEmail: vi.fn(async () => options.existingUser ?? null),
     tryFindById: vi.fn(async () => currentUser),
     create: vi.fn(async () => currentUser),
-    updateProfile: vi.fn(async () => currentUser),
+    updateProfile: vi.fn(async (_input: UpdateUserProfileInput) => currentUser),
     deactivate: vi.fn(async () => {
       currentUser = user({ ...currentUser, deactivatedAt: now });
       return currentUser;
@@ -317,7 +283,10 @@ describe("SCIM user parity", () => {
 
   it("lists members and passes an exact userName filter to persistence", async () => {
     const repo = repository({
-      listMemberships: vi.fn(async () => ({ rows: [{ user: user() }], total: 1 })),
+      listMemberships: vi.fn(async () => ({
+        rows: [{ userId: "user-1", organizationId: "org-1", user: user() }],
+        total: 1,
+      })),
     });
     const { service } = harness({ repository: repo });
 
@@ -340,7 +309,11 @@ describe("SCIM user parity", () => {
 
   it("deactivates and removes a member on delete, sweeping visible grants", async () => {
     const repo = repository({
-      tryFindMembership: vi.fn(async () => ({ user: user() })),
+      tryFindMembership: vi.fn(async () => ({
+        userId: "user-1",
+        organizationId: "org-1",
+        user: user(),
+      })),
       listRoleBindings: vi.fn(async () => [
         {
           id: "grant-1",
@@ -519,6 +492,8 @@ describe("SCIM enterprise cost-center parity", () => {
       id: "department-research",
       organizationId: "org-1",
       name: "Research",
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
     });
     await service.createUser({ organizationId: "org-1", request: request("Research") });
     expect(governance.departmentAssignUser).toHaveBeenCalledWith({

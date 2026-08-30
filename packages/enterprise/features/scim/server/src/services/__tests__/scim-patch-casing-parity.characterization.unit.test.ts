@@ -5,13 +5,13 @@ import { EntitlementService } from "@langwatch/entitlement-contract";
 import { scimPatchRequestSchema } from "@langwatch/enterprise-scim-contract";
 import type { ScimUserProvisioning } from "../scim-provisioning.service";
 import { describe, expect, it, vi } from "vitest";
-import type { ScimRepositoryPort } from "../../ports/scim-repository.port";
 import { ScimDirectoryService } from "../scim-directory.service";
 import { ScimGrantsService } from "../scim-grants.service";
 import { ScimService } from "../scim.service";
 import { QuietScimSyncLifecycle } from "../../ports/__tests__/support/quiet-scim-sync-lifecycle";
 import { GrantsFake } from "../../__tests__/support/grants-fake";
 import type { ScimDirectoryRepository } from "../scim-directory.service";
+import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture";
 
 const patchSchema = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 const parse = (operations: unknown[]) =>
@@ -118,9 +118,11 @@ describe("SCIM PATCH operation casing parity", () => {
   });
 
   it("applies a capitalized Replace to user deactivation", async () => {
-    const repo: ScimRepositoryPort = {
+    const repo = scimRepositoryFixture({
       ...groupRepository(),
       tryFindMembership: vi.fn(async () => ({
+        userId: "user-1",
+        organizationId: "org-1",
         user: {
           id: "user-1",
           name: "Alice Smith",
@@ -134,7 +136,7 @@ describe("SCIM PATCH operation casing parity", () => {
           deactivatedAt: null,
         },
       })),
-    };
+    });
     const users = userService();
     const service = ScimService.create({
       prisma: repo,
