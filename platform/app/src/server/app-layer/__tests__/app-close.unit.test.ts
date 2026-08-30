@@ -4,10 +4,15 @@ import { App, AppShutdownResources, type AppShutdownPhase } from "../app";
 import type { AppDependencies } from "../dependencies";
 
 /**
- * The App constructor only assigns fields, so an App can be built from the two
- * dependencies close() touches. It does spread `deps.commands.*` into several
- * of those fields, hence the proxy — it answers every command group with an
- * empty object so the test does not have to track that list as it grows.
+ * An App built with only what `close()` touches, plus whatever its constructor
+ * insists on along the way.
+ *
+ * That second clause used to be unnecessary: the constructor only assigned
+ * fields. It now composes the feature apps the App holds, which means it reads
+ * a level into several dependency groups and calls `Object.assign` on another,
+ * so those groups have to be present even though no shutdown test looks at
+ * them. The proxy covers `deps.commands.*` the same way, so the list of
+ * command groups can grow without this file tracking it.
  */
 const emptyCommands = new Proxy({}, { get: () => ({}) }) as AppDependencies["commands"];
 
