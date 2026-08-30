@@ -64,3 +64,31 @@ The biggest single contributors are worth knowing before starting:
 Five of the top seven are gateway or governance suites, which suggests the
 count is concentrated rather than uniform — a handful of subsystems mid-move,
 not 487 independent problems.
+
+## The top file, looked at
+
+`governance-activity.integration.test.ts` — 81 errors, the largest single
+contributor — is not a stub drift and will not fall to a rename.
+
+Its 30 `TS2339`s name two methods:
+
+- `app.projects.ensureInternal(...)` — `ProjectApp` has seven methods and this
+  is not among them. The name appears nowhere in production code: only in this
+  suite, in `internal-governance-project.integration.test.ts`, and in
+  `test-utils/annotation-test-services.ts`, where it is stubbed as
+  `unavailable`.
+- `governanceService.summary(...)` — appears only in this suite.
+
+So both are capabilities the tests expect and no class provides. That is the
+absorbed-or-dropped question again, and answering it is governance's own work,
+not a mechanical fix.
+
+The remaining 50 errors are `TS7006` (implicitly-any parameters) and are almost
+certainly downstream: a callback passed to a method that does not exist has no
+contextual type. Expect them to clear with the 30, which is why the file's
+count overstates its difficulty.
+
+**These are integration suites.** They need Postgres and ClickHouse, so a
+change to them cannot be verified by running them the way the unit-lane fixes
+in this session were. Whoever takes it on should be able to run the datastore
+lane, or the fix is being made blind.
