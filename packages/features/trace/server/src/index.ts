@@ -1,22 +1,16 @@
-export {
-  ClickHouseTraceAdapter,
-  type ClickHouseTraceAdapterOptions,
-} from "./adapters/clickhouse.trace.adapter";
+export { ClickHouseTraceAdapter } from "./adapters/clickhouse.trace.adapter";
 export { TraceCanonicalisationService } from "./services/trace-canonicalisation.service";
 export { NullTraceListAdapter } from "./adapters/null-trace-list.adapter";
 export {
   EventingTracePipelineAdapter,
   type EventingTracePipelineAdapterOptions,
 } from "./adapters/eventing.trace-pipeline.adapter";
-export { EventingTraceProcessingAdapter } from "./adapters/eventing.trace-processing.adapter";
+
 export { TraceProcessingServerInstaller } from "./adapters/eventing.trace-processing.installer";
 export { TraceProcessingInstallerPort } from "./ports/trace-processing-installer.port";
 export {
-  createDeferredOriginHandler,
   createOriginGateHandler,
   DEFERRED_ORIGIN_CHECK_DELAY_MS,
-  type DeferredOriginPayload,
-  makeDeferredOriginJobId,
   needsOriginResolution,
   ORIGIN_GATE_DEDUP_TTL_MS,
   ORIGIN_GATE_DELAY_MS,
@@ -33,41 +27,33 @@ export {
   CUSTOM_EVAL_SYNC_DELAY_MS,
   createCustomEvaluationSyncHandler,
   customEvaluationSyncDedupId,
-  extractEvaluationsFromSpan,
   hasSyncableEvaluations,
-  type CustomEvaluationSyncSubscriberDeps,
 } from "./subscribers/custom-evaluation-sync.subscriber";
 export {
   EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
   EXPERIMENT_METRICS_SYNC_DELAY_MS,
   createExperimentMetricsSyncHandler,
   hasExperimentCostMetrics,
-  type ExperimentMetricsSyncSubscriberDeps,
 } from "./subscribers/experiment-metrics-sync.subscriber";
 export {
   PROJECT_METADATA_WINDOW_MS,
   createProjectMetadataHandler,
   isRealFirstIngest,
   projectMetadataGroupKey,
-  type ProjectMetadataSubscriberDeps,
 } from "./subscribers/project-metadata.subscriber";
 export {
   SIMULATION_METRICS_SYNC_DEDUP_TTL_MS,
   SIMULATION_METRICS_SYNC_DELAY_MS,
   createSimulationMetricsSyncHandler,
   hasSimulationMetrics,
-  type SimulationMetricsSyncSubscriberDeps,
 } from "./subscribers/simulation-metrics-sync.subscriber";
 export {
   SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS,
   createSpanStorageBroadcastHandler,
-  type SpanStorageBroadcastSubscriberDeps,
 } from "./subscribers/span-storage-broadcast.subscriber";
 export {
   TRACE_UPDATE_BROADCAST_WINDOW_MS,
   createTraceUpdateBroadcastHandler,
-  type TraceBroadcastSink,
-  type TraceUpdateBroadcastSubscriberDeps,
 } from "./subscribers/trace-update-broadcast.subscriber";
 export {
   TRACKED_EVENT_SYNC_DEDUP_TTL_MS,
@@ -75,16 +61,8 @@ export {
   createTrackedEventSyncHandler,
   hasSyncableFeedback,
   trackedEventSyncDedupId,
-  type TrackedEventSyncSubscriberDeps,
 } from "./subscribers/tracked-event-sync.subscriber";
-export {
-  parseJsonStringValues,
-  sanitizeInvalidJsonEscapes,
-  TraceRequestUtils,
-  type ParentContext,
-  type TraceFlagsInfo,
-  type TraceStateInfo,
-} from "./services/otlp-trace-request.rules";
+export { parseJsonStringValues } from "./services/otlp-trace-request.rules";
 export { IdUtils } from "./services/span-record-identity.rules";
 export { TraceListClickHouseRepository } from "./repositories/clickhouse/trace-list.repository";
 export { TraceSummaryClickHouseRepository } from "./repositories/clickhouse/trace-summary.repository";
@@ -103,58 +81,35 @@ export {
   NullTraceAnalyticsRollupRepository,
   type TraceAnalyticsRollupRepository,
 } from "./repositories/trace-analytics-rollup.repository";
-export type {
-  TraceClickHouseClient,
-  TraceClickHouseResolver,
-  TraceClickHouseWriteClient,
-  TraceClickHouseWriteResolver,
-} from "./ports/clickhouse.port";
+export type { TraceClickHouseResolver } from "./ports/clickhouse.port";
 export {
   TraceWindowedReadMetricsPort,
   type TraceWindowedReadOutcome,
 } from "./ports/trace-windowed-read-metrics.port";
 export { TraceRecordPort } from "./ports/trace-record.port";
-export { TraceFullRecordPort } from "./ports/trace-full-record.port";
-export { TraceTopicAssignmentCommandPort } from "./ports/trace-topic-assignment-command.port";
+
 export { TracePayloadReaderPort } from "./ports/trace-payload-reader.port";
 export { TraceFullIoPort } from "./ports/trace-full-io.port";
 export { TraceEventDerivationPort } from "./ports/trace-event-derivation.port";
 export { TraceQueryFieldValuesPort } from "./ports/query-field-values.port";
-export { TraceQueryClassificationPort } from "./ports/trace-query-classification.port";
+
 export { TraceQueryClassificationAdapter } from "./adapters/trace-query-classification.adapter";
 export {
   extractFreeTextTerms,
-  normalizeQuery,
   translateFilterToClickHouse,
 } from "./adapters/trace-query.clickhouse.adapter";
-export {
-  FIELD_DEFS,
-  KNOWN_FIELDS,
-  type KnownField,
-} from "./adapters/trace-query-fields.clickhouse.adapter";
+
 export {
   FACET_REGISTRY,
   TABLE_TIME_COLUMNS,
-  type CategoricalFacetDef,
-  type DynamicKeysDef,
   type ExpressionCategoricalDef,
   type FacetDefinition,
-  type FacetGroup,
-  type FacetQuery,
-  type FacetQueryContext,
   type FacetTable,
-  type QueryBuilderCategoricalDef,
   type RangeFacetDef,
 } from "./adapters/trace-facet-registry.clickhouse.adapter";
 export { buildSpanAttributeKeysFacetQuery } from "./adapters/trace-facet-span-attribute-keys.clickhouse.adapter";
 export { evaluateQueryInMemory, queryNeeds } from "./services/trace-query-evaluation.service";
-export type {
-  DerivedSpanRow,
-  FieldDef,
-  FieldNeeds,
-  InMemoryTrace,
-  TraceQueryEvaluationRun,
-} from "./adapters/trace-query-evaluation.adapter";
+export type { FieldDef } from "./adapters/trace-query-evaluation.adapter";
 export { TraceSummaryReaderPort } from "./ports/trace-summary-reader.port";
 export {
   TraceSummaryProjectionPort,
@@ -166,7 +121,6 @@ export {
   TraceSpanCostEnrichmentPort,
   TraceSpanPiiRedactionPort,
   TraceSpanTokenEstimationPort,
-  type TraceSpanContentDropResult,
 } from "./ports/trace-span-preparation.port";
 export { TraceSpanSpoolPort, type TraceSpanSpoolIdentity } from "./ports/trace-span-spool.port";
 export { TraceSpanNormalizationPort } from "./ports/trace-span-normalization.port";
@@ -182,11 +136,8 @@ export {
   EventingRecordSpanAdapter as RecordSpanCommand,
   type RecordSpanCommandOptions,
 } from "./adapters/eventing.record-span.adapter";
-export {
-  EventingTraceTopicAdapter as AssignTopicCommand,
-  EventingTraceTopicAssignmentPort,
-} from "./adapters/eventing.trace-topic.adapter";
-export { EventingTraceOriginAdapter as ResolveOriginCommand } from "./adapters/eventing.trace-origin.adapter";
+export { EventingTraceTopicAdapter as AssignTopicCommand } from "./adapters/eventing.trace-topic.adapter";
+
 export { EventingTraceLogContributionAdapter as RecordLogContributionCommand } from "./adapters/eventing.trace-log-contribution.adapter";
 export { EventingTraceMetricCorrelationAdapter as RecordMetricCorrelationCommand } from "./adapters/eventing.trace-metric-correlation.adapter";
 export type {
@@ -198,10 +149,6 @@ export {
   applySpanToSummary,
   MAX_PROCESSED_SPANS,
   mergeModelsMostRecentFirst,
-  RESERVED_CACHE_CREATION_TOKENS,
-  RESERVED_CACHE_READ_TOKENS,
-  RESERVED_REASONING_TOKENS,
-  TRACE_SUMMARY_READ_WINDOW_MS,
   TraceSummaryFoldProjection,
 } from "./projections/trace-summary.projection";
 export {
@@ -228,9 +175,6 @@ export {
   TraceIngressCommandPort,
   TraceIngressPayloadPort,
   TraceSpanDedupPort,
-  type SpanIngestionResult,
-  type SpanIngestionStatus,
-  type TraceRequestCollectionResult,
 } from "./services/trace-ingestion.service";
 export {
   DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
@@ -239,7 +183,6 @@ export {
 } from "./services/trace-attribute-cap.rules";
 export { capPayloadString } from "./services/trace-payload-cap.rules";
 export {
-  clampSpanShardCount,
   MAX_SPAN_SHARD_COUNT,
   resolveSpanCommandShardCount,
   spanCommandGroupKey,
@@ -256,14 +199,12 @@ export { TraceAttributeAccumulationService } from "./services/trace-attribute-ac
 export { TraceOriginService } from "./services/trace-origin.service";
 export {
   extractIOFromLogRecord,
-  OUTPUT_SOURCE,
   shouldOverrideOutput,
   TraceIOAccumulationService,
 } from "./services/trace-io-accumulation.service";
-export { SpanStatusService } from "./services/span-status.service";
+
 export { SpanTimingService } from "./services/span-timing.service";
-export { TraceNameResolutionService } from "./services/trace-name-resolution.service";
-export { TracePromptAccumulationService } from "./services/trace-prompt-accumulation.service";
+
 export { TraceProjectionRuntimeService } from "./services/trace-projection-runtime.service";
 export {
   aggregateScenarioRoleMetrics,
@@ -272,24 +213,7 @@ export {
   type ScenarioRoleSpanInput,
 } from "./services/scenario-role-metrics.rules";
 
-export { TraceLegacyReadPort } from "./ports/trace-legacy-read.port";
-export {
-  TraceApp,
-  type ResolvedShare,
-  type TraceAppDependencies,
-  type TraceCaller,
-  type TraceEditOverlayStore,
-  type TraceLogRecordReader,
-  type TraceLogRecordReadRow,
-  type TraceProjectReader,
-  type TraceShareReader,
-  type TraceSummaryReader,
-  type TracesTopicReader,
-  type TracesTrpcEmitters,
-  type TracesV2ListReader,
-  type TracesV2SessionGroupsReader,
-  type TracesV2SpanReader,
-} from "./app/trace.app";
+export { TraceApp } from "./app/trace.app";
 export {
   SpansTrpcApi,
   type SpansTrpcContext,
@@ -311,36 +235,20 @@ export {
   type CategoryVisibility,
   type Protections,
 } from "./services/trace-viewer-protections.service";
-export {
-  compileHiddenAttributeMatchers,
-  redactHiddenAttributes,
-  redactHiddenAttributesCompiled,
-} from "./services/trace-attribute-redaction.service";
+export { redactHiddenAttributes } from "./services/trace-attribute-redaction.service";
 export {
   buildContentPrivacy,
-  buildSpanContentRedactions,
   contentSearchTermsForViewer,
-  deriveTraceDropPrivacy,
   gateTraceLogVisibility,
-  mapLegacySpanSummaryToTreeNode,
-  mapSpanToDetail,
-  mapSpansToDetailDtos,
   mapTraceSummaryToHeader,
-  readDroppedFromParams,
-  readPiiIncompleteFromParams,
   redactTraceLogContent,
   redactV2Content,
   toConversationContextTurn,
   type TraceContentPrivacyPort,
-  type TraceDerivedAttrPrefixes,
-  type TraceReadMapperPorts,
-  type TraceSpanDisplayPort,
-  type TraceSpanProtectionPort,
   type V2Protections,
 } from "./transport/api-trpc/trace-read-mappers.api";
 export {
   TracesV2TrpcApi,
-  type TracesV2CodingAgentEnrichmentPort,
   type TracesV2ReadPorts,
   type TracesV2TrpcContext,
   type TracesV2TrpcPorts,
@@ -357,9 +265,7 @@ export {
   gateSessionCost,
   gateSessionTitle,
   gateTreeCost,
-  HIDDEN_RESOURCE_ATTRS,
   withoutHiddenResourceAttrs,
-  type SessionTitleRedactionFlag,
 } from "./transport/api-trpc/trace-view-gates.api";
 export {
   createEventsRestApp,

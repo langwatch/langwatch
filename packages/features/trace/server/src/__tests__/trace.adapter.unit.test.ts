@@ -3,9 +3,13 @@ import {
   TracePayloadReaderPort,
   TraceFullIoPort,
   TraceSummaryReaderPort,
-  type TraceClickHouseClient,
-  type TraceClickHouseResolver,
 } from "../index";
+// From the port that defines them: an in-package test does not need the
+// package's public surface, and `index.ts` publishes what CONSUMERS import.
+import type {
+  TraceClickHouseClient,
+  TraceClickHouseResolver,
+} from "../ports/clickhouse.port";
 import { ClickHouseTraceAdapter } from "../index";
 import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository";
 import { describe, expect, it } from "vitest";
