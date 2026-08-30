@@ -579,6 +579,50 @@ describe("the wide run detail drawer", () => {
     );
   });
 
+  /** @scenario "A run that failed before anyone spoke says so" */
+  it("says the simulation failed rather than waiting, on a run with no messages", () => {
+    setRunState(
+      makeRunState({
+        status: ScenarioRunStatus.ERROR,
+        messages: [],
+        results: {
+          verdict: Verdict.FAILURE,
+          metCriteria: [],
+          unmetCriteria: [],
+          error: RUNNER_FAILURE,
+        },
+      }),
+    );
+    renderWide();
+
+    expect(screen.getByTestId("scenario-run-failed-empty")).toHaveTextContent(
+      "Simulation failed",
+    );
+    expect(screen.queryByText("Waiting for the first message")).toBeNull();
+  });
+
+  /** @scenario "A queued run reads the whole drawer with a spinner" */
+  it("reads a spinner beside the queued line, in the whole layout", () => {
+    setRunState(
+      makeRunState({
+        status: ScenarioRunStatus.QUEUED,
+        messages: [],
+        results: { verdict: null, metCriteria: [], unmetCriteria: [] },
+      }),
+    );
+    renderWide();
+
+    const queued = screen.getByTestId("wide-drawer-queued");
+    expect(queued).toHaveTextContent("Queued");
+    expect(
+      queued.parentElement?.querySelector(".chakra-spinner"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("wide-drawer-side-by-side")).toBeInTheDocument();
+    expect(screen.getByTestId("run-verdict-pending")).toHaveTextContent(
+      "Waiting for the run to start",
+    );
+  });
+
   /** @scenario "The criteria appear the moment the run settles" */
   it("reads the stored run again when the run settles without criteria", () => {
     vi.useFakeTimers();

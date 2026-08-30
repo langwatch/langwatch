@@ -234,6 +234,24 @@ Feature: Scenario infrastructure error surfacing and empty-response state
   # the details gets the stack the runner recorded, so the raw text is kept
   # rather than lost, but it is never what the panel opens with.
 
+  # A request that never got an answer arrives under one wrapper from the
+  # model client, whatever the cause. The wrapper is read last, so a refused
+  # certificate or a rejected key still classifies as itself.
+
+  @unit
+  Scenario: A request that never reached the model endpoint is named
+    Given a scenario run failed because the model client could not connect and reported no cause
+    When the failure is classified
+    Then the handled error code is "scenario_platform_unreachable"
+    And the message says the simulation could not reach the model endpoint
+    And it holds no stack trace
+
+  @unit
+  Scenario: A cause inside the wrapper still wins
+    Given a scenario run failed with a connect wrapper that carries a certificate or key reason
+    When the failure is classified
+    Then the reason inside the wrapper names the handled error, not the wrapper
+
   @unit
   Scenario: The stack of a run failure is kept as the detail
     Given a run whose error field holds the runner's name, message and stack

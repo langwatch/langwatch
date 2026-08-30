@@ -15,9 +15,9 @@
 import { Drawer } from "~/components/ui/drawer";
 import { useDrawer } from "~/hooks/useDrawer";
 import { RunDrawerContent } from "./RunDrawerContent";
+import { RunDrawerErrorBody } from "./RunDrawerErrorBody";
 import { RunDrawerHeaderBand } from "./RunDrawerHeaderBand";
 import { RunDrawerLoadingBody } from "./RunDrawerLoadingBody";
-import { RunDrawerQueuedBody } from "./RunDrawerQueuedBody";
 import {
   type RunDrawerState,
   useRunDrawerState,
@@ -25,7 +25,11 @@ import {
   WIDE_DRAWER_MAX_WIDTH,
 } from "./useRunDrawerState";
 
-/** The drawer once the run has state, and the queued read until it does. */
+/**
+ * The drawer body. A queued run draws the same as a running one, so the
+ * layout does not appear piece by piece while the reader waits: only a read
+ * that is still on its way, or one that failed, draws something else.
+ */
 function RunDrawerBody({
   state,
   stop,
@@ -33,23 +37,13 @@ function RunDrawerBody({
   state: RunDrawerState;
   stop: ReturnType<typeof useRunDrawerStop>;
 }) {
-  const { detail, scenarioState } = state;
+  const { detail } = state;
 
-  if (!scenarioState) {
-    // While the tRPC query is on its way, the drawer must not read as
-    // "Queued": that is a valid scenario status, not a "we are still
-    // fetching" signal. Show the same skeleton the drawer would show for
-    // any loading section, and switch to the queued read only once the
-    // record confirms the run is really queued.
-    if (detail.isRunStateLoading && !detail.runStateError) {
-      return <RunDrawerLoadingBody />;
-    }
-    return (
-      <RunDrawerQueuedBody
-        error={detail.runStateError}
-        scenarioId={state.knownScenarioId}
-      />
-    );
+  // While the read is on its way the drawer must not say "Queued": that is a
+  // status of the run, not a report on our own request.
+  if (state.isReadingRun) return <RunDrawerLoadingBody />;
+  if (state.readFailed) {
+    return <RunDrawerErrorBody error={detail.runStateError} />;
   }
 
   return (

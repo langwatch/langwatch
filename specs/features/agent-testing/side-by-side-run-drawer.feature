@@ -202,6 +202,28 @@ Feature: The wide run detail drawer
     Then the stack reads in a monospace block that scrolls
     And its line breaks read as line breaks
 
+  @integration
+  Scenario: A queued run draws the whole drawer
+    Given a run opened from the scenario table the moment it is queued
+    When the drawer opens before the run is written down
+    Then the header, the two columns and the borders read as they do on a running run
+    And a spinner beside the word Queued stands where the messages will be
+    And the results side says it waits for the run to start
+
+  @integration
+  Scenario: A queued run reads the whole drawer with a spinner
+    Given a stored run in the wide drawer whose job has not started
+    When the conversation is read
+    Then a spinner reads beside the word Queued, where the messages will be
+    And the results side says it waits for the run to start
+
+  @integration
+  Scenario: A run that failed before anyone spoke says so
+    Given a failed run open in the wide drawer whose conversation is empty
+    When the conversation is read
+    Then it reads that the simulation failed before the first message
+    And it does not read as one still waiting for a message
+
   # --- v1 is unchanged ---
 
   @integration

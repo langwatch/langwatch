@@ -508,6 +508,27 @@ function emptyModelResponseRule(): ClassificationRule {
   };
 }
 
+/**
+ * What the `ai` SDK puts in front of every request that never got an answer
+ * from the model endpoint. It says nothing about why on its own: the cause,
+ * when there is one, follows the colon, and a refused certificate or a
+ * rejected key arrives under this same wrapper. So it classifies only what no
+ * other rule could name.
+ */
+const MODEL_ENDPOINT_UNREACHABLE_NEEDLE = "Cannot connect to API";
+
+function modelEndpointUnreachableRule(): ClassificationRule {
+  return {
+    needles: [MODEL_ENDPOINT_UNREACHABLE_NEEDLE],
+    build: () => ({
+      code: ScenarioInfraErrorCode.PlatformUnreachable,
+      message:
+        "The simulation could not reach the model endpoint, so no model answered.",
+      hint: "Check that the model provider is up and reachable from LangWatch, then run again.",
+    }),
+  };
+}
+
 const CLASSIFICATION_RULES: ClassificationRule[] = [
   // Connected agent failures. The child's adapter writes
   // `Connected agent call failed (<code>): <message>`, so the code between
@@ -641,6 +662,11 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
       hint: "Run `langwatch agent dev` again on the machine that started the tunnel, or restore the agent's URL in its settings.",
     }),
   },
+  // A request that never reached the model endpoint, with no cause of its
+  // own. Last of the named rules: the `ai` SDK puts this same wrapper around
+  // a refused certificate and a rejected key, so anything that names a cause
+  // must be read before it.
+  modelEndpointUnreachableRule(),
   {
     // Network unreachable (connection refused / DNS / reset / undici fetch).
     needles: [...NETWORK_UNREACHABLE_NEEDLES],

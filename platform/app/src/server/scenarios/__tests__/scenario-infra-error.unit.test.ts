@@ -540,6 +540,34 @@ describe("classifyScenarioInfraError", () => {
     });
   });
 
+  describe("when the request never reached the model endpoint", () => {
+    /** @scenario "A request that never reached the model endpoint is named" */
+    it("names the model endpoint rather than the provider", () => {
+      const result = classifyScenarioInfraError(
+        "[UserSimulatorAgent] AI_RetryError: Failed after 3 attempts. Last error: Cannot connect to API: ",
+      );
+      expect(result.code).toBe(ScenarioInfraErrorCode.PlatformUnreachable);
+      expect(result.message).toContain("could not reach the model endpoint");
+      expectNoInternals(result.message);
+    });
+
+    /** @scenario "A cause inside the wrapper still wins" */
+    it("keeps the certificate reason the wrapper carries", () => {
+      const result = classifyScenarioInfraError(
+        "Cannot connect to API: self-signed certificate in certificate chain",
+      );
+      expect(result.code).toBe(ScenarioInfraErrorCode.UntrustedCertificate);
+    });
+
+    /** @scenario "A cause inside the wrapper still wins" */
+    it("keeps the provider reason the wrapper carries", () => {
+      const result = classifyScenarioInfraError(
+        "Cannot connect to API: API key is invalid.",
+      );
+      expect(result.code).toBe(ScenarioInfraErrorCode.ModelProviderError);
+    });
+  });
+
   describe("when multiple failure reasons overlap in the raw error", () => {
     it("prefers the cert reason over the fetch-failed it rides on", () => {
       const raw =

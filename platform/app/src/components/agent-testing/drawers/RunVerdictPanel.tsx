@@ -287,6 +287,8 @@ function RunFailurePanel({ raw }: { raw: string }) {
       </PanelHeading>
       <Text
         fontSize="12px"
+        fontFamily="mono"
+        color="red.500"
         lineHeight="short"
         wordBreak="break-word"
         data-testid="run-verdict-error-message"

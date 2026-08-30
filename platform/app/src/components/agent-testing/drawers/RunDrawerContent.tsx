@@ -12,7 +12,15 @@
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  */
 
-import { Accordion, Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Accordion,
+  Box,
+  Grid,
+  HStack,
+  Spinner,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { nextSpeakerOf } from "~/components/simulations/next-speaker";
 import { RunDetailSection } from "~/components/simulations/RunDetailSection";
 import { ScenarioMessageRenderer } from "~/components/simulations/ScenarioMessageRenderer";
@@ -36,6 +44,98 @@ import {
 /** How wide the results read beside the conversation. */
 const RESULTS_COLUMN_WIDTH = "310px";
 
+/** The statuses of a run whose job has not started yet. */
+const NOT_STARTED_STATUSES = new Set<string>([
+  ScenarioRunStatus.QUEUED,
+  ScenarioRunStatus.PENDING,
+]);
+
+/** One line where the messages will be, for a run with none yet. */
+function ConversationWaitingLine({
+  message,
+  testId,
+}: {
+  message: string;
+  testId: string;
+}) {
+  return (
+    <HStack gap={2} color="fg.muted" paddingY={6} justify="center">
+      <Spinner size="xs" />
+      <Text fontSize="sm" data-testid={testId}>
+        {message}
+      </Text>
+    </HStack>
+  );
+}
+
+/** An empty state that says why there is nothing to read. */
+function ConversationEmptyState({
+  title,
+  detail,
+  testId,
+}: {
+  title: string;
+  detail: string;
+  testId: string;
+}) {
+  return (
+    <VStack
+      align="center"
+      justify="center"
+      gap={2}
+      paddingY={8}
+      color="fg.muted"
+      data-testid={testId}
+    >
+      <Text fontSize="sm" fontWeight="medium" color="fg">
+        {title}
+      </Text>
+      <Text fontSize="xs" textAlign="center" maxWidth="320px">
+        {detail}
+      </Text>
+    </VStack>
+  );
+}
+
+/**
+ * What stands where the messages will be, on a run that has none.
+ *
+ * A run waiting for its turn says so, a run that failed before anyone spoke
+ * says that instead of reading as one still waiting, and a run whose next
+ * speaker is known draws the bubble that message will land in.
+ */
+function EmptyConversation({
+  detail,
+  scenarioState,
+  typingRole,
+}: {
+  detail: RunDetail;
+  scenarioState: RunScenarioState;
+  typingRole: ReturnType<typeof nextSpeakerOf>;
+}) {
+  if (NOT_STARTED_STATUSES.has(scenarioState.status)) {
+    return (
+      <ConversationWaitingLine message="Queued" testId="wide-drawer-queued" />
+    );
+  }
+  if (scenarioState.results?.error) {
+    return (
+      <ConversationEmptyState
+        title="Simulation failed"
+        detail="It failed before the first message was sent. The reason reads with the results."
+        testId="scenario-run-failed-empty"
+      />
+    );
+  }
+  if (typingRole) return <TypingBubble role={typingRole} />;
+  return (
+    <ConversationWaitingLine
+      message="Waiting for the first message"
+      testId="wide-drawer-waiting"
+    />
+  );
+}
+
 /**
  * The messages of the run. They carry no section heading: the drawer opens on
  * the conversation, so a header over it says only what the reader can see.
@@ -47,21 +147,11 @@ function ConversationSection({ detail }: { detail: RunDetail }) {
   if (detail.shouldShowNoResponse) {
     return (
       <ConversationBox>
-        <VStack
-          align="center"
-          justify="center"
-          gap={2}
-          paddingY={8}
-          color="fg.muted"
-          data-testid="scenario-no-response"
-        >
-          <Text fontSize="sm" fontWeight="medium" color="fg">
-            No response
-          </Text>
-          <Text fontSize="xs" textAlign="center" maxWidth="320px">
-            The agent under test didn&apos;t return any messages for this run.
-          </Text>
-        </VStack>
+        <ConversationEmptyState
+          title="No response"
+          detail="The agent under test didn't return any messages for this run."
+          testId="scenario-no-response"
+        />
       </ConversationBox>
     );
   }
@@ -75,13 +165,11 @@ function ConversationSection({ detail }: { detail: RunDetail }) {
   if (!detail.hasConversation) {
     return (
       <ConversationBox>
-        {typingRole ? (
-          <TypingBubble role={typingRole} />
-        ) : (
-          <HStack gap={2} color="fg.muted" paddingY={6} justify="center">
-            <Text fontSize="sm">Waiting for the first message</Text>
-          </HStack>
-        )}
+        <EmptyConversation
+          detail={detail}
+          scenarioState={scenarioState}
+          typingRole={typingRole}
+        />
       </ConversationBox>
     );
   }
@@ -113,6 +201,7 @@ function ConversationBox({ children }: { children: React.ReactNode }) {
 }
 
 /** What the results column says while a run has not reached a verdict. */
+const RUN_QUEUED_MESSAGE = "Waiting for the run to start";
 const CONVERSATION_RUNNING_MESSAGE =
   "Waiting for more turns to define a verdict";
 const JUDGE_READING_MESSAGE = "The judge is reading the conversation";
@@ -141,6 +230,9 @@ const JUDGED_STATUSES = new Set<string>([
  */
 function pendingMessageFor(scenarioState: RunScenarioState): string | null {
   if (hasVerdict(scenarioState)) return null;
+  if (NOT_STARTED_STATUSES.has(scenarioState.status)) {
+    return RUN_QUEUED_MESSAGE;
+  }
   if (!isTerminalStatus(scenarioState.status)) {
     return CONVERSATION_RUNNING_MESSAGE;
   }
