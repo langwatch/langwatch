@@ -7,7 +7,7 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -68,15 +68,21 @@ describe("<SaveAndRunMenu/>", () => {
 
       await user.click(screen.getByRole("button", { name: /save and run/i }));
 
+      // The popover mounts its rows in a portal and settles over a few
+      // renders, so both the focus and the handler are waited for rather than
+      // read once: under a loaded parallel run the first read lands early and
+      // the row reports no focus, or the click the key raises has not run yet.
       const row = await screen.findByTestId("save-and-run-agent-agent-1");
       row.focus();
-      expect(row).toHaveFocus();
+      await waitFor(() => expect(row).toHaveFocus());
 
       await user.keyboard("{Enter}");
-      expect(onSaveAndRun).toHaveBeenCalledWith({
-        type: "http",
-        id: "agent-1",
-      });
+      await waitFor(() =>
+        expect(onSaveAndRun).toHaveBeenCalledWith({
+          type: "http",
+          id: "agent-1",
+        }),
+      );
     });
   });
 });
