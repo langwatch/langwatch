@@ -619,9 +619,25 @@ means the adapter constructs its own stores and takes their ClickHouse
 dependencies instead — an inversion of who owns construction, not a change to
 the export list.
 
-Webhook's is the same shape and much smaller: 17 references, all in
-`platform/app` composition and tests. It is the natural first one to do, and
-doing it establishes the pattern the trace sixteen would follow.
+**Webhook's is done** (`ea535fb6c4`), and it is the pattern the trace sixteen
+follow. Three moves, in this order:
+
+1. Add an adapter whose `create` returns the PORT, modelled on the package's
+   existing `WebhookEndpointAdapter`. Every caller already wanted the port —
+   they assigned the result to a field typed as one — and only named the
+   implementation because that was the only way to construct it.
+2. Move the port out of `repositories/` into `ports/`. The rule treats
+   `repositories`, `stores` and `projections` as private with no exceptions, so
+   a port living in one cannot be exported at all; ops and data-privacy already
+   keep theirs under `ports/`.
+3. Check every name leaving the surface by NAME, not by module, and diff the
+   index's exported identifiers before and after.
+
+Trace's sixteen are harder in one specific way: its adapter takes the four
+stores as options, so step 1 there means the adapter constructing them and
+accepting ClickHouse dependencies instead — the inversion described above.
+Webhook needed no such change because its repository already took only a
+client resolver.
 
 `F-NAMING-01` — **`try*` carries two meanings and the rule only knows one.**
 `fallible-result-naming` treats the prefix as "may answer absence", which is the
