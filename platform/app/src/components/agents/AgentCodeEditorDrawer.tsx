@@ -12,6 +12,7 @@ import {
 import { HelpCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
+import { AgentTestPanel } from "~/components/agents/AgentTestPanel";
 import { CodeBlockEditor } from "~/components/blocks/CodeBlockEditor";
 import {
   CODE_OUTPUT_TYPES,
@@ -510,6 +511,12 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                     onOutputFieldChange={handleScenarioOutputFieldChange}
                   />
                 </Box>
+
+                {agentId && project?.id ? (
+                  <Box paddingTop={4} borderTopWidth="1px" borderColor="border">
+                    <AgentTestPanel agentId={agentId} projectId={project.id} />
+                  </Box>
+                ) : null}
               </VStack>
             )}
           </Drawer.Body>

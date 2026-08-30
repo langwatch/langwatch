@@ -1,5 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { AGENT_TEST_SET_SUFFIX } from "~/server/scenarios/agent-test-scenario";
 import {
   DEFAULT_SET_ID,
   expandSetIdFilter,
@@ -54,6 +55,13 @@ const EXPORT_SORT_KEY =
  * writes them, and a batch that still holds one of the four is not finished.
  */
 const RUNNING_STATUSES = "'IN_PROGRESS','PENDING','QUEUED','RUNNING'";
+
+/**
+ * Leaves the "Test agent" runs out of a list. They are one-off checks of an
+ * agent, not results of a scenario, so no set list, batch list or last-result
+ * summary shows them. A run is still read by its own id.
+ */
+const AGENT_TEST_SET_EXCLUSION = `AND NOT endsWith(ScenarioSetId, '${AGENT_TEST_SET_SUFFIX}')`;
 
 /**
  * Batch-level aggregate SELECT list, shared by the batch history page and the
@@ -551,6 +559,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            ${dateFilter.whereClause}
+           ${AGENT_TEST_SET_EXCLUSION}
            ${simulationRunDedupPredicate(`TenantId = {tenantId:String} ${dateFilter.whereClause}`)}
        )
        WHERE ArchivedAt IS NULL
@@ -1176,6 +1185,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        WHERE TenantId = {tenantId:String}
          ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
+         ${AGENT_TEST_SET_EXCLUSION}
          ${simulationRunDedupPredicate(`TenantId = {tenantId:String} ${dateFilter.whereClause}`)}
        GROUP BY BatchRunId
        ${combinedHaving}
@@ -1495,7 +1505,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       scenarioIds !== undefined
         ? "AND ScenarioId IN ({scenarioIds:Array(String)})"
         : "";
-    const whereFilters = `TenantId = {tenantId:String} AND ScenarioId != '' ${scenarioFilter} ${dateFilter.whereClause}`;
+    const whereFilters = `TenantId = {tenantId:String} AND ScenarioId != '' ${scenarioFilter} ${dateFilter.whereClause} ${AGENT_TEST_SET_EXCLUSION}`;
 
     const rows = await this.queryRows<{
       ScenarioId: string;

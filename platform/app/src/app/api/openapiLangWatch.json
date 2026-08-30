@@ -3157,6 +3157,67 @@
         ]
       }
     },
+    "/api/agents/{id}/test": {
+      "post": {
+        "operationId": "postApiAgentsByIdTest",
+        "description": "Run one scripted scenario against an agent: the user sends \"ping\", the agent answers, and the run succeeds when the answer arrives. No model is used and nothing is saved. Answers at once with the run ids; the run itself is asynchronous.",
+        "responses": {
+          "200": {
+            "description": "The test run is scheduled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scenarioRunId": {
+                      "type": "string",
+                      "description": "The run to follow; open it in the simulations run drawer."
+                    },
+                    "batchRunId": {
+                      "type": "string",
+                      "description": "The batch the run belongs to."
+                    },
+                    "setId": {
+                      "type": "string",
+                      "description": "The internal set that holds agent test runs."
+                    }
+                  },
+                  "required": [
+                    "scenarioRunId",
+                    "batchRunId",
+                    "setId"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The agent is a personal development agent of someone else"
+          },
+          "404": {
+            "description": "No agent with that id in this project"
+          },
+          "422": {
+            "description": "The agent cannot be tested as it is set up"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
     "/api/agents/{id}/call": {
       "post": {
         "operationId": "postApiAgentsByIdCall",
@@ -48037,6 +48098,24 @@
                                   "user",
                                   "api",
                                   "cli"
+                                ]
+                              },
+                              "agentInstance": {
+                                "type": "object",
+                                "properties": {
+                                  "hostname": {
+                                    "type": "string"
+                                  },
+                                  "label": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "hostname",
+                                  "label"
                                 ]
                               }
                             },

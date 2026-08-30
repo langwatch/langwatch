@@ -2,21 +2,14 @@ import type { JsonValue } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import type { ConnectedComponentConfig } from "~/optimization_studio/types/dsl";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
-import {
-  DEFAULT_CALL_TIMEOUT_MS,
-  MAX_CALL_TIMEOUT_MS,
-} from "~/server/connected-agents/constants";
 import {
   type AgentInstanceView,
   type AgentPresenceStatus,
   NO_PRESENCE,
   readAgentPresence,
 } from "~/server/connected-agents/presence.read";
-import { getConnectedAgentRuntime } from "~/server/connected-agents/runtime";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
-import { assertConnectedAgentsRunnable } from "~/server/suites/connected-targets";
 import {
   type AgentComponentConfig,
   agentTypeSchema,
@@ -27,7 +20,11 @@ import {
   declaredAgentParameters,
 } from "../../agents/agent.service";
 import type { AgentWithFields } from "../../agents/agent-fields";
-import { AgentRegisterOnlyError } from "../../agents/errors";
+import { sendAgentTestTurn } from "../../agents/agent-test-turn";
+import {
+  AgentNotFoundError,
+  AgentRegisterOnlyError,
+} from "../../agents/errors";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   copyWorkflowWithDatasets,
@@ -559,15 +556,15 @@ export const agentsRouter = createTRPCRouter({
     }),
 
   /**
-   * Sends one turn to a connected agent and answers what its function
-   * returned (ADR-128).
+   * Sends one turn to an agent and answers what it returned.
    *
-   * The Test button of the agent drawer. It walks the same path a simulation
+   * The Test panel of the agent drawers. It walks the same path a simulation
    * turn walks, so what a person sees here is what a run will see: the same
-   * dispatcher, the same instance choice, the same handled errors. A personal
-   * development agent of another person is refused before anything is sent.
+   * dispatcher and instance choice for a connected agent, the same adapter
+   * for the others, the same handled errors. A personal development agent of
+   * another person is refused before anything is sent.
    */
-  testConnected: protectedProcedure
+  testTurn: protectedProcedure
     .input(
       z.object({
         id: z.string(),
@@ -580,66 +577,54 @@ export const agentsRouter = createTRPCRouter({
     )
     .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
-      const agent = await AgentService.create(ctx.prisma).getById({
-        id: input.id,
-        projectId: input.projectId,
-      });
-      if (agent?.type !== "connected") {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Connected agent not found",
-        });
-      }
-      await assertConnectedAgentsRunnable({
-        agents: [
-          {
-            id: agent.id,
-            name: agent.name,
-            type: agent.type,
-            config: agent.config as JsonValue,
-            environment: agent.environment,
-            ownerUserId: agent.ownerUserId,
-            hostLabel: agent.hostLabel,
-            lastSeenAt: agent.lastSeenAt,
-            archivedAt: agent.archivedAt,
+      try {
+        return await sendAgentTestTurn({
+          projectId: input.projectId,
+          agentId: input.id,
+          message: input.message,
+          params: input.params,
+          actor: { id: ctx.session.user.id, label: "user" },
+          deps: {
+            readAgent: (params) =>
+              AgentService.create(ctx.prisma).getById(params),
+            users: ctx.prisma,
           },
-        ],
-        actor: { id: ctx.session.user.id, label: "user" },
-        users: ctx.prisma,
-      });
+        });
+      } catch (error) {
+        if (error instanceof AgentNotFoundError) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Agent not found",
+          });
+        }
+        throw error;
+      }
+    }),
 
-      const config = agent.config as ConnectedComponentConfig;
-      const messages = [{ role: "user" as const, content: input.message }];
-      const outcome = await getConnectedAgentRuntime().dispatcher.dispatch({
-        projectId: input.projectId,
-        agent: {
-          id: agent.id,
-          name: agent.name,
-          environment: agent.environment,
-          timeoutMs: Math.min(
-            config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
-            MAX_CALL_TIMEOUT_MS,
-          ),
-          sticky: config.sticky ?? false,
-        },
-        call: {
-          threadId: crypto.randomUUID(),
-          messages,
-          newMessages: messages,
-          params: input.params ?? {},
-          session: undefined,
-          traceparent: null,
-          run: {},
-        },
-      });
-      return {
-        output: outcome.output,
-        instance: {
-          hostname: outcome.instance.hostname,
-          label: outcome.instance.label,
-        },
-        durationMs: outcome.durationMs,
-      };
+  /**
+   * Runs one scripted scenario against the agent, saving nothing, and answers
+   * with the run's ids so the caller can open the run drawer on it.
+   * The "Test agent" item of the agent card menu.
+   */
+  testRun: protectedProcedure
+    .input(z.object({ projectId: z.string(), agentId: z.string() }))
+    .permission("scenarios:create")
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await AgentService.create(ctx.prisma).testRun({
+          projectId: input.projectId,
+          agentId: input.agentId,
+          actor: { id: ctx.session.user.id, label: "user" },
+        });
+      } catch (error) {
+        if (error instanceof AgentNotFoundError) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Agent not found",
+          });
+        }
+        throw error;
+      }
     }),
 
   /**

@@ -15,7 +15,6 @@ import {
   Button,
   Heading,
   HStack,
-  Input,
   Spinner,
   Table,
   Text,
@@ -23,15 +22,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
-import { Play } from "lucide-react";
 import { useEffect, useState } from "react";
+import { AgentTestPanel } from "~/components/agents/AgentTestPanel";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
-import {
-  HandledErrorAlert,
-  readHandledError,
-  showErrorToast,
-} from "~/features/errors";
+import { showErrorToast } from "~/features/errors";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -124,7 +119,11 @@ function AgentBody({
       <DescriptionField agent={agent} projectId={projectId} />
       <ParametersTable agent={agent} />
       <InstancesTable agent={agent} />
-      <TestPanel agent={agent} projectId={projectId} />
+      <AgentTestPanel
+        agentId={agent.id}
+        projectId={projectId}
+        offline={agent.status === "offline"}
+      />
     </VStack>
   );
 }
@@ -301,73 +300,6 @@ function InstancesTable({ agent }: { agent: ConnectedAgentView }) {
   );
 }
 
-/** One turn to the agent, on the path a simulation turn takes. */
-function TestPanel({
-  agent,
-  projectId,
-}: {
-  agent: ConnectedAgentView;
-  projectId: string;
-}) {
-  const [message, setMessage] = useState("Hello");
-  const test = api.agents.testConnected.useMutation();
-
-  return (
-    <VStack align="stretch" gap={2} data-testid="connected-agent-test">
-      <SectionTitle title="Test" />
-      <HStack>
-        <Input
-          size="sm"
-          value={message}
-          onChange={(event) => setMessage(event.target.value)}
-          placeholder="A message to send"
-          data-testid="connected-agent-test-message"
-        />
-        <Button
-          size="sm"
-          colorPalette="blue"
-          loading={test.isPending}
-          disabled={agent.status === "offline" || message.trim().length === 0}
-          onClick={() =>
-            test.mutate({ id: agent.id, projectId, message: message.trim() })
-          }
-          data-testid="connected-agent-test-run"
-        >
-          <Play size={13} />
-          Test
-        </Button>
-      </HStack>
-      {agent.status === "offline" ? (
-        <Text fontSize="12px" color="fg.muted">
-          Start the process that runs this agent to test it.
-        </Text>
-      ) : null}
-      <TestError error={test.error} />
-      {test.data ? (
-        <VStack
-          align="stretch"
-          gap={1}
-          background="bg.muted"
-          borderRadius="md"
-          padding={3}
-          data-testid="connected-agent-test-result"
-        >
-          <Text fontSize="11.5px" color="fg.muted">
-            {`${test.data.instance.hostname}${
-              test.data.instance.label ? ` (${test.data.instance.label})` : ""
-            } answered in ${test.data.durationMs} ms`}
-          </Text>
-          <Box as="pre" fontFamily="mono" fontSize="12px" whiteSpace="pre-wrap">
-            {typeof test.data.output === "string"
-              ? test.data.output
-              : JSON.stringify(test.data.output, null, 2)}
-          </Box>
-        </VStack>
-      ) : null}
-    </VStack>
-  );
-}
-
 function SectionTitle({ title, hint }: { title: string; hint?: string }) {
   return (
     <VStack align="start" gap={0}>
@@ -381,41 +313,4 @@ function SectionTitle({ title, hint }: { title: string; hint?: string }) {
       ) : null}
     </VStack>
   );
-}
-
-/** The refusal of a test call, with the function's own error text under it. */
-function TestError({ error }: { error: unknown }) {
-  if (!error) return null;
-  const message = functionErrorMessage(error);
-  return (
-    <VStack align="stretch" gap={2}>
-      <HandledErrorAlert
-        error={error}
-        fallbackTitle="The test call did not go through"
-      />
-      {message ? (
-        <Text
-          fontSize="12px"
-          fontFamily="mono"
-          whiteSpace="pre-wrap"
-          color="fg.muted"
-          data-testid="connected-agent-test-error-message"
-        >
-          {message}
-        </Text>
-      ) : null}
-    </VStack>
-  );
-}
-
-/**
- * The text the decorated function raised, when the call failed inside it.
- * The registry copy never recites it, but the person testing an agent wrote
- * that function and reads its error here without opening the process logs.
- */
-function functionErrorMessage(error: unknown): string | null {
-  const handled = readHandledError(error);
-  if (handled?.code !== "agent_call_failed") return null;
-  const message = handled.meta.message;
-  return typeof message === "string" && message.trim() ? message : null;
 }

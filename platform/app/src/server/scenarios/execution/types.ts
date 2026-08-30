@@ -344,6 +344,16 @@ export type ScenarioExecutionResult = z.infer<
 // ============================================================================
 
 /**
+ * A run whose conversation is written down in advance. The user sends one
+ * message, the agent answers, and the run succeeds when the answer arrives.
+ */
+export const ScriptedRunSchema = z.object({
+  kind: z.literal("agent_test"),
+  userMessage: z.string().min(1),
+});
+export type ScriptedRun = z.infer<typeof ScriptedRunSchema>;
+
+/**
  * Complete data package for child process execution.
  * Contains everything needed to run a scenario without DB access.
  *
@@ -404,8 +414,15 @@ export const ChildProcessJobDataSchema = z
      * the scenario SDK's default applies.
      */
     traceWaitTimeoutMs: z.number().optional(),
+    /**
+     * A fixed conversation for the run. Present on an agent test run only:
+     * the user's messages are written down, no simulator plays the person and
+     * no judge decides, so the run needs no model at all.
+     */
+    script: ScriptedRunSchema.optional(),
   })
   .superRefine((data, ctx) => {
+    if (data.script) return;
     if (!data.simulatorModelParams && !data.modelParams) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

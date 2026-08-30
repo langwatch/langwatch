@@ -6,6 +6,7 @@ import type {
   Workflow,
 } from "~/optimization_studio/types/dsl";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
+import type { RunActor } from "~/server/scenarios/run-actor";
 import {
   type AgentComponentConfig,
   type AgentCopyRow,
@@ -21,6 +22,11 @@ import {
   linkedWorkflowId,
   resolveAgentFields,
 } from "./agent-fields";
+import {
+  type AgentTestRunResult,
+  createAgentTestRunDeps,
+  scheduleAgentTestRun,
+} from "./agent-test-run";
 import { AgentNotFoundError, AgentRegisterOnlyError } from "./errors";
 
 /**
@@ -330,6 +336,29 @@ export class AgentService {
       throw new AgentNotFoundError();
     }
     return agent;
+  }
+
+  /**
+   * Runs one scripted scenario against the agent and answers with the run's
+   * ids, saving nothing. The person who asked is the run's actor; a personal
+   * development agent of someone else is refused.
+   *
+   * @throws {AgentNotFoundError} when no such agent is in the project
+   * @throws {AgentTestRefusedError} when the agent cannot be run as it is
+   * @throws {AgentOwnerOnlyError} when the agent belongs to someone else
+   */
+  async testRun(input: {
+    projectId: string;
+    agentId: string;
+    actor: RunActor | undefined;
+  }): Promise<AgentTestRunResult> {
+    return scheduleAgentTestRun({
+      ...input,
+      deps: createAgentTestRunDeps({
+        prisma: this.prisma,
+        readAgent: (params) => this.getById(params),
+      }),
+    });
   }
 
   /**

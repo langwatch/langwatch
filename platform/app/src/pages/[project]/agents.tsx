@@ -8,6 +8,7 @@ import { ConnectedAgentsSection } from "~/components/agents/connected/ConnectedA
 import type { ConnectedAgentView } from "~/components/agents/connected/connected-agent-rows";
 import { getAgentEditorDrawer } from "~/components/agents/getAgentEditorDrawer";
 import { PushToCopiesDialog } from "~/components/agents/PushToCopiesDialog";
+import { useAgentTestRun } from "~/components/agents/useAgentTestRun";
 import { CascadeArchiveDialog } from "~/components/CascadeArchiveDialog";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -35,6 +36,7 @@ function Page() {
   const { openDrawer } = useDrawer();
   const utils = api.useUtils();
   const router = useRouter();
+  const { testAgent } = useAgentTestRun({ projectId: project?.id ?? "" });
 
   // State for tracking which agent is being deleted
   const [agentToDelete, setAgentToDelete] = useState<TypedAgent | null>(null);
@@ -209,6 +211,7 @@ function Page() {
                   agentsQuery.data?.find((row) => row.id === agent.id) ?? null,
                 )
               }
+              onTest={(agent) => testAgent(agent.id)}
             />
             {otherAgents.map((agent) => (
               <AgentCard
@@ -217,6 +220,11 @@ function Page() {
                 onClick={() => handleEditAgent(agent)}
                 onEdit={() => handleEditAgent(agent)}
                 onDelete={() => handleDeleteAgent(agent)}
+                onTest={
+                  agent.type === "signature"
+                    ? undefined
+                    : () => testAgent(agent.id)
+                }
                 onOpenWorkflow={
                   agent.type === "workflow"
                     ? () => handleOpenWorkflow(agent)

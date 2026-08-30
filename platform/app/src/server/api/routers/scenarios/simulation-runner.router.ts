@@ -253,7 +253,7 @@ async function queueRun({
    * run says which simulator played the person and which judge decided the
    * verdict, whatever the project default becomes later.
    */
-  resolvedModels: ResolvedRunModels;
+  resolvedModels: ResolvedRunModels | null;
 }): Promise<void> {
   const secretParameterNames = Object.keys(secretParameters);
   const metadata = {

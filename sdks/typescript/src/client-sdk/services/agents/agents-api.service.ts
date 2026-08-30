@@ -71,6 +71,10 @@ export type AgentCallMessage = AgentCallBody["messages"][number];
 export type AgentCallResponse =
   paths["/api/agents/{id}/call"]["post"]["responses"][200]["content"]["application/json"];
 
+/** The ids `POST /api/agents/{id}/test` answers with. */
+export type AgentTestRunResponse =
+  paths["/api/agents/{id}/test"]["post"]["responses"][200]["content"]["application/json"];
+
 export class AgentsApiError extends Error {
   constructor(
     message: string,
@@ -157,5 +161,18 @@ export class AgentsApiService {
     });
     if (error) this.handleApiError(`call agent "${id}"`, error);
     return data as AgentCallResponse;
+  }
+
+  /**
+   * Runs one scripted scenario against an agent: the user sends "ping", the
+   * agent answers, and the run succeeds when the answer arrives. Nothing is
+   * saved; the answer carries the run ids to follow.
+   */
+  async test(id: string): Promise<AgentTestRunResponse> {
+    const { data, error } = await this.apiClient.POST("/api/agents/{id}/test", {
+      params: { path: { id } },
+    });
+    if (error) this.handleApiError(`test agent "${id}"`, error);
+    return data as AgentTestRunResponse;
   }
 }

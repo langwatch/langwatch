@@ -12,7 +12,7 @@
  */
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { ExternalLink, Laptop, User } from "lucide-react";
+import { ExternalLink, Laptop, Play, User } from "lucide-react";
 import { LuTrash2 } from "react-icons/lu";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -38,10 +38,13 @@ export function ConnectedAgentsSection({
   agents,
   onOpen,
   onDelete,
+  onTest,
 }: {
   agents: ConnectedAgentView[];
   onOpen: (agent: ConnectedAgentView) => void;
   onDelete?: (agent: ConnectedAgentView) => void;
+  /** Runs one scripted scenario against the agent and opens the run. */
+  onTest?: (agent: ConnectedAgentView) => void;
 }) {
   return (
     <>
@@ -51,6 +54,7 @@ export function ConnectedAgentsSection({
           agent={agent}
           onOpen={() => onOpen(agent)}
           onDelete={onDelete ? () => onDelete(agent) : undefined}
+          onTest={onTest ? () => onTest(agent) : undefined}
         />
       ))}
     </>
@@ -121,15 +125,17 @@ function ScopeChip({ agent }: { agent: ConnectedAgentView }) {
   );
 }
 
-/** The actions of one card: open the agent, or delete it. */
+/** The actions of one card: open the agent, test it, or delete it. */
 function ConnectedAgentMenu({
   agent,
   onOpen,
   onDelete,
+  onTest,
 }: {
   agent: ConnectedAgentView;
   onOpen: () => void;
   onDelete?: () => void;
+  onTest?: () => void;
 }) {
   return (
     <Menu.Root>
@@ -145,6 +151,19 @@ function ConnectedAgentMenu({
           <ExternalLink size={14} />
           Open
         </Menu.Item>
+        {onTest && (
+          <Menu.Item
+            value="test"
+            onClick={(event) => {
+              event.stopPropagation();
+              onTest();
+            }}
+            data-testid={`agent-test-${agent.id}`}
+          >
+            <Play size={14} />
+            Test agent
+          </Menu.Item>
+        )}
         {onDelete && (
           <Menu.Item
             value="delete"
@@ -167,10 +186,12 @@ export function ConnectedAgentCard({
   agent,
   onOpen,
   onDelete,
+  onTest,
 }: {
   agent: ConnectedAgentView;
   onOpen: () => void;
   onDelete?: () => void;
+  onTest?: () => void;
 }) {
   const sdk = sdkLabel(agent);
   const instances = instanceCountLabel(agent);
@@ -184,7 +205,12 @@ export function ConnectedAgentCard({
       testId={`connected-agent-card-${agent.id}`}
       leading={<PresenceMark agent={agent} />}
       menu={
-        <ConnectedAgentMenu agent={agent} onOpen={onOpen} onDelete={onDelete} />
+        <ConnectedAgentMenu
+          agent={agent}
+          onOpen={onOpen}
+          onDelete={onDelete}
+          onTest={onTest}
+        />
       }
       title={
         <HStack gap={2} width="full" minWidth={0}>

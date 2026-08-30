@@ -128,6 +128,26 @@ export async function callAgent(
   ) as Promise<AgentCallResponse>;
 }
 
+/** The ids `POST /api/agents/:id/test` answers with. */
+export interface AgentTestRunResponse {
+  scenarioRunId: string;
+  batchRunId: string;
+  setId: string;
+}
+
+/**
+ * Runs one scripted scenario against an agent: the user sends "ping", the
+ * agent answers, and the run succeeds when the answer arrives. Nothing is
+ * saved; the answer carries the run ids to follow.
+ */
+export async function testAgent(id: string): Promise<AgentTestRunResponse> {
+  return makeRequest(
+    "POST",
+    `/api/agents/${encodeURIComponent(id)}/test`,
+    {},
+  ) as Promise<AgentTestRunResponse>;
+}
+
 const isMessageList = (value: unknown): value is AgentCallMessage[] =>
   Array.isArray(value) &&
   value.every(

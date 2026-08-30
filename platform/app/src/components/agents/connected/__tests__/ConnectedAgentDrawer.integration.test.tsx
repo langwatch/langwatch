@@ -5,6 +5,7 @@
  * it, and one test turn.
  *
  * @see specs/features/agents/connected-agents-ui.feature
+ * @see specs/agents/agent-test-run.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -86,7 +87,7 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: agentRow, isLoading: false, error: null }),
       },
       update: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-      testConnected: { useMutation: () => testState },
+      testTurn: { useMutation: () => testState },
     },
     useUtils: () => ({
       agents: {
@@ -160,18 +161,26 @@ describe("<ConnectedAgentDrawer />", () => {
     });
   });
 
-  describe("when a message is typed and the test is started", () => {
+  describe("when the test panel is opened", () => {
+    /** @scenario "The connected agent drawer sends one test turn" */
     /** @scenario "The drawer sends one test turn to the agent" */
-    it("sends the turn and shows the answer with the instance that served it", async () => {
+    it("reads ping, and sends the turn and shows the answer with the instance that served it", async () => {
       const user = userEvent.setup();
       const { rerender } = await renderDrawer();
 
-      const input = await screen.findByTestId("connected-agent-test-message");
+      const input = await screen.findByTestId("agent-test-message");
+      expect(input).toHaveValue("ping");
+      await user.click(screen.getByTestId("agent-test-run"));
+      expect(testMutate).toHaveBeenCalledWith({
+        id: "agent_1",
+        projectId: "project_1",
+        message: "ping",
+      });
+
       await user.clear(input);
       await user.type(input, "hi there");
-      await user.click(screen.getByTestId("connected-agent-test-run"));
-
-      expect(testMutate).toHaveBeenCalledWith({
+      await user.click(screen.getByTestId("agent-test-run"));
+      expect(testMutate).toHaveBeenLastCalledWith({
         id: "agent_1",
         projectId: "project_1",
         message: "hi there",
@@ -189,7 +198,7 @@ describe("<ConnectedAgentDrawer />", () => {
         </ChakraProvider>,
       );
 
-      const result = await screen.findByTestId("connected-agent-test-result");
+      const result = await screen.findByTestId("agent-test-result");
       expect(result).toHaveTextContent("Hello back");
       expect(result).toHaveTextContent("build-box (eu-pod)");
     });

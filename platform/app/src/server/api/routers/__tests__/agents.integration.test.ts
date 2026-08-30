@@ -522,4 +522,50 @@ describe("Agents Endpoints", () => {
       expect(config?.prompt).toBe("Synced prompt");
     });
   });
+
+  describe("testRun", () => {
+    describe("when Test agent is requested for an http agent", () => {
+      /** @scenario "The mutation answers with the run ids" */
+      it("answers with the run ids and queues the run in the agent test set", async () => {
+        const agent = await caller.agents.create({
+          projectId,
+          name: "Test Run HTTP Agent",
+          type: "http",
+          config: httpConfig,
+        });
+
+        const result = await caller.agents.testRun({
+          projectId,
+          agentId: agent.id,
+        });
+
+        expect(result.scenarioRunId).toMatch(/^scenariorun_/);
+        expect(result.batchRunId).toMatch(/^scenariobatch_/);
+        expect(result.setId).toBe(`__internal__${projectId}__agent-test`);
+        expect(
+          await prisma.scenario.count({
+            where: { projectId, name: { contains: "Test Run HTTP Agent" } },
+          }),
+        ).toBe(0);
+      });
+    });
+
+    describe("when Test agent is requested for a prompt agent", () => {
+      it("refuses: only HTTP, code, workflow and connected agents run", async () => {
+        const agent = await caller.agents.create({
+          projectId,
+          name: "Test Run Prompt Agent",
+          type: "signature",
+          config: signatureConfig,
+        });
+
+        await expect(
+          caller.agents.testRun({ projectId, agentId: agent.id }),
+        ).rejects.toMatchObject({
+          code: "UNPROCESSABLE_CONTENT",
+          cause: { code: "agent_test_refused" },
+        });
+      });
+    });
+  });
 });

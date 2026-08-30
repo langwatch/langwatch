@@ -1,3 +1,4 @@
+import { AGENT_TEST_SET_SUFFIX } from "~/server/scenarios/agent-test-scenario";
 import { expandSetIdFilter } from "~/server/scenarios/internal-set-id";
 import { TABLE_NAME } from "../repositories/simulation.clickhouse.repository";
 import type { ResultsFilter, ResultsGroupBy } from "./atom.types";
@@ -289,7 +290,11 @@ function stableFilterParts(filter: ResultsFilter): FilterParts {
   // An atom is one scenario, one target, one run. A row that names no
   // scenario answers none of those: it groups under an empty key and reads
   // as a row with no name.
-  const parts: string[] = ["ScenarioId != ''"];
+  const parts: string[] = [
+    "ScenarioId != ''",
+    // A "Test agent" run is a check of an agent, not a result of a scenario.
+    `NOT endsWith(ScenarioSetId, '${AGENT_TEST_SET_SUFFIX}')`,
+  ];
   const params: Record<string, string | string[]> = {};
 
   if (filter.scenarioSetIds && filter.scenarioSetIds.length > 0) {

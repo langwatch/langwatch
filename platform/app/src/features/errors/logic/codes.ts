@@ -32,6 +32,7 @@ export const APP_ERROR_CODES = [
   "agent_register_only",
   "agent_register_refused",
   "agent_report_rate_limited",
+  "agent_test_refused",
   "ai_call_failed",
   "ai_query_provider_error",
   "already_organization_member",
