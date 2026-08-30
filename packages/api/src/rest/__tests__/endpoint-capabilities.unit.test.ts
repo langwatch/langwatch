@@ -437,7 +437,12 @@ describe("withCache", () => {
         "/things.get",
         "2026-08-07",
         async () => ({ id: "1" }),
-        (b) => b.withCache("things", 60),
+        // The cast IS the scenario. `registerRoute` will not accept a define
+        // that declares no output, so the only way to reach the build-time
+        // check is to be the caller it exists for: one behind an `any`, or one
+        // written in JavaScript. Without going round the type, this test would
+        // assert nothing the compiler had not already refused.
+        (b) => b.withCache("things", 60) as never,
       ),
     ).toThrow(/must declare an output schema/);
   });

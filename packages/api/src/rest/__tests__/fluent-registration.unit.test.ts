@@ -61,16 +61,24 @@ describe("a registered endpoint", () => {
 
   it("rejects an invalid version label at registration", () => {
     expect(() =>
-      buildTestService().registerRoute("post", "/things.ping", "2026-02-30", async (c) =>
-        c.body(null, 204),
+      buildTestService().registerRoute(
+        "post",
+        "/things.ping",
+        "2026-02-30",
+        async (c) => c.body(null, 204),
+        (b) => b.withOutput(z.void()),
       ),
     ).toThrow(/Invalid API version/);
   });
 
   it("refuses to register the derived latest namespace", () => {
     expect(() =>
-      buildTestService().registerRoute("post", "/things.ping", "latest", async (c) =>
-        c.body(null, 204),
+      buildTestService().registerRoute(
+        "post",
+        "/things.ping",
+        "latest",
+        async (c) => c.body(null, 204),
+        (b) => b.withOutput(z.void()),
       ),
     ).toThrow(/cannot be registered/);
   });
