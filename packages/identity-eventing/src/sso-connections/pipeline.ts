@@ -4,10 +4,13 @@ import {
 } from "@langwatch/identity-contract";
 import type { SsoConnectionGuards } from "@langwatch/identity-server";
 import {
+  defineAggregate,
+  defineEvents,
   definePipeline,
   type ProcessManagerInitialStage,
   type StateProjectionStore,
 } from "@langwatch/eventing";
+import { SSO_CONNECTION_EVENT_TYPES } from "@langwatch/identity-contract";
 import {
   ActivateConnectionCommand,
   ApproveDomainClaimCommand,
@@ -36,14 +39,10 @@ import {
   runCompleteTeardown,
 } from "./process-manager/connectionTeardown.process";
 import {
-  SSO_CONNECTION_PROJECTION_NAME,
   type SsoConnectionFoldState,
   SsoConnectionStateFoldProjection,
 } from "./projections/ssoConnectionState.foldProjection";
-import {
-  SSO_CONNECTION_AGGREGATE_TYPE,
-  SSO_CONNECTION_PIPELINE_NAME,
-} from "./schemas/constants";
+import { SSO_CONNECTION_AGGREGATE_TYPE, SSO_CONNECTION_PIPELINE_NAME } from "./schemas/constants";
 import type { SsoConnectionEvent } from "./schemas/events";
 
 /**
@@ -99,15 +98,17 @@ export interface SsoConnectionPipelineDeps {
  * has a batch to coalesce.
  */
 export function createSsoConnectionPipeline(deps: SsoConnectionPipelineDeps) {
-  let builder = definePipeline<SsoConnectionEvent>()
-    .withName(SSO_CONNECTION_PIPELINE_NAME)
-    .withAggregateType(SSO_CONNECTION_AGGREGATE_TYPE)
-    .withProjection(
-      SSO_CONNECTION_PROJECTION_NAME,
-      new SsoConnectionStateFoldProjection({
-        store: deps.connectionProjectionStore,
-      }),
-    );
+  let builder = definePipeline<SsoConnectionEvent>({
+    name: SSO_CONNECTION_PIPELINE_NAME,
+    aggregate: defineAggregate({
+      type: SSO_CONNECTION_AGGREGATE_TYPE,
+      events: defineEvents(SSO_CONNECTION_EVENT_TYPES),
+    }),
+  }).withPostgresProjection(
+    new SsoConnectionStateFoldProjection({
+      store: deps.connectionProjectionStore,
+    }),
+  );
 
   for (const [name, Command] of CONNECTION_COMMANDS) {
     // The builder mutates and returns ITSELF; what narrows per call is only

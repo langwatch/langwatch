@@ -1,5 +1,11 @@
 import type { IdentityGuards, MfaGuards } from "@langwatch/identity-server";
-import { definePipeline, type StateProjectionStore } from "@langwatch/eventing";
+import {
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  type StateProjectionStore,
+} from "@langwatch/eventing";
+import { IDENTITY_EVENT_TYPES, MFA_EVENT_TYPES } from "@langwatch/identity-contract";
 import { AttachIdentifierCommand } from "./commands/attachIdentifier.command";
 import { DetachIdentifierCommand } from "./commands/detachIdentifier.command";
 import { EraseUserCommand } from "./commands/eraseUser.command";
@@ -23,10 +29,7 @@ import {
   MfaEnrollmentStateFoldProjection,
   type MfaFoldState,
 } from "./projections/mfaEnrollmentState.foldProjection";
-import {
-  IDENTITY_PIPELINE_NAME,
-  USER_IDENTITY_AGGREGATE_TYPE,
-} from "./schemas/constants";
+import { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "./schemas/constants";
 import type { IdentityEvent } from "./schemas/events";
 import type { MfaEvent } from "./schemas/mfaEvents";
 
@@ -72,11 +75,14 @@ export interface IdentityPipelineDeps {
  * handful of identifiers, so a lane never has a batch to coalesce either.
  */
 export function createIdentityPipeline(deps: IdentityPipelineDeps) {
-  return definePipeline<IdentityEvent | MfaEvent>()
-    .withName(IDENTITY_PIPELINE_NAME)
-    .withAggregateType(USER_IDENTITY_AGGREGATE_TYPE)
-    .withProjection(
-      "identityState",
+  return definePipeline<IdentityEvent | MfaEvent>({
+    name: IDENTITY_PIPELINE_NAME,
+    aggregate: defineAggregate({
+      type: USER_IDENTITY_AGGREGATE_TYPE,
+      events: defineEvents([...IDENTITY_EVENT_TYPES, ...MFA_EVENT_TYPES]),
+    }),
+  })
+    .withPostgresProjection(
       new IdentityStateFoldProjection({
         store: deps.identityProjectionStore,
       }),
@@ -101,42 +107,25 @@ export function createIdentityPipeline(deps: IdentityPipelineDeps) {
       DetachIdentifierCommand,
       new DetachIdentifierCommand(deps.identityGuards),
     )
-    .withCommandInstance(
-      "eraseUser",
-      EraseUserCommand,
-      new EraseUserCommand(deps.identityGuards),
-    )
+    .withCommandInstance("eraseUser", EraseUserCommand, new EraseUserCommand(deps.identityGuards))
     .withCommandInstance(
       "proposeLink",
       ProposeLinkCommand,
       new ProposeLinkCommand(deps.identityGuards),
     )
-    .withProjection(
-      "mfaEnrollmentState",
+    .withPostgresProjection(
       new MfaEnrollmentStateFoldProjection({
         store: deps.mfaProjectionStore,
       }),
     )
-    .withCommandInstance(
-      "enrollMfa",
-      EnrollMfaCommand,
-      new EnrollMfaCommand(deps.mfaGuards),
-    )
-    .withCommandInstance(
-      "confirmMfa",
-      ConfirmMfaCommand,
-      new ConfirmMfaCommand(deps.mfaGuards),
-    )
+    .withCommandInstance("enrollMfa", EnrollMfaCommand, new EnrollMfaCommand(deps.mfaGuards))
+    .withCommandInstance("confirmMfa", ConfirmMfaCommand, new ConfirmMfaCommand(deps.mfaGuards))
     .withCommandInstance(
       "expireMfaEnrollment",
       ExpireMfaEnrollmentCommand,
       new ExpireMfaEnrollmentCommand(deps.mfaGuards),
     )
-    .withCommandInstance(
-      "disableMfa",
-      DisableMfaCommand,
-      new DisableMfaCommand(deps.mfaGuards),
-    )
+    .withCommandInstance("disableMfa", DisableMfaCommand, new DisableMfaCommand(deps.mfaGuards))
     .withCommandInstance(
       "consumeBackupCode",
       ConsumeBackupCodeCommand,

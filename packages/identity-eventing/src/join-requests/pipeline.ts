@@ -7,10 +7,13 @@ import {
 } from "@langwatch/identity-contract";
 import type { JoinRequestGuards } from "@langwatch/identity-server";
 import {
+  defineAggregate,
+  defineEvents,
   definePipeline,
   type ProcessManagerInitialStage,
   type StateProjectionStore,
 } from "@langwatch/eventing";
+import { JOIN_REQUEST_EVENT_TYPES } from "@langwatch/identity-contract";
 import {
   ApproveJoinCommand,
   ExpireJoinCommand,
@@ -32,14 +35,10 @@ import {
   runRemindAdmins,
 } from "./process-manager/joinRequestLifecycle.process";
 import {
-  JOIN_REQUEST_PROJECTION_NAME,
   type JoinRequestFoldState,
   JoinRequestStateFoldProjection,
 } from "./projections/joinRequestState.foldProjection";
-import {
-  JOIN_REQUEST_AGGREGATE_TYPE,
-  JOIN_REQUEST_PIPELINE_NAME,
-} from "./schemas/constants";
+import { JOIN_REQUEST_AGGREGATE_TYPE, JOIN_REQUEST_PIPELINE_NAME } from "./schemas/constants";
 import type { JoinRequestEvent } from "./schemas/events";
 
 /**
@@ -82,15 +81,17 @@ export interface JoinRequestPipelineDeps {
  * coalesce.
  */
 export function createJoinRequestPipeline(deps: JoinRequestPipelineDeps) {
-  let builder = definePipeline<JoinRequestEvent>()
-    .withName(JOIN_REQUEST_PIPELINE_NAME)
-    .withAggregateType(JOIN_REQUEST_AGGREGATE_TYPE)
-    .withProjection(
-      JOIN_REQUEST_PROJECTION_NAME,
-      new JoinRequestStateFoldProjection({
-        store: deps.joinRequestProjectionStore,
-      }),
-    );
+  let builder = definePipeline<JoinRequestEvent>({
+    name: JOIN_REQUEST_PIPELINE_NAME,
+    aggregate: defineAggregate({
+      type: JOIN_REQUEST_AGGREGATE_TYPE,
+      events: defineEvents(JOIN_REQUEST_EVENT_TYPES),
+    }),
+  }).withPostgresProjection(
+    new JoinRequestStateFoldProjection({
+      store: deps.joinRequestProjectionStore,
+    }),
+  );
 
   for (const [name, Command] of JOIN_REQUEST_COMMANDS) {
     // The builder mutates and returns ITSELF; what narrows per call is only
@@ -129,16 +130,8 @@ function mountRequestLifecycle(
 ) {
   return pm
     .state<JoinRequestLifecycleState>(JOIN_REQUEST_LIFECYCLE_INITIAL_STATE)
-    .intent(
-      "remindAdmins",
-      remindAdminsIntentSchema,
-      runRemindAdmins({ port: lifecycle }),
-    )
-    .intent(
-      "expireRequest",
-      expireRequestIntentSchema,
-      runExpireRequest({ port: lifecycle }),
-    )
+    .intent("remindAdmins", remindAdminsIntentSchema, runRemindAdmins({ port: lifecycle }))
+    .intent("expireRequest", expireRequestIntentSchema, runExpireRequest({ port: lifecycle }))
     .on(JOIN_REQUESTED_EVENT_TYPE, onJoinRequested)
     .on(JOIN_APPROVED_EVENT_TYPE, onJoinResolved)
     .on(JOIN_REJECTED_EVENT_TYPE, onJoinResolved)

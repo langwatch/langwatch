@@ -1,5 +1,11 @@
 import type { ScimSyncGuards } from "@langwatch/identity-server";
-import { definePipeline, type StateProjectionStore } from "@langwatch/eventing";
+import {
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  type StateProjectionStore,
+} from "@langwatch/eventing";
+import { SCIM_SYNC_EVENT_TYPES } from "@langwatch/identity-contract";
 import {
   IssueScimTokenCommand,
   RecordScimApplyFailureCommand,
@@ -8,14 +14,10 @@ import {
   RevokeScimSyncCommand,
 } from "./commands/scimSyncCommands";
 import {
-  SCIM_SYNC_PROJECTION_NAME,
   type ScimSyncFoldState,
   ScimSyncStateFoldProjection,
 } from "./projections/scimSyncState.foldProjection";
-import {
-  SCIM_SYNC_AGGREGATE_TYPE,
-  SCIM_SYNC_PIPELINE_NAME,
-} from "./schemas/constants";
+import { SCIM_SYNC_AGGREGATE_TYPE, SCIM_SYNC_PIPELINE_NAME } from "./schemas/constants";
 import type { ScimSyncEvent } from "./schemas/events";
 
 /**
@@ -61,15 +63,17 @@ export interface ScimSyncPipelineDeps {
  * hold up the connection beside it.
  */
 export function createScimSyncPipeline(deps: ScimSyncPipelineDeps) {
-  let builder = definePipeline<ScimSyncEvent>()
-    .withName(SCIM_SYNC_PIPELINE_NAME)
-    .withAggregateType(SCIM_SYNC_AGGREGATE_TYPE)
-    .withProjection(
-      SCIM_SYNC_PROJECTION_NAME,
-      new ScimSyncStateFoldProjection({
-        store: deps.scimSyncProjectionStore,
-      }),
-    );
+  let builder = definePipeline<ScimSyncEvent>({
+    name: SCIM_SYNC_PIPELINE_NAME,
+    aggregate: defineAggregate({
+      type: SCIM_SYNC_AGGREGATE_TYPE,
+      events: defineEvents(SCIM_SYNC_EVENT_TYPES),
+    }),
+  }).withPostgresProjection(
+    new ScimSyncStateFoldProjection({
+      store: deps.scimSyncProjectionStore,
+    }),
+  );
 
   for (const [name, Command] of SCIM_SYNC_COMMANDS) {
     // The builder mutates and returns ITSELF; what narrows per call is only
