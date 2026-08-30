@@ -17,7 +17,7 @@ import type { DatasetStorage } from "../../ports/dataset-storage.port";
 import type { DatasetContentRepository } from "../../repositories/prisma/dataset-content.repository";
 import { DatasetChunkService, type DatasetMutationRecord } from "../dataset-chunk.service";
 
-type Update = { id: string; data: Record<string, unknown>; transactional: boolean };
+type Update = { id: string; content: Record<string, unknown>; transactional: boolean };
 
 /**
  * A repository whose `withDatasetLock` hands the callback a DIFFERENT instance,
@@ -33,9 +33,9 @@ function fakeRepository(record: DatasetMutationRecord) {
   const make = (transactional: boolean): DatasetContentRepository =>
     ({
       findOneOrThrow: async () => current,
-      update: async (input: { id: string; data: Record<string, unknown> }) => {
-        updates.push({ id: input.id, data: input.data, transactional });
-        current = { ...current, ...(input.data as Partial<DatasetMutationRecord>) };
+      updateContent: async (input: { id: string; content: Record<string, unknown> }) => {
+        updates.push({ id: input.id, content: input.content, transactional });
+        current = { ...current, ...(input.content as Partial<DatasetMutationRecord>) };
         return current;
       },
       withDatasetLock: async <T>(

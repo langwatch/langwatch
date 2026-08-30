@@ -17,6 +17,24 @@ export type UpdateDatasetInput = {
 };
 
 /**
+ * The fields a chunk mutation writes back, in the feature's own vocabulary.
+ *
+ * The chunk service used to build `Prisma.DatasetUpdateInput` itself, which
+ * meant seven `as unknown as Prisma.InputJsonValue` casts in a service — the
+ * JSON columns are the only reason those existed. Naming the shape here keeps
+ * the storage vocabulary on the storage side; the casts happen once, below.
+ */
+export type DatasetContentUpdate = {
+  rowCount?: number;
+  sizeBytes?: bigint;
+  chunkCount?: number;
+  chunkOffsets?: unknown;
+  columnTypes?: unknown;
+  name?: string;
+  slug?: string;
+};
+
+/**
  * Repository layer for dataset data access.
  * Single Responsibility: Database operations for datasets.
  * {@link Dataset} represents a collection of data records with associated metadata.
@@ -180,6 +198,31 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
         projectId: input.projectId,
       },
       data: input.data,
+    });
+  }
+
+  /**
+   * Writes back what a chunk mutation computed. Same row guard and same
+   * transaction plumbing as `update`; the difference is that the caller states
+   * counters and offsets rather than a Prisma update document.
+   */
+  async updateContent(input: {
+    id: string;
+    projectId: string;
+    content: DatasetContentUpdate;
+  }): Promise<Dataset> {
+    const { chunkOffsets, columnTypes, ...scalars } = input.content;
+
+    return await this.update({
+      id: input.id,
+      projectId: input.projectId,
+      data: {
+        ...scalars,
+        ...(chunkOffsets !== undefined
+          ? { chunkOffsets: chunkOffsets as Prisma.InputJsonValue }
+          : {}),
+        ...(columnTypes !== undefined ? { columnTypes: columnTypes as Prisma.InputJsonValue } : {}),
+      },
     });
   }
 

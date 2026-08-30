@@ -19,7 +19,6 @@
 
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
-import type { Prisma } from "@langwatch/prisma-client/generated";
 import { DatasetContentRepository } from "../repositories/prisma/dataset-content.repository";
 import {
   type ChunkedDatasetMeta,
@@ -392,12 +391,12 @@ export class DatasetChunkService {
         const patched = offsets.map((o) =>
           o.index === index ? { ...o, byteSize: offset.byteSize } : o,
         );
-        await tx.update({
+        await tx.updateContent({
           id: dataset.id,
           projectId,
-          data: {
+          content: {
             sizeBytes: (current.sizeBytes ?? 0n) + BigInt(offset.byteSize - oldByteSize),
-            chunkOffsets: patched as unknown as Prisma.InputJsonValue,
+            chunkOffsets: patched,
           },
         });
       };
@@ -702,14 +701,14 @@ export class DatasetChunkService {
       }
       const keptOffsets = offsets.slice(0, keptChunkCount);
 
-      await tx.update({
+      await tx.updateContent({
         id: datasetId,
         projectId,
-        data: {
+        content: {
           rowCount,
           sizeBytes: BigInt(sizeBytes),
           chunkCount: keptChunkCount,
-          chunkOffsets: keptOffsets as unknown as Prisma.InputJsonValue,
+          chunkOffsets: keptOffsets,
         },
       });
 
@@ -840,17 +839,17 @@ export class DatasetChunkService {
         fromIndex: meta.chunkCount,
       });
 
-      return await tx.update({
+      return await tx.updateContent({
         id: dataset.id,
         projectId,
-        data: {
+        content: {
           name,
           slug,
-          columnTypes: newColumnTypes as unknown as Prisma.InputJsonValue,
+          columnTypes: newColumnTypes,
           rowCount: meta.rowCount,
           sizeBytes: BigInt(meta.sizeBytes),
           chunkCount: meta.chunkCount,
-          chunkOffsets: meta.chunkOffsets as unknown as Prisma.InputJsonValue,
+          chunkOffsets: meta.chunkOffsets,
         },
       });
     });
@@ -898,14 +897,14 @@ export class DatasetChunkService {
     const addedRows = written.reduce((n, c) => n + c.rowCount, 0);
     const addedBytes = written.reduce((n, c) => n + c.byteSize, 0);
 
-    await tx.update({
+    await tx.updateContent({
       id: current.id,
       projectId,
-      data: {
+      content: {
         rowCount: oldRowCount + addedRows,
         sizeBytes: (current.sizeBytes ?? 0n) + BigInt(addedBytes),
         chunkCount: fromIndex + written.length,
-        chunkOffsets: readOffsets(current).concat(newOffsets) as unknown as Prisma.InputJsonValue,
+        chunkOffsets: readOffsets(current).concat(newOffsets),
       },
     });
 
@@ -993,10 +992,10 @@ export class DatasetChunkService {
       keptChunkCount -= 1;
     }
     const trimmed = keptChunkCount < perChunk.length;
-    await tx.update({
+    await tx.updateContent({
       id: datasetId,
       projectId,
-      data: {
+      content: {
         rowCount,
         sizeBytes: BigInt(sizeBytes),
         // The trailing empty offset entries (startRow === endRow, byteSize 0)
@@ -1004,10 +1003,10 @@ export class DatasetChunkService {
         ...(trimmed
           ? {
               chunkCount: keptChunkCount,
-              chunkOffsets: offsets.slice(0, keptChunkCount) as unknown as Prisma.InputJsonValue,
+              chunkOffsets: offsets.slice(0, keptChunkCount),
             }
           : {
-              chunkOffsets: offsets as unknown as Prisma.InputJsonValue,
+              chunkOffsets: offsets,
             }),
       },
     });
