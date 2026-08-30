@@ -31,10 +31,7 @@ export const EXTERNAL_ID_MAX_LENGTH = 128;
  * caller that round-trips through a form, so the wire says string and means it.
  */
 export const resourceMetadataSchema = z
-  .record(
-    z.string().min(1).max(METADATA_MAX_KEY_LENGTH),
-    z.string().max(METADATA_MAX_VALUE_LENGTH),
-  )
+  .record(z.string().min(1).max(METADATA_MAX_KEY_LENGTH), z.string().max(METADATA_MAX_VALUE_LENGTH))
   .refine((map) => Object.keys(map).length <= METADATA_MAX_KEYS, {
     message: `must hold at most ${METADATA_MAX_KEYS} keys`,
   });
@@ -69,29 +66,13 @@ export function metadataFromRow(value: unknown): ResourceMetadata {
 }
 
 /**
- * The `metadata` half of a patch.
- *
- * REPLACES rather than merges. A merge cannot express deleting a key without
- * inventing a sentinel for it, and a caller that reads-modifies-writes the
- * whole map (which is what every client library does) gets the same result
- * either way. Absent leaves the stored map alone; `{}` empties it.
- */
-export function metadataPatch(
-  next: ResourceMetadata | undefined,
-): ResourceMetadata | undefined {
-  return next;
-}
-
-/**
  * The `externalId` half of a create or patch.
  *
  * Explicit null clears the column back to SQL NULL, which is the value that
  * does not participate in the unique index, the same reason the column is
  * nullable at all. Absent leaves it alone.
  */
-export function externalIdPatch(
-  next: string | null | undefined,
-): string | null | undefined {
+export function externalIdPatch(next: string | null | undefined): string | null | undefined {
   return next === undefined ? undefined : (next ?? null);
 }
 
@@ -108,9 +89,13 @@ export function identityPatchData(patch: {
   metadata?: ResourceMetadata;
 }): { externalId?: string | null; metadata?: ResourceMetadata } {
   return {
-    ...(patch.externalId !== undefined
-      ? { externalId: externalIdPatch(patch.externalId) }
-      : {}),
-    ...(patch.metadata !== undefined ? { metadata: metadataPatch(patch.metadata) } : {}),
+    ...(patch.externalId !== undefined ? { externalId: externalIdPatch(patch.externalId) } : {}),
+    // `metadata` REPLACES rather than merges. A merge cannot express deleting a
+    // key without inventing a sentinel, and a caller that reads-modifies-writes
+    // the whole map — which is what every client library does — gets the same
+    // result either way. Absent leaves the stored map alone; `{}` empties it.
+    // Nothing to transform, unlike `externalId` above, which folds undefined
+    // and null apart.
+    ...(patch.metadata !== undefined ? { metadata: patch.metadata } : {}),
   };
 }

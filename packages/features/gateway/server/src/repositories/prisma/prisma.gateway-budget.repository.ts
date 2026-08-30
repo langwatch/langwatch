@@ -9,7 +9,11 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { GatewayBudget, GatewayBudgetWindow, PrismaClient } from "@langwatch/prisma-client/generated";
+import type {
+  GatewayBudget,
+  GatewayBudgetWindow,
+  PrismaClient,
+} from "@langwatch/prisma-client/generated";
 import { Prisma } from "@langwatch/prisma-client/generated";
 import { PrismaGatewayAuditRepository } from "./prisma.gateway-audit.repository";
 import { serializeRowForAudit } from "../../adapters/gateway-audit-serializer.adapter";
@@ -869,7 +873,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
         const row = await tx.gatewayBudget.create({
           data: {
             organizationId: input.organizationId,
-            scopeType: scopeKindToEnum(input.scope.kind),
+            scopeType: input.scope.kind,
             scopeId: scopeIdForScope(input.scope),
             name: input.name,
             description: input.description ?? null,
@@ -1299,12 +1303,6 @@ function scopeIdForScope(scope: BudgetScope): string {
       // The stored target is the ANCHOR the template applies to.
       return scope.anchorVirtualKeyId ?? scope.anchorProjectId ?? "";
   }
-}
-
-function scopeKindToEnum(
-  kind: BudgetScope["kind"],
-): "ORGANIZATION" | "TEAM" | "PROJECT" | "VIRTUAL_KEY" | "PRINCIPAL" | "GROUP" | "ATTRIBUTED_USER" {
-  return kind;
 }
 
 function resolveProjectFromScope(scope: BudgetScope): string | null {
