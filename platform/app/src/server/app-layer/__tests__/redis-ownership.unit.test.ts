@@ -35,16 +35,7 @@ const REPO_ROOT = path.resolve(APP_ROOT, "../..");
  * holds `env.mjs`, `env-create.mjs` and `noop-css.cjs` today, and a
  * `new IORedis(...)` in any of them scanned clean.
  */
-const SOURCE_EXTENSIONS = new Set([
-  ".ts",
-  ".tsx",
-  ".mts",
-  ".cts",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".cjs",
-]);
+const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"]);
 
 /**
  * Every way an ioredis client gets constructed.
@@ -122,17 +113,17 @@ function* walkSourceFiles(root: string): Generator<string> {
 /**
  * Every source file in the app, plus the workspace packages.
  *
- * The whole of `platform/app` — not `src` and `ee` alone. A script, an E2E
- * spec, a vite plugin and a Prisma seed run in the same processes and against
- * the same Redis as everything else, so a connection opened in one of them is
- * the very thing ADR-093 retired; that they used to be invisible here was an
- * accident of which trees got named (#6948).
+ * The whole of `platform/app` — not `src` alone. A script, an E2E spec, a vite
+ * plugin and a Prisma seed run in the same processes and against the same Redis
+ * as everything else, so a connection opened in one of them is the very thing
+ * ADR-093 retired; that they used to be invisible here was an accident of which
+ * trees got named (#6948).
+ *
+ * `platform/app/ee` was one of those trees and no longer exists — the
+ * enterprise code moved under `packages/`, which this already walks.
  */
 function allSourceFiles(): string[] {
-  return [
-    ...walkSourceFiles(APP_ROOT),
-    ...walkSourceFiles(path.join(REPO_ROOT, "packages")),
-  ];
+  return [...walkSourceFiles(APP_ROOT), ...walkSourceFiles(path.join(REPO_ROOT, "packages"))];
 }
 
 function relative(file: string): string {
@@ -236,8 +227,7 @@ describe("Redis ownership", () => {
 
       // Importing must not need an App — that is the whole point of retiring
       // the module-level singleton.
-      const { checkLangyMessageRateLimit } =
-        await import("../../middleware/rate-limit-langy");
+      const { checkLangyMessageRateLimit } = await import("../../middleware/rate-limit-langy");
 
       const incr = vi.fn().mockResolvedValue(1);
       const expire = vi.fn().mockResolvedValue(1);
@@ -297,11 +287,16 @@ describe("Redis ownership", () => {
 
       for (const directory of [
         "platform/app/src/",
-        "platform/app/ee/",
         "platform/app/scripts/",
         "platform/app/e2e/",
         "platform/app/vite/",
         "packages/",
+        // Named separately from `packages/` for the reason #6948 gives: the
+        // enterprise tree being invisible here was an accident of which trees
+        // got named, and it has since moved out of `platform/app/ee/` into
+        // this one. Asserting `packages/` alone would let it disappear again
+        // without this list noticing.
+        "packages/enterprise/",
       ]) {
         expect(reached(directory), `nothing scanned under ${directory}`).toBe(true);
       }

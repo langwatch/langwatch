@@ -20,6 +20,21 @@ const envMock = env as unknown as { SSOCONN_ROUTING: string };
 
 const REPO_ROOT = join(import.meta.dirname, "../../../../../../..");
 
+/** Trees that hold no source of ours, and are large enough to matter. */
+const SKIP_DIRECTORIES = new Set(["node_modules", "dist", ".next", "coverage", ".turbo"]);
+
+/** Every `.ts` under `root`, as a path relative to it, skipping the above. */
+function* walkTypeScript(root: string, prefix = ""): Generator<string> {
+  for (const entry of readdirSync(join(root, prefix), { withFileTypes: true })) {
+    const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      if (!SKIP_DIRECTORIES.has(entry.name)) yield* walkTypeScript(root, relative);
+    } else if (entry.isFile() && entry.name.endsWith(".ts")) {
+      yield relative;
+    }
+  }
+}
+
 afterEach(() => {
   envMock.SSOCONN_ROUTING = "off";
 });
@@ -106,9 +121,7 @@ describe("the legacy sso string columns", () => {
           data: { name: "Acme", presenceEnabled: false },
         }),
       ).not.toThrow();
-      expect(() =>
-        assertLegacySsoStringWriteAllowed({ data: undefined }),
-      ).not.toThrow();
+      expect(() => assertLegacySsoStringWriteAllowed({ data: undefined })).not.toThrow();
     });
   });
 
@@ -126,21 +139,29 @@ describe("the legacy sso string columns", () => {
      * @scenario "After the flip, the strings stop being written"
      */
     it("has exactly one writer of the SsoConnection table: the fold's store", () => {
-      const roots = [
-        join(REPO_ROOT, "platform/app/src"),
-        join(REPO_ROOT, "platform/app/ee"),
-      ];
+      // `platform/app/ee` used to be the second root and no longer exists —
+      // the enterprise code moved under `packages/`, which is also where the
+      // identity feature is going. Scanning `packages/` rather than dropping
+      // the second root is the point: a guard that only reads the tree being
+      // emptied stops guarding exactly as the code it guards moves out.
+      //
+      // Walked with pruning rather than `readdirSync(recursive)`, which would
+      // enumerate every `node_modules` under `packages/` and take minutes.
+      const roots = [join(REPO_ROOT, "platform/app/src"), join(REPO_ROOT, "packages")];
       const writes =
         /prisma\s*\.\s*ssoConnection\s*\.\s*(create|createMany|update|updateMany|upsert|delete|deleteMany)/;
       const offenders: string[] = [];
       for (const root of roots) {
-        for (const entry of readdirSync(root, { recursive: true })) {
-          const file = String(entry);
+        for (const entry of walkTypeScript(root)) {
+          const file = entry;
           if (!file.endsWith(".ts")) continue;
           if (file.includes("__tests__")) continue;
           // Prisma's own generated model module names every write method for
-          // every table; it is the client, not a caller.
-          if (file.startsWith("generated/")) continue;
+          // every table; it is the client, not a caller. Matched anywhere in
+          // the path rather than at the start: under `platform/app/src` it is
+          // `generated/…`, and under `packages/` it is
+          // `prisma-client/src/generated/…`.
+          if (file.includes("generated/")) continue;
           // Scaffolding shared between suites. It lives outside `__tests__`
           // so several of them can import it, but it is no more a production
           // writer than they are -- and prose that spells the call it is
