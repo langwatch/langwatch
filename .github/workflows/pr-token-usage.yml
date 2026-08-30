@@ -1,0 +1,67 @@
+name: pr-token-usage
+
+# Posts a single sticky comment stating what the coding agents spent on this
+# pull request (sessions, tokens and estimated cost per contributor and per
+# model, read from the LangWatch pull-request usage API), and rewrites that
+# same comment on every subsequent push.
+#
+# `synchronize` IS "a new commit was pushed to this PR", so one `pull_request`
+# trigger covers both "on open" and "on every push". Usage accrues while the
+# work happens, so each push refreshes the numbers; `workflow_dispatch` exists
+# for a manual refresh after the last commit.
+#
+# Deliberately non-blocking: this workflow only describes what the work cost,
+# it never judges it. A LangWatch outage logs a warning and the job stays
+# green, so nothing here should gate a merge or join branch protection.
+#
+# No path filter, so it always produces a result and needs no "-unmodified"
+# stub under the complementary-pair system (see specs/ci/path-filters.feature).
+#
+# Spec: specs/ci/pr-token-usage.feature
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: "Pull request number to refresh"
+        required: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# Two pushes in quick succession would otherwise race: both runs read "no
+# existing comment" and both POST, leaving duplicates on the thread.
+concurrency:
+  group: pr-token-usage-${{ github.event.pull_request.number || inputs.pull_request }}
+  cancel-in-progress: true
+
+jobs:
+  comment:
+    # Fork PRs get a read-only GITHUB_TOKEN and no secrets, so the LangWatch
+    # read and the comment POST would both fail. Skip quietly rather than
+    # paint a red X on a contributor's first PR.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+
+      # The same logic that is about to write the comment proves itself first;
+      # `node --test` with type stripping needs no install step.
+      - name: Test the comment builder
+        run: node --test --experimental-strip-types .github/scripts/pr-token-usage.test.ts
+
+      - name: Build and upsert the usage comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LANGWATCH_API_KEY: ${{ secrets.LANGWATCH_PR_USAGE_API_KEY }}
+          LANGWATCH_PROJECT_ID: ${{ vars.LANGWATCH_PR_USAGE_PROJECT_ID }}
+          PR_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pull_request }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node --experimental-strip-types .github/scripts/pr-token-usage.ts
