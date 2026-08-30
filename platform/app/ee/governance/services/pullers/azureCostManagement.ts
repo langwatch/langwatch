@@ -44,6 +44,8 @@
  */
 
 import { z } from "zod";
+import { PULLED_USAGE_HINT_KEY } from "./pulledUsageRecord";
+import type { NormalizedPullEvent } from "./pullerAdapter";
 
 /**
  * How many days back each run re-reads, today included.
@@ -295,7 +297,11 @@ export function readAzureCostRows({
     const costMinor = amountToDecimalString(at(row, "Cost"));
     const meterCategory = at(row, "MeterCategory");
 
-    if (day === null || costMinor === null || typeof meterCategory !== "string") {
+    if (
+      day === null ||
+      costMinor === null ||
+      typeof meterCategory !== "string"
+    ) {
       unreadableRows += 1;
       continue;
     }
@@ -316,4 +322,117 @@ export function readAzureCostRows({
   }
 
   return { days, unreadableRows, nextLink };
+}
+
+/** The verb these events carry, so a reader can tell them from a conversation. */
+export const AZURE_COST_ACTION = "cost_report" as const;
+
+/**
+ * The days a read produced, as the events the run hands back.
+ *
+ * Exactly one event per day the reply actually named. A day Azure returned no
+ * row for produces NOTHING — no event, no zero. This is the sharpest rule in
+ * the file: the run re-reads a trailing week, so it is constantly asking about
+ * days it has already recorded, and a zero emitted for a day whose bill has
+ * not landed is a correction downward over a real figure that the summarizing
+ * step would faithfully honour. The absence has to survive as an absence.
+ *
+ * The identity is the subscription, the day and the meter category — never the
+ * money. Two reads of the same day produce the same `source_event_id` and the
+ * same `dimensions`, which is what makes the finished figure REPLACE the
+ * partial one instead of landing beside it and doubling the day.
+ */
+export function azureCostEvents({
+  days,
+  subscriptionId,
+}: {
+  days: AzureDailyCost[];
+  subscriptionId: string;
+}): NormalizedPullEvent[] {
+  return days.map((day) => {
+    const dimensions: Record<string, string> = {
+      granularity: "1d",
+      meterCategory: day.meterCategory,
+      subscriptionId,
+    };
+
+    return {
+      source_event_id: `azure_cost:${subscriptionId}:${day.day}:${day.meterCategory}`,
+      // The business day the spend belongs to, not the instant it was read. A
+      // restatement of this day keeps this timestamp unchanged.
+      event_timestamp: `${day.day}T00:00:00.000Z`,
+      // A subscription bill names no person, and inventing one would attribute
+      // shared infrastructure to whoever happened to be configured.
+      actor: "",
+      action: AZURE_COST_ACTION,
+      target: day.meterCategory,
+      cost_usd: day.costMinor,
+      tokens_input: 0,
+      tokens_output: 0,
+      raw_payload: JSON.stringify(day),
+      extra: {
+        subscriptionId,
+        meterCategory: day.meterCategory,
+        [PULLED_USAGE_HINT_KEY]: {
+          costBasis: "provider_reported",
+          // The bill IS the invoice — this is Azure's own actual-cost record
+          // of what the customer was charged, not a usage report that
+          // approximates one.
+          costStatus: "exact",
+          dimensions,
+          costUsd: day.costMinor,
+          currency: day.currencyCode,
+          // Only when Azure published one. Omitted rather than null so the
+          // hint schema's own optionality decides, and never filled from a
+          // rate of our own.
+          ...(day.costUsd === null ? {} : { costUsdBiller: day.costUsd }),
+          model: day.meterCategory,
+        },
+      },
+    };
+  });
+}
+
+/**
+ * Where the cost read stands after a run, for the next run to pick up.
+ *
+ * Three outcomes, and the difference between the last two is the whole point.
+ * A window that was PRICED moves the mark to today. A window that was HELD —
+ * throttled, unreachable, refused — moves nothing: being told to retry says
+ * nothing about what the window costs, and recording zero for it would be a
+ * confident wrong number nothing later corrects. A window held past the cap is
+ * GIVEN UP.
+ *
+ * The hold instant is set once and carried, never refreshed on each failure:
+ * refreshing it would put the cap permanently out of reach, so a window that
+ * can never be read would pin the source forever while asking about an
+ * ever-widening span. Giving up costs those days their cost figure, which is
+ * what they had before any of this existed. Not giving up costs the source its
+ * ability to move at all, and the conversations matter more than the bill.
+ */
+export function nextAzureCostCursor({
+  nowMs,
+  previous,
+  outcome,
+}: {
+  nowMs: number;
+  previous: { pricedThroughDay: string | null; heldSinceMs: number | null };
+  outcome: "priced" | "held";
+}): { pricedThroughDay: string | null; heldSinceMs: number | null } {
+  if (outcome === "priced") {
+    return { pricedThroughDay: utcDay(nowMs), heldSinceMs: null };
+  }
+
+  const heldSinceMs = previous.heldSinceMs ?? nowMs;
+  if (nowMs - heldSinceMs <= AZURE_COST_MAX_HOLD_MS) {
+    return { pricedThroughDay: previous.pricedThroughDay, heldSinceMs };
+  }
+
+  // Give up: mark the day BEFORE the trailing window's own start as priced, so
+  // the next run asks about the last seven days and the ask stops widening.
+  const trailingStartMs = nowMs - (AZURE_COST_REREAD_DAYS - 1) * ONE_DAY_MS;
+  return {
+    pricedThroughDay: utcDay(trailingStartMs - ONE_DAY_MS),
+    heldSinceMs: null,
+  };
 }

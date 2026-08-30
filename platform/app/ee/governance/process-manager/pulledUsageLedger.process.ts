@@ -126,7 +126,9 @@ const LEDGER_CURRENCY_CODE = "USD";
  * amount. An item billed in anything else can only be stated in dollars by the
  * biller, and we never invent a rate to stand in for one it did not publish.
  */
-function ledgerAmountNanoUsd(record: PulledUsageObservedEventData): number | null {
+function ledgerAmountNanoUsd(
+  record: PulledUsageObservedEventData,
+): number | null {
   if (record.currencyCode === LEDGER_CURRENCY_CODE) return record.costNanoMinor;
   return record.costNanoUsd;
 }

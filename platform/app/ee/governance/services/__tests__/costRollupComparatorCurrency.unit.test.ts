@@ -14,11 +14,11 @@
 import { describe, expect, it } from "vitest";
 
 import { GOVERNANCE_COST_SOURCE } from "../../projections/governanceCostRollup.constants";
+import { CostRollupComparatorService } from "../costRollupComparator.service";
 import type {
   GovernanceCostRollupClickHouseRepository,
   GovernanceCostRollupRow,
 } from "../governanceCostRollup.clickhouse.repository";
-import { CostRollupComparatorService } from "../costRollupComparator.service";
 
 const TENANT = "proj_governance_home";
 const DAY = "2026-08-23";
@@ -124,7 +124,9 @@ describe("the cost rollup watchdog on a non-dollar row", () => {
     /** @scenario "The watchdog compares the amount in the currency it was billed in" */
     it("counts the drift even though neither side states a dollar figure", async () => {
       const comparison = await comparatorOver({
-        events: [loggedEvent({ costNanoMinor: 1_533_525_880, currencyCode: "EUR" })],
+        events: [
+          loggedEvent({ costNanoMinor: 1_533_525_880, currencyCode: "EUR" }),
+        ],
         rows: [summaryRow({ currencyCode: "EUR", amountNanoMinor: 999 })],
       }).compareDay({
         tenantId: TENANT,
@@ -141,7 +143,9 @@ describe("the cost rollup watchdog on a non-dollar row", () => {
     /** @scenario "The watchdog compares the amount in the currency it was billed in" */
     it("reports no drift", async () => {
       const comparison = await comparatorOver({
-        events: [loggedEvent({ costNanoMinor: 1_533_525_880, currencyCode: "EUR" })],
+        events: [
+          loggedEvent({ costNanoMinor: 1_533_525_880, currencyCode: "EUR" }),
+        ],
         rows: [
           summaryRow({ currencyCode: "EUR", amountNanoMinor: 1_533_525_880 }),
         ],
