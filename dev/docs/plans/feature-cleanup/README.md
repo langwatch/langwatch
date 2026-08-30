@@ -20,24 +20,24 @@ enactment by hand first; stage-3 agents copy that, they do not invent it.
 | Feature | Files | Lines | 1 · review | 2 · verify | 3 · enact |
 | --- | ---: | ---: | --- | --- | --- |
 | dataset | 35 | 9147 | done (reference) | — | in progress |
-| secret | 9 | 639 | running | | |
-| stored-object | 22 | 2592 | running | | |
-| api-key | 24 | 4102 | running | | |
-| trace | 181 | 29990 | | | |
-| governance (ent) | 143 | 24097 | | | |
-| scenario | 90 | 16758 | | | |
-| gateway | 79 | 16278 | | | |
-| langy | 85 | 15111 | | | |
-| authz | 51 | 13531 | | | |
-| automation | 78 | 10925 | | | |
-| coding-agent | 52 | 10059 | | | |
-| analytics | 30 | 9917 | | | |
-| ops | 49 | 9508 | | | |
-| organization | 20 | 7885 | | | |
-| experiment | 40 | 7106 | | | |
-| identity | 48 | 6956 | | | |
-| model-provider | 33 | 6595 | | | |
-| billing (ent) | 42 | 6287 | | | |
+| secret | 9 | 639 | done | | |
+| stored-object | 22 | 2592 | done | | |
+| api-key | 24 | 4102 | done | | |
+| trace | 181 | 29990 | done | | |
+| governance (ent) | 143 | 24097 | done | | |
+| scenario | 90 | 16758 | done | | |
+| gateway | 79 | 16278 | done | | |
+| langy | 85 | 15111 | done | | |
+| authz | 51 | 13531 | done | | |
+| automation | 78 | 10925 | done | | |
+| coding-agent | 52 | 10059 | running | | |
+| analytics | 30 | 9917 | running | | |
+| ops | 49 | 9508 | running | | |
+| organization | 20 | 7885 | running | | |
+| experiment | 40 | 7106 | running | | |
+| identity | 48 | 6956 | running | | |
+| model-provider | 33 | 6595 | running | | |
+| billing (ent) | 42 | 6287 | running | | |
 | prompt | 19 | 6156 | | | |
 | webhook (ent) | 20 | 5056 | | | |
 | topic | 29 | 4783 | | | |
