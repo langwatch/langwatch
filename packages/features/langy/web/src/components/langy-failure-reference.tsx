@@ -1,7 +1,7 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
 import { useState } from "react";
-import { useCopyToClipboard } from "@langwatch/trace-web";
+import { useCopyToClipboard } from "@langwatch/design-system/use-copy-to-clipboard";
 
 /**
  * The platform's own code for a failure, verbatim and selectable, with the whole

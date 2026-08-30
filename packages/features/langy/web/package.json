@@ -26,7 +26,6 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
-    "@langwatch/trace-web": "workspace:*",
     "lucide-react": "^1.22.0",
     "motion": "^12.42.2",
     "react": "^19.2.7",
