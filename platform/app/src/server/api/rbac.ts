@@ -1,4 +1,9 @@
-import type { AuthzPermission, AuthzService, EnforcedScopeFields } from "@langwatch/authz-contract";
+import type {
+  AuthzDenialReason,
+  AuthzPermission,
+  AuthzService,
+  EnforcedScopeFields,
+} from "@langwatch/authz-contract";
 import type { OpsService } from "@langwatch/ops-contract";
 import { ROLE_KIND } from "@langwatch/role-contract";
 import { declareAuthzMiddleware } from "@langwatch/authz-contract";
@@ -689,7 +694,7 @@ function membershipDisabledDenial(): TRPCError {
 export const checkProjectPermission =
   (permission: Permission) =>
   async ({ ctx, input, next }: PermissionMiddlewareParams<{ projectId: string }>) => {
-    const { permitted, organizationRole } = await resolveProjectPermission(
+    const { permitted, organizationRole, denialReason } = await resolveProjectPermission(
       ctx,
       input.projectId,
       permission,
@@ -740,7 +745,7 @@ export const checkProjectPermission =
 export const checkTeamPermission =
   (permission: Permission) =>
   async ({ ctx, input, next }: PermissionMiddlewareParams<{ teamId: string }>) => {
-    const { permitted, organizationRole } = await resolveTeamPermission(
+    const { permitted, organizationRole, denialReason } = await resolveTeamPermission(
       ctx,
       input.teamId,
       permission,
@@ -1017,9 +1022,7 @@ async function getCurrentMembership({
  * (seat-reconciliation.feature). Matches the policy the AuthZ collector
  * applies to the same row.
  */
-function currentRoleOf(
-  membership: CurrentMembership | null,
-): OrganizationUserRole | null {
+function currentRoleOf(membership: CurrentMembership | null): OrganizationUserRole | null {
   return membership && !membership.disabled ? membership.role : null;
 }
 

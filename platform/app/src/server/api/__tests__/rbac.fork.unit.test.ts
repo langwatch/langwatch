@@ -72,16 +72,12 @@ function buildPrisma({
       }),
     },
     team: {
-      findUnique: vi
-        .fn()
-        .mockResolvedValue({ id: TEAM_ID, organizationId: ORGANIZATION_ID }),
+      findUnique: vi.fn().mockResolvedValue({ id: TEAM_ID, organizationId: ORGANIZATION_ID }),
     },
     organizationUser: {
       findFirst: vi.fn().mockResolvedValue({
         role: "MEMBER",
-        disabledAt: membershipDisabled
-          ? new Date("2026-08-01T00:00:00Z")
-          : null,
+        disabledAt: membershipDisabled ? new Date("2026-08-01T00:00:00Z") : null,
       }),
     },
     groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
@@ -134,10 +130,7 @@ describe("the fork at the permission seams", () => {
         const { ctx } = buildPrisma({ onEngine: true });
         const next = vi.fn().mockResolvedValue("permitted");
 
-        const outcome = await checkDeclaredPermissionAny([
-          "annotations:update",
-          "traces:view",
-        ])({
+        const outcome = await checkDeclaredPermissionAny(["annotations:update", "traces:view"])({
           ctx: {
             ...(ctx as Record<string, unknown>),
             permissionChecked: false,
@@ -269,11 +262,7 @@ describe("the fork at the permission seams", () => {
             membershipDisabled: true,
           });
 
-          const result = await resolveProjectPermission(
-            ctx,
-            PROJECT_ID,
-            "traces:view",
-          );
+          const result = await resolveProjectPermission(ctx, PROJECT_ID, "traces:view");
 
           expect(result).toEqual({
             permitted: false,
@@ -293,11 +282,7 @@ describe("the fork at the permission seams", () => {
             membershipDisabled: true,
           });
 
-          const result = await resolveTeamPermission(
-            ctx,
-            TEAM_ID,
-            "traces:view",
-          );
+          const result = await resolveTeamPermission(ctx, TEAM_ID, "traces:view");
 
           expect(result).toEqual({
             permitted: false,
@@ -321,9 +306,7 @@ describe("the fork at the permission seams", () => {
                 ...(ctx as Record<string, unknown>),
                 permissionChecked: false,
                 app: {
-                  permissions: permissionsServiceFor(
-                    (ctx as { prisma: never }).prisma,
-                  ),
+                  permissions: appPermissionsService((ctx as { prisma: never }).prisma),
                 },
               },
               input: { projectId: PROJECT_ID },
