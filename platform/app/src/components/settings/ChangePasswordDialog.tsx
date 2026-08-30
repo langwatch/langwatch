@@ -1,17 +1,10 @@
 import { Button, Field, HStack, Input, Stack, Text } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  PASSWORD_REQUIREMENTS_HINT,
-  passwordProblem,
-} from "@langwatch/identity-contract";
+import { PASSWORD_REQUIREMENTS_HINT, passwordProblem } from "@langwatch/identity-contract";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import {
-  applyHandledErrorToForm,
-  FormServerError,
-  showErrorToast,
-} from "~/features/errors";
+import { applyHandledErrorToForm, FormServerError, showErrorToast } from "~/features/errors";
 import { api } from "../../utils/api";
 import { Dialog } from "../ui/dialog";
 import { toaster } from "../ui/toaster";
@@ -52,13 +45,21 @@ interface ChangePasswordDialogProps {
   mode?: "change" | "set";
 }
 
-export function ChangePasswordDialog({ open, onClose }: ChangePasswordDialogProps) {
+export function ChangePasswordDialog({
+  open,
+  onClose,
+  mode = "change",
+}: ChangePasswordDialogProps) {
+  // The prop above was declared and documented but never taken out of the
+  // props, so the `isSetting` that every branch below reads was an undefined
+  // identifier — the dialog threw on its first render rather than showing
+  // either flow. Defaulting to "change" keeps the behaviour a caller that
+  // passes nothing has always meant to get.
+  const isSetting = mode === "set";
   const changePasswordMutation = api.user.changePassword.useMutation();
   const setPasswordMutation = api.user.setPassword.useMutation();
   const apiContext = api.useUtils();
-  const pending = isSetting
-    ? setPasswordMutation.isPending
-    : changePasswordMutation.isPending;
+  const pending = isSetting ? setPasswordMutation.isPending : changePasswordMutation.isPending;
 
   const form = useForm<ChangePasswordFormValues>({
     resolver: zodResolver(changePasswordSchema),
@@ -117,9 +118,7 @@ export function ChangePasswordDialog({ open, onClose }: ChangePasswordDialogProp
       }
       showErrorToast({
         error,
-        fallbackTitle: isSetting
-          ? "Couldn't set your password"
-          : "Couldn't change your password",
+        fallbackTitle: isSetting ? "Couldn't set your password" : "Couldn't change your password",
       });
     }
   };
@@ -150,8 +149,8 @@ export function ChangePasswordDialog({ open, onClose }: ChangePasswordDialogProp
               <FormServerError form={form} />
               {isSetting && (
                 <Text fontSize="sm" color="fg.muted">
-                  You sign in without a password today. Setting one gives you a
-                  way in from a device that does not hold your passkey.
+                  You sign in without a password today. Setting one gives you a way in from a device
+                  that does not hold your passkey.
                 </Text>
               )}
               <Text fontSize="sm" color="fg.muted">
@@ -173,33 +172,25 @@ export function ChangePasswordDialog({ open, onClose }: ChangePasswordDialogProp
                 </Field.Root>
               )}
               <Field.Root invalid={!!form.formState.errors.newPassword}>
-                <Field.Label>
-                  {isSetting ? "Password" : "New Password"}
-                </Field.Label>
+                <Field.Label>{isSetting ? "Password" : "New Password"}</Field.Label>
                 <Input
                   type="password"
                   autoComplete="new-password"
                   {...form.register("newPassword")}
                 />
                 {form.formState.errors.newPassword && (
-                  <Field.ErrorText>
-                    {form.formState.errors.newPassword.message}
-                  </Field.ErrorText>
+                  <Field.ErrorText>{form.formState.errors.newPassword.message}</Field.ErrorText>
                 )}
               </Field.Root>
               <Field.Root invalid={!!form.formState.errors.confirmPassword}>
-                <Field.Label>
-                  {isSetting ? "Confirm password" : "Confirm New Password"}
-                </Field.Label>
+                <Field.Label>{isSetting ? "Confirm password" : "Confirm New Password"}</Field.Label>
                 <Input
                   type="password"
                   autoComplete="new-password"
                   {...form.register("confirmPassword")}
                 />
                 {form.formState.errors.confirmPassword && (
-                  <Field.ErrorText>
-                    {form.formState.errors.confirmPassword.message}
-                  </Field.ErrorText>
+                  <Field.ErrorText>{form.formState.errors.confirmPassword.message}</Field.ErrorText>
                 )}
               </Field.Root>
             </Stack>
@@ -209,12 +200,7 @@ export function ChangePasswordDialog({ open, onClose }: ChangePasswordDialogProp
               <Button variant="outline" onClick={onClose} disabled={pending}>
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                colorPalette="orange"
-                disabled={pending}
-                loading={pending}
-              >
+              <Button type="submit" colorPalette="orange" disabled={pending} loading={pending}>
                 {isSetting ? "Set password" : "Change Password"}
               </Button>
             </HStack>
