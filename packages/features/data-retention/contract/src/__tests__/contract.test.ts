@@ -3,9 +3,11 @@ import { retentionDaysInputSchema, resolveRetention } from "../index";
 
 describe("data-retention contract", () => {
   it("accepts only the indefinite sentinel or aligned retention values", () => {
-    expect(retentionDaysInputSchema.parse(0)).toBe(0);
-    expect(retentionDaysInputSchema.parse(49)).toBe(49);
-    expect(() => retentionDaysInputSchema.parse(42)).toThrow();
+    // Acceptance stated as acceptance. `parse(0)).toBe(0)` passed for any
+    // schema that lets 0 through, which is every schema that does not reject it.
+    expect(retentionDaysInputSchema.safeParse(0).success).toBe(true);
+    expect(retentionDaysInputSchema.safeParse(49).success).toBe(true);
+    expect(retentionDaysInputSchema.safeParse(42).success).toBe(false);
   });
 
   it("resolves each category from the nearest scope", () => {

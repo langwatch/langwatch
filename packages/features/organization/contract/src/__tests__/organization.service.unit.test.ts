@@ -8,7 +8,7 @@ import {
   organizationBillingProfileSchema,
   type OrganizationService,
 } from "../index";
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
 describe("OrganizationService contract", () => {
   it("requires a non-empty organization id", () => {
@@ -16,11 +16,11 @@ describe("OrganizationService contract", () => {
   });
 
   it("exposes a required non-null team lookup", () => {
-    const service = null as unknown as OrganizationService;
-    type Result = Awaited<ReturnType<typeof service.getOldestTeamId>>;
-    const acceptsString = (_value: Result): void => undefined;
-    acceptsString("team");
-    expect(true).toBe(true);
+    // The claim is entirely about the type: `getOldestTeamId` answers a string,
+    // never `string | null`. It used to be checked by passing "team" to a
+    // helper and then asserting `true` is `true`, so the runtime expectation
+    // held whatever the type said.
+    expectTypeOf<Awaited<ReturnType<OrganizationService["getOldestTeamId"]>>>().toEqualTypeOf<string>();
   });
 
   it("validates portable billing profile values and claims", () => {

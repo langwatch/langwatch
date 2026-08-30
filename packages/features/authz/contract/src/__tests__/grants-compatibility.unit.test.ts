@@ -168,7 +168,11 @@ describe("AuthzGrantsService compatibility operations", () => {
         duplicates: ["binding_2"],
       }),
     ).toEqual({ attached: ["binding_1"], duplicates: ["binding_2"] });
-    expect(authzRevokeBindingsWhereOutputSchema.parse(2)).toBe(2);
+    // A count is a non-negative integer, which is the only thing this schema
+    // decides; `parse(2)).toBe(2)` held for `z.unknown()` too.
+    expect(authzRevokeBindingsWhereOutputSchema.safeParse(2).success).toBe(true);
+    expect(authzRevokeBindingsWhereOutputSchema.safeParse(-1).success).toBe(false);
+    expect(authzRevokeBindingsWhereOutputSchema.safeParse(1.5).success).toBe(false);
     for (const schema of [
       authzAttachResourceGrantOutputSchema,
       authzRevokeResourceGrantsOutputSchema,

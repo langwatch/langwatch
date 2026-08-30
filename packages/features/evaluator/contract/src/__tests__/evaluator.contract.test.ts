@@ -16,8 +16,8 @@ import {
 
 describe("evaluator contract", () => {
   it("keeps the public evaluator type vocabulary explicit", () => {
-    expect(evaluatorTypeSchema.parse("workflow")).toBe("workflow");
-    expect(() => evaluatorTypeSchema.parse("unknown")).toThrow();
+    expect(evaluatorTypeSchema.safeParse("workflow").success).toBe(true);
+    expect(evaluatorTypeSchema.safeParse("unknown").success).toBe(false);
   });
 
   it("validates the transport-neutral evaluator value", () => {
