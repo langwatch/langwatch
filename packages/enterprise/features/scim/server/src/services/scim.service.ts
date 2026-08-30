@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import type { AuthService } from "@langwatch/auth-contract";
 import crypto from "node:crypto";
 import type { UserProfile, UserService } from "@langwatch/user-contract";
-import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import type { EntitlementService } from "@langwatch/entitlement-contract";
 import {
   type ScimCreateUserRequest,
@@ -31,29 +29,25 @@ import { ScimDirectoryService } from "./scim-directory.service";
 import { ScimDirectoryIdentityService } from "./scim-directory-identity.service";
 import { ScimGrantsService } from "./scim-grants.service";
 import { ScimProvisioningService } from "./scim-provisioning.service";
+import type { ScimDepartmentAssignment } from "./scim-cost-center.service";
+import type { ScimSessionRevocation } from "./scim-user-profile.service";
 
 /**
  * Maps between SCIM 2.0 User resources and LangWatch User/OrganizationUser models.
  * All operations are scoped to an organization for multi-tenancy.
  */
 /**
- * The three methods SCIM actually calls on the two services next to it —
- * `auth.revokeAllBrowserSessions`, `governance.departmentAssignUser` and
- * `governance.departmentResolveByNameOrCreate` — named rather than taken
- * whole.
+ * SCIM takes the two dependencies it passes down, not the two whole services
+ * they came from: `ScimSessionRevocation` is `auth.revokeAllBrowserSessions`
+ * and `ScimDepartmentAssignment` is Governance's two department calls, each
+ * declared beside the leaf service that makes the call.
  *
- * Asking for a whole `AuthService` and a whole `GovernanceService` to use
- * three methods is what forced every test here to build a one-method object
- * and cast it at a service it shares nothing else with. The cast is the
- * signal: a dependency that can only be satisfied by lying about it is asking
- * for more than it needs.
+ * Asking for a whole `AuthService` and a whole `GovernanceService` to use three
+ * methods is what forced every test here to build a one-method object and cast
+ * it at a service it shares nothing else with. The cast is the signal: a
+ * dependency that can only be satisfied by lying about it is asking for more
+ * than it needs.
  */
-type ScimSessionRevocation = Pick<AuthService, "revokeAllBrowserSessions">;
-type ScimDepartmentAssignment = Pick<
-  GovernanceService,
-  "departmentAssignUser" | "departmentResolveByNameOrCreate"
->;
-
 export class ScimService extends ScimServiceContract {
   private readonly repository: ScimRepositoryPort;
   private readonly userOperations: ScimProvisioningService;

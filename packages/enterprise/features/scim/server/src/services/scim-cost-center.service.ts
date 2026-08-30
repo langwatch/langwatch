@@ -6,11 +6,22 @@ import {
   type ScimPatchOperation,
 } from "@langwatch/enterprise-scim-contract";
 
+/**
+ * The two things SCIM asks of Governance: find or create the department a
+ * cost-center attribute names, and put the user in it. Named here, where the
+ * calls are, so the chain that carries it down from `ScimService` states the
+ * same narrow dependency at every step.
+ */
+export type ScimDepartmentAssignment = Pick<
+  GovernanceService,
+  "departmentAssignUser" | "departmentResolveByNameOrCreate"
+>;
+
 /** Applies SCIM cost-center attributes through Governance's department owner. */
 export class ScimCostCenterService {
-  private constructor(private readonly governance: GovernanceService) {}
+  private constructor(private readonly governance: ScimDepartmentAssignment) {}
 
-  static create(governance: GovernanceService): ScimCostCenterService {
+  static create(governance: ScimDepartmentAssignment): ScimCostCenterService {
     return new ScimCostCenterService(governance);
   }
 
@@ -43,11 +54,7 @@ export class ScimCostCenterService {
 
   tryFromRequest(request: ScimCreateUserRequest): string | null | undefined {
     const extension = Reflect.get(request, SCIM_ENTERPRISE_USER_SCHEMA);
-    if (
-      extension === null ||
-      typeof extension !== "object" ||
-      !("costCenter" in extension)
-    ) {
+    if (extension === null || typeof extension !== "object" || !("costCenter" in extension)) {
       return undefined;
     }
     const costCenter = Reflect.get(extension, "costCenter");

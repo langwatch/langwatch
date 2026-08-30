@@ -3,14 +3,25 @@
 import type { AuthService } from "@langwatch/auth-contract";
 import type { UpdateUserProfileInput, UserProfile, UserService } from "@langwatch/user-contract";
 
+/**
+ * The one thing SCIM asks of Auth: drop a user's sessions after their email
+ * changes underneath them. Named here, where the call is, so the chain that
+ * carries it down from `ScimService` states the same narrow dependency at every
+ * step rather than passing a whole `AuthService` to reach one method.
+ */
+export type ScimSessionRevocation = Pick<AuthService, "revokeAllBrowserSessions">;
+
 /** Coordinates the session boundary that follows a SCIM-managed email change. */
 export class ScimUserProfileService {
   private constructor(
     private readonly users: UserService,
-    private readonly auth: AuthService,
+    private readonly auth: ScimSessionRevocation,
   ) {}
 
-  static create(options: { users: UserService; auth: AuthService }): ScimUserProfileService {
+  static create(options: {
+    users: UserService;
+    auth: ScimSessionRevocation;
+  }): ScimUserProfileService {
     return new ScimUserProfileService(options.users, options.auth);
   }
 

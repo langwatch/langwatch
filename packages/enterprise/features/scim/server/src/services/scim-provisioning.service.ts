@@ -2,8 +2,6 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { RoleBindingScopeType, TeamUserRole } from "@langwatch/authz-contract";
-import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
-import type { AuthService } from "@langwatch/auth-contract";
 import type { UserProfile, UserService } from "@langwatch/user-contract";
 import {
   type ScimCreateUserRequest,
@@ -15,10 +13,10 @@ import {
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
 import type { ScimRepositoryPort } from "../ports/scim-repository.port";
 import { ScimGrantsService } from "./scim-grants.service";
-import { ScimCostCenterService } from "./scim-cost-center.service";
+import { ScimCostCenterService, type ScimDepartmentAssignment } from "./scim-cost-center.service";
 import { ScimDeprovisionService } from "./scim-deprovision.service";
 import { ScimUserPatchService } from "./scim-user-patch.service";
-import { ScimUserProfileService } from "./scim-user-profile.service";
+import { ScimUserProfileService, type ScimSessionRevocation } from "./scim-user-profile.service";
 import type { ScimSyncLifecyclePort } from "../ports/scim-sync-lifecycle.port";
 
 function isUniqueViolation(error: unknown): boolean {
@@ -52,8 +50,8 @@ export class ScimProvisioningService {
     writer: AuthzGrantsService;
     grants: ScimGrantsService;
     users: UserService;
-    auth: AuthService;
-    governance: GovernanceService;
+    auth: ScimSessionRevocation;
+    governance: ScimDepartmentAssignment;
     lifecycle: ScimSyncLifecyclePort;
     provenOffboarding: boolean;
   }) {
@@ -82,8 +80,8 @@ export class ScimProvisioningService {
     writer: AuthzGrantsService;
     grants: ScimGrantsService;
     users: UserService;
-    auth: AuthService;
-    governance: GovernanceService;
+    auth: ScimSessionRevocation;
+    governance: ScimDepartmentAssignment;
     lifecycle: ScimSyncLifecyclePort;
     provenOffboarding: boolean;
   }): ScimProvisioningService {
