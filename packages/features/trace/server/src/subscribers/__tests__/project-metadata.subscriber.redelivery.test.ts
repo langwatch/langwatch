@@ -22,8 +22,11 @@
  * The clustering bootstrap is deliberately NOT guarded: it is the
  * reconciliation path, and the injected implementation is rate-limited.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createProjectMetadataHandler } from "../project-metadata.subscriber";
+import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import {
+  createProjectMetadataHandler,
+  type ProjectMetadataSubscriberDeps,
+} from "../project-metadata.subscriber";
 import {
   createContext,
   createFoldState,
@@ -62,7 +65,11 @@ const foldState = createFoldState({
   attributes: { "langwatch.origin": "application", "sdk.language": "python" },
 });
 
-let recordProductEvent: ReturnType<typeof vi.fn>;
+// Typed from the dependency it stands in for, so a change to the sink's shape
+// fails here at the injection rather than being absorbed by a bare `vi.fn()`.
+// (It does not tighten `toHaveBeenCalledWith`, which still accepts an argument
+// carrying fields the signature does not declare.)
+let recordProductEvent: Mock<ProjectMetadataSubscriberDeps["recordProductEvent"]>;
 
 beforeEach(() => {
   recordProductEvent = vi.fn();

@@ -1,12 +1,4 @@
-import {
-  defineAggregate,
-  defineEvents,
-  definePipeline,
-  EventSourcing,
-  type Projection,
-  type RegisteredCommand,
-  type StaticPipelineDefinition,
-} from "@langwatch/eventing";
+import { defineAggregate, defineEvents, definePipeline, EventSourcing } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import {
   type DatasetNormalizePayload,
@@ -18,23 +10,39 @@ import { EventingTraceOriginAdapter } from "../eventing.trace-origin.adapter";
 import { type TraceDeferredOriginSchedulerPort } from "../eventing.deferred-origin.adapter";
 import { EventingTraceTopicAdapter } from "../eventing.trace-topic.adapter";
 import { TraceProcessingServerInstaller } from "../eventing.trace-processing.installer";
-import { TraceProcessingPipelinePort } from "../../ports/trace-processing-pipeline.port";
+import {
+  TraceProcessingPipelinePort,
+  type TraceProcessingPipelineDefinition,
+} from "../../ports/trace-processing-pipeline.port";
 
 class TestDatasetNormalization extends DatasetNormalizationWorkerPort {
   readonly process = vi.fn(async (_payload: DatasetNormalizePayload) => {});
   readonly connect = vi.fn();
 }
 
+/**
+ * Two of Trace's nine commands, which is all this file is about: the installer
+ * registers routing names and durable jobs, and the assertions below name
+ * `assignTopic`.
+ *
+ * The return type is the port's, not a widened one. `TraceProcessingPipelinePort`
+ * declares the exact definition the real builder produces, and its docblock
+ * says why: against `RegisteredCommand` the union erases to its constraint and
+ * `eventSourcing.register()` hands every caller an index-signature command map,
+ * with `recordSpan` typed as `MappedCommand<Record<string, unknown>> | undefined`
+ * rather than as itself. Loosening the port to fit this double would cost the
+ * process that typing.
+ *
+ * So the cast is here, where the narrowing is deliberate and local. Building
+ * the real nine would mean four store-backed projections and a projection
+ * runtime, none of which the installer looks at.
+ */
 class TestTracePipeline extends TraceProcessingPipelinePort {
   deferredOrigins: TraceDeferredOriginSchedulerPort | undefined;
 
   build(options: {
     deferredOrigins: TraceDeferredOriginSchedulerPort;
-  }): StaticPipelineDefinition<
-    TraceProcessingEvent,
-    Record<string, Projection>,
-    RegisteredCommand
-  > {
+  }): TraceProcessingPipelineDefinition {
     this.deferredOrigins = options.deferredOrigins;
     return definePipeline<TraceProcessingEvent>({
       name: "trace_processing",
@@ -45,7 +53,7 @@ class TestTracePipeline extends TraceProcessingPipelinePort {
     })
       .withCommand("resolveOrigin", EventingTraceOriginAdapter)
       .withCommand("assignTopic", EventingTraceTopicAdapter)
-      .build();
+      .build() as unknown as TraceProcessingPipelineDefinition;
   }
 }
 
