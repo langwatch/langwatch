@@ -36725,7 +36725,7 @@ A crash or a kill signal the process cannot catch skips the restore, and the age
 title: Agent Testing
 sidebarTitle: Overview
 keywords: langwatch, agent testing, agent simulations, scenarios, test suites, run plans, simulated user, judge, voice agents, red teaming
-description: Agent testing runs your agent through multi-turn conversations with a simulated user and judges each conversation against the criteria you write.
+description: Test your agents through multi-turn conversations with a simulated user to capture issues before production and prevent regressions.
 ---
 
 <Tip>
@@ -36738,11 +36738,7 @@ description: Agent testing runs your agent through multi-turn conversations with
 
 ## What agent testing is for
 
-One input and one expected output cannot test an agent. An agent calls tools, keeps state and takes several turns to reach an outcome. Agent testing checks the whole conversation, including what the agent did internally.
-
-You write a scenario: the situation the user is in, and the criteria the agent must meet. For example, a customer asks for a refund on an order from last year; the agent must look up the order and must not promise the refund.
-
-LangWatch plays the scenario against your agent and shows a pass or fail for each criterion, with the judge's reasoning and the full conversation.
+Write a scenario: the situation the user is in, and the criteria the agent must meet. For example, a customer asks for a refund on an order from last year; the agent must look up the order and must not promise the refund. LangWatch plays the scenario against your agent with a simulated user, and a judge gives a pass or fail for each criterion with its reasoning and the full conversation.
 
 Use it to:
 
@@ -38103,7 +38099,7 @@ description: Create scenarios, run them against your agent and see the results, 
 
 ## Before you start
 
-A developer connects the agent to LangWatch once, so the simulated user can talk to it and the judge can see what the agent did internally. Send your developer the [Connect your agent](/agent-testing/connect-your-agent) guide. The setup usually takes under an hour.
+Connect your agent to LangWatch, so the simulated user can talk to it and the judge can see what the agent did internally. Send your developer the [Connect your agent](/agent-testing/connect-your-agent) guide. The setup usually takes under an hour.
 
 ## What a scenario is
 

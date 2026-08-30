@@ -21,7 +21,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Agent Testing
 
-- [Agent Testing](https://langwatch.ai/docs/agent-testing/overview.md): Agent testing runs your agent through multi-turn conversations with a simulated user and judges each conversation against the criteria you write.
+- [Agent Testing](https://langwatch.ai/docs/agent-testing/overview.md): Test your agents through multi-turn conversations with a simulated user to capture issues before production and prevent regressions.
 
 ### Get started
 
