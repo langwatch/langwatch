@@ -48,12 +48,19 @@ Feature: One checked code-block ceiling reaches every process that talks to nlpg
       Then the install is refused, because such a ceiling races the stream shutting down
 
     @e2e
+    Scenario: The chart's ceiling matches the Lambda clamp's ceiling exactly
+      Given a ceiling at the highest value the Lambda client will honour unchanged
+      When the chart renders
+      Then every nlpgo caller carries that ceiling
+      And one second above it is refused, because the Lambda client would silently shorten it
+
+    @e2e
     Scenario: The ceiling is still checked when the NLP service is external
       Given an install that runs nlpgo outside this chart
       And a ceiling the chart would refuse for its own NLP service
       When the chart renders
       Then the install is refused just the same
-      And a shortened ceiling is refused too, because the chart cannot impose it on that engine
+      And a shortened ceiling is passed through, because it is a legal external-engine config
 
     @e2e
     Scenario: An external NLP service still leaves the clients installable
