@@ -603,6 +603,30 @@ switches that port from structural to nominal typing — implementors must
 `extends` it, so composition has to change too. That is a decision for the
 feature that owns the port.
 
+`F-PRISMA-02` — **`apps/api`'s two generated-Prisma imports are a Workflow
+vertical slice, not a lint fix.** `prisma-containment` reports 35, and two are in
+`apps/api` — the extraction's TARGET, so they are new debt rather than legacy.
+Both are `import type { PrismaClient }`, and the rule is right to count a type
+import: a module typed against `PrismaClient` still forces its caller to hand
+over a generated client, which is the coupling, even though the import is erased.
+
+`custom-evaluators.ts` runs one query — `prisma.workflow.findMany` for
+`isEvaluator` rows with their versions — and its own docblock already names the
+fix: "until the Workflow vertical owns the query". The seam exists.
+`WorkflowRepository` has a Prisma implementation, and that implementation has
+already solved this exact problem with `WorkflowDatabase`, a narrow structural
+type (`findMany(args: unknown): Promise<unknown[]>`) whose rows are validated
+back through the contract's Zod schemas. Adding `findEvaluators({ projectId })`
+there is the shape of the answer.
+
+What stops it being a small change: **the result is a published wire shape.**
+`evaluation.api.ts`'s `availableCustomEvaluators` returns these rows straight to
+the browser, and `evaluations-legacy.ts` reads `evaluator.versions[0]?.dsl` off
+them. The current implementation spreads the whole Prisma row, so "keep the
+shape identical" means pinning fields nothing has enumerated yet. Sequence it
+with the Workflow vertical, where the shape can be named once and asserted,
+rather than as a by-product of clearing a lint rule.
+
 `F-TRPC-01` — **a moved vertical needs `@trpc/server` in its own manifest.**
 `packages/features/model-provider/server` could not resolve it, which produces
 around forty `TS7031 implicitly any` errors downstream rather than one honest
