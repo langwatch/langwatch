@@ -63,8 +63,16 @@ export const pulledUsageObservedEventDataSchema = z.object({
   tokensCacheRead: z.number().int().nonnegative(),
   tokensCacheWrite: z.number().int().nonnegative(),
 
-  /** The money, priced exactly once at the ingest seam, as an integer. */
-  costNanoUsd: z.number().int().nonnegative(),
+  /**
+   * The money, priced exactly once at the ingest seam, as an integer.
+   *
+   * SIGNED, unlike the token counts above. A provider that refunds or credits
+   * a period reports it as a negative figure in the same field a charge
+   * arrives in, and the credit has to reach the ledger or the charge it
+   * reverses stands alone. A negative token count, by contrast, is not
+   * something that happened, so those stay nonnegative.
+   */
+  costNanoUsd: z.number().int(),
   /**
    * Which price table produced a `computed` cost. Null for
    * `provider_reported`: there was no price table, the provider said the

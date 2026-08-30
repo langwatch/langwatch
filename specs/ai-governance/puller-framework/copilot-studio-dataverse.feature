@@ -260,6 +260,153 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
     And no credential reaches the redirect target
     # This holds for every polling source, not only this one.
 
+  # --- What the environment costs, read from the Azure bill ---
+  #
+  # The transcript table says what was said and never what it cost. The bill
+  # for the whole environment lives in Azure Cost Management, on the
+  # subscription the environment runs in, and it is billed per day per meter
+  # category rather than per conversation. So this is the environment's daily
+  # bill carried alongside its conversations, not a price on any one of them.
+  #
+  # It is bundled into this source deliberately: it is the same customer, the
+  # same credential and the same environment, and a second source to configure
+  # would be a second thing to get wrong for one number.
+
+  @unit
+  Scenario: The daily bill is read as the currency the customer is billed in
+    Given the subscription is billed in a currency other than dollars
+    When the cost read runs
+    Then each day is recorded in the billed currency
+    And the dollar figure recorded is the one Microsoft itself published
+
+  @unit
+  Scenario: The day a bill arrives packed as digits is read as a calendar day
+    Given Microsoft reports the day as a packed number rather than a date
+    When the cost read runs
+    Then each amount is filed under the calendar day those digits name
+
+  @unit
+  Scenario: A cost read that fails never costs the run its conversations
+    Given the environment's conversations were read successfully
+    When the cost read fails for any reason
+    Then the conversations are still delivered
+    And the run does not report an error
+    And the run is not treated as having made no progress
+    # This is the sharpest edge in the whole feature. The worker discards a
+    # run that reports errors without moving its cursor — including the
+    # transcripts it already read. A cost read that threw would therefore
+    # throw away the conversations, which are the reason the source exists.
+
+  @unit
+  Scenario: Being asked to slow down leaves the window unpriced rather than priced at nothing
+    Given Microsoft answers the cost read by asking us to retry later
+    When the cost read runs
+    Then no day in that window carries a cost figure
+    And the run does not move its record of how far cost has been priced
+    # Being throttled is normal operation here, not a fault: the very first
+    # real call against a live subscription was throttled. Recording zero for
+    # a day we were merely told to ask about later would be a confident wrong
+    # number that nothing later corrects.
+
+  @unit
+  Scenario: The very first cost read ever being throttled leaves nothing behind
+    Given the source has never successfully read cost
+    When its first cost read is throttled
+    Then the run records no cost at all
+    And it still delivers its conversations
+    # This is not the hypothetical case: it is what happened on the first real
+    # request against a live subscription. A hold written assuming there is
+    # already a priced-through point to hold at has no defined behaviour here.
+
+  @unit
+  Scenario: A held window is asked about again on the next run
+    Given a run whose cost read was throttled
+    When the next run starts
+    Then it asks about the same window again
+    And it does not wait in place for the throttle to pass
+    # Waiting inside a run burns the run's whole deadline on a sleep and
+    # risks it being killed holding the conversations it already read. The
+    # schedule is the retry.
+
+  @unit
+  Scenario: A window held for too long is given up rather than held forever
+    Given a window that has been held unpriced for longer than the cap
+    When the next run starts
+    Then the source moves past that window
+    And it keeps reading conversations and later days
+    # Holding is right for a bill that is merely late. A window that can never
+    # be answered would otherwise pin the source to one instant permanently.
+
+  @unit
+  Scenario: A source that names no subscription reads no cost at all
+    Given the source names no Azure subscription
+    When the puller runs
+    Then no cost request is made
+    And the conversations are delivered as before
+    # The cost read is opt-in. A customer who only wants transcripts must not
+    # have a second permission grant forced on them to get them.
+
+  @unit
+  Scenario: The first cost read asks about a window that covers the settling days
+    Given a source that has never read cost before
+    When its first cost read runs
+    Then it asks about a window ending today
+    And that window reaches back far enough to cover days still settling
+    # Today's figures are partial by construction — the captured probe shows
+    # today's load balancer at 0.375 against 0.60 on every finished day. A
+    # read that only ever asked about new days would record every day at its
+    # partial figure and never correct one.
+
+  @unit
+  Scenario: A day already recorded is re-read and its figure replaced, not added to
+    Given a day was recorded while it was still running
+    When the same day is read again after it finished
+    Then both reads describe the same day under the same identity
+    And the finished figure replaces the partial one rather than adding to it
+    # The replacement itself is the summarizing step's job and already works.
+    # What is new and easy to get wrong is here: the two reads must produce
+    # the SAME identity for the same day and meter, or the correction lands
+    # beside the figure it was meant to correct and the day doubles.
+
+  @unit
+  Scenario: A re-read day the bill has not landed for emits no figure at all
+    Given a day inside the re-read window that Microsoft returns no row for
+    When the cost read runs
+    Then the run attaches no cost to that day
+    # Not "records a zero that is later replaced": a zero emitted for a day
+    # already recorded at a real figure is a correction downward to nothing,
+    # and the summarizing step would honour it. The absence has to survive as
+    # an absence all the way out of the puller.
+
+  @unit
+  Scenario: A cost reply spread over several pages is read whole
+    Given Microsoft answers the cost read with more rows than one page holds
+    When the cost read runs
+    Then the days on every page are recorded
+    # The captured probe fits in one page and still carries the field that
+    # offers a second. A reader that stops at the first page under-reports
+    # the bill and does so silently.
+
+  @unit
+  Scenario: A cursor written before cost existed is still read
+    Given a source whose stored position was written before cost was ever read
+    When the puller runs
+    Then the position is read as it always was
+    And the source starts reading cost from scratch rather than failing
+    # Positions are persisted and read back on every scheduled run. A shape
+    # change the old value cannot survive stalls every already-configured
+    # source at once.
+
+  @unit
+  Scenario: Conversations failing after cost was read discards both
+    Given the cost read succeeded
+    When reading the conversations then fails
+    Then the run reports the failure and keeps its position
+    And the cost figures from this run are not written on their own
+    # The two are one run and one position. Writing the cost while the
+    # conversation walk is retried from an unchanged position would write the
+    # same cost again on the retry.
+
   # --- Retiring the source that never worked ---
 
   @integration
@@ -276,7 +423,10 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
 
   # --- Not in scope, so nobody goes looking for it ---
 
-  # No money figures of any kind. No charts. No conversation history older
-  # than thirty days — Microsoft deletes it on a schedule before then.
-  # Attribution shows the raw account identifier until the identity work
-  # lands separately.
+  # No price on any individual conversation. The bill above is the whole
+  # environment's daily cost per meter category, which is the only granularity
+  # Azure publishes it at — nothing here divides it across conversations, and
+  # a share worked out from a daily total would be invention rather than
+  # measurement. No charts. No conversation history older than thirty days —
+  # Microsoft deletes it on a schedule before then. Attribution shows the raw
+  # account identifier until the identity work lands separately.
