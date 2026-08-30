@@ -11,7 +11,7 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink, Laptop, User } from "lucide-react";
 import { LuTrash2 } from "react-icons/lu";
 import { Menu } from "~/components/ui/menu";
@@ -197,7 +197,7 @@ export function ConnectedAgentCard({
         </HStack>
       }
       info={
-        <>
+        <VStack align="stretch" gap={1} width="full" minWidth={0}>
           <HStack
             gap={2}
             width="full"
@@ -238,7 +238,7 @@ export function ConnectedAgentCard({
               ))}
             </HStack>
           )}
-        </>
+        </VStack>
       }
     />
   );
