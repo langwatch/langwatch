@@ -62,6 +62,7 @@ describe("lintOverengineering", () => {
 
       expect(violation?.policy).toBe("layer-class");
       expect(violation?.message).toContain("5 of its 5");
+      expect(violation?.message).toContain("`this.inner`");
     });
 
     it("counts the arrow-property spelling a binding facade uses", () => {
@@ -127,6 +128,53 @@ describe("lintOverengineering", () => {
       );
 
       expect(policies()).toEqual([]);
+    });
+
+    it("exempts a class that fans out to several specialists", () => {
+      write(
+        "packages/features/example/server/src/services/example.service.ts",
+        `export class ExampleService {
+  a(input: In): Out { return this.policy.a(input); }
+  b(input: In): Out { return this.catalog.b(input); }
+  c(input: In): Out { return this.lifecycle.c(input); }
+  d(input: In): Out { return this.tokens.d(input); }
+  e(input: In): Out { return this.visibility.e(input); }
+}`,
+      );
+
+      expect(policies()).toEqual([]);
+    });
+
+    it("exempts a service publishing its own repository's verbs", () => {
+      write(
+        "packages/features/example/server/src/services/example.service.ts",
+        `export class ExampleService {
+  private constructor(private readonly repository: ExampleRepository) {}
+  a(input: In): Out { return this.repository.a(input); }
+  b(input: In): Out { return this.repository.b(input); }
+  c(input: In): Out { return this.repository.c(input); }
+  d(input: In): Out { return this.repository.d(input); }
+  e(input: In): Out { return this.repository.e(input); }
+}`,
+      );
+
+      expect(policies()).toEqual([]);
+    });
+
+    it("still reports a service forwarding to another service", () => {
+      write(
+        "packages/features/example/server/src/services/example.service.ts",
+        `export class ExampleService {
+  private constructor(private readonly catalog: ExampleCatalogService) {}
+  a(input: In): Out { return this.catalog.a(input); }
+  b(input: In): Out { return this.catalog.b(input); }
+  c(input: In): Out { return this.catalog.c(input); }
+  d(input: In): Out { return this.catalog.d(input); }
+  e(input: In): Out { return this.catalog.e(input); }
+}`,
+      );
+
+      expect(policies()).toEqual(["layer-class"]);
     });
 
     it("exempts the one facade the feature layout requires", () => {

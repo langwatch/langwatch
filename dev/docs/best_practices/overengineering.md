@@ -87,6 +87,15 @@ routed repositories because both are supposed to delegate; the others fire on a
 handful of places repo-wide, which is the point — a rule that fires everywhere
 teaches nobody anything.
 
+**A service publishing its own repository's verbs is not a layer either.**
+CLAUDE.md forbids a transport from touching a repository, so the service has to
+expose them; `QueueService` looks like 21 pass-throughs precisely because the
+repository beneath it is private and nothing else may reach it. The policy skips
+a class whose forwards all land on a field typed `*Repository`. (That the two
+share a method name is a separate, real problem — repositories are meant to be
+`findAll`/`findById` and services `getAll`/`getById`, so a same-name pair means
+the repository is named like a service.)
+
 **Composition is not a layer.** `layer-class` counts the DISTINCT collaborators
 a mostly-forwarding class delegates to, and only reports it when they are all
 the same one. `ApiKeyService` forwards 30 of its 32 methods, but to seven

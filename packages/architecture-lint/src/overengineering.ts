@@ -153,6 +153,42 @@ function booleanLiteralProperties(signature: ts.SignatureDeclaration): Map<strin
   return found;
 }
 
+/**
+ * The declared type of a `private readonly x: T` field, or of a parameter
+ * property in the constructor. Used to tell a repository apart from another
+ * service.
+ */
+function fieldTypes(node: ts.ClassDeclaration): Map<string, string> {
+  const types = new Map<string, string>();
+  const record = (name: ts.Node, type: ts.TypeNode | undefined): void => {
+    if (!type || !ts.isIdentifier(name)) return;
+    types.set(name.text, type.getText());
+  };
+  for (const member of node.members) {
+    if (ts.isPropertyDeclaration(member) && member.name) record(member.name, member.type);
+    if (ts.isConstructorDeclaration(member)) {
+      for (const parameter of member.parameters) record(parameter.name, parameter.type);
+    }
+  }
+  return types;
+}
+
+/**
+ * A service forwarding to its own repository is the layering rule working, not
+ * a layer to delete. CLAUDE.md is explicit that a transport may not touch a
+ * repository, so the service has to publish those verbs; `QueueService` looks
+ * like 21 pass-throughs precisely BECAUSE the repository beneath it is the
+ * private one and nothing else may reach it. (That the two share a method name
+ * is a separate, real problem: repositories are meant to be `findAll`/`findById`
+ * and services `getAll`/`getById`, so a same-name pair means the repository is
+ * named like a service. That is `service-results`' business, not this policy's.)
+ */
+function forwardsToItsOwnRepository(receiver: string, types: Map<string, string>): boolean {
+  const root = receiver.split(".")[0];
+  const declared = root === undefined ? undefined : types.get(root);
+  return declared !== undefined && /Repository(Port)?$/.test(declared);
+}
+
 function lintFile(root: string, path: string): ArchitectureViolation[] {
   const source = sourceOf(path);
   const file = relative(root, path).split("\\").join("/");
@@ -178,7 +214,15 @@ function lintFile(root: string, path: string): ArchitectureViolation[] {
         // forwards everything to the same collaborator, and that is the one
         // this policy is looking for.
         const distinct = new Set(receivers);
-        if (ratio >= LAYER_DELEGATION_RATIO && distinct.size <= MAX_DELEGATION_RECEIVERS) {
+        const types = fieldTypes(node);
+        const toRepository = [...distinct].every((receiver) =>
+          forwardsToItsOwnRepository(receiver, types),
+        );
+        if (
+          ratio >= LAYER_DELEGATION_RATIO &&
+          distinct.size <= MAX_DELEGATION_RECEIVERS &&
+          !toRepository
+        ) {
           violations.push({
             policy: "layer-class",
             file: path,
