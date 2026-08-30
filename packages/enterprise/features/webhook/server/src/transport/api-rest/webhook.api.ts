@@ -27,7 +27,7 @@ import {
   type SqsDestinationInput,
   type WebhookEndpointView,
 } from "@langwatch/enterprise-webhook-contract";
-import { toStoredEnum, toWireEnum } from "@langwatch/gateway-server";
+import { toStoredEnum, toWireEnum } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import type { Context, Next } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";

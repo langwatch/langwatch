@@ -54,7 +54,7 @@ import {
   resourceMetadataSchema,
 } from "../../adapters/gateway-resource-metadata.adapter";
 import { startOfCurrentMonthUTC } from "../../adapters/gateway-window.adapter";
-import { toStoredEnum, toWireEnum } from "../../adapters/gateway-wire-enums.adapter";
+import { toStoredEnum, toWireEnum } from "@langwatch/gateway-contract";
 import { USD_DISPLAY_STRING_FORMAT } from "../../adapters/gateway-wire-money.adapter";
 import {
   decodePageCursor,

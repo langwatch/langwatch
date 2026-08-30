@@ -10,7 +10,7 @@
 import type { GatewayBudgetWithSeats } from "@langwatch/gateway-contract";
 import { effectiveBudgetPeriod } from "../adapters/gateway-period.adapter";
 import { metadataFromRow } from "./gateway-resource-metadata.adapter";
-import { toWireEnum } from "./gateway-wire-enums.adapter";
+import { toWireEnum } from "@langwatch/gateway-contract";
 import {
   decimalUsdToNanoUsd,
   nanoUsdToDecimalString,

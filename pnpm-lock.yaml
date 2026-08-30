@@ -1696,9 +1696,9 @@ importers:
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../../eventing
-      '@langwatch/gateway-server':
+      '@langwatch/gateway-contract':
         specifier: workspace:*
-        version: link:../../../../features/gateway/server
+        version: link:../../../../features/gateway/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../../handled-error

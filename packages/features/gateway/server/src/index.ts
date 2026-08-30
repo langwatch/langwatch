@@ -64,7 +64,6 @@ export * from "./adapters/gateway-spend-events.adapter";
 export * from "./adapters/gateway-window.adapter";
 export * from "./adapters/gateway-wire-money.adapter";
 export * from "./adapters/gateway-wire-pagination.adapter";
-export * from "./adapters/gateway-wire-enums.adapter";
 export * from "./adapters/gateway-routing-policy-select.adapter";
 export * from "./adapters/virtual-key-crypto.adapter";
 export { nanoUsdToDecimalString } from "./adapters/gateway-wire-money.adapter";

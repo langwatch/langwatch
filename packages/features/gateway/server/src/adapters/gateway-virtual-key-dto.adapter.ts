@@ -16,7 +16,7 @@ import type { ProjectService } from "@langwatch/project-contract";
 
 import type { VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port";
 import { metadataFromRow, type ResourceMetadata } from "./gateway-resource-metadata.adapter";
-import { toWireEnum } from "./gateway-wire-enums.adapter";
+import { toWireEnum } from "@langwatch/gateway-contract";
 
 /**
  * The one fact about a key's trace destination that is not on the key row.

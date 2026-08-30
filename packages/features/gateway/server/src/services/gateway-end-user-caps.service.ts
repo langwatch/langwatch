@@ -4,7 +4,7 @@ import {
   attributedUserBucketScopeId,
   bucketScopeIdFor,
 } from "../adapters/gateway-bucket-scope.adapter";
-import { toWireEnum } from "../adapters/gateway-wire-enums.adapter";
+import { toWireEnum } from "@langwatch/gateway-contract";
 import { usdDisplayString } from "../adapters/gateway-wire-money.adapter";
 import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
 

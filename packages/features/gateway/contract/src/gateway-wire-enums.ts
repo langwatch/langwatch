@@ -14,6 +14,12 @@
  * Both are typed on template literal types rather than `string`, so a value
  * that is not one of the schema's literals is a compile error at the call site
  * and the mapped union stays exact instead of widening to `string`.
+ *
+ * In the CONTRACT because two features need them: the gateway's own REST
+ * surface and the Enterprise webhook one, which was reaching into
+ * `@langwatch/gateway-server` for these two functions and nothing else. They
+ * carry no dependency of any kind — `toLowerCase` and `toUpperCase` behind a
+ * template literal type — so there is nothing here a contract should not hold.
  */
 
 /** The wire spelling of a stored enum value: `"BLOCK"` becomes `"block"`. */
