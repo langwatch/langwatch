@@ -14,7 +14,7 @@
 
 import { nanoid } from "nanoid";
 import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -43,6 +43,8 @@ vi.mock("../../utils", async (importOriginal) => {
 });
 
 import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-web/validation";
+import { lwqlResult } from "@langwatch/analytics-web/testing";
+import { getLangWatchQLService } from "~/server/analytics/lwql/lwql.service";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "../../../db";
 import type { Permission } from "../../rbac";
@@ -568,9 +570,7 @@ describe("the saved workbench chart router", () => {
           expect(result.followsTimeWindow).toBe(true);
           expect(result.followsGranularity).toBe(true);
           expect(result.granularitySeconds).toBe(3600);
-          expect(result.rows).toEqual([
-            { bucket: "2026-02-20 00:00:00", value: 7 },
-          ]);
+          expect(result.rows).toEqual([{ bucket: "2026-02-20 00:00:00", value: 7 }]);
 
           expect(execute).toHaveBeenCalledTimes(1);
           const call = execute.mock.calls[0]![0];
@@ -600,9 +600,7 @@ describe("the saved workbench chart router", () => {
         it("is refused before the query reaches the database", async () => {
           const saved = await saveBucketed();
 
-          await expect(
-            stranger.run({ projectId: PROJECT, id: saved.id }),
-          ).rejects.toThrow();
+          await expect(stranger.run({ projectId: PROJECT, id: saved.id })).rejects.toThrow();
 
           expect(execute).not.toHaveBeenCalled();
         });
@@ -620,11 +618,9 @@ describe("the saved workbench chart router", () => {
           // lacks it, or the fallback would hand the permission right back.
           const outsider = await seedCaller(ORG, ["annotations:view"]);
 
-          expect(
-            await refusalOf(() =>
-              outsider.run({ projectId: PROJECT, id: saved.id }),
-            ),
-          ).toBe("permission_denied");
+          expect(await refusalOf(() => outsider.run({ projectId: PROJECT, id: saved.id }))).toBe(
+            "permission_denied",
+          );
 
           expect(execute).not.toHaveBeenCalled();
         });

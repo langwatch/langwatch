@@ -18,6 +18,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { wrapRawPcmToWav } from "~/shared/audio/pcmToWav";

@@ -18,12 +18,9 @@ import {
   RunRow,
   type RunGroup,
   type RunGroupSummary,
+  type RunHistoryFilterValues,
 } from "@langwatch/suite-web";
-import {
-  makeBatchRun,
-  makeScenarioRunData,
-  makeSummary,
-} from "@langwatch/suite-web/testing";
+import { makeBatchRun, makeScenarioRunData, makeSummary } from "@langwatch/suite-web/testing";
 
 vi.mock("../usePrefetchRunState", () => ({
   usePrefetchRunState: () => vi.fn(),

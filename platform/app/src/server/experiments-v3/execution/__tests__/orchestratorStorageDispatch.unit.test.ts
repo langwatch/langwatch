@@ -26,13 +26,12 @@ import {
   buildTargetMetadata,
   buildTargetResultDispatch,
 } from "../orchestrator";
+import { promptLoadKey } from "../dataLoader";
 import { UNNAMED_FAILURE } from "../types";
 
 const emptyAgents = new Map<string, TypedAgent>();
 
-const promptTarget = (
-  overrides: Record<string, unknown> = {},
-): EvaluationsV3State["targets"] =>
+const promptTarget = (overrides: Record<string, unknown> = {}): EvaluationsV3State["targets"] =>
   [
     {
       id: "target-1",
@@ -296,8 +295,7 @@ describe("buildTargetResultDispatch", () => {
           rowIndex: 2,
           targetId: "target-1",
           output: null,
-          error:
-            'httpblock: Post "https://api.example.com": lookup api.example.com: no such host',
+          error: 'httpblock: Post "https://api.example.com": lookup api.example.com: no such host',
           domainError: nodeErrorToDomainError({
             errorType: "http_error",
             traceId: "4bf92f3577b34da6a3ce929d0e0e4736",
