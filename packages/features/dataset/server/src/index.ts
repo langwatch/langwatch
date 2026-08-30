@@ -62,7 +62,12 @@ export {
 export { DatasetMigrationDatabasePort } from "./ports/dataset-migration-database.port";
 export { createDatasetNormalizeHandler } from "./jobs/dataset-normalize.job";
 export * from "./services/dataset-chunking";
-export * from "./services/dataset-mutations";
+export { DatasetChunkService } from "./services/dataset-chunk.service";
+export type {
+  DatasetMutationRecord,
+  RecomputedDatasetCounts,
+} from "./services/dataset-chunk.service";
+export { MAX_INMEMORY_COLUMN_EDIT_BYTES } from "./services/dataset-chunk.service";
 export * from "./services/presigned-upload";
 export * from "./services/sanitize";
 export * from "./services/errors";

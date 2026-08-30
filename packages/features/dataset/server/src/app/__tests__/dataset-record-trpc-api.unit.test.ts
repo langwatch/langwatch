@@ -24,11 +24,6 @@ import {
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  ChunkTooLargeError as ServerChunkTooLargeError,
-  DatasetNotReadyError as ServerDatasetNotReadyError,
-  DuplicateRecordIdError as ServerDuplicateRecordIdError,
-} from "../../services/errors";
 import { DatasetRecordTrpcApi } from "../../transport/api-trpc/dataset-record.api";
 import { DatasetApp } from "../dataset.app";
 

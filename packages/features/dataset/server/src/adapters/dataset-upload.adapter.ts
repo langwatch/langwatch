@@ -36,7 +36,7 @@ import {
   UploadValidationError,
 } from "../services/errors";
 import { exceedsUploadCap, stagingUploadKey, UPLOAD_MAX_BYTES } from "../services/presigned-upload";
-import { appendS3JsonlRecords, writeInitialS3JsonlChunks } from "../services/dataset-mutations";
+import { DatasetChunkService } from "../services/dataset-chunk.service";
 import { stripNullBytes } from "../services/sanitize";
 
 /** Owns upload lifecycle behavior; routes only see DatasetService's contract. */
@@ -54,12 +54,16 @@ export class DatasetUploadAdapter implements DatasetUploadPort {
       options.storageResolver,
     );
   }
+  private readonly chunks: DatasetChunkService;
+
   constructor(
     private readonly prisma: PrismaClient,
     private readonly datasets: DatasetContentRepository,
     private readonly records: DatasetRecordContentRepository,
     private readonly storageResolver: DatasetStorageResolver,
-  ) {}
+  ) {
+    this.chunks = DatasetChunkService.create({ datasets });
+  }
 
   async uploadToExistingDataset(
     input: UploadExistingDatasetInput,
@@ -90,8 +94,7 @@ export class DatasetUploadAdapter implements DatasetUploadPort {
     }));
     if (dataset.contentLayout === "s3_jsonl") {
       const storage = await this.storageResolver.forProject(input.projectId);
-      await appendS3JsonlRecords({
-        repository: this.datasets,
+      await this.chunks.append({
         dataset,
         projectId: input.projectId,
         entries: entries.map(({ id: _id, ...entry }) => entry),
@@ -131,7 +134,7 @@ export class DatasetUploadAdapter implements DatasetUploadPort {
     );
     const datasetId = `dataset_${nanoid()}`;
     const storage = await this.storageResolver.forProject(input.projectId);
-    const initial = await writeInitialS3JsonlChunks({
+    const initial = await this.chunks.writeInitialChunks({
       projectId: input.projectId,
       datasetId,
       entries,

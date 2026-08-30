@@ -15,16 +15,13 @@ import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
 import { DatasetContentRepository } from "../repositories/prisma/dataset-content.repository";
 import { DatasetRecordContentRepository } from "../repositories/prisma/dataset-record-content.repository";
 import type { ChunkOffset } from "../services/dataset-chunking";
-import {
-  appendS3JsonlRecords,
-  deleteS3JsonlRecords,
-  editS3JsonlRecord,
-  migrateS3JsonlColumns,
-} from "../services/dataset-mutations";
+import { DatasetChunkService } from "../services/dataset-chunk.service";
 import { DatasetChunkCountMissingError, DatasetNotReadyError } from "../services/errors";
 
 /** Object-backed Dataset content; all storage selection is injected at boot. */
 export class DatasetContentAdapter extends DatasetContentPort {
+  private readonly chunks: DatasetChunkService;
+
   private constructor(
     private readonly database: PrismaClient,
     private readonly datasets: DatasetContentRepository,
@@ -32,6 +29,7 @@ export class DatasetContentAdapter extends DatasetContentPort {
     private readonly storageResolver: DatasetStorageResolver,
   ) {
     super();
+    this.chunks = DatasetChunkService.create({ datasets });
   }
 
   static create(options: {
@@ -169,12 +167,11 @@ export class DatasetContentAdapter extends DatasetContentPort {
     input: UpdateDatasetRecordInput & { recordId: string };
   }) {
     const storage = await this.storageResolver.forProject(input.projectId);
-    const result = await editS3JsonlRecord({
+    const result = await this.chunks.editRecord({
       dataset,
       projectId: input.projectId,
       recordId: input.recordId,
       entry: input.updatedRecord,
-      repository: this.datasets,
       storage,
     });
     return {
@@ -192,8 +189,7 @@ export class DatasetContentAdapter extends DatasetContentPort {
   }) {
     const entries = input.entries.map((entry) => ({ ...entry }));
     const storage = await this.storageResolver.forProject(input.projectId);
-    await appendS3JsonlRecords({
-      repository: this.datasets,
+    await this.chunks.append({
       dataset,
       projectId: input.projectId,
       entries,
@@ -204,11 +200,10 @@ export class DatasetContentAdapter extends DatasetContentPort {
   }
 
   async deleteRecords({ dataset, input }: { dataset: Dataset; input: DeleteDatasetRecordsInput }) {
-    const result = await deleteS3JsonlRecords({
+    const result = await this.chunks.deleteRecords({
       dataset,
       projectId: input.projectId,
       recordIds: input.recordIds,
-      repository: this.datasets,
       storage: await this.storageResolver.forProject(input.projectId),
     });
     return { count: result.deleted };
@@ -274,14 +269,13 @@ export class DatasetContentAdapter extends DatasetContentPort {
     slug: string;
     columnTypes: Dataset["columnTypes"];
   }) {
-    const updated = await migrateS3JsonlColumns({
+    const updated = await this.chunks.migrateColumns({
       dataset,
       projectId,
       oldColumnTypes: dataset.columnTypes,
       newColumnTypes: columnTypes,
       name,
       slug,
-      repository: this.datasets,
       storage: await this.storageResolver.forProject(projectId),
     });
     return datasetSchema.parse(updated);
