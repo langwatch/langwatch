@@ -30,7 +30,7 @@ ENVIRONMENT_VARIABLES = (
 CONNECT_VARIABLE = "LANGWATCH_AGENT_CONNECT"
 INSTANCE_LABEL_VARIABLE = "LANGWATCH_AGENT_INSTANCE_LABEL"
 
-MAX_ENVIRONMENT_LENGTH = 64
+MAX_ENVIRONMENT_LENGTH = 32
 MAX_LABEL_LENGTH = 64
 MAX_HOST_LABEL_LENGTH = 24
 
@@ -39,14 +39,20 @@ _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 
 _HOST_SUFFIX_RE = re.compile(r"\.(local|lan|home|localdomain)$", re.IGNORECASE)
 _NOT_HOST_CHARS_RE = re.compile(r"[^a-z0-9-]+")
-_NOT_ENVIRONMENT_CHARS_RE = re.compile(r"[^a-z0-9_.-]+")
+_NOT_ENVIRONMENT_CHARS_RE = re.compile(r"[^a-z0-9_-]+")
 _EDGE_DASHES_RE = re.compile(r"^-+|-+$")
 
 
 def sanitize_environment(value: str | None) -> str:
-    """Lowercase, replace symbols and spaces with dashes, cap the length.
+    """An environment as the platform stores it.
 
+    Lower case, `[a-z0-9_-]` only, at most 32 characters. Runs of other
+    characters become one dash, and the result never starts or ends with one.
     An empty result falls back to `development`.
+
+    The platform builds the identity key of an agent from this value, so the
+    grammar here is the grammar of `sanitizeEnvironment` on the platform. A
+    wider one would let two names the SDK keeps apart register as one agent.
     """
     if value is None:
         return DEFAULT_ENVIRONMENT

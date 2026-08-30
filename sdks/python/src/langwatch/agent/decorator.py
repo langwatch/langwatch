@@ -138,7 +138,12 @@ class ConnectedAgent:
         self.signature: AgentSignature = analyze_signature(
             func, agent_call_type=AgentCall, parameters=parameters
         )
-        functools.update_wrapper(self, func)
+        # `updated=()` drops the default `__dict__` merge. That merge runs
+        # after the assignments above, so a decorated function that already
+        # carries `name`, `timeout` or `environment` would replace the values
+        # this agent was built with, and it would register under an identity
+        # the caller never asked for.
+        functools.update_wrapper(self, func, updated=())
 
     @property
     def key(self) -> str:

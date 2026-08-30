@@ -450,6 +450,11 @@ class AgentClient:
     def _after_fork_in_child(self) -> None:
         """The thread does not exist in the child: forget it and start again."""
         was_started = self._thread is not None
+        # `fork` copies the lock in whatever state it had. If the loop thread
+        # held it at that moment, it arrives here held by a thread that does
+        # not exist, and the `start()` below would wait for it forever. The
+        # child has one thread at this point, so a new lock is safe.
+        self._lock = threading.RLock()
         self._thread = None
         self._loop = None
         self._stop = None

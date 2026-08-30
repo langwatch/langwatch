@@ -4,12 +4,12 @@ These examples connect a Python function to LangWatch Agent Testing with `langwa
 
 ## Files
 
-- `support_agent.py`: a support agent on `gpt-5-mini`. Run it with `python support_agent.py`. The script blocks in `langwatch.agent.serve()` until Ctrl-C.
-- `support_agent_fastapi.py`: the same function inside a FastAPI application. Run it with `uvicorn support_agent_fastapi:app`. The import of the module starts the connection. The web server keeps the process alive.
+- `support_agent.py`: a support agent on `gpt-5-mini`. Run it with `uv run support_agent.py`. The script blocks in `langwatch.agent.serve()` until Ctrl-C.
+- `support_agent_fastapi.py`: the same function inside a FastAPI application. Run it with `uv run uvicorn support_agent_fastapi:app`. The import of the module starts the connection. The web server keeps the process alive.
 
 ## Setup
 
-1. Install the SDK and the example dependencies: `pip install langwatch openai fastapi uvicorn python-dotenv`.
+1. Install the SDK and the example dependencies: `uv add langwatch openai fastapi uvicorn python-dotenv`.
 2. Set `LANGWATCH_API_KEY` to the API key of your project.
 3. Set `OPENAI_API_KEY`.
 4. Start one of the examples. The agent shows as Online on the Agents page of your project.

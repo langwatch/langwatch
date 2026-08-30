@@ -48,9 +48,12 @@ def test_environment_resolution_order(monkeypatch):
 # @scenario "The environment is sanitized"
 def test_environment_is_sanitized():
     assert identity.sanitize_environment("  Staging EU / Blue!  ") == "staging-eu-blue"
-    assert identity.sanitize_environment("prod.v2_a") == "prod.v2_a"
+    # The platform grammar drops the dot and caps the name at 32 characters,
+    # so the SDK does the same. Two names that differ only past that point
+    # would otherwise register as one agent.
+    assert identity.sanitize_environment("prod.v2_a") == "prod-v2_a"
     assert identity.sanitize_environment("---") == "development"
-    assert identity.sanitize_environment("x" * 100) == "x" * 64
+    assert identity.sanitize_environment("x" * 100) == "x" * 32
     assert identity.sanitize_environment(None) == "development"
 
 

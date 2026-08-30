@@ -226,7 +226,14 @@ def _spec_from_definition(*, name: str, definition: Mapping[str, Any]) -> Parame
     python_type = _PYTHON_TYPES.get(str(declared_type), Any)
     annotation: Any = python_type
     if options:
-        annotation = Literal[tuple(options)]  # type: ignore[valid-type]
+        try:
+            annotation = Literal[tuple(options)]  # type: ignore[valid-type]
+        except TypeError:
+            # A JSON Schema `enum` can hold objects or arrays, and `Literal`
+            # takes hashable values only. The declared type stays, and the
+            # membership check against `options` still rejects a value that
+            # the list does not hold.
+            annotation = python_type
     schema: dict[str, Any] = {"type": declared_type}
     if options:
         schema["enum"] = list(options)
@@ -234,7 +241,13 @@ def _spec_from_definition(*, name: str, definition: Mapping[str, Any]) -> Parame
         schema["description"] = definition["description"]
     if default is not MISSING:
         schema["default"] = _jsonable(default)
-    adapter = TypeAdapter(annotation) if annotation is not Any else None
+    try:
+        adapter = TypeAdapter(annotation) if annotation is not Any else None
+    except Exception:
+        # The reflected path already degrades this way. A parameter the
+        # adapter cannot describe is still checked against `options` and the
+        # declared type, so the decorated function keeps working.
+        adapter = None
     return ParameterSpec(
         name=name,
         annotation=annotation,
