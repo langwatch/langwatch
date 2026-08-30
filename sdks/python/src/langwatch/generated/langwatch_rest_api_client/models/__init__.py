@@ -2463,6 +2463,19 @@ from .post_api_agent_cache_by_name_claim_response_500_error_meta import PostApiA
 from .post_api_agents_body import PostApiAgentsBody
 from .post_api_agents_body_config import PostApiAgentsBodyConfig
 from .post_api_agents_body_type import PostApiAgentsBodyType
+from .post_api_agents_by_id_call_body import PostApiAgentsByIdCallBody
+from .post_api_agents_by_id_call_body_messages_item import PostApiAgentsByIdCallBodyMessagesItem
+from .post_api_agents_by_id_call_body_new_messages_item import PostApiAgentsByIdCallBodyNewMessagesItem
+from .post_api_agents_by_id_call_body_params import PostApiAgentsByIdCallBodyParams
+from .post_api_agents_by_id_call_body_run import PostApiAgentsByIdCallBodyRun
+from .post_api_agents_by_id_call_response_200 import PostApiAgentsByIdCallResponse200
+from .post_api_agents_by_id_call_response_200_instance import PostApiAgentsByIdCallResponse200Instance
+from .post_api_agents_by_id_call_response_200_output_type_1 import PostApiAgentsByIdCallResponse200OutputType1
+from .post_api_agents_by_id_call_response_200_output_type_2_item import PostApiAgentsByIdCallResponse200OutputType2Item
+from .post_api_agents_by_id_call_response_400 import PostApiAgentsByIdCallResponse400
+from .post_api_agents_by_id_call_response_401 import PostApiAgentsByIdCallResponse401
+from .post_api_agents_by_id_call_response_422 import PostApiAgentsByIdCallResponse422
+from .post_api_agents_by_id_call_response_500 import PostApiAgentsByIdCallResponse500
 from .post_api_analytics_body import PostApiAnalyticsBody
 from .post_api_analytics_body_filters import PostApiAnalyticsBodyFilters
 from .post_api_analytics_body_filters_annotations_has_annotation_type_1 import (
@@ -7481,6 +7494,19 @@ __all__ = (
     "PostApiAgentsBody",
     "PostApiAgentsBodyConfig",
     "PostApiAgentsBodyType",
+    "PostApiAgentsByIdCallBody",
+    "PostApiAgentsByIdCallBodyMessagesItem",
+    "PostApiAgentsByIdCallBodyNewMessagesItem",
+    "PostApiAgentsByIdCallBodyParams",
+    "PostApiAgentsByIdCallBodyRun",
+    "PostApiAgentsByIdCallResponse200",
+    "PostApiAgentsByIdCallResponse200Instance",
+    "PostApiAgentsByIdCallResponse200OutputType1",
+    "PostApiAgentsByIdCallResponse200OutputType2Item",
+    "PostApiAgentsByIdCallResponse400",
+    "PostApiAgentsByIdCallResponse401",
+    "PostApiAgentsByIdCallResponse422",
+    "PostApiAgentsByIdCallResponse500",
     "PostApiAnalyticsBody",
     "PostApiAnalyticsBodyFilters",
     "PostApiAnalyticsBodyFiltersAnnotationsHasAnnotationType1",
