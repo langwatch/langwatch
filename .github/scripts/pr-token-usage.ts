@@ -89,8 +89,47 @@ export const agentLabel = (agent: string): string =>
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 
-/** Full numbers with separators, never abbreviated: "2,603,257,062". */
+/** Full numbers with separators: "2,603,257,062". Used for small counts. */
 export const formatCount = (n: number): string => n.toLocaleString("en-US");
+
+const COUNT_WORDS = ["thousand", "million", "billion", "trillion"];
+
+/** Token counts render as words, not digits or letter abbreviations:
+ * 2,603,257,062 is "2.6 billion". One decimal below one hundred of a unit,
+ * none above; a value that rounds up to a whole next unit is promoted. */
+export const humanizeCount = (n: number): string => {
+  if (n < 1_000) return formatCount(n);
+  let index = Math.min(Math.floor(Math.log10(n) / 3), COUNT_WORDS.length) - 1;
+  const display = (i: number): string => {
+    const value = n / 10 ** ((i + 1) * 3);
+    return value >= 100 ? value.toFixed(0) : value.toFixed(1);
+  };
+  let digits = display(index);
+  if (Number(digits) >= 1_000 && index < COUNT_WORDS.length - 1) {
+    index += 1;
+    digits = display(index);
+  }
+  return `${digits.replace(/\.0$/, "")} ${COUNT_WORDS[index]}`;
+};
+
+const AGENT_ICONS: Record<string, string> = {
+  claude_code: "claude-code.svg",
+  codex: "codex.svg",
+  opencode: "opencode.svg",
+  cursor: "cursor.svg",
+  gemini_cli: "gemini.svg",
+  github_copilot: "github-copilot.svg",
+};
+
+/** A known agent renders with its product icon before the name; an unknown
+ * one renders as its label alone rather than a broken image. */
+export const agentCell = (agent: string): string => {
+  const icon = AGENT_ICONS[agent];
+  const label = agentLabel(agent);
+  return icon
+    ? `<img src="https://app.langwatch.ai/images/external-icons/${icon}" width="14" height="14" /> ${label}`
+    : label;
+};
 
 /** null cost means the caller may not price this row — an em dash, not $0. */
 export const formatCost = (cost: number | null): string =>
@@ -106,9 +145,9 @@ const usageTable = (rows: UsageRow[], totals: UsageTotals): string[] => {
     out.push(
       line([
         row.contributorLabel,
-        agentLabel(row.agent),
+        agentCell(row.agent),
         formatCount(row.sessionsCount),
-        formatCount(row.totalTokens),
+        humanizeCount(row.totalTokens),
         formatCost(row.costUsd),
       ]),
     );
@@ -118,7 +157,7 @@ const usageTable = (rows: UsageRow[], totals: UsageTotals): string[] => {
       "**Total**",
       "",
       `**${formatCount(totals.sessionsCount)}**`,
-      `**${formatCount(totals.totalTokens)}**`,
+      `**${humanizeCount(totals.totalTokens)}**`,
       `**${formatCost(totals.costUsd)}**`,
     ]),
   );
@@ -138,20 +177,20 @@ const tokenDetailTable = (
     out.push(
       line([
         row.contributorLabel,
-        formatCount(row.inputTokens),
-        formatCount(row.outputTokens),
-        formatCount(row.cacheReadTokens),
-        formatCount(row.cacheCreationTokens),
+        humanizeCount(row.inputTokens),
+        humanizeCount(row.outputTokens),
+        humanizeCount(row.cacheReadTokens),
+        humanizeCount(row.cacheCreationTokens),
       ]),
     );
   }
   out.push(
     line([
       "**Total**",
-      `**${formatCount(totals.inputTokens)}**`,
-      `**${formatCount(totals.outputTokens)}**`,
-      `**${formatCount(totals.cacheReadTokens)}**`,
-      `**${formatCount(totals.cacheCreationTokens)}**`,
+      `**${humanizeCount(totals.inputTokens)}**`,
+      `**${humanizeCount(totals.outputTokens)}**`,
+      `**${humanizeCount(totals.cacheReadTokens)}**`,
+      `**${humanizeCount(totals.cacheCreationTokens)}**`,
     ]),
   );
   return out;
@@ -167,11 +206,11 @@ const modelTable = (breakdown: ModelBreakdownRow[]): string[] => {
     out.push(
       line([
         `\`${row.model}\``,
-        formatCount(row.inputTokens),
-        formatCount(row.outputTokens),
-        formatCount(row.cacheReadTokens),
-        formatCount(row.cacheCreationTokens),
-        formatCount(row.totalTokens),
+        humanizeCount(row.inputTokens),
+        humanizeCount(row.outputTokens),
+        humanizeCount(row.cacheReadTokens),
+        humanizeCount(row.cacheCreationTokens),
+        humanizeCount(row.totalTokens),
         formatCost(row.costUsd),
       ]),
     );

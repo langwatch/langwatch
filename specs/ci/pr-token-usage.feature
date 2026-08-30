@@ -74,17 +74,19 @@ Feature: PR token usage comment
     Then the cost cells render as an em dash rather than zero
 
   @unit
-  Scenario: Token counts are written in full with thousands separators
+  Scenario: Token counts render as words
     Given a usage rollup with a token count above one billion
     When the comment body is built
-    Then the count is written in full with separators, never abbreviated
+    Then the count renders as a spelled-out magnitude such as "2.6 billion"
+    And the unit is a word, never a letter abbreviation
+    And a count below one thousand stays a plain number
 
   @unit
-  Scenario: Agent identifiers render as product names
+  Scenario: Agent identifiers render as product names with their icons
     Given a usage row whose agent is "claude_code"
     When the comment body is built
-    Then the agent renders as "Claude Code"
-    And an unknown agent identifier falls back to a readable form of itself
+    Then the agent renders as "Claude Code" beside its product icon
+    And an unknown agent identifier falls back to a readable form of itself, without a broken image
 
   @unit
   Scenario: An unmapped pull request reads as no usage

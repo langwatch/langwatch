@@ -3,10 +3,12 @@ import { describe, it } from "node:test";
 
 import {
   MARKER,
+  agentCell,
   agentLabel,
   buildCommentBody,
   formatCost,
   formatCount,
+  humanizeCount,
   interpretUsageResponse,
   type PullRequestUsage,
   type UsageRow,
@@ -82,9 +84,15 @@ describe("given a usage rollup with rows for two contributors", () => {
         }),
       );
       assert.ok(body.startsWith(MARKER));
-      assert.match(body, /\| Ada Lovelace \| Claude Code \| 2 \| 37,000 \| \$12\.50 \|/);
-      assert.match(body, /\| Grace Hopper \| Codex \| 2 \| 37,000 \| \$3\.00 \|/);
-      assert.match(body, /\| \*\*Total\*\* \|  \| \*\*4\*\* \| \*\*74,000\*\* \| \*\*\$15\.50\*\* \|/);
+      assert.match(
+        body,
+        /\| Ada Lovelace \| <img [^|]+\/> Claude Code \| 2 \| 37 thousand \| \$12\.50 \|/,
+      );
+      assert.match(
+        body,
+        /\| Grace Hopper \| <img [^|]+\/> Codex \| 2 \| 37 thousand \| \$3\.00 \|/,
+      );
+      assert.match(body, /\| \*\*Total\*\* \|  \| \*\*4\*\* \| \*\*74 thousand\*\* \| \*\*\$15\.50\*\* \|/);
     });
   });
 });
@@ -99,7 +107,7 @@ describe("given a usage rollup with a model breakdown", () => {
       assert.ok(detailsStart !== -1 && detailsEnd > detailsStart);
       const details = body.slice(detailsStart, detailsEnd);
       assert.match(details, /`claude-fable-5`/);
-      assert.match(details, /\| 37,000 \| \$12\.50 \|/);
+      assert.match(details, /\| 37 thousand \| \$12\.50 \|/);
     });
   });
 });
@@ -114,8 +122,8 @@ describe("given a usage rollup whose cost fields are null", () => {
           totals: { ...usage().totals, costUsd: null },
         }),
       );
-      assert.match(body, /\| Ada Lovelace \| Claude Code \| 2 \| 37,000 \| — \|/);
-      assert.match(body, /\| \*\*Total\*\* \|  \| \*\*2\*\* \| \*\*37,000\*\* \| \*\*—\*\* \|/);
+      assert.match(body, /\| Ada Lovelace \| <img [^|]+\/> Claude Code \| 2 \| 37 thousand \| — \|/);
+      assert.match(body, /\| \*\*Total\*\* \|  \| \*\*2\*\* \| \*\*37 thousand\*\* \| \*\*—\*\* \|/);
       assert.ok(!body.includes("$0.00"));
     });
   });
@@ -123,8 +131,8 @@ describe("given a usage rollup whose cost fields are null", () => {
 
 describe("given a usage rollup with a token count above one billion", () => {
   describe("when the comment body is built", () => {
-    /** @scenario "Token counts are written in full with thousands separators" */
-    it("writes the count in full with separators, never abbreviated", () => {
+    /** @scenario "Token counts render as words" */
+    it("renders the count as a spelled-out magnitude, never a letter abbreviation", () => {
       const big = 2_603_257_062;
       const body = build(
         usage({
@@ -132,20 +140,41 @@ describe("given a usage rollup with a token count above one billion", () => {
           totals: { ...usage().totals, totalTokens: big },
         }),
       );
-      assert.ok(body.includes("2,603,257,062"));
+      assert.ok(body.includes("2.6 billion"));
+      assert.ok(!body.includes("2,603,257,062"));
       assert.ok(!/\d(\.\d+)?[KMB]\b/.test(body));
     });
   });
 });
 
+describe("given the count humanizer", () => {
+  it("picks the right word, keeps small counts plain, and promotes on round-up", () => {
+    assert.equal(humanizeCount(0), "0");
+    assert.equal(humanizeCount(999), "999");
+    assert.equal(humanizeCount(37_000), "37 thousand");
+    assert.equal(humanizeCount(156_800), "157 thousand");
+    assert.equal(humanizeCount(1_888_045), "1.9 million");
+    assert.equal(humanizeCount(2_603_257_062), "2.6 billion");
+    assert.equal(humanizeCount(4_200_000_000_000), "4.2 trillion");
+    assert.equal(humanizeCount(999_960), "1 million");
+  });
+});
+
 describe("given a usage row's agent identifier", () => {
   describe("when the comment body is built", () => {
-    /** @scenario "Agent identifiers render as product names" */
-    it("renders known identifiers as product names and unknown ones readably", () => {
+    /** @scenario "Agent identifiers render as product names with their icons" */
+    it("renders known identifiers with their product icon and unknown ones readably without one", () => {
       assert.equal(agentLabel("claude_code"), "Claude Code");
-      assert.equal(agentLabel("opencode"), "OpenCode");
       assert.equal(agentLabel("gemini_cli"), "Gemini CLI");
-      assert.equal(agentLabel("mystery_agent"), "Mystery Agent");
+      assert.equal(
+        agentCell("claude_code"),
+        '<img src="https://app.langwatch.ai/images/external-icons/claude-code.svg" width="14" height="14" /> Claude Code',
+      );
+      assert.equal(
+        agentCell("codex"),
+        '<img src="https://app.langwatch.ai/images/external-icons/codex.svg" width="14" height="14" /> Codex',
+      );
+      assert.equal(agentCell("mystery_agent"), "Mystery Agent");
     });
   });
 });
