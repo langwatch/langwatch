@@ -31,4 +31,6 @@ export type {
 } from "./schema";
 export { PROTOCOL_VERSION } from "./protocol";
 export type { AgentMessage, AgentParameterValue, JsonSchemaObject } from "./protocol";
-export { resolveEnvironment, sanitizeEnvironment, resolveConnectUrl } from "./identity";
+export { resolveEnvironment, sanitizeEnvironment, resolveConnectUrl, resolveHttpConnectUrl } from "./identity";
+export { resolveTransport, AGENT_TRANSPORTS } from "./transport";
+export type { AgentTransport } from "./transport";

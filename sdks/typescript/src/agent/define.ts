@@ -18,6 +18,7 @@ import {
   DEFAULT_ENVIRONMENT,
 } from "./identity";
 import type { AgentMessage, AgentParameterValue, JsonSchemaObject } from "./protocol";
+import type { AgentTransport } from "./transport";
 import {
   AgentParameterError,
   createParameterReader,
@@ -94,6 +95,8 @@ export interface ConnectAgentOptions<P extends ParameterInput = ParameterDefinit
   apiKey?: string;
   endpoint?: string;
   projectId?: string;
+  /** `websocket` (default, falls back to HTTP when the upgrade is refused) or `http`. Also LANGWATCH_AGENT_TRANSPORT. */
+  transport?: AgentTransport;
   logger?: Logger;
 }
 
@@ -254,6 +257,7 @@ export function connectAgent(
         endpoint: options.endpoint,
         projectId: readProjectId(options.projectId),
         instanceLabel: resolveInstanceLabel({ explicit: options.instanceLabel }),
+        transport: options.transport,
         logger,
       });
       client.addAgent(runtime);

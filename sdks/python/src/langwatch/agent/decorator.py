@@ -101,6 +101,7 @@ class ConnectedAgent:
         api_key: str | None = None,
         endpoint: str | None = None,
         project_id: str | None = None,
+        transport: str | None = None,
     ) -> None:
         if inspect.isgeneratorfunction(func) or inspect.isasyncgenfunction(func):
             raise TypeError(
@@ -132,6 +133,7 @@ class ConnectedAgent:
         self.api_key = api_key
         self.endpoint = endpoint
         self.project_id = project_id
+        self.transport = transport
         self.is_async = inspect.iscoroutinefunction(func)
         self.signature: AgentSignature = analyze_signature(
             func, agent_call_type=AgentCall, parameters=parameters
@@ -261,6 +263,7 @@ def connect_agent(
     api_key: str | None = None,
     endpoint: str | None = None,
     project_id: str | None = None,
+    transport: str | None = None,
 ) -> Callable[[F], F]:
     """Connect the function that runs your agent to LangWatch Agent Testing.
 
@@ -282,6 +285,8 @@ def connect_agent(
         concurrency: Calls in flight per process, default 1 in development and 4 elsewhere.
         sticky: Keep one conversation on one process.
         api_key, endpoint, project_id: Override the SDK configuration.
+        transport: `websocket` (default, falls back to HTTP when the upgrade
+            is refused) or `http`; also `LANGWATCH_AGENT_TRANSPORT`.
     """
 
     def decorate(func: F) -> F:
@@ -299,6 +304,7 @@ def connect_agent(
             api_key=api_key,
             endpoint=endpoint,
             project_id=project_id,
+            transport=transport,
         )
         register(agent)
         return agent  # type: ignore[return-value]

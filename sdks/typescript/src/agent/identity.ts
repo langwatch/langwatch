@@ -180,6 +180,14 @@ export function resolveConnectUrl(endpoint?: string | null): string {
   return `${socketBase}${CONNECT_PATH}`;
 }
 
+/**
+ * The base of the HTTP long-poll routes for an endpoint:
+ * `https://app.langwatch.ai` becomes `https://app.langwatch.ai/api/agents/connect`.
+ */
+export function resolveHttpConnectUrl(endpoint?: string | null): string {
+  return `${resolveEndpoint(endpoint)}${CONNECT_PATH}`;
+}
+
 /** The headers the socket opens with. */
 export function buildConnectHeaders({
   apiKey,

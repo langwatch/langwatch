@@ -5,6 +5,11 @@ an outbound WebSocket to LangWatch, registers the agents and answers the
 calls the platform sends. It reconnects with backoff, sends `deregister` on
 shutdown and restarts itself in a forked child. Nothing here raises into
 customer code: every failure is logged and answered on the socket.
+
+The same frames also travel over HTTP long polling, for a network that
+blocks WebSockets: `transport="http"` or `LANGWATCH_AGENT_TRANSPORT=http`
+selects it, and a WebSocket upgrade a proxy answers with an HTTP status
+falls back to it on its own.
 """
 
 from __future__ import annotations
@@ -23,6 +28,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit, urlunsplit
 
+import httpx
 from opentelemetry import context as otel_context
 from opentelemetry import propagate
 
@@ -68,11 +74,55 @@ USER_AGENT = f"langwatch-python/{__version__}"
 
 CONNECTIVITY_WARNING_INTERVAL_SECONDS = 300.0
 
+TRANSPORTS = ("websocket", "http")
+TRANSPORT_VARIABLE = "LANGWATCH_AGENT_TRANSPORT"
+INSTANCE_TOKEN_HEADER = "X-Agent-Instance-Token"
+# The platform answers a poll inside 25 seconds; the request budget sits
+# well above it so a slow proxy does not read as a lost session.
+POLL_TIMEOUT_SECONDS = 45.0
+
 _WEBSOCKETS_MAJOR = int(
     str(getattr(websockets, "__version__", "13")).split(".")[0] or 13
 )
 
 NOT_CONNECTED = "connect_agent: the agent was not connected to LangWatch"
+
+
+def resolve_transport(explicit: str | None = None) -> str:
+    """The explicit argument, then `LANGWATCH_AGENT_TRANSPORT`, else `websocket`.
+
+    Anything that is not `http` is the WebSocket, which falls back to HTTP on
+    its own when the upgrade is refused.
+    """
+    candidate = explicit if explicit and explicit.strip() else None
+    if candidate is None:
+        candidate = os.environ.get(TRANSPORT_VARIABLE)
+    if candidate is not None and candidate.strip().lower() == "http":
+        return "http"
+    return "websocket"
+
+
+def http_url(endpoint: str) -> str:
+    """`https://app.langwatch.ai` becomes `https://app.langwatch.ai/api/agents/connect`."""
+    return endpoint.strip().rstrip("/") + CONNECT_PATH
+
+
+def _upgrade_status(error: BaseException) -> int | None:
+    """The HTTP status a WebSocket upgrade was answered with, if that is what failed."""
+    response = getattr(error, "response", None)
+    code = getattr(response, "status_code", None)
+    if isinstance(code, int):
+        return code
+    code = getattr(error, "status_code", None)
+    return code if isinstance(code, int) else None
+
+
+def _json_of(response: httpx.Response) -> dict[str, Any] | None:
+    try:
+        body = response.json()
+    except ValueError:
+        return None
+    return body if isinstance(body, dict) else None
 
 
 def refusal_advice(code: str, message: str, meta: dict[str, Any] | None) -> str:
@@ -148,6 +198,7 @@ class AgentClient:
         endpoint: str | None = None,
         project_id: str | None = None,
         instance_label: str | None = None,
+        transport: str | None = None,
         backoff_initial: float = BACKOFF_INITIAL_SECONDS,
         backoff_max: float = BACKOFF_MAX_SECONDS,
         install_process_hooks: bool = True,
@@ -157,6 +208,7 @@ class AgentClient:
         self._endpoint = endpoint
         self._project_id = project_id
         self._instance_label = instance_label
+        self._transport = transport
         self._backoff_initial = backoff_initial
         self._backoff_max = backoff_max
         self._install_process_hooks = install_process_hooks
@@ -169,6 +221,11 @@ class AgentClient:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._stop: asyncio.Event | None = None
         self._socket: Any = None
+        self._http: httpx.AsyncClient | None = None
+        self._instance_token: str | None = None
+        self._poll_task: asyncio.Task[Any] | None = None
+        self._session_lost = False
+        self._transport_in_use: str | None = None
         self._identity = InstanceIdentity(label=resolve_instance_label(instance_label))
         self._in_flight: dict[str, asyncio.Task[None]] = {}
         self._in_flight_agent: dict[str, str] = {}
@@ -185,6 +242,7 @@ class AgentClient:
         self.resolved_api_key = ""
         self.resolved_endpoint = ""
         self.resolved_project_id: str | None = None
+        self.resolved_transport = "websocket"
 
     # ----- registry -----
 
@@ -200,6 +258,11 @@ class AgentClient:
     @property
     def started(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
+
+    @property
+    def transport(self) -> str:
+        """The transport in use: the configured one, or `http` after a refused upgrade."""
+        return self._transport_in_use or self.resolved_transport
 
     def register_agent(self, agent: ConnectedAgent) -> None:
         """Add the agent and start or refresh the connection."""
@@ -246,6 +309,11 @@ class AgentClient:
                 first.instance_label if first and first.instance_label else None
             )
             self._identity.label = label
+        self.resolved_transport = resolve_transport(
+            self._transport or (first.transport if first else None)
+        )
+        if self._transport_in_use is None:
+            self._transport_in_use = self.resolved_transport
 
     def _enabled(self) -> bool:
         agents = self.agents
@@ -260,9 +328,9 @@ class AgentClient:
             return "the connection is disabled (CI or LANGWATCH_AGENT_CONNECT=0)"
         if self._disabled_reason is not None:
             return self._disabled_reason
-        if websockets is None:
-            return "the websockets package is not installed; run pip install websockets"
         self._resolve_settings()
+        if websockets is None and self.resolved_transport == "websocket":
+            return "the websockets package is not installed; run pip install websockets"
         if not self.resolved_api_key:
             return "set LANGWATCH_API_KEY, or pass api_key= to connect_agent"
         return None
@@ -386,6 +454,10 @@ class AgentClient:
         self._loop = None
         self._stop = None
         self._socket = None
+        self._http = None
+        self._instance_token = None
+        self._poll_task = None
+        self._session_lost = False
         self._in_flight = {}
         self._in_flight_agent = {}
         self._pending_results = []
@@ -421,11 +493,26 @@ class AgentClient:
             except asyncio.CancelledError:
                 raise
             except Exception as error:
-                self._note_connectivity(
-                    "unreachable",
-                    f"could not reach {self.resolved_endpoint} ({type(error).__name__}: {error}); "
-                    "check LANGWATCH_ENDPOINT and the network",
-                )
+                status = _upgrade_status(error)
+                if status is not None and self._transport_in_use == "websocket":
+                    # A proxy answered the upgrade with a status: the socket
+                    # can never open here, and the same frames travel over
+                    # plain HTTP.
+                    self._transport_in_use = "http"
+                    reconnect_at_once = True
+                    logger.warning(
+                        "connect_agent: the WebSocket upgrade to %s was answered with HTTP %s; "
+                        "using the HTTP transport at %s instead",
+                        socket_url(self.resolved_endpoint),
+                        status,
+                        http_url(self.resolved_endpoint),
+                    )
+                else:
+                    self._note_connectivity(
+                        "unreachable",
+                        f"could not reach {self.resolved_endpoint} ({type(error).__name__}: {error}); "
+                        "check LANGWATCH_ENDPOINT and the network",
+                    )
             if self._disabled_reason is not None:
                 break
             if self._stop.is_set():
@@ -485,9 +572,11 @@ class AgentClient:
         return websockets.connect(url, **options)
 
     async def _session(self) -> bool:
-        """One connection, from register to close. Returns True on a 1012 close."""
+        """One connection, from register to close. Returns True to reconnect at once."""
         self._resolve_settings()
         self._session_registered = False
+        if self._transport_in_use == "http":
+            return await self._http_session()
         async with self._connect() as socket:
             self._socket = socket
             try:
@@ -499,7 +588,124 @@ class AgentClient:
                 self._registered.clear()
             return socket.close_code == GOING_AWAY_CLOSE_CODE
 
+    # ----- HTTP long polling -----
+
+    def _http_headers(self) -> dict[str, str]:
+        headers = connection_headers(
+            api_key=self.resolved_api_key, project_id=self.resolved_project_id
+        )
+        if self._instance_token:
+            headers[INSTANCE_TOKEN_HEADER] = self._instance_token
+        return headers
+
+    async def _http_session(self) -> bool:
+        """One HTTP session: a register, then polls until the session ends.
+
+        Returns True when the platform no longer knows the session, so the
+        loop registers again at once.
+        """
+        base = http_url(self.resolved_endpoint)
+        timeout = httpx.Timeout(POLL_TIMEOUT_SECONDS, connect=OPEN_TIMEOUT_SECONDS)
+        async with httpx.AsyncClient(timeout=timeout) as http:
+            self._http = http
+            self._instance_token = None
+            self._session_lost = False
+            try:
+                agents: list[AgentRegistration] = [a.registration() for a in self.agents]
+                frame = register_frame(
+                    sdk=SDK_INFO,
+                    instance=self._identity.to_frame(
+                        in_flight_call_ids=list(self._in_flight)
+                    ),
+                    agents=agents,
+                )
+                response = await http.post(
+                    base + "/register", json=frame, headers=self._http_headers()
+                )
+                body = _json_of(response)
+                answer = body.get("frame") if body else None
+                if not isinstance(answer, dict):
+                    raise RuntimeError(
+                        f"the register request was answered with HTTP {response.status_code}"
+                    )
+                self.register_count += 1
+                token = body.get("instanceToken") if body else None
+                if isinstance(token, str) and token:
+                    self._instance_token = token
+                await self._handle_frame(answer)
+                if answer.get("type") != "registered" or not self._instance_token:
+                    return False
+                return await self._poll_loop(http, base)
+            finally:
+                self._http = None
+                self._instance_token = None
+                self._registered.clear()
+
+    async def _poll_loop(self, http: httpx.AsyncClient, base: str) -> bool:
+        assert self._stop is not None
+        while not self._stop.is_set() and not self._session_lost:
+            params = (
+                {"inFlight": ",".join(self._in_flight)} if self._in_flight else None
+            )
+            self._poll_task = asyncio.ensure_future(
+                http.get(base + "/poll", params=params, headers=self._http_headers())
+            )
+            try:
+                response = await self._poll_task
+            except asyncio.CancelledError:
+                if self._stop.is_set() or self._session_lost:
+                    return self._session_lost
+                raise
+            finally:
+                self._poll_task = None
+            if response.status_code == 410:
+                logger.info(
+                    "connect_agent: the platform no longer knows this instance, registering again"
+                )
+                return True
+            body = _json_of(response)
+            if response.status_code >= 400:
+                refused = body.get("frame") if body else None
+                if isinstance(refused, dict):
+                    await self._handle_frame(refused)
+                    return False
+                raise RuntimeError(
+                    f"the poll was answered with HTTP {response.status_code}"
+                )
+            for frame in (body or {}).get("frames") or []:
+                if isinstance(frame, dict):
+                    await self._handle_frame(frame)
+        return self._session_lost
+
+    async def _http_post(self, frame: Any) -> bool:
+        http = self._http
+        if http is None or not self._instance_token:
+            return False
+        base = http_url(self.resolved_endpoint)
+        try:
+            response = await http.post(
+                base + "/frames",
+                json={"frames": [frame]},
+                headers=self._http_headers(),
+            )
+        except Exception as error:
+            logger.debug("connect_agent: post failed: %s", error)
+            return False
+        if response.status_code == 410:
+            self._session_lost = True
+            if self._poll_task is not None:
+                self._poll_task.cancel()
+            return False
+        if response.status_code >= 400:
+            logger.debug(
+                "connect_agent: the frames route answered HTTP %s", response.status_code
+            )
+            return False
+        return True
+
     async def _send(self, frame: Any) -> bool:
+        if self._transport_in_use == "http":
+            return await self._http_post(frame)
         socket = self._socket
         if socket is None:
             return False
@@ -528,6 +734,9 @@ class AgentClient:
             return
         if not isinstance(frame, dict):
             return
+        await self._handle_frame(frame)
+
+    async def _handle_frame(self, frame: dict[str, Any]) -> None:
         kind = frame.get("type")
         if kind == "registered":
             self._on_registered(frame)  # type: ignore[arg-type]
@@ -569,7 +778,8 @@ class AgentClient:
         if isinstance(instance_id, str) and instance_id:
             self._identity.id = instance_id
         logger.info(
-            "connect_agent: connected, %d agent(s) online at %s",
+            "connect_agent: connected%s, %d agent(s) online at %s",
+            " over HTTP long polling" if self._transport_in_use == "http" else "",
             len(self._agents_by_id),
             self.resolved_endpoint,
         )
@@ -677,6 +887,8 @@ class AgentClient:
         for task in list(self._in_flight.values()):
             task.cancel()
         await self._send(deregister_frame())
+        if self._poll_task is not None:
+            self._poll_task.cancel()
         socket = self._socket
         if socket is not None:
             try:
@@ -738,7 +950,9 @@ __all__ = [
     "AgentClient",
     "connection_headers",
     "default_client",
+    "http_url",
     "register",
+    "resolve_transport",
     "serve",
     "socket_url",
 ]

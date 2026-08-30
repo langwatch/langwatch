@@ -18,6 +18,7 @@ import {
   buildConnectHeaders,
   buildInstance,
   resolveConnectUrl,
+  resolveHttpConnectUrl,
   SDK_IDENTITY,
 } from "./identity";
 import {
@@ -35,8 +36,11 @@ import {
 } from "./protocol";
 import { AgentParameterError, type ParameterReader } from "./schema";
 import {
+  type AgentTransport,
   defaultSocketFactory,
+  HttpLongPollSocket,
   NoWebSocketError,
+  resolveTransport,
   type SocketFactory,
   type SocketLike,
 } from "./transport";
@@ -58,6 +62,8 @@ export interface AgentClientConfig {
   endpoint?: string;
   projectId?: string;
   instanceLabel?: string;
+  /** `websocket` (default) or `http`; also `LANGWATCH_AGENT_TRANSPORT`. */
+  transport?: AgentTransport;
   logger: Logger;
   socketFactory?: SocketFactory;
   /** Reconnect delays, for tests. Defaults to 1 s doubling up to 30 s. */
@@ -142,7 +148,12 @@ export class AgentClient {
   private readonly inFlight = new Map<string, InFlightCall>();
   private readonly instance: RegisterInstance;
   private readonly url: string;
+  private readonly httpUrl: string;
   private readonly headers: Record<string, string>;
+  /** The transport in use: the configured one, or HTTP after a refused upgrade. */
+  private activeTransport: AgentTransport;
+  private upgradeStatus: number | null = null;
+  private transportAnnounced = false;
   private readonly logger: Logger;
   private readonly openSocket: SocketFactory;
   private readonly backoff: { baseMs: number; maxMs: number };
@@ -163,6 +174,8 @@ export class AgentClient {
   constructor(config: AgentClientConfig) {
     this.instance = buildInstance({ label: config.instanceLabel });
     this.url = resolveConnectUrl(config.endpoint);
+    this.httpUrl = resolveHttpConnectUrl(config.endpoint);
+    this.activeTransport = resolveTransport({ explicit: config.transport });
     this.headers = buildConnectHeaders({ apiKey: config.apiKey, projectId: config.projectId });
     this.logger = config.logger;
     this.openSocket = config.socketFactory ?? defaultSocketFactory;
@@ -172,6 +185,11 @@ export class AgentClient {
 
   get instanceId(): string {
     return this.instance.id;
+  }
+
+  /** The transport the client speaks now. */
+  get transport(): AgentTransport {
+    return this.activeTransport;
   }
 
   get isRegistered(): boolean {
@@ -299,7 +317,10 @@ export class AgentClient {
     if (this.stopped || this.socket) return;
     let socket: SocketLike;
     try {
-      socket = this.openSocket({ url: this.url, headers: this.headers });
+      socket =
+        this.activeTransport === "http"
+          ? new HttpLongPollSocket({ url: this.httpUrl, headers: this.headers })
+          : this.openSocket({ url: this.url, headers: this.headers });
     } catch (error) {
       if (error instanceof NoWebSocketError) {
         this.giveUp(
@@ -318,6 +339,9 @@ export class AgentClient {
       this.lastError = describeError(error);
     });
     socket.onPing(() => this.armWatchdog());
+    socket.onUpgradeRefused?.((status) => {
+      this.upgradeStatus = status;
+    });
     socket.onClose((code) => this.guard(() => this.onClosed(code)));
   }
 
@@ -331,6 +355,18 @@ export class AgentClient {
     }
     for (const waiter of this.closeWaiters.splice(0)) waiter();
     if (this.stopped) return;
+    if (this.upgradeStatus !== null && this.activeTransport === "websocket") {
+      // A proxy answered the upgrade with a status: the socket can never
+      // open here, and the same frames travel over plain HTTP.
+      const status = this.upgradeStatus;
+      this.upgradeStatus = null;
+      this.activeTransport = "http";
+      this.logger.warn(
+        `the WebSocket upgrade to ${this.url} was answered with HTTP ${status}; using the HTTP transport at ${this.httpUrl} instead`,
+      );
+      this.scheduleConnect(0);
+      return;
+    }
     const delay = reconnectDelayMs({ attempt: this.attempt, ...this.backoff });
     this.attempt += 1;
     this.noteDisconnected({ wasRegistered, code });
@@ -436,6 +472,10 @@ export class AgentClient {
     if (this.failureNoticeAt !== null) {
       this.logger.info("connected to LangWatch");
       this.failureNoticeAt = null;
+    }
+    if (this.activeTransport === "http" && !this.transportAnnounced) {
+      this.transportAnnounced = true;
+      this.logger.info(`connected to LangWatch over HTTP long polling at ${this.httpUrl}`);
     }
     this.heartbeatIntervalMs = frame.heartbeatIntervalMs;
     if (frame.instanceId && frame.instanceId !== this.instance.id) this.instance.id = frame.instanceId;
