@@ -58,8 +58,69 @@ function makeTrackedEventSink() {
   };
 }
 
-function feedbackSpan(payloads: Record<string, unknown>[]) {
-  return createOtlpSpan(payloads.map((payload) => ({ name: "langwatch.event", payload })));
+type FeedbackPayload = {
+  event_type: string;
+  metrics?: Record<string, number>;
+  event_details?: Record<string, string>;
+};
+
+/**
+ * The attributes `recordTrackedEventSpan` actually emits for one feedback
+ * event: a discrete `event.type`, and one attribute per metric and detail.
+ *
+ * NOT `json_encoded_event`. That is the EVALUATION channel's shape — what
+ * `custom-evaluation-sync.subscriber` parses, and what the shared
+ * `createOtlpSpan` helper builds. Handed a JSON blob, this subscriber's
+ * `reconstructTrackedEvent` finds no `event.type`, returns undefined, and the
+ * event is dropped before validation: the sink records nothing and every
+ * assertion here reads zero. That is what these seven tests were doing.
+ */
+function feedbackAttributes(payload: FeedbackPayload) {
+  return [
+    { key: "event.type", value: { stringValue: payload.event_type } },
+    ...Object.entries(payload.metrics ?? {}).map(([key, value]) => ({
+      key: `event.metrics.${key}`,
+      value: { doubleValue: value },
+    })),
+    ...Object.entries(payload.event_details ?? {}).map(([key, value]) => ({
+      key: `event.details.${key}`,
+      value: { stringValue: value },
+    })),
+  ];
+}
+
+/** One span carrying the given span events, in the order given. */
+function spanWithEvents(events: { name: string; attributes: unknown[] }[]) {
+  return {
+    traceId: "aaaa0000000000000000000000000001",
+    spanId: "bbbb000000000001",
+    parentSpanId: null,
+    name: "main",
+    kind: 1,
+    startTimeUnixNano: "1700000000000000000",
+    endTimeUnixNano: "1700000001000000000",
+    attributes: [],
+    events: events.map((event) => ({
+      timeUnixNano: "1700000000500000000",
+      name: event.name,
+      attributes: event.attributes,
+    })),
+    links: [],
+    status: { code: null, message: null },
+    flags: null,
+    droppedAttributesCount: 0,
+    droppedEventsCount: 0,
+    droppedLinksCount: 0,
+  } as unknown as ReturnType<typeof createOtlpSpan>;
+}
+
+function feedbackSpan(payloads: FeedbackPayload[]) {
+  return spanWithEvents(
+    payloads.map((payload) => ({
+      name: "langwatch.event",
+      attributes: feedbackAttributes(payload),
+    })),
+  );
 }
 
 const thumbsUp = {
@@ -172,9 +233,19 @@ describe("given a span whose feedback sits behind an unrelated span event", () =
     const sink = makeTrackedEventSink();
     const handler = createTrackedEventSyncHandler(sink.deps);
     const event = createSpanReceivedEvent(
-      createOtlpSpan([
-        { name: "langwatch.evaluation.custom", payload: { name: "toxicity" } },
-        { name: "langwatch.event", payload: thumbsUp },
+      spanWithEvents([
+        // The evaluation channel really does carry a JSON blob, so the two
+        // shapes sit on one span here exactly as they do in production.
+        {
+          name: "langwatch.evaluation.custom",
+          attributes: [
+            {
+              key: "json_encoded_event",
+              value: { stringValue: JSON.stringify({ name: "toxicity" }) },
+            },
+          ],
+        },
+        { name: "langwatch.event", attributes: feedbackAttributes(thumbsUp) },
       ]),
     );
 
