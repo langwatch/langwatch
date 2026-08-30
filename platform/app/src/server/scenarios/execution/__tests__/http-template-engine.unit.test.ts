@@ -322,6 +322,25 @@ describe("trace variables in the template context", () => {
     });
 
     /** @scenario "The held session cannot decide the host a turn is sent to" */
+    it("refuses when a mapping carries the session under another name", () => {
+      // A mapping may alias the session to any identifier, so blanking the
+      // `session` key alone leaves the same agent-controlled value in the
+      // context under the alias.
+      expect(() =>
+        renderUrlTemplate({
+          template: "https://{{ host }}/chat",
+          context: buildTemplateContext({
+            input: inputWith("hi"),
+            session: "attacker.example.com",
+            scenarioMappings: {
+              host: { type: "source", sourceId: "scenario", path: ["session"] },
+            },
+          }),
+        }),
+      ).toThrow(/host/);
+    });
+
+    /** @scenario "The held session cannot decide the host a turn is sent to" */
     it("still renders a session inside the path", () => {
       const url = renderUrlTemplate({
         template: "https://api.example.com/chat/{{ session }}",

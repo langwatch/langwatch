@@ -428,9 +428,7 @@ describe("the wide run detail drawer", () => {
     expect(screen.getByTestId("run-verdict-pending")).toBeInTheDocument();
     // The judge reads the agent's answer next, and it writes no message, so
     // nothing is drawn for it.
-    expect(
-      screen.queryByTestId("conversation-typing"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("conversation-typing")).not.toBeInTheDocument();
   });
 
   /** @scenario "A run that is still going shows the conversation growing beside empty results" */

@@ -161,6 +161,17 @@ function sessionContextValue(session: unknown): RawJson | string {
  * interpolation. `scenarioMappings` output is merged last and overrides base
  * keys, preserving each mapping's raw-vs-scalar treatment.
  */
+/**
+ * The context keys a mapping filled from the held session.
+ *
+ * A mapping may alias the session to any identifier, so the name `session` is
+ * not the only place the agent's own value reaches the template. The list
+ * travels with the context rather than as an argument, so a caller cannot
+ * build a context and forget to pass it. It is not enumerable, so the template
+ * engine never renders it.
+ */
+const SESSION_DERIVED_KEYS = Symbol("sessionDerivedKeys");
+
 export function buildTemplateContext({
   input,
   scenarioMappings,
@@ -199,6 +210,7 @@ export function buildTemplateContext({
   }
 
   const mapped: Record<string, unknown> = {};
+  const sessionDerived: string[] = [];
   if (scenarioMappings) {
     const resolved = resolveFieldMappings({
       fieldMappings: scenarioMappings,
@@ -214,10 +226,16 @@ export function buildTemplateContext({
         (field === "input" && inputIsStructured) ||
         (field === "session" && sessionIsStructured);
       mapped[identifier] = isRawJson ? new RawJson(value) : value;
+      if (field === "session") sessionDerived.push(identifier);
     }
   }
 
-  return { ...base, params: parameters ?? {}, ...mapped };
+  const context = { ...base, params: parameters ?? {}, ...mapped };
+  Object.defineProperty(context, SESSION_DERIVED_KEYS, {
+    value: sessionDerived,
+    enumerable: false,
+  });
+  return context;
 }
 
 /** The origin of a rendered URL, or null when it names none. */
@@ -248,11 +266,12 @@ function assertSessionDidNotChooseTheHost({
   context: Record<string, unknown>;
   rendered: string;
 }): void {
-  if (!("session" in context)) return;
-  const withoutSession = urlLiquid.parseAndRenderSync(template, {
-    ...context,
-    session: "",
-  });
+  const derived = (context as Record<symbol, unknown>)[SESSION_DERIVED_KEYS];
+  const aliases = Array.isArray(derived) ? (derived as string[]) : [];
+  if (!("session" in context) && aliases.length === 0) return;
+  const blanked: Record<string, unknown> = { ...context, session: "" };
+  for (const alias of aliases) blanked[alias] = "";
+  const withoutSession = urlLiquid.parseAndRenderSync(template, blanked);
   if (originOf(rendered) !== originOf(withoutSession)) {
     throw new Error(
       "the session of the agent cannot decide the host the turn is sent to",
