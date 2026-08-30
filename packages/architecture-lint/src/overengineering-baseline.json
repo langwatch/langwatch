@@ -4,9 +4,6 @@
     "conditional-type-depth|packages/config/src/index.ts",
     "layer-class|packages/enterprise/composition/api/src/governance/personal-usage.adapter.ts",
     "layer-class|packages/enterprise/features/billing/server/src/services/seat-event-subscription.service.ts",
-    "layer-class|packages/enterprise/features/governance/server/src/services/governance-activity.service.ts",
-    "layer-class|packages/enterprise/features/governance/server/src/services/governance-ai-tools.service.ts",
-    "layer-class|packages/enterprise/features/governance/server/src/services/governance-department.service.ts",
     "layer-class|packages/features/agent/server/src/transport/api-rest/agent-legacy-facade.api.ts",
     "layer-class|packages/features/langy/web/src/langy-client.ts",
     "overload-by-literal|packages/config/src/index.ts"
