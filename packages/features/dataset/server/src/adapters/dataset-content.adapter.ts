@@ -96,13 +96,7 @@ export class DatasetContentAdapter extends DatasetContentPort {
     };
   }
 
-  async getDatasetPage({
-    dataset,
-    input,
-  }: {
-    dataset: Dataset;
-    input: DatasetPageInput;
-  }) {
+  async getDatasetPage({ dataset, input }: { dataset: Dataset; input: DatasetPageInput }) {
     const page = await this.listRecords({ dataset, input });
     return {
       id: dataset.id,
@@ -142,9 +136,7 @@ export class DatasetContentAdapter extends DatasetContentPort {
     const bounded =
       limitMb === null
         ? selected
-        : selected.filter(
-            (record) => JSON.stringify(record.entry).length <= limitMb * 1024 * 1024,
-          );
+        : selected.filter((record) => JSON.stringify(record.entry).length <= limitMb * 1024 * 1024);
     return {
       dataset,
       records: bounded,
@@ -178,7 +170,6 @@ export class DatasetContentAdapter extends DatasetContentPort {
   }) {
     const storage = await this.storageResolver.forProject(input.projectId);
     const result = await editS3JsonlRecord({
-      prisma: this.database,
       dataset,
       projectId: input.projectId,
       recordId: input.recordId,
@@ -187,10 +178,7 @@ export class DatasetContentAdapter extends DatasetContentPort {
       storage,
     });
     return {
-      record: toDatasetRecord(
-        { id: input.recordId, entry: input.updatedRecord },
-        dataset,
-      ),
+      record: toDatasetRecord({ id: input.recordId, entry: input.updatedRecord }, dataset),
       created: !result.updated,
     };
   }
@@ -205,7 +193,7 @@ export class DatasetContentAdapter extends DatasetContentPort {
     const entries = input.entries.map((entry) => ({ ...entry }));
     const storage = await this.storageResolver.forProject(input.projectId);
     await appendS3JsonlRecords({
-      prisma: this.database,
+      repository: this.datasets,
       dataset,
       projectId: input.projectId,
       entries,
@@ -215,15 +203,8 @@ export class DatasetContentAdapter extends DatasetContentPort {
     return entries.map((entry) => toDatasetRecord({ id: entry.id, entry }, dataset));
   }
 
-  async deleteRecords({
-    dataset,
-    input,
-  }: {
-    dataset: Dataset;
-    input: DeleteDatasetRecordsInput;
-  }) {
+  async deleteRecords({ dataset, input }: { dataset: Dataset; input: DeleteDatasetRecordsInput }) {
     const result = await deleteS3JsonlRecords({
-      prisma: this.database,
       dataset,
       projectId: input.projectId,
       recordIds: input.recordIds,
@@ -294,7 +275,6 @@ export class DatasetContentAdapter extends DatasetContentPort {
     columnTypes: Dataset["columnTypes"];
   }) {
     const updated = await migrateS3JsonlColumns({
-      prisma: this.database,
       dataset,
       projectId,
       oldColumnTypes: dataset.columnTypes,

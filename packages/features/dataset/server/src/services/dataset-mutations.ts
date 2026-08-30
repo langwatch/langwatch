@@ -18,15 +18,15 @@
  * + counter math live in exactly one place (no duplicated read-modify-write).
  *
  * Layering: this is a domain module that sits BELOW `DatasetService` and ABOVE
- * `DatasetRepository` — routes never reach it, the service delegates here, and
- * every PG read/write of the `Dataset` row goes through the repository (passed
- * the lock's `tx`). The advisory-lock transaction is the unit of work; the
- * repository is the only thing that speaks Prisma.
+ * `DatasetContentRepository` — routes never reach it, the service delegates
+ * here, and nothing here holds a database client. The lock and its transaction
+ * belong to the repository, which hands the callback a repository bound to that
+ * transaction; the repository stays the only thing that speaks Prisma.
  */
 
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Prisma } from "@langwatch/prisma-client/generated";
 import { DatasetContentRepository as DatasetRepository } from "../repositories/prisma/dataset-content.repository";
 import {
   type ChunkedDatasetMeta,
@@ -35,7 +35,6 @@ import {
   chunkMetaOf,
   toSingleJsonl,
 } from "./dataset-chunking";
-import { withDatasetLock } from "./dataset-lock";
 import { type DatasetStorage } from "../ports/dataset-storage.port";
 import {
   DatasetConflictError,
@@ -64,9 +63,7 @@ const tryToMapPreviousColumnsToNewColumns = (
     if (exact) mapping[previous.name] = exact.name;
   }
   const previousUnmapped = previousColumns.filter((column) => !(column.name in mapping));
-  const newUnmapped = newColumns.filter(
-    (column) => !Object.values(mapping).includes(column.name),
-  );
+  const newUnmapped = newColumns.filter((column) => !Object.values(mapping).includes(column.name));
   previousUnmapped.forEach((previous, index) => {
     const next = newUnmapped[index];
     if (next) mapping[previous.name] = next.name;
@@ -154,9 +151,7 @@ const isChunkLine = (line: unknown): line is ChunkLine =>
 /** Read the persisted `chunkOffsets` JSON back as a typed array (defensive
  * against a null/legacy value — defaults to empty). */
 const readOffsets = (dataset: DatasetMutationRecord): ChunkOffset[] =>
-  Array.isArray(dataset.chunkOffsets)
-    ? (dataset.chunkOffsets as unknown as ChunkOffset[])
-    : [];
+  Array.isArray(dataset.chunkOffsets) ? (dataset.chunkOffsets as unknown as ChunkOffset[]) : [];
 
 /** Gate a mutation on `status='ready'` (Decision 6). Throws otherwise so a
  * still-preparing or failed dataset is never mutated under the lock. */
@@ -199,15 +194,13 @@ const recomputeOffsets = (
  */
 const appendLinesInTx = async ({
   tx,
-  repository,
   current,
   projectId,
   entries,
   storage,
   forcedIds,
 }: {
-  tx: Prisma.TransactionClient;
-  repository: DatasetRepository;
+  tx: DatasetRepository;
   current: DatasetMutationRecord;
   projectId: string;
   entries: unknown[];
@@ -234,21 +227,16 @@ const appendLinesInTx = async ({
   const addedRows = written.reduce((n, c) => n + c.rowCount, 0);
   const addedBytes = written.reduce((n, c) => n + c.byteSize, 0);
 
-  await repository.update(
-    {
-      id: current.id,
-      projectId,
-      data: {
-        rowCount: oldRowCount + addedRows,
-        sizeBytes: (current.sizeBytes ?? 0n) + BigInt(addedBytes),
-        chunkCount: fromIndex + written.length,
-        chunkOffsets: readOffsets(current).concat(
-          newOffsets,
-        ) as unknown as Prisma.InputJsonValue,
-      },
+  await tx.update({
+    id: current.id,
+    projectId,
+    data: {
+      rowCount: oldRowCount + addedRows,
+      sizeBytes: (current.sizeBytes ?? 0n) + BigInt(addedBytes),
+      chunkCount: fromIndex + written.length,
+      chunkOffsets: readOffsets(current).concat(newOffsets) as unknown as Prisma.InputJsonValue,
     },
-    { tx },
-  );
+  });
 
   return { appended: lines.length };
 };
@@ -351,34 +339,27 @@ export const deleteAllS3JsonlChunks = async ({
  * miss. A fresh `record_<nanoid>` is minted wherever an id is absent.
  */
 export const appendS3JsonlRecords = async ({
-  prisma,
   dataset,
   projectId,
   entries,
   forcedIds,
   storage,
-  repository: providedRepository,
+  repository,
 }: {
-  prisma: PrismaClient;
   dataset: DatasetMutationRecord;
   projectId: string;
   entries: unknown[];
   forcedIds?: (string | undefined)[];
   storage: DatasetStorage;
-  repository?: DatasetRepository;
+  repository: DatasetRepository;
 }): Promise<{ appended: number }> => {
   const datasetStorage = storage;
-  const repository = providedRepository ?? DatasetRepository.create(prisma);
 
-  return withDatasetLock({ prisma, datasetId: dataset.id }, async (tx) => {
-    const current = await repository.findOneOrThrow(
-      { id: dataset.id, projectId },
-      { tx },
-    );
+  return repository.withDatasetLock(dataset.id, async (tx) => {
+    const current = await tx.findOneOrThrow({ id: dataset.id, projectId });
     assertReady(current);
     return appendLinesInTx({
       tx,
-      repository,
       current,
       projectId,
       entries,
@@ -453,14 +434,12 @@ const locateIdsBeforeLock = async ({
  * compaction/offset math lives in exactly one place.
  */
 const commitDeleteCounts = async ({
-  repository,
   tx,
   datasetId,
   projectId,
   perChunk,
 }: {
-  repository: DatasetRepository;
-  tx: Prisma.TransactionClient;
+  tx: DatasetRepository;
   datasetId: string;
   projectId: string;
   perChunk: Array<{ rowCount: number; byteSize: number }>;
@@ -471,30 +450,24 @@ const commitDeleteCounts = async ({
     keptChunkCount -= 1;
   }
   const trimmed = keptChunkCount < perChunk.length;
-  await repository.update(
-    {
-      id: datasetId,
-      projectId,
-      data: {
-        rowCount,
-        sizeBytes: BigInt(sizeBytes),
-        // The trailing empty offset entries (startRow === endRow, byteSize 0)
-        // contribute nothing to the totals, so slicing is exact.
-        ...(trimmed
-          ? {
-              chunkCount: keptChunkCount,
-              chunkOffsets: offsets.slice(
-                0,
-                keptChunkCount,
-              ) as unknown as Prisma.InputJsonValue,
-            }
-          : {
-              chunkOffsets: offsets as unknown as Prisma.InputJsonValue,
-            }),
-      },
+  await tx.update({
+    id: datasetId,
+    projectId,
+    data: {
+      rowCount,
+      sizeBytes: BigInt(sizeBytes),
+      // The trailing empty offset entries (startRow === endRow, byteSize 0)
+      // contribute nothing to the totals, so slicing is exact.
+      ...(trimmed
+        ? {
+            chunkCount: keptChunkCount,
+            chunkOffsets: offsets.slice(0, keptChunkCount) as unknown as Prisma.InputJsonValue,
+          }
+        : {
+            chunkOffsets: offsets as unknown as Prisma.InputJsonValue,
+          }),
     },
-    { tx },
-  );
+  });
 };
 
 /**
@@ -510,24 +483,21 @@ const commitDeleteCounts = async ({
  * full in-lock scan, so correctness never depends on the hint.
  */
 export const editS3JsonlRecord = async ({
-  prisma,
   dataset,
   projectId,
   recordId,
   entry,
   storage,
-  repository: providedRepository,
+  repository,
 }: {
-  prisma: PrismaClient;
   dataset: DatasetMutationRecord;
   projectId: string;
   recordId: string;
   entry: unknown;
   storage: DatasetStorage;
-  repository?: DatasetRepository;
+  repository: DatasetRepository;
 }): Promise<{ updated: boolean }> => {
   const datasetStorage = storage;
-  const repository = providedRepository ?? DatasetRepository.create(prisma);
 
   // OFF the lock: locate the row's chunk so only that chunk is re-read under it.
   // Skipped unless the dataset looks ready — never do storage I/O ahead of the
@@ -543,11 +513,8 @@ export const editS3JsonlRecord = async ({
         })
       : null;
 
-  return withDatasetLock({ prisma, datasetId: dataset.id }, async (tx) => {
-    const current = await repository.findOneOrThrow(
-      { id: dataset.id, projectId },
-      { tx },
-    );
+  return repository.withDatasetLock(dataset.id, async (tx) => {
+    const current = await tx.findOneOrThrow({ id: dataset.id, projectId });
     assertReady(current);
 
     const chunkCount = current.chunkCount ?? 0;
@@ -573,17 +540,14 @@ export const editS3JsonlRecord = async ({
       const patched = offsets.map((o) =>
         o.index === index ? { ...o, byteSize: offset.byteSize } : o,
       );
-      await repository.update(
-        {
-          id: dataset.id,
-          projectId,
-          data: {
-            sizeBytes: (current.sizeBytes ?? 0n) + BigInt(offset.byteSize - oldByteSize),
-            chunkOffsets: patched as unknown as Prisma.InputJsonValue,
-          },
+      await tx.update({
+        id: dataset.id,
+        projectId,
+        data: {
+          sizeBytes: (current.sizeBytes ?? 0n) + BigInt(offset.byteSize - oldByteSize),
+          chunkOffsets: patched as unknown as Prisma.InputJsonValue,
         },
-        { tx },
-      );
+      });
     };
 
     // Fast path — the pre-scan located the row and the offset index covers every
@@ -596,9 +560,7 @@ export const editS3JsonlRecord = async ({
           datasetId: dataset.id,
           index,
         });
-        const rowIndex = rows.findIndex(
-          (line) => isChunkLine(line) && line.id === recordId,
-        );
+        const rowIndex = rows.findIndex((line) => isChunkLine(line) && line.id === recordId);
         if (rowIndex !== -1) {
           await rewriteRowAt(index, rows, rowIndex);
           return { updated: true };
@@ -619,9 +581,7 @@ export const editS3JsonlRecord = async ({
         datasetId: dataset.id,
         index,
       });
-      const rowIndex = rows.findIndex(
-        (line) => isChunkLine(line) && line.id === recordId,
-      );
+      const rowIndex = rows.findIndex((line) => isChunkLine(line) && line.id === recordId);
       if (rowIndex === -1) continue;
       await rewriteRowAt(index, rows, rowIndex);
       return { updated: true };
@@ -631,7 +591,6 @@ export const editS3JsonlRecord = async ({
     // upsertRecord / updateDatasetRecord create-on-miss path).
     await appendLinesInTx({
       tx,
-      repository,
       current,
       projectId,
       entries: [entry],
@@ -664,25 +623,21 @@ export const editS3JsonlRecord = async ({
  * `recomputeDatasetCounts` remains the explicit I-COUNT repair.)
  */
 export const deleteS3JsonlRecords = async ({
-  prisma,
   dataset,
   projectId,
   recordIds,
   storage,
-  repository: providedRepository,
+  repository,
 }: {
-  prisma: PrismaClient;
   dataset: DatasetMutationRecord;
   projectId: string;
   recordIds: string[];
   storage: DatasetStorage;
-  repository?: DatasetRepository;
+  repository: DatasetRepository;
 }): Promise<{ deleted: number }> => {
   const datasetStorage = storage;
-  const repository = providedRepository ?? DatasetRepository.create(prisma);
   const removeSet = new Set(recordIds);
-  const isTarget = (line: unknown): boolean =>
-    isChunkLine(line) && removeSet.has(line.id);
+  const isTarget = (line: unknown): boolean => isChunkLine(line) && removeSet.has(line.id);
 
   // OFF the lock: locate the target ids' chunks so only the affected chunks are
   // re-read under the lock (not all chunkCount). Skipped for a not-ready dataset
@@ -699,11 +654,8 @@ export const deleteS3JsonlRecords = async ({
         })
       : null;
 
-  return withDatasetLock({ prisma, datasetId: dataset.id }, async (tx) => {
-    const current = await repository.findOneOrThrow(
-      { id: dataset.id, projectId },
-      { tx },
-    );
+  return repository.withDatasetLock(dataset.id, async (tx) => {
+    const current = await tx.findOneOrThrow({ id: dataset.id, projectId });
     assertReady(current);
 
     const chunkCount = current.chunkCount ?? 0;
@@ -716,11 +668,7 @@ export const deleteS3JsonlRecords = async ({
     // index covers every chunk: re-read just the affected chunks, take unaffected
     // chunk sizes from the authoritative offset index. Bails (returns null) if
     // any located id isn't where the hint said.
-    if (
-      hint &&
-      hint.locatedIds.size === removeSet.size &&
-      offsets.length === chunkCount
-    ) {
+    if (hint && hint.locatedIds.size === removeSet.size && offsets.length === chunkCount) {
       const fast = await (async (): Promise<{ deleted: number } | null> => {
         const removedIds = new Set<string>();
         const newRowCount = new Map<number, number>();
@@ -788,7 +736,6 @@ export const deleteS3JsonlRecords = async ({
             byteSize: newByteSize.get(o.index) ?? o.byteSize,
           }));
         await commitDeleteCounts({
-          repository,
           tx,
           datasetId: dataset.id,
           projectId,
@@ -834,7 +781,6 @@ export const deleteS3JsonlRecords = async ({
       return { deleted: 0 };
     }
     await commitDeleteCounts({
-      repository,
       tx,
       datasetId: dataset.id,
       projectId,
@@ -861,23 +807,20 @@ export const deleteS3JsonlRecords = async ({
  * chunk is gone but later chunks survive). Returns the recomputed counts.
  */
 export const recomputeDatasetCounts = async ({
-  prisma,
   datasetId,
   projectId,
   storage,
-  repository: providedRepository,
+  repository,
 }: {
-  prisma: PrismaClient;
   datasetId: string;
   projectId: string;
   storage: DatasetStorage;
-  repository?: DatasetRepository;
+  repository: DatasetRepository;
 }): Promise<RecomputedDatasetCounts> => {
   const datasetStorage = storage;
-  const repository = providedRepository ?? DatasetRepository.create(prisma);
 
-  return withDatasetLock({ prisma, datasetId }, async (tx) => {
-    const current = await repository.findOneOrThrow({ id: datasetId, projectId }, { tx });
+  return repository.withDatasetLock(datasetId, async (tx) => {
+    const current = await tx.findOneOrThrow({ id: datasetId, projectId });
 
     const chunkCount = current.chunkCount ?? 0;
     const perChunk: Array<{ rowCount: number; byteSize: number }> = [];
@@ -911,19 +854,16 @@ export const recomputeDatasetCounts = async ({
     }
     const keptOffsets = offsets.slice(0, keptChunkCount);
 
-    await repository.update(
-      {
-        id: datasetId,
-        projectId,
-        data: {
-          rowCount,
-          sizeBytes: BigInt(sizeBytes),
-          chunkCount: keptChunkCount,
-          chunkOffsets: keptOffsets as unknown as Prisma.InputJsonValue,
-        },
+    await tx.update({
+      id: datasetId,
+      projectId,
+      data: {
+        rowCount,
+        sizeBytes: BigInt(sizeBytes),
+        chunkCount: keptChunkCount,
+        chunkOffsets: keptOffsets as unknown as Prisma.InputJsonValue,
       },
-      { tx },
-    );
+    });
 
     return {
       rowCount,
@@ -957,7 +897,6 @@ export const recomputeDatasetCounts = async ({
  * is a future optimization if multi-GB column edits become common.
  */
 export const migrateS3JsonlColumns = async ({
-  prisma,
   dataset,
   projectId,
   oldColumnTypes,
@@ -965,9 +904,8 @@ export const migrateS3JsonlColumns = async ({
   name,
   slug,
   storage,
-  repository: providedRepository,
+  repository,
 }: {
-  prisma: PrismaClient;
   dataset: DatasetMutationRecord;
   projectId: string;
   oldColumnTypes: DatasetColumns;
@@ -975,16 +913,12 @@ export const migrateS3JsonlColumns = async ({
   name: string;
   slug: string;
   storage: DatasetStorage;
-  repository?: DatasetRepository;
+  repository: DatasetRepository;
 }): Promise<DatasetMutationRecord> => {
   const datasetStorage = storage;
-  const repository = providedRepository ?? DatasetRepository.create(prisma);
 
-  return withDatasetLock({ prisma, datasetId: dataset.id }, async (tx) => {
-    const current = await repository.findOneOrThrow(
-      { id: dataset.id, projectId },
-      { tx },
-    );
+  return repository.withDatasetLock(dataset.id, async (tx) => {
+    const current = await tx.findOneOrThrow({ id: dataset.id, projectId });
     assertReady(current);
 
     // Revalidate the SOURCE schema under the lock. `oldColumnTypes` was captured
@@ -1060,21 +994,18 @@ export const migrateS3JsonlColumns = async ({
       fromIndex: meta.chunkCount,
     });
 
-    return await repository.update(
-      {
-        id: dataset.id,
-        projectId,
-        data: {
-          name,
-          slug,
-          columnTypes: newColumnTypes as unknown as Prisma.InputJsonValue,
-          rowCount: meta.rowCount,
-          sizeBytes: BigInt(meta.sizeBytes),
-          chunkCount: meta.chunkCount,
-          chunkOffsets: meta.chunkOffsets as unknown as Prisma.InputJsonValue,
-        },
+    return await tx.update({
+      id: dataset.id,
+      projectId,
+      data: {
+        name,
+        slug,
+        columnTypes: newColumnTypes as unknown as Prisma.InputJsonValue,
+        rowCount: meta.rowCount,
+        sizeBytes: BigInt(meta.sizeBytes),
+        chunkCount: meta.chunkCount,
+        chunkOffsets: meta.chunkOffsets as unknown as Prisma.InputJsonValue,
       },
-      { tx },
-    );
+    });
   });
 };

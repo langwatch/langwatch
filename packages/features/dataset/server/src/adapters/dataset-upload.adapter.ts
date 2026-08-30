@@ -35,15 +35,8 @@ import {
   UploadTooLargeError,
   UploadValidationError,
 } from "../services/errors";
-import {
-  exceedsUploadCap,
-  stagingUploadKey,
-  UPLOAD_MAX_BYTES,
-} from "../services/presigned-upload";
-import {
-  appendS3JsonlRecords,
-  writeInitialS3JsonlChunks,
-} from "../services/dataset-mutations";
+import { exceedsUploadCap, stagingUploadKey, UPLOAD_MAX_BYTES } from "../services/presigned-upload";
+import { appendS3JsonlRecords, writeInitialS3JsonlChunks } from "../services/dataset-mutations";
 import { stripNullBytes } from "../services/sanitize";
 
 /** Owns upload lifecycle behavior; routes only see DatasetService's contract. */
@@ -98,7 +91,7 @@ export class DatasetUploadAdapter implements DatasetUploadPort {
     if (dataset.contentLayout === "s3_jsonl") {
       const storage = await this.storageResolver.forProject(input.projectId);
       await appendS3JsonlRecords({
-        prisma: this.prisma,
+        repository: this.datasets,
         dataset,
         projectId: input.projectId,
         entries: entries.map(({ id: _id, ...entry }) => entry),
@@ -127,9 +120,7 @@ export class DatasetUploadAdapter implements DatasetUploadPort {
       format: detectFileFormat(input.filename),
     });
     const renamedHeaders = renameReservedColumns(headers);
-    const rename = new Map(
-      headers.map((header, index) => [header, renamedHeaders[index]!]),
-    );
+    const rename = new Map(headers.map((header, index) => [header, renamedHeaders[index]!]));
     const entries = convertRowsToColumnTypes(
       rows.map((row) =>
         Object.fromEntries(
@@ -232,8 +223,7 @@ export class DatasetUploadAdapter implements DatasetUploadPort {
     input: FinalizeUploadInput,
   ): Promise<{ datasetId: string; status: "processing" }> {
     const dataset = await this.findDataset(input.datasetId, input.projectId);
-    if (dataset.status !== "uploading" || !dataset.stagingKey)
-      throw new UploadNotPendingError();
+    if (dataset.status !== "uploading" || !dataset.stagingKey) throw new UploadNotPendingError();
     const storage = await this.storageResolver.forProject(input.projectId);
     let size: number;
     try {
@@ -279,10 +269,7 @@ export class DatasetUploadAdapter implements DatasetUploadPort {
     input: RetryNormalizeInput,
   ): Promise<{ datasetId: string; status: "processing" }> {
     const dataset = await this.findDataset(input.datasetId, input.projectId);
-    if (
-      (dataset.status !== "failed" && dataset.status !== "processing") ||
-      !dataset.stagingKey
-    )
+    if ((dataset.status !== "failed" && dataset.status !== "processing") || !dataset.stagingKey)
       throw new UploadNotPendingError("Dataset is not retryable");
     await this.datasets.update({
       id: dataset.id,
@@ -307,13 +294,9 @@ export class DatasetUploadAdapter implements DatasetUploadPort {
         "file_too_large",
       );
     const { rows } = parseFileContent({ content, format: detectFileFormat(filename) });
-    if (!rows.length)
-      throw new UploadValidationError("File contains no data rows", "empty_file");
+    if (!rows.length) throw new UploadValidationError("File contains no data rows", "empty_file");
     if (rows.length > MAX_ROWS_LIMIT)
-      throw new UploadValidationError(
-        `File contains too many rows`,
-        "row_limit_exceeded",
-      );
+      throw new UploadValidationError(`File contains too many rows`, "row_limit_exceeded");
   }
 }
 

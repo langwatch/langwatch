@@ -23,26 +23,76 @@ export type UpdateDatasetInput = {
  * Single Responsibility: Database operations for datasets.
  * {@link Dataset} represents a collection of data records with associated metadata.
  */
+/**
+ * Max wall-clock a dataset-mutation transaction may run before Prisma aborts it
+ * with P2028. Sized for the worst case inside the lock: edit, delete and count
+ * recomputation do O(chunkCount) read + rewrite calls, each a round-trip to
+ * object storage. Prisma's 5s default P2028s on any non-trivial dataset.
+ */
+export const DATASET_MUTATION_TXN_TIMEOUT_MS = 120_000;
+
+/**
+ * Max wall-clock to WAIT for a pooled connection before the transaction starts,
+ * separate from the run budget above. Prisma's 2s default fails a mutation on a
+ * busy pool before it has done anything.
+ */
+export const DATASET_MUTATION_TXN_MAX_WAIT_MS = 10_000;
+
+/** A `PrismaClient`, or the transaction-scoped client `$transaction` hands back. */
+type DatasetContentClient = PrismaClient | Prisma.TransactionClient;
+
 export class DatasetContentRepository {
-  private constructor(private readonly prisma: PrismaClient) {}
+  private constructor(
+    private readonly prisma: DatasetContentClient,
+    /** Absent on a transaction-scoped instance — only the root can open one. */
+    private readonly root: PrismaClient | null,
+  ) {}
 
   static create(prisma: PrismaClient): DatasetContentRepository {
-    return new DatasetContentRepository(prisma);
+    return new DatasetContentRepository(prisma, prisma);
+  }
+
+  /**
+   * ADR-032 Decision 9: runs `mutate` under this dataset's advisory lock, inside
+   * one transaction, so a chunk write and the counter update it implies commit
+   * or roll back together (I-COUNT). Without it two concurrent appends both read
+   * `chunkCount=N`, both write `chunk-N`, and one is lost with the offset index
+   * left drifting.
+   *
+   * `mutate` receives a REPOSITORY bound to the transaction, not Prisma's
+   * transaction client: the caller is a service, and a service does not hold a
+   * database client. The advisory key is namespaced per dataset, so mutations of
+   * different datasets never block each other.
+   */
+  async withDatasetLock<T>(
+    datasetId: string,
+    mutate: (tx: DatasetContentRepository) => Promise<T>,
+  ): Promise<T> {
+    if (!this.root) {
+      throw new Error("withDatasetLock cannot nest: this repository is already transactional");
+    }
+
+    return await this.root.$transaction(
+      async (client) => {
+        // `$executeRaw`, not `$queryRaw`: pg_advisory_xact_lock returns void,
+        // which $queryRaw cannot deserialize. The lock is held for the whole
+        // transaction, which is what serializes the mutation.
+        await client.$executeRaw`-- @tenancy: advisory-lock helper, key is dataset-bounded
+SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
+        return await mutate(new DatasetContentRepository(client, null));
+      },
+      {
+        timeout: DATASET_MUTATION_TXN_TIMEOUT_MS,
+        maxWait: DATASET_MUTATION_TXN_MAX_WAIT_MS,
+      },
+    );
   }
 
   /**
    * Finds a single dataset by id within a project.
    */
-  async findOne(
-    input: {
-      id: string;
-      projectId: string;
-    },
-    options?: {
-      tx?: Prisma.TransactionClient;
-    },
-  ): Promise<Dataset | null> {
-    const client = options?.tx ?? this.prisma;
+  async findOne(input: { id: string; projectId: string }): Promise<Dataset | null> {
+    const client = this.prisma;
     return await client.dataset.findFirst({
       where: {
         id: input.id,
@@ -60,16 +110,8 @@ export class DatasetContentRepository {
    * counterpart to {@link findOne} so those paths surface it loudly (Prisma's
    * `NotFoundError`) instead of null-checking a "can't happen".
    */
-  async findOneOrThrow(
-    input: {
-      id: string;
-      projectId: string;
-    },
-    options?: {
-      tx?: Prisma.TransactionClient;
-    },
-  ): Promise<Dataset> {
-    const client = options?.tx ?? this.prisma;
+  async findOneOrThrow(input: { id: string; projectId: string }): Promise<Dataset> {
+    const client = this.prisma;
     return await client.dataset.findFirstOrThrow({
       where: {
         id: input.id,
@@ -81,17 +123,12 @@ export class DatasetContentRepository {
   /**
    * Finds dataset by slug within a project.
    */
-  async findBySlug(
-    input: {
-      slug: string;
-      projectId: string;
-      excludeId?: string;
-    },
-    options?: {
-      tx?: Prisma.TransactionClient;
-    },
-  ): Promise<Dataset | null> {
-    const client = options?.tx ?? this.prisma;
+  async findBySlug(input: {
+    slug: string;
+    projectId: string;
+    excludeId?: string;
+  }): Promise<Dataset | null> {
+    const client = this.prisma;
     return await client.dataset.findFirst({
       where: {
         slug: input.slug,
@@ -104,13 +141,8 @@ export class DatasetContentRepository {
   /**
    * Creates a new dataset.
    */
-  async create(
-    input: CreateDatasetInput,
-    options?: {
-      tx?: Prisma.TransactionClient;
-    },
-  ): Promise<Dataset> {
-    const client = options?.tx ?? this.prisma;
+  async create(input: CreateDatasetInput): Promise<Dataset> {
+    const client = this.prisma;
     return await client.dataset.create({
       data: input,
     });
@@ -127,13 +159,8 @@ export class DatasetContentRepository {
    *
    * @throws {Prisma.PrismaClientKnownRequestError} P2025 if no row matches id+project
    */
-  async update(
-    input: UpdateDatasetInput,
-    options?: {
-      tx?: Prisma.TransactionClient;
-    },
-  ): Promise<Dataset> {
-    const client = options?.tx ?? this.prisma;
+  async update(input: UpdateDatasetInput): Promise<Dataset> {
+    const client = this.prisma;
 
     return await client.dataset.update({
       where: {
@@ -155,16 +182,8 @@ export class DatasetContentRepository {
    * id+projectId predicate is the tenancy guard. Returns the count deleted
    * (0 = already reaped, or no longer pending).
    */
-  async deletePendingUpload(
-    input: {
-      id: string;
-      projectId: string;
-    },
-    options?: {
-      tx?: Prisma.TransactionClient;
-    },
-  ): Promise<number> {
-    const client = options?.tx ?? this.prisma;
+  async deletePendingUpload(input: { id: string; projectId: string }): Promise<number> {
+    const client = this.prisma;
     const { count } = await client.dataset.deleteMany({
       where: {
         id: input.id,
@@ -234,10 +253,7 @@ export class DatasetContentRepository {
    * re-drive. This stops `findStaleProcessing` from re-selecting the same row on
    * every subsequent upload within the TTL. Returns the rows touched.
    */
-  async markProcessingRedriven(input: {
-    id: string;
-    projectId: string;
-  }): Promise<number> {
+  async markProcessingRedriven(input: { id: string; projectId: string }): Promise<number> {
     const { count } = await this.prisma.dataset.updateMany({
       where: {
         id: input.id,
@@ -258,10 +274,7 @@ export class DatasetContentRepository {
    * a retried row re-enters `processing` long after it was created, so the clock
    * must start when normalization (re)started.
    */
-  async findStaleProcessing(input: {
-    projectId: string;
-    olderThan: Date;
-  }): Promise<Dataset[]> {
+  async findStaleProcessing(input: { projectId: string; olderThan: Date }): Promise<Dataset[]> {
     return await this.prisma.dataset.findMany({
       where: {
         projectId: input.projectId,
@@ -302,10 +315,7 @@ export class DatasetContentRepository {
    * scheduler. The `olderThan` cutoff is conservative (well beyond the presign
    * TTL) so a still-in-flight upload is never matched.
    */
-  async findStalePendingUploads(input: {
-    projectId: string;
-    olderThan: Date;
-  }): Promise<Dataset[]> {
+  async findStalePendingUploads(input: { projectId: string; olderThan: Date }): Promise<Dataset[]> {
     return await this.prisma.dataset.findMany({
       where: {
         projectId: input.projectId,
@@ -329,10 +339,7 @@ export class DatasetContentRepository {
   /**
    * Finds a dataset by slug or id within a project, excluding archived datasets.
    */
-  async findBySlugOrId(input: {
-    slugOrId: string;
-    projectId: string;
-  }): Promise<Dataset | null> {
+  async findBySlugOrId(input: { slugOrId: string; projectId: string }): Promise<Dataset | null> {
     return await this.prisma.dataset.findFirst({
       where: {
         projectId: input.projectId,

@@ -9,7 +9,7 @@ import { StreamingChunkWriter } from "../services/dataset-chunk-writer";
 import {
   DATASET_MUTATION_TXN_MAX_WAIT_MS,
   DATASET_MUTATION_TXN_TIMEOUT_MS,
-} from "../services/dataset-lock";
+} from "../repositories/prisma/dataset-content.repository";
 
 const logger = createLogger("langwatch:dataset:migration");
 const DATASET_PAGE_SIZE = 50;
