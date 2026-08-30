@@ -77,3 +77,37 @@ commit left `coding-agent-server` with ten TS2352s that main does not have.
 
 Stage 1 fans out; stage 3 does not, until the dataset enactment is finished by
 hand — agents copy a proven reference, they do not discover a design.
+
+## Where the value has actually been (2026-08-31)
+
+The lint count moves slowly — 866 to 864 over a long pass — because the two
+biggest policies are inventories (`legacy-feature-fragment` 465,
+`feature-source-layout` 207) that shrink only when whole modules move. The real
+finds sit underneath them, and they repeat:
+
+**A feature package holds the live copy; `platform/app` holds the tests.** Seen
+three times in one pass — the analytics ClickHouse cluster (385 cases on a copy
+nothing imports, one on the copy that runs — see
+`analytics-clickhouse-divergence.md`), `TraceIOAccumulationService`, and
+billing's `UsageLimitService`. The check is cheap: for a duplicated or extracted
+module, ask which copy has importers and which has the tests. When the answer
+differs, the tests are guarding nothing.
+
+**Extraction widens types to break a dependency.** The analytics filter
+translator lost `Record<FilterField, …>` for `Record<string, …>` because
+`FilterField` lived in `platform/app`, taking the guarantee that every filter
+field has a handler with it. Publishing the vocabulary from the contract gets it
+back. Worth grepping for wherever a package copy of a platform module names
+`string` where the original named a union.
+
+**A long method is nearly always a phase list with no names.** Every
+`service-quality` fix in this pass — `accumulateIO` (194 lines),
+`accumulateAttributes` (141), `extractAttributes` (140), `checkAndSendWarning`
+(184), `SuiteExecutionService.execute` (98) — was a sequence of steps writing
+into one mutable bag, where the order was the contract and nothing said so. They
+split the same way: one private method per step, taking what it needs, and a
+top-level method that reads as the list.
+
+Refactor behind a test net in the package, not the one in `platform/app`, and
+sabotage it first — a `GROUP BY` replaced inside a comment passed 368 tests and
+proved nothing.
