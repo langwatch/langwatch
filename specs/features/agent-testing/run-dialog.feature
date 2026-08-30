@@ -488,6 +488,45 @@ Feature: The run dialog
     When a value is given for a name none of the scenarios declare
     Then the run is refused with "scenario_parameter_unknown"
     And the rejection names the unknown name and the names the run does declare
+    And it says the agent the run goes against does not declare it either
+
+  # --- Where a queued run lands ---
+
+  @integration
+  Scenario: The dialog is gone before the run drawer opens
+    Given the run dialog with an agent chosen
+    When the run is queued
+    Then the dialog closes first
+    And only then does the caller hear that the run started
+    And the run drawer stays open, because no dialog tears down over it
+
+  # --- Parameters the chosen agent cannot read ---
+  #
+  # A run resolves its values against the scenarios of the run plus the agent
+  # it goes against, so the agent decides which names are known. A remembered
+  # value that came with another agent is dropped; a value somebody typed is
+  # never taken away, and holds the run instead.
+
+  @integration
+  Scenario: A remembered value the chosen agent cannot read is dropped
+    Given a suite that remembers the parameters of a run against a connected agent
+    When the dialog opens on an agent that declares none of them
+    Then the parameter line holds none of the remembered names
+    And the parameter block is folded away
+    And Run can start
+
+  @integration
+  Scenario: A typed value nothing in the run declares is read back
+    Given the run dialog with parameter overrides added
+    When a value is typed for a name neither the scenarios nor the agent declare
+    Then the field says the name is declared by nothing in the run, and names the agent
+    And the value stays as it was typed, so the run still carries it
+
+  @integration
+  Scenario: A value the chosen agent declares is kept
+    Given a suite that remembers the parameters of a run against a connected agent
+    When the dialog opens on that same agent
+    Then the parameter line still holds them
 
   @integration
   Scenario: A run refused because every scenario is archived says so in the dialog

@@ -79,6 +79,7 @@ import {
 import {
   declaredDefaults,
   targetKeyOf,
+  targetLabelOf,
   targetLabels,
   withCanonicalOverrides,
 } from "./target-key";
@@ -216,11 +217,17 @@ async function resolveParametersPerTarget(params: {
     const targetKey = targetKeyOf(target);
     if (parametersByTargetKey.has(targetKey)) continue;
 
+    const agent = params.agentsById.get(target.referenceId);
     const resolved = await resolveRunParameters({
       scenarios: params.scenarios,
-      targetDefinitions: agentParameterDefinitionsOf(
-        params.agentsById.get(target.referenceId),
-      ),
+      targetDefinitions: agentParameterDefinitionsOf(agent),
+      targetLabel: agent
+        ? targetLabelOf({
+            name: agent.name,
+            environment: agent.environment,
+            differingNames: new Set(),
+          })
+        : undefined,
       values: { ...params.values, ...target.runParameters },
     });
     parametersByTargetKey.set(

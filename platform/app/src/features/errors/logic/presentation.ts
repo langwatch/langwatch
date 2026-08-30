@@ -1733,20 +1733,25 @@ const presentations = {
   },
   // ---- scenario run parameters ----
   scenario_parameter_unknown: {
-    // Both lists are our own names, not free text: the run dialog needs to
-    // show the rejected one so the typo is visible, and the declared ones so
-    // the customer can see what they meant to write.
-    title: "No scenario in this run has a parameter by that name",
+    // The lists and the target are our own names, not free text: the run
+    // dialog needs to show the rejected name so the typo is visible, the
+    // declared ones so the customer can see what they meant to write, and the
+    // target because a run against another agent can accept the same name.
+    title: "Nothing in this run declares a parameter by that name",
     describe: (error) => {
       const unknown = strList(error, "unknownKeys");
       const declared = strList(error, "declaredNames");
+      const target = str(error, "targetLabel", "");
+      const source = target
+        ? `by any scenario in this run, and not by ${target}`
+        : "by any scenario in this run, and not by the agent it runs against";
       const rejected =
         unknown.length > 0
-          ? `${listLabels(unknown)} ${unknown.length === 1 ? "isn't" : "aren't"} declared by any scenario in this run.`
-          : "One of the values supplied isn't declared by any scenario in this run.";
+          ? `${listLabels(unknown)} ${unknown.length === 1 ? "isn't" : "aren't"} declared ${source}.`
+          : `One of the values supplied isn't declared ${source}.`;
       return declared.length > 0
         ? `${rejected} You can set ${listLabels(declared)}.`
-        : `${rejected} None of its scenarios declare parameters.`;
+        : `${rejected} This run declares no parameters at all.`;
     },
   },
   scenario_test_suite_not_found: {

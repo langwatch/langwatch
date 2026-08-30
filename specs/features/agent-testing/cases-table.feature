@@ -413,6 +413,15 @@ Feature: The scenarios table
     Then the runs of the suite are not read
     And opening the list reads them
 
+  # --- Save & Run ---
+
+  @integration
+  Scenario: Save & Run opens the run dialog again after a run drawer was closed
+    Given a scenario saved with Save & Run, whose run drawer was opened and closed
+    When Save & Run is used a second time on the same page
+    Then the run dialog opens again
+    And the scenario is not only saved
+
   # --- Empty states ---
 
   @integration

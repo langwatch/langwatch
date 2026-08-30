@@ -10,6 +10,7 @@
  */
 
 import { Box, VStack } from "@chakra-ui/react";
+import { useEffect, useRef } from "react";
 import { HandledErrorAlert } from "~/features/errors";
 import { CustomizeChips } from "../shared/CustomizeChips";
 import { FieldLabel } from "../shared/DialogFields";
@@ -133,8 +134,22 @@ function ComparisonBlocks({
   );
 }
 
-/** What the dialog says when the run cannot start, or did not. */
+/**
+ * What the dialog says when the run cannot start, or did not.
+ *
+ * The alert stands at the foot of a body that scrolls, so a refusal on a
+ * dialog with several blocks open lands out of view and the run reads as one
+ * that did nothing at all. It is brought into view the moment it appears.
+ */
 function RunDialogNotices({ form }: { form: RunDialogForm }) {
+  const alert = useRef<HTMLDivElement>(null);
+  const { inlineError } = form;
+
+  useEffect(() => {
+    if (inlineError == null) return;
+    alert.current?.scrollIntoView?.({ block: "nearest" });
+  }, [inlineError]);
+
   return (
     <>
       {form.missingProvider && <MissingProviderNotice />}
@@ -148,10 +163,10 @@ function RunDialogNotices({ form }: { form: RunDialogForm }) {
         }
       />
 
-      {form.inlineError != null && (
-        <Box data-testid="run-dialog-error">
+      {inlineError != null && (
+        <Box ref={alert} data-testid="run-dialog-error">
           <HandledErrorAlert
-            error={form.inlineError}
+            error={inlineError}
             fallbackTitle="Couldn't start the run"
           />
         </Box>

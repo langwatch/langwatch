@@ -52,17 +52,23 @@ export type ResolvedScenarioParameters = {
 };
 
 /**
- * Refuses the run when the caller named something no scenario in it declares.
+ * Refuses the run when the caller named something nothing in it declares.
  *
  * A name the run cannot act on is almost always a typo, and a run that
  * silently ignored it would report a pass for values the target never saw.
+ * The declarations read are the scenarios' own plus the target's, so the
+ * refusal names the target: the same value can be right for one agent of the
+ * run and unknown to the next.
  */
 function assertEveryNameIsDeclared({
   declaredNames,
   values,
+  targetLabel,
 }: {
   declaredNames: Set<string>;
   values?: RunParameterValues;
+  /** The target this set of values was resolved for, when the run names one. */
+  targetLabel?: string;
 }): void {
   if (!values) return;
   const unknownKeys = findUnknownParameterKeys({ declaredNames, values });
@@ -70,6 +76,7 @@ function assertEveryNameIsDeclared({
   throw new ScenarioParameterUnknownError({
     unknownKeys,
     declaredNames: [...declaredNames],
+    ...(targetLabel ? { targetLabel } : {}),
   });
 }
 
@@ -238,7 +245,7 @@ function secretValuesFor({
  * the secret ones out of that merge.
  *
  * @throws {ScenarioParameterUnknownError} when a supplied name is declared by
- *   no scenario in the run.
+ *   no scenario in the run and by no target of it.
  * @throws {ScenarioSecretParameterConflictError} when one name is declared
  *   secret by one scenario in the run and plain by another.
  * @throws {ScenarioSecretParameterMissingError} when a declared secret has no
@@ -255,6 +262,7 @@ function secretValuesFor({
 export async function resolveRunParameters({
   scenarios,
   targetDefinitions = [],
+  targetLabel,
   values,
 }: {
   scenarios: readonly ScenarioRunConfig[];
@@ -265,6 +273,8 @@ export async function resolveRunParameters({
    * never secret: a secret stays scenario-declared and run-level.
    */
   targetDefinitions?: readonly ScenarioParameterDefinition[];
+  /** What the target is called, for a refusal that names it. */
+  targetLabel?: string;
   values?: RunParameterValues;
 }): Promise<Map<string, ResolvedScenarioParameters>> {
   const targetPlain = targetDefinitions.filter(
@@ -300,7 +310,7 @@ export async function resolveRunParameters({
   for (const definition of targetPlain) plainNames.add(definition.name);
   const declaredNames = new Set([...plainNames, ...secretNames]);
 
-  assertEveryNameIsDeclared({ declaredNames, values });
+  assertEveryNameIsDeclared({ declaredNames, values, targetLabel });
   assertEveryValueIsAnOption({
     definitions: [...allDefinitions, ...targetPlain],
     values,

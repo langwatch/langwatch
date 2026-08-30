@@ -166,6 +166,19 @@ const OFFLINE_AGENT = {
   type: "http" as const,
   config: {},
 };
+/** A connected agent whose own function declares two parameters. */
+const CONNECTED_AGENT = {
+  id: "agent_connected",
+  name: "support-agent",
+  type: "connected" as const,
+  config: {},
+  environment: "production",
+  status: "online" as const,
+  parameters: [
+    { name: "model", defaultValue: "gpt-5-mini" },
+    { name: "plan", defaultValue: "free" },
+  ],
+};
 
 const suiteSubject = (
   overrides: Partial<Extract<RunDialogSubject, { kind: "suite" }>> = {},
@@ -1268,6 +1281,100 @@ describe("<RunDialog/>", () => {
     expect(mockSuitesRunPlan).not.toHaveBeenCalled();
   });
 
+  describe("when a run is queued", () => {
+    /** @scenario "The dialog is gone before the run drawer opens" */
+    it("closes the dialog before it says the run started", async () => {
+      const user = userEvent.setup();
+      const order: string[] = [];
+      const onClose = vi.fn(() => order.push("close"));
+      const onRunStarted = vi.fn(() => order.push("started"));
+      render(
+        <RunDialog
+          subject={suiteSubject({
+            initialTarget: { type: "http", id: "agent_1" },
+          })}
+          onClose={onClose}
+          onRunStarted={onRunStarted}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      await user.click(screen.getByTestId("run-dialog-run"));
+
+      await waitFor(() => expect(onRunStarted).toHaveBeenCalled());
+      expect(order).toEqual(["close", "started"]);
+    });
+  });
+
+  // --- Parameters the chosen agent cannot read ---
+
+  describe("when the run remembers values of a run against another agent", () => {
+    const rememberedOn = (referenceId: string) =>
+      suiteSubject({
+        initialTarget: {
+          type: referenceId === "agent_1" ? "http" : "connected",
+          id: referenceId,
+        },
+        persistedTarget: {
+          type: referenceId === "agent_1" ? "http" : "connected",
+          referenceId,
+          runParameters: { model: "gpt-5-mini", plan: "free" },
+        },
+      });
+
+    /** @scenario "A remembered value the chosen agent cannot read is dropped" */
+    it("drops them and folds the block away when the agent declares none", async () => {
+      mockAgentsGetAll.mockReturnValue({
+        data: [ONLINE_AGENT, CONNECTED_AGENT],
+      });
+      renderDialog(rememberedOn("agent_1"));
+
+      await waitFor(() =>
+        expect(
+          screen.queryByTestId("run-dialog-parameters"),
+        ).not.toBeInTheDocument(),
+      );
+      expect(screen.getByTestId("run-dialog-run")).not.toBeDisabled();
+    });
+
+    /** @scenario "A value the chosen agent declares is kept" */
+    it("keeps them when the agent that declares them is the one chosen", async () => {
+      mockAgentsGetAll.mockReturnValue({
+        data: [ONLINE_AGENT, CONNECTED_AGENT],
+      });
+      renderDialog(rememberedOn("agent_connected"));
+
+      const line = await screen.findByTestId("run-dialog-parameter-line");
+      expect(line).toHaveValue("model=gpt-5-mini, plan=free");
+      expect(screen.getByTestId("run-dialog-run")).not.toBeDisabled();
+    });
+  });
+
+  describe("when a name nothing in the run declares is typed", () => {
+    /** @scenario "A typed value nothing in the run declares is read back" */
+    it("says so under the field, and keeps the value", async () => {
+      const user = userEvent.setup();
+      mockScenariosGetAll.mockReturnValue(
+        casesDeclaring([{ name: "model", defaultValue: "gpt-5" }]),
+      );
+      renderDialog(
+        suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
+      );
+
+      await user.click(screen.getByTestId("customize-chip-params"));
+      const line = screen.getByTestId("run-dialog-parameter-line");
+      await user.click(line);
+      await user.paste(", seats=12");
+
+      expect(
+        await screen.findByText(
+          /seats is not declared by any scenario in this run, and not by prod-agent/,
+        ),
+      ).toBeInTheDocument();
+      expect(line).toHaveValue("model=gpt-5, seats=12");
+    });
+  });
+
   // --- Failure paths ---
 
   /** @scenario "A parameter value the scenarios do not declare is refused by name" */
@@ -1277,6 +1384,7 @@ describe("<RunDialog/>", () => {
       handledRejection("scenario_parameter_unknown", {
         unknownKeys: ["modle"],
         declaredNames: ["model"],
+        targetLabel: "support-agent · production",
       }),
     );
     renderDialog(
@@ -1287,10 +1395,11 @@ describe("<RunDialog/>", () => {
 
     const error = await screen.findByTestId("run-dialog-error");
     expect(error).toHaveTextContent(
-      "No scenario in this run has a parameter by that name",
+      "Nothing in this run declares a parameter by that name",
     );
     expect(error).toHaveTextContent("modle");
     expect(error).toHaveTextContent("model");
+    expect(error).toHaveTextContent("support-agent · production");
   });
 
   /** @scenario "A run refused because every scenario is archived says so in the dialog" */

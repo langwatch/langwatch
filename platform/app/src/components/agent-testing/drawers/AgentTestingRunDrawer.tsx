@@ -83,7 +83,12 @@ export function AgentTestingRunDrawer({ open }: { open?: boolean }) {
   return (
     <Drawer.Root
       open={!!open}
-      onOpenChange={() => closeDrawer()}
+      // Only a close is a close. The handler is called on every change of the
+      // open state, so one that reads nothing closes the drawer the moment it
+      // is asked to open, and the run that opened it lands on a bare page.
+      onOpenChange={({ open: isOpen }) => {
+        if (!isOpen) closeDrawer();
+      }}
       placement="end"
       size="lg"
     >

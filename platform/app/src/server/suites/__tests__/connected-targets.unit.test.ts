@@ -233,6 +233,23 @@ describe("SuiteService.run with a connected target", () => {
       });
       expect(refused.startRun).not.toHaveBeenCalled();
     });
+
+    /** @scenario "The refusal names the target it was resolved for" */
+    it("names the target the values were resolved for", async () => {
+      const { service } = serviceWith({ agents, scenarioParameters });
+
+      const failure = await service
+        .run({
+          ...runDefaults,
+          suite: suiteWith([{ type: "connected", referenceId: "agent_1" }]),
+          parameters: { region: "eu" },
+        })
+        .catch((error: unknown) => error);
+
+      expect(failure).toMatchObject({
+        meta: { targetLabel: "support-agent · production" },
+      });
+    });
   });
 
   describe("when the scenario and the agent both default one name", () => {

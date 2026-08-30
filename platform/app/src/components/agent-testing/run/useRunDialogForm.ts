@@ -56,6 +56,12 @@ import type {
   RunDialogSubject,
   RunTarget,
 } from "./run-dialog-types";
+import {
+  lineWithoutUndeclared,
+  undeclaredNamesOnLine,
+  undeclaredNamesOnRows,
+  undeclaredParameterMessage,
+} from "./undeclared-parameters";
 import { useCompareRows } from "./useCompareRows";
 import { useRunConfigurationHistory } from "./useRunConfigurationHistory";
 import { useRunHistorySeed } from "./useRunHistorySeed";
@@ -141,6 +147,10 @@ function rememberedParameters(subject: RunDialogSubject | null) {
 /** The state of the parameter block: its line, its rows and its secrets. */
 function useParameterFieldsState() {
   const [parameterLine, setParameterLine] = useState("");
+  // False while the line is the one the dialog wrote itself, from what the
+  // subject remembers or from a stored configuration. Only a line the dialog
+  // wrote may be shortened when the agent cannot read what is on it.
+  const [parameterLineTyped, setParameterLineTyped] = useState(false);
   // Null while the line is what the block holds: the rows are read off the
   // line until something is typed into one of them.
   const [parameterRows, setParameterRows] = useState<ParameterRow[] | null>(
@@ -152,6 +162,8 @@ function useParameterFieldsState() {
   return {
     parameterLine,
     setParameterLine,
+    parameterLineTyped,
+    setParameterLineTyped,
     parameterRows,
     setParameterRows,
     rowsRequested,
@@ -192,6 +204,7 @@ function useRunDialogFields(subject: RunDialogSubject | null) {
     setNote("");
     setShowParams(remembered.show);
     parameterFields.setParameterLine(remembered.line);
+    parameterFields.setParameterLineTyped(false);
     parameterFields.setRowsRequested(remembered.rowsRequested);
     parameterFields.setParameterRows(remembered.rows);
     parameterFields.setSecretValues({});
@@ -288,6 +301,11 @@ function useRunDialogChoices(subject: RunDialogSubject | null) {
     allScenarios,
     testSuites: testSuites ?? [],
     scopeScenarios,
+    /**
+     * Whether the two reads that hold every declaration have answered. Until
+     * they do, a name the dialog cannot find is not an unknown name.
+     */
+    areChoicesLoaded: agents !== undefined && allScenarios !== undefined,
   };
 }
 
@@ -369,6 +387,150 @@ function useDeclaredParameters({
   return { parameterDefinitions, declaredParametersOf, secretDefinitions };
 }
 
+/** The agent the run goes against, as the dialog names it. */
+function targetLabelOf({
+  target,
+  agents,
+}: {
+  target: TargetValue;
+  agents: readonly RunDialogAgent[];
+}): string | null {
+  if (!target || target.type === "prompt") return null;
+  const agent = agents.find((candidate) => candidate.id === target.id);
+  if (!agent) return null;
+  return agent.label ?? agent.name;
+}
+
+/**
+ * The plain overrides the block holds that nothing in the run declares.
+ *
+ * A line the dialog wrote itself is shortened to what the run can read. A run
+ * remembers the values of the agent it went against, so opening the dialog on
+ * another agent would otherwise carry them to one whose function has no
+ * parameter by that name, and the run would be refused the moment it started.
+ *
+ * A line somebody wrote is left as it is and read back to them instead: a
+ * value that was typed is never taken away in silence, and a name the run
+ * cannot read still goes out, so the server refuses it by name rather than
+ * the dialog dropping it. The field says so first, under the value itself.
+ */
+function useUndeclaredParameters({
+  fields,
+  definitions,
+  rows,
+  showParameterRows,
+  hasDeclaredSecrets,
+  agents,
+  isLoaded,
+  isCompare,
+}: {
+  fields: RunDialogFields;
+  definitions: readonly DeclaredParameter[];
+  rows: readonly ParameterRow[];
+  showParameterRows: boolean;
+  /** Whether a declared secret holds the block open on its own. */
+  hasDeclaredSecrets: boolean;
+  agents: readonly RunDialogAgent[];
+  /** Whether the reads that hold the declarations have answered. */
+  isLoaded: boolean;
+  isCompare: boolean;
+}): ParameterFieldError | null {
+  const { parameterLine, parameterLineTyped, setParameterLine } = fields;
+  const { showParams, setShowParams, rowsRequested, target } = fields;
+  // A comparison keeps its plain values on the rows of its targets, each one
+  // read against its own agent, so this block holds the secrets alone.
+  const isActive = isLoaded && showParams && !isCompare;
+
+  useEffect(() => {
+    if (!isActive || parameterLineTyped) return;
+    const shortened = lineWithoutUndeclared({
+      line: parameterLine,
+      definitions,
+    });
+    if (shortened === parameterLine) return;
+    setParameterLine(shortened);
+    // A block that held remembered values alone has nothing left to say, so
+    // it folds away and the chip offers it again.
+    if (shortened === "" && !rowsRequested && !hasDeclaredSecrets) {
+      setShowParams(false);
+    }
+  }, [
+    isActive,
+    parameterLineTyped,
+    parameterLine,
+    definitions,
+    rowsRequested,
+    hasDeclaredSecrets,
+    setParameterLine,
+    setShowParams,
+  ]);
+
+  const names = useMemo(() => {
+    if (!isActive) return [];
+    return showParameterRows
+      ? undeclaredNamesOnRows({ rows, definitions })
+      : undeclaredNamesOnLine({ line: parameterLine, definitions });
+  }, [isActive, showParameterRows, rows, parameterLine, definitions]);
+
+  return useMemo(() => {
+    const [first] = names;
+    if (first === undefined) return null;
+    return {
+      name: first,
+      message: undeclaredParameterMessage({
+        names,
+        targetLabel: targetLabelOf({ target, agents }),
+      }),
+    };
+  }, [names, target, agents]);
+}
+
+/**
+ * The secrets of the block: their values, whether the run still waits for one,
+ * and whether the block may fold back into its single line.
+ *
+ * A declared secret holds the block in its rows, since a value that must stay
+ * hidden cannot be read on a line beside the plain ones.
+ */
+function useSecretParameterFields({
+  fields,
+  secretDefinitions,
+  rows,
+  showParameterRows,
+  isCompare,
+}: {
+  fields: RunDialogFields;
+  secretDefinitions: readonly DeclaredParameter[];
+  rows: ParameterRow[];
+  showParameterRows: boolean;
+  isCompare: boolean;
+}) {
+  const { showParams, secretValues, setSecretValues } = fields;
+
+  const setSecretValue = useCallback(
+    (name: string, value: string) => {
+      setSecretValues((previous) => ({ ...previous, [name]: value }));
+    },
+    [setSecretValues],
+  );
+
+  const isCollecting = showParams || isCompare;
+  const declaredWithoutValue = secretDefinitions.some(
+    (definition) => (secretValues[definition.name] ?? "") === "",
+  );
+  const rowWithoutValue =
+    (showParameterRows || isCompare) && missingSecretRowNames(rows).length > 0;
+
+  return {
+    setSecretValue,
+    hasMissingSecrets:
+      isCollecting && (declaredWithoutValue || rowWithoutValue),
+    /** Whether the block may fold back into the single line it started on. */
+    canLeaveParameterRows:
+      secretDefinitions.length === 0 && canCollapseRows(rows),
+  };
+}
+
 /**
  * The overrides the run can carry, and the fields that collect them.
  *
@@ -385,6 +547,7 @@ function useRunDialogParameters({
   targetAgentIds,
   fields,
   isCompare,
+  areChoicesLoaded,
 }: {
   subject: RunDialogSubject | null;
   allScenarios: readonly { id: string; parameters: unknown }[] | undefined;
@@ -393,9 +556,10 @@ function useRunDialogParameters({
   targetAgentIds: readonly string[];
   fields: RunDialogFields;
   isCompare: boolean;
+  /** Whether the reads that hold the declarations have answered. */
+  areChoicesLoaded: boolean;
 }) {
-  const { showParams, parameterLine } = fields;
-  const { secretValues, setSecretValues } = fields;
+  const { showParams, parameterLine, secretValues } = fields;
 
   const scenarioIds = useMemo(
     () => scenarioIdsOfSubject(subject, allScenarios ?? []),
@@ -427,18 +591,15 @@ function useRunDialogParameters({
     parameterDefinitions,
   });
 
-  const setSecretValue = useCallback(
-    (name: string, value: string) => {
-      setSecretValues((previous) => ({ ...previous, [name]: value }));
-    },
-    [setSecretValues],
-  );
-
   const rowActions = useParameterRowActions({ fields, rows: parameterRows });
 
-  /** Whether the block may fold back into the single line it started on. */
-  const canLeaveParameterRows =
-    !hasDeclaredSecrets && canCollapseRows(parameterRows);
+  const secrets = useSecretParameterFields({
+    fields,
+    secretDefinitions,
+    rows: parameterRows,
+    showParameterRows,
+    isCompare,
+  });
 
   const values = resolveParameterValues({
     showParams: showParams || isCompare,
@@ -450,15 +611,18 @@ function useRunDialogParameters({
     definitions: parameterDefinitions,
   });
 
-  const hasMissingSecrets =
-    (showParams || isCompare) &&
-    (secretDefinitions.some(
-      (definition) => (secretValues[definition.name] ?? "") === "",
-    ) ||
-      ((showParameterRows || isCompare) &&
-        missingSecretRowNames(parameterRows).length > 0));
-
   const parameterDefaults = useParameterDefaults(parameterDefinitions);
+
+  const undeclaredError = useUndeclaredParameters({
+    fields,
+    definitions: parameterDefinitions,
+    rows: parameterRows,
+    showParameterRows,
+    hasDeclaredSecrets,
+    agents,
+    isLoaded: areChoicesLoaded,
+    isCompare,
+  });
 
   return {
     parameterDefinitions,
@@ -467,13 +631,14 @@ function useRunDialogParameters({
     secretDefinitions,
     parameterRows,
     showParameterRows,
-    canLeaveParameterRows,
     ...rowActions,
     showParameters,
     hideParameters,
-    setSecretValue,
+    ...secrets,
     ...values,
-    hasMissingSecrets,
+    // A refusal the server named wins: it read the whole run, and this one is
+    // only what the dialog can see of the same rule.
+    parameterError: fields.parameterError ?? undeclaredError,
   };
 }
 
@@ -528,16 +693,22 @@ function useParameterRowActions({
   rows: ParameterRow[];
 }) {
   const { setParameterLine, setParameterRows, setRowsRequested } = fields;
-  const { setParameterError } = fields;
+  const { setParameterError, setParameterLineTyped } = fields;
 
   /** Typing on the line makes the line what the rows are read from again. */
   const editParameterLine = useCallback(
     (line: string) => {
       setParameterLine(line);
+      setParameterLineTyped(true);
       setParameterRows(null);
       setParameterError(null);
     },
-    [setParameterLine, setParameterRows, setParameterError],
+    [
+      setParameterLine,
+      setParameterLineTyped,
+      setParameterRows,
+      setParameterError,
+    ],
   );
 
   const setParameterRowsMode = useCallback(
@@ -984,6 +1155,7 @@ export function useRunDialogForm(subject: RunDialogSubject | null) {
     targetAgentIds,
     fields,
     isCompare: planFields.showCompare,
+    areChoicesLoaded: choices.areChoicesLoaded,
   });
   const targeting = useRunDialogTargeting({
     fields,

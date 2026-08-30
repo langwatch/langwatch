@@ -224,7 +224,10 @@ function ClassicScenarioRunDetailDrawer({
     <>
       <Drawer.Root
         open={!!open}
-        onOpenChange={() => closeDrawer()}
+        // Only a close is a close; see AgentTestingRunDrawer.
+        onOpenChange={({ open: isOpen }) => {
+          if (!isOpen) closeDrawer();
+        }}
         placement="end"
         size="lg"
       >
