@@ -3,10 +3,7 @@ import type {
   ScenarioExecutionService,
   ScenarioExecutionResult,
 } from "@langwatch/scenario-contract";
-import {
-  createContextFromJobData,
-  runWithContext,
-} from "@langwatch/observability/context";
+import { createContextFromJobData, runWithContext } from "@langwatch/observability/context";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { CancellationSubscriberPort } from "../ports/cancellation-channel.port";
 import { ScenarioExecutionRunnerPort } from "../ports/scenario-execution-runner.port";
@@ -124,10 +121,7 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
     this.options.pool.drain();
   }
 
-  async handleFailed(
-    jobData: ExecutionJobData,
-    error: string | undefined,
-  ): Promise<void> {
+  async handleFailed(jobData: ExecutionJobData, error: string | undefined): Promise<void> {
     await this.options.execution.finishUnsuccessfulRun({
       projectId: jobData.projectId,
       scenarioId: jobData.scenarioId,
@@ -177,26 +171,17 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
     try {
       prefetch = await preparation.result;
     } catch (error) {
-      await childSession?.abort();
-      if (!childSession) {
-        this.options.pool.deregisterChild(jobData.scenarioRunId);
-      }
+      await this.releaseChild({ childSession, scenarioRunId: jobData.scenarioRunId });
       throw error;
     }
 
     if (this.options.pool.wasCancelled(jobData.scenarioRunId)) {
-      await childSession?.abort();
-      if (!childSession) {
-        this.options.pool.deregisterChild(jobData.scenarioRunId);
-      }
+      await this.releaseChild({ childSession, scenarioRunId: jobData.scenarioRunId });
       await this.handleCancelled(jobData, "Cancelled before execution started");
       return;
     }
     if (!prefetch.success) {
-      await childSession?.abort();
-      if (!childSession) {
-        this.options.pool.deregisterChild(jobData.scenarioRunId);
-      }
+      await this.releaseChild({ childSession, scenarioRunId: jobData.scenarioRunId });
       jobLogger.error(
         { error: prefetch.error, phase: "prefetch" },
         "Failed to prefetch scenario data",
@@ -228,6 +213,28 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
     });
   }
 
+  /**
+   * Releases whatever this run is holding.
+   *
+   * A child session deregisters itself as it aborts; without one, the pool is
+   * still holding a registration that nothing else will release.
+   */
+  private async releaseChild({
+    childSession,
+    scenarioRunId,
+  }: {
+    childSession: ScenarioChildExecutionSession | null;
+    scenarioRunId: string;
+  }): Promise<void> {
+    if (childSession) {
+      await childSession.abort();
+
+      return;
+    }
+
+    this.options.pool.deregisterChild(scenarioRunId);
+  }
+
   private async finishExecution(input: {
     jobData: ExecutionJobData;
     result: ScenarioExecutionResult;
@@ -241,10 +248,7 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
 
     if (result.success) {
       this.options.metrics.completed(durationMs);
-      jobLogger.info(
-        { success: true, durationMs, childDurationMs },
-        "Scenario job completed",
-      );
+      jobLogger.info({ success: true, durationMs, childDurationMs }, "Scenario job completed");
       return;
     }
     if (result.cancelled) {
