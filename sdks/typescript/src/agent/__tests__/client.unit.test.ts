@@ -162,6 +162,20 @@ const callFrame = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+/**
+ * A parameter schema whose validation waits for a gate, so a call can be held
+ * inside the parameter reading while another call frame arrives.
+ */
+const gatedParameters = (gate: Promise<void>) => ({
+  "~standard": {
+    jsonSchema: { input: () => ({ type: "object", properties: {} }) },
+    validate: async (value: unknown) => {
+      await gate;
+      return { value };
+    },
+  },
+});
+
 let platform: FakePlatform;
 let logs: ReturnType<typeof recordingLogger>;
 
@@ -220,6 +234,21 @@ describe("the agent client, given a fake platform", () => {
       const register = await connection.nextFrame<RegisterFrame>("register");
 
       expect(platform.connections).toHaveLength(1);
+      expect(register.agents.map((agent) => agent.name)).toEqual(["alpha", "beta"]);
+    });
+  });
+
+  describe("when an agent is defined before the register is answered", () => {
+    /** @scenario "An agent defined before the registration is answered still reaches the platform" */
+    it("opens a new socket whose register lists both agents", async () => {
+      define(async () => "a", { name: "alpha" });
+      const first = await platform.nextConnection();
+      await first.nextFrame<RegisterFrame>("register");
+
+      define(async () => "b", { name: "beta" });
+
+      const second = await platform.nextConnection();
+      const register = await second.nextFrame<RegisterFrame>("register");
       expect(register.agents.map((agent) => agent.name)).toEqual(["alpha", "beta"]);
     });
   });
@@ -417,19 +446,105 @@ describe("the agent client, given a fake platform", () => {
       const gate = new Promise<void>((resolve) => {
         release = resolve;
       });
+      let calls = 0;
+      const { connection } = await connectSupport(
+        async () => {
+          calls += 1;
+          if (calls === 1) {
+            await gate;
+            return "late";
+          }
+          return "second";
+        },
+        { concurrency: 2 },
+      );
+
+      connection.send(callFrame({ callId: "call_1" }));
+      await connection.nextFrame("ack");
+      connection.send({ type: "cancel", callId: "call_1" });
+
+      // One socket keeps the order, so the result of a call sent after the
+      // cancel proves the client read the cancel first.
+      connection.send(callFrame({ callId: "call_2" }));
+      expect(await connection.nextFrame("result")).toMatchObject({ callId: "call_2", output: "second" });
+
+      release();
+      // The same again after the handler returned: the third result proves the
+      // first call had its chance to answer.
+      connection.send(callFrame({ callId: "call_3" }));
+      expect(await connection.nextFrame("result")).toMatchObject({ callId: "call_3", output: "second" });
+      expect(connection.frames.filter((frame) => frame.type === "result")).toHaveLength(0);
+    });
+
+    /** @scenario "A cancel frame frees the concurrency slot at once" */
+    it("runs a later call after a cancel instead of refusing it as busy", async () => {
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let calls = 0;
       const { connection } = await connectSupport(async () => {
-        await gate;
-        return "late";
+        calls += 1;
+        if (calls === 1) {
+          await gate;
+          return "late";
+        }
+        return "second";
       });
 
       connection.send(callFrame({ callId: "call_1" }));
       await connection.nextFrame("ack");
       connection.send({ type: "cancel", callId: "call_1" });
-      await wait(20);
-      release();
-      await wait(50);
+      connection.send(callFrame({ callId: "call_2" }));
 
-      expect(connection.frames.filter((frame) => frame.type === "result")).toHaveLength(0);
+      expect(await connection.nextFrame("result")).toMatchObject({ callId: "call_2", output: "second" });
+      release();
+    });
+
+    /** @scenario "A handler that never returns frees its slot on the timeout" */
+    it("answers agent_call_timeout and takes the next call", async () => {
+      let calls = 0;
+      const { connection } = await connectSupport(
+        async () => {
+          calls += 1;
+          if (calls === 1) return new Promise<string>(() => undefined);
+          return "second";
+        },
+        { timeoutMs: 60 },
+      );
+
+      connection.send(callFrame({ callId: "call_1" }));
+      await connection.nextFrame("ack");
+      expect(await connection.nextFrame("result")).toMatchObject({
+        callId: "call_1",
+        error: { code: "agent_call_timeout" },
+      });
+
+      connection.send(callFrame({ callId: "call_2" }));
+      expect(await connection.nextFrame("result")).toMatchObject({ callId: "call_2", output: "second" });
+    });
+
+    /** @scenario "The concurrency slot is taken before the parameters are read" */
+    it("refuses a second call as busy while the first still reads its parameters", async () => {
+      let openGate!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        openGate = resolve;
+      });
+      const handler = vi.fn(async () => "ok");
+      const { connection } = await connectSupport(handler, {
+        parameters: gatedParameters(gate) as never,
+      });
+
+      connection.send(callFrame({ callId: "call_1" }));
+      connection.send(callFrame({ callId: "call_2" }));
+
+      expect(await connection.nextFrame("result")).toMatchObject({
+        callId: "call_2",
+        error: { code: "agent_busy" },
+      });
+      openGate();
+      expect(await connection.nextFrame("result")).toMatchObject({ callId: "call_1", output: "ok" });
+      expect(handler).toHaveBeenCalledTimes(1);
     });
 
     it("refuses a call whose deadline already passed", async () => {
@@ -573,7 +688,7 @@ describe("the agent client, given a fake platform", () => {
     });
   });
 
-  describe("when no WebSocket implementation is available", () => {
+  describe("when the ws package is not installed", () => {
     /** @scenario "No WebSocket implementation is one warning and the client gives up" */
     it("warns once about ws and leaves no timer armed", async () => {
       overrideSharedClientForTests({
@@ -586,7 +701,7 @@ describe("the agent client, given a fake platform", () => {
 
       const warnings = logs.lines("warn", /not connected to LangWatch/);
       expect(warnings).toHaveLength(1);
-      expect(warnings[0]).toMatch(/Install the ws package.*Node 22/);
+      expect(warnings[0]).toMatch(/npm install ws/);
       expect(sharedClientForTests()?.hasPendingConnect).toBe(false);
       expect((await agent({ messages: [] })).output).toBe("ok");
     });

@@ -1300,11 +1300,15 @@
             "pages": [
               "api-reference/agents/overview",
               "api-reference/agents/list-agents",
+              "api-reference/agents/list-poll",
               "api-reference/agents/create-agents",
+              "api-reference/agents/create-frames",
+              "api-reference/agents/create-register",
               "api-reference/agents/get-agents",
               "api-reference/agents/update-agents",
               "api-reference/agents/put-update-agents",
               "api-reference/agents/action-call",
+              "api-reference/agents/action-test",
               "api-reference/agents/delete-agents"
             ]
           },

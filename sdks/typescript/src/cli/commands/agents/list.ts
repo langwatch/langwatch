@@ -17,6 +17,18 @@ export const agentOwnerLabel = (agent: AgentResponse): string =>
 export const agentStatusLabel = (agent: AgentResponse): string => agent.status ?? "";
 
 /**
+ * Colours one status cell. The table pads the cell to the width of the widest
+ * value before it colours it, so the status is read from the trimmed text and
+ * the colour is applied to the padded cell, which keeps the columns aligned.
+ */
+export const agentStatusColor = (value: string): string => {
+  const status = value.trim();
+  if (status === "online") return chalk.green(value);
+  if (status === "offline") return chalk.gray(value);
+  return value;
+};
+
+/**
  * Returns the listing rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts). The `table` closure
  * is the human form.
@@ -71,8 +83,7 @@ export const listAgentsCommand = async (): Promise<CommandResult | void> => {
             Name: chalk.cyan,
             ID: chalk.green,
             Type: chalk.yellow,
-            Status: (value: string) =>
-              value === "online" ? chalk.green(value) : value === "offline" ? chalk.gray(value) : value,
+            Status: agentStatusColor,
           },
         });
 

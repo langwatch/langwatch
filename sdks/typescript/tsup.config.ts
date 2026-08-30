@@ -41,11 +41,37 @@ export default defineConfig([
       "src/observability-sdk/index.ts",
       "src/observability-sdk/setup/node/index.ts",
       "src/observability-sdk/instrumentation/langchain/index.ts",
-      "src/agent/index.ts",
     ],
     splitting: true,
     clean: false,
     format: ["cjs", "esm"],
+    dts: true,
+    sourcemap: true,
+    noExternal,
+    define,
+  },
+  {
+    // `langwatch/agent` — Node only, and built as a SEPARATE config object for
+    // that reason. `src/agent/transport.ts` loads the optional `ws` package
+    // with `createRequire(__filename)` so a runtime without it degrades to one
+    // message instead of failing while the module loads. In the ESM output
+    // `__filename` comes from `shims`, which spells it
+    // `fileURLToPath(import.meta.url)` and so needs both a target that keeps
+    // `import.meta` (the tsconfig target, es2017, replaces it with an empty
+    // object) and `node:url`. Both belong to this entry alone: shared with the
+    // library entries above, the shim would land in a chunk the
+    // browser-capable observability entries import.
+    //
+    // Object-form entry pins the output path, the way the CLI entry below
+    // does: a plain string entry would take src/agent as the outbase and emit
+    // dist/index.js over the library's main entry.
+    entry: { "agent/index": "src/agent/index.ts" },
+    splitting: false,
+    clean: false,
+    format: ["cjs", "esm"],
+    platform: "node",
+    target: "es2020",
+    shims: true,
     dts: true,
     sourcemap: true,
     noExternal,

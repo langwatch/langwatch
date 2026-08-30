@@ -17,6 +17,12 @@ Feature: connectAgent turns a function into a simulation target
       Then one register frame reaches the platform
       And it lists both agents
 
+    Scenario: An agent defined before the registration is answered still reaches the platform
+      Given an agent was defined and its register frame is not answered yet
+      When a second agent is defined
+      Then the client opens a new socket
+      And the register frame on it lists both agents
+
     Scenario: Nothing happens without an API key
       Given no API key is configured
       When an agent is defined
@@ -215,11 +221,28 @@ Feature: connectAgent turns a function into a simulation target
       When the platform sends cancel for it
       Then no result frame is sent for that call when the handler returns
 
+    Scenario: A cancel frame frees the concurrency slot at once
+      Given an agent with concurrency 1 and a call in progress
+      When the platform sends cancel for that call
+      Then a later call runs instead of being refused as busy
+
+    Scenario: A handler that never returns frees its slot on the timeout
+      Given an agent with concurrency 1 and a handler that never returns
+      When the call timeout passes
+      Then its result frame carries the error code agent_call_timeout
+      And a later call runs instead of being refused as busy
+
     Scenario: A call beyond the concurrency limit is refused as busy
       Given an agent with concurrency 1 and a call in progress
       When a second call frame arrives
       Then its result frame carries the error code agent_busy
       And the first call completes
+
+    Scenario: The concurrency slot is taken before the parameters are read
+      Given an agent with concurrency 1
+      When a second call frame arrives while the first call still reads its parameters
+      Then the second result frame carries the error code agent_busy
+      And the handler runs once
 
     Scenario: Disconnecting sends deregister and closes the socket
       Given a connected agent
@@ -284,9 +307,9 @@ Feature: connectAgent turns a function into a simulation target
       Then one info line says the agent connected
 
     Scenario: No WebSocket implementation is one warning and the client gives up
-      Given neither ws nor a global WebSocket can open a socket
+      Given the ws package is not installed
       When an agent is defined
-      Then one warning says to install ws or run on Node 22 or later
+      Then one warning says to install ws
       And no reconnect timer is left armed
 
     Scenario: The API key travels only in the Authorization header

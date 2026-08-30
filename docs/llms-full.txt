@@ -37512,7 +37512,7 @@ If the endpoint answers `{"reply": "...", "conversation_id": "conv_8f2"}`, set `
 }
 ```
 
-The first turn of a conversation renders `{{ session }}` as an empty string. A response with nothing at the path keeps the value from the previous turn. Any JSON value works: a string renders as text, an object or a list renders as raw JSON. The value is capped at 64 KB; a larger one fails the turn with `agent_payload_too_large`.
+The first turn of a conversation renders `{{ session }}` as an empty string. A response with no value at the path keeps the value from the previous turn. Any JSON value works: a string renders as text, an object or a list renders as raw JSON. The value is capped at 64 KB; a larger one fails the turn with `agent_payload_too_large`.
 
 An object or a list goes in the body without quotes. Give it a JSON value for the first turn with the `default` filter, or the body is not valid JSON before the endpoint has answered once:
 
@@ -37594,7 +37594,7 @@ langwatch agent create 'My Agent' --type http --config '{
 langwatch test-suite run 'Smoke' --target http:<agent-id> --wait
 ```
 
-`sessionPath` is optional; leave it out when the endpoint keeps nothing between turns.
+`sessionPath` is optional; leave it out when the endpoint keeps no value between turns.
 
 ### Common failures
 
@@ -67773,11 +67773,38 @@ openapi: "POST /api/agents/{id}/call"
 
 ---
 
+# FILE: ./api-reference/agents/action-test.mdx
+
+---
+title: "Create Test"
+openapi: "POST /api/agents/{id}/test"
+---
+
+---
+
 # FILE: ./api-reference/agents/create-agents.mdx
 
 ---
 title: "Create a new agent"
 openapi: "POST /api/agents"
+---
+
+---
+
+# FILE: ./api-reference/agents/create-frames.mdx
+
+---
+title: "Create Frames"
+openapi: "POST /api/agents/connect/frames"
+---
+
+---
+
+# FILE: ./api-reference/agents/create-register.mdx
+
+---
+title: "Create Register"
+openapi: "POST /api/agents/connect/register"
 ---
 
 ---
@@ -67805,6 +67832,15 @@ openapi: "GET /api/agents/{id}"
 ---
 title: "List all non-archived agents for the project"
 openapi: "GET /api/agents"
+---
+
+---
+
+# FILE: ./api-reference/agents/list-poll.mdx
+
+---
+title: "List Poll"
+openapi: "GET /api/agents/connect/poll"
 ---
 
 ---

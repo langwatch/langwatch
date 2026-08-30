@@ -131,7 +131,10 @@ export function refusalAdvice(frame: RefusedFrame): string {
 
 interface InFlightCall {
   runtime: AgentRuntime;
+  /** True once the call was cancelled or timed out: a late result is dropped. */
   cancelled: boolean;
+  /** The timer that ends the call on its deadline, cleared when the call ends. */
+  timer: NodeJS.Timeout | null;
 }
 
 const SHUTDOWN_SIGNALS = ["SIGINT", "SIGTERM"] as const;
@@ -162,6 +165,8 @@ export class AgentClient {
   private socket: SocketLike | null = null;
   private registered = false;
   private stopped = false;
+  /** True while a socket is closed on purpose to register the full agent list again. */
+  private restarting = false;
   private attempt = 0;
   private connectTimer: NodeJS.Timeout | null = null;
   private watchdog: NodeJS.Timeout | null = null;
@@ -224,7 +229,28 @@ export class AgentClient {
       return;
     }
     this.stopped = false;
+    if (this.socket) {
+      // The register frame of the earlier agents is already on its way, and
+      // the platform ignores a second register on an open socket. A fresh
+      // socket carries the complete list.
+      this.restartSocket();
+      return;
+    }
     this.scheduleConnect(0);
+  }
+
+  /** Closes the socket and connects again at once, keeping the reconnect loop. */
+  private restartSocket(): void {
+    const socket = this.socket;
+    if (!socket) return;
+    this.restarting = true;
+    try {
+      socket.close(1000, "agents changed");
+    } catch {
+      this.restarting = false;
+      this.socket = null;
+      this.scheduleConnect(0);
+    }
   }
 
   /** Removes an agent; the last one leaving deregisters and closes the socket. */
@@ -324,7 +350,7 @@ export class AgentClient {
     } catch (error) {
       if (error instanceof NoWebSocketError) {
         this.giveUp(
-          "no WebSocket implementation is available. Install the ws package (npm install ws) or run on Node 22 or later.",
+          "the ws package is not installed. Run npm install ws; the platform reads the API key from a request header, and only ws can send it.",
         );
         return;
       }
@@ -347,6 +373,8 @@ export class AgentClient {
 
   private onClosed(code?: number): void {
     const wasRegistered = this.registered;
+    const restarting = this.restarting;
+    this.restarting = false;
     this.socket = null;
     this.registered = false;
     if (this.watchdog) {
@@ -364,6 +392,10 @@ export class AgentClient {
       this.logger.warn(
         `the WebSocket upgrade to ${this.url} was answered with HTTP ${status}; using the HTTP transport at ${this.httpUrl} instead`,
       );
+      this.scheduleConnect(0);
+      return;
+    }
+    if (restarting) {
       this.scheduleConnect(0);
       return;
     }
@@ -451,7 +483,11 @@ export class AgentClient {
         return;
       case "cancel": {
         const call = this.inFlight.get(frame.callId);
-        if (call) call.cancelled = true;
+        if (!call) return;
+        call.cancelled = true;
+        // The handler may run for as long as it wants; the slot it held is
+        // free at once, so the next call is not refused as busy.
+        this.releaseCall({ callId: frame.callId, entry: call });
         return;
       }
     }
@@ -522,10 +558,17 @@ export class AgentClient {
       return;
     }
 
+    // The slot is taken before the first await. Reading the parameters is
+    // asynchronous, and a second call arriving inside that window would pass
+    // the concurrency check above if the entry were written after it.
+    const entry: InFlightCall = { runtime, cancelled: false, timer: null };
+    this.inFlight.set(frame.callId, entry);
+
     let params: Record<string, AgentParameterValue>;
     try {
       params = await runtime.readParams(frame.params);
     } catch (error) {
+      this.releaseCall({ callId: frame.callId, entry });
       this.sendError({
         callId: frame.callId,
         code: "agent_parameter_invalid",
@@ -533,10 +576,15 @@ export class AgentClient {
       });
       return;
     }
+    if (entry.cancelled) {
+      this.releaseCall({ callId: frame.callId, entry });
+      return;
+    }
 
-    const entry: InFlightCall = { runtime, cancelled: false };
-    this.inFlight.set(frame.callId, entry);
+    // The ack means the function started: before it the platform may hand the
+    // call to another instance, so it stays after the parameters are read.
     this.send({ type: "ack", protocol: PROTOCOL_VERSION, callId: frame.callId });
+    this.armCallDeadline({ frame, entry, runtime });
 
     const parent = frame.traceparent
       ? propagation.extract(context.active(), { traceparent: frame.traceparent })
@@ -570,8 +618,54 @@ export class AgentClient {
       this.logger.warn(`agent "${runtime.name}" call ${frame.callId} failed: ${message}`);
       this.sendError({ callId: frame.callId, code, message });
     } finally {
-      this.inFlight.delete(frame.callId);
+      this.releaseCall({ callId: frame.callId, entry });
     }
+  }
+
+  /** Frees the slot the call holds and drops its deadline timer. */
+  private releaseCall({ callId, entry }: { callId: string; entry: InFlightCall }): void {
+    if (entry.timer) {
+      clearTimeout(entry.timer);
+      entry.timer = null;
+    }
+    if (this.inFlight.get(callId) === entry) this.inFlight.delete(callId);
+  }
+
+  /**
+   * The call ends on its deadline: one timeout result, and the slot is free
+   * from that moment. A handler that never returns then costs one call, not
+   * every call after it.
+   */
+  private armCallDeadline({
+    frame,
+    entry,
+    runtime,
+  }: {
+    frame: CallFrame;
+    entry: InFlightCall;
+    runtime: AgentRuntime;
+  }): void {
+    const fromDeadline = frame.deadlineAt === null ? Infinity : frame.deadlineAt - Date.now();
+    const limit = Math.min(fromDeadline, runtime.timeoutMs);
+    if (!Number.isFinite(limit)) return;
+    const timer = setTimeout(() => {
+      entry.timer = null;
+      if (entry.cancelled) return;
+      // The handler keeps running: a function cannot be stopped from here.
+      // Its late result is dropped, because the platform has an answer.
+      entry.cancelled = true;
+      this.releaseCall({ callId: frame.callId, entry });
+      this.logger.warn(
+        `agent "${runtime.name}" call ${frame.callId} passed its ${limit} ms limit`,
+      );
+      this.sendError({
+        callId: frame.callId,
+        code: "agent_call_timeout",
+        message: `the call passed the ${limit} ms limit of agent "${runtime.name}"`,
+      });
+    }, Math.max(0, limit));
+    timer.unref();
+    entry.timer = timer;
   }
 
   private sendError({ callId, code, message }: { callId: string; code: string; message: string }): void {

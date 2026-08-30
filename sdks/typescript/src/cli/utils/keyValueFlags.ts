@@ -99,10 +99,14 @@ export const parseKeyValueFlags = ({
  * `true` and `false`. Text that cannot be read as the declared type stays
  * text, and the platform refuses it by name.
  */
-export const coerceParameterValue = (
-  value: string,
-  type?: RunParameterType,
-): RunParameterValue => {
+export const coerceParameterValue = ({
+  value,
+  type,
+}: {
+  value: string;
+  /** The type the target declares for this name, when it declares one. */
+  type?: RunParameterType;
+}): RunParameterValue => {
   if (type === "string") return value;
   if (type === "number") {
     const asNumber = Number(value);
@@ -143,7 +147,7 @@ export const parseRunParameterFlags = ({
   const parsed = new Map<string, RunParameterValue>();
   for (const pair of pairs) {
     const { key, value } = splitPair({ pair, flag: PARAM_FLAG });
-    parsed.set(key, coerceParameterValue(value, types?.get(key)));
+    parsed.set(key, coerceParameterValue({ value, type: types?.get(key) }));
   }
   return Object.fromEntries(parsed);
 };

@@ -19,6 +19,11 @@ Feature: The agent commands show connected agents and run them through the relay
       And the connected agent reads online
       And the HTTP agent has an empty environment and status
 
+    Scenario: The status colour follows the status, not the column width
+      Given a list with both an online and an offline agent
+      When the status column is padded to the width of offline
+      Then online is still green and offline is still grey
+
     Scenario: The owner column reads the owner of a personal agent or the host of a machine-scoped one
       Given a personal development agent owned by a user and a host-scoped one
       When I run "langwatch agent list"

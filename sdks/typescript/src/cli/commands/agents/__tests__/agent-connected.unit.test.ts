@@ -7,6 +7,7 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import chalk from "chalk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/client-sdk/services/agents/agents-api.service", async (importOriginal) => {
@@ -35,7 +36,7 @@ import {
   type AgentResponse,
 } from "@/client-sdk/services/agents/agents-api.service";
 import { describeParameter, getAgentCommand } from "../get";
-import { agentOwnerLabel, agentStatusLabel, listAgentsCommand } from "../list";
+import { agentOwnerLabel, agentStatusColor, agentStatusLabel, listAgentsCommand } from "../list";
 import { buildRelayBody, runAgentCommand } from "../run";
 import { testAgentCommand } from "../test";
 
@@ -122,6 +123,19 @@ describe("listAgentsCommand()", () => {
       expect(output).toContain("online");
       expect(agentStatusLabel(httpAgent())).toBe("");
       expect(agentOwnerLabel(httpAgent())).toBe("");
+    });
+
+    /** @scenario "The status colour follows the status, not the column width" */
+    it("colours online green even when the column is padded to the width of offline", () => {
+      const level = chalk.level;
+      chalk.level = 1;
+      try {
+        expect(agentStatusColor("online ")).toBe(chalk.green("online "));
+        expect(agentStatusColor("offline")).toBe(chalk.gray("offline"));
+        expect(agentStatusColor("       ")).toBe("       ");
+      } finally {
+        chalk.level = level;
+      }
     });
 
     /** @scenario "The owner column reads the owner of a personal agent or the host of a machine-scoped one" */

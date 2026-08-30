@@ -72,75 +72,79 @@ describe("connectAgent()", () => {
     });
   });
 
-  describe("when parameters are a zod schema", () => {
-    /** @scenario "A zod schema types the handler params" */
-    it("types params as the parsed output of the schema", () => {
-      const agent = connectAgent(
-        {
-          name: "zod",
-          enabled: false,
-          parameters: z.object({
-            model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),
-            plan: z.string().default("free").describe("Customer plan"),
-            maxTools: z.number().int().default(5),
-          }),
-        },
-        async ({ params }) => {
-          expectTypeOf(params.model).toEqualTypeOf<"gpt-5" | "gpt-5-mini">();
-          expectTypeOf(params.plan).toEqualTypeOf<string>();
-          expectTypeOf(params.maxTools).toEqualTypeOf<number>();
-          return "ok";
-        },
-      );
-      const properties = agent.parameters.properties as Record<string, Record<string, unknown>>;
-      expect(properties.model?.enum).toEqual(["gpt-5", "gpt-5-mini"]);
-      expect(properties.plan?.description).toBe("Customer plan");
-      expect(properties.maxTools?.type).toBe("integer");
-    });
-
-    /** @scenario "A zod schema validates the values before the call" */
-    it("refuses a value the schema rejects before the handler runs", async () => {
-      const handler = vi.fn(async () => "ok");
-      const agent = connectAgent(
-        { name: "zod-int", enabled: false, parameters: z.object({ maxTools: z.number().int().default(5) }) },
-        handler,
-      );
-
-      await expect(agent({ messages: [], params: { maxTools: 2.5 } })).rejects.toMatchObject({
-        code: "agent_parameter_invalid",
-        message: expect.stringContaining("maxTools"),
+  describe("given the parameters are a zod schema", () => {
+    describe("when the agent is defined and called", () => {
+      /** @scenario "A zod schema types the handler params" */
+      it("types params as the parsed output of the schema", () => {
+        const agent = connectAgent(
+          {
+            name: "zod",
+            enabled: false,
+            parameters: z.object({
+              model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),
+              plan: z.string().default("free").describe("Customer plan"),
+              maxTools: z.number().int().default(5),
+            }),
+          },
+          async ({ params }) => {
+            expectTypeOf(params.model).toEqualTypeOf<"gpt-5" | "gpt-5-mini">();
+            expectTypeOf(params.plan).toEqualTypeOf<string>();
+            expectTypeOf(params.maxTools).toEqualTypeOf<number>();
+            return "ok";
+          },
+        );
+        const properties = agent.parameters.properties as Record<string, Record<string, unknown>>;
+        expect(properties.model?.enum).toEqual(["gpt-5", "gpt-5-mini"]);
+        expect(properties.plan?.description).toBe("Customer plan");
+        expect(properties.maxTools?.type).toBe("integer");
       });
-      expect(handler).not.toHaveBeenCalled();
-    });
 
-    /** @scenario "A zod schema fills its defaults and keeps undeclared values" */
-    it("fills the defaults and passes undeclared values through", async () => {
-      const seen: unknown[] = [];
-      const agent = connectAgent(
-        { name: "zod-defaults", enabled: false, parameters: z.object({ plan: z.string().default("free") }) },
-        async ({ params }) => {
-          seen.push(params);
-          return "ok";
-        },
-      );
+      /** @scenario "A zod schema validates the values before the call" */
+      it("refuses a value the schema rejects before the handler runs", async () => {
+        const handler = vi.fn(async () => "ok");
+        const agent = connectAgent(
+          { name: "zod-int", enabled: false, parameters: z.object({ maxTools: z.number().int().default(5) }) },
+          handler,
+        );
 
-      await agent({ messages: [], params: { tone: "formal" } as never });
+        await expect(agent({ messages: [], params: { maxTools: 2.5 } })).rejects.toMatchObject({
+          code: "agent_parameter_invalid",
+          message: expect.stringContaining("maxTools"),
+        });
+        expect(handler).not.toHaveBeenCalled();
+      });
 
-      expect(seen).toEqual([{ plan: "free", tone: "formal" }]);
+      /** @scenario "A zod schema fills its defaults and keeps undeclared values" */
+      it("fills the defaults and passes undeclared values through", async () => {
+        const seen: unknown[] = [];
+        const agent = connectAgent(
+          { name: "zod-defaults", enabled: false, parameters: z.object({ plan: z.string().default("free") }) },
+          async ({ params }) => {
+            seen.push(params);
+            return "ok";
+          },
+        );
+
+        await agent({ messages: [], params: { tone: "formal" } as never });
+
+        expect(seen).toEqual([{ plan: "free", tone: "formal" }]);
+      });
     });
   });
 
-  describe("when parameters are a plain JSON Schema", () => {
-    it("accepts it with untyped params", () => {
-      const fromJson = connectAgent(
-        {
-          name: "json",
-          enabled: false,
-          parameters: { type: "object", properties: { model: { type: "string", default: "gpt-5-mini" } } },
-        },
-        async () => "ok",
-      );
-      expect((fromJson.parameters.properties as Record<string, unknown>).model).toBeDefined();
+  describe("given the parameters are a plain JSON Schema", () => {
+    describe("when the agent is defined", () => {
+      it("accepts it with untyped params", () => {
+        const fromJson = connectAgent(
+          {
+            name: "json",
+            enabled: false,
+            parameters: { type: "object", properties: { model: { type: "string", default: "gpt-5-mini" } } },
+          },
+          async () => "ok",
+        );
+        expect((fromJson.parameters.properties as Record<string, unknown>).model).toBeDefined();
+      });
     });
   });
 

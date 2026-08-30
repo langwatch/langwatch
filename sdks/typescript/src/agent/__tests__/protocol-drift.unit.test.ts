@@ -22,11 +22,10 @@ const PLATFORM_PROTOCOL = resolve(
 const SDK_PROTOCOL = resolve(__dirname, "../protocol.ts");
 const SDK_CLIENT = resolve(__dirname, "../client.ts");
 
-/** The top-level keys of one zod object literal in the platform source, by schema name. */
-function platformKeys({ source, schema }: { source: string; schema: string }): string[] {
-  const start = source.indexOf(`export const ${schema} =`);
-  if (start === -1) throw new Error(`platform protocol has no ${schema}`);
-  const open = source.indexOf("{", start);
+/** The text between one brace and the brace that closes it, braces excluded. */
+function bracedBody({ source, from }: { source: string; from: number }): string {
+  const open = source.indexOf("{", from);
+  if (open === -1) throw new Error("no brace after the declaration");
   let depth = 0;
   let end = open;
   for (; end < source.length; end += 1) {
@@ -36,7 +35,14 @@ function platformKeys({ source, schema }: { source: string; schema: string }): s
       if (depth === 0) break;
     }
   }
-  const body = source.slice(open + 1, end);
+  return source.slice(open + 1, end);
+}
+
+/** The top-level keys of one zod object literal in the platform source, by schema name. */
+function platformKeys({ source, schema }: { source: string; schema: string }): string[] {
+  const start = source.indexOf(`export const ${schema} =`);
+  if (start === -1) throw new Error(`platform protocol has no ${schema}`);
+  const body = bracedBody({ source, from: start });
   const keys: string[] = [];
   let level = 0;
   for (const line of body.split("\n")) {
@@ -50,13 +56,27 @@ function platformKeys({ source, schema }: { source: string; schema: string }): s
   return keys;
 }
 
-/** The keys of one TypeScript interface in the SDK source, by name. */
+/**
+ * The top-level keys of one TypeScript interface in the SDK source, by name.
+ * The body is read by matching braces, so an inline object type such as
+ * `meta?: { projects: unknown[] }` neither cuts the list short nor adds the
+ * keys nested inside it.
+ */
 function sdkKeys({ source, name }: { source: string; name: string }): string[] {
-  const match = new RegExp(`export interface ${name}\\s*\\{([^}]*)\\}`).exec(source);
-  if (!match) throw new Error(`SDK protocol has no interface ${name}`);
-  return [...match[1]!.matchAll(/^\s*(?:readonly\s+)?([A-Za-z_][A-Za-z0-9_]*)\??:/gm)].map(
-    (entry) => entry[1]!,
-  );
+  const start = new RegExp(`export interface ${name}\\s*\\{`).exec(source);
+  if (!start) throw new Error(`SDK protocol has no interface ${name}`);
+  const body = bracedBody({ source, from: start.index });
+  const keys: string[] = [];
+  let level = 0;
+  for (const line of body.split("\n")) {
+    const trimmed = line.trim();
+    if (level === 0) {
+      const match = /^(?:readonly\s+)?([A-Za-z_][A-Za-z0-9_]*)\??:/.exec(trimmed);
+      if (match) keys.push(match[1]!);
+    }
+    level += (trimmed.match(/[{(]/g) ?? []).length - (trimmed.match(/[})]/g) ?? []).length;
+  }
+  return keys;
 }
 
 const sorted = (keys: string[]): string[] => [...keys].sort();
@@ -81,9 +101,9 @@ describe("the SDK protocol, given the platform's protocol module", () => {
 
   it("knows every frame type the platform names", () => {
     const platformTypes = [
-      ...new Set([...platform.matchAll(/type: z\.literal\("([a-z]+)"\)/g)].map((entry) => entry[1]!)),
+      ...new Set([...platform.matchAll(/type: z\.literal\("([a-z_]+)"\)/g)].map((entry) => entry[1]!)),
     ].sort();
-    const sdkTypes = [...new Set([...sdk.matchAll(/type: "([a-z]+)";/g)].map((entry) => entry[1]!))].sort();
+    const sdkTypes = [...new Set([...sdk.matchAll(/type: "([a-z_]+)";/g)].map((entry) => entry[1]!))].sort();
     expect(sdkTypes).toEqual(platformTypes);
     expect(sdkTypes).toEqual(["ack", "call", "cancel", "deregister", "refused", "register", "registered", "result"]);
   });

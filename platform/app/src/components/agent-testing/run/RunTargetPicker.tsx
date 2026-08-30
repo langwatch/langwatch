@@ -173,6 +173,11 @@ function AgentBlock({
       paddingX={3}
       paddingY={2.5}
       height={AGENT_CARD_HEIGHT}
+      // A grid item is as wide as its content unless told otherwise, so a
+      // long label would widen the column past the dialog instead of
+      // truncating.
+      minWidth={0}
+      width="100%"
       onClick={() => canRun && onSelect({ type: agent.type, id: agent.id })}
       data-testid={`run-dialog-agent-${agent.id}`}
       aria-pressed={isActive}
@@ -190,7 +195,13 @@ function AgentBlock({
         </HStack>
         {isActive && <Check size={14} color="var(--chakra-colors-blue-500)" />}
       </HStack>
-      <Text fontSize="12.5px" fontWeight="medium" truncate marginTop={3}>
+      <Text
+        fontSize="12.5px"
+        fontWeight="medium"
+        truncate
+        marginTop={3}
+        title={agent.label ?? agent.name}
+      >
         {agent.label ?? agent.name}
       </Text>
       <AgentReachLine agent={agent} />
@@ -200,7 +211,7 @@ function AgentBlock({
   if (canRun) return card;
   return (
     <Tooltip content={ownerOnlyCopy(agent.owner?.name)}>
-      <Box>{card}</Box>
+      <Box minWidth={0}>{card}</Box>
     </Tooltip>
   );
 }

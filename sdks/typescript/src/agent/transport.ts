@@ -2,16 +2,16 @@
  * The connection the client speaks over, behind one small interface so the
  * client never depends on how the frames travel.
  *
- * Two transports carry the same frames. The WebSocket is the default: `ws`
- * is preferred because it carries the request headers the platform
- * authenticates with, and the runtime's global `WebSocket` (Node 22+, Bun,
- * Deno) is the fallback when `ws` exposes no constructor. HTTP long polling
- * is for a network that blocks WebSockets: one POST registers, a GET waits
- * for the next frames, a POST carries the answers. It speaks through the
- * global `fetch` (Node 20+).
+ * Two transports carry the same frames. The WebSocket is the default and it
+ * needs the `ws` package: the platform authenticates from the request
+ * headers of the upgrade, and no global `WebSocket` constructor can send
+ * them. HTTP long polling is for a network that blocks WebSockets: one POST
+ * registers, a GET waits for the next frames, a POST carries the answers. It
+ * speaks through the global `fetch` (Node 20+).
  */
 
-import { WebSocket as WsWebSocket } from "ws";
+import { createRequire } from "node:module";
+import type { WebSocket as WsWebSocket } from "ws";
 
 export const AGENT_TRANSPORTS = ["websocket", "http"] as const;
 export type AgentTransport = (typeof AGENT_TRANSPORTS)[number];
@@ -59,10 +59,10 @@ export interface SocketLike {
 
 export type SocketFactory = (args: { url: string; headers: Record<string, string> }) => SocketLike;
 
-/** Thrown when neither `ws` nor a global WebSocket can open the socket. */
+/** Thrown when the `ws` package is not installed. */
 export class NoWebSocketError extends Error {
   constructor() {
-    super("no WebSocket implementation is available in this runtime");
+    super("the ws package is not installed, so no socket can carry the API key header");
     this.name = "NoWebSocketError";
   }
 }
@@ -105,38 +105,35 @@ const wrapWs = (socket: WsWebSocket): SocketLike => {
   };
 };
 
-interface GlobalWebSocketLike {
-  send: (data: string) => void;
-  close: (code?: number, reason?: string) => void;
-  addEventListener: (type: string, listener: (event: never) => void) => void;
-}
+type WsConstructor = new (
+  url: string,
+  options: { headers: Record<string, string> },
+) => WsWebSocket;
 
-const wrapGlobal = (socket: GlobalWebSocketLike): SocketLike => ({
-  send: (data) => socket.send(data),
-  close: (code, reason) => socket.close(code, reason),
-  terminate: () => socket.close(),
-  onOpen: (listener) => socket.addEventListener("open", listener),
-  onMessage: (listener) =>
-    socket.addEventListener("message", (event: never) =>
-      listener(textOf((event as { data: unknown }).data)),
-    ),
-  onClose: (listener) =>
-    socket.addEventListener("close", (event: never) => listener((event as { code: number }).code)),
-  onError: (listener) => socket.addEventListener("error", listener),
-  onPing: () => {
-    // The global WebSocket answers pings itself and does not report them.
-  },
-});
-
-/** Opens a socket with `ws`, or with the global WebSocket when `ws` is not there. */
-export const defaultSocketFactory: SocketFactory = ({ url, headers }) => {
-  if (typeof WsWebSocket === "function") {
-    return wrapWs(new WsWebSocket(url, { headers }));
+/**
+ * The `ws` constructor, or null when the package cannot be loaded. It is
+ * required rather than imported: a runtime or a bundle without `ws` must
+ * reach the factory below and get one clear message, never fail while this
+ * module loads.
+ */
+const wsConstructor = (): WsConstructor | null => {
+  try {
+    const loaded = createRequire(__filename)("ws") as { WebSocket?: unknown };
+    return typeof loaded.WebSocket === "function" ? (loaded.WebSocket as WsConstructor) : null;
+  } catch {
+    return null;
   }
-  const Global = (globalThis as unknown as { WebSocket?: new (url: string) => GlobalWebSocketLike })
-    .WebSocket;
-  if (typeof Global !== "function") throw new NoWebSocketError();
-  return wrapGlobal(new Global(url));
+};
+
+/**
+ * Opens a socket with `ws`. A global `WebSocket` is no substitute: it takes
+ * no request headers, the API key never travels in the URL, and the platform
+ * would refuse every socket it opened.
+ */
+export const defaultSocketFactory: SocketFactory = ({ url, headers }) => {
+  const Ws = wsConstructor();
+  if (!Ws) throw new NoWebSocketError();
+  return wrapWs(new Ws(url, { headers }));
 };
 
 // ---------------------------------------------------------------------------

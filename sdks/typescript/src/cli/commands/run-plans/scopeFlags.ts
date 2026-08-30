@@ -193,7 +193,7 @@ function parseTargetParameters({
     }
     const key = decodeQueryPart({ part: pair.slice(0, separator), target });
     const value = decodeQueryPart({ part: pair.slice(separator + 1), target });
-    parsed.set(key, coerceParameterValue(value));
+    parsed.set(key, coerceParameterValue({ value }));
   }
   return Object.fromEntries(parsed);
 }

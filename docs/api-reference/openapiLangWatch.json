@@ -3157,6 +3157,67 @@
         ]
       }
     },
+    "/api/agents/{id}/test": {
+      "post": {
+        "operationId": "postApiAgentsByIdTest",
+        "description": "Run one scripted scenario against an agent: the user sends \"ping\", the agent answers, and the run succeeds when the answer arrives. No model is used and nothing is saved. Answers at once with the run ids; the run itself is asynchronous.",
+        "responses": {
+          "200": {
+            "description": "The test run is scheduled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scenarioRunId": {
+                      "type": "string",
+                      "description": "The run to follow; open it in the simulations run drawer."
+                    },
+                    "batchRunId": {
+                      "type": "string",
+                      "description": "The batch the run belongs to."
+                    },
+                    "setId": {
+                      "type": "string",
+                      "description": "The internal set that holds agent test runs."
+                    }
+                  },
+                  "required": [
+                    "scenarioRunId",
+                    "batchRunId",
+                    "setId"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The agent is a personal development agent of someone else"
+          },
+          "404": {
+            "description": "No agent with that id in this project"
+          },
+          "422": {
+            "description": "The agent cannot be tested as it is set up"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
     "/api/agents/{id}/call": {
       "post": {
         "operationId": "postApiAgentsByIdCall",
@@ -3442,6 +3503,685 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/agents/connect/register": {
+      "post": {
+        "operationId": "postApiAgentsConnectRegister",
+        "description": "Register the connected agents of a process over HTTP, for a network that blocks WebSockets. The body is the register frame of the connect protocol. Answers with the registered frame and the instance token the poll and frames routes are addressed with, or with a refused frame.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "protocol": {
+                    "type": "number",
+                    "enum": [
+                      1
+                    ]
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "register"
+                    ]
+                  },
+                  "sdk": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "version": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "language": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 32
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "version",
+                      "language"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "instance": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "hostname": {
+                        "type": "string",
+                        "maxLength": 255
+                      },
+                      "username": {
+                        "type": "string",
+                        "maxLength": 255
+                      },
+                      "pid": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "startedAt": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "label": {
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "inFlightCallIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 128
+                        },
+                        "maxItems": 1000,
+                        "default": []
+                      },
+                      "maxConcurrency": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "minimum": 0,
+                        "maximum": 1000
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "hostname",
+                      "username",
+                      "pid",
+                      "startedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "agents": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 255
+                        },
+                        "environment": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "description": {
+                          "type": "string",
+                          "maxLength": 2000
+                        },
+                        "parameters": {
+                          "type": "object",
+                          "additionalProperties": {},
+                          "default": {}
+                        },
+                        "concurrency": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0,
+                          "maximum": 1000
+                        },
+                        "timeoutMs": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        },
+                        "sticky": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "environment"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1,
+                    "maxItems": 100
+                  }
+                },
+                "required": [
+                  "protocol",
+                  "type",
+                  "sdk",
+                  "instance",
+                  "agents"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The instance is registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "frame": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "protocol": {
+                              "type": "number",
+                              "const": 1
+                            },
+                            "type": {
+                              "type": "string",
+                              "const": "registered"
+                            },
+                            "agents": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "environment": {
+                                    "type": "string"
+                                  },
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "url": {
+                                    "type": "string"
+                                  },
+                                  "parameterNotes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "name",
+                                  "environment",
+                                  "id",
+                                  "url",
+                                  "parameterNotes"
+                                ]
+                              }
+                            },
+                            "heartbeatIntervalMs": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0
+                            },
+                            "instanceId": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "protocol",
+                            "type",
+                            "agents",
+                            "heartbeatIntervalMs",
+                            "instanceId"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "protocol": {
+                              "type": "number",
+                              "const": 1
+                            },
+                            "type": {
+                              "type": "string",
+                              "const": "refused"
+                            },
+                            "code": {
+                              "type": "string",
+                              "enum": [
+                                "api_key_invalid",
+                                "project_required",
+                                "permission_denied",
+                                "key_type_not_allowed",
+                                "replica_count_unsupported",
+                                "parameters_invalid",
+                                "environment_invalid",
+                                "protocol_invalid"
+                              ]
+                            },
+                            "message": {
+                              "type": "string"
+                            },
+                            "meta": {
+                              "type": "object",
+                              "additionalProperties": {}
+                            }
+                          },
+                          "required": [
+                            "protocol",
+                            "type",
+                            "code",
+                            "message"
+                          ]
+                        }
+                      ],
+                      "description": "The registered frame, or the refused frame with its reason."
+                    },
+                    "instanceToken": {
+                      "type": "string",
+                      "description": "The token the poll and frames routes are addressed with, in the X-Agent-Instance-Token header. Present when the register was accepted."
+                    }
+                  },
+                  "required": [
+                    "frame"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is not valid: a refused frame"
+          },
+          "403": {
+            "description": "The key type or its permissions cannot connect an agent: a refused frame"
+          },
+          "422": {
+            "description": "The body is not a register frame, or an agent of it is not valid: a refused frame"
+          },
+          "503": {
+            "description": "The deployment runs several replicas without Redis: a refused frame"
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/agents/connect/poll": {
+      "get": {
+        "operationId": "getApiAgentsConnectPoll",
+        "description": "Wait for the next call and cancel frames of a registered instance, up to 25 seconds, then answer with what is waiting or with an empty list. Each poll refreshes the instance presence, so a process that polls reads Online. Addressed with the instance token in the X-Agent-Instance-Token header.",
+        "responses": {
+          "200": {
+            "description": "The frames waiting for the instance, possibly none",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "frames": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "protocol": {
+                                "type": "number",
+                                "const": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "const": "call"
+                              },
+                              "callId": {
+                                "type": "string"
+                              },
+                              "agentId": {
+                                "type": "string"
+                              },
+                              "threadId": {
+                                "type": "string"
+                              },
+                              "messages": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "role": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "role"
+                                  ],
+                                  "additionalProperties": true
+                                }
+                              },
+                              "newMessages": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "role": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "role"
+                                  ],
+                                  "additionalProperties": true
+                                }
+                              },
+                              "params": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                                },
+                                "additionalProperties": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "boolean"
+                                    }
+                                  ]
+                                }
+                              },
+                              "session": {},
+                              "traceparent": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "deadlineAt": {
+                                "type": "integer"
+                              },
+                              "run": {
+                                "type": "object",
+                                "properties": {
+                                  "scenarioRunId": {
+                                    "type": "string"
+                                  },
+                                  "scenarioName": {
+                                    "type": "string"
+                                  },
+                                  "batchRunId": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            "required": [
+                              "protocol",
+                              "type",
+                              "callId",
+                              "agentId",
+                              "threadId",
+                              "messages",
+                              "newMessages",
+                              "params",
+                              "traceparent",
+                              "deadlineAt",
+                              "run"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "protocol": {
+                                "type": "number",
+                                "const": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "const": "cancel"
+                              },
+                              "callId": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "protocol",
+                              "type",
+                              "callId"
+                            ]
+                          }
+                        ]
+                      },
+                      "description": "The call and cancel frames waiting for the instance; empty once the poll wait passes with none."
+                    }
+                  },
+                  "required": [
+                    "frames"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is not valid: a refused frame"
+          },
+          "410": {
+            "description": "The instance token is not known; register the instance again"
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/agents/connect/frames": {
+      "post": {
+        "operationId": "postApiAgentsConnectFrames",
+        "description": "Post the ack, result and deregister frames of a registered instance. Addressed with the instance token in the X-Agent-Instance-Token header.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "frames": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "protocol": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "ack"
+                              ]
+                            },
+                            "callId": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "protocol",
+                            "type",
+                            "callId"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "protocol": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "result"
+                              ]
+                            },
+                            "callId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "output": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "role": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "role"
+                                  ],
+                                  "additionalProperties": true
+                                },
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "role": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "role"
+                                    ],
+                                    "additionalProperties": true
+                                  }
+                                }
+                              ]
+                            },
+                            "session": {},
+                            "error": {
+                              "type": "object",
+                              "properties": {
+                                "code": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "message": {
+                                  "type": "string",
+                                  "maxLength": 4000
+                                }
+                              },
+                              "required": [
+                                "code",
+                                "message"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "protocol",
+                            "type",
+                            "callId"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "protocol": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "deregister"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "protocol",
+                            "type"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "description": "Ack, result and deregister frames, in order."
+                  }
+                },
+                "required": [
+                  "frames"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The frames were taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accepted": {
+                      "type": "integer",
+                      "description": "How many frames were taken."
+                    }
+                  },
+                  "required": [
+                    "accepted"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is not valid: a refused frame"
+          },
+          "410": {
+            "description": "The instance token is not known; register the instance again"
+          },
+          "422": {
+            "description": "A frame is not one the route takes"
+          }
+        },
         "security": [
           {
             "project_api_key": []
@@ -48037,6 +48777,24 @@
                                   "user",
                                   "api",
                                   "cli"
+                                ]
+                              },
+                              "agentInstance": {
+                                "type": "object",
+                                "properties": {
+                                  "hostname": {
+                                    "type": "string"
+                                  },
+                                  "label": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "hostname",
+                                  "label"
                                 ]
                               }
                             },
