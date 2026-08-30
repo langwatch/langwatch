@@ -96,7 +96,7 @@ export class AuthService extends AuthCapability {
       return session;
     }
 
-    const targetIsActive = await this.options.repository.tryFindActiveUser({
+    const targetIsActive = await this.options.repository.isUserActive({
       id: impersonation.data.id,
     });
     if (!targetIsActive) return session;

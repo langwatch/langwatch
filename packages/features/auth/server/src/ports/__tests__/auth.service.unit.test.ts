@@ -126,7 +126,7 @@ class Sessions extends AuthSessionRepository {
   } | null> {
     return this.stored;
   }
-  async tryFindActiveUser({ id }: { id: string }): Promise<boolean> {
+  async isUserActive({ id }: { id: string }): Promise<boolean> {
     return id === "target-1";
   }
   async listTokensForUser(): Promise<string[]> {

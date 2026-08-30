@@ -58,7 +58,7 @@ class PrismaAuthSessionRepository extends AuthSessionRepository {
     });
   }
 
-  async tryFindActiveUser({ id }: { id: string }): Promise<boolean> {
+  async isUserActive({ id }: { id: string }): Promise<boolean> {
     const user = await this.database.user.findUnique({
       where: { id },
       select: { id: true, deactivatedAt: true },
