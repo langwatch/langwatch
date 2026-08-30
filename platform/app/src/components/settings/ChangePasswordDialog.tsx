@@ -24,8 +24,14 @@ const newPassword = z.string().superRefine((value, ctx) => {
 const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(1, "Current password is required"),
-    newPassword: z.string().min(8, "Password must be at least 8 characters"),
-    confirmPassword: z.string().min(8, "Password must be at least 8 characters"),
+    // `newPassword` above, not a restated `min(8)`. The restatement was still
+    // here while the refinement sat unused, so the form checked length only:
+    // it accepted a password over the 72-byte bcrypt limit and one made
+    // entirely of spaces, both of which the server then refused. The minimum
+    // happened to agree at 8 — `PASSWORD_MINIMUM_LENGTH` — which is why this
+    // read as correct.
+    newPassword,
+    confirmPassword: newPassword,
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
     message: "Passwords don't match",
