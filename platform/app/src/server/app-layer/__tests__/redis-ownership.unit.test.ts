@@ -22,7 +22,7 @@ import { App, AppShutdownResources, getApp, globalForApp, resetApp } from "../ap
 import { createTestApp } from "../presets";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-/** `platform/app/` — parent of `src/` and of the `ee/` tree. */
+/** `platform/app/` — parent of `src/`, `scripts/`, `e2e/` and `vite/`. */
 const APP_ROOT = path.resolve(HERE, "../../../..");
 /** Repo root — where the `packages/*` workspace tree lives (ADR-076). */
 const REPO_ROOT = path.resolve(APP_ROOT, "../..");

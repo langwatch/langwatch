@@ -152,9 +152,7 @@ describe("the legacy sso string columns", () => {
         /prisma\s*\.\s*ssoConnection\s*\.\s*(create|createMany|update|updateMany|upsert|delete|deleteMany)/;
       const offenders: string[] = [];
       for (const root of roots) {
-        for (const entry of walkTypeScript(root)) {
-          const file = entry;
-          if (!file.endsWith(".ts")) continue;
+        for (const file of walkTypeScript(root)) {
           if (file.includes("__tests__")) continue;
           // Prisma's own generated model module names every write method for
           // every table; it is the client, not a caller. Matched anywhere in
