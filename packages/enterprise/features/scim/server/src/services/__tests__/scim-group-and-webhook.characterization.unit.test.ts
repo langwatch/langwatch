@@ -6,6 +6,7 @@ import { ScimDirectoryService } from "../scim-directory.service";
 import { ScimGrantsService } from "../scim-grants.service";
 import type { ScimRepositoryPort } from "../../ports/scim-repository.port";
 import { GrantsFake } from "../../__tests__/support/grants-fake";
+import { scimPatchRequestSchema } from "@langwatch/enterprise-scim-contract";
 
 function groupsRepository(): ScimRepositoryPort {
   return {
@@ -36,6 +37,8 @@ class ScimServiceFake extends ScimService {
   readonly createUser = vi.fn(async () => ({}));
   readonly listUsers = vi.fn(async () => ({ Resources: [{ id: "user_1" }] }));
   readonly deleteUser = vi.fn(async () => {});
+  // `ScimService` grew this and the fake did not follow.
+  readonly revokeTokensForConnection: ScimService["revokeTokensForConnection"] = vi.fn();
   readonly generateToken: ScimService["generateToken"] = vi.fn();
   readonly listTokens: ScimService["listTokens"] = vi.fn();
   readonly revokeToken: ScimService["revokeToken"] = vi.fn();
@@ -62,13 +65,19 @@ describe("SCIM characterization: group PATCH membership and operation casing", (
     await groups.updateGroup({
       organizationId: "org_1",
       externalScimId: "external_1",
-      patchRequest: {
+      // Parsed, because that is the shape `updateGroup` receives: the route
+      // runs `scimPatchRequestSchema.safeParse(body)` and passes `parsed.data`.
+      // The mixed case is the point — SCIM's `op` is case-insensitive and the
+      // schema lowercases it in a `preprocess` — but handing the raw literal
+      // straight to the service skipped the very step under test, and the
+      // parsed type is lowercase-only so it could not typecheck either.
+      patchRequest: scimPatchRequestSchema.parse({
         schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
         Operations: [
           { op: "Add", path: "members", value: [{ value: "user_2" }] },
           { op: "REMOVE", path: "members", value: [{ value: "user_1" }] },
         ],
-      },
+      }),
     });
     expect(repo.addGroupMember).toHaveBeenCalledWith({
       groupId: "group_1",

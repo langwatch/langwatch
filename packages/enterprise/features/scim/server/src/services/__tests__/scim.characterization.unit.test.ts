@@ -306,7 +306,16 @@ describe("SCIM characterization: provisioning invariants", () => {
       service(repository()).getUser({ organizationId: "org_1", id: "missing" }),
     ).rejects.toMatchObject({
       name: "ScimProtocolError",
-      response: { status: "404", detail: "User not found" },
+      // `schemas` because a `ScimError` carries it and `Partial` only relaxes
+      // the TOP level — `response` is checked whole, so leaving it off made
+      // the `satisfies` describe a body the protocol cannot produce. Naming it
+      // also asserts the error really is a SCIM error envelope rather than an
+      // object that happens to have a status and a detail.
+      response: {
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+        status: "404",
+        detail: "User not found",
+      },
     } satisfies Partial<ScimProtocolError>);
   });
 });
