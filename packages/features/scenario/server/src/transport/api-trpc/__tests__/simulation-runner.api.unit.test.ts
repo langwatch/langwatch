@@ -512,7 +512,10 @@ describe("simulation runner run procedure", () => {
       it("rejects a name no scenario declares before anything is queued", async () => {
         await expect(
           caller.run({ ...defaultInput, parameters: { regoin: "eu-west" } }),
-        ).rejects.toMatchObject({ code: "scenario_parameter_unknown" });
+          // On the `cause`: tRPC wraps whatever a procedure throws, and the
+          // handled error is what it wraps — which is where the app's
+          // formatter reads it from too.
+        ).rejects.toMatchObject({ cause: { code: "scenario_parameter_unknown" } });
 
         expect(mockPrefetchScenarioData).not.toHaveBeenCalled();
         expect(mockQueueRun).not.toHaveBeenCalled();
@@ -593,13 +596,17 @@ describe("simulation runner run procedure", () => {
           metadata?: Record<string, unknown>;
         };
         expect(queued.metadata).not.toHaveProperty("note");
-        // Only the reserved namespace is recorded: the note added nothing.
+        // The reserved namespace and the run's resolved parameters, which
+        // `ScenarioApp.queueSimulationRun` puts on the metadata deliberately
+        // (its own docblock: "the resolved parameters travel on the
+        // metadata"). Nothing here came from the absent note.
         expect(queued.metadata).toEqual({
           langwatch: {
             targetReferenceId: "prompt_123",
             targetType: "prompt",
             scenarioVersion: 5,
           },
+          parameters: { account_tier: "gold" },
         });
       });
     });

@@ -7,10 +7,7 @@
 import { AdminSurfaceHiddenError, OpsService } from "@langwatch/ops-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  SsoConnectionTrpcApi,
-  type SsoConnectionTrpcContext,
-} from "../sso-connection.api";
+import { SsoConnectionTrpcApi, type SsoConnectionTrpcContext } from "../sso-connection.api";
 
 const backoffice = {
   list: vi.fn(),
@@ -94,6 +91,20 @@ function unreachable(): never {
 
 const trpc = initTRPC.context<SsoConnectionTrpcContext>().create();
 
+/**
+ * The domain error a procedure threw, out from under tRPC's wrapper.
+ *
+ * `initTRPC.create()` here has no `errorFormatter`, so a thrown
+ * `AdminSurfaceHiddenError` arrives as a `TRPCError` carrying it as `cause` —
+ * which is exactly where `createTrpcErrorFormatter` looks for it in the real
+ * app. Asserting through the wrapper is how this file states "the domain
+ * error reached the boundary intact" without building a formatter it does not
+ * own.
+ */
+function domainErrorOf(error: unknown): unknown {
+  return (error as { cause?: unknown }).cause ?? error;
+}
+
 /** The process's chain is exercised in the app; here it is the identity. */
 const identityPolicy = <TProcedure>(procedure: TProcedure): TProcedure => procedure;
 
@@ -134,7 +145,7 @@ describe("the back-office single sign-on surface", () => {
         () => {
           throw new Error("attestDomain resolved: the back office gate let the call through");
         },
-        (error: unknown) => error as AdminSurfaceHiddenError,
+        (error: unknown) => domainErrorOf(error) as AdminSurfaceHiddenError,
       );
       expect(denial).toBeInstanceOf(AdminSurfaceHiddenError);
       expect(denial.code).toBe("not_found");
@@ -160,7 +171,10 @@ describe("the back-office single sign-on surface", () => {
         () => caller.requestTeardown({ ...TARGET, reason: null }),
       ];
       for (const attempt of attempts) {
-        await expect(attempt()).rejects.toBeInstanceOf(AdminSurfaceHiddenError);
+        const refusal = await attempt().then(() => {
+          throw new Error("the back office gate let a call through");
+        }, domainErrorOf);
+        expect(refusal).toBeInstanceOf(AdminSurfaceHiddenError);
       }
       expect(backoffice.claimDomain).not.toHaveBeenCalled();
       expect(backoffice.requestTeardown).not.toHaveBeenCalled();

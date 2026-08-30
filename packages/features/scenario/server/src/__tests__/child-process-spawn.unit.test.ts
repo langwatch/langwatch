@@ -28,6 +28,11 @@ vi.mock("fs", async (importOriginal) => {
       ...actual,
       existsSync: vi.fn(),
       statSync: vi.fn(),
+      // Mocked too, or the freshness scan walks the REAL tree at the paths
+      // below — which do not exist, so `readdirSync` throws, the check's
+      // catch answers "not fresh", and the bundle branch can never be
+      // reached however the mtimes are arranged.
+      readdirSync: vi.fn(),
     },
   };
 });
@@ -61,6 +66,7 @@ describe("resolveChildProcessSpawn", () => {
   beforeEach(() => {
     vi.mocked(fs.existsSync).mockReset();
     vi.mocked(fs.statSync).mockReset();
+    vi.mocked(fs.readdirSync).mockReset();
     mockLogger.info.mockReset();
     mockLogger.debug.mockReset();
     mockLogger.error.mockReset();
@@ -157,6 +163,11 @@ describe("resolveChildProcessSpawn", () => {
       bundleMtimeMs?: number;
       sourceMtimeMs: number;
     }) => {
+      // One child source in the scanned root, so `hasFileNewerThan` compares
+      // exactly one mtime against the bundle's.
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        { name: "child.ts", isDirectory: () => false },
+      ] as never);
       vi.mocked(fs.statSync).mockImplementation((target) => {
         if (target === BUNDLE) {
           if (bundleMtimeMs === undefined) throw new Error("ENOENT");
