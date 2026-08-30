@@ -29,16 +29,40 @@ import { DIALOG_FIELD_STYLE, FieldLabel } from "../shared/DialogFields";
 import { FG_MUTED } from "../shared/design";
 import { RemoveBlockButton } from "../shared/RemoveBlockButton";
 import { SmallButton } from "../shared/SmallButton";
+import { CaseRecentRunsButton } from "./CaseRecentRunsButton";
 import { CaseVersionHistoryPopover } from "./CaseVersionHistoryPopover";
 import type { TestSuiteEntry } from "./test-cases";
 import type { CaseDraft, CaseEditorState } from "./useCaseEditor";
 
 const CASE_MODAL_SUBTITLE = "Test your agent on a critical path or edge case";
 
+/**
+ * What a field that grows with its text carries.
+ *
+ * The two long fields of the dialog follow their own text rather than holding a
+ * fixed box, the way the prompt editor does. Growing stops at three times the
+ * height the field opens at, and the field scrolls from there, so one long
+ * scenario cannot push the footer of the drawer off the screen.
+ *
+ * A grown field writes its height inline, so each field states the height it
+ * opens at as well; without it the field would shrink under its own rows while
+ * it is empty.
+ */
+const GROWING_FIELD = { autoresize: true, resize: "none" } as const;
+
+/** The height the situation opens at, and the height it stops growing at. */
+const SITUATION_HEIGHT = { min: "52px", max: "156px" } as const;
+
+/** The same pair for the criteria, which opens two lines taller. */
+const CRITERIA_HEIGHT = { min: "92px", max: "276px" } as const;
+
 const PARAMETERS_HELP =
   "Parameters reach your agent as arguments of the function you annotated. Use them to run the same scenario as a free or a pro customer, in another locale, or on another model.";
 
-/** The heading: what the dialog is for, and the way back to the versions. */
+/**
+ * The heading: what the dialog is for, the way into a recent run of this
+ * scenario, and the way back to its versions.
+ */
 export function CaseModalHeader({
   isEditing,
   scenarioId,
@@ -66,12 +90,17 @@ export function CaseModalHeader({
       <Text fontSize="12px" color={FG_MUTED} marginTop={0.5}>
         {CASE_MODAL_SUBTITLE}
       </Text>
-      {isEditing && scenarioId && version !== null && (
-        <CaseVersionHistoryPopover
-          scenarioId={scenarioId}
-          version={version}
-          initialOpen={openHistoryOnOpen}
-        />
+      {isEditing && scenarioId && (
+        <HStack position="absolute" top={2.5} right={11} gap={1.5}>
+          <CaseRecentRunsButton scenarioId={scenarioId} />
+          {version !== null && (
+            <CaseVersionHistoryPopover
+              scenarioId={scenarioId}
+              version={version}
+              initialOpen={openHistoryOnOpen}
+            />
+          )}
+        </HStack>
       )}
       <Drawer.CloseTrigger />
     </Drawer.Header>
@@ -140,8 +169,10 @@ function SituationAndCriteria({
         <FieldLabel>Situation · what is the user trying to do?</FieldLabel>
         <Textarea
           {...DIALOG_FIELD_STYLE}
+          {...GROWING_FIELD}
           rows={2}
-          resize="none"
+          minHeight={SITUATION_HEIGHT.min}
+          maxHeight={SITUATION_HEIGHT.max}
           aria-label="Situation"
           placeholder="The customer is on day three of waiting for a refund and threatens to charge back."
           value={draft.situation}
@@ -153,8 +184,10 @@ function SituationAndCriteria({
         <FieldLabel>Criteria · one per line</FieldLabel>
         <Textarea
           {...DIALOG_FIELD_STYLE}
+          {...GROWING_FIELD}
           rows={4}
-          resize="none"
+          minHeight={CRITERIA_HEIGHT.min}
+          maxHeight={CRITERIA_HEIGHT.max}
           aria-label="Criteria"
           placeholder={
             "Keeps a calm tone\nGives the refund status without being asked twice\nDoes not promise compensation we do not offer"
@@ -229,11 +262,21 @@ export function CaseModalFields({
       )}
       <TitleAndSuiteRow draft={draft} setDraft={setDraft} suites={suites} />
       <SituationAndCriteria draft={draft} setDraft={setDraft} />
-      {/* The chip row sits pinned to the bottom of the scroll area, so the
-          gap between the last question and the footer belongs to it, not to
+      {/* A block a chip opened reads where the reader was looking when they
+          opened it: straight under the criteria, in the order the chips sit
+          in. Pinned to the foot with the chip row, it left a hole under a
+          short scenario and read as part of the chips rather than as part of
+          the scenario. */}
+      <CustomizeBlocks editor={editor} />
+      {/* The chip row alone is pinned to the bottom of the scroll area, so the
+          gap between the last block and the footer belongs to it, not to
           empty space. */}
       <Box marginTop="auto">
-        <CustomizeSection editor={editor} />
+        <CustomizeChips
+          title="Customize scenario"
+          chips={editor.customize.chips}
+          testId="customize-case-chips"
+        />
       </Box>
     </VStack>
   );
@@ -279,8 +322,6 @@ export function CaseModalFooter({ editor }: { editor: CaseEditorState }) {
         <SmallButton
           variant="solid"
           colorPalette="blue"
-          background={undefined}
-          borderColor="transparent"
           loading={editor.isSaving}
           disabled={!!editor.problem}
           title={editor.problem ?? undefined}
@@ -393,14 +434,27 @@ function ModelsBlock({
 }
 
 /**
- * What the scenario can carry beyond the four questions: the parameters, the turn
- * limits and the model overrides, each behind a chip until it is asked for.
+ * What the scenario can carry beyond the four questions: the parameters, the
+ * turn limits and the model overrides, each behind a chip until it is asked
+ * for.
+ *
+ * The blocks read in the order their chips sit in, and they read as part of the
+ * scenario rather than as part of the chip row: a scenario with one block open
+ * runs criteria, block, chips, top to bottom.
  */
-function CustomizeSection({ editor }: { editor: CaseEditorState }) {
+function CustomizeBlocks({ editor }: { editor: CaseEditorState }) {
   const { draft, setDraft, customize } = editor;
 
+  if (
+    !customize.showParameters &&
+    !customize.showTurns &&
+    !customize.showModels
+  ) {
+    return null;
+  }
+
   return (
-    <VStack align="stretch" gap={4}>
+    <VStack align="stretch" gap={4} data-testid="case-customize-blocks">
       {customize.showParameters && (
         <ParametersBlock
           draft={draft}
@@ -422,11 +476,6 @@ function CustomizeSection({ editor }: { editor: CaseEditorState }) {
           onRemove={customize.removeModels}
         />
       )}
-      <CustomizeChips
-        title="Customize scenario"
-        chips={customize.chips}
-        testId="customize-case-chips"
-      />
     </VStack>
   );
 }

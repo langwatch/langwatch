@@ -139,11 +139,13 @@ describe("the version stamp on suite runs", () => {
     expect(stampsByScenarioId.get(atThree.id)).toEqual({
       targetReferenceId: agent.id,
       targetType: "http",
+      targetKey: agent.id,
       scenarioVersion: 3,
     });
     expect(stampsByScenarioId.get(atSeven.id)).toEqual({
       targetReferenceId: agent.id,
       targetType: "http",
+      targetKey: agent.id,
       scenarioVersion: 7,
     });
   });

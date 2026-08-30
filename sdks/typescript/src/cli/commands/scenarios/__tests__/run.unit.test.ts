@@ -158,6 +158,37 @@ describe("runScenarioCommand()", () => {
     });
   });
 
+  describe("when the same agent is given twice with different parameters", () => {
+    /** @scenario "Run a scenario against one agent on two models" */
+    it("sends two targets, each with its own values", async () => {
+      await runScenarioCommand("scenario_1", {
+        target: [
+          "http:agent_abc123?model=gpt-5",
+          "http:agent_abc123?model=gpt-5-mini",
+        ],
+      });
+
+      expect(runSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            targets: [
+              {
+                type: "http",
+                referenceId: "agent_abc123",
+                runParameters: { model: "gpt-5" },
+              },
+              {
+                type: "http",
+                referenceId: "agent_abc123",
+                runParameters: { model: "gpt-5-mini" },
+              },
+            ],
+          }),
+        }),
+      );
+    });
+  });
+
   describe("when a plan name is given", () => {
     /** @scenario "Run a scenario under a plan name" */
     it("sends it, so the run joins that plan", async () => {

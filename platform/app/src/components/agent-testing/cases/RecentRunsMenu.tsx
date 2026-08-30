@@ -1,6 +1,10 @@
 /**
- * The way into a recent run of the open set, in the header of the scenarios panel
- * between "New scenario" and "Run suite".
+ * Every way into a recent run of the Scenarios tab: the button above the table,
+ * the submenu of a row menu, and the button in the scenario editor.
+ *
+ * All three read one list, so a run reads the same and opens the same wherever
+ * it is reached from. What changes between them is the scope: the open set, one
+ * test suite, or one scenario.
  *
  * A row holds the run plan the run belongs to, how long ago it started and how
  * it did, and nothing more. The whole point is to reach a run in one click, so
@@ -13,21 +17,26 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import { Box, HStack, Text } from "@chakra-ui/react";
-import { ChevronDown, History } from "lucide-react";
+import { Box, type ButtonProps, HStack, Icon, Text } from "@chakra-ui/react";
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import type { Period } from "~/components/PeriodSelector";
 import { Menu } from "~/components/ui/menu";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { FG_MUTED } from "../shared/design";
 import { formatPassRate, passRateColor } from "../shared/pass-rate-color";
 import { SmallButton } from "../shared/SmallButton";
+import { MENU_ACTION_ICONS, MenuActionLabel } from "./MenuActionLabel";
 import { useOpenPlanRun } from "./useOpenPlanRun";
 import { type RecentRun, useSuiteRecentRuns } from "./useSuiteRecentRuns";
 
 /** What the button reads. */
 export const OPEN_RECENT_RUN_LABEL = "Open recent run";
+
+/** What the submenu of a row menu reads. */
+export const OPEN_RECENT_RUNS_LABEL = "Open recent runs";
 
 /** What a run that still has scenarios to judge reads in place of a rate. */
 export const RUNNING_RUN_LABEL = "running";
@@ -37,10 +46,18 @@ export type RecentRunsMenuProps = {
   /** The scenarios filed under the set, which are what its runs covered. */
   scenarioIds: string[];
   /**
-   * False when no scenario of the set ran inside the period, so there is
+   * False when no scenario of the scope ran inside the period, so there is
    * nothing to open.
    */
   hasRun: boolean;
+  /**
+   * What the tooltip says while there is nothing to open. A caller that gives
+   * one keeps the button on screen and turns it off; a caller that gives none
+   * drops the button, which is what the line above the table does.
+   */
+  emptyHint?: string;
+  /** Called once a run is chosen, for a caller that must close itself first. */
+  onChosen?: () => void;
 };
 
 /** One run, as one row: the run plan, the time, the result. */
@@ -98,6 +115,7 @@ function RecentRunsList({
   period,
   scenarioIds,
   isOpen,
+  onChosen,
 }: RecentRunsMenuProps & { isOpen: boolean }) {
   const { runs, isLoading } = useSuiteRecentRuns({
     scenarioIds,
@@ -117,22 +135,52 @@ function RecentRunsList({
         <RecentRunRow
           key={run.batchRunId}
           run={run}
-          onOpen={(chosen) =>
+          onOpen={(chosen) => {
             openPlanRun({
               planSlug: chosen.planSlug,
               batchRunId: chosen.batchRunId,
-            })
-          }
+            });
+            onChosen?.();
+          }}
         />
       ))}
     </>
   );
 }
 
+/**
+ * The button itself, which reads the same whether it is on or off.
+ *
+ * It spreads what it is given: as the trigger of the menu it is handed the
+ * click, the ref and the aria state, and dropping them leaves a button that
+ * opens nothing.
+ */
+function RecentRunsTrigger(props: ButtonProps) {
+  return (
+    <SmallButton {...props} data-testid="recent-runs-trigger">
+      <Icon as={MENU_ACTION_ICONS.openRecentRuns} boxSize="13px" />
+      {OPEN_RECENT_RUN_LABEL}
+      <ChevronDown size={13} />
+    </SmallButton>
+  );
+}
+
 export function RecentRunsMenu(props: RecentRunsMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  if (!props.hasRun) return null;
+  if (!props.hasRun) {
+    if (!props.emptyHint) return null;
+
+    return (
+      <Tooltip content={props.emptyHint}>
+        {/* A disabled button dispatches no pointer event, so the tooltip would
+            never fire; the span is what the hover lands on. */}
+        <Box as="span" display="inline-flex">
+          <RecentRunsTrigger disabled />
+        </Box>
+      </Tooltip>
+    );
+  }
 
   return (
     <Menu.Root
@@ -140,14 +188,52 @@ export function RecentRunsMenu(props: RecentRunsMenuProps) {
       onOpenChange={({ open }: { open: boolean }) => setIsOpen(open)}
     >
       <Menu.Trigger asChild>
-        <SmallButton data-testid="recent-runs-trigger">
-          <History size={13} />
-          {OPEN_RECENT_RUN_LABEL}
-          <ChevronDown size={13} />
-        </SmallButton>
+        <RecentRunsTrigger />
       </Menu.Trigger>
       <Menu.Content minWidth="240px" data-testid="recent-runs-list">
         <RecentRunsList {...props} isOpen={isOpen} />
+      </Menu.Content>
+    </Menu.Root>
+  );
+}
+
+/**
+ * The same list, as a submenu of a row menu.
+ *
+ * A row menu offered "Open last run", which reached one run and said nothing
+ * about the rest. The submenu offers the same runs the button above the table
+ * offers, narrowed to the row it hangs off, so a row menu and the line above
+ * the table answer the same question the same way.
+ *
+ * The runs are read only once the submenu is opened, so a menu that nobody
+ * opens this far downloads nothing.
+ *
+ * The list carries its own test id: a row submenu can be open while the button
+ * above the table is mounted, and one id on both would match twice.
+ */
+export function RecentRunsSubmenu({
+  period,
+  scenarioIds,
+}: Pick<RecentRunsMenuProps, "period" | "scenarioIds">) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <Menu.Root
+      positioning={{ placement: "right-start", gutter: 2 }}
+      onOpenChange={({ open }: { open: boolean }) => setIsOpen(open)}
+    >
+      <Menu.TriggerItem value="open-recent-runs">
+        <MenuActionLabel action="openRecentRuns">
+          {OPEN_RECENT_RUNS_LABEL}
+        </MenuActionLabel>
+      </Menu.TriggerItem>
+      <Menu.Content minWidth="240px" data-testid="recent-runs-submenu-list">
+        <RecentRunsList
+          period={period}
+          scenarioIds={scenarioIds}
+          hasRun
+          isOpen={isOpen}
+        />
       </Menu.Content>
     </Menu.Root>
   );

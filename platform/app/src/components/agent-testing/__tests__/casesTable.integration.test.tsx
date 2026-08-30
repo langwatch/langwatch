@@ -160,7 +160,6 @@ function panelProps(
     onEdit: vi.fn(),
     onDuplicate: vi.fn(),
     onMoveToSuite: vi.fn(),
-    onOpenLastRun: vi.fn(),
     onArchive: vi.fn(),
     onOpenExternalCase: vi.fn(),
     onRenameSuite: vi.fn(),
@@ -493,8 +492,8 @@ describe("the scenarios table", () => {
     expect(runButton.querySelector("svg.lucide-play")).toBeInTheDocument();
   });
 
-  /** @scenario "The row menu offers Edit, Duplicate, Open last run, Move to suite... and Archive in order" */
-  it("offers Edit, Duplicate, Open last run, Move to suite... and Archive in order", async () => {
+  /** @scenario "The row menu offers Edit, Duplicate, Open recent runs, Move to suite... and Archive in order" */
+  it("offers Edit, Duplicate, Open recent runs, Move to suite... and Archive in order", async () => {
     renderPanel({
       cases: [makeCase()],
       lastResults: new Map([["case_1", makeResult()]]),
@@ -507,7 +506,7 @@ describe("the scenarios table", () => {
     expect(items).toEqual([
       "Edit",
       "Duplicate",
-      "Open last run",
+      "Open recent runs",
       "Move to suite...",
       "Archive",
     ]);
@@ -535,8 +534,8 @@ describe("the scenarios table", () => {
     ]);
   });
 
-  /** @scenario "Open last run is not offered for a scenario that never ran" */
-  it("does not offer Open last run for a scenario that never ran", async () => {
+  /** @scenario "Open recent runs is not offered for a scenario that never ran" */
+  it("does not offer Open recent runs for a scenario that never ran", async () => {
     renderPanel({ cases: [makeCase()], lastResults: new Map() });
     await openRowMenu("Double charge");
 
@@ -544,7 +543,7 @@ describe("the scenarios table", () => {
       await screen.findByRole("menuitem", { name: "Edit" }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("menuitem", { name: "Open last run" }),
+      screen.queryByRole("menuitem", { name: "Open recent runs" }),
     ).not.toBeInTheDocument();
   });
 
@@ -642,7 +641,6 @@ describe("the scenarios table", () => {
     await user.click(screen.getByText("Double charge"));
 
     expect(props.onRowClick).toHaveBeenCalledWith(testCase);
-    expect(props.onOpenLastRun).not.toHaveBeenCalled();
   });
 
   /** @scenario "Clicking a row with no last run opens the scenario editor" */
@@ -782,6 +780,7 @@ describe("the scenarios table", () => {
     });
 
     /** @scenario "A run of one scenario of the suite is offered above the table" */
+    /** @scenario "The submenu holds a run of a suite whose scenarios ran one at a time" */
     it("offers a run that a scenario of the suite made its own plan for", async () => {
       setRecentRuns([makeSuiteRun({ batchRunId: "batch_alone" })], {
         batch_alone: ONE_CASE_SET,
@@ -947,6 +946,61 @@ describe("the scenarios table", () => {
 
       expect(suiteRunDataQuery.mock.calls.some(isEnabledRead)).toBe(true);
       expect(suitesGetAllQuery.mock.calls.some(isEnabledRead)).toBe(true);
+    });
+  });
+
+  describe("when the recent runs hang off a row menu", () => {
+    /** @scenario "Open recent runs holds the runs of that scenario" */
+    it("lists the runs of that scenario and opens one under its plan", async () => {
+      setRecentRuns(threeRuns());
+      renderPanel({
+        cases: [makeCase()],
+        lastResults: new Map([["case_1", makeResult()]]),
+      });
+      const user = await openRowMenu("Double charge");
+
+      await user.click(
+        await screen.findByRole("menuitem", { name: /Open recent runs/ }),
+      );
+
+      const list = await screen.findByTestId("recent-runs-submenu-list");
+      const rows = within(list).getAllByTestId(/^recent-run-/);
+      expect(rows).toHaveLength(3);
+
+      await user.click(rows[0]!);
+
+      // The row opens the run under the plan that holds it, the way the button
+      // above the table does, rather than in the single run drawer.
+      expect(routerPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: "/[project]/agent-testing/[[...path]]",
+        }),
+        expect.stringContaining("/results/"),
+        { shallow: true },
+      );
+    });
+
+    /** @scenario "The runs of a row are read only when its submenu is opened" */
+    it("reads nothing while the submenu stays closed", async () => {
+      setRecentRuns(threeRuns());
+      renderPanel({
+        cases: [makeCase()],
+        lastResults: new Map([["case_1", makeResult()]]),
+      });
+      suiteRunDataQuery.mockClear();
+      suitesGetAllQuery.mockClear();
+
+      const user = await openRowMenu("Double charge");
+      await screen.findByRole("menuitem", { name: /Open recent runs/ });
+
+      expect(suiteRunDataQuery.mock.calls.some(isEnabledRead)).toBe(false);
+
+      await user.click(
+        screen.getByRole("menuitem", { name: /Open recent runs/ }),
+      );
+      await screen.findByTestId("recent-runs-submenu-list");
+
+      expect(suiteRunDataQuery.mock.calls.some(isEnabledRead)).toBe(true);
     });
   });
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -14,6 +14,12 @@ from ..models.post_api_scenario_events_body_type_0_metadata_langwatch_target_typ
 )
 from ..types import UNSET, Unset
 
+if TYPE_CHECKING:
+    from ..models.post_api_scenario_events_body_type_0_metadata_langwatch_target_parameters import (
+        PostApiScenarioEventsBodyType0MetadataLangwatchTargetParameters,
+    )
+
+
 T = TypeVar("T", bound="PostApiScenarioEventsBodyType0MetadataLangwatch")
 
 
@@ -23,6 +29,8 @@ class PostApiScenarioEventsBodyType0MetadataLangwatch:
     Attributes:
         target_reference_id (str):
         target_type (PostApiScenarioEventsBodyType0MetadataLangwatchTargetType):
+        target_key (str | Unset):
+        target_parameters (PostApiScenarioEventsBodyType0MetadataLangwatchTargetParameters | Unset):
         simulation_suite_id (str | Unset):
         scenario_version (int | Unset):
         simulator_model (str | Unset):
@@ -35,6 +43,8 @@ class PostApiScenarioEventsBodyType0MetadataLangwatch:
 
     target_reference_id: str
     target_type: PostApiScenarioEventsBodyType0MetadataLangwatchTargetType
+    target_key: str | Unset = UNSET
+    target_parameters: PostApiScenarioEventsBodyType0MetadataLangwatchTargetParameters | Unset = UNSET
     simulation_suite_id: str | Unset = UNSET
     scenario_version: int | Unset = UNSET
     simulator_model: str | Unset = UNSET
@@ -49,6 +59,12 @@ class PostApiScenarioEventsBodyType0MetadataLangwatch:
         target_reference_id = self.target_reference_id
 
         target_type = self.target_type.value
+
+        target_key = self.target_key
+
+        target_parameters: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.target_parameters, Unset):
+            target_parameters = self.target_parameters.to_dict()
 
         simulation_suite_id = self.simulation_suite_id
 
@@ -76,6 +92,10 @@ class PostApiScenarioEventsBodyType0MetadataLangwatch:
                 "targetType": target_type,
             }
         )
+        if target_key is not UNSET:
+            field_dict["targetKey"] = target_key
+        if target_parameters is not UNSET:
+            field_dict["targetParameters"] = target_parameters
         if simulation_suite_id is not UNSET:
             field_dict["simulationSuiteId"] = simulation_suite_id
         if scenario_version is not UNSET:
@@ -97,10 +117,25 @@ class PostApiScenarioEventsBodyType0MetadataLangwatch:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.post_api_scenario_events_body_type_0_metadata_langwatch_target_parameters import (
+            PostApiScenarioEventsBodyType0MetadataLangwatchTargetParameters,
+        )
+
         d = dict(src_dict)
         target_reference_id = d.pop("targetReferenceId")
 
         target_type = PostApiScenarioEventsBodyType0MetadataLangwatchTargetType(d.pop("targetType"))
+
+        target_key = d.pop("targetKey", UNSET)
+
+        _target_parameters = d.pop("targetParameters", UNSET)
+        target_parameters: PostApiScenarioEventsBodyType0MetadataLangwatchTargetParameters | Unset
+        if isinstance(_target_parameters, Unset):
+            target_parameters = UNSET
+        else:
+            target_parameters = PostApiScenarioEventsBodyType0MetadataLangwatchTargetParameters.from_dict(
+                _target_parameters
+            )
 
         simulation_suite_id = d.pop("simulationSuiteId", UNSET)
 
@@ -126,6 +161,8 @@ class PostApiScenarioEventsBodyType0MetadataLangwatch:
         post_api_scenario_events_body_type_0_metadata_langwatch = cls(
             target_reference_id=target_reference_id,
             target_type=target_type,
+            target_key=target_key,
+            target_parameters=target_parameters,
             simulation_suite_id=simulation_suite_id,
             scenario_version=scenario_version,
             simulator_model=simulator_model,

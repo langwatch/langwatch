@@ -23,7 +23,7 @@ Feature: The run dialog
     A test suite is only a grouping and carries no run option. The run options
     of a run belong to the run plan its name resolves onto, so the next run
     dialog of that scope opens on the newest configuration for everybody on the
-    team: the target, the second target of a comparison, the parameter
+    team: the target, the targets of a comparison, the parameter
     overrides, the repeat count and the simulation models. A secret value is
     never written down: a secret row is written down by its key alone, so the
     next dialog shows the row and asks for the value again.
@@ -67,8 +67,9 @@ Feature: The run dialog
   @integration
   Scenario: A comparison run derives both targets into the name
     Given the run dialog open on the test suite "Refunds" with "dev-agent" chosen
-    When "Compare agents" is chosen and "prod-agent" is added
+    When "Compare agents" is chosen and the second row defaults to "prod-agent"
     Then the run name reads "Refunds dev-agent vs prod-agent"
+    And the name reads the targets in the order the run plan sorts them
 
   @integration
   Scenario: The name field lists the configurations this scope ran with before
@@ -227,12 +228,15 @@ Feature: The run dialog
     And a name written on that line is sent as the run parameter of that name
 
   @integration
-  Scenario: The compare chip adds a second agent to the run
+  Scenario: The compare chip turns the run into a comparison
     Given the run dialog with one agent chosen
     When "Compare agents" is chosen
-    Then a second agent can be added to the run
-    And the run goes against both agents
-    And removing the block leaves the first agent alone
+    Then the agent section becomes the "Compare agents" rows, one per target
+    And the run goes against every row, each with its own parameters
+    And removing the block leaves the first row as the agent to be tested
+
+    The rows, their defaults, the four-row cap and the refusal of two equal
+    targets are in comparison-mode.feature.
 
   @integration
   Scenario: The simulation models chip adds the user simulator and the judge
@@ -394,6 +398,14 @@ Feature: The run dialog
     A test suite carries no run option of its own. What a suite remembers is
     the newest run plan of its scope, so the scenarios below are answered by
     that plan and never by the suite row.
+
+  @unit
+  Scenario: A solid button of the surface keeps the hover of its own variant
+    Given the small button every Agent Testing surface is drawn with
+    When a caller asks for the solid variant
+    Then the outlined border, the panel background and the quiet hover are left off
+    And the button keeps the hover its own variant gives it
+    And the label stays readable while the pointer is over it
 
   @integration
   Scenario: Confirming a run remembers the target for next time

@@ -25,6 +25,7 @@
  * @see specs/scenarios/run-configuration-on-runs.feature
  */
 
+import { targetKeyOfRun } from "~/components/suites/run-history-transforms";
 import type { RunActor } from "~/server/scenarios/run-actor";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
@@ -37,6 +38,12 @@ export type RunSettingParameter = {
 export type RunSettings = {
   /** Sorted by name, so two runs of one plan read in the same order. */
   parameters: RunSettingParameter[];
+  /**
+   * Every parameter each target received, keyed by target key and sorted by
+   * name. A comparison reads these beside each target, in place of the
+   * Parameters row.
+   */
+  parametersByTarget: Map<string, RunSettingParameter[]>;
   /** How many times each scenario and target pair ran. One when it ran once. */
   repeatCount: number;
   /** Null only on a run recorded before the models were stamped. */
@@ -52,32 +59,92 @@ export type RunSettings = {
 };
 
 /**
- * The parameter values of a batch: the first run that carries any.
+ * The run-level parameter values of a batch.
  *
  * A person who sets a parameter in the run dialog sets it for every scenario,
  * so a run of the batch that carries values carries the ones they chose.
  * Values only differ between scenarios for defaults nobody set.
+ *
+ * A run carries the values its target resolved, which are the run-level
+ * values with the target's own overrides on top. The overrides are taken back
+ * out: they belong to the target, and the Targets row reads them beside the
+ * target they belong to.
+ *
+ * Every run is read, not the first one that carries anything, and a name is
+ * answered by the first run that did NOT override it. One target overriding
+ * `plan` would otherwise drop the run-level `plan` from the block for the
+ * whole batch, and which run came first would decide what the block prints.
  */
 function readParameters(
   scenarioRuns: ScenarioRunData[],
 ): RunSettingParameter[] {
+  const valueByName = new Map<string, string>();
   for (const run of scenarioRuns) {
-    const raw = run.metadata?.parameters;
-    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) continue;
-
-    const parameters = Object.entries(raw)
-      .filter(
-        ([, value]) =>
-          typeof value === "string" ||
-          typeof value === "number" ||
-          typeof value === "boolean",
-      )
-      .map(([name, value]) => ({ name, value: String(value) }))
-      .sort((left, right) => left.name.localeCompare(right.name));
-
-    if (parameters.length > 0) return parameters;
+    const overridden = new Set(
+      Object.keys(run.metadata?.langwatch?.targetParameters ?? {}),
+    );
+    for (const parameter of parametersOfRun(run)) {
+      if (overridden.has(parameter.name)) continue;
+      if (valueByName.has(parameter.name)) continue;
+      valueByName.set(parameter.name, parameter.value);
+    }
   }
-  return [];
+  return [...valueByName]
+    .map(([name, value]) => ({ name, value }))
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+/** The parameters of one run as the block prints them, sorted by name. */
+function parametersOfRun(run: ScenarioRunData): RunSettingParameter[] {
+  const raw = run.metadata?.parameters;
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return [];
+  return Object.entries(raw)
+    .filter(
+      ([, value]) =>
+        typeof value === "string" ||
+        typeof value === "number" ||
+        typeof value === "boolean",
+    )
+    .map(([name, value]) => ({ name, value: String(value) }))
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+/**
+ * The full set of values each target received, over every run of it.
+ *
+ * This is the merged set, the run-level values with the target's own on top,
+ * which is what the agent was called with. On a comparison, it is the one
+ * layer of parameters the settings read.
+ *
+ * Every scenario declares its own parameters, so one run of the target can
+ * carry a name another does not. The names are taken together, the first
+ * value seen for a name kept, so the line reads everything the target was
+ * called with somewhere in the run.
+ */
+function readParametersByTarget(
+  scenarioRuns: ScenarioRunData[],
+): Map<string, RunSettingParameter[]> {
+  const byTarget = new Map<string, Map<string, string>>();
+  for (const run of scenarioRuns) {
+    const key = targetKeyOfRun(run);
+    if (!key) continue;
+    const values = byTarget.get(key) ?? new Map<string, string>();
+    for (const parameter of parametersOfRun(run)) {
+      if (!values.has(parameter.name))
+        values.set(parameter.name, parameter.value);
+    }
+    byTarget.set(key, values);
+  }
+  return new Map(
+    [...byTarget]
+      .filter(([, values]) => values.size > 0)
+      .map(([key, values]) => [
+        key,
+        [...values]
+          .map(([name, value]) => ({ name, value }))
+          .sort((left, right) => left.name.localeCompare(right.name)),
+      ]),
+  );
 }
 
 /**
@@ -86,12 +153,15 @@ function readParameters(
  * The largest group answers for the batch: a scenario that was cancelled
  * before its later iterations started would otherwise pull the count under
  * what the run was started with.
+ *
+ * A target is its key, so the same agent on two sets of parameters is two
+ * targets and a scenario that ran once against each is not a repeat.
  */
 function readRepeatCount(scenarioRuns: ScenarioRunData[]): number {
   const counts = new Map<string, number>();
   for (const run of scenarioRuns) {
-    const targetId = run.metadata?.langwatch?.targetReferenceId ?? "";
-    const key = `${run.scenarioId}::${targetId}`;
+    const targetKey = targetKeyOfRun(run) ?? "";
+    const key = `${run.scenarioId}::${targetKey}`;
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   return Math.max(1, ...counts.values());
@@ -179,6 +249,7 @@ export function readRunSettings(
   if (scenarioRuns.length === 0) return null;
   return {
     parameters: readParameters(scenarioRuns),
+    parametersByTarget: readParametersByTarget(scenarioRuns),
     repeatCount: readRepeatCount(scenarioRuns),
     simulatorModel: readModel(scenarioRuns, "simulatorModel"),
     judgeModel: readModel(scenarioRuns, "judgeModel"),

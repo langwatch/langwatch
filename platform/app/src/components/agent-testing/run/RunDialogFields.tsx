@@ -12,11 +12,13 @@
 import { Box, VStack } from "@chakra-ui/react";
 import { HandledErrorAlert } from "~/features/errors";
 import { CustomizeChips } from "../shared/CustomizeChips";
+import { FieldLabel } from "../shared/DialogFields";
+import { CompareAgentsSection } from "./CompareAgentsSection";
 import { MissingProviderNotice } from "./MissingProviderNotice";
+import { ParameterRowsEditor } from "./ParameterRowsEditor";
 import { RunNameField } from "./RunNameField";
 import { RunNoteField } from "./RunNoteField";
 import {
-  CompareTargetsSection,
   RepeatCountSection,
   SimulationModelsSection,
 } from "./RunOptionSections";
@@ -60,7 +62,9 @@ function AddedBlocks({
         />
       )}
 
-      {form.showParams && <RunParametersSection form={form} isBusy={isBusy} />}
+      {form.showParams && !form.showCompare && (
+        <RunParametersSection form={form} isBusy={isBusy} />
+      )}
 
       {form.showNote && (
         <RunNoteField
@@ -72,6 +76,54 @@ function AddedBlocks({
           }}
         />
       )}
+    </>
+  );
+}
+
+/**
+ * The targets of a comparison, and under them the secrets the scope declares:
+ * a secret is run-level, so one block serves every target.
+ *
+ * The block stands even while it holds nothing. A comparison replaces the
+ * parameter section, so its "Add secret parameter" control is the only way
+ * into an ad hoc secret, and hiding the block on an empty one would make a
+ * person leave the comparison to type a secret.
+ */
+function ComparisonBlocks({
+  form,
+  isBusy,
+}: {
+  form: RunDialogForm;
+  isBusy: boolean;
+}) {
+  return (
+    <>
+      <CompareAgentsSection
+        rows={form.compareRows}
+        agents={form.scenarioAgents}
+        onChangeRow={form.updateCompareRow}
+        onAddRow={form.addCompareRow}
+        canAddRow={form.canAddCompareRow}
+        onRemoveRow={form.removeCompareRow}
+        onRemove={form.removeComparison}
+        hasDuplicates={form.hasDuplicateCompareRows}
+        defaults={form.parameterDefaults}
+        isBusy={isBusy}
+      />
+      <VStack align="stretch" gap={0} data-testid="run-dialog-compare-secrets">
+        <FieldLabel>Secret parameters</FieldLabel>
+        <ParameterRowsEditor
+          rows={form.parameterRows}
+          onChangeRow={form.updateParameterRow}
+          onAddRow={form.addSecretParameterRow}
+          onRemoveRow={form.removeParameterRow}
+          declaredSecrets={form.secretDefinitions}
+          secretValues={form.secretValues}
+          onChangeSecretValue={form.setSecretValue}
+          disabled={isBusy}
+          secretOnly
+        />
+      </VStack>
     </>
   );
 }
@@ -115,26 +167,17 @@ export function RunDialogFields({
         isBusy={isBusy}
       />
 
-      <TargetSection
-        mode={form.mode}
-        agents={form.scenarioAgents}
-        prompts={form.publishedPrompts}
-        target={form.target}
-        onSelect={form.setTarget}
-        onRemovePromptPicker={form.removePromptPicker}
-        onSetupAgent={form.handleSetupAgent}
-      />
-
-      {form.showCompare && form.mode === "agents" && (
-        <CompareTargetsSection
+      {form.showCompare ? (
+        <ComparisonBlocks form={form} isBusy={isBusy} />
+      ) : (
+        <TargetSection
+          mode={form.mode}
           agents={form.scenarioAgents}
-          primary={form.target}
-          compareTarget={form.compareTarget}
-          onSelect={form.setCompareTarget}
-          onRemove={() => {
-            form.setShowCompare(false);
-            form.setCompareTarget(null);
-          }}
+          prompts={form.publishedPrompts}
+          target={form.target}
+          onSelect={form.setTarget}
+          onRemovePromptPicker={form.removePromptPicker}
+          onSetupAgent={form.handleSetupAgent}
         />
       )}
 

@@ -5,6 +5,7 @@
  * starts, persists its target, and reads its refusals.
  *
  * @see specs/features/agent-testing/run-dialog.feature
+ * @see specs/features/agent-testing/comparison-mode.feature
  * @see specs/suites/run-notes.feature
  * @see specs/suites/test-suite-run-plan-reuse.feature
  * @see specs/features/agent-testing/results-tabs.feature
@@ -21,9 +22,12 @@ import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TestCasesTab } from "../cases/TestCasesTab";
+import { COMPARE_HINT } from "../run/CompareAgentsSection";
+import { DUPLICATE_TARGETS_MESSAGE } from "../run/compare-rows";
 import { RunDialog, type RunDialogSubject } from "../run/RunDialog";
 import { LOCKED_IN_ROWS_MESSAGE } from "../run/RunParametersSection";
 import { configurationKeyOf } from "../run/run-configuration";
+import { targetColor } from "../shared/target-colors";
 import { useAgentTestingStore } from "../useAgentTestingStore";
 
 const mockSuitesRunPlan = vi.hoisted(() => vi.fn());
@@ -1250,6 +1254,7 @@ function configurationEntry(
     targets?: {
       type: string;
       referenceId: string;
+      runParameters?: Record<string, string>;
       runSecretParameterNames?: string[];
     }[];
     repeatCount?: number;
@@ -1368,19 +1373,19 @@ describe("the run name", () => {
   });
 
   /** @scenario "A comparison run derives both targets into the name" */
-  it("reads both agents of a comparison, joined by vs", async () => {
+  it("reads both agents of a comparison, joined by vs, in the plan's order", async () => {
     const user = userEvent.setup();
     renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
+      suiteSubject({ initialTarget: { type: "http", id: "agent_2" } }),
     );
 
     await user.click(screen.getByTestId("customize-chip-compare"));
-    await user.click(
-      within(screen.getByTestId("run-dialog-compare")).getByTestId(
-        "run-dialog-agent-agent_2",
-      ),
-    );
 
+    // The second row defaulted to the other agent, and the name reads the
+    // targets the way the run plan sorts them rather than the row order.
+    expect(screen.getByTestId("run-dialog-compare-agent-1")).toHaveValue(
+      "agent_1",
+    );
     expect(screen.getByTestId("run-dialog-name")).toHaveValue(
       "Refunds prod-agent vs staging-agent",
     );
@@ -1517,14 +1522,21 @@ describe("the run name", () => {
     );
     expect(screen.getByTestId("run-dialog-compare")).toBeInTheDocument();
     expect(screen.getByLabelText("Repeat count")).toHaveValue(3);
-    expect(screen.getByTestId("run-dialog-parameter-line")).toHaveValue(
+    // A configuration stored with its overrides at run level puts them on
+    // every row, which is what that run did with them.
+    expect(screen.getByTestId("run-dialog-compare-parameters-0")).toHaveValue(
       "locale=de",
     );
+    expect(screen.getByTestId("run-dialog-compare-parameters-1")).toHaveValue(
+      "locale=de",
+    );
+    expect(
+      screen.queryByTestId("run-dialog-parameter-line"),
+    ).not.toBeInTheDocument();
     // The name was taken over, so it no longer follows the agent.
-    await user.click(
-      within(screen.getByTestId("run-dialog-target-section")).getByTestId(
-        "run-dialog-agent-agent_2",
-      ),
+    await user.selectOptions(
+      screen.getByTestId("run-dialog-compare-agent-0"),
+      "agent_2",
     );
     expect(screen.getByTestId("run-dialog-name")).toHaveValue(
       "Nightly refunds",
@@ -1956,19 +1968,20 @@ describe("the chips that add a run option", () => {
 
   afterEach(cleanup);
 
-  /** @scenario "The compare chip adds a second agent to the run" */
-  it("adds a second agent, sends both, and leaves the first alone on removal", async () => {
+  /** @scenario "The compare chip turns the run into a comparison" */
+  it("turns the agent section into rows, sends every row, and puts the first back on removal", async () => {
     const user = userEvent.setup();
     renderDialog(
       suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
     );
 
     await user.click(screen.getByTestId("customize-chip-compare"));
-    await user.click(
-      within(screen.getByTestId("run-dialog-compare")).getByTestId(
-        "run-dialog-agent-agent_2",
-      ),
-    );
+
+    expect(
+      screen.queryByTestId("run-dialog-target-section"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("run-dialog-compare-row-0")).toBeInTheDocument();
+    expect(screen.getByTestId("run-dialog-compare-row-1")).toBeInTheDocument();
     await user.click(screen.getByTestId("run-dialog-run"));
 
     await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
@@ -2025,5 +2038,441 @@ describe("the chips that add a run option", () => {
     expect(mockSuitesRunPlan.mock.calls[0]![0]).toMatchObject({
       config: { repeatCount: 3 },
     });
+  });
+});
+
+describe("the comparison", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockHasProviders.value = true;
+    useAgentTestingStore.setState({ lastRunTarget: null, pendingRun: null });
+    mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT, OFFLINE_AGENT] });
+    mockPromptsGetAll.mockReturnValue({ data: [] });
+    mockScenariosGetAll.mockReturnValue(
+      casesDeclaring([{ name: "locale", defaultValue: "en" }]),
+    );
+    mockTestSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
+    mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
+    mockRunConfigurations.mockReturnValue({ data: [], isLoading: false });
+    mockSuitesRunPlan.mockResolvedValue({
+      batchRunId: "batch_new",
+      jobCount: 1,
+      suiteId: "plan_1",
+      planName: "Refunds prod-agent",
+      created: true,
+    });
+  });
+
+  afterEach(cleanup);
+
+  /**
+   * Opens the dialog on the first agent with the parameter block open, which
+   * prefills the line with the declared "locale=en".
+   */
+  async function openWithParameters(user: ReturnType<typeof userEvent.setup>) {
+    renderDialog(
+      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
+    );
+    await user.click(screen.getByTestId("customize-chip-params"));
+  }
+
+  /** Writes a parameter line onto one row of the comparison. */
+  async function writeRowParameters(
+    user: ReturnType<typeof userEvent.setup>,
+    index: number,
+    line: string,
+  ) {
+    const input = screen.getByTestId(`run-dialog-compare-parameters-${index}`);
+    await user.clear(input);
+    if (line !== "") await user.type(input, line);
+  }
+
+  /** @scenario "Compare agents replaces the agent and the parameter sections" */
+  it("replaces the agent and the parameter sections with two coloured rows", async () => {
+    const user = userEvent.setup();
+    await openWithParameters(user);
+
+    await user.click(screen.getByTestId("customize-chip-compare"));
+
+    expect(
+      screen.queryByTestId("run-dialog-target-section"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("run-dialog-parameters"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("customize-chip-params"),
+    ).not.toBeInTheDocument();
+    const section = screen.getByTestId("run-dialog-compare");
+    expect(within(section).getByText("Compare agents")).toBeInTheDocument();
+    expect(screen.getAllByTestId(/^run-dialog-compare-row-/)).toHaveLength(2);
+    expect(screen.getByTestId("run-dialog-compare-dot-0")).toHaveAttribute(
+      "data-color",
+      targetColor(0),
+    );
+    expect(screen.getByTestId("run-dialog-compare-dot-1")).toHaveAttribute(
+      "data-color",
+      targetColor(1),
+    );
+  });
+
+  /** @scenario "The first row is the agent that was chosen with its parameter line" */
+  /** @scenario "The second row defaults to the next agent with the same parameter line" */
+  it("opens on the chosen agent with its line, and the next agent with the same line", async () => {
+    const user = userEvent.setup();
+    await openWithParameters(user);
+
+    await user.click(screen.getByTestId("customize-chip-compare"));
+
+    expect(screen.getByTestId("run-dialog-compare-agent-0")).toHaveValue(
+      "agent_1",
+    );
+    expect(screen.getByTestId("run-dialog-compare-parameters-0")).toHaveValue(
+      "locale=en",
+    );
+    expect(screen.getByTestId("run-dialog-compare-agent-1")).toHaveValue(
+      "agent_2",
+    );
+    expect(screen.getByTestId("run-dialog-compare-parameters-1")).toHaveValue(
+      "locale=en",
+    );
+    // The list offers the same agents as the picker, tunnel mark included.
+    expect(
+      within(screen.getByTestId("run-dialog-compare-agent-1")).getByRole(
+        "option",
+        { name: "prod-agent · Local tunnel" },
+      ),
+    ).toBeInTheDocument();
+  });
+
+  /** @scenario "The second row defaults to the same agent when there is no other" */
+  it("opens the second row on the same agent with the same line when the project has one agent", async () => {
+    const user = userEvent.setup();
+    mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT] });
+    await openWithParameters(user);
+
+    await user.click(screen.getByTestId("customize-chip-compare"));
+
+    expect(screen.getByTestId("run-dialog-compare-agent-1")).toHaveValue(
+      "agent_1",
+    );
+    expect(screen.getByTestId("run-dialog-compare-parameters-1")).toHaveValue(
+      "locale=en",
+    );
+  });
+
+  /** @scenario "A row is added as a copy of the last row, up to four" */
+  it("adds a copy of the last row, and stops at four", async () => {
+    const user = userEvent.setup();
+    await openWithParameters(user);
+    await user.click(screen.getByTestId("customize-chip-compare"));
+    await writeRowParameters(user, 1, "locale=de");
+
+    await user.click(screen.getByTestId("run-dialog-compare-add"));
+
+    expect(screen.getByTestId("run-dialog-compare-agent-2")).toHaveValue(
+      "agent_2",
+    );
+    expect(screen.getByTestId("run-dialog-compare-parameters-2")).toHaveValue(
+      "locale=de",
+    );
+
+    await user.click(screen.getByTestId("run-dialog-compare-add"));
+    expect(screen.getAllByTestId(/^run-dialog-compare-row-/)).toHaveLength(4);
+    expect(
+      screen.queryByTestId("run-dialog-compare-add"),
+    ).not.toBeInTheDocument();
+  });
+
+  /** @scenario "The hint under the rows says the same agent twice works" */
+  it("reads the hint under the rows", async () => {
+    const user = userEvent.setup();
+    await openWithParameters(user);
+
+    await user.click(screen.getByTestId("customize-chip-compare"));
+
+    expect(screen.getByTestId("run-dialog-compare-hint")).toHaveTextContent(
+      COMPARE_HINT,
+    );
+  });
+
+  /** @scenario "Removing a row down to one leaves compare mode with that row as the agent" */
+  it("leaves compare mode with the remaining row as the agent to be tested", async () => {
+    const user = userEvent.setup();
+    renderDialog(
+      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
+    );
+    await user.click(screen.getByTestId("customize-chip-compare"));
+
+    await user.click(screen.getByRole("button", { name: "Remove target 1" }));
+
+    expect(screen.queryByTestId("run-dialog-compare")).not.toBeInTheDocument();
+    expect(screen.getByTestId("run-dialog-agent-agent_2")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByTestId("run-dialog-name")).toHaveValue(
+      "Refunds staging-agent",
+    );
+  });
+
+  /** @scenario "Removing the section puts the first row back" */
+  it("puts the first row back as the agent, with its line in the parameter section", async () => {
+    const user = userEvent.setup();
+    await openWithParameters(user);
+    await user.click(screen.getByTestId("customize-chip-compare"));
+    await writeRowParameters(user, 0, "locale=de");
+
+    await user.click(
+      screen.getByRole("button", { name: "Remove the comparison" }),
+    );
+
+    expect(screen.getByTestId("run-dialog-agent-agent_1")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByTestId("run-dialog-parameter-line")).toHaveValue(
+      "locale=de",
+    );
+  });
+
+  /** @scenario "Removing the section puts the first row back" */
+  it("folds the parameter section away when the first row had no line", async () => {
+    const user = userEvent.setup();
+    renderDialog(
+      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
+    );
+    await user.click(screen.getByTestId("customize-chip-compare"));
+
+    await user.click(
+      screen.getByRole("button", { name: "Remove the comparison" }),
+    );
+
+    expect(
+      screen.queryByTestId("run-dialog-parameters"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("customize-chip-params")).toBeInTheDocument();
+  });
+
+  /** @scenario "Two rows with the same agent and the same parameters are refused" */
+  it("refuses two rows of the same agent with the same parameters and holds Run", async () => {
+    const user = userEvent.setup();
+    mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT] });
+    renderDialog(
+      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
+    );
+    await user.click(screen.getByTestId("customize-chip-compare"));
+    await writeRowParameters(user, 0, "model=gpt-5-mini");
+    await writeRowParameters(user, 1, "model=gpt-5-mini");
+
+    expect(screen.getByTestId("run-dialog-compare-error")).toHaveTextContent(
+      DUPLICATE_TARGETS_MESSAGE,
+    );
+    expect(screen.getByTestId("run-dialog-run")).toBeDisabled();
+
+    await writeRowParameters(user, 1, "model=gpt-5");
+    expect(
+      screen.queryByTestId("run-dialog-compare-error"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("run-dialog-run")).toBeEnabled();
+  });
+
+  /** @scenario "Two rows that differ only by a typed default are one target" */
+  it("refuses a row that only spells the declared default out beside an empty one", async () => {
+    const user = userEvent.setup();
+    mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT] });
+    await openWithParameters(user);
+    await user.click(screen.getByTestId("customize-chip-compare"));
+    // Row one keeps the declared "locale=en"; row two is emptied.
+    await writeRowParameters(user, 1, "");
+
+    expect(screen.getByTestId("run-dialog-compare-error")).toHaveTextContent(
+      DUPLICATE_TARGETS_MESSAGE,
+    );
+    expect(screen.getByTestId("run-dialog-run")).toBeDisabled();
+
+    await writeRowParameters(user, 1, "locale=de");
+    expect(
+      screen.queryByTestId("run-dialog-compare-error"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("run-dialog-run")).toBeEnabled();
+  });
+
+  /** @scenario "A typed default is not an override" */
+  it("sends no override for a value typed equal to its declared default", async () => {
+    const user = userEvent.setup();
+    await openWithParameters(user);
+    await user.click(screen.getByTestId("customize-chip-compare"));
+    await writeRowParameters(user, 1, "locale=de");
+
+    await user.click(screen.getByTestId("run-dialog-run"));
+
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+    const input = mockSuitesRunPlan.mock.calls[0]![0];
+    expect(input.config.targets).toEqual([
+      { type: "http", referenceId: "agent_1" },
+      {
+        type: "http",
+        referenceId: "agent_2",
+        runParameters: { locale: "de" },
+      },
+    ]);
+  });
+
+  /** @scenario "The secret parameters of the scope are one shared block" */
+  it("shows one shared secret block under the rows and waits for its value", async () => {
+    const user = userEvent.setup();
+    mockScenariosGetAll.mockReturnValue(
+      casesDeclaring([
+        { name: "locale", defaultValue: "en" },
+        { name: "api_token", secret: true },
+      ]),
+    );
+    renderDialog(
+      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
+    );
+
+    await user.click(screen.getByTestId("customize-chip-compare"));
+
+    const secrets = screen.getByTestId("run-dialog-compare-secrets");
+    expect(within(secrets).getByText("Secret parameters")).toBeInTheDocument();
+    const value = within(secrets).getByTestId(
+      "run-dialog-parameter-value-api_token",
+    );
+    expect(value).toHaveAttribute("type", "password");
+    expect(screen.getByTestId("run-dialog-run")).toBeDisabled();
+
+    await user.type(value, "tok_1");
+    expect(screen.getByTestId("run-dialog-run")).toBeEnabled();
+    await user.click(screen.getByTestId("run-dialog-run"));
+
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+    const input = mockSuitesRunPlan.mock.calls[0]![0];
+    // The secret goes with the run alone, shared by every target.
+    expect(input.parameters).toEqual({ api_token: "tok_1" });
+    expect(input.config.targets[0].runParameters).toBeUndefined();
+  });
+
+  /** @scenario "A comparison always offers a way to add a shared secret" */
+  it("offers the add secret control while the block holds nothing", async () => {
+    const user = userEvent.setup();
+    mockScenariosGetAll.mockReturnValue(casesDeclaring([]));
+    renderDialog(
+      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
+    );
+
+    await user.click(screen.getByTestId("customize-chip-compare"));
+
+    const secrets = screen.getByTestId("run-dialog-compare-secrets");
+    expect(
+      within(secrets).getByRole("button", { name: "Add a secret parameter" }),
+    ).toBeInTheDocument();
+  });
+
+  /** @scenario "Each target carries its own parameters" */
+  it("sends each target with its own parameters and no run-level ones", async () => {
+    const user = userEvent.setup();
+    mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT] });
+    await openWithParameters(user);
+    await user.click(screen.getByTestId("customize-chip-compare"));
+    // "locale=de" is not the declared default, so it stays an override on
+    // both rows; the name still reads only the value that differs.
+    await writeRowParameters(user, 0, "locale=de, model=gpt-5");
+    await writeRowParameters(user, 1, "locale=de, model=gpt-5-mini");
+
+    await user.click(screen.getByTestId("run-dialog-run"));
+
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+    const input = mockSuitesRunPlan.mock.calls[0]![0];
+    expect(input.config.targets).toEqual([
+      {
+        type: "http",
+        referenceId: "agent_1",
+        runParameters: { locale: "de", model: "gpt-5" },
+      },
+      {
+        type: "http",
+        referenceId: "agent_1",
+        runParameters: { locale: "de", model: "gpt-5-mini" },
+      },
+    ]);
+    // One layer of parameters: the rows carry them all, the run carries none.
+    expect(input.parameters).toBeUndefined();
+    // The name reads the value that differs and leaves the shared one out.
+    expect(input.name).toBe(
+      "Refunds prod-agent · model=gpt-5 vs prod-agent · model=gpt-5-mini",
+    );
+  });
+
+  /** @scenario "A stored comparison comes back with every target and its parameters" */
+  it("restores three rows, each with the parameters of its target", async () => {
+    const user = userEvent.setup();
+    mockRunConfigurations.mockReturnValue({
+      data: [
+        configurationEntry({
+          planName: "Model bake-off",
+          targets: [
+            {
+              type: "http",
+              referenceId: "agent_1",
+              runParameters: { model: "gpt-5" },
+            },
+            {
+              type: "http",
+              referenceId: "agent_1",
+              runParameters: { model: "gpt-5-mini" },
+            },
+            { type: "http", referenceId: "agent_2" },
+          ],
+        }),
+      ],
+      isLoading: false,
+    });
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("run-dialog-name-caret"));
+    await user.click(
+      within(await screen.findByTestId("run-dialog-name-options")).getAllByRole(
+        "button",
+      )[0]!,
+    );
+
+    expect(screen.getAllByTestId(/^run-dialog-compare-row-/)).toHaveLength(3);
+    expect(screen.getByTestId("run-dialog-compare-agent-0")).toHaveValue(
+      "agent_1",
+    );
+    expect(screen.getByTestId("run-dialog-compare-parameters-0")).toHaveValue(
+      "model=gpt-5",
+    );
+    expect(screen.getByTestId("run-dialog-compare-parameters-1")).toHaveValue(
+      "model=gpt-5-mini",
+    );
+    expect(screen.getByTestId("run-dialog-compare-agent-2")).toHaveValue(
+      "agent_2",
+    );
+    expect(screen.getByTestId("run-dialog-compare-parameters-2")).toHaveValue(
+      "",
+    );
+  });
+
+  /** @scenario "The footer counts the targets" */
+  it("reads the scenarios and the targets on Run", async () => {
+    const user = userEvent.setup();
+    renderDialog(
+      suiteSubject({
+        initialTarget: { type: "http", id: "agent_1" },
+        scenarioIds: ["case_1", "case_2", "case_3"],
+      }),
+    );
+    expect(screen.getByTestId("run-dialog-run")).toHaveTextContent(
+      "Run 3 scenarios",
+    );
+
+    await user.click(screen.getByTestId("customize-chip-compare"));
+
+    expect(screen.getByTestId("run-dialog-run")).toHaveTextContent(
+      "Run 3 scenarios × 2 targets",
+    );
   });
 });

@@ -141,6 +141,48 @@ Feature: The results atom
     And the platform run is not
     And no more targets are returned than the cap allows
 
+  # --- A target is an agent and its parameters ---
+  #
+  # A run plan may point one agent at itself twice with different parameter
+  # overrides, "prod-agent on gpt-5 vs prod-agent on gpt-5-mini". Each of those
+  # is its own target, so the platform stamps a target key on every run: the
+  # reference id alone when the target carries no overrides, and the reference
+  # id plus a short hash of the overrides when it does. The overrides
+  # themselves travel beside the key, so a reader can name the variant.
+
+  @integration
+  Scenario: A target with parameter overrides is its own target
+    Given a run of one scenario against "prod-agent" and against "prod-agent" with the parameter "model=gpt-5-mini"
+    When the atoms are read
+    Then two atoms are returned
+    And the atom of the plain target folds under "prod-agent"
+    And the atom of the variant folds under the stamped target key, which is not "prod-agent"
+    And the atom of the variant carries the parameters "model=gpt-5-mini"
+    And the atom of the plain target carries no target parameters
+
+  @integration
+  Scenario: An old run with no target key keeps its reference id as key
+    Given a run recorded before target keys were stamped, pointed at "prod-agent"
+    When the atom is read
+    Then its target key reads "prod-agent"
+    And it carries no target parameters
+
+  @integration
+  Scenario: The run targets list carries parameter variants
+    Given a run of "prod-agent" with the parameter "model=gpt-5-mini", a plain run of "prod-agent", and a run pushed from code naming "AcmeSupportAgent"
+    When the run targets of the window are read
+    Then the variant is listed under its stamped key, with the reference id "prod-agent" and the parameters "model=gpt-5-mini"
+    And "AcmeSupportAgent" is listed under its code key
+    And the plain run of "prod-agent" is not listed, since the agent list already names it
+
+  @integration
+  Scenario: The overview groups a parameter variant apart from its agent
+    Given a run of one scenario against "prod-agent" and against "prod-agent" with the parameter "model=gpt-5-mini"
+    When the overview is read grouped by target
+    Then two groups are returned
+    And the group of the variant carries the parameters "model=gpt-5-mini"
+    And the group of the plain target carries no target parameters
+
   @integration
   Scenario: One run against two targets gives one atom per target
     Given a run of two scenarios against two targets

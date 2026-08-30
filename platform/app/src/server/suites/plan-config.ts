@@ -17,6 +17,7 @@
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { RunParameterValues } from "~/server/scenarios/parameters";
 import { type SuiteScope, suiteScopeSchema } from "./scope";
+import { targetIdentityKey, targetSortKey } from "./target-key";
 import type { SuiteTarget } from "./types";
 
 /** Everything a run plan holds beside its name. */
@@ -31,19 +32,41 @@ export type PlanConfig = {
 /**
  * Orders targets so "dev vs prod" and "prod vs dev" are one config.
  *
- * Stable and total: `type` then `referenceId`, both of which every target
- * carries. Comparison columns therefore keep their order between runs of the
- * same plan.
+ * Stable and total: `type`, then the reference id, then the parameter
+ * overrides, all of which every target carries (see `targetSortKey`).
+ * Comparison columns therefore keep their order between runs of the same
+ * plan, and a plain agent sorts before the same agent with overrides.
  */
 export function sortSuiteTargets(targets: SuiteTarget[]): SuiteTarget[] {
   return [...targets].sort((left, right) =>
-    targetKey(left).localeCompare(targetKey(right)),
+    targetSortKey(left).localeCompare(targetSortKey(right)),
   );
 }
 
-/** `<type>:<referenceId>`. The whole of a target's identity. */
-function targetKey(target: SuiteTarget): string {
-  return `${target.type}:${target.referenceId}`;
+/**
+ * The targets that appear more than once in a config, one per repeated one.
+ *
+ * Two targets of one agent with the same overrides would run the same thing
+ * twice under one column, so a config holding any is refused. The same agent
+ * with different overrides is two targets, and is fine.
+ *
+ * Two targets are the same one when `targetIdentityKey` says so, which reads
+ * the overrides as JSON. The readable sort key cannot answer this: a value
+ * that holds a comma and an `=` writes the pairs another target writes.
+ */
+export function duplicateSuiteTargets(targets: SuiteTarget[]): SuiteTarget[] {
+  const seen = new Set<string>();
+  const reported = new Set<string>();
+  const duplicates: SuiteTarget[] = [];
+  for (const target of targets) {
+    const key = targetIdentityKey(target);
+    if (seen.has(key) && !reported.has(key)) {
+      duplicates.push(target);
+      reported.add(key);
+    }
+    seen.add(key);
+  }
+  return duplicates;
 }
 
 /**
@@ -90,7 +113,7 @@ export function configurationKey(params: {
   const { config } = params;
   return [
     scopeKey({ scope: config.scope, scenarioIds: params.scenarioIds }),
-    sortSuiteTargets(config.targets).map(targetKey).join("+"),
+    sortSuiteTargets(config.targets).map(targetIdentityKey).join("+"),
     `x${config.repeatCount}`,
     config.simulatorModel ?? "",
     config.judgeModel ?? "",

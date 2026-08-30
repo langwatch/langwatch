@@ -37360,6 +37360,48 @@ console.log(result.batchRunId);
 
 `langwatch.runPlans.run({ ... })` takes the same body as `POST /api/v1/run-plans/run`.
 
+## Compare two agents, or one agent on two models
+
+A run goes against every target you name, so naming two targets runs each scenario twice and files both under one batch. That is how you compare a candidate against what is in production.
+
+A target may also carry the parameter values it alone runs with. Name the same agent twice with different values and you compare that agent on two models in the same run.
+
+```bash
+langwatch test-suite run "Checkout regression" \
+  --target 'http:agent_abc123?model=gpt-5' \
+  --target 'http:agent_abc123?model=gpt-5-mini' \
+  --wait
+```
+
+The suffix after the question mark is a query string. Both halves are percent-decoded, so a value that holds `?` or `&` must be written as `%3F` or `%26`. A value is read as the type it looks like: `true` and `false` become booleans, a plain number becomes a number, everything else stays text.
+
+On the REST API the same values go in `runParameters` on the target:
+
+```bash
+curl -X POST "https://app.langwatch.ai/api/v1/test-suites/suite_abc123/run" \
+  -H "X-Auth-Token: ${LANGWATCH_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targets": [
+      {
+        "type": "http",
+        "referenceId": "agent_abc123",
+        "runParameters": { "model": "gpt-5" }
+      },
+      {
+        "type": "http",
+        "referenceId": "agent_abc123",
+        "runParameters": { "model": "gpt-5-mini" }
+      }
+    ],
+    "note": "gpt-5 against gpt-5-mini"
+  }'
+```
+
+`runParameters` are merged over the run-level `parameters`, and the target wins. Use `parameters` for what every target shares, such as a fixture id or a tenant, and `runParameters` for what tells the targets apart.
+
+The results page shows one column per target, each with its own pass rate, duration and cost, so you read the two side by side rather than as one fused number.
+
 ## Poll the batch
 
 `GET /api/simulation-runs/batches/{batchRunId}` answers with the counts of one batch:
@@ -52579,6 +52621,15 @@ langwatch run-plan archive <planId>
 - `--name` is what makes the run reusable. Without it the platform names the plan itself.
 - `--idempotency-key <key>` makes a retried job join the first run instead of starting a second one. Use it in CI, where a re-run of the same job is normal.
 
+**Comparison runs.** Two targets in one run is a comparison: every scenario runs against both, and the results page shows one column per target with its own pass rate, duration and cost. A target may also carry the parameter values it alone runs with, written as a query string after the reference id, so the same agent named twice with different values compares that agent on two models. Quote the value, because the shell reads `?` and `&` itself. A target value wins over the same name given with `--param`, so `--param` carries what every target shares and the suffix carries what tells the targets apart.
+
+```bash
+langwatch run-plan run --test-suite "Refunds" \
+  --target 'http:<agentId>?model=gpt-5' \
+  --target 'http:<agentId>?model=gpt-5-mini' \
+  --name "Refunds model comparison" --format json
+```
+
 Whichever command started the run, follow its progress without blocking via:
 
 ```bash
@@ -55448,6 +55499,15 @@ langwatch run-plan archive <planId>
 - Exactly one kind of scope per run: `--all`, or `--test-suite`, or `--label`, or `--scenario`. `--test-suite`, `--label` and `--scenario` repeat.
 - `--name` is what makes the run reusable. Without it the platform names the plan itself.
 - `--idempotency-key <key>` makes a retried job join the first run instead of starting a second one. Use it in CI, where a re-run of the same job is normal.
+
+**Comparison runs.** Two targets in one run is a comparison: every scenario runs against both, and the results page shows one column per target with its own pass rate, duration and cost. A target may also carry the parameter values it alone runs with, written as a query string after the reference id, so the same agent named twice with different values compares that agent on two models. Quote the value, because the shell reads `?` and `&` itself. A target value wins over the same name given with `--param`, so `--param` carries what every target shares and the suffix carries what tells the targets apart.
+
+```bash
+langwatch run-plan run --test-suite "Refunds" \
+  --target 'http:<agentId>?model=gpt-5' \
+  --target 'http:<agentId>?model=gpt-5-mini' \
+  --name "Refunds model comparison" --format json
+```
 
 Whichever command started the run, follow its progress without blocking via:
 
@@ -58612,6 +58672,15 @@ langwatch run-plan archive <planId>
 - Exactly one kind of scope per run: `--all`, or `--test-suite`, or `--label`, or `--scenario`. `--test-suite`, `--label` and `--scenario` repeat.
 - `--name` is what makes the run reusable. Without it the platform names the plan itself.
 - `--idempotency-key <key>` makes a retried job join the first run instead of starting a second one. Use it in CI, where a re-run of the same job is normal.
+
+**Comparison runs.** Two targets in one run is a comparison: every scenario runs against both, and the results page shows one column per target with its own pass rate, duration and cost. A target may also carry the parameter values it alone runs with, written as a query string after the reference id, so the same agent named twice with different values compares that agent on two models. Quote the value, because the shell reads `?` and `&` itself. A target value wins over the same name given with `--param`, so `--param` carries what every target shares and the suffix carries what tells the targets apart.
+
+```bash
+langwatch run-plan run --test-suite "Refunds" \
+  --target 'http:<agentId>?model=gpt-5' \
+  --target 'http:<agentId>?model=gpt-5-mini' \
+  --name "Refunds model comparison" --format json
+```
 
 Whichever command started the run, follow its progress without blocking via:
 

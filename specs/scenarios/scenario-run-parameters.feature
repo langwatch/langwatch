@@ -162,3 +162,51 @@ Feature: Scenario run parameters
     Given a workflow started from the command line with a param flag
     When the command runs
     Then the workflow entry receives that name as an input holding the flag's value
+
+  # --- Parameters per target ---
+  #
+  # A run may point one agent at itself on two models. A target can therefore
+  # carry parameter overrides of its own, merged over the values supplied for
+  # the run as a whole. The target's values win. Each target's merged set is
+  # checked the way the run's values are: a name no scenario in the run
+  # declares is refused. Secret values are supplied once per run and never per
+  # target, so a target that tries to carry one is refused before anything is
+  # scheduled or written.
+
+  @unit
+  Scenario: Each target receives its own parameters merged over the run parameters
+    Given a scenario declaring "model" with the default "gpt-5" and "region" with the default "eu-central"
+    And a run supplying "region" as "us-east"
+    And a target carrying the override "model=gpt-5-mini" beside a target carrying none
+    When the run is prepared
+    Then the target with the override resolves "model" as "gpt-5-mini" and "region" as "us-east"
+    And the target without one resolves "model" as "gpt-5" and "region" as "us-east"
+
+  @unit
+  Scenario: A target override no scenario in the run declares is refused
+    Given a scenario declaring only "model"
+    When a run is started with a target carrying the override "seats=12"
+    Then the run is refused with the code "scenario_parameter_unknown"
+    And nothing is scheduled
+
+  @unit
+  Scenario: A target override naming a secret parameter is refused
+    Given a scenario declaring the secret parameter "api_token"
+    When a run is started with a target carrying the override "api_token=..."
+    Then the run is refused with a validation error naming the targets field
+    And nothing is scheduled
+
+  @unit
+  Scenario: The target key and its parameters travel in the run metadata
+    Given a run against "prod-agent" and against "prod-agent" with the override "model=gpt-5-mini"
+    When the runs of the batch are queued
+    Then every run carries "targetKey" in the reserved langwatch namespace
+    And the run of the variant carries "targetParameters" holding only the override
+    And the run of the plain target carries no "targetParameters" key
+    And the "parameters" of each run hold that target's merged values
+
+  @integration
+  Scenario: The target key and its parameters read back off the stored run
+    Given a run queued against "prod-agent" with the override "model=gpt-5-mini"
+    When the run is stored and read back
+    Then its metadata carries the target key and the override under the reserved langwatch namespace

@@ -11,8 +11,10 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { computeRelativeWindow } from "~/components/PeriodSelector";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { SuiteNameDialog } from "../cases/SuiteNameDialog";
 import { SuiteRail } from "../cases/SuiteRail";
 import {
@@ -21,8 +23,14 @@ import {
 } from "../cases/test-cases";
 import type { SuiteLastRun } from "../cases/useTestCasesData";
 
+const routerPush = vi.fn();
+
 vi.mock("~/utils/compat/next-router", () => ({
-  useRouter: () => ({ query: {}, push: vi.fn(), isReady: true }),
+  useRouter: () => ({
+    query: { project: "test-project" },
+    push: routerPush,
+    isReady: true,
+  }),
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -34,6 +42,24 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 vi.mock("~/utils/formatTimeAgo", () => ({
   formatTimeAgoCompact: () => "2h ago",
   formatTimeAgo: () => "2 hours ago",
+}));
+
+// The recent runs of a suite hang off its row menu, so opening that submenu
+// reads the runs of the whole project and narrows them to the suite.
+const suiteRunDataQuery = vi.fn();
+const suitesGetAllQuery = vi.fn();
+
+vi.mock("~/utils/api", () => ({
+  api: {
+    scenarios: {
+      getSuiteRunData: {
+        useQuery: (...args: unknown[]) => suiteRunDataQuery(...args),
+      },
+    },
+    suites: {
+      getAll: { useQuery: (...args: unknown[]) => suitesGetAllQuery(...args) },
+    },
+  },
 }));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -74,6 +100,10 @@ function renderRail(
     lastRunBySuiteId: new Map<string, SuiteLastRun>([
       ["suite_1", makeLastRun()],
     ]),
+    scenarioIdsBySuiteId: new Map<string, string[]>([
+      ["suite_1", ["case_1"]],
+      ["suite_default", ["case_1"]],
+    ]),
     collapsed: false,
     onToggleCollapsed: vi.fn(),
     onSelect: vi.fn(),
@@ -81,7 +111,6 @@ function renderRail(
     onNewTestCase: vi.fn(),
     onRunSuite: vi.fn(),
     onRenameSuite: vi.fn(),
-    onOpenLastRun: vi.fn(),
     onArchiveSuite: vi.fn(),
     period: THIRTY_DAYS,
     periodMode: "relative",
@@ -110,8 +139,65 @@ function railEntries(): string[] {
     .filter((id): id is string => !!id?.startsWith("suite-rail-item-"));
 }
 
+/**
+ * Two batches of the project: one that covered a scenario of Refunds, and one
+ * that covered a scenario of another suite. Narrowing to the open suite is the
+ * work the submenu does, so a fixture holding only its own runs would prove
+ * nothing.
+ */
+const TWO_HOURS_AGO = Date.now() - 2 * 60 * 60 * 1000 - 60_000;
+
+const REFUNDS_SET = "__internal__suite_1__suite";
+const OTHER_SET = "__internal__suite_2__suite";
+
+function makeProjectRun(
+  overrides: Partial<ScenarioRunData> = {},
+): ScenarioRunData {
+  return {
+    scenarioId: "case_1",
+    batchRunId: "batch_refunds",
+    scenarioRunId: "run_refunds",
+    name: "Double charge",
+    description: null,
+    metadata: null,
+    status: ScenarioRunStatus.SUCCESS,
+    results: null,
+    messages: [],
+    timestamp: TWO_HOURS_AGO,
+    durationInMs: 6300,
+    totalCost: 0.0042,
+    ...overrides,
+  } as ScenarioRunData;
+}
+
+/** Hands the two reads their answer: the runs, and the set each batch is of. */
+function setProjectRuns(runs: ScenarioRunData[]) {
+  suiteRunDataQuery.mockReturnValue({
+    data: {
+      runs,
+      scenarioSetIds: {
+        batch_refunds: REFUNDS_SET,
+        batch_elsewhere: OTHER_SET,
+      },
+    },
+    isLoading: false,
+  });
+}
+
 describe("the test suites rail", () => {
   afterEach(cleanup);
+
+  beforeEach(() => {
+    routerPush.mockClear();
+    setProjectRuns([]);
+    suitesGetAllQuery.mockReturnValue({
+      data: [
+        { id: "suite_1", name: "Refunds", slug: "refunds" },
+        { id: "suite_2", name: "Checkout", slug: "checkout" },
+      ],
+      isLoading: false,
+    });
+  });
 
   // --- What is listed ---
 
@@ -209,7 +295,7 @@ describe("the test suites rail", () => {
       "New scenario",
       "Run suite",
       "Rename",
-      "Open last run",
+      "Open recent runs",
       "Archive suite",
     ]);
   });
@@ -272,23 +358,49 @@ describe("the test suites rail", () => {
       "New scenario",
       "Run suite",
       "Rename",
-      "Open last run",
+      "Open recent runs",
       "Archive suite",
     ]);
   });
 
-  /** @scenario "Open last run goes straight to the last run of that suite" */
-  it("opens the last run of that suite", async () => {
-    const { props } = renderRail();
-    const user = await openSuiteMenu("Refunds");
+  describe("given the project ran batches of this suite and of another", () => {
+    describe("when Open recent runs is chosen", () => {
+      /** @scenario "Open recent runs holds the runs that covered the suite" */
+      it("lists the runs that covered the suite and opens one under its plan", async () => {
+        setProjectRuns([
+          makeProjectRun(),
+          makeProjectRun({
+            batchRunId: "batch_elsewhere",
+            scenarioRunId: "run_elsewhere",
+            scenarioId: "case_elsewhere",
+          }),
+        ]);
+        renderRail();
+        const user = await openSuiteMenu("Refunds");
 
-    await user.click(
-      await screen.findByRole("menuitem", { name: "Open last run" }),
-    );
+        await user.click(
+          await screen.findByRole("menuitem", { name: /Open recent runs/ }),
+        );
 
-    expect(props.onOpenLastRun).toHaveBeenCalledWith(
-      expect.objectContaining({ slug: "refunds" }),
-    );
+        const list = await screen.findByTestId("recent-runs-submenu-list");
+        const rows = within(list).getAllByTestId(/^recent-run-/);
+        expect(rows.map((row) => row.getAttribute("data-testid"))).toEqual([
+          "recent-run-batch_refunds",
+        ]);
+        expect(rows[0]).toHaveTextContent("Refunds");
+
+        await user.click(rows[0]!);
+
+        // The row opens the run under the plan that holds it, on the Results tab.
+        expect(routerPush).toHaveBeenCalledWith(
+          expect.objectContaining({
+            pathname: "/[project]/agent-testing/[[...path]]",
+          }),
+          expect.stringContaining("/results/refunds/batch_refunds"),
+          { shallow: true },
+        );
+      });
+    });
   });
 
   /** @scenario "Every action of the rail row menu carries its icon" */
@@ -309,17 +421,21 @@ describe("the test suites rail", () => {
     ]);
   });
 
-  /** @scenario "Open last run is not offered for a suite that never ran" */
-  it("does not offer Open last run for a suite that never ran", async () => {
-    renderRail({ lastRunBySuiteId: new Map<string, SuiteLastRun>() });
-    await openSuiteMenu("Refunds");
+  describe("given the suite never ran", () => {
+    describe("when the row menu is opened", () => {
+      /** @scenario "Open recent runs is not offered for a suite that never ran" */
+      it("does not offer Open recent runs", async () => {
+        renderRail({ lastRunBySuiteId: new Map<string, SuiteLastRun>() });
+        await openSuiteMenu("Refunds");
 
-    expect(
-      await screen.findByRole("menuitem", { name: "Run suite" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("menuitem", { name: "Open last run" }),
-    ).not.toBeInTheDocument();
+        expect(
+          await screen.findByRole("menuitem", { name: "Run suite" }),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByRole("menuitem", { name: /Open recent runs/ }),
+        ).not.toBeInTheDocument();
+      });
+    });
   });
 
   /** @scenario "Archive suite opens the confirmation dialog" */
@@ -364,14 +480,14 @@ describe("the test suites rail", () => {
   });
 
   /** @scenario "A person with read-only access sees no changing actions in the row menu" */
-  it("offers only Open last run to a person with read-only access", async () => {
+  it("offers only Open recent runs to a person with read-only access", async () => {
     renderRail({ canManage: false });
     await openSuiteMenu("Refunds");
 
     const items = (await screen.findAllByRole("menuitem")).map(
       (item) => item.textContent,
     );
-    expect(items).toEqual(["Open last run"]);
+    expect(items).toEqual(["Open recent runs"]);
     expect(
       screen.queryByRole("button", { name: "New Test Suite" }),
     ).not.toBeInTheDocument();

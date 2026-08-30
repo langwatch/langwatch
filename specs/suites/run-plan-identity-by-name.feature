@@ -192,6 +192,96 @@ Feature: A run plan is identified by its name
     When the plan's config is written
     Then the targets are stored in the same order as a run started against "dev-agent" and then "prod-agent"
 
+  # --- A target is an agent and its parameters ---
+  #
+  # A target may carry parameter overrides of its own, so one agent can be run
+  # against itself on two models. The overrides are part of the target's
+  # identity: its key is the reference id alone when it carries none, and the
+  # reference id plus a short hash of the overrides when it does. The client
+  # never hashes anything of its own; it reads the key the server stamped.
+
+  @unit
+  Scenario: A target with no overrides keys as its reference id alone
+    Given a target pointing at "prod-agent" with no parameter overrides
+    When its key is taken
+    Then the key reads "prod-agent"
+    And a target with an empty set of overrides keys the same way
+
+  @unit
+  Scenario: A target with overrides keys as its reference id and a hash of the overrides
+    Given a target pointing at "prod-agent" with the override "model=gpt-5-mini"
+    When its key is taken
+    Then the key reads "prod-agent" followed by "#" and eight hex characters
+    And the same overrides written in another order take the same key
+    And a different override value takes a different key
+
+  @unit
+  Scenario: A target key splits back into its reference id and its hash
+    Given the key of a target with overrides
+    When it is split
+    Then the reference id and the hash are read back
+    And the key of a target with no overrides splits into the reference id and no hash
+
+  @unit
+  Scenario: A target's parameters read as a sorted list of pairs
+    Given the overrides "seats=12" and "model=gpt-5-mini"
+    When they are read as a label
+    Then the label reads "model=gpt-5-mini, seats=12"
+
+  @unit
+  Scenario: A target is labelled with the parameters that tell it from the other targets of its agent
+    Given a target named "prod-agent" with the overrides "locale=de, model=gpt-5-mini"
+    When it is the only target of that agent
+    Then its label reads "prod-agent"
+    When the same agent appears again with the overrides "locale=de, model=gpt-5"
+    Then its label reads "prod-agent · model=gpt-5-mini"
+    And the value both targets share is not in the label
+    And a repeated agent that carries none of the differing parameters still reads "prod-agent"
+
+  @unit
+  Scenario: The same agent twice with different parameters is two targets
+    Given a run against "prod-agent" and against "prod-agent" with the override "model=gpt-5-mini"
+    When the targets are sorted for storage
+    Then both are kept
+    And they are sorted by type, reference id and parameters, read as "type:referenceId|k=v,k2=v2", so the order is the same on every run and the same one the run dialog shows
+
+  @unit
+  Scenario: A value holding a comma and an equals sign does not fake a second target
+    Given a target with the override "a" holding "b,c=d" and a target with the overrides "a=b" and "c=d"
+    When the targets are compared
+    Then they are two targets and neither is refused as a duplicate
+
+  @integration
+  Scenario: Two identical targets are refused
+    Given a project with one scenario and the agent "prod-agent"
+    When a run is started against "prod-agent" twice with the same overrides
+    Then the run is refused with a validation error naming the targets field
+    And no run plan of that name exists
+    And nothing is scheduled
+
+  @integration
+  Scenario: A typed default is not an override
+    Given a project with one scenario that declares "model" with the default "gpt-5" and the agent "prod-agent"
+    When a run is started with no name against "prod-agent" with "locale=de, model=gpt-5" and against "prod-agent" with "locale=de, model=gpt-5-mini"
+    Then the plan stores the first target with "locale=de" alone
+    And the plan is named "Refunds prod-agent vs prod-agent · model=gpt-5-mini"
+
+  @integration
+  Scenario: Two targets that differ only by a typed default are refused
+    Given a project with one scenario that declares "model" with the default "gpt-5" and the agent "prod-agent"
+    When a run is started against "prod-agent" with no overrides and against "prod-agent" with "model=gpt-5"
+    Then the run is refused with a validation error naming the targets field
+    And no run plan of that name exists
+
+  @integration
+  Scenario: A run named by the server labels a repeated agent with its parameters
+    Given a project holding the test suite "Refunds" and the agent "prod-agent"
+    When a run of "Refunds" is started with no name against "prod-agent" with "locale=de" and against "prod-agent" with "locale=de, model=gpt-5-mini"
+    Then a run plan named "Refunds prod-agent vs prod-agent · model=gpt-5-mini" is created
+    And the value both targets share is not in the name
+    And the labels follow the stored order of the targets
+    And a second run with no name joins that same plan
+
   @integration
   Scenario: A run started under an empty name is refused
     Given a project with scenarios and one target

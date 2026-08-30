@@ -664,7 +664,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_run_plan",
-    "Run scenarios against targets. The plan name identifies the run plan: an existing name is re-run with the configuration you send here, a new name creates the plan. Configuration is the scope, the targets, the repeat count and the models; parameters, the note and the idempotency key belong to this run alone.",
+    "Run scenarios against targets. The plan name identifies the run plan: an existing name is re-run with the configuration you send here, a new name creates the plan. Configuration is the scope, the targets, the repeat count and the models; parameters, the note and the idempotency key belong to this run alone. Send more than one target to compare them in the same run, and give a target its own parameters to compare one agent on two models.",
     {
       name: z
         .string()
@@ -683,7 +683,9 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         ),
       targets: z
         .array(runPlanTargetSchema)
-        .describe("What to run the scenarios against."),
+        .describe(
+          "What to run the scenarios against. Every target runs every scenario, and the results show one column for each, so this is how one run compares two agents or one agent on two models.",
+        ),
       repeatCount: z
         .number()
         .int()
@@ -701,7 +703,9 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .describe("Model that judges the criteria. Omit for the project default."),
       parameters: runParametersSchema
         .optional()
-        .describe("Values for the parameters the scenarios declare, by name."),
+        .describe(
+          "Values for the parameters the scenarios declare, by name. They apply to every target; a target that names the same parameter overrides them for itself.",
+        ),
       note: z
         .string()
         .max(200)
@@ -898,12 +902,14 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_run_test_suite",
-    "Run every scenario of a test suite against targets. This creates or joins the run plan named '<suite name> <target name>' unless you send a name of your own.",
+    "Run every scenario of a test suite against targets. This creates or joins the run plan named '<suite name> <target name>' unless you send a name of your own. Send more than one target to compare them in the same run, and give a target its own parameters to compare one agent on two models.",
     {
       id: z.string().describe("The test suite ID to run"),
       targets: z
         .array(runPlanTargetSchema)
-        .describe("What to run the scenarios against."),
+        .describe(
+          "What to run the scenarios against. Every target runs every scenario, and the results show one column for each.",
+        ),
       name: z
         .string()
         .optional()
@@ -927,7 +933,9 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .describe("Model that judges the criteria. Omit for the project default."),
       parameters: runParametersSchema
         .optional()
-        .describe("Values for the parameters the scenarios declare, by name."),
+        .describe(
+          "Values for the parameters the scenarios declare, by name. They apply to every target; a target that names the same parameter overrides them for itself.",
+        ),
       note: z
         .string()
         .max(200)

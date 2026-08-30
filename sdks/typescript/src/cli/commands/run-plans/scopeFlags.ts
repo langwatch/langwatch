@@ -5,6 +5,10 @@ import type {
 } from "@/client-sdk/services/run-plans";
 import type { TestSuitesApiService } from "@/client-sdk/services/test-suites";
 import {
+  coerceParameterValue,
+  type RunParameterValue,
+} from "../../utils/keyValueFlags";
+import {
   resolveSuiteReference,
   SuiteReferenceError,
 } from "../test-suites/resolveSuite";
@@ -110,12 +114,94 @@ export function describeScope(scope: RunPlanScope | null | undefined): string {
 const TARGET_TYPES = ["prompt", "http", "code", "workflow"] as const;
 
 /**
- * Reads the repeatable `--target <type>:<referenceId>` flag.
+ * A target as the command line writes it: what to run against, plus the
+ * parameter values that target alone runs with.
+ *
+ * The overrides are typed here rather than taken from the generated REST types
+ * so the parser states its own contract; the platform merges them over the
+ * run-level `--param` values, and the target wins.
+ */
+export type ParsedRunTarget = RunPlanTarget & {
+  runParameters?: Record<string, RunParameterValue>;
+};
+
+const rejectTarget = (message: string): never => {
+  console.error(chalk.red(`Error: ${message}`));
+  process.exit(1);
+};
+
+/** Percent-decode one half of a query pair, naming the target when it cannot be read. */
+function decodeQueryPart({
+  part,
+  target,
+}: {
+  part: string;
+  target: string;
+}): string {
+  try {
+    return decodeURIComponent(part);
+  } catch {
+    return rejectTarget(
+      `invalid target "${target}": "${part}" is not a valid percent-encoded value.`,
+    );
+  }
+}
+
+/**
+ * Reads the `?k=v&k2=v2` suffix of one target into the values that target runs
+ * with.
+ *
+ * The grammar is a query string, so `&` separates pairs and both halves are
+ * percent-decoded. A value is read as the type it looks like, the same rule
+ * `--param` uses, and a name repeated inside one suffix keeps the last value.
+ */
+function parseTargetParameters({
+  query,
+  target,
+}: {
+  query: string;
+  target: string;
+}): Record<string, RunParameterValue> {
+  if (query === "") {
+    rejectTarget(
+      `invalid target "${target}": the question mark carries no parameters. Write it as ${target}model=gpt-5, or leave the question mark out.`,
+    );
+  }
+  // A Map, not an object literal: assigning `__proto__` on a literal runs the
+  // prototype setter, which drops the pair without a word instead of sending
+  // the name the platform would refuse.
+  const parsed = new Map<string, RunParameterValue>();
+  for (const pair of query.split("&")) {
+    const separator = pair.indexOf("=");
+    if (separator <= 0) {
+      rejectTarget(
+        `invalid target parameter "${pair}" in "${target}". Write each one as key=value, separated by &.`,
+      );
+    }
+    const key = decodeQueryPart({ part: pair.slice(0, separator), target });
+    const value = decodeQueryPart({ part: pair.slice(separator + 1), target });
+    parsed.set(key, coerceParameterValue(value));
+  }
+  return Object.fromEntries(parsed);
+}
+
+/**
+ * Reads the repeatable `--target <type>:<referenceId>[?k=v&k2=v2]` flag.
  *
  * A run with no target has nothing to run against, so an empty list is a
  * refusal rather than a request the platform answers with a 422.
+ *
+ * The suffix is what makes a comparison run possible: the same agent named
+ * twice with different parameters is two targets, and the results show one
+ * column for each. The question mark is the separator, so a reference id or a
+ * value that holds one is refused by name rather than split in the wrong
+ * place.
+ *
+ * @see specs/features/run-plan-cli.feature
  */
-export function parseTargets(targetStrings: string[] | undefined): RunPlanTarget[] {
+export function parseTargets(
+  targetStrings: string[] | undefined,
+): ParsedRunTarget[] {
   if (!targetStrings || targetStrings.length === 0) {
     console.error(
       chalk.red(
@@ -136,7 +222,7 @@ export function parseTargets(targetStrings: string[] | undefined): RunPlanTarget
       process.exit(1);
     }
     const type = value.slice(0, colonIndex);
-    const referenceId = value.slice(colonIndex + 1);
+    const rest = value.slice(colonIndex + 1);
     if (!TARGET_TYPES.includes(type as (typeof TARGET_TYPES)[number])) {
       console.error(
         chalk.red(
@@ -145,7 +231,33 @@ export function parseTargets(targetStrings: string[] | undefined): RunPlanTarget
       );
       process.exit(1);
     }
-    return { type: type as RunPlanTarget["type"], referenceId };
+
+    const questionIndex = rest.indexOf("?");
+    if (questionIndex === -1) {
+      return {
+        type: type as RunPlanTarget["type"],
+        referenceId: decodeQueryPart({ part: rest, target: value }),
+      };
+    }
+
+    // Decoded, because the refusal below tells a reader to write a question
+    // mark in a reference id as %3F. Handing that back undecoded would send
+    // the platform a reference id nothing resolves.
+    const referenceId = decodeQueryPart({
+      part: rest.slice(0, questionIndex),
+      target: value,
+    });
+    const query = rest.slice(questionIndex + 1);
+    if (query.includes("?")) {
+      rejectTarget(
+        `invalid target "${value}": a reference id or a value that holds a question mark must percent-encode it as %3F.`,
+      );
+    }
+    return {
+      type: type as RunPlanTarget["type"],
+      referenceId,
+      runParameters: parseTargetParameters({ query, target: value }),
+    };
   });
 }
 

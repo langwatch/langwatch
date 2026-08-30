@@ -1,8 +1,17 @@
 import type { PrismaClient } from "~/generated/prisma/client";
-import type { RunParameterValues } from "~/server/scenarios/parameters";
+import {
+  parseRunParametersJson,
+  type RunParameterValues,
+  withoutParameterNames,
+} from "~/server/scenarios/parameters";
 import { configurationKey } from "~/server/suites/plan-config";
 import { parseSuiteScope, type SuiteScope } from "~/server/suites/scope";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
+import {
+  hasParameterOverrides,
+  splitTargetKey,
+  targetKeyOf,
+} from "~/server/suites/target-key";
 import { type SuiteTarget, suiteTargetSchema } from "~/server/suites/types";
 import type { ResultsFilter } from "../result-atoms/atom.types";
 import type {
@@ -153,42 +162,56 @@ function scenarioIdsOf(scope: RunConfigurationScope): string[] | undefined {
   return scope.mode === "scenarios" ? scope.scenarioIds : undefined;
 }
 
-/** The targets a plan row holds, dropping anything that no longer parses. */
-function planTargets(raw: unknown): Map<string, SuiteTarget> {
+/** The targets a plan row holds, by key and by reference, dropping anything that no longer parses. */
+function planTargets(raw: unknown): PlanTargets {
   const entries = Array.isArray(raw) ? raw : [];
+  const byKey = new Map<string, SuiteTarget>();
   const byReference = new Map<string, SuiteTarget>();
   for (const entry of entries) {
     const parsed = suiteTargetSchema.safeParse(entry);
-    if (parsed.success) byReference.set(parsed.data.referenceId, parsed.data);
+    if (!parsed.success) continue;
+    byKey.set(targetKeyOf(parsed.data), parsed.data);
+    byReference.set(parsed.data.referenceId, parsed.data);
   }
-  return byReference;
+  return { byKey, byReference };
+}
+
+/** A plan row's targets, keyed both ways a recorded target is looked up. */
+interface PlanTargets {
+  byKey: Map<string, SuiteTarget>;
+  byReference: Map<string, SuiteTarget>;
 }
 
 /**
- * A recorded `<type>:<referenceId>` pair, as the target the dialog reopens.
+ * A recorded `<type>:<targetKey>` pair and its overrides, as the target the
+ * dialog reopens.
  *
- * The plan row's target wins when it names the same reference, because it
- * carries the prompt bindings and the secret parameter names the run row never
- * held. Neither takes part in the configuration key, so this cannot change
- * which configurations are listed; without it a picked prompt target would
- * come back with its bindings lost.
+ * The identity comes from the run: its reference id, and the overrides it
+ * ran with. The plan row's target contributes only what the run row never
+ * held, the prompt bindings and the secret parameter names, matched by key
+ * and then by reference. Neither takes part in the configuration key, so
+ * this cannot change which configurations are listed; without it a picked
+ * prompt target would come back with its bindings lost.
  */
 function toTarget({
   pair,
-  planTargetsByReference,
+  parameters,
+  planTargets,
 }: {
   pair: string;
-  planTargetsByReference: Map<string, SuiteTarget>;
+  /** The raw overrides the run recorded for this target, or ''. */
+  parameters: string;
+  planTargets: PlanTargets;
 }): SuiteTarget | null {
   const separator = pair.indexOf(":");
   if (separator < 0) return null;
-  const referenceId = pair.slice(separator + 1);
+  const key = pair.slice(separator + 1);
+  const { referenceId } = splitTargetKey(key);
   if (referenceId === "") return null;
 
-  const stored = planTargetsByReference.get(referenceId);
-  if (stored) return stored;
-
-  const type = pair.slice(0, separator);
+  const stored =
+    planTargets.byKey.get(key) ?? planTargets.byReference.get(referenceId);
+  const type = stored?.type ?? pair.slice(0, separator);
   if (
     type !== "http" &&
     type !== "prompt" &&
@@ -197,40 +220,38 @@ function toTarget({
   ) {
     return null;
   }
-  return { type, referenceId };
+
+  const runParameters = parseRunParametersJson(parameters);
+  return {
+    type,
+    referenceId,
+    ...(stored?.scenarioMappings !== undefined && {
+      scenarioMappings: stored.scenarioMappings,
+    }),
+    ...(stored?.runSecretParameterNames !== undefined && {
+      runSecretParameterNames: stored.runSecretParameterNames,
+    }),
+    ...(hasParameterOverrides(runParameters) && { runParameters }),
+  };
 }
 
 /**
- * The parameter values a run recorded, read back off the raw stored JSON.
+ * The run-level values a run recorded.
  *
- * Tolerant on purpose: a value the current shape does not understand is
- * dropped rather than taking the whole entry down, the same way a stored scope
- * that no longer parses still runs. A run with no parameters stored the empty
- * string.
+ * The stored parameters are the merged set the first scenario run resolved,
+ * which includes the overrides of the target that run went against. Those
+ * belong to the target, so they are taken back out; what is left is what was
+ * set for the run as a whole.
  */
-function parseRunParameters(raw: string): RunParameterValues {
-  if (raw === "") return {};
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return {};
-  }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    return {};
-  }
-
-  const values: RunParameterValues = {};
-  for (const [name, value] of Object.entries(parsed)) {
-    if (
-      typeof value === "string" ||
-      typeof value === "number" ||
-      typeof value === "boolean"
-    ) {
-      values[name] = value;
-    }
-  }
-  return values;
+function runLevelParameters(row: RawRunConfigurationRow): RunParameterValues {
+  const merged = parseRunParametersJson(row.Parameters);
+  const overrides = parseRunParametersJson(row.FirstTargetParameters);
+  return (
+    withoutParameterNames({
+      values: merged,
+      names: new Set(Object.keys(overrides)),
+    }) ?? {}
+  );
 }
 
 /** One folded row, plus the plan that owns it, as one dropdown entry. */
@@ -241,13 +262,17 @@ function toEntry({
   row: RawRunConfigurationRow;
   plan: PlanRow;
 }): RunConfigurationEntry {
-  const planTargetsByReference = planTargets(plan.targets);
-  const targets = row.TargetPairs.flatMap((pair) => {
-    const target = toTarget({ pair, planTargetsByReference });
+  const stored = planTargets(plan.targets);
+  const targets = row.TargetPairs.flatMap((pair, index) => {
+    const target = toTarget({
+      pair,
+      parameters: row.TargetParameters[index] ?? "",
+      planTargets: stored,
+    });
     return target ? [target] : [];
   });
   const scope = scopeOf(plan);
-  const runParameters = parseRunParameters(row.Parameters);
+  const runParameters = runLevelParameters(row);
   const configuration = {
     scope,
     targets,
@@ -312,7 +337,6 @@ function collapse(entries: RunConfigurationEntry[]): RunConfigurationEntry[] {
 export const __testing = {
   toEntry,
   scopeOf,
-  parseRunParameters,
   toTarget,
   collapse,
 };

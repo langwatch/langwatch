@@ -22471,6 +22471,10 @@ export interface operations {
                             targetReferenceId: string;
                             /** @enum {string} */
                             targetType: "prompt" | "http" | "code" | "workflow";
+                            targetKey?: string;
+                            targetParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
                             simulationSuiteId?: string;
                             scenarioVersion?: number;
                             simulatorModel?: string;
@@ -25292,6 +25296,10 @@ export interface operations {
                             type: "prompt" | "http" | "code" | "workflow";
                             /** @description The id of the prompt, agent or workflow to run against. */
                             referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
                         }[];
                         repeatCount: number;
                         labels: string[];
@@ -25397,6 +25405,10 @@ export interface operations {
                         type: "prompt" | "http" | "code" | "workflow";
                         /** @description The id of the prompt, agent or workflow to run against. */
                         referenceId: string;
+                        /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                        runParameters?: {
+                            [key: string]: string | number | boolean;
+                        };
                     }[];
                     /** @default 1 */
                     repeatCount?: number;
@@ -25447,6 +25459,10 @@ export interface operations {
                             type: "prompt" | "http" | "code" | "workflow";
                             /** @description The id of the prompt, agent or workflow to run against. */
                             referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
                         }[];
                         repeatCount: number;
                         labels: string[];
@@ -25559,6 +25575,10 @@ export interface operations {
                             type: "prompt" | "http" | "code" | "workflow";
                             /** @description The id of the prompt, agent or workflow to run against. */
                             referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
                         }[];
                         repeatCount: number;
                         labels: string[];
@@ -25759,6 +25779,10 @@ export interface operations {
                         type: "prompt" | "http" | "code" | "workflow";
                         /** @description The id of the prompt, agent or workflow to run against. */
                         referenceId: string;
+                        /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                        runParameters?: {
+                            [key: string]: string | number | boolean;
+                        };
                     }[];
                     repeatCount?: number;
                     labels?: string[];
@@ -25807,6 +25831,10 @@ export interface operations {
                             type: "prompt" | "http" | "code" | "workflow";
                             /** @description The id of the prompt, agent or workflow to run against. */
                             referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
                         }[];
                         repeatCount: number;
                         labels: string[];
@@ -25933,6 +25961,10 @@ export interface operations {
                             type: "prompt" | "http" | "code" | "workflow";
                             /** @description The id of the prompt, agent or workflow to run against. */
                             referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
                         }[];
                         repeatCount: number;
                         labels: string[];
@@ -26031,6 +26063,10 @@ export interface operations {
                         type: "prompt" | "http" | "code" | "workflow";
                         /** @description The id of the prompt, agent or workflow to run against. */
                         referenceId: string;
+                        /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                        runParameters?: {
+                            [key: string]: string | number | boolean;
+                        };
                     }[];
                     /** @description How many times each scenario and target pairing runs, between 1 and 5. Used only when the id names a test suite. */
                     repeatCount?: number;
@@ -26074,6 +26110,10 @@ export interface operations {
                                 type: "prompt" | "http" | "code" | "workflow";
                                 /** @description The id of the prompt, agent or workflow to run against. */
                                 referenceId: string;
+                                /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                                runParameters?: {
+                                    [key: string]: string | number | boolean;
+                                };
                             };
                             name: string | null;
                         }[];
@@ -26187,7 +26227,7 @@ export interface operations {
                         };
                         /** @description The scenarios the last run of this plan covered. */
                         scenarioIds: string[];
-                        /** @description What the plan runs against, in the order the results show. */
+                        /** @description What the plan runs against, in the order the results show. A target carrying runParameters runs with those values. */
                         targets: {
                             /**
                              * @description What kind of thing the scenarios run against.
@@ -26196,6 +26236,10 @@ export interface operations {
                             type: "prompt" | "http" | "code" | "workflow";
                             /** @description The id of the prompt, agent or workflow to run against. */
                             referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
                         }[];
                         /** @description How many times each scenario and target pairing runs. */
                         repeatCount: number;
@@ -26251,7 +26295,7 @@ export interface operations {
                             /** @constant */
                             mode: "scenarios";
                         };
-                        /** @description The prompts, agents or workflows every scenario runs against. */
+                        /** @description The prompts, agents or workflows every scenario runs against. Every target runs every scenario, so naming more than one compares them in the same run. */
                         targets: {
                             /**
                              * @description What kind of thing the scenarios run against.
@@ -26260,6 +26304,10 @@ export interface operations {
                             type: "prompt" | "http" | "code" | "workflow";
                             /** @description The id of the prompt, agent or workflow to run against. */
                             referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
                         }[];
                         /** @description How many times each scenario and target pairing runs. Between 1 and 5; defaults to 1. */
                         repeatCount?: number;
@@ -26272,7 +26320,7 @@ export interface operations {
                     };
                     /** @description Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call. */
                     idempotencyKey?: string;
-                    /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name. */
+                    /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name, and a target that names the same parameter in its runParameters overrides it for that target. */
                     parameters?: {
                         [key: string]: string | number | boolean;
                     };
@@ -26319,6 +26367,10 @@ export interface operations {
                                 type: "prompt" | "http" | "code" | "workflow";
                                 /** @description The id of the prompt, agent or workflow to run against. */
                                 referenceId: string;
+                                /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                                runParameters?: {
+                                    [key: string]: string | number | boolean;
+                                };
                             };
                             /** @description The scenario name, when known. */
                             name: string | null;
@@ -26382,7 +26434,7 @@ export interface operations {
                         };
                         /** @description The scenarios the last run of this plan covered. */
                         scenarioIds: string[];
-                        /** @description What the plan runs against, in the order the results show. */
+                        /** @description What the plan runs against, in the order the results show. A target carrying runParameters runs with those values. */
                         targets: {
                             /**
                              * @description What kind of thing the scenarios run against.
@@ -26391,6 +26443,10 @@ export interface operations {
                             type: "prompt" | "http" | "code" | "workflow";
                             /** @description The id of the prompt, agent or workflow to run against. */
                             referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
                         }[];
                         /** @description How many times each scenario and target pairing runs. */
                         repeatCount: number;
@@ -26462,7 +26518,7 @@ export interface operations {
                 "application/json": {
                     /** @description Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call. */
                     idempotencyKey?: string;
-                    /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name. */
+                    /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name, and a target that names the same parameter in its runParameters overrides it for that target. */
                     parameters?: {
                         [key: string]: string | number | boolean;
                     };
@@ -26509,6 +26565,10 @@ export interface operations {
                                 type: "prompt" | "http" | "code" | "workflow";
                                 /** @description The id of the prompt, agent or workflow to run against. */
                                 referenceId: string;
+                                /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                                runParameters?: {
+                                    [key: string]: string | number | boolean;
+                                };
                             };
                             /** @description The scenario name, when known. */
                             name: string | null;
@@ -26771,7 +26831,7 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description The prompts, agents or workflows the suite runs against. A test suite stores none of its own, so a run states them. */
+                    /** @description The prompts, agents or workflows the suite runs against. A test suite stores none of its own, so a run states them. Every target runs every scenario, so naming more than one compares them in the same run. */
                     targets: {
                         /**
                          * @description What kind of thing the scenarios run against.
@@ -26780,6 +26840,10 @@ export interface operations {
                         type: "prompt" | "http" | "code" | "workflow";
                         /** @description The id of the prompt, agent or workflow to run against. */
                         referenceId: string;
+                        /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                        runParameters?: {
+                            [key: string]: string | number | boolean;
+                        };
                     }[];
                     /** @description The run plan this run joins or creates. Leave it out and the name is derived from the suite name and the targets. */
                     name?: string;
@@ -26791,7 +26855,7 @@ export interface operations {
                     judgeModel?: string | null;
                     /** @description Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call. */
                     idempotencyKey?: string;
-                    /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name. */
+                    /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name, and a target that names the same parameter in its runParameters overrides it for that target. */
                     parameters?: {
                         [key: string]: string | number | boolean;
                     };
@@ -26838,6 +26902,10 @@ export interface operations {
                                 type: "prompt" | "http" | "code" | "workflow";
                                 /** @description The id of the prompt, agent or workflow to run against. */
                                 referenceId: string;
+                                /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                                runParameters?: {
+                                    [key: string]: string | number | boolean;
+                                };
                             };
                             /** @description The scenario name, when known. */
                             name: string | null;

@@ -79,6 +79,7 @@ function makeGroup(overrides: Partial<ResultGroup> = {}): ResultGroup {
     scenarioCount: 3,
     lastRunAt: NOW,
     targetKeys: ["agent_dev"],
+    targetParameters: null,
     trend: [
       { key: "run_1", passRate: 100 },
       { key: "run_2", passRate: 100 },

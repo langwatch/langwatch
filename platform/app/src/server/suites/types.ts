@@ -42,11 +42,15 @@ const suiteTargetFields = z.object({
    */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   /**
-   * The parameter overrides the last run of this suite used, so the next run
-   * dialog opens on the same values for everyone on the team.
+   * The parameter overrides this target runs with, merged over the values
+   * supplied for the run as a whole. The target's values win.
+   *
+   * They are part of the target's identity: one agent may appear twice in a
+   * run with different overrides, and each is its own target with its own
+   * key and its own column. See `target-key.ts`.
    *
    * Secret parameters are never kept here: their values are typed once per
-   * run and travel with the run alone.
+   * run and travel with the run alone. A target naming one is refused.
    */
   runParameters: runParameterValuesSchema.optional(),
   /**

@@ -151,7 +151,7 @@ export function CasesPanelBody(props: CasesPanelBodyProps) {
         onRunCase={props.onRunCase}
         onEdit={props.onEdit}
         onDuplicate={props.onDuplicate}
-        onOpenLastRun={props.onOpenLastRun}
+        period={props.period}
         onArchive={props.onArchive}
       />
       <MoveToSuiteSelectionBar

@@ -14,7 +14,6 @@
  */
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import type { PromptEntry } from "./PromptPicker";
 import type { RunNameOption } from "./RunNameField";
 import type { ScopeScenario, ScopeTestSuite } from "./RunScopeSection";
@@ -24,8 +23,9 @@ import {
   describeConfigurations,
   type RunConfigurationEntry,
   type RunScope,
+  sortedTargetLabels,
 } from "./run-configuration";
-import type { RunDialogSubject } from "./run-dialog-types";
+import type { RunDialogSubject, RunTarget } from "./run-dialog-types";
 
 /** What one target is called, for the derived name and the dropdown rows. */
 export function buildTargetLabels({
@@ -114,15 +114,27 @@ function scenarioScopeLabel({
   return `${scope.scenarioIds.length} scenarios`;
 }
 
-/** The targets of the run, in the order the derived name reads them. */
+/**
+ * The targets of the run, in the order the derived name reads them: the order
+ * the run plan sorts them in, so the name is the plan's name whichever row
+ * was picked first.
+ */
 function labelsOfTargets({
   targets,
   targetLabels,
 }: {
-  targets: readonly NonNullable<TargetValue>[];
+  targets: readonly RunTarget[];
   targetLabels: ReadonlyMap<string, string>;
 }): string[] {
-  return targets.map((target) => targetLabels.get(target.id) ?? target.id);
+  return sortedTargetLabels({
+    targets: targets.map((target) => ({
+      type: target.type,
+      referenceId: target.id,
+      ...(target.runParameters ? { runParameters: target.runParameters } : {}),
+    })),
+    targetLabels,
+    fallbackLabel: (target) => target.referenceId,
+  });
 }
 
 export function useRunName({
@@ -138,7 +150,7 @@ export function useRunName({
   /** The name of the stored run plan the dialog opened on, if it opened on one. */
   planName: string | null;
   scopeLabel: string;
-  targets: readonly NonNullable<TargetValue>[];
+  targets: readonly RunTarget[];
   targetLabels: ReadonlyMap<string, string>;
   /** The configurations this scope ran with, newest first. */
   entries: readonly RunConfigurationEntry[];

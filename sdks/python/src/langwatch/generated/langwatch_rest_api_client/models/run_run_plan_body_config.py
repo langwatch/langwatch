@@ -30,6 +30,7 @@ class RunRunPlanBodyConfig:
             scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written
             later runs without editing the plan.
         targets (list[RunRunPlanBodyConfigTargetsItem]): The prompts, agents or workflows every scenario runs against.
+            Every target runs every scenario, so naming more than one compares them in the same run.
         repeat_count (int | Unset): How many times each scenario and target pairing runs. Between 1 and 5; defaults to
             1.
         simulator_model (None | str | Unset): The model that plays the user for every scenario in the run. Overrides

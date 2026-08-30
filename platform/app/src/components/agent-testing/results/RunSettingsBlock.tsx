@@ -19,16 +19,26 @@
  * simulator model read only when the run carries them, so a run that recorded
  * neither stays a short block.
  *
+ * The targets row names every target the run went against, on a run against
+ * one target as much as on a comparison. A comparison has one layer of
+ * parameters: each target line carries every value that target received, and
+ * there is no parameters row. A run against one target reads the target's
+ * own overrides on its line and the run-level values on the parameters row,
+ * so no value reads twice.
+ *
  * The run note is not here. It reads in the header line and does not move.
  *
  * @see specs/features/agent-testing/results-tabs.feature
+ * @see specs/features/agent-testing/comparison-mode.feature
  */
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
 import { FG_MUTED } from "../shared/design";
-import type { RunSettings } from "./run-settings";
+import { TargetDot } from "../shared/TargetDot";
+import type { RunSettingParameter, RunSettings } from "./run-settings";
+import type { BatchTarget } from "./useBatchTargets";
 
 /**
  * What a model row says when the run recorded no model at all.
@@ -42,6 +52,18 @@ export const PROJECT_DEFAULT_MODEL = "Project default model";
 
 const LABEL_WIDTH = "104px";
 
+/**
+ * The line every row of the block stands on.
+ *
+ * The rows are centred rather than aligned on a baseline. A row whose value is
+ * plain text has a text baseline to align to, but a model row holds an icon
+ * beside its name, and that value has no line box of its own: CSS then takes
+ * the bottom of the value as its baseline and drops the label to the foot of
+ * the taller row. One height for every row keeps the label beside its value
+ * whatever the value is drawn from.
+ */
+const ROW_HEIGHT = "18px";
+
 function SettingRow({
   label,
   testId,
@@ -52,7 +74,13 @@ function SettingRow({
   children: ReactNode;
 }) {
   return (
-    <HStack align="baseline" gap={3} width="full" data-testid={testId}>
+    <HStack
+      align="center"
+      gap={3}
+      width="full"
+      minHeight={ROW_HEIGHT}
+      data-testid={testId}
+    >
       <Text
         fontSize="11.5px"
         color={FG_MUTED}
@@ -62,7 +90,14 @@ function SettingRow({
       >
         {label}
       </Text>
-      <Box minWidth={0}>{children}</Box>
+      <Box
+        minWidth={0}
+        display="flex"
+        alignItems="center"
+        minHeight={ROW_HEIGHT}
+      >
+        {children}
+      </Box>
     </HStack>
   );
 }
@@ -89,12 +124,77 @@ function ModelRow({
   );
 }
 
+/** One parameter as a chip: a literal, so it reads in a monospace font. */
+function ParameterChip({ name, value }: { name: string; value: string }) {
+  return (
+    <Text
+      as="code"
+      fontFamily="mono"
+      fontSize="11.5px"
+      background="bg.muted"
+      borderRadius="sm"
+      paddingX={1.5}
+      paddingY={0.5}
+    >
+      {`${name} = ${value}`}
+    </Text>
+  );
+}
+
+/** The overrides a target alone carried, as the block prints them. */
+function overridesOf(target: BatchTarget): RunSettingParameter[] {
+  return Object.entries(target.parameters ?? {})
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, value]) => ({ name, value: String(value) }));
+}
+
+/**
+ * The targets the run went against, one line each: the dot the target reads
+ * in everywhere on the page, its name, and its parameters as chips.
+ */
+function TargetsRow({
+  targets,
+  parametersOf,
+}: {
+  targets: BatchTarget[];
+  parametersOf: (target: BatchTarget) => RunSettingParameter[];
+}) {
+  return (
+    <SettingRow label="Targets" testId="run-settings-targets">
+      <VStack align="stretch" gap={1} paddingY="1px">
+        {targets.map((target) => (
+          <HStack
+            key={target.key}
+            gap={2}
+            flexWrap="wrap"
+            minHeight={ROW_HEIGHT}
+            data-testid={`run-settings-target-${target.key}`}
+          >
+            <TargetDot color={target.color} />
+            <Text fontSize="12px">{target.name}</Text>
+            {parametersOf(target).map((parameter) => (
+              <ParameterChip
+                key={parameter.name}
+                name={parameter.name}
+                value={parameter.value}
+              />
+            ))}
+          </HStack>
+        ))}
+      </VStack>
+    </SettingRow>
+  );
+}
+
 export function RunSettingsBlock({
   settings,
+  targets,
   startedLabel,
   startedByLabel,
 }: {
   settings: RunSettings;
+  /** The targets of the run, in order and in colour. */
+  targets: BatchTarget[];
   /** The date and the age of the run, or nothing when neither is known. */
   startedLabel: string | null;
   /**
@@ -106,6 +206,14 @@ export function RunSettingsBlock({
   const startedRow = [startedLabel, startedByLabel]
     .filter((part): part is string => !!part)
     .join(" · ");
+  // A comparison reads every value on the target lines and nothing under
+  // them; a run against one target reads its overrides on the line and the
+  // run-level values on their own row.
+  const isComparison = targets.length > 1;
+  const parametersOf = (target: BatchTarget) =>
+    isComparison
+      ? (settings.parametersByTarget.get(target.key) ?? [])
+      : overridesOf(target);
 
   return (
     <VStack
@@ -125,22 +233,19 @@ export function RunSettingsBlock({
         </SettingRow>
       ) : null}
 
-      {settings.parameters.length > 0 ? (
+      {targets.length > 0 ? (
+        <TargetsRow targets={targets} parametersOf={parametersOf} />
+      ) : null}
+
+      {!isComparison && settings.parameters.length > 0 ? (
         <SettingRow label="Parameters" testId="run-settings-parameters">
           <HStack gap={2} flexWrap="wrap">
             {settings.parameters.map((parameter) => (
-              <Text
+              <ParameterChip
                 key={parameter.name}
-                as="code"
-                fontFamily="mono"
-                fontSize="11.5px"
-                background="bg.muted"
-                borderRadius="sm"
-                paddingX={1.5}
-                paddingY={0.5}
-              >
-                {`${parameter.name} = ${parameter.value}`}
-              </Text>
+                name={parameter.name}
+                value={parameter.value}
+              />
             ))}
           </HStack>
         </SettingRow>

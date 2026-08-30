@@ -133,7 +133,7 @@ export function useTestCasesTab(): TestCasesTabModel {
   });
 
   const caseMutations = useCaseMutations(projectId);
-  const open = useCaseOpenActions(data.lastResults);
+  const open = useCaseOpenActions();
 
   return {
     base,

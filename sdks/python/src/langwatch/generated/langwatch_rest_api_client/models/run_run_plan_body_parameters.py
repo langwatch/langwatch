@@ -12,7 +12,8 @@ T = TypeVar("T", bound="RunRunPlanBodyParameters")
 @_attrs_define
 class RunRunPlanBodyParameters:
     """Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides
-    the scenario's own default for that name.
+    the scenario's own default for that name, and a target that names the same parameter in its runParameters overrides
+    it for that target.
 
     """
 

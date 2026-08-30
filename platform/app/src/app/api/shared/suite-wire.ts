@@ -27,9 +27,9 @@ import { parseSuiteScope, suiteScopeSchema } from "~/server/suites/scope";
 /**
  * A target on the wire.
  *
- * The two fields that address a target, and no more: the prompt-input bindings
- * and the remembered run values the domain target also carries are written by
- * the platform's own run dialog, never sent by an API caller.
+ * What addresses a target, plus the parameter values that target alone runs
+ * with. The prompt-input bindings the domain target also carries are written
+ * by the platform's own run dialog, never sent by an API caller.
  */
 export const suiteTargetSchema = z.object({
   type: z
@@ -38,6 +38,11 @@ export const suiteTargetSchema = z.object({
   referenceId: z
     .string()
     .describe("The id of the prompt, agent or workflow to run against."),
+  runParameters: runParameterValuesSchema
+    .optional()
+    .describe(
+      "Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target.",
+    ),
 });
 
 /** What a query string may say for yes and for no. Compared case-folded. */
@@ -80,7 +85,9 @@ export const runPlanConfigSchema = z.object({
   scope: runPlanScopeSchema,
   targets: z
     .array(suiteTargetSchema)
-    .describe("The prompts, agents or workflows every scenario runs against."),
+    .describe(
+      "The prompts, agents or workflows every scenario runs against. Every target runs every scenario, so naming more than one compares them in the same run.",
+    ),
   repeatCount: z
     .number()
     .int()
@@ -119,7 +126,7 @@ const runValuesShape = {
   parameters: runParameterValuesSchema
     .optional()
     .describe(
-      "Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name.",
+      "Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name, and a target that names the same parameter in its runParameters overrides it for that target.",
     ),
   note: runNoteSchema.describe(
     "One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters.",
@@ -153,7 +160,7 @@ export const testSuiteRunInputSchema = z.object({
   targets: z
     .array(suiteTargetSchema)
     .describe(
-      "The prompts, agents or workflows the suite runs against. A test suite stores none of its own, so a run states them.",
+      "The prompts, agents or workflows the suite runs against. A test suite stores none of its own, so a run states them. Every target runs every scenario, so naming more than one compares them in the same run.",
     ),
   name: z
     .string()
@@ -205,7 +212,9 @@ export const runPlanSchema = z.object({
     .describe("The scenarios the last run of this plan covered."),
   targets: z
     .array(suiteTargetSchema)
-    .describe("What the plan runs against, in the order the results show."),
+    .describe(
+      "What the plan runs against, in the order the results show. A target carrying runParameters runs with those values.",
+    ),
   repeatCount: z
     .number()
     .describe("How many times each scenario and target pairing runs."),

@@ -57,15 +57,15 @@ export const resultAtomsRouter = createTRPCRouter({
     }),
 
   /**
-   * The targets a run from code named inside the window, for the target
-   * filter. They have no row in Postgres, so the agent and prompt lists
-   * cannot name them.
+   * The targets the window names that the agent and prompt lists cannot, for
+   * the target filter: those a run from code named, and the parameter
+   * variants of stored targets. Neither has a row of its own in Postgres.
    */
-  getCodeTargets: protectedProcedure
+  getRunTargets: protectedProcedure
     .input(windowSchema)
     .permission("scenarios:view")
     .query(async ({ input }) => {
-      return getApp().simulations.results.getCodeTargets({
+      return getApp().simulations.results.getRunTargets({
         projectId: input.projectId,
         startDate: input.startDate ?? Date.now() - THIRTY_DAYS_MS,
         endDate: input.endDate,

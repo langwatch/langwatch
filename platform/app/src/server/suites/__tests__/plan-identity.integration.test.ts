@@ -456,6 +456,86 @@ describe("resolving a run plan by name", () => {
       expect(await plansNamed(expected)).toHaveLength(1);
     });
 
+    /** @scenario "A run named by the server labels a repeated agent with its parameters" */
+    /** @scenario "A typed default is not an override" */
+    it("labels a repeated agent with its parameters when the run sends no name", async () => {
+      const refunds = await suiteService.createTestSuite({
+        projectId,
+        name: "Refunds",
+      });
+      await suiteService.createTestSuite({ projectId, name: "Checkout" });
+      await scenarioService.create({
+        projectId,
+        name: "One",
+        situation: "A customer asks for help",
+        criteria: ["The agent helps"],
+        labels: [],
+        testSuiteId: refunds.id,
+        parameters: [
+          { name: "model", defaultValue: "gpt-5" },
+          { name: "locale", defaultValue: "en" },
+        ],
+      });
+      const agent = await createHttpAgent();
+      // The first target spells the declared default of "model" out, which
+      // is no override: it is stored, keyed and named as "locale=de" alone.
+      const targets: SuiteTarget[] = [
+        {
+          type: "http",
+          referenceId: agent.id,
+          runParameters: { locale: "de", model: "gpt-5-mini" },
+        },
+        {
+          type: "http",
+          referenceId: agent.id,
+          runParameters: { locale: "de", model: "gpt-5" },
+        },
+      ];
+      const scope: SuiteScope = {
+        mode: "test_suites",
+        testSuiteIds: [refunds.id],
+      };
+      const config = { scope, targets };
+
+      const result = await suiteService.runPlan({
+        projectId,
+        organizationId,
+        config,
+        idempotencyKey: `run-${nanoid(6)}`,
+      });
+
+      // The target with fewer parameters sorts first, and only the value
+      // that differs is in the label: the locale both share stays out.
+      const expected = `Refunds ${agent.name} vs ${agent.name} · model=gpt-5-mini`;
+      expect(result.created).toBe(true);
+      expect(result.planName).toBe(expected);
+      expect(result.jobCount).toBe(2);
+      const stored = (await plansNamed(expected))[0]!;
+      expect(stored.targets).toEqual([
+        {
+          type: "http",
+          referenceId: agent.id,
+          runParameters: { locale: "de" },
+        },
+        {
+          type: "http",
+          referenceId: agent.id,
+          runParameters: { locale: "de", model: "gpt-5-mini" },
+        },
+      ]);
+
+      const again = await suiteService.runPlan({
+        projectId,
+        organizationId,
+        config,
+        idempotencyKey: `run-${nanoid(6)}`,
+      });
+
+      expect(again.created).toBe(false);
+      expect(again.suiteId).toBe(result.suiteId);
+      expect(await plansNamed(expected)).toHaveLength(1);
+    });
+
     /** @scenario "A test suite does not answer to a run plan name" */
     it("ignores a test suite of the same name", async () => {
       await createCase("One");
@@ -644,6 +724,63 @@ describe("resolving a run plan by name", () => {
       // Nothing was written at all, so the row was never even touched.
       expect(after.updatedAt).toEqual(before.updatedAt);
       expect(startSuiteRun).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "Two targets that differ only by a typed default are refused" */
+    it("creates no plan when two targets differ only by a typed default", async () => {
+      await scenarioService.create({
+        projectId,
+        name: "One",
+        situation: "A customer asks for help",
+        criteria: ["The agent helps"],
+        labels: [],
+        parameters: [{ name: "model", defaultValue: "gpt-5" }],
+      });
+      const agent = await createHttpAgent();
+
+      await expect(
+        runUnderName({
+          name: "Typed default",
+          scope: { mode: "all" },
+          targets: [
+            { type: "http", referenceId: agent.id },
+            {
+              type: "http",
+              referenceId: agent.id,
+              runParameters: { model: "gpt-5" },
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({
+        code: "validation_error",
+        meta: { fieldErrors: { targets: [expect.any(String)] } },
+      });
+      expect(await plansNamed("Typed default")).toHaveLength(0);
+    });
+
+    /** @scenario "Two identical targets are refused" */
+    it("creates no plan when two targets share a key", async () => {
+      await createCase("One");
+      const agent = await createHttpAgent();
+      const twice: SuiteTarget = {
+        type: "http",
+        referenceId: agent.id,
+        runParameters: { model: "gpt-5-mini" },
+      };
+
+      await expect(
+        runUnderName({
+          name: "Twice",
+          scope: { mode: "all" },
+          targets: [twice, { ...twice }],
+        }),
+      ).rejects.toMatchObject({
+        code: "validation_error",
+        meta: { fieldErrors: { targets: [expect.any(String)] } },
+      });
+
+      expect(await plansNamed("Twice")).toHaveLength(0);
+      expect(startSuiteRun).not.toHaveBeenCalled();
     });
 
     /** @scenario "A run refused for naming no target creates no plan" */

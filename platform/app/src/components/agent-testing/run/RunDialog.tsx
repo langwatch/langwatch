@@ -55,6 +55,7 @@ function isRunBlocked({
 }): boolean {
   if (controller.isBusy) return true;
   if (isNoteTooLong(form.note) || form.hasMissingSecrets) return true;
+  if (form.hasDuplicateCompareRows) return true;
   if (form.runName.trim() === "") return true;
   if (form.caseCount === 0) return true;
   if (form.target) return false;
@@ -161,6 +162,7 @@ export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
           isRunBlocked={isRunBlocked({ form, controller })}
           blockedReason={runBlockedReason({ subject, form, controller })}
           caseCount={form.caseCount}
+          targetCount={form.runTargets.length}
           onClose={onClose}
         />
       </Dialog.Content>

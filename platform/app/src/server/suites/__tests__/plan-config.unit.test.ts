@@ -8,10 +8,12 @@ import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
   configurationKey,
+  duplicateSuiteTargets,
   normalizePlanScope,
   scopeKey,
   sortSuiteTargets,
 } from "../plan-config";
+import { targetSortKey } from "../target-key";
 import type { SuiteTarget } from "../types";
 
 /** A Prisma stand-in that answers only the test suite read the normalise makes. */
@@ -108,6 +110,147 @@ describe("sortSuiteTargets", () => {
         sortSuiteTargets([dev, prod]),
       );
       expect(sortSuiteTargets([prod, dev])).toEqual([dev, prod]);
+    });
+  });
+
+  describe("when the same agent appears twice with different overrides", () => {
+    /** @scenario "The same agent twice with different parameters is two targets" */
+    it("keeps both, the plain one first, in one order every run", () => {
+      const plain: SuiteTarget = { type: "http", referenceId: "prod-agent" };
+      const mini: SuiteTarget = {
+        type: "http",
+        referenceId: "prod-agent",
+        runParameters: { model: "gpt-5-mini" },
+      };
+
+      expect(sortSuiteTargets([mini, plain])).toEqual([plain, mini]);
+      expect(sortSuiteTargets([plain, mini])).toEqual([plain, mini]);
+      // The readable string, never the hash: the run dialog sorts by the same
+      // one, so the columns keep the order the dialog showed.
+      expect(targetSortKey(mini)).toBe("http:prod-agent|model=gpt-5-mini");
+      expect(targetSortKey(plain)).toBe("http:prod-agent|");
+    });
+  });
+});
+
+describe("duplicateSuiteTargets", () => {
+  describe("when two targets share a key", () => {
+    /** @scenario "Two identical targets are refused" */
+    it("names the repeated one", () => {
+      const twice: SuiteTarget = {
+        type: "http",
+        referenceId: "prod-agent",
+        runParameters: { model: "gpt-5-mini" },
+      };
+
+      expect(duplicateSuiteTargets([twice, { ...twice }])).toEqual([twice]);
+    });
+  });
+
+  describe("when the same agent appears with different overrides", () => {
+    /** @scenario "The same agent twice with different parameters is two targets" */
+    it("reports nothing", () => {
+      expect(
+        duplicateSuiteTargets([
+          { type: "http", referenceId: "prod-agent" },
+          {
+            type: "http",
+            referenceId: "prod-agent",
+            runParameters: { model: "gpt-5-mini" },
+          },
+        ]),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when one override holds the separators the readable key writes", () => {
+    /** @scenario "A value holding a comma and an equals sign does not fake a second target" */
+    it("keeps two targets whose pairs read alike apart", () => {
+      expect(
+        duplicateSuiteTargets([
+          {
+            type: "http",
+            referenceId: "prod-agent",
+            runParameters: { a: "b,c=d" },
+          },
+          {
+            type: "http",
+            referenceId: "prod-agent",
+            runParameters: { a: "b", c: "d" },
+          },
+        ]),
+      ).toEqual([]);
+    });
+  });
+});
+
+describe("configurationKey", () => {
+  describe("when a target carries overrides", () => {
+    it("keys the variant apart from the plain target", () => {
+      const config = {
+        scope: { mode: "all" } as const,
+        repeatCount: 1,
+        simulatorModel: null,
+        judgeModel: null,
+      };
+      const plain = configurationKey({
+        config: {
+          ...config,
+          targets: [{ type: "http", referenceId: "prod-agent" }],
+        },
+      });
+      const variant = configurationKey({
+        config: {
+          ...config,
+          targets: [
+            {
+              type: "http",
+              referenceId: "prod-agent",
+              runParameters: { model: "gpt-5-mini" },
+            },
+          ],
+        },
+      });
+
+      expect(variant).not.toBe(plain);
+    });
+  });
+
+  describe("when one target's override holds a comma and an equals sign", () => {
+    /** @scenario "A value holding a comma and an equals sign does not fake a second target" */
+    it("keys it apart from the target whose pairs read alike", () => {
+      const config = {
+        scope: { mode: "all" } as const,
+        repeatCount: 1,
+        simulatorModel: null,
+        judgeModel: null,
+      };
+      const oneValue = configurationKey({
+        config: {
+          ...config,
+          targets: [
+            {
+              type: "http",
+              referenceId: "prod-agent",
+              runParameters: { a: "b,c=d" },
+            },
+          ],
+        },
+      });
+      const twoValues = configurationKey({
+        config: {
+          ...config,
+          targets: [
+            {
+              type: "http",
+              referenceId: "prod-agent",
+              runParameters: { a: "b", c: "d" },
+            },
+          ],
+        },
+      });
+
+      expect(oneValue).not.toBe(twoValues);
     });
   });
 });

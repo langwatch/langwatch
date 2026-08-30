@@ -144,6 +144,88 @@ describe("handleRunPlan()", () => {
     });
   });
 
+  describe("when two targets name the same agent with different parameters", () => {
+    /** @scenario "Agent compares one agent on two models in one run" */
+    it("sends both targets, each carrying its own runParameters", async () => {
+      await handleRunPlan({
+        scope: { mode: "labels", labels: ["auth"] },
+        targets: [
+          {
+            type: "http",
+            referenceId: "agent_abc",
+            parameters: { model: "gpt-5" },
+          },
+          {
+            type: "http",
+            referenceId: "agent_abc",
+            parameters: { model: "gpt-5-mini" },
+          },
+        ],
+      });
+
+      expect(mockRunRunPlan).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            targets: [
+              {
+                type: "http",
+                referenceId: "agent_abc",
+                runParameters: { model: "gpt-5" },
+              },
+              {
+                type: "http",
+                referenceId: "agent_abc",
+                runParameters: { model: "gpt-5-mini" },
+              },
+            ],
+          }),
+        }),
+      );
+    });
+
+    /** @scenario "Agent compares one agent on two models in one run" */
+    it("keeps the run-level parameters, which a target overrides for itself", async () => {
+      await handleRunPlan({
+        ...runInput,
+        targets: [
+          {
+            type: "http",
+            referenceId: "agent_abc",
+            parameters: { model: "gpt-5" },
+          },
+        ],
+        parameters: { model: "gpt-5-mini", account_tier: "gold" },
+      });
+
+      expect(mockRunRunPlan).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          parameters: { model: "gpt-5-mini", account_tier: "gold" },
+          config: expect.objectContaining({
+            targets: [
+              {
+                type: "http",
+                referenceId: "agent_abc",
+                runParameters: { model: "gpt-5" },
+              },
+            ],
+          }),
+        }),
+      );
+    });
+
+    it("leaves runParameters out of a target that names none", async () => {
+      await handleRunPlan(runInput);
+
+      expect(mockRunRunPlan).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            targets: [{ type: "http", referenceId: "agent_abc" }],
+          }),
+        }),
+      );
+    });
+  });
+
   describe("when the run skipped archived rows", () => {
     /** @scenario "A run reports what it skipped as archived" */
     it("lists the skipped scenarios and the skipped targets", async () => {
@@ -253,6 +335,32 @@ describe("handleGetRunPlan()", () => {
 
     it("includes the plan name in the heading", () => {
       expect(result).toContain("# Run Plan: Regression Plan");
+    });
+  });
+
+  describe("when a plan compares one agent on two models", () => {
+    /** @scenario "Agent reads the full configuration of a run plan" */
+    it("reads the two targets apart by the parameters each one runs with", async () => {
+      mockGetRunPlan.mockResolvedValue({
+        ...samplePlan,
+        targets: [
+          {
+            type: "http",
+            referenceId: "agent_abc",
+            runParameters: { model: "gpt-5" },
+          },
+          {
+            type: "http",
+            referenceId: "agent_abc",
+            runParameters: { model: "gpt-5-mini" },
+          },
+        ],
+      });
+
+      const result = await handleGetRunPlan({ id: "plan_abc123" });
+
+      expect(result).toContain("- http:agent_abc (model=gpt-5)");
+      expect(result).toContain("- http:agent_abc (model=gpt-5-mini)");
     });
   });
 

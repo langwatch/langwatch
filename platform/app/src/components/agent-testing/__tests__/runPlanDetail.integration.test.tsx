@@ -18,12 +18,16 @@ import {
 } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
+import { targetKeyOf } from "~/server/suites/target-key";
+import { api } from "~/utils/api";
+import { NOT_IN_RUN_LABEL } from "../results/ComparisonResultsRow";
 import { RunPlanDetail } from "../results/RunPlanDetail";
 import { RUN_AGAIN_LABEL } from "../results/RunPlanDetailHeader";
 import { PROJECT_DEFAULT_MODEL } from "../results/RunSettingsBlock";
 import { RunsSidebarEntry } from "../results/RunsSidebarEntry";
 import type { RunPlan } from "../results/run-plans";
 import { passRateColor } from "../shared/pass-rate-color";
+import { TARGET_COLORS } from "../shared/target-colors";
 import { useAgentTestingStore } from "../useAgentTestingStore";
 
 const mockGetSuiteRunData = vi.hoisted(() => vi.fn());
@@ -1097,6 +1101,35 @@ describe("<RunPlanDetail/>", () => {
     expect(judge.querySelector("svg")).not.toBeNull();
   });
 
+  /** @scenario "Every label of the block sits beside its value" */
+  it("stands every row on one line, whatever its value is drawn from", async () => {
+    const user = userEvent.setup();
+    setRuns(configuredBatch());
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const block = screen.getByTestId("run-settings-block");
+    // A model row holds a provider icon beside the name and has no line box of
+    // its own, so a baseline alignment dropped its label to the foot of the
+    // row. Every row centres on one height instead, so the model rows sit the
+    // way the "Started" row does.
+    const rows = [
+      "run-settings-started",
+      "run-settings-simulator",
+      "run-settings-judge",
+    ].map((testId) => within(block).getByTestId(testId));
+
+    const startedHeight = window.getComputedStyle(rows[0]!).minHeight;
+    expect(startedHeight).not.toBe("");
+
+    for (const row of rows) {
+      const style = window.getComputedStyle(row);
+      expect(style.alignItems).toBe("center");
+      expect(style.minHeight).toBe(startedHeight);
+    }
+  });
+
   /** @scenario "The block names the models the run really ran on" */
   /** @scenario "The run settings read the resolved model, not the configured one" */
   it("names the models the run resolved, never the project default", async () => {
@@ -1400,6 +1433,509 @@ describe("<RunPlanDetail/>", () => {
     expect(
       screen.queryByTestId("runs-sidebar-pending"),
     ).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * A run against more than one target.
+ *
+ * @see specs/features/agent-testing/comparison-mode.feature
+ */
+describe("<RunPlanDetail/> on a comparison run", () => {
+  const DEV = "agent_dev";
+  const PROD = "agent_prod";
+  const DEV_MINI = targetKeyOf({
+    referenceId: DEV,
+    runParameters: { model: "gpt-5-mini" },
+  });
+
+  /** A hex colour as jsdom reads it back off a computed style. */
+  const rgbOf = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((at) =>
+      Number.parseInt(hex.slice(at, at + 2), 16),
+    );
+    return `rgb(${r}, ${g}, ${b})`;
+  };
+  const tokenVar = (token: string) =>
+    `var(--chakra-colors-${token.replace(".", "-")})`;
+
+  /** One run of a scenario against a target, keyed the way the platform keys it. */
+  function runAgainst({
+    scenarioRunId,
+    scenarioId,
+    name,
+    referenceId,
+    parameters,
+    batchRunId = "batch_3",
+    timestamp = NOW,
+    ...rest
+  }: Partial<ScenarioRunData> & {
+    scenarioRunId: string;
+    scenarioId: string;
+    name: string;
+    referenceId: string;
+    parameters?: Record<string, string>;
+  }): ScenarioRunData {
+    return makeRun({
+      scenarioRunId,
+      scenarioId,
+      name,
+      batchRunId,
+      timestamp,
+      metadata: {
+        parameters: { locale: "de", ...parameters },
+        langwatch: {
+          targetReferenceId: referenceId,
+          targetType: "http",
+          targetKey: targetKeyOf({ referenceId, runParameters: parameters }),
+          ...(parameters ? { targetParameters: parameters } : {}),
+        },
+      } as never,
+      ...rest,
+    });
+  }
+
+  const failed = {
+    status: ScenarioRunStatus.FAILED,
+    results: {
+      verdict: Verdict.FAILURE,
+      metCriteria: [],
+      unmetCriteria: ["a"],
+    },
+  };
+
+  /** Two scenarios against dev and prod: dev passed one of two, prod both. */
+  function comparisonBatch(batchRunId = "batch_3", timestamp = NOW) {
+    return [
+      runAgainst({
+        scenarioRunId: `${batchRunId}_d1`,
+        scenarioId: "scen_1",
+        name: "Angry refund request",
+        referenceId: DEV,
+        batchRunId,
+        timestamp,
+      }),
+      runAgainst({
+        scenarioRunId: `${batchRunId}_p1`,
+        scenarioId: "scen_1",
+        name: "Angry refund request",
+        referenceId: PROD,
+        batchRunId,
+        timestamp,
+      }),
+      runAgainst({
+        scenarioRunId: `${batchRunId}_d2`,
+        scenarioId: "scen_2",
+        name: "Track a parcel",
+        referenceId: DEV,
+        batchRunId,
+        timestamp,
+        ...failed,
+      }),
+      runAgainst({
+        scenarioRunId: `${batchRunId}_p2`,
+        scenarioId: "scen_2",
+        name: "Track a parcel",
+        referenceId: PROD,
+        batchRunId,
+        timestamp,
+      }),
+    ];
+  }
+
+  beforeEach(() => {
+    useAgentTestingStore.setState({
+      viewMode: "table",
+      pendingRun: null,
+      cancellingJobId: null,
+    });
+    mockGetBatchRunCount.mockReturnValue({ data: { count: 2 } });
+    mockFreshnessQuery.mockReturnValue({ data: undefined });
+    vi.mocked(api.agents.getAll.useQuery).mockReturnValue({
+      data: [
+        { id: DEV, name: "dev-agent" },
+        { id: PROD, name: "prod-agent" },
+      ],
+    } as never);
+    setRuns(comparisonBatch());
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  /** @scenario "A comparison run reads one column per target" */
+  it("reads a Scenario column and one column per target in sorted order, with no row menu", () => {
+    renderDetail();
+
+    const table = screen.getByTestId("comparison-results-table");
+    expect(screen.queryByTestId("run-results-table")).not.toBeInTheDocument();
+
+    const columns = within(table).getAllByTestId(/^comparison-column-/);
+    expect(columns.map((column) => column.dataset.testid)).toEqual([
+      `comparison-column-${DEV}`,
+      `comparison-column-${PROD}`,
+    ]);
+    expect(columns[0]).toHaveTextContent("dev-agent");
+    expect(columns[1]).toHaveTextContent("prod-agent");
+
+    // The dot of each column is the colour of its position.
+    const dotOf = (column: HTMLElement) =>
+      window.getComputedStyle(within(column).getByTestId("target-dot"))
+        .backgroundColor;
+    expect(dotOf(columns[0]!)).toBe(rgbOf(TARGET_COLORS[0]));
+    expect(dotOf(columns[1]!)).toBe(rgbOf(TARGET_COLORS[1]));
+
+    const row = within(table).getByTestId("comparison-row-scen_1");
+    expect(row).toHaveTextContent("Angry refund request");
+    expect(
+      within(row).queryByRole("button", { name: /Actions for/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  /** @scenario "Each target column carries its own summary" */
+  it("reads each target's own pass rate in its column and none in the header line", () => {
+    renderDetail();
+
+    const dev = screen.getByTestId(`comparison-column-${DEV}`);
+    const prod = screen.getByTestId(`comparison-column-${PROD}`);
+    expect(within(dev).getByTestId("run-metrics-summary")).toHaveTextContent(
+      "50%",
+    );
+    expect(within(prod).getByTestId("run-metrics-summary")).toHaveTextContent(
+      "100%",
+    );
+
+    const header = screen.getByTestId("run-summary-run");
+    expect(header).toHaveTextContent("Run #2");
+    expect(
+      within(header).queryByTestId("run-metrics-summary"),
+    ).not.toBeInTheDocument();
+  });
+
+  /** @scenario "A cell reads one line per run of its scenario and target" */
+  it("stacks one verdict per run in a cell, each opening its own drawer", async () => {
+    const user = userEvent.setup();
+    setRuns([
+      ...comparisonBatch(),
+      runAgainst({
+        scenarioRunId: "batch_3_d1_again",
+        scenarioId: "scen_1",
+        name: "Angry refund request",
+        referenceId: DEV,
+      }),
+      runAgainst({
+        scenarioRunId: "batch_3_d1_third",
+        scenarioId: "scen_1",
+        name: "Angry refund request",
+        referenceId: DEV,
+      }),
+    ]);
+    renderDetail();
+
+    const cell = screen.getByTestId(`comparison-cell-scen_1-${DEV}`);
+    const lines = within(cell).getAllByTestId(/^comparison-run-/);
+    expect(lines).toHaveLength(3);
+    for (const line of lines) {
+      expect(line).toHaveTextContent("Passed (1/1)");
+      expect(line).toHaveTextContent("6.3s · $0.004200");
+    }
+
+    await user.click(
+      within(cell).getByTestId("comparison-run-batch_3_d1_again"),
+    );
+    expect(mockOpenDrawer).toHaveBeenCalledWith(
+      "scenarioRunDetail",
+      expect.objectContaining({
+        urlParams: expect.objectContaining({
+          scenarioRunId: "batch_3_d1_again",
+        }),
+      }),
+    );
+  });
+
+  /** @scenario "A scenario with no run for a target reads not in run" */
+  it("says not in run in the cell of a target the scenario never ran against", () => {
+    setRuns(
+      comparisonBatch().filter((run) => run.scenarioRunId !== "batch_3_p2"),
+    );
+    renderDetail();
+
+    expect(
+      screen.getByTestId(`comparison-cell-scen_2-${PROD}`),
+    ).toHaveTextContent(NOT_IN_RUN_LABEL);
+    expect(
+      screen.getByTestId(`comparison-cell-scen_2-${DEV}`),
+    ).not.toHaveTextContent(NOT_IN_RUN_LABEL);
+  });
+
+  /** @scenario "A run that is still going keeps its status in the cell" */
+  it("reads the running status and no time and no cost in a cell still going", () => {
+    setRuns([
+      ...comparisonBatch().filter((run) => run.scenarioRunId !== "batch_3_p2"),
+      runAgainst({
+        scenarioRunId: "batch_3_p2",
+        scenarioId: "scen_2",
+        name: "Track a parcel",
+        referenceId: PROD,
+        status: ScenarioRunStatus.IN_PROGRESS,
+        results: null,
+        durationInMs: 1,
+        totalCost: undefined,
+      }),
+    ]);
+    renderDetail();
+
+    const cell = screen.getByTestId(`comparison-cell-scen_2-${PROD}`);
+    expect(cell).toHaveTextContent("Running");
+    expect(cell).not.toHaveTextContent("ms");
+    expect(cell).not.toHaveTextContent("$");
+  });
+
+  /** @scenario "The charts of a comparison run put the targets next to each other" */
+  it("draws the four charts with one bar per target, and the runs oldest first", () => {
+    setRuns([
+      ...comparisonBatch("batch_3", NOW),
+      ...comparisonBatch("batch_2", NOW - 86_400_000),
+    ]);
+    renderDetail();
+
+    const charts = screen.getByTestId("comparison-charts");
+    // The charts read between the header line and the table.
+    const header = screen.getByTestId("run-summary-line");
+    const table = screen.getByTestId("comparison-results-table");
+    expect(
+      header.compareDocumentPosition(charts) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      charts.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    expect(charts).toHaveTextContent("Pass rate");
+    expect(charts).toHaveTextContent("Total cost");
+    expect(charts).toHaveTextContent("Average reply latency");
+    expect(charts).toHaveTextContent("Pass rate over runs");
+
+    const passRate = screen.getByTestId("comparison-chart-pass-rate");
+    const bars = within(passRate).getAllByTestId("mini-bar");
+    expect(bars).toHaveLength(2);
+    expect(window.getComputedStyle(bars[0]!).backgroundColor).toBe(
+      rgbOf(TARGET_COLORS[0]),
+    );
+    expect(window.getComputedStyle(bars[1]!).backgroundColor).toBe(
+      rgbOf(TARGET_COLORS[1]),
+    );
+    expect(passRate).toHaveTextContent("50%");
+    expect(passRate).toHaveTextContent("100%");
+
+    const overRuns = screen.getByTestId("comparison-chart-pass-rate-over-runs");
+    const groups = within(overRuns).getAllByTestId(
+      /^comparison-chart-pass-rate-over-runs-group-/,
+    );
+    expect(groups.map((group) => group.dataset.testid)).toEqual([
+      "comparison-chart-pass-rate-over-runs-group-batch_2",
+      "comparison-chart-pass-rate-over-runs-group-batch_3",
+    ]);
+    expect(within(groups[0]!).getAllByTestId("mini-bar")).toHaveLength(2);
+    expect(overRuns).toHaveTextContent("Run #1");
+    expect(overRuns).toHaveTextContent("Run #2");
+  });
+
+  /** @scenario "The charts of a comparison run put the targets next to each other" */
+  it("reads a short label under each bar and the full label on hover", () => {
+    setRuns([
+      runAgainst({
+        scenarioRunId: "r1",
+        scenarioId: "scen_1",
+        name: "Angry refund request",
+        referenceId: DEV,
+      }),
+      runAgainst({
+        scenarioRunId: "r2",
+        scenarioId: "scen_1",
+        name: "Angry refund request",
+        referenceId: DEV,
+        parameters: { model: "gpt-5-mini" },
+      }),
+    ]);
+    renderDetail();
+
+    const passRate = screen.getByTestId("comparison-chart-pass-rate");
+    // The same agent twice: the differing parameters alone tell the bars
+    // apart, and the one with none reads "default".
+    expect(within(passRate).getByTitle("dev-agent")).toHaveTextContent(
+      "default",
+    );
+    expect(
+      within(passRate).getByTitle("dev-agent · model=gpt-5-mini"),
+    ).toHaveTextContent("model=gpt-5-mini");
+    expect(passRate).not.toHaveTextContent("dev-agent");
+
+    // Two different agents read their names.
+    setRuns(comparisonBatch());
+    cleanup();
+    renderDetail();
+    const byName = screen.getByTestId("comparison-chart-pass-rate");
+    expect(within(byName).getByTitle("dev-agent")).toHaveTextContent(
+      "dev-agent",
+    );
+    expect(within(byName).getByTitle("prod-agent")).toHaveTextContent(
+      "prod-agent",
+    );
+  });
+
+  /** @scenario "A single-target run carries no comparison charts" */
+  /** @scenario "A single-target run reads as before" */
+  it("reads a single-target run as a plain table with the summary in the header and no charts", async () => {
+    const user = userEvent.setup();
+    setRuns(
+      comparisonBatch().filter((run) => run.scenarioRunId.includes("_d")),
+    );
+    renderDetail();
+
+    expect(screen.queryByTestId("comparison-charts")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("comparison-results-table"),
+    ).not.toBeInTheDocument();
+    const table = screen.getByTestId("run-results-table");
+    expect(within(table).getByText("Passed (1/1)")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("run-summary-run")).getByTestId(
+        "run-metrics-summary",
+      ),
+    ).toHaveTextContent("50%");
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+    const targets = screen.getByTestId("run-settings-targets");
+    expect(
+      within(targets).getAllByTestId(/^run-settings-target-/),
+    ).toHaveLength(1);
+    expect(targets).toHaveTextContent("dev-agent");
+    expect(targets).not.toHaveTextContent("locale");
+    expect(screen.getByTestId("run-settings-parameters")).toHaveTextContent(
+      "locale = de",
+    );
+  });
+
+  /** @scenario "An older run with no target key reads as one column" */
+  it("reads a run recorded before targets carried a key as a single-target run", () => {
+    setRuns(
+      comparisonBatch()
+        .filter((run) => run.scenarioRunId.includes("_d"))
+        .map((run) => {
+          const langwatch = { ...run.metadata?.langwatch };
+          delete (langwatch as { targetKey?: string }).targetKey;
+          return { ...run, metadata: { ...run.metadata, langwatch } } as never;
+        }),
+    );
+    renderDetail();
+
+    expect(screen.getByTestId("run-results-table")).toBeInTheDocument();
+    expect(screen.queryByTestId("comparison-charts")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("run-summary-run")).getByTestId(
+        "run-metrics-summary",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  /** @scenario "The grid of a comparison run reads one section per target" */
+  it("reads one grid section per target under its dot and its name", () => {
+    useAgentTestingStore.setState({ viewMode: "grid" });
+    renderDetail();
+
+    const sections = screen.getAllByTestId(/^comparison-grid-agent/);
+    expect(sections.map((section) => section.dataset.testid)).toEqual([
+      `comparison-grid-${DEV}`,
+      `comparison-grid-${PROD}`,
+    ]);
+    const legend = screen.getByTestId(`comparison-grid-legend-${PROD}`);
+    expect(legend).toHaveTextContent("prod-agent");
+    expect(
+      window.getComputedStyle(within(legend).getByTestId("target-dot"))
+        .backgroundColor,
+    ).toBe(rgbOf(TARGET_COLORS[1]));
+    expect(
+      within(sections[0]!)
+        .getByTestId("scenario-grid")
+        .querySelectorAll(
+          "[data-testid^='scenario-grid-card'], article, button",
+        ).length,
+    ).toBeGreaterThan(0);
+  });
+
+  /** @scenario "The runs rail reads one rate per target on a comparison run" */
+  it("reads one rate per target in the runs rail, each in its pass-rate colour, and no passed count", () => {
+    renderDetail();
+
+    const result = screen.getByTestId("runs-sidebar-item-batch_3-result");
+    expect(result).toHaveTextContent("50%");
+    expect(result).toHaveTextContent("vs");
+    expect(result).toHaveTextContent("100%");
+    expect(result).toHaveTextContent("· 2 targets");
+    expect(result).not.toHaveTextContent("passed");
+
+    const [dev, prod] = within(result).getAllByTestId("pass-rate-text");
+    expect(window.getComputedStyle(dev!).color).toBe(
+      tokenVar(passRateColor(50)),
+    );
+    expect(window.getComputedStyle(prod!).color).toBe(
+      tokenVar(passRateColor(100)),
+    );
+    expect(
+      window.getComputedStyle(
+        screen.getByTestId(`runs-sidebar-item-batch_3-target-dot-${DEV}`),
+      ).backgroundColor,
+    ).toBe(rgbOf(TARGET_COLORS[0]));
+  });
+
+  /** @scenario "The run settings of a comparison read one layer of parameters" */
+  it("reads every parameter each target received on its Targets line, and no Parameters row", async () => {
+    const user = userEvent.setup();
+    setRuns([
+      runAgainst({
+        scenarioRunId: "r1",
+        scenarioId: "scen_1",
+        name: "Angry refund request",
+        referenceId: DEV,
+      }),
+      runAgainst({
+        scenarioRunId: "r2",
+        scenarioId: "scen_1",
+        name: "Angry refund request",
+        referenceId: DEV,
+        parameters: { model: "gpt-5-mini" },
+      }),
+    ]);
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const targets = screen.getByTestId("run-settings-targets");
+    const lines = within(targets).getAllByTestId(/^run-settings-target-/);
+    expect(lines.map((line) => line.dataset.testid)).toEqual([
+      `run-settings-target-${DEV}`,
+      `run-settings-target-${DEV_MINI}`,
+    ]);
+    expect(lines[0]).toHaveTextContent("dev-agent");
+    expect(within(lines[0]!).getByText("locale = de")).toBeInTheDocument();
+    expect(lines[0]).not.toHaveTextContent("model");
+    expect(lines[1]).toHaveTextContent("dev-agent");
+    expect(within(lines[1]!).getByText("locale = de")).toBeInTheDocument();
+    const chip = within(lines[1]!).getByText("model = gpt-5-mini");
+    expect(chip.tagName).toBe("CODE");
+
+    // One layer of parameters: the target lines carry them all.
+    expect(
+      screen.queryByTestId("run-settings-parameters"),
+    ).not.toBeInTheDocument();
+
+    // The same two targets read as two columns.
+    expect(
+      screen.getByTestId(`comparison-column-${DEV_MINI}`),
+    ).toHaveTextContent("dev-agent · model=gpt-5-mini");
   });
 });
 

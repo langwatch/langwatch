@@ -594,6 +594,14 @@ Feature: The Results tab
     And each model reads with the icon of its provider
 
   @integration
+  Scenario: Every label of the block sits beside its value
+    Given the run settings block is shown on a run with both models recorded
+    When the "Simulator model" and "Judge model" rows are read
+    Then each label sits beside its value and not under it
+    And a model row stands as tall as the "Started" row
+    And the icon of the provider does not push the row open
+
+  @integration
   Scenario: The first row of the block says when the run started and who started it
     Given a run started in the app by the person now reading it
     When "Show run settings" is chosen

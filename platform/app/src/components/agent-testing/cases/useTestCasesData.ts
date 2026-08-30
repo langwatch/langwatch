@@ -49,6 +49,12 @@ export type TestCasesData = {
    * from the map has nothing to open.
    */
   lastRunBySuiteId: Map<string, SuiteLastRun>;
+  /**
+   * The scenarios filed under every suite. A run covered a suite when it
+   * covered one of these, which is what the recent runs of a suite are read
+   * from.
+   */
+  scenarioIdsBySuiteId: Map<string, string[]>;
   isLoading: boolean;
 };
 
@@ -203,6 +209,21 @@ function lastRunBySuite({
   return bySuite;
 }
 
+/** The scenarios of every suite, keyed by suite id. */
+function useScenarioIdsBySuite(cases: TestCase[]): Map<string, string[]> {
+  return useMemo(() => {
+    const bySuite = new Map<string, string[]>();
+    for (const testCase of cases) {
+      const suiteId = testCase.testSuiteId;
+      if (!suiteId) continue;
+      const filed = bySuite.get(suiteId);
+      if (filed) filed.push(testCase.id);
+      else bySuite.set(suiteId, [testCase.id]);
+    }
+    return bySuite;
+  }, [cases]);
+}
+
 function useLastRunBySuite({
   cases,
   lastResults,
@@ -227,6 +248,7 @@ export function useTestCasesData({
   const externalSets = useExternalSetEntries(queries.externalSetSummaries);
   const lastResults = useLastResultsByCase(queries.lastResultRows);
   const lastRunBySuiteId = useLastRunBySuite({ cases, lastResults });
+  const scenarioIdsBySuiteId = useScenarioIdsBySuite(cases);
 
   return {
     cases,
@@ -236,6 +258,7 @@ export function useTestCasesData({
     lastResults,
     isLastResultsLoading: queries.isLastResultsLoading,
     lastRunBySuiteId,
+    scenarioIdsBySuiteId,
     isLoading: queries.isLoading,
   };
 }

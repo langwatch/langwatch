@@ -1058,6 +1058,15 @@ langwatch run-plan archive <planId>
 - `--name` is what makes the run reusable. Without it the platform names the plan itself.
 - `--idempotency-key <key>` makes a retried job join the first run instead of starting a second one. Use it in CI, where a re-run of the same job is normal.
 
+**Comparison runs.** Two targets in one run is a comparison: every scenario runs against both, and the results page shows one column per target with its own pass rate, duration and cost. A target may also carry the parameter values it alone runs with, written as a query string after the reference id, so the same agent named twice with different values compares that agent on two models. Quote the value, because the shell reads `?` and `&` itself. A target value wins over the same name given with `--param`, so `--param` carries what every target shares and the suffix carries what tells the targets apart.
+
+```bash
+langwatch run-plan run --test-suite "Refunds" \
+  --target 'http:<agentId>?model=gpt-5' \
+  --target 'http:<agentId>?model=gpt-5-mini' \
+  --name "Refunds model comparison" --format json
+```
+
 Whichever command started the run, follow its progress without blocking via:
 
 ```bash

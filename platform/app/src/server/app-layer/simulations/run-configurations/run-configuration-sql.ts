@@ -15,20 +15,21 @@
  * @see specs/features/agent-testing/run-configuration-history.feature
  */
 
-import { LANGWATCH_METADATA } from "../result-atoms/atom-sql";
+import { LANGWATCH_METADATA, TARGET_KEY_EXPR } from "../result-atoms/atom-sql";
 
 /** The target's type: `http`, `prompt`, `code` or `workflow`. */
 export const TARGET_TYPE_EXPR = `JSONExtractString(${LANGWATCH_METADATA}, 'targetType')`;
 
 /**
- * A target as one comparable string, `<type>:<referenceId>`.
+ * A target as one comparable string, `<type>:<targetKey>`.
  *
  * The same two fields the shared key recipe joins, in the same order, so the
- * pre-collapse this drives groups the rows the final key would group. The
- * final key is still taken in TypeScript from the shared function: this string
- * only decides how many rows leave the database.
+ * pre-collapse this drives groups the rows the final key would group: one
+ * agent run with two sets of overrides is two targets here as it is there.
+ * The final key is still taken in TypeScript from the shared function: this
+ * string only decides how many rows leave the database.
  */
-export const TARGET_PAIR_EXPR = `concat(${TARGET_TYPE_EXPR}, ':', JSONExtractString(${LANGWATCH_METADATA}, 'targetReferenceId'))`;
+export const TARGET_PAIR_EXPR = `concat(${TARGET_TYPE_EXPR}, ':', ${TARGET_KEY_EXPR})`;
 
 /**
  * The simulator model the plan was configured with, '' when it named none.

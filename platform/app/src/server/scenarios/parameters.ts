@@ -216,6 +216,39 @@ export type ScenarioParameterDefinition = z.infer<
 export type RunParameterValues = z.infer<typeof runParameterValuesSchema>;
 
 /**
+ * Reads parameter values back off the raw JSON a run stored them as.
+ *
+ * Tolerant on purpose: a value the current shape does not understand is
+ * dropped rather than taking the whole read down, the same way a stored scope
+ * that no longer parses still runs. A run that stored none reads as the empty
+ * string, and so does a run recorded before the field existed.
+ */
+export function parseRunParametersJson(raw: string): RunParameterValues {
+  if (raw === "") return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return {};
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return {};
+  }
+
+  const values: RunParameterValues = {};
+  for (const [name, value] of Object.entries(parsed)) {
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
+      values[name] = value;
+    }
+  }
+  return values;
+}
+
+/**
  * Reads the declarations off a scenario's stored JSON column.
  *
  * Tolerant on purpose: a scenario whose column holds a shape this version does

@@ -327,6 +327,33 @@ describe("runTestSuiteCommand()", () => {
     });
   });
 
+  describe("when the same agent is given twice with different parameters", () => {
+    /** @scenario "Run a test suite against one agent on two models" */
+    it("sends two targets, each with its own values", async () => {
+      await runTestSuiteCommand({
+        reference: "suite_abc",
+        options: {
+          target: ["http:agent_abc?model=gpt-5", "http:agent_abc?model=gpt-5-mini"],
+        },
+      });
+
+      expect(runSpy).toHaveBeenCalledWith("suite_abc", {
+        targets: [
+          {
+            type: "http",
+            referenceId: "agent_abc",
+            runParameters: { model: "gpt-5" },
+          },
+          {
+            type: "http",
+            referenceId: "agent_abc",
+            runParameters: { model: "gpt-5-mini" },
+          },
+        ],
+      });
+    });
+  });
+
   describe("when the suite is named by name", () => {
     /** @scenario "Run a test suite by name" */
     it("resolves the name to its ID", async () => {

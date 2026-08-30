@@ -15,6 +15,7 @@ import type {
   SimulationSuite,
 } from "~/generated/prisma/client";
 import type {
+  ParametersByTargetKey,
   SuiteRunResult,
   SuiteRunService,
 } from "~/server/app-layer/suites/suite-run.service";
@@ -23,7 +24,11 @@ import { slugify } from "~/utils/slugify";
 import { AgentRepository } from "../agents/agent.repository";
 import { LlmConfigRepository } from "../prompt-config/repositories/llm-config.repository";
 import { ScenarioNotFoundError } from "../scenarios/errors";
-import type { RunParameterValues } from "../scenarios/parameters";
+import {
+  parseScenarioParameterDefinitions,
+  partitionParameterDefinitions,
+  type RunParameterValues,
+} from "../scenarios/parameters";
 import { resolveRunParameters } from "../scenarios/resolve-run-parameters";
 import type { RunActor } from "../scenarios/run-actor";
 import {
@@ -46,7 +51,11 @@ import {
   SuiteScopeNotAllowedError,
   SuiteTargetsRequiredError,
 } from "./errors";
-import { normalizePlanScope, sortSuiteTargets } from "./plan-config";
+import {
+  duplicateSuiteTargets,
+  normalizePlanScope,
+  sortSuiteTargets,
+} from "./plan-config";
 import { derivePlanName } from "./plan-name";
 import { withPlanNameLock } from "./plan-name-lock";
 import { isDynamicScope, parseSuiteScope, type SuiteScope } from "./scope";
@@ -57,6 +66,12 @@ import {
   SuiteRepository,
   type UpdateSuiteInput,
 } from "./suite.repository";
+import {
+  declaredDefaults,
+  targetKeyOf,
+  targetLabels,
+  withCanonicalOverrides,
+} from "./target-key";
 import {
   isSuiteAgentTargetType,
   parseSuiteTargets,
@@ -102,40 +117,102 @@ type ResolvedRunReferences = {
 type PreparedRun = {
   /** The scenarios the run covers, archived ones included. */
   scenarioIds: string[];
-  /** The targets the run reaches, in stored order. */
+  /**
+   * The targets the run reaches, in stored order, each with its overrides
+   * canonical: a value equal to the declared default is no override.
+   */
   targets: SuiteTarget[];
   references: ResolvedRunReferences;
-  parametersByScenarioId: Map<string, RunParameterValues>;
+  parametersByTargetKey: ParametersByTargetKey;
   secretParametersByScenarioId: Map<string, RunSecretCiphertext>;
 };
 
+const TARGET_DUPLICATE_REFUSAL =
+  "Two targets are the same agent with the same parameters.";
+
+const TARGET_SECRET_REFUSAL =
+  "A secret parameter is supplied once for the run, not per target.";
+
+/** One refusal against the targets field, before anything is read or written. */
+function refuseTargets(message: string): never {
+  throw new ValidationError(message, {
+    meta: { fieldErrors: { targets: [message] } },
+  });
+}
+
 /**
- * Resolves the values each scenario of a run reads, split into the plain ones
- * the child reads as `params` and the secret ones it reads as `secrets`.
+ * Refuses a target whose overrides name a secret parameter.
  *
- * The secrets are encrypted here, at the last point that holds them in clear,
- * so the queued event and everything folded from it carry ciphertext. Only
- * scenarios that resolved at least one secret get an entry.
+ * A secret value is typed once per run and travels with the run alone. A
+ * target's overrides are stored on the plan row in clear, so a secret among
+ * them would be written down where everyone who can open the plan reads it.
  */
-async function resolveParameterMaps(params: {
+function assertNoSecretOverrides(params: {
   scenarios: readonly ScenarioRunConfig[];
+  targets: readonly SuiteTarget[];
+}): void {
+  const secretNames = new Set(
+    params.scenarios.flatMap((scenario) =>
+      partitionParameterDefinitions(
+        parseScenarioParameterDefinitions(scenario.parameters),
+      ).secret.map((definition) => definition.name),
+    ),
+  );
+  if (secretNames.size === 0) return;
+  const offending = params.targets.some((target) =>
+    Object.keys(target.runParameters ?? {}).some((name) =>
+      secretNames.has(name),
+    ),
+  );
+  if (offending) refuseTargets(TARGET_SECRET_REFUSAL);
+}
+
+/**
+ * Resolves the values each scenario of a run reads, once per target, split
+ * into the plain ones the child reads as `params` and the secret ones it
+ * reads as `secrets`.
+ *
+ * A target's overrides are merged over the run's values, the target winning,
+ * and each merged set is checked the way the run's values are: a name no
+ * scenario declares is refused. Two targets with one key resolve once.
+ *
+ * The secrets are run-level, so every target resolves the same ones. They are
+ * encrypted here, at the last point that holds them in clear, so the queued
+ * event and everything folded from it carry ciphertext. Only scenarios that
+ * resolved at least one secret get an entry.
+ */
+async function resolveParametersPerTarget(params: {
+  scenarios: readonly ScenarioRunConfig[];
+  targets: readonly SuiteTarget[];
   values?: RunParameterValues;
 }): Promise<{
-  parametersByScenarioId: Map<string, RunParameterValues>;
+  parametersByTargetKey: ParametersByTargetKey;
   secretParametersByScenarioId: Map<string, RunSecretCiphertext>;
 }> {
-  const resolved = await resolveRunParameters({
-    scenarios: params.scenarios,
-    values: params.values,
-  });
-  return {
-    parametersByScenarioId: new Map(
-      [...resolved].map(([scenarioId, scenarioParameters]) => [
-        scenarioId,
-        scenarioParameters.parameters,
-      ]),
-    ),
-    secretParametersByScenarioId: new Map(
+  assertNoSecretOverrides(params);
+
+  const parametersByTargetKey: ParametersByTargetKey = new Map();
+  let secretParametersByScenarioId: Map<string, RunSecretCiphertext> | null =
+    null;
+
+  for (const target of params.targets) {
+    const targetKey = targetKeyOf(target);
+    if (parametersByTargetKey.has(targetKey)) continue;
+
+    const resolved = await resolveRunParameters({
+      scenarios: params.scenarios,
+      values: { ...params.values, ...target.runParameters },
+    });
+    parametersByTargetKey.set(
+      targetKey,
+      new Map(
+        [...resolved].map(([scenarioId, scenarioParameters]) => [
+          scenarioId,
+          scenarioParameters.parameters,
+        ]),
+      ),
+    );
+    secretParametersByScenarioId ??= new Map(
       [...resolved]
         .filter(
           ([, scenarioParameters]) =>
@@ -145,7 +222,12 @@ async function resolveParameterMaps(params: {
           scenarioId,
           encryptRunSecretValues(scenarioParameters.secretParameters),
         ]),
-    ),
+    );
+  }
+
+  return {
+    parametersByTargetKey,
+    secretParametersByScenarioId: secretParametersByScenarioId ?? new Map(),
   };
 }
 
@@ -853,26 +935,55 @@ export class SuiteService {
     if (params.targets.length === 0) {
       throw new SuiteTargetsRequiredError();
     }
+    // Two targets with one key would run the same thing twice under one
+    // column. Refused here, before any read, so no plan row is touched.
+    if (duplicateSuiteTargets(params.targets).length > 0) {
+      refuseTargets(TARGET_DUPLICATE_REFUSAL);
+    }
 
     const scenarioIds = await params.readScenarioIds();
-    const references = await this.resolveReferences({
+    const resolved = await this.resolveReferences({
       scenarioIds,
       projectId: params.projectId,
       organizationId: params.organizationId,
       targets: params.targets,
     });
 
-    const { parametersByScenarioId, secretParametersByScenarioId } =
-      await resolveParameterMaps({
+    // The identity of a target is its overrides, and a value equal to the
+    // declared default is no override. Only the scenarios say what the
+    // defaults are, so the canonical set is known here and not before: it is
+    // what the key, the sort, the name and the stamp all read.
+    const defaults = declaredDefaults(
+      resolved.scenarioConfigs.flatMap((scenario) =>
+        parseScenarioParameterDefinitions(scenario.parameters),
+      ),
+    );
+    const targets = sortSuiteTargets(
+      withCanonicalOverrides({ targets: params.targets, defaults }),
+    );
+    // Two targets that differ only by a typed default are one target.
+    if (duplicateSuiteTargets(targets).length > 0) {
+      refuseTargets(TARGET_DUPLICATE_REFUSAL);
+    }
+    const references = {
+      ...resolved,
+      activeTargets: sortSuiteTargets(
+        withCanonicalOverrides({ targets: resolved.activeTargets, defaults }),
+      ),
+    };
+
+    const { parametersByTargetKey, secretParametersByScenarioId } =
+      await resolveParametersPerTarget({
         scenarios: references.scenarioConfigs,
+        targets: references.activeTargets,
         values: params.parameters,
       });
 
     return {
       scenarioIds,
-      targets: params.targets,
+      targets,
       references,
-      parametersByScenarioId,
+      parametersByTargetKey,
       secretParametersByScenarioId,
     };
   }
@@ -899,7 +1010,7 @@ export class SuiteService {
       skippedArchived: prepared.references.skippedArchived,
       idempotencyKey: params.idempotencyKey,
       batchRunId: params.batchRunId,
-      parametersByScenarioId: prepared.parametersByScenarioId,
+      parametersByTargetKey: prepared.parametersByTargetKey,
       secretParametersByScenarioId: prepared.secretParametersByScenarioId,
       note: params.note,
       actor: params.actor,
@@ -1123,7 +1234,9 @@ export class SuiteService {
         span.setAttribute("suite.scenario_count", prepared.scenarioIds.length);
 
         // Derived only once the run holds up, so a refused run reads no names
-        // it will not use.
+        // it will not use. The prepared targets carry the canonical
+        // overrides, so the name and the stored config read the same target
+        // the run was stamped with.
         const name =
           requestedName ??
           (await this.defaultPlanName({
@@ -1131,7 +1244,7 @@ export class SuiteService {
             organizationId: params.organizationId,
             scope,
             scenarioIds: params.config.scenarioIds ?? [],
-            targets,
+            targets: prepared.targets,
           }));
 
         const { suite, created } = await this.resolvePlanByName({
@@ -1139,7 +1252,7 @@ export class SuiteService {
           name,
           config: params.config,
           scope,
-          targets,
+          targets: prepared.targets,
           scenarioIds: prepared.scenarioIds,
         });
         span.setAttribute("suite.id", suite.id);
@@ -1321,13 +1434,17 @@ export class SuiteService {
         organizationId: params.organizationId,
       }),
     ]);
+    // Stored order, so the name reads the columns in the order the results
+    // show them. A target the project no longer names reads as its id, and an
+    // agent that appears more than once reads with the parameters that tell
+    // its targets apart.
     return derivePlanName({
       scopeLabel,
-      // Stored order, so the name reads the columns in the order the results
-      // show them. A target the project no longer names reads as its id.
-      targetLabels: sortSuiteTargets(params.targets).map(
-        (target) => targetNames[target.referenceId] ?? target.referenceId,
-      ),
+      targetLabels: targetLabels({
+        targets: sortSuiteTargets(params.targets),
+        nameOf: (target) =>
+          targetNames[target.referenceId] ?? target.referenceId,
+      }),
     });
   }
 

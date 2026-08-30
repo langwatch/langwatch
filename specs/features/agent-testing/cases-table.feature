@@ -103,11 +103,26 @@ Feature: The scenarios table
     And it carries the play icon
 
   @integration
-  Scenario: The row menu offers Edit, Duplicate, Open last run, Move to suite... and Archive in order
+  Scenario: The row menu offers Edit, Duplicate, Open recent runs, Move to suite... and Archive in order
     Given a scenario row with a finished run
     When its row menu is opened
-    Then the actions read, in order: "Edit", "Duplicate", "Open last run", "Move to suite...", "Archive"
+    Then the actions read, in order: "Edit", "Duplicate", "Open recent runs", "Move to suite...", "Archive"
     And no "History" action is offered, because the versions read inside the editor
+
+  @integration
+  Scenario: Open recent runs holds the runs of that scenario
+    Given a scenario row with three finished runs
+    When "Open recent runs" is opened from its row menu
+    Then the runs of that scenario are listed newest first
+    And each row reads the run plan the run belongs to, how long ago it started and how it did
+    And choosing one opens it on the Results tab, under the plan that holds it
+
+  @integration
+  Scenario: The runs of a row are read only when its submenu is opened
+    Given a scenario row with a finished run
+    When its row menu is opened and the submenu is left closed
+    Then the runs of that scenario are not read
+    And opening the submenu reads them
 
   @integration
   Scenario: Every action of the row menu carries its icon
@@ -139,10 +154,10 @@ Feature: The scenarios table
     And no "No test suite" option is offered, because a scenario always sits in one
 
   @integration
-  Scenario: Open last run is not offered for a scenario that never ran
+  Scenario: Open recent runs is not offered for a scenario that never ran
     Given a scenario with no run
     When its row menu is opened
-    Then "Open last run" is not offered
+    Then "Open recent runs" is not offered
 
   @integration
   Scenario: Duplicate creates a copy in the same suite
@@ -175,6 +190,14 @@ Feature: The scenarios table
 
   # --- The scenario editor ---
 
+  @unit
+  Scenario: The scenario editor opens wider than a standard drawer
+    Given the widths a drawer of the product can ask for by name
+    When the scenario editor names the width it opens at
+    Then that width is a step of the drawer recipe and not a width of its own
+    And the step is wider than the standard medium drawer by about a fifth
+    And it stays narrower than the large drawer, so four fields do not read as half a page
+
   @integration
   Scenario: New scenario opens the scenario dialog straight away
     Given the Agent Testing page is open
@@ -182,6 +205,15 @@ Feature: The scenarios table
     Then the scenario dialog opens titled "New scenario"
     And it asks for a title, a test suite, a situation and the criteria
     And no step asks to write the scenario with a model first
+
+  @integration
+  Scenario: The situation and the criteria grow with what is written in them
+    Given the scenario dialog is open
+    When more lines are written than the situation or the criteria field opens at
+    Then the field grows to hold them, the way the prompt editor grows
+    And it stops growing at three times the height it opened at
+    And it scrolls from there, so the footer of the drawer stays on the screen
+    And an empty field still opens at the height it always had
 
   @integration
   Scenario: The scenario dialog footer holds the labels, Save and Save and Run
@@ -197,6 +229,21 @@ Feature: The scenarios table
     Then the dialog is titled "Edit scenario"
     And the header offers "v4 · History"
     And choosing it opens the version history
+
+  @integration
+  Scenario: The editor offers a recent run of the scenario it is open on
+    Given a scenario with a finished run
+    When its editor is opened
+    Then the header offers "Open recent run" beside its version
+    And the list holds the recent runs of that scenario alone
+    And choosing one opens it on the Results tab and closes the editor
+
+  @integration
+  Scenario: The editor turns the recent runs off on a scenario that never ran
+    Given a scenario with no run
+    When its editor is opened
+    Then "Open recent run" is offered but cannot be chosen
+    And it says the scenario has not run yet
 
   @integration
   Scenario: Save and Run saves the scenario and then asks what to run it against
@@ -221,6 +268,20 @@ Feature: The scenarios table
     Then the min and the max turn fields are added to the form
     And the chip is no longer offered
     And removing the block takes the fields away and offers the chip again
+
+  @integration
+  Scenario: A block a chip opens reads under the criteria, not at the foot of the body
+    Given the scenario dialog is open
+    When "Define min and max turns" is chosen
+    Then the block reads straight under the criteria
+    And the "Customize scenario" chip row is the last thing in the body
+    And a short scenario leaves no gap between the criteria and the block
+
+  @integration
+  Scenario: Two open blocks read in the order their chips sit in
+    Given the scenario dialog is open
+    When "Add parameters" and "Override models" are both chosen
+    Then the parameters read above the model overrides, the way the chips are ordered
 
   @integration
   Scenario: Editing a scenario opens the blocks it already uses
@@ -330,6 +391,14 @@ Feature: The scenarios table
     When one of the runs is chosen
     Then the address names the Results tab, the plan the run belongs to and that run
     And the page is not reloaded, so a live run keeps streaming
+
+  @unit
+  Scenario: Every way into a recent run carries the same list icon
+    Given the button above the table and the recent runs of a row menu
+    When the icon of each is read
+    Then both read the list icon the shared list names
+    And no way into a run carries the history icon
+    And the history icon is left to the version history, which is what it means
 
   @integration
   Scenario: A suite whose scenarios have no run in the period offers no recent runs button
