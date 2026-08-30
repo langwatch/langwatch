@@ -576,6 +576,58 @@ jobs:
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/trace-web run typecheck
 
+      # Eleven more suites that ran nowhere. Between them they hold ~4,550
+      # tests and cost about a minute: `@langwatch/eventing` and
+      # `@langwatch/trace-server` alone are 963 and 1,390. Every one of them
+      # was red when first run, and none of the failures was a bug in the code
+      # under test — they were fixtures, doubles and assertions that had drifted
+      # from the interfaces around them, which is exactly what a suite nobody
+      # runs turns into. Naming them here is what stops that happening again.
+      # the event-sourcing framework itself — pipelines, projections, replay, the process-manager fleet.
+      - name: Run @langwatch/eventing tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/eventing run test
+      # the largest feature package, including the ingestion subscribers.
+      - name: Run @langwatch/trace-server tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/trace-server run test
+      # simulation execution and the child-process spawn policy.
+      - name: Run @langwatch/scenario-server tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/scenario-server run test
+      # the suite and run-plan forms.
+      - name: Run @langwatch/suite-web tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/suite-web run test
+      # the assistant's browser behaviour.
+      - name: Run @langwatch/langy-web tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/langy-web run test
+      # the studio's pickers and flows.
+      - name: Run @langwatch/workflow-web tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/workflow-web run test
+      # the grants vocabulary every authorization path validates against.
+      - name: Run @langwatch/authz-contract tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/authz-contract run test
+      # usage reporting and the Stripe error masking.
+      - name: Run @langwatch/enterprise-billing-server tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/enterprise-billing-server run test
+      # the back-office single sign-on surface and its hidden-surface denials.
+      - name: Run @langwatch/enterprise-sso-server tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/enterprise-sso-server run test
+      # the resource-limit rows.
+      - name: Run @langwatch/enterprise-licensing-web tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/enterprise-licensing-web run test
+      # endpoint validation and delivery.
+      - name: Run @langwatch/enterprise-webhook-server tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/enterprise-webhook-server run test
+
       # @langwatch/langyworker is the langy-worker pi-harness wrapper
       # (services/langyworker) the langyagent image compiles into the worker
       # binary. It sits outside platform/app, so the root typecheck and the
