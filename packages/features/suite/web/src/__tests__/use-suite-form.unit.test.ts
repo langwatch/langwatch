@@ -353,6 +353,9 @@ describe("useSuiteForm()", () => {
         expect(data).toEqual({
           name: "  My Suite  ",
           description: "  Suite description  ",
+          // A suite form starts on its explicit case list; only the run plan
+          // editor opens on a dynamic scope.
+          scope: { mode: "cases" },
           selectedScenarioIds: ["scen_1"],
           selectedTargets: [{ type: "http", referenceId: "agent_1" }],
           repeatCount: 1,

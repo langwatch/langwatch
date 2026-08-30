@@ -9,9 +9,8 @@
  */
 
 import { type MutableRefObject, useCallback, useRef, useState } from "react";
-import type { UseFormReturn } from "react-hook-form";
 import type { DrawerType } from "~/components/drawerRegistry";
-import type { SuiteFormData } from "@langwatch/suite-web";
+import type { SuiteFormData, SuiteFormReturn } from "@langwatch/suite-web";
 import { useSuiteRunMutation } from "~/components/suites/useSuiteRunMutation";
 import { toaster } from "~/components/ui/toaster";
 import {
@@ -43,9 +42,7 @@ function buildMutationPayload({
     projectId,
     name: data.name.trim(),
     description: data.description.trim() || undefined,
-    ...(isFixedScope
-      ? {}
-      : { scenarioIds: data.selectedScenarioIds, scope: data.scope }),
+    ...(isFixedScope ? {} : { scenarioIds: data.selectedScenarioIds, scope: data.scope }),
     targets: data.selectedTargets,
     repeatCount: data.repeatCount,
     labels: data.labels,
@@ -58,10 +55,7 @@ function buildMutationPayload({
 type PlanMutateOptions = { onSuccess: (saved: SimulationSuite) => void };
 type PlanPayload = ReturnType<typeof buildMutationPayload>;
 type PlanMutate = (input: PlanPayload, options?: PlanMutateOptions) => void;
-type PlanMutateWithId = (
-  input: PlanPayload & { id: string },
-  options?: PlanMutateOptions,
-) => void;
+type PlanMutateWithId = (input: PlanPayload & { id: string }, options?: PlanMutateOptions) => void;
 
 /** What a stored plan does: refresh the lists, hand it back, and say so. */
 function onStored({
@@ -99,7 +93,7 @@ function onRefused({
   saveAndRunRef,
   fallbackTitle,
 }: {
-  form: UseFormReturn<SuiteFormData>;
+  form: SuiteFormReturn;
   saveAndRunRef: MutableRefObject<boolean>;
   fallbackTitle: string;
 }) {
@@ -115,8 +109,7 @@ function onRefused({
       );
       return;
     }
-    if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
-      return;
+    if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
     showErrorToast({ error, fallbackTitle });
   };
 }
@@ -128,7 +121,7 @@ export type PlanEditorWritesInput = {
   /** The stored plan being edited, or nothing for a new one. */
   suite: SimulationSuite | null | undefined;
   /** The react-hook-form instance the fields are bound to. */
-  form: UseFormReturn<SuiteFormData>;
+  form: SuiteFormReturn;
   /** Where the editor is opened from, so a saved plan can be handed back. */
   onSaved?: (suite: SimulationSuite) => void;
   onRunRequested?: (suite: SimulationSuite) => void;
@@ -198,8 +191,7 @@ export function usePlanEditorWrites({
   );
 
   const handleError = useCallback(
-    (fallbackTitle: string) =>
-      onRefused({ form, saveAndRunRef, fallbackTitle }),
+    (fallbackTitle: string) => onRefused({ form, saveAndRunRef, fallbackTitle }),
     [form],
   );
 
@@ -235,14 +227,7 @@ export function usePlanEditorWrites({
         },
       });
     },
-    [
-      store,
-      closeDrawer,
-      onRunRequested,
-      runMutation,
-      projectId,
-      idempotencyKey,
-    ],
+    [store, closeDrawer, onRunRequested, runMutation, projectId, idempotencyKey],
   );
 
   return {
