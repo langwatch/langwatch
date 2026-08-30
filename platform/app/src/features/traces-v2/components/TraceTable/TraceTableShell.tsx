@@ -7,13 +7,15 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import {
-  horizontalListSortingStrategy,
-  SortableContext,
-  useSortable,
-} from "@dnd-kit/sortable";
+import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { flexRender, type Header, type Table } from "@tanstack/react-table";
+import {
+  type ColumnMeta as TanstackColumnMeta,
+  flexRender,
+  type Header,
+  type RowData,
+  type Table,
+} from "@tanstack/react-table";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef } from "react";
@@ -24,12 +26,28 @@ import { Table as TableEl, Th, Thead, Tr } from "./TablePrimitives";
 
 type Color = NonNullable<SystemStyleObject["color"]>;
 
-export interface ColumnMeta {
-  align?: "left" | "right";
-  flex?: boolean;
-  /** Number of shimmer bars the skeleton should render for this column. */
-  skeletonLines?: number;
+/**
+ * What this table reads off a column's `meta`.
+ *
+ * Declared as a module augmentation because that is how TanStack intends the
+ * field to be typed: `ColumnMeta` ships as an empty interface for consumers to
+ * merge into, and `ColumnDef.meta` is typed as it. A separate interface of the
+ * same shape does not satisfy that — assigning one gives "has no properties in
+ * common with type 'ColumnMeta<…>'", which is what every `meta:` in
+ * `columns.ts` was doing. `packages/features/dataset/web` augments the same
+ * interface for its own fields; declaration merging combines them.
+ */
+declare module "@tanstack/react-table" {
+  interface ColumnMeta<TData extends RowData, TValue> {
+    align?: "left" | "right";
+    flex?: boolean;
+    /** Number of shimmer bars the skeleton should render for this column. */
+    skeletonLines?: number;
+  }
 }
+
+/** The augmented meta, for call sites that hold one on its own. */
+export type ColumnMeta = TanstackColumnMeta<unknown, unknown>;
 
 interface TraceTableShellProps<T> {
   table: Table<T>;
@@ -207,17 +225,9 @@ export function TraceTableShell<T>({
         previous `bg.muted`, which felt too dark per operator feedback.
         Dark mode keeps the existing slight elevation token.
       */}
-      <Thead
-        position="sticky"
-        top={0}
-        zIndex={2}
-        bg={{ base: "bg.subtle", _dark: "bg.surface" }}
-      >
+      <Thead position="sticky" top={0} zIndex={2} bg={{ base: "bg.subtle", _dark: "bg.surface" }}>
         {reorderable ? (
-          <SortableContext
-            items={sortableHeaderIds}
-            strategy={horizontalListSortingStrategy}
-          >
+          <SortableContext items={sortableHeaderIds} strategy={horizontalListSortingStrategy}>
             {table.getHeaderGroups().map((headerGroup) => (
               <Tr key={headerGroup.id} borderBottomWidth="0">
                 {headerGroup.headers.map((header, i) => (
@@ -393,8 +403,7 @@ function HeaderCell<T>({
   // renderers, not this header, so it's unaffected. The select-checkbox
   // column is the one exception: its body checkbox is centred, so the
   // header checkbox centres too (left-aligning it sat ~2px off the rows).
-  const align: "left" | "center" =
-    header.column.id === SELECT_COLUMN_ID ? "center" : "left";
+  const align: "left" | "center" = header.column.id === SELECT_COLUMN_ID ? "center" : "left";
   const canSort = header.column.getCanSort();
   const sortDirection = header.column.getIsSorted();
   const isActiveSort = sortDirection !== false;
@@ -560,9 +569,7 @@ function SortableHeaderButton({
       // and non-sortable headers line up to the same grid.
       paddingX={0}
       paddingY={0}
-      justifyContent={
-        align === "right" ? "flex-end" : align === "center" ? "center" : "flex-start"
-      }
+      justifyContent={align === "right" ? "flex-end" : align === "center" ? "center" : "flex-start"}
       color="inherit"
       userSelect="none"
       fontSize="inherit"
