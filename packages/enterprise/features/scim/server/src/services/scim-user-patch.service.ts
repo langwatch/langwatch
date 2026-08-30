@@ -10,10 +10,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+/**
+ * What a SCIM `active` flag turns into: the directory says a user is on or off,
+ * and that is the whole of what patching asks of `UserService`.
+ */
+export type ScimUserActivation = Pick<UserService, "deactivate" | "reactivate">;
+
 /** Applies the mutable SCIM User attributes without owning user lookup or output. */
 export class ScimUserPatchService {
   private constructor(
-    private readonly users: UserService,
+    private readonly users: ScimUserActivation,
     private readonly profiles: ScimUserProfileService,
     private readonly costCenters: ScimCostCenterService,
     private readonly deprovision: ScimDeprovisionService,
@@ -21,7 +27,7 @@ export class ScimUserPatchService {
   ) {}
 
   static create(
-    users: UserService,
+    users: ScimUserActivation,
     profiles: ScimUserProfileService,
     costCenters: ScimCostCenterService,
     deprovision: ScimDeprovisionService,

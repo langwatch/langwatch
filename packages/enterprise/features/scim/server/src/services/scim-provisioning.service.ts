@@ -6,7 +6,6 @@ import type { UserProfile, UserService } from "@langwatch/user-contract";
 import {
   type ScimCreateUserRequest,
   type ScimListResponse,
-  type ScimPatchOperation,
   type ScimPatchRequest,
   type ScimUser,
 } from "@langwatch/enterprise-scim-contract";
@@ -15,8 +14,22 @@ import type { ScimRepositoryPort } from "../ports/scim-repository.port";
 import { ScimGrantsService } from "./scim-grants.service";
 import { ScimCostCenterService, type ScimDepartmentAssignment } from "./scim-cost-center.service";
 import { ScimDeprovisionService } from "./scim-deprovision.service";
-import { ScimUserPatchService } from "./scim-user-patch.service";
-import { ScimUserProfileService, type ScimSessionRevocation } from "./scim-user-profile.service";
+import { ScimUserPatchService, type ScimUserActivation } from "./scim-user-patch.service";
+import {
+  ScimUserProfileService,
+  type ScimSessionRevocation,
+  type ScimUserProfileReadWrite,
+} from "./scim-user-profile.service";
+
+/**
+ * Everything SCIM asks of `UserService`: the two reads that decide whether a
+ * directory user already exists here, the create, and what the leaf services
+ * need to change a profile or flip `active`. Six of the contract's twenty-two
+ * members.
+ */
+export type ScimUserProvisioning = ScimUserActivation &
+  ScimUserProfileReadWrite &
+  Pick<UserService, "tryFindByEmail" | "create">;
 import type { ScimSyncLifecyclePort } from "../ports/scim-sync-lifecycle.port";
 
 function isUniqueViolation(error: unknown): boolean {
@@ -28,7 +41,7 @@ function isUniqueViolation(error: unknown): boolean {
 export class ScimProvisioningService {
   private readonly prisma: ScimRepositoryPort;
   private readonly writer: AuthzGrantsService;
-  private readonly userService: UserService;
+  private readonly userService: ScimUserProvisioning;
   private readonly grants: ScimGrantsService;
   private readonly deprovision: ScimDeprovisionService;
   private readonly provenOffboarding: boolean;
@@ -49,7 +62,7 @@ export class ScimProvisioningService {
     prisma: ScimRepositoryPort;
     writer: AuthzGrantsService;
     grants: ScimGrantsService;
-    users: UserService;
+    users: ScimUserProvisioning;
     auth: ScimSessionRevocation;
     governance: ScimDepartmentAssignment;
     lifecycle: ScimSyncLifecyclePort;
@@ -79,7 +92,7 @@ export class ScimProvisioningService {
     prisma: ScimRepositoryPort;
     writer: AuthzGrantsService;
     grants: ScimGrantsService;
-    users: UserService;
+    users: ScimUserProvisioning;
     auth: ScimSessionRevocation;
     governance: ScimDepartmentAssignment;
     lifecycle: ScimSyncLifecyclePort;

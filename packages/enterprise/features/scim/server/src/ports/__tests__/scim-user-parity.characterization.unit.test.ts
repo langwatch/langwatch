@@ -7,10 +7,11 @@ import {
 } from "@langwatch/enterprise-scim-contract";
 import type { ScimRepositoryPort } from "../scim-repository.port";
 import { ScimService } from "../../services/scim.service";
-import type { UserProfile, UserService } from "@langwatch/user-contract";
+import type { UserProfile } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle";
 import { GrantsFake } from "../../__tests__/support/grants-fake";
+import type { ScimUserProvisioning } from "../../services/scim-provisioning.service";
 
 const now = new Date("2026-08-25T12:00:00.000Z");
 
@@ -92,7 +93,6 @@ function harness(
   const repo = options.repository ?? repository();
   let currentUser = options.currentUser ?? user();
   const users = {
-    getProfiles: vi.fn(),
     tryFindByEmail: vi.fn(async () => options.existingUser ?? null),
     tryFindById: vi.fn(async () => currentUser),
     create: vi.fn(async () => currentUser),
@@ -105,7 +105,7 @@ function harness(
       currentUser = user({ ...currentUser, deactivatedAt: null });
       return currentUser;
     }),
-  } as UserService;
+  } satisfies ScimUserProvisioning;
   const governance = {
     departmentResolveByNameOrCreate: vi.fn(async () => ({
       id: "department-1",

@@ -3,7 +3,7 @@
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import { EntitlementService } from "@langwatch/entitlement-contract";
 import { scimPatchRequestSchema } from "@langwatch/enterprise-scim-contract";
-import type { UserService } from "@langwatch/user-contract";
+import type { ScimUserProvisioning } from "../scim-provisioning.service";
 import { describe, expect, it, vi } from "vitest";
 import type { ScimRepositoryPort } from "../../ports/scim-repository.port";
 import { ScimDirectoryService } from "../scim-directory.service";
@@ -57,7 +57,11 @@ function groupRepository(): ScimRepositoryPort {
   } as ScimRepositoryPort;
 }
 
-function userService(): UserService {
+const notReached = async (): Promise<never> => {
+  throw new Error("not reached by the patch-casing parity tests");
+};
+
+function userService(): ScimUserProvisioning {
   const current = {
     id: "user-1",
     name: "Alice Smith",
@@ -70,11 +74,17 @@ function userService(): UserService {
     lastLoginAt: null,
     deactivatedAt: null,
   };
+  // The three this file exercises answer; the other three throw, because a
+  // patch that reached user creation or a profile write would mean the casing
+  // parity under test had routed somewhere it should not.
   return {
     tryFindById: vi.fn(async () => ({ ...current, deactivatedAt: new Date() })),
     deactivate: vi.fn(async () => ({ ...current, deactivatedAt: new Date() })),
     reactivate: vi.fn(async () => current),
-  } as UserService;
+    tryFindByEmail: vi.fn(notReached),
+    create: vi.fn(notReached),
+    updateProfile: vi.fn(notReached),
+  } satisfies ScimUserProvisioning;
 }
 
 function governance(): GovernanceService {

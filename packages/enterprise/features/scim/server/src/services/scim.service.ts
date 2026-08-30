@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import crypto from "node:crypto";
-import type { UserProfile, UserService } from "@langwatch/user-contract";
+import type { UserProfile } from "@langwatch/user-contract";
 import type { EntitlementService } from "@langwatch/entitlement-contract";
 import {
   type ScimCreateUserRequest,
@@ -28,7 +28,7 @@ import type {
 import { ScimDirectoryService } from "./scim-directory.service";
 import { ScimDirectoryIdentityService } from "./scim-directory-identity.service";
 import { ScimGrantsService } from "./scim-grants.service";
-import { ScimProvisioningService } from "./scim-provisioning.service";
+import { ScimProvisioningService, type ScimUserProvisioning } from "./scim-provisioning.service";
 import type { ScimDepartmentAssignment } from "./scim-cost-center.service";
 import type { ScimSessionRevocation } from "./scim-user-profile.service";
 
@@ -68,7 +68,7 @@ export class ScimService extends ScimServiceContract {
   }: {
     prisma: ScimRepositoryPort;
     writer: AuthzGrantsService;
-    users: UserService;
+    users: ScimUserProvisioning;
     auth: ScimSessionRevocation;
     governance: ScimDepartmentAssignment;
     entitlements: EntitlementService;
@@ -97,7 +97,7 @@ export class ScimService extends ScimServiceContract {
   static create(options: {
     prisma: ScimRepositoryPort;
     writer: AuthzGrantsService;
-    users: UserService;
+    users: ScimUserProvisioning;
     auth: ScimSessionRevocation;
     governance: ScimDepartmentAssignment;
     entitlements: EntitlementService;

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import type { UserService } from "@langwatch/user-contract";
 import { EntitlementService } from "@langwatch/entitlement-contract";
 import { ScimService } from "../scim.service";
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
@@ -9,6 +8,7 @@ import type { ScimRepositoryPort } from "../../ports/scim-repository.port";
 import { QuietScimSyncLifecycle } from "../../ports/__tests__/support/quiet-scim-sync-lifecycle";
 import type { ScimSyncLifecyclePort } from "../../ports/scim-sync-lifecycle.port";
 import { GrantsFake } from "../../__tests__/support/grants-fake";
+import type { ScimUserProvisioning } from "../scim-provisioning.service";
 
 const now = new Date("2026-08-25T12:00:00.000Z");
 
@@ -83,7 +83,7 @@ function service(
       updateProfile: vi.fn(),
       deactivate: vi.fn(),
       reactivate: vi.fn(),
-    } as UserService,
+    } satisfies ScimUserProvisioning,
     governance: {
       departmentResolveByNameOrCreate: vi.fn(async () => ({
         id: "department_1",
@@ -268,7 +268,7 @@ describe("SCIM characterization: provisioning invariants", () => {
       create: vi.fn(),
       updateProfile: vi.fn(),
       deactivate: vi.fn(),
-    } as UserService;
+    } satisfies ScimUserProvisioning;
     const scim = ScimService.create({
       prisma: repo,
       users,

@@ -11,15 +11,21 @@ import type { UpdateUserProfileInput, UserProfile, UserService } from "@langwatc
  */
 export type ScimSessionRevocation = Pick<AuthService, "revokeAllBrowserSessions">;
 
+/**
+ * The two user reads and writes a SCIM profile update needs: the previous
+ * profile, to see whether the email moved, and the write itself.
+ */
+export type ScimUserProfileReadWrite = Pick<UserService, "tryFindById" | "updateProfile">;
+
 /** Coordinates the session boundary that follows a SCIM-managed email change. */
 export class ScimUserProfileService {
   private constructor(
-    private readonly users: UserService,
+    private readonly users: ScimUserProfileReadWrite,
     private readonly auth: ScimSessionRevocation,
   ) {}
 
   static create(options: {
-    users: UserService;
+    users: ScimUserProfileReadWrite;
     auth: ScimSessionRevocation;
   }): ScimUserProfileService {
     return new ScimUserProfileService(options.users, options.auth);
