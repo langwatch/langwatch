@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
+import type { EvaluatorService, SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import { EvaluatorSettingsService } from "@langwatch/evaluation-server/internal";
 import type { Trace } from "@langwatch/trace-contract";
 import type { TraceService } from "~/server/traces/trace.service";
@@ -58,6 +58,7 @@ interface TestOverrides {
   modelEnvResolver?: Partial<ModelEnvResolver>;
   workflowExecutor?: Partial<WorkflowExecutor>;
   client?: Partial<LangEvalsClient>;
+  evaluators?: Partial<EvaluatorService>;
   trace?: Trace | undefined;
 }
 
@@ -93,11 +94,23 @@ function createTestService(overrides: TestOverrides = {}) {
     ...overrides.client,
   };
 
+  // The real `augmentResult` hands the result to the native augmenter, which
+  // fills in the parts a built-in evaluator's own reply leaves out. Passing it
+  // through unchanged is the honest default here: these tests assert what the
+  // client answered reaches the caller, and an augmenter that rewrote it would
+  // be asserting the augmenter instead.
+  const mockEvaluators = {
+    augmentResult: vi.fn(({ result }: { result: SingleEvaluationResult }) => result),
+    executeCode: vi.fn().mockResolvedValue({ status: "processed", score: 1 }),
+    ...overrides.evaluators,
+  } as unknown as EvaluatorService;
+
   const deps: EvaluationExecutionDeps = {
     traceService: mockTraceService,
     modelEnvResolver: mockModelEnvResolver,
     workflowExecutor: mockWorkflowExecutor,
     langevalsClient: mockClient,
+    evaluators: mockEvaluators,
   };
 
   const service = new EvaluationExecutionService(deps);
