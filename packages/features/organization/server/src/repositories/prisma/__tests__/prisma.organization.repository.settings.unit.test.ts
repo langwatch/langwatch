@@ -63,7 +63,7 @@ describe("PrismaOrganizationRepository settings", () => {
       new TestSettingsSecrets(),
     );
 
-    await expect(repository.getSettings("organization")).resolves.toMatchObject({
+    await expect(repository.tryFindSettings("organization")).resolves.toMatchObject({
       s3Endpoint: "https://storage.example.com",
       s3AccessKeyId: "access-key",
       s3Bucket: "bucket",

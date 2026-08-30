@@ -32,7 +32,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     return new PrismaOrganizationRepository(database as PrismaClient, settingsSecrets);
   }
 
-  async findSettings(organizationId: string) {
+  async tryFindStoredSettings(organizationId: string) {
     return this.database.organization.findUnique({
       where: { id: organizationId },
       select: {
@@ -52,8 +52,8 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     });
   }
 
-  async getSettings(organizationId: string) {
-    const settings = await this.findSettings(organizationId);
+  async tryFindSettings(organizationId: string) {
+    const settings = await this.tryFindStoredSettings(organizationId);
     if (!settings) return null;
     return {
       ...settings,

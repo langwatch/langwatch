@@ -53,11 +53,11 @@ class StubRepository extends OrganizationRepository {
     return this.teamId;
   }
 
-  getSettings(): Promise<OrganizationSettings | null> {
+  tryFindSettings(): Promise<OrganizationSettings | null> {
     return Promise.resolve(this.settings);
   }
 
-  findSettings(): Promise<StoredOrganizationSettings | null> {
+  tryFindStoredSettings(): Promise<StoredOrganizationSettings | null> {
     return Promise.resolve(this.storedSettings);
   }
 

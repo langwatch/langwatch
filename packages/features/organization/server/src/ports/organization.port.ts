@@ -40,8 +40,10 @@ export type StoredOrganizationSettings = {
 };
 
 export abstract class OrganizationRepository {
-  abstract getSettings(organizationId: string): Promise<OrganizationSettings | null>;
-  abstract findSettings(organizationId: string): Promise<StoredOrganizationSettings | null>;
+  abstract tryFindSettings(organizationId: string): Promise<OrganizationSettings | null>;
+  abstract tryFindStoredSettings(
+    organizationId: string,
+  ): Promise<StoredOrganizationSettings | null>;
   abstract updateSettings(input: {
     organizationId: string;
     name?: string;

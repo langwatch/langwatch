@@ -293,7 +293,7 @@ export class OrganizationService extends OrganizationServiceContract {
 
   async getSettings(input: { organizationId: string }): Promise<OrganizationSettings> {
     const parsed = getOrganizationSettingsInputSchema.parse(input);
-    const settings = await this.repository.getSettings(parsed.organizationId);
+    const settings = await this.repository.tryFindSettings(parsed.organizationId);
     if (!settings) throw new OrganizationNotFoundError();
     return settings;
   }
@@ -304,7 +304,8 @@ export class OrganizationService extends OrganizationServiceContract {
     const parsed = updateOrganizationSettingsInputSchema.parse(input);
     const wasSharingEnabled =
       parsed.traceSharingEnabled === false
-        ? (await this.repository.findSettings(parsed.organizationId))?.traceSharingEnabled === true
+        ? (await this.repository.tryFindStoredSettings(parsed.organizationId))
+            ?.traceSharingEnabled === true
         : false;
     await this.repository.updateSettings(parsed);
     return { traceShareRevocationRequired: wasSharingEnabled };
