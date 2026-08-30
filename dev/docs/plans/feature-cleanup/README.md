@@ -22,21 +22,21 @@ enactment by hand first; stage-3 agents copy that, they do not invent it.
 | dataset | 35 | 9147 | done | | commits 1-4 |
 | secret | 9 | 639 | done | |  |
 | stored-object | 22 | 2592 | done | |  |
-| api-key | 24 | 4102 | done | |  |
+| api-key | 24 | 4102 | done | | hidden-name list |
 | trace | 181 | 29990 | done | |  |
-| governance (ent) | 143 | 24097 | done | |  |
+| governance (ent) | 143 | 24097 | done | | 3 layers cut |
 | scenario | 90 | 16758 | done | |  |
 | gateway | 79 | 16278 | done | |  |
 | langy | 85 | 15111 | done | |  |
-| authz | 51 | 13531 | done | |  |
-| automation | 78 | 10925 | done | |  |
-| coding-agent | 52 | 10059 | done | |  |
+| authz | 51 | 13531 | done | | engine gate |
+| automation | 78 | 10925 | done | | TS2554 fixed |
+| coding-agent | 52 | 10059 | done | | registry + typecheck |
 | analytics | 30 | 9917 |  | |  |
 | ops | 49 | 9508 |  | |  |
 | organization | 20 | 7885 |  | |  |
 | experiment | 40 | 7106 | done | |  |
 | identity | 48 | 6956 |  | |  |
-| model-provider | 33 | 6595 | done | |  |
+| model-provider | 33 | 6595 | done | | REST statuses |
 | billing (ent) | 42 | 6287 | done | |  |
 | prompt | 19 | 6156 |  | |  |
 | webhook (ent) | 20 | 5056 |  | |  |
@@ -69,7 +69,11 @@ enactment by hand first; stage-3 agents copy that, they do not invent it.
 | audit-log (ent) | 5 | 206 |  | |  |
 | notification | 5 | 114 |  | |  |
 
-49 features, 268,000 lines of feature-server source. 15 reviewed.
+49 features, 268,000 lines of feature-server source. 15 reviewed, 7 partly enacted.
+
+Every feature package typechecks clean — server, contract, web and separate
+test configs — as of `c078e26d88`. That was not true before it: the test-move
+commit left `coding-agent-server` with ten TS2352s that main does not have.
 
 Stage 1 fans out; stage 3 does not, until the dataset enactment is finished by
 hand — agents copy a proven reference, they do not discover a design.
