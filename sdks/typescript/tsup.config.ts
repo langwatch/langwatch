@@ -41,6 +41,7 @@ export default defineConfig([
       "src/observability-sdk/index.ts",
       "src/observability-sdk/setup/node/index.ts",
       "src/observability-sdk/instrumentation/langchain/index.ts",
+      "src/agent/index.ts",
     ],
     splitting: true,
     clean: false,
