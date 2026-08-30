@@ -6,11 +6,7 @@ import type {
 } from "./ingestion-pull.commands";
 import type { RecordPulledUsageCommand } from "./pulled-usage.commands";
 import type { TraceDepartmentInput } from "./department";
-import type {
-  AnomalyRule,
-  CreateAnomalyRuleInput,
-  UpdateAnomalyRuleInput,
-} from "./anomaly-rule";
+import type { AnomalyRule, CreateAnomalyRuleInput, UpdateAnomalyRuleInput } from "./anomaly-rule";
 import type { Department, DepartmentAssignments } from "./department";
 import type { CanonicalCostEvent, OtlpLogsRequest } from "./canonical-cost";
 import type {
@@ -47,11 +43,7 @@ import type {
   UpdateIngestionTemplateOttlInput,
 } from "./ingestion-template";
 import type { GovernanceOcsfExportInput, GovernanceOcsfExportPage } from "./ocsf-export";
-import type {
-  OttlTransformInput,
-  OttlTransformResult,
-  OttlValidationResult,
-} from "./ottl";
+import type { OttlTransformInput, OttlTransformResult, OttlValidationResult } from "./ottl";
 import type {
   PersonalUsageBreakdown,
   PersonalUsageBucket,
@@ -117,10 +109,7 @@ import type {
  */
 export abstract class GovernanceService {
   abstract anomalyRuleList(organizationId: string): Promise<AnomalyRule[]>;
-  abstract tryFindAnomalyRuleById(
-    id: string,
-    organizationId: string,
-  ): Promise<AnomalyRule | null>;
+  abstract tryFindAnomalyRuleById(id: string, organizationId: string): Promise<AnomalyRule | null>;
   abstract anomalyRuleGetById(id: string, organizationId: string): Promise<AnomalyRule>;
   abstract anomalyRuleCreate(input: CreateAnomalyRuleInput): Promise<AnomalyRule>;
   abstract anomalyRuleUpdate(input: UpdateAnomalyRuleInput): Promise<AnomalyRule>;
@@ -128,10 +117,7 @@ export abstract class GovernanceService {
 
   abstract departmentList(organizationId: string): Promise<Department[]>;
   abstract departmentAssignments(organizationId: string): Promise<DepartmentAssignments>;
-  abstract departmentCreate(input: {
-    organizationId: string;
-    name: string;
-  }): Promise<Department>;
+  abstract departmentCreate(input: { organizationId: string; name: string }): Promise<Department>;
   abstract departmentResolveByNameOrCreate(input: {
     organizationId: string;
     name: string;
@@ -141,10 +127,7 @@ export abstract class GovernanceService {
     organizationId: string;
     name: string;
   }): Promise<Department>;
-  abstract departmentArchive(input: {
-    id: string;
-    organizationId: string;
-  }): Promise<void>;
+  abstract departmentArchive(input: { id: string; organizationId: string }): Promise<void>;
   abstract departmentAssignUser(input: {
     organizationId: string;
     userId: string;
@@ -167,9 +150,7 @@ export abstract class GovernanceService {
   abstract ingestionRecordRunCompleted(
     input: RecordIngestionPullRunCompletedCommand,
   ): Promise<void>;
-  abstract ingestionRecordRunFailed(
-    input: RecordIngestionPullRunFailedCommand,
-  ): Promise<void>;
+  abstract ingestionRecordRunFailed(input: RecordIngestionPullRunFailedCommand): Promise<void>;
   abstract usageRecord(input: RecordPulledUsageCommand): Promise<void>;
 
   abstract resolveSourceNonBillable(input: {
@@ -178,15 +159,9 @@ export abstract class GovernanceService {
   }): Promise<boolean>;
   abstract resolveTraceDepartment(input: TraceDepartmentInput): string;
 
-  abstract activitySummary(
-    input: ActivityMonitorWindowQuery,
-  ): Promise<ActivityMonitorSummary>;
-  abstract activitySpendByUser(
-    input: ActivityMonitorPagedWindowQuery,
-  ): Promise<SpendByUserRow[]>;
-  abstract activitySpendByTeam(
-    input: ActivityMonitorPagedWindowQuery,
-  ): Promise<SpendByTeamRow[]>;
+  abstract activitySummary(input: ActivityMonitorWindowQuery): Promise<ActivityMonitorSummary>;
+  abstract activitySpendByUser(input: ActivityMonitorPagedWindowQuery): Promise<SpendByUserRow[]>;
+  abstract activitySpendByTeam(input: ActivityMonitorPagedWindowQuery): Promise<SpendByTeamRow[]>;
   abstract activitySpendByDepartment(
     input: ActivityMonitorWindowQuery,
   ): Promise<SpendByDepartmentRow[]>;
@@ -216,9 +191,7 @@ export abstract class GovernanceService {
   abstract ingestionKeyEnsureForProject(
     input: IngestionKeyMintCommand,
   ): Promise<IssuedIngestionKey>;
-  abstract ingestionKeyIssueForProject(
-    input: IngestionKeyMintCommand,
-  ): Promise<IssuedIngestionKey>;
+  abstract ingestionKeyIssueForProject(input: IngestionKeyMintCommand): Promise<IssuedIngestionKey>;
   abstract ingestionKeyEnsureForPersonalProject(input: {
     userId: string;
     organizationId: string;
@@ -231,9 +204,7 @@ export abstract class GovernanceService {
     organizationId: string;
   }): Promise<PersonalIngestionKey[]>;
 
-  abstract ingestionSourceList(
-    organizationId: string,
-  ): Promise<GovernanceIngestionSource[]>;
+  abstract ingestionSourceList(organizationId: string): Promise<GovernanceIngestionSource[]>;
   abstract tryFindIngestionSourceById(
     id: string,
     organizationId: string,
@@ -242,6 +213,17 @@ export abstract class GovernanceService {
     id: string,
     organizationId: string,
   ): Promise<GovernanceIngestionSource>;
+  /**
+   * Of the trace destinations these sources point at, the ones still live in
+   * this organization. The admin surfaces need the complement — a destination
+   * that is absent has stopped routing — and cannot derive it from the project
+   * list they already hold, because a project outside the reader's own teams
+   * is equally absent and is not archived at all.
+   */
+  abstract ingestionSourceLiveTraceProjectIds(
+    sources: ReadonlyArray<{ traceProjectId?: string | null }>,
+    organizationId: string,
+  ): Promise<Set<string>>;
   abstract tryFindIngestionSourceByIngestSecret(
     rawSecret: string,
   ): Promise<GovernanceIngestionSource | null>;
@@ -261,12 +243,8 @@ export abstract class GovernanceService {
   ): Promise<GovernanceIngestionSource>;
   abstract ingestionSourceRecordEventReceived(id: string): Promise<void>;
 
-  abstract templateListForUser(input: {
-    organizationId: string;
-  }): Promise<IngestionTemplate[]>;
-  abstract templateListForOrgAdmin(input: {
-    organizationId: string;
-  }): Promise<IngestionTemplate[]>;
+  abstract templateListForUser(input: { organizationId: string }): Promise<IngestionTemplate[]>;
+  abstract templateListForOrgAdmin(input: { organizationId: string }): Promise<IngestionTemplate[]>;
   abstract tryFindTemplateByIdForOrg(input: {
     id: string;
     organizationId: string;
@@ -275,9 +253,7 @@ export abstract class GovernanceService {
     id: string;
     organizationId: string;
   }): Promise<IngestionTemplate>;
-  abstract templateCreateOrg(
-    input: CreateIngestionTemplateInput,
-  ): Promise<IngestionTemplate>;
+  abstract templateCreateOrg(input: CreateIngestionTemplateInput): Promise<IngestionTemplate>;
   abstract templateUpdateOttlRules(
     input: UpdateIngestionTemplateOttlInput,
   ): Promise<IngestionTemplate>;
@@ -290,9 +266,7 @@ export abstract class GovernanceService {
   abstract ocsfList(input: GovernanceOcsfExportInput): Promise<GovernanceOcsfExportPage>;
   abstract ottlValidate(statements: string[]): Promise<OttlValidationResult>;
   abstract ottlTransform(input: OttlTransformInput): Promise<OttlTransformResult>;
-  abstract personalUsageSummary(
-    input: PersonalUsageQueryInput,
-  ): Promise<PersonalUsageSummary>;
+  abstract personalUsageSummary(input: PersonalUsageQueryInput): Promise<PersonalUsageSummary>;
   abstract personalUsageDailyBuckets(
     input: PersonalUsageQueryInput,
   ): Promise<PersonalUsageBucket[]>;
@@ -304,15 +278,11 @@ export abstract class GovernanceService {
     input: GovernanceBudgetOverviewInput,
   ): Promise<GovernanceBudgetOverviewForUser>;
   abstract routingPolicyList(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]>;
-  abstract tryFindRoutingPolicyById(
-    input: FindRoutingPolicyInput,
-  ): Promise<RoutingPolicy | null>;
+  abstract tryFindRoutingPolicyById(input: FindRoutingPolicyInput): Promise<RoutingPolicy | null>;
   abstract routingPolicyGetById(input: FindRoutingPolicyInput): Promise<RoutingPolicy>;
   abstract routingPolicyCreate(input: CreateRoutingPolicyInput): Promise<RoutingPolicy>;
   abstract routingPolicyUpdate(input: UpdateRoutingPolicyInput): Promise<RoutingPolicy>;
-  abstract routingPolicySetDefault(
-    input: SetDefaultRoutingPolicyInput,
-  ): Promise<RoutingPolicy>;
+  abstract routingPolicySetDefault(input: SetDefaultRoutingPolicyInput): Promise<RoutingPolicy>;
   abstract routingPolicyDelete(input: DeleteRoutingPolicyInput): Promise<void>;
   abstract tryResolveDefaultRoutingPolicyForUser(
     input: ResolveDefaultRoutingPolicyInput,
@@ -347,9 +317,7 @@ export abstract class GovernanceService {
   abstract aiToolSeedStarterPack(
     input: SeedAiToolStarterPackInput,
   ): Promise<{ created: number; updated: number; skipped: number }>;
-  abstract aiToolListConfiguredProvidersForUser(
-    input: AiToolMemberInput,
-  ): Promise<string[]>;
+  abstract aiToolListConfiguredProvidersForUser(input: AiToolMemberInput): Promise<string[]>;
   abstract aiToolListProviderOptionsForAdmin(
     input: AiToolOrganizationInput,
   ): Promise<AiToolProviderOption[]>;
@@ -360,27 +328,19 @@ export abstract class GovernanceService {
   abstract aiToolResolvePolicyOverrides(
     input: AiToolMemberInput,
   ): Promise<Partial<Record<PlatformToolSlug, PlatformToolPolicy>>>;
-  abstract aiToolResolvePolicyMap(
-    input: AiToolMemberInput,
-  ): Promise<PlatformToolPolicyMap>;
+  abstract aiToolResolvePolicyMap(input: AiToolMemberInput): Promise<PlatformToolPolicyMap>;
   abstract aiToolResolvePolicy(
     input: AiToolMemberInput & { slug: PlatformToolSlug },
   ): Promise<PlatformToolPolicy>;
-  abstract aiToolResolveCliCatalogForUser(
-    input: AiToolMemberInput,
-  ): Promise<AiToolCliCatalog>;
+  abstract aiToolResolveCliCatalogForUser(input: AiToolMemberInput): Promise<AiToolCliCatalog>;
 
   abstract cliBootstrapResolve(input: CliBootstrapInput): Promise<CliBootstrapResult>;
   abstract cliSessionListForUser(input: CliUserInput): Promise<CliSession[]>;
-  abstract cliSessionRevoke(
-    input: RevokeCliSessionInput,
-  ): Promise<{ revokedTokens: number }>;
+  abstract cliSessionRevoke(input: RevokeCliSessionInput): Promise<{ revokedTokens: number }>;
   abstract cliTokenRevokeForUser(input: CliUserInput): Promise<{ revokedCount: number }>;
   abstract adminWorkspaceRecordView(
     input: RecordWorkspaceViewInput,
   ): Promise<RecordWorkspaceViewResult>;
-  abstract quarantineFillEvaluate(
-    input: QuarantineFillInput,
-  ): Promise<QuarantineFillStats>;
+  abstract quarantineFillEvaluate(input: QuarantineFillInput): Promise<QuarantineFillStats>;
   abstract resolveSetupState(organizationId: string): Promise<GovernanceSetupState>;
 }

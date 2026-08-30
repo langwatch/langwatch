@@ -1415,38 +1415,14 @@ export function SourceEditDrawer({
           </Heading>
         </Drawer.Header>
         <Drawer.Body>
-          <VStack align="stretch" gap={3}>
-            <VStack align="stretch" gap={1}>
-              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                Display name
-              </Text>
-              <Input size="sm" value={name} onChange={(e) => setName(e.target.value)} />
-            </VStack>
-            <VStack align="stretch" gap={1}>
-              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                Description (optional)
-              </Text>
-              <Textarea
-                size="sm"
-                rows={2}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </VStack>
-
-            <OttlEditor
-              organizationId={organizationId}
-              sourceType={source.sourceType}
-              statements={statements}
-              onChange={setStatements}
-              enabled={isOttlEnabledSourceType(source.sourceType)}
-            />
-
-            <Text fontSize="xs" color="fg.muted">
-              Source type and ingest secret are immutable after create. Use “Rotate secret” for the
-              secret; archive + recreate to change source type.
-            </Text>
-          </VStack>
+          <SourceEditBody
+            form={form}
+            source={source}
+            sourceType={sourceType}
+            hasPulled={hasPulled}
+            organizationId={organizationId}
+            destinationCtx={destinationCtx}
+          />
         </Drawer.Body>
         <Drawer.Footer>
           <HStack gap={3} width="full">

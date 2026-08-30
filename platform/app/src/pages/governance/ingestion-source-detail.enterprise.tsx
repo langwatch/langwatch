@@ -58,6 +58,8 @@ import {
   useSourceEventsPager,
   type PageRequest,
 } from "@langwatch/enterprise-governance-web";
+import { useDestinationContext } from "./ingestionSourceForms";
+import { SourceEditDrawer } from "./inventory.enterprise";
 
 /**
  * Per-source detail page - health metrics + a cursor-walked table of every
@@ -73,10 +75,7 @@ type Source = RouterOutputs["ingestionSources"]["get"];
 type EventRow = RouterOutputs["activityMonitor"]["eventsForSource"][number];
 type SourceHealthMetrics = RouterOutputs["activityMonitor"]["sourceHealthMetrics"];
 
-const STATUS_META: Record<
-  string,
-  { icon: typeof CircleCheck; label: string; color: string }
-> = {
+const STATUS_META: Record<string, { icon: typeof CircleCheck; label: string; color: string }> = {
   active: { icon: CircleCheck, label: "Active", color: "green.500" },
   awaiting_first_event: {
     icon: CircleDashed,
@@ -182,8 +181,7 @@ function SourceDetailHeader({
             variant="ghost"
             colorPalette="red"
             onClick={() => {
-              if (!confirm(`Archive "${source.name}"? Historical events stay readable.`))
-                return;
+              if (!confirm(`Archive "${source.name}"? Historical events stay readable.`)) return;
               onArchive();
             }}
             loading={isArchiving}
@@ -282,10 +280,7 @@ function SourceActivityPanels({
         error={healthQuery.error}
         isLoading={healthQuery.isLoading}
       />
-      <StaleTimestampCallout
-        health={health ?? null}
-        eventsCount={eventsPager.loadedCount}
-      />
+      <StaleTimestampCallout health={health ?? null} eventsCount={eventsPager.loadedCount} />
       {/* `EmptyEventsHint` walks an admin through setting up an integration.
           The table only shows it once a load SUCCEEDED and came back empty —
           showing it on a failed load sends someone debugging a live source
@@ -339,13 +334,7 @@ function SourceAccessDenied({ pageTitle }: { pageTitle: string }) {
 }
 
 /** The page chrome every state of this page renders inside. */
-function SourceDetailShell({
-  pageTitle,
-  children,
-}: {
-  pageTitle: string;
-  children: ReactNode;
-}) {
+function SourceDetailShell({ pageTitle, children }: { pageTitle: string; children: ReactNode }) {
   return (
     <GovernanceLayout pageTitle={pageTitle}>
       <EnterpriseLockedSurface
@@ -402,8 +391,7 @@ function useSourceDetailMutations({
         sourceName: data.source.name,
       });
     },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't rotate the secret" }),
+    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't rotate the secret" }),
   });
   const archive = api.ingestionSources.archive.useMutation({
     onSuccess: () => {
@@ -472,10 +460,23 @@ function useIngestionSourceDetailPage() {
     sourceName: string;
   } | null>(null);
 
-  const { rotate: rotateMutation, archive: archiveMutation } = useSourceDetailMutations({
+  const [isEditing, setIsEditing] = useState(false);
+
+  const {
+    rotate: rotateMutation,
+    archive: archiveMutation,
+    update: updateMutation,
+  } = useSourceDetailMutations({
     orgId,
     sourceId,
     onSecretRevealed: setSecretReveal,
+    // A saved edit closes the drawer and re-reads the row, so the header and
+    // the panels below it show what was just written rather than the copy the
+    // page loaded with.
+    onEdited: () => {
+      setIsEditing(false);
+      void sourceQuery.refetch();
+    },
   });
 
   return {
@@ -625,9 +626,7 @@ function LoadedSourceDetail({
           isRotating={rotateMutation.isPending}
           isArchiving={archiveMutation.isPending}
           onRotate={() => rotateMutation.mutate({ organizationId: orgId, id: source.id })}
-          onArchive={() =>
-            archiveMutation.mutate({ organizationId: orgId, id: source.id })
-          }
+          onArchive={() => archiveMutation.mutate({ organizationId: orgId, id: source.id })}
           onEdit={() => setIsEditing(true)}
         />
 
@@ -676,9 +675,7 @@ function StaleTimestampCallout({
   // event).
   if (!health) return null;
   const all30dZero =
-    (health.events24h ?? 0) === 0 &&
-    (health.events7d ?? 0) === 0 &&
-    (health.events30d ?? 0) === 0;
+    (health.events24h ?? 0) === 0 && (health.events7d ?? 0) === 0 && (health.events30d ?? 0) === 0;
   if (!all30dZero || eventsCount === 0) return null;
   return (
     <Box
@@ -690,13 +687,13 @@ function StaleTimestampCallout({
     >
       <Text fontSize="sm" color="amber.900">
         <strong>Heads up:</strong> the events table below has loaded {eventsCount} event
-        {eventsCount === 1 ? "" : "s"}, but the rolling 24h&nbsp;/&nbsp;7d&nbsp;/&nbsp;30d
-        health windows are all zero. Your events likely have a stale{" "}
-        <Code fontSize="xs">startTimeUnixNano</Code> (timestamps before today). When
-        firing test events, set <Code fontSize="xs">startTimeUnixNano</Code> to{" "}
-        <Code fontSize="xs">String(Date.now() * 1_000_000)</Code> so the event lands
-        inside the rolling window. The secret-reveal modal&apos;s &quot;Test it now&quot;
-        curl already does this for you.
+        {eventsCount === 1 ? "" : "s"}, but the rolling 24h&nbsp;/&nbsp;7d&nbsp;/&nbsp;30d health
+        windows are all zero. Your events likely have a stale{" "}
+        <Code fontSize="xs">startTimeUnixNano</Code> (timestamps before today). When firing test
+        events, set <Code fontSize="xs">startTimeUnixNano</Code> to{" "}
+        <Code fontSize="xs">String(Date.now() * 1_000_000)</Code> so the event lands inside the
+        rolling window. The secret-reveal modal&apos;s &quot;Test it now&quot; curl already does
+        this for you.
       </Text>
     </Box>
   );
@@ -705,23 +702,21 @@ function StaleTimestampCallout({
 function EmptyEventsHint({ source }: { source: Source }) {
   const baseUrl =
     typeof window !== "undefined" ? window.location.origin : "https://langwatch.invalid";
-  const isOtel =
-    source.sourceType === "otel_generic" || source.sourceType === "claude_cowork";
+  const isOtel = source.sourceType === "otel_generic" || source.sourceType === "claude_cowork";
   const isWebhook = source.sourceType === "workato";
   const mode = isOtel ? "otel" : isWebhook ? "webhook" : "<mode>";
   const endpoint = `${baseUrl}/api/ingest/${mode}/${source.id}`;
   return (
     <VStack align="stretch" gap={3}>
       <Text fontSize="sm" color="fg.muted">
-        No traces from this source yet. Push an OTLP body to{" "}
-        <Code fontSize="xs">{endpoint}</Code> with the source&apos;s bearer secret to
-        start populating.
+        No traces from this source yet. Push an OTLP body to <Code fontSize="xs">{endpoint}</Code>{" "}
+        with the source&apos;s bearer secret to start populating.
       </Text>
       <Text fontSize="xs" color="fg.muted">
-        Spans land in the LangWatch trace store with this source&apos;s origin tag,
-        viewable in the trace viewer. If you are sending agent traces from your own
-        LangWatch SDK, use <Code fontSize="xs">/api/otel/v1/traces</Code> with your
-        project API key - different auth, same trace store. See{" "}
+        Spans land in the LangWatch trace store with this source&apos;s origin tag, viewable in the
+        trace viewer. If you are sending agent traces from your own LangWatch SDK, use{" "}
+        <Code fontSize="xs">/api/otel/v1/traces</Code> with your project API key - different auth,
+        same trace store. See{" "}
         <Link
           href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
           color="blue.600"
@@ -731,22 +726,16 @@ function EmptyEventsHint({ source }: { source: Source }) {
         .
       </Text>
       <Text fontSize="xs" color="fg.muted">
-        Lost the secret? Click <strong>Rotate secret</strong> above - the new bearer is
-        shown once with a copy-paste curl example, and the prior secret stays valid for
-        24h while you roll the new value through every upstream client.
+        Lost the secret? Click <strong>Rotate secret</strong> above - the new bearer is shown once
+        with a copy-paste curl example, and the prior secret stays valid for 24h while you roll the
+        new value through every upstream client.
       </Text>
       {isOtel && (
         <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={3}>
           <Text fontSize="xs" fontWeight="semibold" color="fg.muted" mb={2}>
             Minimum viable OTLP body shape (camelCase keys):
           </Text>
-          <Code
-            display="block"
-            fontSize="xs"
-            whiteSpace="pre"
-            overflowX="auto"
-            padding={2}
-          >{`{
+          <Code display="block" fontSize="xs" whiteSpace="pre" overflowX="auto" padding={2}>{`{
   "resource_spans": [{
     "scope_spans": [{
       "spans": [{
@@ -764,9 +753,9 @@ function EmptyEventsHint({ source }: { source: Source }) {
   }]
 }`}</Code>
           <Text fontSize="xs" color="fg.muted" mt={2}>
-            Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on success. If you
-            get <Code fontSize="xs">events: 0</Code> with a hint, the body shape
-            didn&apos;t parse. See the{" "}
+            Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on success. If you get{" "}
+            <Code fontSize="xs">events: 0</Code> with a hint, the body shape didn&apos;t parse. See
+            the{" "}
             <Link
               href="https://docs.langwatch.ai/ai-gateway/governance/ingestion-sources/otel-generic"
               color="blue.600"
@@ -830,9 +819,7 @@ function SecretRevealModal({
   const otlpUrl = `${baseUrl}/api/ingest/otel/${sourceId}`;
   const webhookUrl = `${baseUrl}/api/ingest/webhook/${sourceId}`;
   const usesPushUrl =
-    sourceType === "otel_generic" ||
-    sourceType === "claude_cowork" ||
-    sourceType === "claude_code";
+    sourceType === "otel_generic" || sourceType === "claude_cowork" || sourceType === "claude_code";
   const usesWebhookUrl = sourceType === "workato";
   const isClaudeCode = sourceType === "claude_code";
 
@@ -879,11 +866,7 @@ function SecretRevealModal({
   };
 
   return (
-    <DialogRoot
-      open
-      onOpenChange={(e) => !e.open && onClose()}
-      closeOnInteractOutside={false}
-    >
+    <DialogRoot open onOpenChange={(e) => !e.open && onClose()} closeOnInteractOutside={false}>
       <DialogContent maxWidth="2xl">
         <DialogHeader>
           <DialogTitle>
@@ -897,10 +880,9 @@ function SecretRevealModal({
         <DialogBody>
           <VStack align="stretch" gap={4}>
             <Text fontSize="sm" color="fg.muted">
-              This is the only time we&apos;ll show this secret. Save it somewhere safe
-              and paste it into the upstream platform&apos;s admin console. The previous
-              secret keeps working for 24h so you have time to roll the new value through
-              every upstream client.
+              This is the only time we&apos;ll show this secret. Save it somewhere safe and paste it
+              into the upstream platform&apos;s admin console. The previous secret keeps working for
+              24h so you have time to roll the new value through every upstream client.
             </Text>
             <VStack align="stretch" gap={1}>
               <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
@@ -954,21 +936,11 @@ function SecretRevealModal({
                   <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
                     Claude Code shell env block
                   </Text>
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    onClick={() => copy(claudeCodeEnvBlock)}
-                  >
+                  <Button size="xs" variant="outline" onClick={() => copy(claudeCodeEnvBlock)}>
                     <Copy size={12} /> Copy block
                   </Button>
                 </HStack>
-                <Code
-                  padding={3}
-                  fontSize="xs"
-                  whiteSpace="pre"
-                  display="block"
-                  overflowX="auto"
-                >
+                <Code padding={3} fontSize="xs" whiteSpace="pre" display="block" overflowX="auto">
                   {claudeCodeEnvBlock}
                 </Code>
                 <Text fontSize="xs" color="fg.muted">
@@ -980,10 +952,9 @@ function SecretRevealModal({
                   <Code fontSize="xs" backgroundColor="transparent">
                     OTEL_RESOURCE_ATTRIBUTES=team.id=…
                   </Code>{" "}
-                  - it lands as a resource attribute and slots into /governance&apos;s
-                  spendByTeam without further config. Department attribution is resolved
-                  from the project&apos;s assignment at read time, not from an OTEL
-                  attribute.
+                  - it lands as a resource attribute and slots into /governance&apos;s spendByTeam
+                  without further config. Department attribution is resolved from the project&apos;s
+                  assignment at read time, not from an OTEL attribute.
                 </Text>
               </VStack>
             )}

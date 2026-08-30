@@ -21,9 +21,11 @@
 import {
   GOVERNANCE_INGESTION_SOURCE_TYPES,
   getStarterTemplate,
+  type GovernanceService,
   isOttlEnabledSourceType,
   OTTL_ENABLED_SOURCE_TYPES,
 } from "@langwatch/enterprise-governance-contract";
+import { hasPollerCursor } from "@langwatch/enterprise-governance-server";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -70,7 +72,10 @@ export function toIngestionSourceDto({
     // inside parserConfig — which is the bug this field was added to close.
     pullSchedule: string | null;
     status: string;
-    traceProjectId: string | null;
+    // Optional on the contract, never absent on a row Prisma read: normalised
+    // to `null` below so the wire shape stays `string | null` and the key is
+    // never dropped from the JSON by an `undefined`.
+    traceProjectId?: string | null;
     lastEventAt: Date | null;
     archivedAt: Date | null;
     createdAt: Date;
@@ -125,10 +130,8 @@ export function toIngestionSourceDto({
      */
     pullSchedule: row.pullSchedule,
     status: row.status,
-    traceProjectId: row.traceProjectId,
-    traceProjectArchived: row.traceProjectId
-      ? !liveTraceProjectIds.has(row.traceProjectId)
-      : false,
+    traceProjectId: row.traceProjectId ?? null,
+    traceProjectArchived: row.traceProjectId ? !liveTraceProjectIds.has(row.traceProjectId) : false,
     lastEventAt: row.lastEventAt,
     archivedAt: row.archivedAt,
     createdAt: row.createdAt,
@@ -138,11 +141,11 @@ export function toIngestionSourceDto({
 }
 
 async function dtoForRow(
-  service: IngestionSourceService,
+  service: GovernanceService,
   row: Parameters<typeof toIngestionSourceDto>[0]["row"],
   organizationId: string,
 ) {
-  const liveTraceProjectIds = await service.liveTraceProjectIds(
+  const liveTraceProjectIds = await service.ingestionSourceLiveTraceProjectIds(
     [row],
     organizationId,
   );
@@ -157,7 +160,12 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const service = ctx.app.governance;
       const rows = await service.ingestionSourceList(input.organizationId);
-      return rows.map(toDto);
+      // One destination query for the whole page rather than one per row.
+      const liveTraceProjectIds = await service.ingestionSourceLiveTraceProjectIds(
+        rows,
+        input.organizationId,
+      );
+      return rows.map((row) => toIngestionSourceDto({ row, liveTraceProjectIds }));
     }),
 
   /** Get a single source by id (org-scoped). */
@@ -166,7 +174,8 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .permission("ingestionSources:view")
     .query(async ({ ctx, input }) => {
       const service = ctx.app.governance;
-      return toDto(await service.ingestionSourceGetById(input.id, input.organizationId));
+      const row = await service.ingestionSourceGetById(input.id, input.organizationId);
+      return dtoForRow(service, row, input.organizationId);
     }),
 
   /**
@@ -249,10 +258,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .permission("ingestionSources:manage")
     .mutation(async ({ ctx, input }) => {
       const service = ctx.app.governance;
-      const rotated = await service.ingestionSourceRotateSecret(
-        input.id,
-        input.organizationId,
-      );
+      const rotated = await service.ingestionSourceRotateSecret(input.id, input.organizationId);
       return {
         source: await dtoForRow(service, rotated.source, input.organizationId),
         ingestSecret: rotated.ingestSecret,
@@ -264,11 +270,8 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .permission("ingestionSources:manage")
     .mutation(async ({ ctx, input }) => {
       const service = ctx.app.governance;
-      const archived = await service.ingestionSourceArchive(
-        input.id,
-        input.organizationId,
-      );
-      return toDto(archived);
+      const archived = await service.ingestionSourceArchive(input.id, input.organizationId);
+      return dtoForRow(service, archived, input.organizationId);
     }),
 
   /**

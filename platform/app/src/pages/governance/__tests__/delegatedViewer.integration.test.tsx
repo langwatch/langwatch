@@ -21,10 +21,7 @@ import type React from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  getOrganizationRolePermissions,
-  getTeamRolePermissions,
-} from "~/server/api/rbac";
+import { getOrganizationRolePermissions, getTeamRolePermissions } from "~/server/api/rbac";
 
 const harness = vi.hoisted(() => ({
   /** The grants the viewer under test holds. */
@@ -34,8 +31,7 @@ const harness = vi.hoisted(() => ({
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", async () => {
-  const rbac =
-    await vi.importActual<typeof import("~/server/api/rbac")>("~/server/api/rbac");
+  const rbac = await vi.importActual<typeof import("~/server/api/rbac")>("~/server/api/rbac");
   const holds = (permission: string) =>
     rbac.hasPermissionWithHierarchy(harness.permissions, permission);
   return {
@@ -125,7 +121,7 @@ vi.mock("~/utils/api", () => {
 
 import AnomalyRulesPage from "../anomaly-rules.enterprise";
 import IngestionSourceDetailPage from "../ingestion-source-detail.enterprise";
-import IngestionSourcesPage from "../inventory.enterprise";
+import InventoryPage from "../inventory.enterprise";
 
 import GovernanceOverviewPage from "../index";
 import PeoplePage from "../people";
@@ -226,9 +222,7 @@ describe("governance pages for a delegated viewer", () => {
     it("sends no activity-monitor query", () => {
       renderPage({ Page: GovernanceOverviewPage });
 
-      expect(
-        harness.requested.filter((path) => path.startsWith("activityMonitor.")),
-      ).toEqual([]);
+      expect(harness.requested.filter((path) => path.startsWith("activityMonitor."))).toEqual([]);
       // The grants it DOES hold are still read, so the page is not simply
       // querying nothing.
       expect(harness.requested).toContain("sessionPolicy.get");
@@ -273,9 +267,7 @@ describe("governance pages for a delegated viewer", () => {
       harness.permissions = [...DELEGATED_VIEWER, "ingestionSources:view"];
       renderPage({ Page: InventoryPage });
 
-      expect(
-        screen.queryByRole("button", { name: /Add source/ }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Add source/ })).not.toBeInTheDocument();
       expect(screen.getByText(/ingestionSources:manage/)).toBeInTheDocument();
       expect(harness.requested).toContain("ingestionSources.list");
     });
@@ -297,9 +289,7 @@ describe("governance pages for a delegated viewer", () => {
       expect(screen.getByText("Ingestion sources")).toBeInTheDocument();
       expect(screen.getByText("CLI session policy")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
-      expect(
-        screen.queryByText(/Ask an organization admin to grant you/),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/Ask an organization admin to grant you/)).not.toBeInTheDocument();
 
       // Every panel's read is actually issued for an admin.
       expect(harness.requested).toContain("activityMonitor.summary");
@@ -316,9 +306,7 @@ describe("governance pages for a delegated viewer", () => {
       renderPage({ Page: PeoplePage });
 
       expect(screen.getByText("Create a department")).toBeInTheDocument();
-      expect(
-        screen.queryByText(/Ask an organization admin to grant you/),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/Ask an organization admin to grant you/)).not.toBeInTheDocument();
     });
   });
 

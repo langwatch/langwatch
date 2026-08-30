@@ -51,21 +51,23 @@ export class GovernanceIngestionOperationsService {
   readonly ingestionDisable: GovernanceService["ingestionDisable"] = (...args) =>
     this.eventing.disableIngestion(...args);
 
-  readonly ingestionRecordRunCompleted: GovernanceService["ingestionRecordRunCompleted"] =
-    (...args) => this.eventing.recordIngestionRunCompleted(...args);
-
-  readonly ingestionRecordRunFailed: GovernanceService["ingestionRecordRunFailed"] = (
+  readonly ingestionRecordRunCompleted: GovernanceService["ingestionRecordRunCompleted"] = (
     ...args
-  ) => this.eventing.recordIngestionRunFailed(...args);
+  ) => this.eventing.recordIngestionRunCompleted(...args);
+
+  readonly ingestionRecordRunFailed: GovernanceService["ingestionRecordRunFailed"] = (...args) =>
+    this.eventing.recordIngestionRunFailed(...args);
 
   readonly usageRecord: GovernanceService["usageRecord"] = (...args) =>
     this.eventing.recordPulledUsage(...args);
 
-  readonly ingestionKeyEnsureForProject: GovernanceService["ingestionKeyEnsureForProject"] =
-    (...args) => this.ingestionKeys.ensureForProject(...args);
+  readonly ingestionKeyEnsureForProject: GovernanceService["ingestionKeyEnsureForProject"] = (
+    ...args
+  ) => this.ingestionKeys.ensureForProject(...args);
 
-  readonly ingestionKeyIssueForProject: GovernanceService["ingestionKeyIssueForProject"] =
-    (...args) => this.ingestionKeys.issueForProject(...args);
+  readonly ingestionKeyIssueForProject: GovernanceService["ingestionKeyIssueForProject"] = (
+    ...args
+  ) => this.ingestionKeys.issueForProject(...args);
 
   readonly ingestionKeyEnsureForPersonalProject: GovernanceService["ingestionKeyEnsureForPersonalProject"] =
     (...args) => this.ingestionKeys.ensureForPersonalProject(...args);
@@ -80,27 +82,27 @@ export class GovernanceIngestionOperationsService {
     ...args
   ) => this.ingestionSources.tryFindById(...args);
 
-  readonly ingestionSourceGetById: GovernanceService["ingestionSourceGetById"] = (
-    ...args
-  ) => this.ingestionSources.getById(...args);
+  readonly ingestionSourceGetById: GovernanceService["ingestionSourceGetById"] = (...args) =>
+    this.ingestionSources.getById(...args);
+
+  readonly ingestionSourceLiveTraceProjectIds: GovernanceService["ingestionSourceLiveTraceProjectIds"] =
+    (...args) => this.ingestionSources.liveTraceProjectIds(...args);
 
   readonly tryFindIngestionSourceByIngestSecret: GovernanceService["tryFindIngestionSourceByIngestSecret"] =
     (...args) => this.ingestionSources.tryFindByIngestSecret(...args);
 
-  readonly ingestionSourceCreate: GovernanceService["ingestionSourceCreate"] = (
-    ...args
-  ) => this.ingestionSources.createSource(...args);
+  readonly ingestionSourceCreate: GovernanceService["ingestionSourceCreate"] = (...args) =>
+    this.ingestionSources.createSource(...args);
 
-  readonly ingestionSourceUpdate: GovernanceService["ingestionSourceUpdate"] = (
-    ...args
-  ) => this.ingestionSources.updateSource(...args);
+  readonly ingestionSourceUpdate: GovernanceService["ingestionSourceUpdate"] = (...args) =>
+    this.ingestionSources.updateSource(...args);
 
-  readonly ingestionSourceRotateSecret: GovernanceService["ingestionSourceRotateSecret"] =
-    (...args) => this.ingestionSources.rotateSecret(...args);
-
-  readonly ingestionSourceArchive: GovernanceService["ingestionSourceArchive"] = (
+  readonly ingestionSourceRotateSecret: GovernanceService["ingestionSourceRotateSecret"] = (
     ...args
-  ) => this.ingestionSources.archive(...args);
+  ) => this.ingestionSources.rotateSecret(...args);
+
+  readonly ingestionSourceArchive: GovernanceService["ingestionSourceArchive"] = (...args) =>
+    this.ingestionSources.archive(...args);
 
   readonly ingestionSourceRecordEventReceived: GovernanceService["ingestionSourceRecordEventReceived"] =
     (...args) => this.ingestionSources.recordEventReceived(...args);
@@ -108,34 +110,30 @@ export class GovernanceIngestionOperationsService {
   readonly templateListForUser: GovernanceService["templateListForUser"] = (...args) =>
     this.templates.listForUser(...args);
 
-  readonly templateListForOrgAdmin: GovernanceService["templateListForOrgAdmin"] = (
-    ...args
-  ) => this.templates.listForOrgAdmin(...args);
+  readonly templateListForOrgAdmin: GovernanceService["templateListForOrgAdmin"] = (...args) =>
+    this.templates.listForOrgAdmin(...args);
 
-  readonly tryFindTemplateByIdForOrg: GovernanceService["tryFindTemplateByIdForOrg"] = (
-    ...args
-  ) => this.templates.tryFindByIdForOrg(...args);
+  readonly tryFindTemplateByIdForOrg: GovernanceService["tryFindTemplateByIdForOrg"] = (...args) =>
+    this.templates.tryFindByIdForOrg(...args);
 
-  readonly templateGetByIdForOrg: GovernanceService["templateGetByIdForOrg"] = (
-    ...args
-  ) => this.templates.getByIdForOrg(...args);
+  readonly templateGetByIdForOrg: GovernanceService["templateGetByIdForOrg"] = (...args) =>
+    this.templates.getByIdForOrg(...args);
 
   readonly templateCreateOrg: GovernanceService["templateCreateOrg"] = (...args) =>
     this.templates.createOrgTemplate(...args);
 
-  readonly templateUpdateOttlRules: GovernanceService["templateUpdateOttlRules"] = (
-    ...args
-  ) => this.templates.updateOttlRules(...args);
+  readonly templateUpdateOttlRules: GovernanceService["templateUpdateOttlRules"] = (...args) =>
+    this.templates.updateOttlRules(...args);
 
   readonly templateArchiveOrg: GovernanceService["templateArchiveOrg"] = (...args) =>
     this.templates.archiveOrgTemplate(...args);
 
-  readonly templateCloneFromPlatform: GovernanceService["templateCloneFromPlatform"] = (
-    ...args
-  ) => this.templates.cloneFromPlatform(...args);
+  readonly templateCloneFromPlatform: GovernanceService["templateCloneFromPlatform"] = (...args) =>
+    this.templates.cloneFromPlatform(...args);
 
-  readonly templateSyncPlatformCatalog: GovernanceService["templateSyncPlatformCatalog"] =
-    (...args) => this.templates.syncPlatformCatalog(...args);
+  readonly templateSyncPlatformCatalog: GovernanceService["templateSyncPlatformCatalog"] = (
+    ...args
+  ) => this.templates.syncPlatformCatalog(...args);
 
   readonly ocsfList: GovernanceService["ocsfList"] = (...args) => this.ocsf.list(...args);
 

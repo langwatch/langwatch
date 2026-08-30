@@ -1037,7 +1037,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
 
     const messages = Array.isArray(watchedMessages) ? watchedMessages : [];
     const inputs = Array.isArray(watchedInputs) ? watchedInputs : [];
-    const inputIds = new Set(inputs.map((i: { identifier: string }) => i.identifier));
+    const declaredFieldIds = inputs.map((input: { identifier: string }) => input.identifier);
 
     const usedVariables = getFieldsUsedByPromptTemplate({
       messages: messages.map((message) => ({

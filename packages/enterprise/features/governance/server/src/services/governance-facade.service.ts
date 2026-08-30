@@ -34,9 +34,8 @@ export class DefaultGovernanceService extends GovernanceService {
   readonly anomalyRuleList: GovernanceService["anomalyRuleList"] = (...args) =>
     this.rules.anomalyRuleList(...args);
 
-  readonly tryFindAnomalyRuleById: GovernanceService["tryFindAnomalyRuleById"] = (
-    ...args
-  ) => this.rules.tryFindAnomalyRuleById(...args);
+  readonly tryFindAnomalyRuleById: GovernanceService["tryFindAnomalyRuleById"] = (...args) =>
+    this.rules.tryFindAnomalyRuleById(...args);
 
   readonly anomalyRuleGetById: GovernanceService["anomalyRuleGetById"] = (...args) =>
     this.rules.anomalyRuleGetById(...args);
@@ -53,15 +52,15 @@ export class DefaultGovernanceService extends GovernanceService {
   readonly departmentList: GovernanceService["departmentList"] = (...args) =>
     this.rules.departmentList(...args);
 
-  readonly departmentAssignments: GovernanceService["departmentAssignments"] = (
-    ...args
-  ) => this.rules.departmentAssignments(...args);
+  readonly departmentAssignments: GovernanceService["departmentAssignments"] = (...args) =>
+    this.rules.departmentAssignments(...args);
 
   readonly departmentCreate: GovernanceService["departmentCreate"] = (...args) =>
     this.rules.departmentCreate(...args);
 
-  readonly departmentResolveByNameOrCreate: GovernanceService["departmentResolveByNameOrCreate"] =
-    (...args) => this.rules.departmentResolveByNameOrCreate(...args);
+  readonly departmentResolveByNameOrCreate: GovernanceService["departmentResolveByNameOrCreate"] = (
+    ...args
+  ) => this.rules.departmentResolveByNameOrCreate(...args);
 
   readonly departmentRename: GovernanceService["departmentRename"] = (...args) =>
     this.rules.departmentRename(...args);
@@ -75,17 +74,14 @@ export class DefaultGovernanceService extends GovernanceService {
   readonly departmentAssignTeam: GovernanceService["departmentAssignTeam"] = (...args) =>
     this.rules.departmentAssignTeam(...args);
 
-  readonly departmentAssignProject: GovernanceService["departmentAssignProject"] = (
-    ...args
-  ) => this.rules.departmentAssignProject(...args);
+  readonly departmentAssignProject: GovernanceService["departmentAssignProject"] = (...args) =>
+    this.rules.departmentAssignProject(...args);
 
-  readonly resolveSourceNonBillable: GovernanceService["resolveSourceNonBillable"] = (
-    ...args
-  ) => this.rules.resolveSourceNonBillable(...args);
+  readonly resolveSourceNonBillable: GovernanceService["resolveSourceNonBillable"] = (...args) =>
+    this.rules.resolveSourceNonBillable(...args);
 
-  readonly resolveTraceDepartment: GovernanceService["resolveTraceDepartment"] = (
-    ...args
-  ) => this.rules.resolveTraceDepartment(...args);
+  readonly resolveTraceDepartment: GovernanceService["resolveTraceDepartment"] = (...args) =>
+    this.rules.resolveTraceDepartment(...args);
 
   readonly aiToolListForUser: GovernanceService["aiToolListForUser"] = (...args) =>
     this.rules.aiToolListForUser(...args);
@@ -112,9 +108,8 @@ export class DefaultGovernanceService extends GovernanceService {
     ...args
   ) => this.rules.aiToolEnsureDefaultCatalog(...args);
 
-  readonly aiToolSeedStarterPack: GovernanceService["aiToolSeedStarterPack"] = (
-    ...args
-  ) => this.rules.aiToolSeedStarterPack(...args);
+  readonly aiToolSeedStarterPack: GovernanceService["aiToolSeedStarterPack"] = (...args) =>
+    this.rules.aiToolSeedStarterPack(...args);
 
   readonly aiToolListConfiguredProvidersForUser: GovernanceService["aiToolListConfiguredProvidersForUser"] =
     (...args) => this.rules.aiToolListConfiguredProvidersForUser(...args);
@@ -128,18 +123,19 @@ export class DefaultGovernanceService extends GovernanceService {
   readonly aiToolReorder: GovernanceService["aiToolReorder"] = (...args) =>
     this.rules.aiToolReorder(...args);
 
-  readonly aiToolResolvePolicyOverrides: GovernanceService["aiToolResolvePolicyOverrides"] =
-    (...args) => this.rules.aiToolResolvePolicyOverrides(...args);
-
-  readonly aiToolResolvePolicyMap: GovernanceService["aiToolResolvePolicyMap"] = (
+  readonly aiToolResolvePolicyOverrides: GovernanceService["aiToolResolvePolicyOverrides"] = (
     ...args
-  ) => this.rules.aiToolResolvePolicyMap(...args);
+  ) => this.rules.aiToolResolvePolicyOverrides(...args);
+
+  readonly aiToolResolvePolicyMap: GovernanceService["aiToolResolvePolicyMap"] = (...args) =>
+    this.rules.aiToolResolvePolicyMap(...args);
 
   readonly aiToolResolvePolicy: GovernanceService["aiToolResolvePolicy"] = (...args) =>
     this.rules.aiToolResolvePolicy(...args);
 
-  readonly aiToolResolveCliCatalogForUser: GovernanceService["aiToolResolveCliCatalogForUser"] =
-    (...args) => this.rules.aiToolResolveCliCatalogForUser(...args);
+  readonly aiToolResolveCliCatalogForUser: GovernanceService["aiToolResolveCliCatalogForUser"] = (
+    ...args
+  ) => this.rules.aiToolResolveCliCatalogForUser(...args);
 
   readonly extractCanonicalCostEvents: GovernanceService["extractCanonicalCostEvents"] = (
     ...args
@@ -151,21 +147,23 @@ export class DefaultGovernanceService extends GovernanceService {
   readonly ingestionDisable: GovernanceService["ingestionDisable"] = (...args) =>
     this.ingestion.ingestionDisable(...args);
 
-  readonly ingestionRecordRunCompleted: GovernanceService["ingestionRecordRunCompleted"] =
-    (...args) => this.ingestion.ingestionRecordRunCompleted(...args);
-
-  readonly ingestionRecordRunFailed: GovernanceService["ingestionRecordRunFailed"] = (
+  readonly ingestionRecordRunCompleted: GovernanceService["ingestionRecordRunCompleted"] = (
     ...args
-  ) => this.ingestion.ingestionRecordRunFailed(...args);
+  ) => this.ingestion.ingestionRecordRunCompleted(...args);
+
+  readonly ingestionRecordRunFailed: GovernanceService["ingestionRecordRunFailed"] = (...args) =>
+    this.ingestion.ingestionRecordRunFailed(...args);
 
   readonly usageRecord: GovernanceService["usageRecord"] = (...args) =>
     this.ingestion.usageRecord(...args);
 
-  readonly ingestionKeyEnsureForProject: GovernanceService["ingestionKeyEnsureForProject"] =
-    (...args) => this.ingestion.ingestionKeyEnsureForProject(...args);
+  readonly ingestionKeyEnsureForProject: GovernanceService["ingestionKeyEnsureForProject"] = (
+    ...args
+  ) => this.ingestion.ingestionKeyEnsureForProject(...args);
 
-  readonly ingestionKeyIssueForProject: GovernanceService["ingestionKeyIssueForProject"] =
-    (...args) => this.ingestion.ingestionKeyIssueForProject(...args);
+  readonly ingestionKeyIssueForProject: GovernanceService["ingestionKeyIssueForProject"] = (
+    ...args
+  ) => this.ingestion.ingestionKeyIssueForProject(...args);
 
   readonly ingestionKeyEnsureForPersonalProject: GovernanceService["ingestionKeyEnsureForPersonalProject"] =
     (...args) => this.ingestion.ingestionKeyEnsureForPersonalProject(...args);
@@ -180,27 +178,27 @@ export class DefaultGovernanceService extends GovernanceService {
     ...args
   ) => this.ingestion.tryFindIngestionSourceById(...args);
 
-  readonly ingestionSourceGetById: GovernanceService["ingestionSourceGetById"] = (
-    ...args
-  ) => this.ingestion.ingestionSourceGetById(...args);
+  readonly ingestionSourceLiveTraceProjectIds: GovernanceService["ingestionSourceLiveTraceProjectIds"] =
+    (...args) => this.ingestion.ingestionSourceLiveTraceProjectIds(...args);
+
+  readonly ingestionSourceGetById: GovernanceService["ingestionSourceGetById"] = (...args) =>
+    this.ingestion.ingestionSourceGetById(...args);
 
   readonly tryFindIngestionSourceByIngestSecret: GovernanceService["tryFindIngestionSourceByIngestSecret"] =
     (...args) => this.ingestion.tryFindIngestionSourceByIngestSecret(...args);
 
-  readonly ingestionSourceCreate: GovernanceService["ingestionSourceCreate"] = (
-    ...args
-  ) => this.ingestion.ingestionSourceCreate(...args);
+  readonly ingestionSourceCreate: GovernanceService["ingestionSourceCreate"] = (...args) =>
+    this.ingestion.ingestionSourceCreate(...args);
 
-  readonly ingestionSourceUpdate: GovernanceService["ingestionSourceUpdate"] = (
-    ...args
-  ) => this.ingestion.ingestionSourceUpdate(...args);
+  readonly ingestionSourceUpdate: GovernanceService["ingestionSourceUpdate"] = (...args) =>
+    this.ingestion.ingestionSourceUpdate(...args);
 
-  readonly ingestionSourceRotateSecret: GovernanceService["ingestionSourceRotateSecret"] =
-    (...args) => this.ingestion.ingestionSourceRotateSecret(...args);
-
-  readonly ingestionSourceArchive: GovernanceService["ingestionSourceArchive"] = (
+  readonly ingestionSourceRotateSecret: GovernanceService["ingestionSourceRotateSecret"] = (
     ...args
-  ) => this.ingestion.ingestionSourceArchive(...args);
+  ) => this.ingestion.ingestionSourceRotateSecret(...args);
+
+  readonly ingestionSourceArchive: GovernanceService["ingestionSourceArchive"] = (...args) =>
+    this.ingestion.ingestionSourceArchive(...args);
 
   readonly ingestionSourceRecordEventReceived: GovernanceService["ingestionSourceRecordEventReceived"] =
     (...args) => this.ingestion.ingestionSourceRecordEventReceived(...args);
@@ -208,37 +206,32 @@ export class DefaultGovernanceService extends GovernanceService {
   readonly templateListForUser: GovernanceService["templateListForUser"] = (...args) =>
     this.ingestion.templateListForUser(...args);
 
-  readonly templateListForOrgAdmin: GovernanceService["templateListForOrgAdmin"] = (
-    ...args
-  ) => this.ingestion.templateListForOrgAdmin(...args);
+  readonly templateListForOrgAdmin: GovernanceService["templateListForOrgAdmin"] = (...args) =>
+    this.ingestion.templateListForOrgAdmin(...args);
 
-  readonly tryFindTemplateByIdForOrg: GovernanceService["tryFindTemplateByIdForOrg"] = (
-    ...args
-  ) => this.ingestion.tryFindTemplateByIdForOrg(...args);
+  readonly tryFindTemplateByIdForOrg: GovernanceService["tryFindTemplateByIdForOrg"] = (...args) =>
+    this.ingestion.tryFindTemplateByIdForOrg(...args);
 
-  readonly templateGetByIdForOrg: GovernanceService["templateGetByIdForOrg"] = (
-    ...args
-  ) => this.ingestion.templateGetByIdForOrg(...args);
+  readonly templateGetByIdForOrg: GovernanceService["templateGetByIdForOrg"] = (...args) =>
+    this.ingestion.templateGetByIdForOrg(...args);
 
   readonly templateCreateOrg: GovernanceService["templateCreateOrg"] = (...args) =>
     this.ingestion.templateCreateOrg(...args);
 
-  readonly templateUpdateOttlRules: GovernanceService["templateUpdateOttlRules"] = (
-    ...args
-  ) => this.ingestion.templateUpdateOttlRules(...args);
+  readonly templateUpdateOttlRules: GovernanceService["templateUpdateOttlRules"] = (...args) =>
+    this.ingestion.templateUpdateOttlRules(...args);
 
   readonly templateArchiveOrg: GovernanceService["templateArchiveOrg"] = (...args) =>
     this.ingestion.templateArchiveOrg(...args);
 
-  readonly templateCloneFromPlatform: GovernanceService["templateCloneFromPlatform"] = (
+  readonly templateCloneFromPlatform: GovernanceService["templateCloneFromPlatform"] = (...args) =>
+    this.ingestion.templateCloneFromPlatform(...args);
+
+  readonly templateSyncPlatformCatalog: GovernanceService["templateSyncPlatformCatalog"] = (
     ...args
-  ) => this.ingestion.templateCloneFromPlatform(...args);
+  ) => this.ingestion.templateSyncPlatformCatalog(...args);
 
-  readonly templateSyncPlatformCatalog: GovernanceService["templateSyncPlatformCatalog"] =
-    (...args) => this.ingestion.templateSyncPlatformCatalog(...args);
-
-  readonly ocsfList: GovernanceService["ocsfList"] = (...args) =>
-    this.ingestion.ocsfList(...args);
+  readonly ocsfList: GovernanceService["ocsfList"] = (...args) => this.ingestion.ocsfList(...args);
 
   readonly ottlValidate: GovernanceService["ottlValidate"] = (...args) =>
     this.ingestion.ottlValidate(...args);
@@ -255,47 +248,45 @@ export class DefaultGovernanceService extends GovernanceService {
   readonly activitySpendByTeam: GovernanceService["activitySpendByTeam"] = (...args) =>
     this.activity.activitySpendByTeam(...args);
 
-  readonly activitySpendByDepartment: GovernanceService["activitySpendByDepartment"] = (
+  readonly activitySpendByDepartment: GovernanceService["activitySpendByDepartment"] = (...args) =>
+    this.activity.activitySpendByDepartment(...args);
+
+  readonly activitySpendOverTime: GovernanceService["activitySpendOverTime"] = (...args) =>
+    this.activity.activitySpendOverTime(...args);
+
+  readonly activityRecentAnomalies: GovernanceService["activityRecentAnomalies"] = (...args) =>
+    this.activity.activityRecentAnomalies(...args);
+
+  readonly activityIngestionSourcesHealth: GovernanceService["activityIngestionSourcesHealth"] = (
     ...args
-  ) => this.activity.activitySpendByDepartment(...args);
+  ) => this.activity.activityIngestionSourcesHealth(...args);
 
-  readonly activitySpendOverTime: GovernanceService["activitySpendOverTime"] = (
+  readonly activityEventsForSource: GovernanceService["activityEventsForSource"] = (...args) =>
+    this.activity.activityEventsForSource(...args);
+
+  readonly activitySourceHealthMetrics: GovernanceService["activitySourceHealthMetrics"] = (
     ...args
-  ) => this.activity.activitySpendOverTime(...args);
-
-  readonly activityRecentAnomalies: GovernanceService["activityRecentAnomalies"] = (
-    ...args
-  ) => this.activity.activityRecentAnomalies(...args);
-
-  readonly activityIngestionSourcesHealth: GovernanceService["activityIngestionSourcesHealth"] =
-    (...args) => this.activity.activityIngestionSourcesHealth(...args);
-
-  readonly activityEventsForSource: GovernanceService["activityEventsForSource"] = (
-    ...args
-  ) => this.activity.activityEventsForSource(...args);
-
-  readonly activitySourceHealthMetrics: GovernanceService["activitySourceHealthMetrics"] =
-    (...args) => this.activity.activitySourceHealthMetrics(...args);
+  ) => this.activity.activitySourceHealthMetrics(...args);
 
   readonly personalUsageSummary: GovernanceService["personalUsageSummary"] = (...args) =>
     this.activity.personalUsageSummary(...args);
 
-  readonly personalUsageDailyBuckets: GovernanceService["personalUsageDailyBuckets"] = (
+  readonly personalUsageDailyBuckets: GovernanceService["personalUsageDailyBuckets"] = (...args) =>
+    this.activity.personalUsageDailyBuckets(...args);
+
+  readonly personalUsageBreakdownByModel: GovernanceService["personalUsageBreakdownByModel"] = (
     ...args
-  ) => this.activity.personalUsageDailyBuckets(...args);
+  ) => this.activity.personalUsageBreakdownByModel(...args);
 
-  readonly personalUsageBreakdownByModel: GovernanceService["personalUsageBreakdownByModel"] =
-    (...args) => this.activity.personalUsageBreakdownByModel(...args);
-
-  readonly personalBudgetOverviewForUser: GovernanceService["personalBudgetOverviewForUser"] =
-    (...args) => this.activity.personalBudgetOverviewForUser(...args);
+  readonly personalBudgetOverviewForUser: GovernanceService["personalBudgetOverviewForUser"] = (
+    ...args
+  ) => this.activity.personalBudgetOverviewForUser(...args);
 
   readonly routingPolicyList: GovernanceService["routingPolicyList"] = (...args) =>
     this.lifecycle.routingPolicyList(...args);
 
-  readonly tryFindRoutingPolicyById: GovernanceService["tryFindRoutingPolicyById"] = (
-    ...args
-  ) => this.lifecycle.tryFindRoutingPolicyById(...args);
+  readonly tryFindRoutingPolicyById: GovernanceService["tryFindRoutingPolicyById"] = (...args) =>
+    this.lifecycle.tryFindRoutingPolicyById(...args);
 
   readonly routingPolicyGetById: GovernanceService["routingPolicyGetById"] = (...args) =>
     this.lifecycle.routingPolicyGetById(...args);
@@ -306,9 +297,8 @@ export class DefaultGovernanceService extends GovernanceService {
   readonly routingPolicyUpdate: GovernanceService["routingPolicyUpdate"] = (...args) =>
     this.lifecycle.routingPolicyUpdate(...args);
 
-  readonly routingPolicySetDefault: GovernanceService["routingPolicySetDefault"] = (
-    ...args
-  ) => this.lifecycle.routingPolicySetDefault(...args);
+  readonly routingPolicySetDefault: GovernanceService["routingPolicySetDefault"] = (...args) =>
+    this.lifecycle.routingPolicySetDefault(...args);
 
   readonly routingPolicyDelete: GovernanceService["routingPolicyDelete"] = (...args) =>
     this.lifecycle.routingPolicyDelete(...args);
@@ -316,20 +306,18 @@ export class DefaultGovernanceService extends GovernanceService {
   readonly tryResolveDefaultRoutingPolicyForUser: GovernanceService["tryResolveDefaultRoutingPolicyForUser"] =
     (...args) => this.lifecycle.tryResolveDefaultRoutingPolicyForUser(...args);
 
-  readonly personalVirtualKeyEnsureDefault: GovernanceService["personalVirtualKeyEnsureDefault"] =
-    (...args) => this.lifecycle.personalVirtualKeyEnsureDefault(...args);
-
-  readonly personalVirtualKeyIssue: GovernanceService["personalVirtualKeyIssue"] = (
+  readonly personalVirtualKeyEnsureDefault: GovernanceService["personalVirtualKeyEnsureDefault"] = (
     ...args
-  ) => this.lifecycle.personalVirtualKeyIssue(...args);
+  ) => this.lifecycle.personalVirtualKeyEnsureDefault(...args);
 
-  readonly personalVirtualKeyList: GovernanceService["personalVirtualKeyList"] = (
-    ...args
-  ) => this.lifecycle.personalVirtualKeyList(...args);
+  readonly personalVirtualKeyIssue: GovernanceService["personalVirtualKeyIssue"] = (...args) =>
+    this.lifecycle.personalVirtualKeyIssue(...args);
 
-  readonly personalVirtualKeyRevoke: GovernanceService["personalVirtualKeyRevoke"] = (
-    ...args
-  ) => this.lifecycle.personalVirtualKeyRevoke(...args);
+  readonly personalVirtualKeyList: GovernanceService["personalVirtualKeyList"] = (...args) =>
+    this.lifecycle.personalVirtualKeyList(...args);
+
+  readonly personalVirtualKeyRevoke: GovernanceService["personalVirtualKeyRevoke"] = (...args) =>
+    this.lifecycle.personalVirtualKeyRevoke(...args);
 
   readonly personalVirtualKeyRevokeAllForUser: GovernanceService["personalVirtualKeyRevokeAllForUser"] =
     (...args) => this.lifecycle.personalVirtualKeyRevokeAllForUser(...args);
@@ -337,24 +325,20 @@ export class DefaultGovernanceService extends GovernanceService {
   readonly cliBootstrapResolve: GovernanceService["cliBootstrapResolve"] = (...args) =>
     this.lifecycle.cliBootstrapResolve(...args);
 
-  readonly cliSessionListForUser: GovernanceService["cliSessionListForUser"] = (
-    ...args
-  ) => this.lifecycle.cliSessionListForUser(...args);
+  readonly cliSessionListForUser: GovernanceService["cliSessionListForUser"] = (...args) =>
+    this.lifecycle.cliSessionListForUser(...args);
 
   readonly cliSessionRevoke: GovernanceService["cliSessionRevoke"] = (...args) =>
     this.lifecycle.cliSessionRevoke(...args);
 
-  readonly cliTokenRevokeForUser: GovernanceService["cliTokenRevokeForUser"] = (
-    ...args
-  ) => this.lifecycle.cliTokenRevokeForUser(...args);
+  readonly cliTokenRevokeForUser: GovernanceService["cliTokenRevokeForUser"] = (...args) =>
+    this.lifecycle.cliTokenRevokeForUser(...args);
 
-  readonly adminWorkspaceRecordView: GovernanceService["adminWorkspaceRecordView"] = (
-    ...args
-  ) => this.lifecycle.adminWorkspaceRecordView(...args);
+  readonly adminWorkspaceRecordView: GovernanceService["adminWorkspaceRecordView"] = (...args) =>
+    this.lifecycle.adminWorkspaceRecordView(...args);
 
-  readonly quarantineFillEvaluate: GovernanceService["quarantineFillEvaluate"] = (
-    ...args
-  ) => this.lifecycle.quarantineFillEvaluate(...args);
+  readonly quarantineFillEvaluate: GovernanceService["quarantineFillEvaluate"] = (...args) =>
+    this.lifecycle.quarantineFillEvaluate(...args);
 
   readonly resolveSetupState: GovernanceService["resolveSetupState"] = (...args) =>
     this.lifecycle.resolveSetupState(...args);

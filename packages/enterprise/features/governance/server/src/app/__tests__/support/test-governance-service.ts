@@ -76,6 +76,8 @@ export class TestGovernanceService extends GovernanceService {
   ingestionSourceCreate = unsupported<GovernanceService["ingestionSourceCreate"]>();
   ingestionSourceGetById = unsupported<GovernanceService["ingestionSourceGetById"]>();
   ingestionSourceList = unsupported<GovernanceService["ingestionSourceList"]>();
+  ingestionSourceLiveTraceProjectIds =
+    unsupported<GovernanceService["ingestionSourceLiveTraceProjectIds"]>();
   ingestionSourceRecordEventReceived =
     unsupported<GovernanceService["ingestionSourceRecordEventReceived"]>();
   ingestionSourceRotateSecret = unsupported<GovernanceService["ingestionSourceRotateSecret"]>();
