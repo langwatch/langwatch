@@ -38,7 +38,7 @@
     "start": "tsx src/index.ts",
     "build": "tsup && node build.js",
     "prepublish": "pnpm run build",
-    "test": "vitest"
+    "test": "vitest run"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

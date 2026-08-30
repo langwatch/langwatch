@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "vitest",
+    "test": "vitest run",
     "compile": "tsx _compiler/compile.ts",
     "sync": "tsx _publish/sync.ts"
   },
