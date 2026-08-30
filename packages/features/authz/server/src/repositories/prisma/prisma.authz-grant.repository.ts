@@ -1,9 +1,9 @@
 /**
  * ADR-092 — the Prisma implementation of AuthzGrantsRepository's READ half:
  * the tenancy lookups (`tryFindTeamOrganization`, `tryFindProjectLineage`, ...)
- * every write path validates with. `LedgerAuthzGrantsRepository` composes
- * this repository for reads and owns every write itself, through the grants
- * ledger — see authz-grants.ledger.repository.ts.
+ * every write path validates with. `EventingAuthzGrantRepository` composes
+ * this repository for reads and owns every write itself, by emitting commands
+ * — see ../eventing/eventing.authz-grant.repository.ts.
  */
 import type { AuthzDatabase } from "../authz-read.repository";
 import type { AuthzGrantRepository } from "../authz-grant.repository";
@@ -24,9 +24,7 @@ type PrismaAuthzGrantDatabase = {
     findUnique(args: unknown): Promise<{ id: string; organizationId: string } | null>;
   };
   customRole: {
-    findUnique(
-      args: unknown,
-    ): Promise<{ organizationId: string; permissions: unknown } | null>;
+    findUnique(args: unknown): Promise<{ organizationId: string; permissions: unknown } | null>;
   };
   team: {
     findUnique(args: unknown): Promise<{ organizationId: string } | null>;
@@ -44,9 +42,7 @@ type PrismaAuthzGrantDatabase = {
 
 export class PrismaAuthzGrantRepository implements AuthzGrantsReadRepository {
   static create(database: AuthzDatabase): PrismaAuthzGrantRepository {
-    return new PrismaAuthzGrantRepository(
-      database as unknown as PrismaAuthzGrantDatabase,
-    );
+    return new PrismaAuthzGrantRepository(database as unknown as PrismaAuthzGrantDatabase);
   }
 
   private constructor(private readonly prisma: PrismaAuthzGrantDatabase) {}

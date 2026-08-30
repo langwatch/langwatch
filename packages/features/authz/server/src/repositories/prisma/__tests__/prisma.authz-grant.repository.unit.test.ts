@@ -4,7 +4,13 @@ import { PrismaAuthzGrantRepository } from "../prisma.authz-grant.repository";
 /**
  * The tenancy lookups every write path validates with - the Prisma queries
  * this repository owns. The writes themselves live in
- * LedgerAuthzGrantsRepository, tested in authz-grants.ledger.repository.unit.test.ts.
+ * `EventingAuthzGrantRepository`, which composes this one for reads and emits
+ * commands for everything it changes.
+ *
+ * Its provenance — the actor and source stamped on the emitted command — is
+ * not covered anywhere: the service test asserts the CALL into the repository,
+ * and the eventing repository's own tests assert neither. See
+ * dev/docs/plans/package-move-capability-gaps.md.
  */
 
 describe("PrismaAuthzGrantRepository", () => {
@@ -34,9 +40,9 @@ describe("PrismaAuthzGrantRepository", () => {
       const findUnique = vi.fn().mockResolvedValue({ organizationId: "org-1" });
       const prisma = { team: { findUnique } } as never;
 
-      const result = await PrismaAuthzGrantRepository.create(
-        prisma,
-      ).tryFindTeamOrganization({ teamId: "team-1" });
+      const result = await PrismaAuthzGrantRepository.create(prisma).tryFindTeamOrganization({
+        teamId: "team-1",
+      });
 
       expect(findUnique).toHaveBeenCalledWith({
         where: { id: "team-1" },
@@ -52,9 +58,9 @@ describe("PrismaAuthzGrantRepository", () => {
         const findUnique = vi.fn().mockResolvedValue({ team: null });
         const prisma = { project: { findUnique } } as never;
 
-        const result = await PrismaAuthzGrantRepository.create(
-          prisma,
-        ).tryFindProjectLineage({ projectId: "project-1" });
+        const result = await PrismaAuthzGrantRepository.create(prisma).tryFindProjectLineage({
+          projectId: "project-1",
+        });
 
         expect(result).toBeNull();
       });
@@ -67,9 +73,9 @@ describe("PrismaAuthzGrantRepository", () => {
         });
         const prisma = { project: { findUnique } } as never;
 
-        const result = await PrismaAuthzGrantRepository.create(
-          prisma,
-        ).tryFindProjectLineage({ projectId: "project-1" });
+        const result = await PrismaAuthzGrantRepository.create(prisma).tryFindProjectLineage({
+          projectId: "project-1",
+        });
 
         expect(result).toEqual({ teamId: "team-1", organizationId: "org-1" });
       });
