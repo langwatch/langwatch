@@ -22,6 +22,12 @@ describe("getAgentEditorDrawer", () => {
     });
   });
 
+  describe("when opening a connected agent", () => {
+    it("returns agentConnectedDetail", () => {
+      expect(getAgentEditorDrawer("connected")).toBe("agentConnectedDetail");
+    });
+  });
+
   describe("when editing a signature agent", () => {
     it("throws because signature agents have no editor drawer", () => {
       expect(() => getAgentEditorDrawer("signature")).toThrow(

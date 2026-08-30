@@ -641,7 +641,7 @@
                 "platform_delete_agent"
               ],
               "skill": "connect-agent",
-              "docs": "https://langwatch.ai/docs/agent-simulations/local-development.md"
+              "docs": "https://langwatch.ai/docs/agent-simulations/connect-your-agent.md"
             },
             "api": "/api/agents",
             "docs": "https://langwatch.ai/docs/agent-simulations/connect-your-agent.md"

@@ -11,6 +11,8 @@ import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
 import { Check, Code, Globe, Plug, Workflow } from "lucide-react";
 import { agentHasDevTunnel } from "~/components/agents/LocalTunnelBadge";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
+import { ownerOnlyCopy } from "~/components/scenarios/useFilteredScenarioTargets";
+import { Tooltip } from "~/components/ui/tooltip";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 
@@ -38,10 +40,18 @@ export type RunDialogAgent = {
   name: string;
   type: "http" | "code" | "workflow" | "connected";
   config?: unknown;
-  /** The environment of a connected agent. */
+  /** The name with the environment of a connected agent, when it has one. */
+  label?: string;
+  /** The environment of a connected agent; nothing for the other kinds. */
   environment?: string | null;
-  /** The owner of a personal connected agent. */
-  owner?: { name: string | null } | null;
+  /** Whether a process is holding a connected agent right now. */
+  status?: "online" | "offline";
+  /** The owner of a personal development agent. */
+  owner?: { userId: string; name: string | null } | null;
+  /** False only for a development agent of another person. */
+  runnable?: boolean;
+  /** True when a development agent belongs to another person. */
+  belongsToTeammate?: boolean;
   /** The parameters a connected agent declares. */
   parameters?: ScenarioParameterDefinition[];
 };
@@ -86,23 +96,34 @@ function AgentBlock({
 }) {
   const AgentIcon = AGENT_ICONS[agent.type];
   const hasDevTunnel = agentHasDevTunnel(agent);
+  const isConnected = agent.type === "connected";
+  const isOnline = agent.status === "online";
+  const canRun = agent.runnable !== false;
 
-  return (
+  const card = (
     <Box
       as="button"
       textAlign="left"
-      cursor="pointer"
+      cursor={canRun ? "pointer" : "not-allowed"}
+      opacity={canRun ? 1 : 0.5}
       borderWidth="1px"
       borderColor={isActive ? "blue.500" : "border"}
       background={isActive ? "blue.subtle" : undefined}
-      _hover={{ background: isActive ? "blue.subtle" : "bg.muted/60" }}
+      _hover={{
+        background: isActive
+          ? "blue.subtle"
+          : canRun
+            ? "bg.muted/60"
+            : undefined,
+      }}
       borderRadius="xl"
       paddingX={3}
       paddingY={2.5}
       height={AGENT_CARD_HEIGHT}
-      onClick={() => onSelect({ type: agent.type, id: agent.id })}
+      onClick={() => canRun && onSelect({ type: agent.type, id: agent.id })}
       data-testid={`run-dialog-agent-${agent.id}`}
       aria-pressed={isActive}
+      aria-disabled={!canRun}
     >
       <HStack justify="space-between" align="start">
         <HStack
@@ -117,7 +138,7 @@ function AgentBlock({
         {isActive && <Check size={14} color="var(--chakra-colors-blue-500)" />}
       </HStack>
       <Text fontSize="12.5px" fontWeight="medium" truncate marginTop={3}>
-        {agent.name}
+        {agent.label ?? agent.name}
       </Text>
       {/* The row keeps its height with or without the line, so the cards
           line up. */}
@@ -127,7 +148,21 @@ function AgentBlock({
         minHeight="16px"
         data-testid={hasDevTunnel ? `agent-dev-tunnel-${agent.id}` : undefined}
       >
-        {hasDevTunnel && (
+        {isConnected && (
+          <>
+            <Box
+              boxSize="8px"
+              borderRadius="full"
+              flexShrink={0}
+              background={isOnline ? "green.500" : "fg.subtle"}
+              data-testid={`agent-presence-${agent.id}`}
+            />
+            <Text fontSize="11px" color={FG_MUTED} truncate>
+              {isOnline ? "Online" : "Offline"}
+            </Text>
+          </>
+        )}
+        {!isConnected && hasDevTunnel && (
           <>
             <Box
               boxSize="8px"
@@ -142,6 +177,13 @@ function AgentBlock({
         )}
       </HStack>
     </Box>
+  );
+
+  if (canRun) return card;
+  return (
+    <Tooltip content={ownerOnlyCopy(agent.owner?.name)}>
+      <Box>{card}</Box>
+    </Tooltip>
   );
 }
 

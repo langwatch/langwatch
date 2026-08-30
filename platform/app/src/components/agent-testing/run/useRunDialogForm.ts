@@ -23,6 +23,7 @@ import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { declaredDefaults } from "~/server/suites/target-key";
 import { api } from "~/utils/api";
+import { useSession } from "~/utils/auth-client";
 import type { CustomizeChip } from "../shared/CustomizeChips";
 import { applyConfigurationTo } from "./apply-configuration";
 import {
@@ -222,6 +223,9 @@ export type RunDialogFields = ReturnType<typeof useRunDialogFields>;
 /** The agents, the published prompts and the scenarios the project holds. */
 function useRunDialogChoices(subject: RunDialogSubject | null) {
   const { project } = useOrganizationTeamProject();
+  // Who is looking: a development agent of another person is theirs to run.
+  const { data: session } = useSession();
+  const viewerUserId = session?.user?.id ?? null;
   const projectId = project?.id ?? "";
   const isDialogOpen = !!project && !!subject;
 
@@ -229,7 +233,11 @@ function useRunDialogChoices(subject: RunDialogSubject | null) {
     { projectId },
     { enabled: isDialogOpen },
   );
-  const scenarioAgents = useFilteredAgents(agents, "");
+  const scenarioAgents = useFilteredAgents({
+    agents,
+    searchValue: "",
+    viewerUserId,
+  });
   const { data: prompts } = useAllPromptsForProject();
   const { data: allScenarios } = api.scenarios.getAll.useQuery(
     { projectId },

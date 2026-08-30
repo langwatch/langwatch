@@ -3,11 +3,24 @@ import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
 /**
- * Fetches agents and prompts for the current project and builds a
- * Map<id, displayName> so callers can resolve target reference IDs
- * to human-readable names.
+ * What a target reference id stands for: the name it reads as, and, for a
+ * connected agent, the environment and the owner that tell one row of that
+ * name from another (ADR-128).
  */
-export function useTargetNameMap(): Map<string, string> {
+export interface TargetIdentity {
+  name: string;
+  /** The environment of a connected agent; nothing for every other target. */
+  environment: string | null;
+  /** The display name of the owner of a personal development agent. */
+  ownerName: string | null;
+}
+
+/**
+ * Fetches agents and prompts for the current project and builds a
+ * Map<id, TargetIdentity> so callers can resolve target reference IDs to what
+ * a person calls them.
+ */
+export function useTargetIdentityMap(): Map<string, TargetIdentity> {
   const { project } = useOrganizationTeamProject();
 
   const { data: agents } = api.agents.getAll.useQuery(
@@ -20,10 +33,14 @@ export function useTargetNameMap(): Map<string, string> {
   );
 
   return useMemo(() => {
-    const map = new Map<string, string>();
+    const map = new Map<string, TargetIdentity>();
     if (agents) {
       for (const agent of agents) {
-        map.set(agent.id, agent.name);
+        map.set(agent.id, {
+          name: agent.name,
+          environment: agent.type === "connected" ? agent.environment : null,
+          ownerName: agent.owner?.name ?? null,
+        });
       }
     }
     if (prompts) {
@@ -31,9 +48,28 @@ export function useTargetNameMap(): Map<string, string> {
         // Prefer the globally-unique handle, then the plain name (always
         // present), then the id as last resort. This keeps placeholder
         // prompts (no handle yet) from collapsing to their raw cuid.
-        map.set(prompt.id, prompt.handle ?? prompt.name ?? prompt.id);
+        map.set(prompt.id, {
+          name: prompt.handle ?? prompt.name ?? prompt.id,
+          environment: null,
+          ownerName: null,
+        });
       }
     }
     return map;
   }, [agents, prompts]);
+}
+
+/**
+ * The same lookup reduced to the display name alone, for the callers that
+ * only print a name.
+ */
+export function useTargetNameMap(): Map<string, string> {
+  const identities = useTargetIdentityMap();
+  return useMemo(
+    () =>
+      new Map(
+        [...identities].map(([id, identity]) => [id, identity.name] as const),
+      ),
+    [identities],
+  );
 }
