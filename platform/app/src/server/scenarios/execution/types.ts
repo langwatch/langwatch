@@ -324,6 +324,10 @@ export const ScenarioExecutionResultSchema = z.object({
   error: z.string().optional(),
   /** When true, the job was cancelled by user (not a crash/error). */
   cancelled: z.boolean().optional(),
+  /** The connected agent instance that answered the run, when one did. */
+  agentInstance: z
+    .object({ hostname: z.string(), label: z.string().nullable() })
+    .optional(),
 });
 export type ScenarioExecutionResult = z.infer<
   typeof ScenarioExecutionResultSchema

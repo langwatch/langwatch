@@ -131,6 +131,16 @@ export const langwatchMetadataSchema = z.object({
    */
   actorId: z.string().optional(),
   actorLabel: runActorLabelSchema.optional(),
+  /**
+   * The connected agent instance that served the run, recorded when the run
+   * finished. Absent for every other kind of target, and for a run recorded
+   * before instances were.
+   *
+   * @see specs/scenarios/served-agent-instance-on-runs.feature
+   */
+  agentInstance: z
+    .object({ hostname: z.string(), label: z.string().nullable() })
+    .optional(),
 });
 
 /**

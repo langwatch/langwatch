@@ -226,6 +226,35 @@ export type SimulationRunCancelRequestedEvent = z.infer<
 >;
 
 /**
+ * AgentInstanceRecorded event - emitted once the run knows which connected
+ * agent instance answered it. The fold writes it into the run's metadata
+ * under `langwatch.agentInstance`, so the results page can show where the
+ * run was served. It arrives after the run finished: the child learns the
+ * instance during the run and the parent records it when the child exits.
+ */
+export const simulationRunAgentInstanceRecordedEventDataSchema = z.object({
+  scenarioRunId: z.string(),
+  agentInstance: z.object({
+    hostname: z.string(),
+    label: z.string().nullable(),
+  }),
+});
+export type SimulationRunAgentInstanceRecordedEventData = z.infer<
+  typeof simulationRunAgentInstanceRecordedEventDataSchema
+>;
+
+export const SimulationRunAgentInstanceRecordedEventSchema = EventSchema.extend(
+  {
+    type: z.literal(SIMULATION_RUN_EVENT_TYPES.AGENT_INSTANCE_RECORDED),
+    version: z.literal(SIMULATION_EVENT_VERSIONS.AGENT_INSTANCE_RECORDED),
+    data: simulationRunAgentInstanceRecordedEventDataSchema,
+  },
+);
+export type SimulationRunAgentInstanceRecordedEvent = z.infer<
+  typeof SimulationRunAgentInstanceRecordedEventSchema
+>;
+
+/**
  * RunDeleted event - emitted when a simulation run is soft-deleted.
  */
 export const simulationRunDeletedEventDataSchema = z.object({
@@ -290,11 +319,13 @@ export type SimulationProcessingEvent =
   | SimulationRunFinishedEvent
   | SimulationRunMetricsComputedEvent
   | SimulationRunCancelRequestedEvent
+  | SimulationRunAgentInstanceRecordedEvent
   | SimulationRunDeletedEvent
   | SimulationSetArchivedEvent;
 
 export {
   isSimulationMessageSnapshotEvent,
+  isSimulationRunAgentInstanceRecordedEvent,
   isSimulationRunCancelRequestedEvent,
   isSimulationRunDeletedEvent,
   isSimulationRunFinishedEvent,

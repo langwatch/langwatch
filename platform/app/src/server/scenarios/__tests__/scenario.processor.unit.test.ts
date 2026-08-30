@@ -97,6 +97,9 @@ describe("handleCancelledJobResult", () => {
       failureEmitter: {
         ensureFailureEventsEmitted: vi.fn().mockResolvedValue(undefined),
       },
+      agentInstanceRecorder: {
+        recordAgentInstance: vi.fn().mockResolvedValue(undefined),
+      },
     };
   });
 
@@ -152,6 +155,9 @@ describe("handleFailedJobResult", () => {
       },
       failureEmitter: {
         ensureFailureEventsEmitted: vi.fn().mockResolvedValue(undefined),
+      },
+      agentInstanceRecorder: {
+        recordAgentInstance: vi.fn().mockResolvedValue(undefined),
       },
     };
   });
