@@ -40,7 +40,7 @@ vi.mock("~/server/app-layer/app", () => ({
         },
       }),
     },
-    traces: {
+    traceIngestion: {
       collection: {
         ingestNormalizedSpan: (data: Record<string, any>) => {
           ingestedSpans.push(data);
@@ -53,9 +53,7 @@ vi.mock("~/server/app-layer/app", () => ({
 
 /** The value of one span attribute, whichever shape it was written in. */
 function spanAttr(span: Record<string, any>, key: string): unknown {
-  const found = (span.span.attributes as Record<string, any>[]).find(
-    (a) => a.key === key,
-  );
+  const found = (span.span.attributes as Record<string, any>[]).find((a) => a.key === key);
   return found?.value?.doubleValue ?? found?.value?.stringValue;
 }
 
@@ -410,11 +408,9 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
   it("counts every open session when the key has no cap", async () => {
     const vk = await keyWithCap(`vk-nocap-${nanoid(6)}`, null);
     for (let i = 0; i < 3; i++) {
-      expect(await reserveRealtimeSession(reservation(vk, `n${i}-${nanoid(6)}`))).toEqual(
-        {
-          ok: true,
-        },
-      );
+      expect(await reserveRealtimeSession(reservation(vk, `n${i}-${nanoid(6)}`))).toEqual({
+        ok: true,
+      });
     }
   });
 
@@ -507,12 +503,12 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
 
     await expireStaleRealtimeSessions({ virtualKeyId: vk });
 
-    expect(
-      (await prisma.gatewayRealtimeSession.findUnique({ where: { id: old } }))?.status,
-    ).toBe("EXPIRED");
-    expect(
-      (await prisma.gatewayRealtimeSession.findUnique({ where: { id: fresh } }))?.status,
-    ).toBe("OPEN");
+    expect((await prisma.gatewayRealtimeSession.findUnique({ where: { id: old } }))?.status).toBe(
+      "EXPIRED",
+    );
+    expect((await prisma.gatewayRealtimeSession.findUnique({ where: { id: fresh } }))?.status).toBe(
+      "OPEN",
+    );
   });
 
   describe("when a usage report arrives from a different key in the same project", () => {

@@ -40,10 +40,7 @@ const SPAN_NAME = "realtime.session.settled";
  * replay cannot inflate the trace's cost.
  */
 function settlementSpanId(sessionId: string): string {
-  return createHash("sha256")
-    .update(`realtime-settlement:${sessionId}`)
-    .digest("hex")
-    .slice(0, 16);
+  return createHash("sha256").update(`realtime-settlement:${sessionId}`).digest("hex").slice(0, 16);
 }
 
 function attr(key: string, value: string | number) {
@@ -104,7 +101,11 @@ export async function recordRealtimeSessionSpan(params: {
     // REST collectors both route through, and its (tenant, trace, span) dedup
     // gate is what makes a resent webhook or a retried usage report write this
     // span once rather than adding another cost to the trace.
-    const collection = getApp().traces?.collection;
+    // `traceIngestion`, not `traces`: `App.traces` is a TraceApp and carries
+    // reads only. Reaching for `traces?.collection` resolved to undefined, and
+    // the guard below turned that into a silent return — no realtime session
+    // has written its span since.
+    const collection = getApp().traceIngestion?.collection;
     if (!collection) return;
     await collection.ingestNormalizedSpan({
       tenantId: session.projectId,
