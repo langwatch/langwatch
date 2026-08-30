@@ -462,5 +462,39 @@ describe("SavedWorkbenchChartService", () => {
         });
       });
     });
+
+    describe("when the surface asks for a window, a step, and what to do if it overflows", () => {
+      it("forwards all three, so a period wider than the saved step can coarsen", async () => {
+        const repository = new FakeRepository({ chart: record() });
+        const executed: unknown[] = [];
+        const { service } = build({
+          repository,
+          langWatchQL: {
+            execute: async (input: unknown) => {
+              executed.push(input);
+              return { rows: [] } as never;
+            },
+          } as Partial<LangWatchQLService>,
+        });
+
+        await service.run({
+          projectId: "project-1",
+          chartId: "chart-1",
+          execution: {
+            project: { projectId: "project-1" },
+            protections: PROTECTIONS,
+            timeWindow: { from: 0, to: 1 },
+            granularitySeconds: 3600,
+            onBudgetOverflow: "coarsen",
+          } as never,
+        });
+
+        expect(executed[0]).toMatchObject({
+          timeWindow: { from: 0, to: 1 },
+          granularitySeconds: 3600,
+          onBudgetOverflow: "coarsen",
+        });
+      });
+    });
   });
 });
