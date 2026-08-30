@@ -422,7 +422,7 @@ export const createDatasetNormalizeHandler = (deps: DatasetNormalizeDeps) => {
   return async (payload: DatasetNormalizePayload): Promise<void> => {
     const { projectId, datasetId, stagingKey, filename } = payload;
 
-    const dataset = await deps.repository.findOne({ id: datasetId, projectId });
+    const dataset = await deps.repository.tryFindOne({ id: datasetId, projectId });
     // Idempotent re-drive guard (I-IDEM): only a `processing` dataset is
     // normalizable. A re-enqueue after success (ready) or a concurrent finalize
     // race is a no-op.

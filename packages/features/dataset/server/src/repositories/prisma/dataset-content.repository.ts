@@ -121,7 +121,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   /**
    * Finds a single dataset by id within a project.
    */
-  async findOne(input: { id: string; projectId: string }): Promise<Dataset | null> {
+  async tryFindOne(input: { id: string; projectId: string }): Promise<Dataset | null> {
     const client = this.prisma;
     return await client.dataset.findFirst({
       where: {
@@ -153,7 +153,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   /**
    * Finds dataset by slug within a project.
    */
-  async findBySlug(input: {
+  async tryFindBySlug(input: {
     slug: string;
     projectId: string;
     excludeId?: string;
@@ -348,7 +348,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
    * project user could spray orphan objects there. `stagingKey` is server-minted
    * and bound to the row at presign time.
    */
-  async findPendingUploadByStagingKey(input: {
+  async tryFindPendingUploadByStagingKey(input: {
     projectId: string;
     stagingKey: string;
   }): Promise<Dataset | null> {
@@ -388,19 +388,6 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
     return await this.prisma.dataset.findMany({
       where: { projectId: input.projectId },
       select: { slug: true },
-    });
-  }
-
-  /**
-   * Finds a dataset by slug or id within a project, excluding archived datasets.
-   */
-  async findBySlugOrId(input: { slugOrId: string; projectId: string }): Promise<Dataset | null> {
-    return await this.prisma.dataset.findFirst({
-      where: {
-        projectId: input.projectId,
-        archivedAt: null,
-        OR: [{ slug: input.slugOrId }, { id: input.slugOrId }],
-      },
     });
   }
 

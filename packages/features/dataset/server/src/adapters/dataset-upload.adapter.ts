@@ -167,7 +167,7 @@ export class DatasetUploadAdapter implements DatasetUploadPort {
 
   async createPendingUpload(input: PendingUploadInput): Promise<PendingUploadResult> {
     const slug = slugify(input.name);
-    if (await this.datasets.findBySlug({ projectId: input.projectId, slug }))
+    if (await this.datasets.tryFindBySlug({ projectId: input.projectId, slug }))
       throw new DatasetConflictError();
     const storage = await this.storageResolver.forProject(input.projectId);
     const upload = await storage.createPresignedUpload({ projectId: input.projectId });
@@ -190,7 +190,7 @@ export class DatasetUploadAdapter implements DatasetUploadPort {
     if (!storage.putStaged) throw new DirectUploadUnavailableError();
     const key = stagingUploadKey(input.projectId, input.uploadId);
     if (
-      !(await this.datasets.findPendingUploadByStagingKey({
+      !(await this.datasets.tryFindPendingUploadByStagingKey({
         projectId: input.projectId,
         stagingKey: key,
       }))
@@ -284,8 +284,8 @@ export class DatasetUploadAdapter implements DatasetUploadPort {
 
   private async findDataset(slugOrId: string, projectId: string): Promise<Dataset> {
     const dataset =
-      (await this.datasets.findOne({ id: slugOrId, projectId })) ??
-      (await this.datasets.findBySlug({ slug: slugOrId, projectId }));
+      (await this.datasets.tryFindOne({ id: slugOrId, projectId })) ??
+      (await this.datasets.tryFindBySlug({ slug: slugOrId, projectId }));
     if (!dataset) throw new DatasetNotFoundError();
     return dataset;
   }
