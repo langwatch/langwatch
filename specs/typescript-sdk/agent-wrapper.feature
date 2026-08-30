@@ -294,6 +294,37 @@ Feature: connectAgent turns a function into a simulation target
       Then the request URL carries no key
       And the Authorization header carries it
 
+  Rule: The transport is WebSocket by default and HTTP long polling when asked or when the upgrade is refused
+
+    Scenario: The transport option selects HTTP long polling
+      Given an agent defined with transport "http"
+      When the client connects
+      Then the register frame is posted to /api/agents/connect/register with the API key in the Authorization header
+      And the client polls /api/agents/connect/poll with the instance token
+      And a call answered by the poll is acked and answered by a POST to /api/agents/connect/frames
+
+    Scenario: LANGWATCH_AGENT_TRANSPORT selects the transport
+      Given LANGWATCH_AGENT_TRANSPORT is "http"
+      When an agent is defined without a transport option
+      Then the client registers over HTTP and opens no socket
+
+    Scenario: A refused WebSocket upgrade falls back to HTTP with one warning
+      Given a proxy that answers the WebSocket upgrade with an HTTP status
+      When an agent is defined with the default transport
+      Then one warning names the status and says the HTTP transport is used
+      And the client registers over HTTP at once
+
+    Scenario: A poll that answers session unknown registers again
+      Given a client registered over HTTP with a call in progress
+      When a poll is answered with status 410
+      Then the client posts a new register frame that lists the in-flight call id
+
+    Scenario: Disconnecting over HTTP posts deregister
+      Given a client registered over HTTP
+      When disconnect is called
+      Then a deregister frame is posted to the frames route
+      And no poll is made after that
+
   Rule: The traceparent of a call is the parent context of the handler
 
     Scenario: The handler runs under the traceparent of the call

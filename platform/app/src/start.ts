@@ -86,6 +86,7 @@ import {
 import { assertRedisReady } from "./server/app-layer/redis-readiness";
 import { assetBaseOrigin, getAssetBase } from "./server/asset-base";
 import { ConnectGateway } from "./server/connected-agents/connect.gateway";
+import { closeLongPollTransport } from "./server/connected-agents/long-poll.route";
 import {
   closeConnectedAgentRuntime,
   getConnectedAgentRuntime,
@@ -477,6 +478,7 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
         name: "connected-agents",
         run: async () => {
           await connectGateway.close();
+          await closeLongPollTransport();
           await closeConnectedAgentRuntime();
         },
       },

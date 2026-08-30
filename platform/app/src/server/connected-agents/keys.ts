@@ -43,6 +43,16 @@ export function resultKey(callId: string): string {
   return `agent_result:${PREFIX}:${callId}`;
 }
 
+/** Set once a call was handed to its instance over HTTP; it is never handed twice. */
+export function callDeliveredKey(callId: string): string {
+  return `agent_call_delivered:${PREFIX}:${callId}`;
+}
+
+/** The HTTP long-poll session behind one instance token. */
+export function httpSessionKey(token: string): string {
+  return `agent_http_session:${PREFIX}:${token}`;
+}
+
 /** The instance a sticky thread is pinned to. */
 export function threadPinKey(agentId: string, threadId: string): string {
   return `agent_thread:${PREFIX}:${agentId}:${threadId}`;

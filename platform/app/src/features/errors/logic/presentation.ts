@@ -540,6 +540,11 @@ const presentations = {
     describe: () =>
       "Check the API key, the project and the permissions the process connects with. The process prints the reason at startup.",
   },
+  agent_session_unknown: {
+    title: "The agent process needs to register again",
+    describe: () =>
+      "The platform no longer knows this instance. The SDK registers again on its own; restart the process if it does not.",
+  },
   agent_payload_too_large: {
     title: "This turn is too large",
     describe: (error) => {

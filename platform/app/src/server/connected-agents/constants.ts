@@ -75,6 +75,16 @@ export const PRESENCE_TTL_SECONDS = 30;
 /** How often presence is refreshed while the socket answers pings. */
 export const PRESENCE_REFRESH_MS = 10_000;
 
+/** How long a poll of the HTTP transport waits for a frame before it answers empty. */
+export const POLL_WAIT_MS = 25_000;
+
+/**
+ * How long an HTTP session outlives its last poll. Longer than the presence
+ * TTL on purpose: a process that missed a few polls reads Offline meanwhile
+ * and resumes with the same token, with no second register.
+ */
+export const HTTP_SESSION_TTL_SECONDS = 5 * 60;
+
 /** The per-call budget when the agent declares none. */
 export const DEFAULT_CALL_TIMEOUT_MS = 120_000;
 

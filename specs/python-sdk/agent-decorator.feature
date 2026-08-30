@@ -349,3 +349,39 @@ Feature: Python SDK connect_agent decorator
     Given a started client
     When the process forks
     Then the child gets a new instance id and a new connection thread
+
+  # --- Transport ---
+
+  @unit
+  Scenario: The transport option selects HTTP long polling
+    Given connect_agent(transport="http")
+    When the client starts
+    Then it posts the register frame to /api/agents/connect/register with the API key
+    And it polls /api/agents/connect/poll with the instance token
+    And a call answered by the poll is acked and answered by a POST to /api/agents/connect/frames
+
+  @unit
+  Scenario: LANGWATCH_AGENT_TRANSPORT selects the transport
+    Given LANGWATCH_AGENT_TRANSPORT set to "http" and no transport argument
+    When the client starts
+    Then it registers over HTTP and opens no WebSocket
+
+  @unit
+  Scenario: A refused WebSocket upgrade falls back to HTTP with one warning
+    Given the default transport
+    And a proxy that answers the WebSocket upgrade with an HTTP status
+    When the client starts
+    Then one warning line names the status and says the HTTP transport is used
+    And the client registers over HTTP at once
+
+  @unit
+  Scenario: A poll that answers session unknown registers again
+    Given a client registered over HTTP with a call in flight
+    When a poll is answered with status 410
+    Then the client posts a new register frame that lists the in-flight call id
+
+  @unit
+  Scenario: Deregister is posted on shutdown over HTTP
+    Given a client registered over HTTP
+    When the client stops
+    Then a deregister frame is posted to the frames route before the thread ends

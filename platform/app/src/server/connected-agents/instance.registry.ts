@@ -63,21 +63,7 @@ export class InstanceRegistry {
   }): Promise<void> {
     await this.store.hset(
       instanceMetaKey(meta.instanceId),
-      {
-        instanceId: meta.instanceId,
-        projectId: meta.projectId,
-        hostname: meta.hostname,
-        username: meta.username,
-        pid: String(meta.pid),
-        sdkName: meta.sdk.name,
-        sdkVersion: meta.sdk.version,
-        sdkLanguage: meta.sdk.language,
-        label: meta.label ?? "",
-        podId: meta.podId,
-        connectedAt: String(meta.connectedAt),
-        maxConcurrency: String(meta.maxConcurrency),
-        agentIds: agentIds.join(","),
-      },
+      fieldsOf(meta, agentIds),
       PRESENCE_TTL_SECONDS,
     );
     await this.refresh({
@@ -88,17 +74,25 @@ export class InstanceRegistry {
     });
   }
 
-  /** Refreshes the last-seen score of an instance on every agent it serves. */
+  /**
+   * Refreshes the last-seen score of an instance on every agent it serves.
+   *
+   * With `meta`, a hash that aged out while the instance was still there (a
+   * stalled pod, a poll later than the TTL) is written again, so the
+   * instance reads live instead of vanishing until it registers again.
+   */
   async refresh({
     projectId,
     instanceId,
     agentIds,
     now = Date.now(),
+    meta,
   }: {
     projectId: string;
     instanceId: string;
     agentIds: string[];
     now?: number;
+    meta?: InstanceMeta;
   }): Promise<void> {
     await Promise.all([
       ...agentIds.map((agentId) =>
@@ -109,17 +103,26 @@ export class InstanceRegistry {
           PRESENCE_TTL_SECONDS,
         ),
       ),
-      this.touchMeta(instanceId),
+      this.touchMeta({ instanceId, agentIds, meta }),
     ]);
   }
 
-  /** Extends the meta hash without rewriting it. */
-  private async touchMeta(instanceId: string): Promise<void> {
-    const meta = await this.store.hgetall(instanceMetaKey(instanceId));
-    if (meta) {
+  /** Extends the meta hash without rewriting it, or restores it from `meta`. */
+  private async touchMeta({
+    instanceId,
+    agentIds,
+    meta,
+  }: {
+    instanceId: string;
+    agentIds: string[];
+    meta: InstanceMeta | undefined;
+  }): Promise<void> {
+    const current = await this.store.hgetall(instanceMetaKey(instanceId));
+    const fields = current ?? (meta ? fieldsOf(meta, agentIds) : null);
+    if (fields) {
       await this.store.hset(
         instanceMetaKey(instanceId),
-        meta,
+        fields,
         PRESENCE_TTL_SECONDS,
       );
     }
@@ -213,6 +216,27 @@ export class InstanceRegistry {
   async decrementInflight(instanceId: string): Promise<number> {
     return this.store.decr(inflightKey(instanceId));
   }
+}
+
+function fieldsOf(
+  meta: InstanceMeta,
+  agentIds: string[],
+): Record<string, string> {
+  return {
+    instanceId: meta.instanceId,
+    projectId: meta.projectId,
+    hostname: meta.hostname,
+    username: meta.username,
+    pid: String(meta.pid),
+    sdkName: meta.sdk.name,
+    sdkVersion: meta.sdk.version,
+    sdkLanguage: meta.sdk.language,
+    label: meta.label ?? "",
+    podId: meta.podId,
+    connectedAt: String(meta.connectedAt),
+    maxConcurrency: String(meta.maxConcurrency),
+    agentIds: agentIds.join(","),
+  };
 }
 
 function metaFromFields(fields: Record<string, string>): InstanceMeta {

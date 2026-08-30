@@ -41,6 +41,7 @@ import {
   isHttpMethod,
   securityForCredentialClass,
 } from "../server/api/security";
+import { app as connectedAgentLongPollApp } from "../server/connected-agents/long-poll.route";
 import { app as connectedAgentRelayApp } from "../server/connected-agents/relay.route";
 // The two legacy route files below are wired in for the routes they describe
 // and nothing else: `generateSpecs` skips any handler without `describeRoute`,
@@ -194,6 +195,10 @@ export default async function execute() {
   const agentsSpec = await generateSpecs(agentsApp);
   console.log("Building connected agent relay spec...");
   const connectedAgentRelaySpec = await generateSpecs(connectedAgentRelayApp);
+  console.log("Building connected agent long-poll spec...");
+  const connectedAgentLongPollSpec = await generateSpecs(
+    connectedAgentLongPollApp,
+  );
   console.log("Building api keys spec...");
   const apiKeysSpec = await generateSpecs(apiKeysApp);
   console.log("Building analytics spec...");
@@ -289,6 +294,7 @@ export default async function execute() {
       agentCacheSpec,
       agentsSpec,
       connectedAgentRelaySpec,
+      connectedAgentLongPollSpec,
       apiKeysSpec,
       analyticsSpec,
       analyticsSqlSpec,

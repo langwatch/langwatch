@@ -212,6 +212,24 @@ export class AgentRegisterRefusedError extends HandledError {
   }
 }
 
+/** An HTTP poll or frame named an instance token the platform does not know. */
+export class AgentSessionUnknownError extends HandledError {
+  declare readonly code: "agent_session_unknown";
+
+  constructor() {
+    super(
+      "agent_session_unknown",
+      "The instance token is not known. Register the instance again.",
+      {
+        httpStatus: 410,
+        fault: "customer",
+        ...remediation("agent_session_unknown"),
+      },
+    );
+    this.name = "AgentSessionUnknownError";
+  }
+}
+
 /** A body, a result or a session is above its cap. */
 export class AgentPayloadTooLargeError extends HandledError {
   declare readonly code: "agent_payload_too_large";

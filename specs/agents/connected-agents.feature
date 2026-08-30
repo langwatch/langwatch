@@ -6,7 +6,9 @@ Feature: Connected agents
   # A connected agent is an Agent row of type "connected". The SDK opens an
   # outbound WebSocket to /api/agents/connect, registers the agents of the
   # process, and receives simulation turns over that socket. The platform
-  # shows the agent Online while at least one instance is connected.
+  # shows the agent Online while at least one instance is connected. The
+  # same frames also travel over HTTP long polling for a process whose
+  # network blocks WebSockets (the Rule at the end of this file).
   #
   # @see dev/docs/adr/128-connected-agents.md
 
@@ -451,3 +453,88 @@ Feature: Connected agents
     Then the row is archived
     And an update that only edits the description is accepted
     And an update that changes the type is refused with "agent_register_only"
+
+  # ---------------------------------------------------------------------------
+  # HTTP long-poll transport
+  # ---------------------------------------------------------------------------
+
+  Rule: The same frames travel over HTTP long polling
+
+    # POST /api/agents/connect/register takes the register frame and answers
+    # with the registered frame and an instance token. GET
+    # /api/agents/connect/poll waits up to the poll wait for the next call and
+    # cancel frames of that instance and refreshes its presence. POST
+    # /api/agents/connect/frames takes ack, result and deregister frames. The
+    # session logic behind both transports is the same.
+
+    @integration
+    Scenario: A register over HTTP creates the rows and answers with an instance token
+      Given an SDK process whose network blocks WebSockets
+      When it posts a register frame to the register route with the API key
+      Then an agent row of type "connected" exists for each agent of the frame
+      And the answer carries the registered frame and an instance token
+
+    @integration
+    Scenario: The HTTP transport refuses the same credentials as the socket
+      Given a personal key that holds only "scenarios:view"
+      When it posts a register frame to the register route
+      Then the answer is a refused frame with "permission_denied"
+      And an ingestion key is refused with "key_type_not_allowed"
+
+    @integration
+    Scenario: A poll delivers a parked call once
+      Given an instance registered over HTTP that is not polling
+      When a call is dispatched to it
+      And the instance polls
+      Then the poll answers with the call frame
+      And a second poll does not answer with the same call
+
+    @integration
+    Scenario: A poll refreshes presence
+      Given an instance registered over HTTP
+      When the instance polls
+      Then the instance is live for its agent
+      And a read after the presence TTL with no poll in between finds it offline
+
+    @integration
+    Scenario: A result posted over HTTP answers the dispatcher
+      Given an instance that received a call by poll
+      When it posts an ack frame and a result frame to the frames route
+      Then the dispatcher returns the output of the result
+
+    @integration
+    Scenario: A cancel reaches a polling instance
+      Given an instance that received a call by poll and acknowledged it
+      When the relay request is aborted
+      Then the next poll answers with a cancel frame for that call
+
+    @integration
+    Scenario: A deregister posted over HTTP retires the instance at once
+      Given an instance registered over HTTP
+      When it posts a deregister frame to the frames route
+      Then the instance is no longer live
+      And a poll with its instance token is answered with "agent_session_unknown"
+
+    @integration
+    Scenario: A poll with an unknown instance token asks the process to register again
+      Given an instance token the platform does not know
+      When a poll is made with it
+      Then the answer is "agent_session_unknown" with status 410
+
+    @integration
+    Scenario: A process that stops polling goes offline after the presence TTL
+      Given an instance registered over HTTP whose last poll is older than the presence TTL
+      When a call is dispatched to its agent
+      Then the call fails with "agent_offline"
+
+    @unit
+    Scenario: A poll with nothing pending answers empty after the poll wait
+      Given an instance registered over HTTP and no pending call
+      When the instance polls
+      Then the poll answers with no frame once the poll wait passes
+
+    @unit
+    Scenario: An HTTP register is refused without Redis on a deployment with several replicas
+      Given no Redis and LANGWATCH_APP_REPLICAS set to 3
+      When a process posts a register frame
+      Then the answer is a refused frame with "replica_count_unsupported"

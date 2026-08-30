@@ -406,6 +406,13 @@ const registry = {
     ],
     docsPath: "/agent-simulations/connect-your-agent",
   },
+  agent_session_unknown: {
+    tips: [
+      "Post a new register frame to /api/agents/connect/register and use the instance token it answers with",
+      "A session expires five minutes after its last poll",
+    ],
+    docsPath: "/agent-simulations/connect-your-agent",
+  },
   agent_payload_too_large: {
     tips: [
       "Read `meta.what`, `meta.sizeBytes` and `meta.limitBytes`",

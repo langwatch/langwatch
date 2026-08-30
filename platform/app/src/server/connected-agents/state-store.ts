@@ -18,6 +18,8 @@ export interface AgentStateStore {
   /** Whether this store is shared between app replicas. */
   readonly shared: boolean;
   set(key: string, value: string, ttlSeconds: number): Promise<void>;
+  /** SET NX: writes only when the key is absent; resolves to whether it wrote. */
+  setIfAbsent(key: string, value: string, ttlSeconds: number): Promise<boolean>;
   get(key: string): Promise<string | null>;
   del(key: string): Promise<void>;
   zadd(
@@ -72,6 +74,10 @@ export function createRedisStateStore(redis: RedisConnection): AgentStateStore {
     shared: true,
     async set(key, value, ttlSeconds) {
       await redis.set(key, value, "EX", ttlSeconds);
+    },
+    async setIfAbsent(key, value, ttlSeconds) {
+      const written = await redis.set(key, value, "EX", ttlSeconds, "NX");
+      return written === "OK";
     },
     async get(key) {
       return redis.get(key);
@@ -190,6 +196,13 @@ export function createMemoryStateStore({
     shared: false,
     async set(key, value, ttlSeconds) {
       strings.set(key, { value, expiresAt: now() + ttlSeconds * 1000 });
+    },
+    async setIfAbsent(key, value, ttlSeconds) {
+      if (live(strings, key) !== null || live(counters, key) !== null) {
+        return false;
+      }
+      strings.set(key, { value, expiresAt: now() + ttlSeconds * 1000 });
+      return true;
     },
     async get(key) {
       // A counter is a string key in Redis; GET reads it the same way.
