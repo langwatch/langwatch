@@ -10,6 +10,7 @@
  * `agent_session_unknown` with status 410, and the SDK registers again.
  */
 
+import type { Context } from "hono";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { env } from "~/env.mjs";
@@ -21,16 +22,15 @@ import { AgentPayloadTooLargeError, AgentRegisterRefusedError } from "./errors";
 import {
   INSTANCE_TOKEN_HEADER,
   LongPollTransport,
-  refusalStatus,
 } from "./long-poll.transport";
 import {
   ackFrameSchema,
-  cancelFrameSchema,
   callFrameSchema,
+  cancelFrameSchema,
   deregisterFrameSchema,
   refusedFrameSchema,
-  registerFrameSchema,
   registeredFrameSchema,
+  registerFrameSchema,
   resultFrameSchema,
 } from "./protocol";
 import { getConnectedAgentRuntime } from "./runtime";
@@ -105,14 +105,34 @@ export async function closeLongPollTransport(): Promise<void> {
   await transport?.close();
 }
 
-function credentialsOf(headers: {
-  authorization?: string;
-  projectId?: string;
-}): ConnectCredentials {
+type ConnectApp = ReturnType<typeof createProjectApp>;
+
+function credentialsOf(c: Context): ConnectCredentials {
   return {
-    authorization: headers.authorization,
-    projectId: headers.projectId,
+    authorization: c.req.header("authorization"),
+    projectId: c.req.header("x-project-id"),
   };
+}
+
+async function jsonBodyOf(c: Context): Promise<unknown> {
+  try {
+    return await c.req.json();
+  } catch {
+    return null;
+  }
+}
+
+/** A credential refusal is a refused frame; anything else stays an error. */
+function refusedOrThrow(
+  c: Context,
+  error: unknown,
+  transport: LongPollTransport,
+): Response {
+  if (error instanceof AgentRegisterRefusedError) {
+    const answer = transport.refusedAnswer(error);
+    return c.json(answer.body, answer.status as 200);
+  }
+  throw error;
 }
 
 /** Builds the three routes over one transport; tests pass their own. */
@@ -122,7 +142,6 @@ export function createLongPollApp({
   transport: () => LongPollTransport;
 }) {
   const secured = createProjectApp({ basePath: "/api/agents" });
-
   const payloadGuard = bodyLimit({
     maxSize: relayPayloadCaps().frameBytes,
     onError: () => {
@@ -134,7 +153,19 @@ export function createLongPollApp({
       });
     },
   });
+  mountRegister({ secured, transport, payloadGuard });
+  mountPoll({ secured, transport });
+  mountFrames({ secured, transport, payloadGuard });
+  return secured.hono;
+}
 
+type Mount = {
+  secured: ConnectApp;
+  transport: () => LongPollTransport;
+  payloadGuard: ReturnType<typeof bodyLimit>;
+};
+
+function mountRegister({ secured, transport, payloadGuard }: Mount): void {
   secured.access(connectPolicy).post(
     "/connect/register",
     payloadGuard,
@@ -169,23 +200,16 @@ export function createLongPollApp({
       },
     }),
     async (c) => {
-      let body: unknown;
-      try {
-        body = await c.req.json();
-      } catch {
-        body = null;
-      }
       const answer = await transport().register({
-        credentials: credentialsOf({
-          authorization: c.req.header("authorization"),
-          projectId: c.req.header("x-project-id"),
-        }),
-        body,
+        credentials: credentialsOf(c),
+        body: await jsonBodyOf(c),
       });
       return c.json(answer.body, answer.status as 200);
     },
   );
+}
 
+function mountPoll({ secured, transport }: Omit<Mount, "payloadGuard">): void {
   secured.access(connectPolicy).get(
     "/connect/poll",
     describeRoute({
@@ -213,10 +237,7 @@ export function createLongPollApp({
         : [];
       try {
         const answer = await transport().poll({
-          credentials: credentialsOf({
-            authorization: c.req.header("authorization"),
-            projectId: c.req.header("x-project-id"),
-          }),
+          credentials: credentialsOf(c),
           token: c.req.header(INSTANCE_TOKEN_HEADER),
           inFlightCallIds,
           signal: c.req.raw.signal,
@@ -227,7 +248,9 @@ export function createLongPollApp({
       }
     },
   );
+}
 
+function mountFrames({ secured, transport, payloadGuard }: Mount): void {
   secured.access(connectPolicy).post(
     "/connect/frames",
     payloadGuard,
@@ -255,13 +278,7 @@ export function createLongPollApp({
       },
     }),
     async (c) => {
-      let body: unknown;
-      try {
-        body = await c.req.json();
-      } catch {
-        body = null;
-      }
-      const parsed = postedFramesSchema.safeParse(body);
+      const parsed = postedFramesSchema.safeParse(await jsonBodyOf(c));
       if (!parsed.success) {
         throw new AgentRegisterRefusedError({
           reason: "protocol_invalid",
@@ -271,10 +288,7 @@ export function createLongPollApp({
       }
       try {
         const answer = await transport().frames({
-          credentials: credentialsOf({
-            authorization: c.req.header("authorization"),
-            projectId: c.req.header("x-project-id"),
-          }),
+          credentials: credentialsOf(c),
           token: c.req.header(INSTANCE_TOKEN_HEADER),
           frames: parsed.data.frames,
         });
@@ -284,21 +298,6 @@ export function createLongPollApp({
       }
     },
   );
-
-  return secured.hono;
-}
-
-/** A credential refusal is a refused frame; anything else stays an error. */
-function refusedOrThrow(
-  c: { json: (body: unknown, status: 200) => Response },
-  error: unknown,
-  transport: LongPollTransport,
-): Response {
-  if (error instanceof AgentRegisterRefusedError) {
-    const answer = transport.refusedAnswer(error);
-    return c.json(answer.body, answer.status as 200);
-  }
-  throw error;
 }
 
 export const app = createLongPollApp({ transport: getLongPollTransport });

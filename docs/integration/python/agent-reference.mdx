@@ -38,6 +38,7 @@ The process connects only with an API key. The SDK reads `LANGWATCH_API_KEY` fro
 | `api_key` | `str \| None` | `LANGWATCH_API_KEY` | The key the connection authenticates with. |
 | `endpoint` | `str \| None` | `LANGWATCH_ENDPOINT` | The LangWatch instance to connect to. |
 | `project_id` | `str \| None` | `None` | The project, for a key that covers more than one. |
+| `transport` | `str \| None` | `websocket` | `websocket` or `http`. See [Transport](#transport). |
 
 ### Environment resolution
 
@@ -132,6 +133,10 @@ Blocks the calling thread while the connection runs, for a script whose only job
 
 The connection starts on first use, once per process, on a daemon thread with its own event loop. A fork restarts it in the child, so a preloading worker server keeps working. SIGINT, SIGTERM and normal exit send a deregistration, so the agent reads Offline at once. A dropped connection is retried with a growing wait, from 1 second to 30 seconds.
 
+### Transport
+
+The connection is an outbound WebSocket by default. On a network that blocks WebSockets, the same frames travel over HTTP long polling: the SDK posts the registration, waits on a request for the next turn, and posts each answer. Pass `transport="http"` or set `LANGWATCH_AGENT_TRANSPORT=http` to use it from the start. With the default transport, a proxy that answers the WebSocket upgrade with an HTTP status makes the SDK switch to HTTP on its own, with one warning line that names the status. The transport in use is printed on the connected line.
+
 ### Environment variables
 
 | Variable | Effect |
@@ -142,6 +147,7 @@ The connection starts on first use, once per process, on a daemon thread with it
 | `LANGWATCH_AGENT_ENVIRONMENT` | The environment to register under. |
 | `LANGWATCH_AGENT_CONNECT` | `0` or `false` stops this process from connecting. |
 | `LANGWATCH_AGENT_INSTANCE_LABEL` | The instance name shown in the instances table. |
+| `LANGWATCH_AGENT_TRANSPORT` | `http` uses HTTP long polling instead of the WebSocket. |
 
 ### Errors
 

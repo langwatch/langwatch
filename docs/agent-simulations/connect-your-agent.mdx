@@ -378,7 +378,7 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 | Symptom | Cause | Fix |
 |---|---|---|
 | `langwatch agent list` shows no row for the agent | The process started without an API key, so the SDK opened no connection. | Set `LANGWATCH_API_KEY` in the process environment and restart the process. |
-| The row reads `Offline` | The process stopped, or its outbound WSS connection is blocked. | Restart the process. On a network that blocks WebSockets, use the HTTP fallback. |
+| The row reads `Offline` | The process stopped, or its outbound WSS connection is blocked. | Restart the process. On a network that blocks WebSockets, set `LANGWATCH_AGENT_TRANSPORT=http` so the SDK uses HTTP long polling. |
 | The run is refused with `agent_offline` | No instance was connected when the run started. | Start the agent process and run again. |
 | The run is refused with `agent_owner_only` | The agent registered under `development` with a personal key, so only its owner can run it. | Run it as the owner, or register it under a shared environment name such as `dev-shared`. |
 | The run is refused with `scenario_parameter_option_invalid` | A value is outside the closed option list the agent declares. | Use one of the listed options, or widen the `Literal` (Python) or `z.enum` (TypeScript) list in the code. |
@@ -748,6 +748,12 @@ The connection is **outbound only**. The process opens one TLS connection to Lan
 
 The API key travels in a request header, never in the URL, so it is not written to proxy logs or browser history. On a self-hosted deployment behind a private certificate authority, point the runtime at the certificate bundle: `SSL_CERT_FILE` for Python, `NODE_EXTRA_CA_CERTS` for Node.
 
+### Behind a proxy that blocks WebSockets
+
+The connection is a WebSocket by default. Some corporate proxies refuse the upgrade and answer it with an HTTP status such as 403 or 426. The SDK then switches to HTTP long polling on its own, prints one warning line that names the status, and the agent connects the same way: one POST registers, one request waits for the next turn, one POST carries each answer. No WebSocket egress is needed for this path, only outbound HTTPS.
+
+To use HTTP from the start, pass `transport="http"` in Python or `transport: "http"` in TypeScript, or set `LANGWATCH_AGENT_TRANSPORT=http` in the process environment. A poll waits up to 25 seconds on the platform side; a proxy with a shorter read timeout closes it early, and the SDK polls again.
+
 Declare parameters with their types and their options, and do not pass a raw parameter string into a privileged operation. The function's own safety is yours: LangWatch calls it, and what it does is your code.
 
 ## Troubleshooting
@@ -844,7 +850,7 @@ The run settings also record which instance served each run, so a result from a 
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| The row reads **Offline** | The process stopped, or its outbound connection is blocked by a proxy or a firewall. | Restart the process. Allow outbound WSS to your LangWatch endpoint, or use an [HTTP agent](/agent-simulations/other-ways-to-connect) on a network that blocks WebSockets. |
+| The row reads **Offline** | The process stopped, or its outbound connection is blocked by a proxy or a firewall. | Restart the process. On a network that blocks WebSockets, set `LANGWATCH_AGENT_TRANSPORT=http`, see [Behind a proxy that blocks WebSockets](#behind-a-proxy-that-blocks-websockets). |
 | The run is refused with `agent_offline` | No instance was connected when the run started. | Start the agent process, then run again. |
 | The run is refused with `agent_owner_only` | The agent registered under `development` with a personal key, so it belongs to one person. | Run it as its owner, or register it under a shared environment name. |
 | A turn fails with `agent_call_timeout` | The function took longer than the agent's timeout. | Raise `timeout`, up to 300 seconds, or make the agent answer faster. |

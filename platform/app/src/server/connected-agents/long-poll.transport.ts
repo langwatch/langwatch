@@ -234,30 +234,45 @@ export class LongPollTransport {
     const { session, stored } = await this.openSession({ credentials, token });
     const watch = await this.ensureWatch(session);
     await this.touch(stored, session);
+    const frames = await this.collectFrames({
+      session,
+      watch,
+      inFlight: new Set(inFlightCallIds.slice(0, MAX_IN_FLIGHT_IDS)),
+      signal,
+    });
+    if (!this.closed) await this.touch(stored, session);
+    return { frames };
+  }
 
+  /** Drains what is waiting, or waits for a nudge until the poll wait passes. */
+  private async collectFrames({
+    session,
+    watch,
+    inFlight,
+    signal,
+  }: {
+    session: SessionInfo;
+    watch: Watch;
+    inFlight: Set<string>;
+    signal?: AbortSignal;
+  }): Promise<(CallFrame | CancelFrame)[]> {
     const frames: (CallFrame | CancelFrame)[] = [];
-    const inFlight = new Set(inFlightCallIds.slice(0, MAX_IN_FLIGHT_IDS));
     const deadline = this.core.now() + this.pollWaitMs;
     for (;;) {
       frames.push(...(await this.drain({ session, inFlight })));
       const remaining = deadline - this.core.now();
-      if (frames.length > 0 || remaining <= 0 || signal?.aborted || this.closed)
-        break;
+      if (this.settled({ frames, signal }) || remaining <= 0) return frames;
       const nudge = await this.waitForNudge({ watch, ms: remaining, signal });
-      if (!nudge || this.closed) break;
-      if ("cancel" in nudge) {
-        // An empty cancel is the wake of a closing watch, not a frame.
-        if (!nudge.cancel) break;
-        inFlight.delete(nudge.cancel);
-        frames.push({
-          type: "cancel",
-          protocol: PROTOCOL_VERSION,
-          callId: nudge.cancel,
-        });
-      }
+      const outcome = nudgeOutcome({ nudge, closed: this.closed });
+      if (outcome === "stop") return frames;
+      if (outcome === "drain") continue;
+      inFlight.delete(outcome.cancel);
+      frames.push({
+        type: "cancel",
+        protocol: PROTOCOL_VERSION,
+        callId: outcome.cancel,
+      });
     }
-    if (!this.closed) await this.touch(stored, session);
-    return { frames };
   }
 
   /**
@@ -394,6 +409,17 @@ export class LongPollTransport {
     return frames;
   }
 
+  /** A poll answers as soon as it holds a frame, or when its request or this pod is going away. */
+  private settled({
+    frames,
+    signal,
+  }: {
+    frames: unknown[];
+    signal?: AbortSignal;
+  }): boolean {
+    return frames.length > 0 || signal?.aborted === true || this.closed;
+  }
+
   private waitForNudge({
     watch,
     ms,
@@ -487,9 +513,29 @@ export class LongPollTransport {
       for (const waiter of watch.waiters) waiter({ cancel: "" });
       await watch.unsubscribe();
     }
-    const pending = await store.zrangebyscore(pendingKey(session.instanceId), 0);
+    const pending = await store.zrangebyscore(
+      pendingKey(session.instanceId),
+      0,
+    );
     await this.core.retire(session, pending);
   }
+}
+
+/**
+ * What a poll does with a nudge: no nudge is the wait passing or the request
+ * going away, an empty cancel is the wake of a closing watch, a call means
+ * the pending set is read again, and a cancel is a frame.
+ */
+function nudgeOutcome({
+  nudge,
+  closed,
+}: {
+  nudge: InstanceNudge | null;
+  closed: boolean;
+}): "stop" | "drain" | { cancel: string } {
+  if (!nudge || closed) return "stop";
+  if ("call" in nudge) return "drain";
+  return nudge.cancel ? { cancel: nudge.cancel } : "stop";
 }
 
 /** The HTTP status a refusal answers with, by its code. */

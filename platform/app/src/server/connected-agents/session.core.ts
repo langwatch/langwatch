@@ -55,8 +55,8 @@ import {
   PROTOCOL_VERSION,
   type RefusedCode,
   type RefusedFrame,
-  type RegisterFrame,
   type RegisteredFrame,
+  type RegisterFrame,
   type ResultFrame,
 } from "./protocol";
 import type { ConnectedAgentRuntime } from "./runtime";
@@ -137,25 +137,8 @@ export class AgentSessionCore {
     if (!resolved) {
       throw await this.refusalForMiss({ resolver, token, projectId });
     }
-    if (resolved.type === "apiKey") {
-      if (resolved.ingestSourceType || resolved.isLangySessionKey) {
-        throw new AgentRegisterRefusedError({
-          reason: "key_type_not_allowed",
-          message:
-            "An ingestion key or a Langy session key cannot connect an agent. Use a personal or a project API key.",
-        });
-      }
-    }
-    try {
-      await enforceApiKeyCeiling({ resolved, permission: "scenarios:manage" });
-    } catch (error) {
-      if (!HandledError.isHandled(error)) throw error;
-      throw new AgentRegisterRefusedError({
-        reason: "permission_denied",
-        message:
-          "The API key needs the scenarios:manage permission to connect an agent.",
-      });
-    }
+    assertKeyKindMayConnect(resolved);
+    await assertKeyMayManageScenarios(resolved);
     return resolved;
   }
 
@@ -544,6 +527,33 @@ export class AgentSessionCore {
       replyChannel(stored.replyTo),
       JSON.stringify(nudge),
     );
+  }
+}
+
+/** An ingestion key or a Langy session key never connects an agent. */
+function assertKeyKindMayConnect(resolved: ResolvedToken): void {
+  if (resolved.type !== "apiKey") return;
+  if (resolved.ingestSourceType || resolved.isLangySessionKey) {
+    throw new AgentRegisterRefusedError({
+      reason: "key_type_not_allowed",
+      message:
+        "An ingestion key or a Langy session key cannot connect an agent. Use a personal or a project API key.",
+    });
+  }
+}
+
+async function assertKeyMayManageScenarios(
+  resolved: ResolvedToken,
+): Promise<void> {
+  try {
+    await enforceApiKeyCeiling({ resolved, permission: "scenarios:manage" });
+  } catch (error) {
+    if (!HandledError.isHandled(error)) throw error;
+    throw new AgentRegisterRefusedError({
+      reason: "permission_denied",
+      message:
+        "The API key needs the scenarios:manage permission to connect an agent.",
+    });
   }
 }
 

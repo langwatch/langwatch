@@ -140,7 +140,9 @@ async function register(
 
 async function registered(pod: Pod) {
   const { status, body } = await register(pod, projectApiKey);
-  expect(status).toBe(200);
+  if (status !== 200) {
+    throw new Error(`register answered ${status}: ${JSON.stringify(body)}`);
+  }
   const frame = body.frame as { agents: { id: string }[]; instanceId: string };
   return {
     instanceToken: body.instanceToken as string,
@@ -152,10 +154,7 @@ async function registered(pod: Pod) {
 async function poll(
   pod: Pod,
   instanceToken: string,
-  {
-    inFlight = [],
-    signal,
-  }: { inFlight?: string[]; signal?: AbortSignal } = {},
+  { inFlight = [], signal }: { inFlight?: string[]; signal?: AbortSignal } = {},
 ): Promise<{ status: number; body: Json }> {
   const query = inFlight.length > 0 ? `?inFlight=${inFlight.join(",")}` : "";
   const response = await pod.app.request(`/api/agents/connect/poll${query}`, {
@@ -425,7 +424,11 @@ describe("poll", () => {
 
       const later = Date.now() + (PRESENCE_TTL_SECONDS + 1) * 1000;
       expect(
-        await podB.runtime.registry.listLive({ projectId, agentId, now: later }),
+        await podB.runtime.registry.listLive({
+          projectId,
+          agentId,
+          now: later,
+        }),
       ).toEqual([]);
     });
   });
@@ -435,7 +438,9 @@ describe("poll", () => {
     it("answers the next poll with a cancel frame", async () => {
       const { instanceToken, agentId } = await registered(podA);
       const controller = new AbortController();
-      const pending = dispatchFrom(podB, agentId, { signal: controller.signal });
+      const pending = dispatchFrom(podB, agentId, {
+        signal: controller.signal,
+      });
 
       const first = await poll(podA, instanceToken);
       const callId = (first.body.frames as Json[])[0]!.callId as string;
