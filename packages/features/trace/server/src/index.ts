@@ -1,7 +1,7 @@
 export {
   ClickHouseTraceAdapter,
   type ClickHouseTraceAdapterOptions,
-} from "./adapters/clickhouse-trace.adapter";
+} from "./adapters/clickhouse.trace.adapter";
 export { TraceCanonicalisationService } from "./services/trace-canonicalisation.service";
 export { NullTraceListAdapter } from "./adapters/null-trace-list.adapter";
 export {

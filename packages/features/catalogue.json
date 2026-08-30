@@ -34,14 +34,6 @@
       ]
     },
     {
-      "id": "audit-log",
-      "root": "packages/enterprise/features/audit-log",
-      "classification": "enterprise",
-      "subjects": [
-        "audit-log"
-      ]
-    },
-    {
       "id": "auth",
       "root": "packages/features/auth",
       "classification": "core",
@@ -71,14 +63,6 @@
         "report-schedule",
         "trigger",
         "trigger-fire-history"
-      ]
-    },
-    {
-      "id": "billing",
-      "root": "packages/enterprise/features/billing",
-      "classification": "enterprise",
-      "subjects": [
-        "billing"
       ]
     },
     {
@@ -186,35 +170,6 @@
       ]
     },
     {
-      "id": "governance",
-      "root": "packages/enterprise/features/governance",
-      "classification": "enterprise",
-      "subjects": [
-        "ai-tool-catalog",
-        "anomaly-alert",
-        "anomaly-rule",
-        "canonical-cost",
-        "cost-attribution-policy",
-        "department",
-        "gateway-debit",
-        "governance",
-        "ingestion-credentials",
-        "ingestion-pull",
-        "ingestion-source",
-        "ingestion-template",
-        "ocsf-export",
-        "ottl",
-        "persona-home",
-        "personal-usage",
-        "platform-tool-policy",
-        "pull-destination",
-        "pulled-usage",
-        "puller",
-        "quarantine-fill",
-        "spend-spike-anomaly"
-      ]
-    },
-    {
       "id": "identity",
       "root": "packages/features/identity",
       "classification": "core",
@@ -236,30 +191,12 @@
       ]
     },
     {
-      "id": "licensing",
-      "root": "packages/enterprise/features/licensing",
-      "classification": "enterprise",
-      "subjects": [
-        "license",
-        "licensing"
-      ]
-    },
-    {
       "id": "log",
       "root": "packages/features/log",
       "classification": "core",
       "subjects": [
         "log",
         "log-ingestion"
-      ]
-    },
-    {
-      "id": "managed-provider",
-      "root": "packages/enterprise/features/managed-provider",
-      "classification": "enterprise",
-      "subjects": [
-        "managed-model-provider",
-        "managed-provider"
       ]
     },
     {
@@ -355,28 +292,12 @@
       ]
     },
     {
-      "id": "saas",
-      "root": "packages/enterprise/features/saas",
-      "classification": "enterprise",
-      "subjects": [
-        "saas"
-      ]
-    },
-    {
       "id": "scenario",
       "root": "packages/features/scenario",
       "classification": "core",
       "subjects": [
         "scenario",
         "simulation"
-      ]
-    },
-    {
-      "id": "scim",
-      "root": "packages/enterprise/features/scim",
-      "classification": "enterprise",
-      "subjects": [
-        "scim"
       ]
     },
     {
@@ -393,14 +314,6 @@
       "classification": "core",
       "subjects": [
         "share"
-      ]
-    },
-    {
-      "id": "sso",
-      "root": "packages/enterprise/features/sso",
-      "classification": "enterprise",
-      "subjects": [
-        "sso"
       ]
     },
     {
@@ -447,19 +360,106 @@
       ]
     },
     {
-      "id": "webhook",
-      "root": "packages/enterprise/features/webhook",
-      "classification": "enterprise",
-      "subjects": [
-        "webhook"
-      ]
-    },
-    {
       "id": "workflow",
       "root": "packages/features/workflow",
       "classification": "core",
       "subjects": [
         "workflow"
+      ]
+    },
+    {
+      "id": "audit-log",
+      "root": "packages/enterprise/features/audit-log",
+      "classification": "enterprise",
+      "subjects": [
+        "audit-log"
+      ]
+    },
+    {
+      "id": "billing",
+      "root": "packages/enterprise/features/billing",
+      "classification": "enterprise",
+      "subjects": [
+        "billing"
+      ]
+    },
+    {
+      "id": "governance",
+      "root": "packages/enterprise/features/governance",
+      "classification": "enterprise",
+      "subjects": [
+        "ai-tool-catalog",
+        "anomaly-alert",
+        "anomaly-rule",
+        "canonical-cost",
+        "cost-attribution-policy",
+        "department",
+        "gateway-debit",
+        "governance",
+        "ingestion-credentials",
+        "ingestion-pull",
+        "ingestion-source",
+        "ingestion-template",
+        "ocsf-export",
+        "ottl",
+        "persona-home",
+        "personal-usage",
+        "platform-tool-policy",
+        "pull-destination",
+        "pulled-usage",
+        "puller",
+        "quarantine-fill",
+        "spend-spike-anomaly"
+      ]
+    },
+    {
+      "id": "licensing",
+      "root": "packages/enterprise/features/licensing",
+      "classification": "enterprise",
+      "subjects": [
+        "license",
+        "licensing"
+      ]
+    },
+    {
+      "id": "managed-provider",
+      "root": "packages/enterprise/features/managed-provider",
+      "classification": "enterprise",
+      "subjects": [
+        "managed-model-provider",
+        "managed-provider"
+      ]
+    },
+    {
+      "id": "saas",
+      "root": "packages/enterprise/features/saas",
+      "classification": "enterprise",
+      "subjects": [
+        "saas"
+      ]
+    },
+    {
+      "id": "scim",
+      "root": "packages/enterprise/features/scim",
+      "classification": "enterprise",
+      "subjects": [
+        "scim"
+      ]
+    },
+    {
+      "id": "sso",
+      "root": "packages/enterprise/features/sso",
+      "classification": "enterprise",
+      "subjects": [
+        "sso"
+      ]
+    },
+    {
+      "id": "webhook",
+      "root": "packages/enterprise/features/webhook",
+      "classification": "enterprise",
+      "subjects": [
+        "webhook"
       ]
     }
   ]

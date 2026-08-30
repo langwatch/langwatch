@@ -22,7 +22,7 @@ export {
 export {
   PostgresOpsAdapter,
   type PostgresOpsAdapterOptions,
-} from "./adapters/postgres-ops.adapter";
+} from "./adapters/postgres.ops.adapter";
 export {
   RedisOpsSnapshotAdapter,
   type RedisOpsSnapshotAdapterOptions,
