@@ -22,7 +22,7 @@ Read the codebase first. Find the function that takes a conversation and returns
 
 ```bash
 pip install langwatch          # Python
-npm install langwatch          # TypeScript, Node only
+npm install langwatch zod      # TypeScript, Node only
 ```
 
 The process needs `LANGWATCH_API_KEY` in its environment. It is the same project key the CLI uses. Without a key the SDK logs one line and opens no connection.
@@ -42,12 +42,22 @@ async def support_agent(messages: list[dict], thread_id: str) -> str:
 **TypeScript**
 
 ```typescript
+import { z } from "zod";
 import { connectAgent } from "langwatch/agent";
 
 export const supportAgent = connectAgent(
-  { name: "support-agent" },
-  async ({ messages, threadId }) => {
-    return await runMyAgent(messages);
+  {
+    name: "support-agent",
+    environment: process.env.APP_ENV ?? "development",
+    parameters: z.object({
+      model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),
+      plan: z.string().default("free").describe("Customer plan"),
+      maxTools: z.number().int().default(5),
+    }),
+  },
+  async ({ messages, params }) => {
+    // params is typed: { model: "gpt-5" | "gpt-5-mini"; plan: string; maxTools: number }
+    return await runMyAgent(messages, { model: params.model });
   },
 );
 ```
@@ -78,25 +88,18 @@ async def support_agent(
     ...
 ```
 
-TypeScript declares them in a `parameters` map, and the handler receives them typed under `params`:
+TypeScript declares them with a zod schema in `parameters`, the way Step 3 shows. The schema types `params` in the handler, and the SDK validates the values a run supplies against it. Add `zod` to the project (`npm install zod`) if it is not there yet. Read the schema this way:
 
-```typescript
-export const supportAgent = connectAgent(
-  {
-    name: "support-agent",
-    parameters: {
-      model: { options: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" },
-      plan: { default: "free", description: "Customer plan" },
-      maxTools: { type: "number", default: 5 },
-    },
-  },
-  async ({ messages, params }) => {
-    return await runMyAgent(messages, { model: params.model });
-  },
-);
-```
+- `z.enum([...])` becomes a closed option list in the run dialog. A value outside the list is refused.
+- `.default(value)` sets the default.
+- `.describe(text)` sets the description shown beside the field.
+- `z.number()` and `z.boolean()` set the parameter type. `z.string()` is text.
 
-Declare a parameter for a value the tests must vary: a model, a plan, a tenant, a fixture id. `Literal` and `Enum` in Python, and `options` in TypeScript, become a closed list that the run dialog offers as choices and the platform refuses a value outside of.
+Give every property a default, or the run must supply a value for it. Keep the schema flat and scalar: nested objects and arrays are not run parameters.
+
+valibot and arktype work the same way, and so does any other Standard Schema object that carries a JSON Schema converter. `parameters` also takes a definition map for a project with no schema library (`{ model: { options: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" } }`), or a plain JSON Schema object.
+
+Declare a parameter for a value the tests must vary: a model, a plan, a tenant, a fixture id. `Literal` and `Enum` in Python, and `z.enum` in TypeScript, become a closed list that the run dialog offers as choices and the platform refuses a value outside of.
 
 ### Session, when the agent mints its own conversation id
 
@@ -289,7 +292,7 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 | The row reads `Offline` | The process stopped, or its outbound WSS connection is blocked. | Restart the process. On a network that blocks WebSockets, use the HTTP fallback. |
 | The run is refused with `agent_offline` | No instance was connected when the run started. | Start the agent process and run again. |
 | The run is refused with `agent_owner_only` | The agent registered under `development` with a personal key, so only its owner can run it. | Run it as the owner, or register it under a shared environment name such as `dev-shared`. |
-| The run is refused with `scenario_parameter_option_invalid` | A value is outside the closed option list the agent declares. | Use one of the listed options, or widen the `Literal` or `options` list in the code. |
+| The run is refused with `scenario_parameter_option_invalid` | A value is outside the closed option list the agent declares. | Use one of the listed options, or widen the `Literal` (Python) or `z.enum` (TypeScript) list in the code. |
 | A turn fails with `agent_call_timeout` | The function took longer than the agent's timeout. | Raise `timeout` on the decorator (up to 300 seconds), or make the agent answer faster. |
 | Trace-dependent criteria come back inconclusive | The agent reports its traces to a different LangWatch project, or it reports none at all. | Point the agent's tracing at the same project's API key. Set it up with the `tracing` skill. |
 

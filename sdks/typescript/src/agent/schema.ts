@@ -27,18 +27,52 @@ export interface ParameterDefinition {
 /** Parameters declared by name. */
 export type ParameterDefinitions = Record<string, ParameterDefinition>;
 
-/** The Standard JSON Schema converter an object exposes under `"~standard"`. */
+/**
+ * The Standard JSON Schema converter an object exposes under `"~standard"`.
+ * Method syntax on purpose: a library narrows `target` to its own union, and
+ * a method parameter is checked bivariantly, so zod 4, valibot and arktype
+ * all fit without the SDK naming any of them.
+ */
 export interface StandardJsonSchemaConverter {
-  readonly input?: (options: { readonly target: string }) => Record<string, unknown>;
-  readonly output?: (options: { readonly target: string }) => Record<string, unknown>;
+  input?(options: { readonly target: string }): Record<string, unknown>;
+  output?(options: { readonly target: string }): Record<string, unknown>;
 }
 
-/** Any object that implements the Standard JSON Schema interface. */
-export interface StandardJsonSchema {
+/** One problem a Standard Schema `validate` reports. */
+export interface StandardSchemaIssue {
+  readonly message: string;
+  readonly path?: ReadonlyArray<PropertyKey | { readonly key: PropertyKey }> | undefined;
+}
+
+export type StandardSchemaResult<O> =
+  | { readonly value: O; readonly issues?: undefined }
+  | { readonly issues: ReadonlyArray<StandardSchemaIssue> };
+
+/**
+ * Any object that implements the Standard JSON Schema interface. When it also
+ * implements Standard Schema (`validate`), the values of every call go
+ * through it before the handler runs, so a zod 4 schema validates, fills its
+ * defaults and types `params` in one place.
+ */
+export interface StandardJsonSchema<O = unknown> {
   readonly "~standard": {
     readonly jsonSchema: StandardJsonSchemaConverter;
+    validate?(value: unknown): StandardSchemaResult<O> | Promise<StandardSchemaResult<O>>;
+    /** Type-only, from Standard Schema: the parsed output type. */
+    readonly types?: { readonly input: unknown; readonly output: O } | undefined;
   };
 }
+
+/** The `params` type a Standard Schema object gives the handler: its parsed output. */
+export type InferStandardOutput<S> = S extends { readonly "~standard": { readonly types?: infer T } }
+  ? [NonNullable<T>] extends [never]
+    ? Record<string, AgentParameterValue>
+    : NonNullable<T> extends { readonly output: infer O }
+      ? O extends Record<string, unknown>
+        ? O
+        : Record<string, AgentParameterValue>
+      : Record<string, AgentParameterValue>
+  : Record<string, AgentParameterValue>;
 
 /** Every form `parameters` accepts. */
 export type ParameterInput = ParameterDefinitions | StandardJsonSchema | JsonSchemaObject;
@@ -107,11 +141,11 @@ const definitionMapToSchema = (definitions: ParameterDefinitions): JsonSchemaObj
 
 const readStandardJsonSchema = (input: StandardJsonSchema): JsonSchemaObject => {
   const converter = input["~standard"].jsonSchema;
-  const convert = converter.input ?? converter.output;
-  if (typeof convert !== "function") {
+  const options = { target: "draft-2020-12" };
+  const schema = converter.input?.(options) ?? converter.output?.(options);
+  if (schema === undefined) {
     throw new AgentParameterError(`the "~standard".jsonSchema converter has no input function; ${ACCEPTED_FORMS}`);
   }
-  const schema = convert({ target: "draft-2020-12" });
   if (!isRecord(schema)) {
     throw new AgentParameterError(`the "~standard".jsonSchema converter returned no object; ${ACCEPTED_FORMS}`);
   }
@@ -224,4 +258,63 @@ export function resolveParameterValues({
     values[spec.name] = coerce({ spec, value });
   }
   return values;
+}
+
+const issuePath = (issue: StandardSchemaIssue): string =>
+  (issue.path ?? [])
+    .map((segment) =>
+      typeof segment === "object" && segment !== null ? String(segment.key) : String(segment),
+    )
+    .join(".");
+
+/**
+ * The values after the schema's own `validate`: a zod 4 schema refines,
+ * fills its defaults and strips what it does not declare. A refusal names
+ * every issue with its path. Names the schema does not declare pass through
+ * untouched, so a scenario-declared parameter still reaches the handler.
+ */
+export async function validateParameterValues({
+  schema,
+  values,
+}: {
+  schema: StandardJsonSchema;
+  values: Record<string, AgentParameterValue>;
+}): Promise<Record<string, AgentParameterValue>> {
+  const standard = schema["~standard"];
+  const result = await standard.validate?.(values);
+  if (result === undefined) return values;
+  if (result.issues) {
+    const detail = result.issues
+      .map((issue) => {
+        const path = issuePath(issue);
+        return path ? `${path}: ${issue.message}` : issue.message;
+      })
+      .join("; ");
+    throw new AgentParameterError(`parameters refused by the schema: ${detail}`);
+  }
+  const parsed = isRecord(result.value) ? (result.value as Record<string, AgentParameterValue>) : {};
+  return { ...values, ...parsed };
+}
+
+/** What every call's parameters go through before the handler runs. */
+export type ParameterReader = (
+  supplied: Record<string, AgentParameterValue> | undefined,
+) => Promise<Record<string, AgentParameterValue>>;
+
+/**
+ * The reader of one agent: defaults and coercion from the specs, then the
+ * schema's own validation when the input carries one.
+ */
+export function createParameterReader({
+  input,
+  specs,
+}: {
+  input: ParameterInput | undefined;
+  specs: ParameterSpec[];
+}): ParameterReader {
+  const schema = isStandardJsonSchema(input) ? input : undefined;
+  return async (supplied) => {
+    const values = resolveParameterValues({ specs, supplied });
+    return schema ? validateParameterValues({ schema, values }) : values;
+  };
 }

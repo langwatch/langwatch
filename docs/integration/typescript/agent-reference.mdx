@@ -11,17 +11,27 @@ icon: terminal
 Registers a handler as a simulation target. The SDK opens one outbound connection per process, registers the agent with its name, its environment and its declared parameters, and calls the handler once per conversation turn.
 
 ```typescript
+import { z } from "zod";
 import { connectAgent } from "langwatch/agent";
 
 export const supportAgent = connectAgent(
-  { name: "support-agent" },
-  async ({ messages, threadId }) => {
-    return await runMyAgent(messages);
+  {
+    name: "support-agent",
+    environment: process.env.APP_ENV ?? "development",
+    parameters: z.object({
+      model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),
+      plan: z.string().default("free").describe("Customer plan"),
+      maxTools: z.number().int().default(5),
+    }),
+  },
+  async ({ messages, params }) => {
+    // params is typed: { model: "gpt-5" | "gpt-5-mini"; plan: string; maxTools: number }
+    return await runMyAgent(messages, { model: params.model });
   },
 );
 ```
 
-The entry point is Node only. `connectAgent` returns the handler, so `supportAgent({ messages })` calls it directly and a unit test needs no connection. The returned function also exposes `.disconnect()`, which closes the connection and drops the agent from the presence list.
+The entry point is Node only, and `zod` declares the run parameters, so a project installs `langwatch zod`. `connectAgent` returns the handler, so `supportAgent({ messages })` calls it directly and a unit test needs no connection. The returned function also exposes `.disconnect()`, which closes the connection and drops the agent from the presence list.
 
 The process connects only with an API key. The SDK reads `LANGWATCH_API_KEY` from the environment, logs one line when it is absent, and lets the process run.
 
@@ -32,7 +42,7 @@ The process connects only with an API key. The SDK reads `LANGWATCH_API_KEY` fro
 | `name` | `string` | required | The agent's name, and the first half of a `connected:<name>@<environment>` target. |
 | `environment` | `string` | resolved, see below | The environment row this process registers under. |
 | `description` | `string` | none | One line about the agent, shown on the agents page. |
-| `parameters` | definition map or JSON Schema | none | What the agent accepts from a run. |
+| `parameters` | zod schema, definition map or JSON Schema | none | What the agent accepts from a run. |
 | `enabled` | `boolean` | `true`, `false` when `CI` is set | Whether this process connects. |
 | `instanceLabel` | `string` | none | A name for this instance in the instances table. |
 | `timeoutMs` | `number` | `120000` | Milliseconds one call may take. The ceiling is `300000`. |
@@ -65,7 +75,28 @@ The handler receives one object.
 
 Three forms, all of which reach the platform as the same declaration.
 
-**A definition map.** `params` is typed from it, with no schema library involved:
+**A zod schema**, the form the example above uses. `params` is typed from it:
+
+```typescript
+parameters: z.object({
+  model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),
+  plan: z.string().default("free").describe("Customer plan"),
+  maxTools: z.number().int().default(5),
+})
+```
+
+| In the schema | Effect |
+|---|---|
+| `z.enum([...])` | A closed list of allowed values, up to 50. A value outside it is refused. |
+| `.default(value)` | The default the run dialog prefills |
+| `.describe(text)` | Shown beside the field in the run dialog |
+| `z.string()`, `z.number()`, `z.boolean()` | The parameter's type |
+
+Give every property a default, or the run must supply a value for it. Keep the schema flat and scalar: nested objects and arrays are not run parameters.
+
+Pass the schema object itself, never `schema["~standard"].jsonSchema` and never a validator instance. The SDK reads the JSON Schema converter the object carries under `"~standard"`, so valibot, arktype and any other Standard Schema library work the same way, and the SDK imports none of them.
+
+**A definition map**, for a project with no schema library:
 
 ```typescript
 parameters: {
@@ -82,21 +113,7 @@ parameters: {
 | `options` | scalar array | A closed list of allowed values, up to 50 |
 | `description` | `string` | Shown beside the field in the run dialog |
 
-**A Standard Schema's JSON Schema.** Any library that implements Standard Schema exposes it at `schema["~standard"].jsonSchema`:
-
-```typescript
-import { z } from "zod";
-
-const schema = z.object({
-  model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),
-});
-
-connectAgent({ name: "support-agent", parameters: schema["~standard"].jsonSchema }, handler);
-```
-
 **A plain JSON Schema object**, `{ type: "object", properties: { ... } }`.
-
-Pass the schema object, never the library's validator instance. The SDK does not import a schema library, which is what keeps it out of your bundle.
 
 Values arrive validated against the declaration. A value the declaration refuses fails the call with `agent_parameter_invalid` before the handler runs. A parameter the run did not supply arrives as its default; one with no default that the run did not supply fails the call with the name in the message.
 

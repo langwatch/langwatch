@@ -92,7 +92,7 @@ describe("toParameterSchema()", () => {
   });
 
   describe("when given a schema library instance with no JSON Schema converter", () => {
-    /** @scenario "A zod instance is refused" */
+    /** @scenario "A schema object with no JSON Schema converter is refused" */
     it("refuses it and names the three accepted forms", () => {
       const fakeZod3 = { _def: { typeName: "ZodObject" }, parse: () => ({}) };
 

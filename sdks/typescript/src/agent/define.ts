@@ -20,9 +20,10 @@ import {
 import type { AgentMessage, AgentParameterValue, JsonSchemaObject } from "./protocol";
 import {
   AgentParameterError,
+  createParameterReader,
   parameterSpecsFromSchema,
-  resolveParameterValues,
   toParameterSchema,
+  type InferStandardOutput,
   type ParameterDefinition,
   type ParameterDefinitions,
   type ParameterInput,
@@ -166,12 +167,21 @@ const readProjectId = (explicit: string | undefined): string | undefined => {
   return typeof candidate === "string" && candidate.trim() !== "" ? candidate.trim() : undefined;
 };
 
+/**
+ * A schema library object (zod 4, valibot, arktype: anything with Standard
+ * Schema and Standard JSON Schema) types `params` as its parsed output and
+ * validates every call's values before the handler runs.
+ */
+export function connectAgent<const S extends StandardJsonSchema>(
+  options: ConnectAgentOptions<S> & { parameters: S },
+  handler: AgentHandler<InferStandardOutput<S>>,
+): ConnectedAgent<InferStandardOutput<S>>;
 export function connectAgent<const P extends ParameterDefinitions = Record<string, never>>(
   options: ConnectAgentOptions<P>,
   handler: AgentHandler<InferParameters<P>>,
 ): ConnectedAgent<InferParameters<P>>;
 export function connectAgent(
-  options: ConnectAgentOptions<StandardJsonSchema | JsonSchemaObject>,
+  options: ConnectAgentOptions<JsonSchemaObject>,
   handler: AgentHandler<Record<string, AgentParameterValue>>,
 ): ConnectedAgent<Record<string, AgentParameterValue>>;
 export function connectAgent(
@@ -194,11 +204,10 @@ export function connectAgent(
   const runHandler = async (call: AgentCall<Record<string, AgentParameterValue>>): Promise<AgentResult> =>
     normalizeReply(await handler(call));
 
+  const readParams = createParameterReader({ input: options.parameters, specs });
+
   const invoke = async (call: DirectAgentCall<Record<string, AgentParameterValue>>): Promise<AgentResult> => {
-    const params = resolveParameterValues({
-      specs,
-      supplied: call.params as Record<string, AgentParameterValue> | undefined,
-    });
+    const params = await readParams(call.params as Record<string, AgentParameterValue> | undefined);
     return runHandler({
       messages: call.messages,
       newMessages: call.newMessages ?? call.messages,
@@ -221,7 +230,7 @@ export function connectAgent(
       timeoutMs,
       ...(options.sticky ? { sticky: true } : {}),
     },
-    specs,
+    readParams,
     concurrency,
     timeoutMs,
     run: runHandler,

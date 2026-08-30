@@ -13,7 +13,8 @@
   "dependencies": {
     "@ai-sdk/openai": "^2.0.6",
     "ai": "^5.0.52",
-    "langwatch": "file:../../"
+    "langwatch": "file:../../",
+    "zod": "^4.0.14"
   },
   "devDependencies": {
     "tsx": "^4.20.0",

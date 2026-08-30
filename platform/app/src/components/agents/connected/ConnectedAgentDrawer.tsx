@@ -1,6 +1,6 @@
 /**
- * One connected agent in full: what it accepts, which processes hold it, how
- * to connect another one, and a way to call it once (ADR-128).
+ * One connected agent in full: what it accepts, which processes hold it, and
+ * a way to call it once (ADR-128).
  *
  * The name, the environment and the parameters come from the process that
  * registered them, so they are read here and never edited. Only the
@@ -25,7 +25,6 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { Play } from "lucide-react";
 import { useEffect, useState } from "react";
-import { CopyButton } from "~/components/CopyButton";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import {
@@ -36,7 +35,6 @@ import {
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { pythonSnippet, typescriptSnippet } from "./connect-snippets";
 import {
   type ConnectedAgentView,
   presenceLabel,
@@ -53,10 +51,11 @@ export function ConnectedAgentDrawer(props: ConnectedAgentDrawerProps) {
   const drawerParams = useDrawerParams();
   const { project } = useOrganizationTeamProject();
   const agentId = props.agentId ?? drawerParams.agentId;
+  const projectId = project?.id ?? "";
 
   const agentQuery = api.agents.getById.useQuery(
-    { id: agentId ?? "", projectId: project?.id ?? "" },
-    { enabled: !!agentId && !!project?.id, refetchInterval: 5000 },
+    { id: agentId ?? "", projectId },
+    { enabled: !!agentId && !!projectId, refetchInterval: 5000 },
   );
   const agent = agentQuery.data as ConnectedAgentView | null | undefined;
 
@@ -68,32 +67,65 @@ export function ConnectedAgentDrawer(props: ConnectedAgentDrawerProps) {
       <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header>
-          <VStack align="start" gap={1}>
-            <Heading size="md">{agent?.name ?? "Agent"}</Heading>
-            {agent ? <PresenceLine agent={agent} /> : null}
-          </VStack>
+          <AgentTitle agent={agent} />
         </Drawer.Header>
         <Drawer.Body>
-          {agentQuery.isLoading ? (
-            <HStack justify="center" paddingY={8}>
-              <Spinner />
-            </HStack>
-          ) : agent ? (
-            <VStack align="stretch" gap={6} paddingBottom={6}>
-              <DescriptionField agent={agent} projectId={project?.id ?? ""} />
-              <ParametersTable agent={agent} />
-              <InstancesTable agent={agent} />
-              <ConnectSnippet agent={agent} />
-              <TestPanel agent={agent} projectId={project?.id ?? ""} />
-            </VStack>
-          ) : (
-            <Text color="fg.muted">
-              This agent is no longer in the project.
-            </Text>
-          )}
+          <AgentBody
+            agent={agent}
+            isLoading={agentQuery.isLoading}
+            projectId={projectId}
+          />
         </Drawer.Body>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+/** The agent name, with its presence line under it. */
+function AgentTitle({
+  agent,
+}: {
+  agent: ConnectedAgentView | null | undefined;
+}) {
+  return (
+    <VStack align="start" gap={1}>
+      <Heading size="md">{agent?.name ?? "Agent"}</Heading>
+      {agent ? <PresenceLine agent={agent} /> : null}
+    </VStack>
+  );
+}
+
+/** The sections of the drawer, or the state that stands in for them. */
+function AgentBody({
+  agent,
+  isLoading,
+  projectId,
+}: {
+  agent: ConnectedAgentView | null | undefined;
+  isLoading: boolean;
+  projectId: string;
+}) {
+  if (isLoading) {
+    return (
+      <HStack justify="center" paddingY={8}>
+        <Spinner />
+      </HStack>
+    );
+  }
+
+  if (!agent) {
+    return (
+      <Text color="fg.muted">This agent is no longer in the project.</Text>
+    );
+  }
+
+  return (
+    <VStack align="stretch" gap={6} paddingBottom={6}>
+      <DescriptionField agent={agent} projectId={projectId} />
+      <ParametersTable agent={agent} />
+      <InstancesTable agent={agent} />
+      <TestPanel agent={agent} projectId={projectId} />
+    </VStack>
   );
 }
 
@@ -265,41 +297,6 @@ function InstancesTable({ agent }: { agent: ConnectedAgentView }) {
           </Table.Body>
         </Table.Root>
       )}
-    </VStack>
-  );
-}
-
-/** The code that connects another process to this same agent. */
-function ConnectSnippet({ agent }: { agent: ConnectedAgentView }) {
-  const language = agent.config.sdk?.language ?? "python";
-  const code =
-    language === "typescript" || language === "javascript"
-      ? typescriptSnippet({ name: agent.name, environment: agent.environment })
-      : pythonSnippet({ name: agent.name, environment: agent.environment });
-
-  return (
-    <VStack align="stretch" gap={2} data-testid="connected-agent-snippet">
-      <SectionTitle title="Connect another process" />
-      <HStack
-        align="start"
-        gap={2}
-        background="bg.muted"
-        borderRadius="md"
-        paddingX={3}
-        paddingY={2}
-      >
-        <Box
-          as="pre"
-          flex={1}
-          overflowX="auto"
-          fontFamily="mono"
-          fontSize="12px"
-          whiteSpace="pre"
-        >
-          {code}
-        </Box>
-        <CopyButton value={code} label="Snippet" />
-      </HStack>
     </VStack>
   );
 }

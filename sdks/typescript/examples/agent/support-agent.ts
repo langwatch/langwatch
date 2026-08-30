@@ -12,6 +12,7 @@
 import { openai } from "@ai-sdk/openai";
 import { generateText, type ModelMessage } from "ai";
 import { connectAgent } from "langwatch/agent";
+import { z } from "zod";
 
 const SYSTEM_PROMPT = (plan: string) =>
   `You are the support agent of ACME, a project management tool. The customer is on the ${plan} plan. Answer in two short sentences. If the customer wants a refund, ask for the invoice number first.`;
@@ -20,10 +21,19 @@ export const supportAgent = connectAgent(
   {
     name: "support-agent",
     description: "Answers ACME support questions",
-    parameters: {
-      model: { options: ["gpt-5-mini", "gpt-5"], default: "gpt-5-mini", description: "The model that answers" },
-      plan: { default: "free", description: "The customer plan the agent believes it is talking to" },
-    },
+    // The zod schema types `params` below, and the SDK validates the values a
+    // run supplies against it. `z.enum` becomes a closed option list in the run
+    // dialog, `.default()` the default, `.describe()` the description.
+    parameters: z.object({
+      model: z
+        .enum(["gpt-5-mini", "gpt-5"])
+        .default("gpt-5-mini")
+        .describe("The model that answers"),
+      plan: z
+        .string()
+        .default("free")
+        .describe("The customer plan the agent believes it is talking to"),
+    }),
   },
   async ({ messages, params, session }) => {
     // `session` is whatever this function returned as session on the previous

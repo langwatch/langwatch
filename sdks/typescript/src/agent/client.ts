@@ -33,7 +33,7 @@ import {
   type RegisterInstance,
   type RegisteredFrame,
 } from "./protocol";
-import { AgentParameterError, resolveParameterValues, type ParameterSpec } from "./schema";
+import { AgentParameterError, type ParameterReader } from "./schema";
 import {
   defaultSocketFactory,
   NoWebSocketError,
@@ -46,7 +46,8 @@ export interface AgentRuntime {
   name: string;
   environment: string;
   register: RegisterAgent;
-  specs: ParameterSpec[];
+  /** Defaults, coercion and the schema's own validation, before every call. */
+  readParams: ParameterReader;
   concurrency: number;
   timeoutMs: number;
   run: (call: AgentCall<Record<string, AgentParameterValue>>) => Promise<AgentResult>;
@@ -483,7 +484,7 @@ export class AgentClient {
 
     let params: Record<string, AgentParameterValue>;
     try {
-      params = resolveParameterValues({ specs: runtime.specs, supplied: frame.params });
+      params = await runtime.readParams(frame.params);
     } catch (error) {
       this.sendError({
         callId: frame.callId,

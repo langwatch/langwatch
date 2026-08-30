@@ -20,7 +20,7 @@ import {
 /** The install line of each language, above its snippet. */
 const INSTALL_COMMANDS: Record<SnippetLanguage, string> = {
   python: "pip install langwatch",
-  typescript: "npm install langwatch",
+  typescript: "npm install langwatch zod",
 };
 
 export function ConnectAgentPanel({

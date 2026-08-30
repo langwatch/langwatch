@@ -7,6 +7,10 @@
  * that already exists, so a teammate can connect their own process to the
  * same identity.
  *
+ * The TypeScript snippet declares its run parameters with a zod schema, which
+ * is the form the SDK types `params` from and validates the incoming values
+ * with.
+ *
  * @see docs/agent-simulations/connect-your-agent.mdx
  * @see specs/features/agents/connected-agents-ui.feature
  */
@@ -70,16 +74,22 @@ export function typescriptSnippet({
   name?: string;
   environment?: string | null;
 } = {}): string {
-  const options = environment
-    ? `{ name: "${name}", environment: "${environment}" }`
-    : `{ name: "${name}" }`;
   return [
+    'import { z } from "zod";',
     'import { connectAgent } from "langwatch/agent";',
     "",
     `export const ${camelCaseOf(name)} = connectAgent(`,
-    `  ${options},`,
-    "  async ({ messages, threadId }) => {",
-    "    return await runMyAgent(messages);",
+    "  {",
+    `    name: "${name}",`,
+    environment
+      ? `    environment: "${environment}",`
+      : '    environment: process.env.APP_ENV ?? "development",',
+    "    parameters: z.object({",
+    '      model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),',
+    "    }),",
+    "  },",
+    "  async ({ messages, params }) => {",
+    "    return await runMyAgent(messages, { model: params.model });",
     "  },",
     ");",
   ].join("\n");

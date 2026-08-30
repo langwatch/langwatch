@@ -76,7 +76,24 @@ Feature: connectAgent turns a function into a simulation target
       Then the handler runs with the default value
       And the reply is returned as output and session
 
-  Rule: Parameters are declared as a map or a schema, never as a zod instance
+  Rule: Parameters are declared with a schema library, a definition map or a JSON Schema
+
+    Scenario: A zod schema types the handler params
+      Given parameters declared as a zod object with model as an enum with a default, plan a string with a default and maxTools a number with a default
+      Then params.model is the union of the enum values
+      And params.plan is a string
+      And params.maxTools is a number
+
+    Scenario: A zod schema validates the values before the call
+      Given parameters declared as a zod object with maxTools an integer
+      When a call carries 2.5 for maxTools
+      Then the call is refused with agent_parameter_invalid naming maxTools
+      And the handler does not run
+
+    Scenario: A zod schema fills its defaults and keeps undeclared values
+      Given parameters declared as a zod object with plan defaulting to free
+      When a call carries only a scenario-declared value tone
+      Then the handler receives plan free and tone as sent
 
     Scenario: A definition map becomes a JSON Schema object
       Given parameters model with options and a default, plan with a default, and maxTools typed number
@@ -99,8 +116,8 @@ Feature: connectAgent turns a function into a simulation target
       When the schema is built
       Then it is the parameter schema
 
-    Scenario: A zod instance is refused
-      Given a value that has no "~standard".jsonSchema and no properties
+    Scenario: A schema object with no JSON Schema converter is refused
+      Given a value that has no "~standard".jsonSchema and no properties, for example a zod 3 instance
       When the schema is built
       Then the definition is refused with a message naming the three accepted forms
 
