@@ -36767,7 +36767,7 @@ The decorator never stops the application from starting. Every problem is one wa
     | `endpoint` | `LANGWATCH_ENDPOINT` | Which LangWatch instance to connect to. |
     | `project_id` | none | The project, for a key that covers more than one. |
 
-    `langwatch.agent.serve()` blocks the current thread while the connection runs. `langwatch.Param(description=..., options=[...], type=..., secret=...)` annotates one parameter. `langwatch.AgentReply(output, session=...)` returns a reply with a session value.
+    `langwatch.agent.serve()` blocks the current thread while the connection runs. `langwatch.Param(description=..., options=[...], type=...)` annotates one parameter. `langwatch.AgentReply(output, session=...)` returns a reply with a session value.
 
   ### TypeScript
 

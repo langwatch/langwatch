@@ -84,7 +84,7 @@ Every parameter with a default that is not a turn field is a run parameter.
 | `Literal[...]`, an `Enum` class | A closed list of options |
 | `Optional[T]` | The type, and a value that may be empty |
 | The default value | The default the run dialog prefills |
-| `Annotated[T, langwatch.Param(...)]` | A description, an options list, a type, or the secret flag |
+| `Annotated[T, langwatch.Param(...)]` | A description, an options list, or a type |
 
 An annotation the SDK does not map falls back to that type's JSON schema and is offered as text.
 
@@ -99,7 +99,6 @@ Annotates one run parameter.
 | `description` | `str` | Shown beside the field in the run dialog |
 | `options` | `list` | A closed list of allowed values, up to 50 |
 | `type` | `str` | Overrides the type read from the annotation |
-| `secret` | `bool` | Marks the value a credential |
 
 ```python
 from typing import Annotated
