@@ -215,6 +215,47 @@ describe("SavedWorkbenchChartService", () => {
       });
     });
 
+    describe("when the name is longer than the column holds", () => {
+      it("refuses it", async () => {
+        const { service } = build();
+
+        await expect(
+          service.create({
+            projectId: "project-1",
+            protections: PROTECTIONS,
+            name: "x".repeat(256),
+            definition: definition(),
+          }),
+        ).rejects.toBeInstanceOf(SavedWorkbenchChartValidationError);
+      });
+    });
+
+    describe("when the definition carries a query, parameters and a specification", () => {
+      it("stores them together rather than only the query", async () => {
+        const { service, repository } = build();
+        const spec = { mark: "bar" };
+
+        await service.create({
+          projectId: "project-1",
+          protections: PROTECTIONS,
+          name: "Traces per day",
+          definition: definition({
+            sql: "SELECT count() FROM traces",
+            parameters: { since: "2026-02-01" },
+            vegaLiteSpec: spec,
+          }),
+        });
+
+        const call = repository.calls.find((c) => c.method === "createSavedWorkbenchChart");
+        expect((call?.input as { definition: SavedWorkbenchChartDefinition }).definition).toEqual({
+          version: WORKBENCH_CHART_DEFINITION_VERSION,
+          sql: "SELECT count() FROM traces",
+          parameters: { since: "2026-02-01" },
+          vegaLiteSpec: spec,
+        });
+      });
+    });
+
     describe("when the name is blank", () => {
       it("refuses it", async () => {
         const { service } = build();
@@ -264,6 +305,8 @@ describe("SavedWorkbenchChartService", () => {
     });
 
     describe("when the policy refuses the definition", () => {
+      /** @scenario "A specification the chart policy refuses never reaches the database" */
+      /** @scenario "SQL the LangWatchQL validator refuses never reaches the database" */
       it("does not write the row", async () => {
         const refusal = new Error("column is content-gated");
         const { service, repository } = build({ policy: new RecordingPolicy(refusal) });

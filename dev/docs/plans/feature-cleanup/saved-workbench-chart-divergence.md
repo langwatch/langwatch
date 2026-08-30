@@ -49,6 +49,16 @@ Two things looked like live regressions and are not:
   and the package transport populates all three
   (`saved-workbench-chart.api.ts:290`). Pinned by a test now.
 
+## What has been done (2026-08-31)
+
+The governance half is out. `validateSavedWorkbenchChartDefinition` is live and
+unchanged, so its cases did not need a service at all — they are now
+`__tests__/validateSavedWorkbenchChartDefinition.unit.test.ts`, ten cases
+against the function directly, sabotage-checked by disabling each governor in
+turn (3 cases fail without the LangWatchQL validation, 2 without the chart
+policy). The package service's net covers the other half, that a refused
+definition is never written, and carries those two `@scenario` annotations.
+
 ## Removing the dead half
 
 The 44 cases are not worthless: 23 of them are the governance specification, and
@@ -76,6 +86,38 @@ pinned on the live path by the forwarding case added here.
 Then: delete the class (lines 160-550), the interfaces only it uses, and
 `savedWorkbenchChart.repository.ts`. Keep the two functions and
 `workbenchChartDefinition.ts`.
+
+**What still blocks it, exactly.** The three files bind 24 scenarios of
+`specs/analytics/lwql-saved-charts.feature`; the replacements above bind 4.
+Deleting today would quietly unbind these 20, and a `.feature` scenario nothing
+binds enforces nothing:
+
+    A builder chart is not readable as a workbench chart
+    A placed chart round-trips with the dashboard id and grid position it was given
+    A saved chart is listed among the project's workbench charts
+    A saved chart reads back with its SQL, parameters and specification intact
+    A saved workbench chart is not readable as a builder chart
+    A stored definition that no longer matches the schema is named, not returned as data
+    Another project's saved chart cannot be edited or deleted
+    Another project's saved chart is not readable
+    Another project's saved chart is not runnable
+    Another project's saved charts are not listed
+    Deleting a placed chart leaves no dangling reference on its dashboard
+    Editing a saved chart runs exactly the governors that creating it ran
+    Placing a chart onto a dashboard already holding builder charts does not overlap them
+    Placing a chart onto another project's dashboard is refused, and nothing is written
+    Placing a chart requires a dashboard id and accepts an optional grid position
+    Placing a chart that does not exist in this project is refused
+    Placing a saved workbench chart does not let a builder chart land on top of it
+    Running a saved chart executes its stored statement with its saved values and the surface's window and step
+    Running a saved chart refuses a step finer than the period's bucket budget
+    Unplacing a chart clears every placement field, not just the dashboard id
+
+Four of those are tenancy — another project's chart must not be readable,
+runnable, editable or listed — so this is not bookkeeping. They belong on the
+package service, where the behaviour now lives, and several of them want the
+real database rather than a fake, which is why the integration file cannot
+simply be dropped either.
 
 ## Why this keeps happening
 
