@@ -1304,6 +1304,7 @@
               "api-reference/agents/get-agents",
               "api-reference/agents/update-agents",
               "api-reference/agents/put-update-agents",
+              "api-reference/agents/action-call",
               "api-reference/agents/delete-agents"
             ]
           },

@@ -6,7 +6,6 @@ import { generateSpecs as generateSpecsUnpinned } from "hono-openapi";
 import path from "path";
 import { app as agentCacheApp } from "../app/api/agent-cache/[[...route]]/app";
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
-import { app as connectedAgentRelayApp } from "../server/connected-agents/relay.route";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
 import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";
 import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
@@ -42,6 +41,7 @@ import {
   isHttpMethod,
   securityForCredentialClass,
 } from "../server/api/security";
+import { app as connectedAgentRelayApp } from "../server/connected-agents/relay.route";
 // The two legacy route files below are wired in for the routes they describe
 // and nothing else: `generateSpecs` skips any handler without `describeRoute`,
 // so the unannotated siblings sharing these files (the stripe webhook, the demo

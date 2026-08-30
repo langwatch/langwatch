@@ -67664,6 +67664,15 @@ openapi: "PUT /api/agent-cache/{name}"
 
 ---
 
+# FILE: ./api-reference/agents/action-call.mdx
+
+---
+title: "Create Call"
+openapi: "POST /api/agents/{id}/call"
+---
+
+---
+
 # FILE: ./api-reference/agents/create-agents.mdx
 
 ---
