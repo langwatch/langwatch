@@ -5,6 +5,7 @@ import type {
   DetailSnapshot,
   LiveSnapshot,
   OpsSnapshotAbortSignal,
+  OpsSnapshotLease,
 } from "@langwatch/ops-contract";
 import { OpsSnapshotRepository } from "../repositories/ops-snapshot.repository";
 
@@ -55,10 +56,7 @@ export class DefaultOpsSnapshotService extends OpsSnapshotServiceContract {
     computedAt: Date;
   } {
     const now = Date.now();
-    if (
-      this.badgeCache &&
-      now - this.badgeCache.computedAt.getTime() < BADGE_CACHE_TTL_MS
-    ) {
+    if (this.badgeCache && now - this.badgeCache.computedAt.getTime() < BADGE_CACHE_TTL_MS) {
       return this.badgeCache;
     }
 
@@ -129,7 +127,7 @@ export class DefaultOpsSnapshotService extends OpsSnapshotServiceContract {
     }
   }
 
-  acquireOrRenewLease(input: { writerId: string }) {
+  acquireOrRenewLease(input: { writerId: string }): Promise<OpsSnapshotLease> {
     return this.repository.acquireOrRenewLease(input);
   }
 
@@ -137,11 +135,11 @@ export class DefaultOpsSnapshotService extends OpsSnapshotServiceContract {
     return this.repository.releaseLease();
   }
 
-  writeLive(input: { snapshot: LiveSnapshot; leaseToken: string }) {
+  writeLive(input: { snapshot: LiveSnapshot; leaseToken: string }): Promise<boolean> {
     return this.repository.writeLive(input);
   }
 
-  writeDetail(input: { snapshot: DetailSnapshot; leaseToken: string }) {
+  writeDetail(input: { snapshot: DetailSnapshot; leaseToken: string }): Promise<boolean> {
     return this.repository.writeDetail(input);
   }
 

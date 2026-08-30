@@ -1,10 +1,7 @@
 import { LangyFinalPartsService } from "./langy-final-parts.service";
 import { LangyTurnStartService } from "./langy-turn-start.service";
 import { LangyTurnStopService } from "./langy-turn-stop.service";
-import {
-  type LangyTurnServiceDeps,
-  type StartConversationTurnInput,
-} from "./langy-turn.shared";
+import { type LangyTurnServiceDeps, type StartConversationTurnInput } from "./langy-turn.shared";
 import { LangyTurnWarmService } from "./langy-turn-warm.service";
 
 export type {
@@ -39,7 +36,9 @@ export class LangyTurnService {
     return new LangyTurnService(deps);
   }
 
-  startConversationTurn(input: StartConversationTurnInput) {
+  startConversationTurn(
+    input: StartConversationTurnInput,
+  ): Promise<{ conversationId: string; turnId: string }> {
     return this.start.startConversationTurn(input);
   }
 
@@ -48,7 +47,7 @@ export class LangyTurnService {
     conversationId: string;
     turnId: string;
     userId: string;
-  }) {
+  }): Promise<void> {
     return this.stop.stopTurn(input);
   }
 
@@ -57,7 +56,7 @@ export class LangyTurnService {
     session: StartConversationTurnInput["session"];
     requestedConversationId: string | null;
     modelOverride?: string;
-  }) {
+  }): Promise<{ conversationId: string | null; warmed: boolean }> {
     return this.warm.warmConversationWorker(input);
   }
 }
