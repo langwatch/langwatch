@@ -600,6 +600,7 @@ export const agentsRouter = createTRPCRouter({
             environment: agent.environment,
             ownerUserId: agent.ownerUserId,
             hostLabel: agent.hostLabel,
+            lastSeenAt: agent.lastSeenAt,
             archivedAt: agent.archivedAt,
           },
         ],

@@ -13,6 +13,7 @@ import {
   type SignatureComponentConfig,
   signatureComponentSchema,
 } from "~/optimization_studio/types/dsl";
+import { connectedAgentVisibleWhere } from "./connected-agent-visibility";
 
 /**
  * Agent types enum - matches ComponentType for signature/code/custom(workflow)/http,
@@ -217,7 +218,8 @@ export class AgentRepository {
 
   /**
    * Finds all agents for a project with copy-count for replica UI.
-   * Excludes archived agents. Orders by most recently updated.
+   * Excludes archived agents and connected agents unseen for too long.
+   * Orders by most recently updated.
    * Returns typed agents with parsed config.
    */
   async findAll(input: { projectId: string }): Promise<TypedAgent[]> {
@@ -225,6 +227,7 @@ export class AgentRepository {
       where: {
         projectId: input.projectId,
         archivedAt: null,
+        ...connectedAgentVisibleWhere(),
       },
       orderBy: {
         updatedAt: "desc",
@@ -239,7 +242,8 @@ export class AgentRepository {
 
   /**
    * Finds agents for a project with pagination.
-   * Excludes archived agents. Orders by most recently updated.
+   * Excludes archived agents and connected agents unseen for too long.
+   * Orders by most recently updated.
    */
   async findAllPaginated(input: {
     projectId: string;
@@ -249,6 +253,7 @@ export class AgentRepository {
     const where = {
       projectId: input.projectId,
       archivedAt: null,
+      ...connectedAgentVisibleWhere(),
     };
 
     const [agents, total] = await Promise.all([
@@ -300,8 +305,8 @@ export class AgentRepository {
   }
 
   /**
-   * Finds a connected agent by its identity key, archived or not, so a
-   * reconnect of an archived identity restores the same row.
+   * Finds a connected agent by its identity key, whatever its state, so a
+   * process that registers the same identity writes the row it already has.
    */
   async findByIdentityKey(input: {
     projectId: string;
@@ -315,7 +320,8 @@ export class AgentRepository {
   }
 
   /**
-   * Finds connected agents by name and environment, archived ones excluded.
+   * Finds connected agents by name and environment, archived ones and ones
+   * unseen for too long excluded.
    *
    * Several rows can answer: one per scope in a development environment. The
    * caller decides which of them a reference addresses.
@@ -332,6 +338,7 @@ export class AgentRepository {
         name: input.name,
         environment: input.environment,
         archivedAt: null,
+        ...connectedAgentVisibleWhere(),
       },
     });
     return agents.map(parseAgent);
@@ -339,8 +346,9 @@ export class AgentRepository {
 
   /**
    * Re-registers a connected agent on its existing row: the name and the
-   * config the SDK sent now, the row active again, and the presence
-   * projection fresh.
+   * config the SDK sent now, and the presence projection fresh. A row unseen
+   * for too long is listed again because `lastSeenAt` moved, not because a
+   * flag was cleared.
    */
   async reregisterConnected(input: {
     id: string;
@@ -354,7 +362,6 @@ export class AgentRepository {
       data: {
         name: input.name,
         config: validatedConfig as unknown as Prisma.InputJsonValue,
-        archivedAt: null,
         lastSeenAt: new Date(),
       },
     });
@@ -550,6 +557,7 @@ const IDENTITY_SELECT = {
   environment: true,
   ownerUserId: true,
   hostLabel: true,
+  lastSeenAt: true,
   archivedAt: true,
 } as const;
 
@@ -570,6 +578,7 @@ export type AgentIdentityRow = {
   environment: string | null;
   ownerUserId: string | null;
   hostLabel: string | null;
+  lastSeenAt: Date | null;
   archivedAt: Date | null;
 };
 

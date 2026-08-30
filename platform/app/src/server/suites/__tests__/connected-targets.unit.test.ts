@@ -48,6 +48,7 @@ function connectedAgent({
     environment: ownerUserId ? "development" : "production",
     ownerUserId,
     hostLabel: null,
+    lastSeenAt: new Date(),
     archivedAt: null,
   };
 }

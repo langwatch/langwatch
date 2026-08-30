@@ -793,6 +793,45 @@ describe("SuiteService", () => {
       });
     });
 
+    describe("given a connected target unseen for thirty one days", () => {
+      describe("when the suite run is triggered", () => {
+        /** @scenario "A connected agent unseen for thirty days is refused as a run target" */
+        it("skips it the way it skips an archived target", async () => {
+          const unseenAt = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
+          const { service, suiteRunService } = createService({
+            agentRepository: {
+              findManyIncludingArchived: vi.fn(
+                async ({ ids }: { ids: string[] }) =>
+                  ids.map((id) => ({
+                    id,
+                    type: id === "agent_unseen" ? "connected" : "http",
+                    archivedAt: null,
+                    lastSeenAt: id === "agent_unseen" ? unseenAt : null,
+                  })),
+              ),
+            },
+          });
+          const suite = makeSuite({
+            scenarioIds: ["scen_1"],
+            targets: [
+              { type: "http", referenceId: "agent_1" },
+              { type: "connected", referenceId: "agent_unseen" },
+            ] as SuiteTarget[],
+          });
+
+          const result = await service.run({ suite, ...RUN_DEFAULTS });
+
+          expect(result.jobCount).toBe(1);
+          expect(suiteRunService.startRun).toHaveBeenCalledWith(
+            expect.objectContaining({
+              activeTargets: [{ type: "http", referenceId: "agent_1" }],
+              skippedArchived: { scenarios: [], targets: ["agent_unseen"] },
+            }),
+          );
+        });
+      });
+    });
+
     describe("given all scenarios in a suite are archived", () => {
       describe("when the suite run is triggered", () => {
         /** @scenario Suite run fails when all scenarios are archived */
