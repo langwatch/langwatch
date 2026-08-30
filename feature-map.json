@@ -611,12 +611,12 @@
         {
           "id": "library.agents",
           "name": "Agents",
-          "description": "Agent definitions used in simulations and experiments",
+          "description": "Agent definitions used in simulations and experiments. A connected agent registers itself from code: connect_agent in Python, connectAgent from langwatch/agent in TypeScript",
           "surfaces": {
             "code": {
               "sdk": {
-                "python": "langwatch.agents",
-                "typescript": "langwatch.agents"
+                "python": "langwatch.agents, langwatch.connect_agent",
+                "typescript": "langwatch.agents, connectAgent (langwatch/agent)"
               },
               "cli": [
                 "agent list",
@@ -627,8 +627,8 @@
                 "agent update",
                 "agent delete"
               ],
-              "skill": null,
-              "docs": null
+              "skill": "connect-agent",
+              "docs": "https://langwatch.ai/docs/agent-simulations/connect-your-agent.md"
             },
             "platform": {
               "ui": "/agents",
@@ -640,11 +640,11 @@
                 "platform_run_agent",
                 "platform_delete_agent"
               ],
-              "skill": null,
-              "docs": null
+              "skill": "connect-agent",
+              "docs": "https://langwatch.ai/docs/agent-simulations/local-development.md"
             },
             "api": "/api/agents",
-            "docs": null
+            "docs": "https://langwatch.ai/docs/agent-simulations/connect-your-agent.md"
           },
           "sync": null,
           "produces": [
