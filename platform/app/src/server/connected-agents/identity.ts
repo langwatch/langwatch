@@ -4,7 +4,7 @@
  * One row per project, name, environment and scope. The environment is what
  * the SDK resolved; the scope is derived from it and from the credential that
  * registered: a development agent belongs to the key's owner, or to the host
- * when the key names nobody. Every other environment is shared.
+ * when the key names no person. Every other environment is shared.
  *
  * Browser-safe: no node imports, so the run dialog and the CLI can build the
  * same keys.

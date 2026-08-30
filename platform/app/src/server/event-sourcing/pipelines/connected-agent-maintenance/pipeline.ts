@@ -17,7 +17,7 @@ export interface ConnectedAgentMaintenancePipelineDeps {
 /**
  * The daily sweep of connected agents (ADR-128, "Presence"), in its own
  * pipeline for the same reason the other maintenance pipelines are in
- * theirs: archiving rows nobody connects to any more is neither a run
+ * theirs: archiving rows no process connects to any more is neither a run
  * concern nor a queue concern.
  *
  * The pipeline carries no events and no commands. A process manager with no

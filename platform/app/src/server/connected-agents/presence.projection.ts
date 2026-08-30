@@ -55,7 +55,7 @@ export async function touchAgentLastSeen({
   }
 }
 
-/** Test seam: forget every throttle mark. */
+/** Forgets every throttle mark, for tests that reuse the process. */
 export function resetLastSeenThrottle(): void {
   lastWrites.clear();
 }

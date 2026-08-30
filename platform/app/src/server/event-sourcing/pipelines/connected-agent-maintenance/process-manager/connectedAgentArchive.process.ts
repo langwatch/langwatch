@@ -11,7 +11,7 @@ const logger = createLogger("langwatch:connected-agents:archive-sweep");
 export const CONNECTED_AGENT_ARCHIVE_PROCESS_NAME = "connectedAgentArchive";
 
 /**
- * Daily. A connected agent unseen for thirty days is one nobody runs any
+ * Daily. A connected agent unseen for thirty days is one no person runs any
  * more; archiving it keeps the agents list to what is real. A reconnect of
  * the same identity restores the row, so nothing is lost.
  */

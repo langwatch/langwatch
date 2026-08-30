@@ -90,7 +90,7 @@ Feature: Connected agents
 
   @integration
   Scenario: A host-scoped development agent is runnable by the team
-    Given a development agent scoped to a host and owned by nobody in particular
+    Given a development agent scoped to a host and owned by no person
     When user "u_2" starts a run that targets it
     Then the run is scheduled
 
