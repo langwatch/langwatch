@@ -2,14 +2,21 @@ import type { JsonValue } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import type { ConnectedComponentConfig } from "~/optimization_studio/types/dsl";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
+import {
+  DEFAULT_CALL_TIMEOUT_MS,
+  MAX_CALL_TIMEOUT_MS,
+} from "~/server/connected-agents/constants";
 import {
   type AgentInstanceView,
   type AgentPresenceStatus,
   NO_PRESENCE,
   readAgentPresence,
 } from "~/server/connected-agents/presence.read";
+import { getConnectedAgentRuntime } from "~/server/connected-agents/runtime";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
+import { assertConnectedAgentsRunnable } from "~/server/suites/connected-targets";
 import {
   type AgentComponentConfig,
   agentTypeSchema,
@@ -549,6 +556,89 @@ export const agentsRouter = createTRPCRouter({
         }
         throw error;
       }
+    }),
+
+  /**
+   * Sends one turn to a connected agent and answers what its function
+   * returned (ADR-128).
+   *
+   * The Test button of the agent drawer. It walks the same path a simulation
+   * turn walks, so what a person sees here is what a run will see: the same
+   * dispatcher, the same instance choice, the same handled errors. A personal
+   * development agent of another person is refused before anything is sent.
+   */
+  testConnected: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        projectId: z.string(),
+        message: z.string().min(1),
+        params: z
+          .record(z.union([z.string(), z.number(), z.boolean()]))
+          .optional(),
+      }),
+    )
+    .permission("evaluations:manage")
+    .mutation(async ({ ctx, input }) => {
+      const agent = await AgentService.create(ctx.prisma).getById({
+        id: input.id,
+        projectId: input.projectId,
+      });
+      if (agent?.type !== "connected") {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Connected agent not found",
+        });
+      }
+      await assertConnectedAgentsRunnable({
+        agents: [
+          {
+            id: agent.id,
+            name: agent.name,
+            type: agent.type,
+            config: agent.config as JsonValue,
+            environment: agent.environment,
+            ownerUserId: agent.ownerUserId,
+            hostLabel: agent.hostLabel,
+            archivedAt: agent.archivedAt,
+          },
+        ],
+        actor: { id: ctx.session.user.id, label: "user" },
+        users: ctx.prisma,
+      });
+
+      const config = agent.config as ConnectedComponentConfig;
+      const messages = [{ role: "user" as const, content: input.message }];
+      const outcome = await getConnectedAgentRuntime().dispatcher.dispatch({
+        projectId: input.projectId,
+        agent: {
+          id: agent.id,
+          name: agent.name,
+          environment: agent.environment,
+          timeoutMs: Math.min(
+            config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
+            MAX_CALL_TIMEOUT_MS,
+          ),
+          sticky: config.sticky ?? false,
+        },
+        call: {
+          threadId: crypto.randomUUID(),
+          messages,
+          newMessages: messages,
+          params: input.params ?? {},
+          session: undefined,
+          traceparent: null,
+          run: {},
+        },
+      });
+      return {
+        output: outcome.output,
+        instance: {
+          hostname: outcome.instance.hostname,
+          label: outcome.instance.label,
+        },
+        durationMs: outcome.durationMs,
+      };
     }),
 
   /**
