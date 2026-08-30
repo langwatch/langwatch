@@ -80,6 +80,7 @@ function input(email: string): AdminOperationInput {
 }
 
 describe("AdminBackofficeService user email updates", () => {
+  /** @scenario "An operator changing a user's email revokes their browser sessions" */
   it("persists an email before revoking browser sessions", async () => {
     const order: string[] = [];
     const users = new UserFake();
@@ -105,6 +106,7 @@ describe("AdminBackofficeService user email updates", () => {
     expect(order).toEqual(["profile", "sessions"]);
   });
 
+  /** @scenario "A change that only differs in case or spacing revokes nothing" */
   it("does not revoke sessions for a normalized case-only change", async () => {
     const users = new UserFake();
     const auth = new AuthFake();
@@ -120,6 +122,7 @@ describe("AdminBackofficeService user email updates", () => {
     expect(auth.revokeAllBrowserSessions).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A failed revocation still leaves the new backoffice email in place" */
   it("retains the profile update when browser-session revocation fails", async () => {
     const users = new UserFake();
     users.updateProfile.mockResolvedValue({ ...user, email: "new@example.com" });

@@ -389,6 +389,7 @@ describe("SCIM user parity", () => {
     expect(users.deactivate).toHaveBeenCalledWith({ id: "user-1" });
   });
 
+  /** @scenario "SCIM replacing a user's email revokes their browser sessions" */
   it("revokes browser sessions after a full replace changes an email", async () => {
     const { auth, users, service } = harness({ membership: { user: user() } });
     const order: string[] = [];
@@ -413,6 +414,7 @@ describe("SCIM user parity", () => {
     expect(order).toEqual(["profile", "sessions"]);
   });
 
+  /** @scenario "SCIM patching a user's email revokes their browser sessions" */
   it("revokes browser sessions after a PATCH changes an email", async () => {
     const { auth, users, service } = harness({ membership: { user: user() } });
     const order: string[] = [];
@@ -437,6 +439,7 @@ describe("SCIM user parity", () => {
     expect(order).toEqual(["profile", "sessions"]);
   });
 
+  /** @scenario "A failed revocation still leaves the new SCIM email in place" */
   it("retains a SCIM profile update when session revocation fails", async () => {
     const { auth, users, service } = harness({ membership: { user: user() } });
     vi.mocked(users.updateProfile).mockResolvedValue(user({ email: "new@acme.com" }));
