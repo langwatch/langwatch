@@ -111,14 +111,18 @@ export class AgentCallFailedError extends HandledError {
   }
 }
 
-/** The instance that held the call went away after it started the function. */
+/**
+ * The call reached an instance and that instance went away before it
+ * answered. The turn is not placed on another instance, because the function
+ * may have run.
+ */
 export class AgentDisconnectedError extends HandledError {
   declare readonly code: "agent_disconnected";
 
   constructor({ instanceId }: { instanceId: string }) {
     super(
       "agent_disconnected",
-      "The connected agent instance that was working on this call disconnected.",
+      "The connected agent instance that was working on this call disconnected before it answered. The turn was not sent again, because the function may have run.",
       {
         httpStatus: 502,
         fault: "customer",

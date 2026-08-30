@@ -240,8 +240,14 @@ export class ConnectGateway {
   private async deliverCall(session: Session, callId: string): Promise<void> {
     const stored = await this.core.readCallForSession(session.info, callId);
     if (!stored) return;
+    // The call counts as in flight only once the frame is written. A socket
+    // that went away between the nudge and the write never carried it, so the
+    // dispatcher is told to place the call again rather than to give up.
+    if (!this.send(session.socket, this.core.callFrame(stored))) {
+      await this.core.undeliver(session.info, callId);
+      return;
+    }
     session.activeCallIds.add(callId);
-    this.send(session.socket, this.core.callFrame(stored));
   }
 
   private async onInstanceNudge(session: Session, raw: string): Promise<void> {
@@ -331,9 +337,16 @@ export class ConnectGateway {
     ws.close(POLICY_VIOLATION_CLOSE_CODE, String(refused.meta.reason));
   }
 
-  private send(ws: WebSocket, frame: PlatformFrame): void {
-    if (ws.readyState !== WebSocket.OPEN) return;
-    ws.send(JSON.stringify(frame));
+  /** Writes one frame. False when the frame did not leave this process. */
+  private send(ws: WebSocket, frame: PlatformFrame): boolean {
+    if (ws.readyState !== WebSocket.OPEN) return false;
+    try {
+      ws.send(JSON.stringify(frame));
+      return true;
+    } catch (error) {
+      logger.warn({ error, type: frame.type }, "socket write failed");
+      return false;
+    }
   }
 
   /** Closes every socket with 1012 so the SDKs reconnect at once. */

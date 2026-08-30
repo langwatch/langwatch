@@ -164,11 +164,21 @@ Feature: Connected agents
     Then the instance receives the call frame
     And the result the instance sends is returned to replica B
 
+  # A call is delivered at most once. The platform places it again only when
+  # it can prove the frame never reached an instance.
   @unit
-  Scenario: A call is retried on another instance only before it is acknowledged
+  Scenario: A call the platform proves never arrived runs on another instance
     Given two live instances of one agent
-    When the first instance goes away before it acknowledges the call
+    When the platform records that the call frame never left for the first instance
     Then the call is dispatched again to the other instance
+
+  @unit
+  Scenario: A delivered call whose instance goes away is never repeated
+    Given two live instances of one agent
+    And the call frame reached the first instance
+    When that instance goes away before it acknowledges the call
+    Then the call fails with "agent_disconnected"
+    And no other instance receives it
 
   @unit
   Scenario: A call that was acknowledged is never repeated

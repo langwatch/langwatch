@@ -39,6 +39,12 @@ export const storedResultSchema = z.object({
   error: resultErrorSchema.optional(),
   /** Set by the gateway when the socket closed before the instance answered. */
   disconnected: z.boolean().optional(),
+  /**
+   * Set by the gateway when the call frame never left the platform: the
+   * socket was gone before the write, or the instance does not serve that
+   * agent. The function cannot have run, so the call is safe to retry.
+   */
+  undelivered: z.boolean().optional(),
 });
 export type StoredResult = z.infer<typeof storedResultSchema>;
 

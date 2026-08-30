@@ -39,7 +39,6 @@ import {
 } from "./errors";
 import type { InstanceRegistry, LiveInstance } from "./instance.registry";
 import {
-  callAckKey,
   callKey,
   INSTANCE_GONE_CHANNEL,
   instanceChannel,
@@ -354,9 +353,14 @@ export class CallDispatcher {
         case "result":
           return await this.readAnswer({ instance, envelope, sticky });
         case "gone": {
-          const acknowledged = await this.store.get(callAckKey(callId));
+          // The frame reached a socket. Whether the instance acknowledged it
+          // or not, the function may have started, so the turn is not placed
+          // again. A frame that never left says so through the result, which
+          // `readAnswer` reads.
           await this.retire({ projectId, instance, agentId: envelope.agentId });
-          return acknowledged ? { kind: "disconnected" } : { kind: "retry" };
+          const result = await this.readResult(callId);
+          if (result?.undelivered) return { kind: "retry" };
+          return { kind: "disconnected" };
         }
         case "timeout":
           await this.cancel({ callId, instanceId: instance.instanceId });
@@ -429,12 +433,15 @@ export class CallDispatcher {
   > {
     const { callId } = envelope;
     const result = await this.readResult(callId);
+    if (result?.undelivered) {
+      // The frame never left the platform, so the function did not start.
+      return { kind: "retry" };
+    }
     if (!result || result.disconnected) {
-      // The socket pod closed the call without an answer. Before the
-      // function started that is safe to try elsewhere; after, it is
-      // not, since the function may have run.
-      const acknowledged = await this.store.get(callAckKey(callId));
-      return acknowledged ? { kind: "disconnected" } : { kind: "retry" };
+      // The socket carried the call and then closed with no answer. The
+      // function may have run, so the turn is not placed on another
+      // instance.
+      return { kind: "disconnected" };
     }
     if (result.error) {
       throw remoteError(result.error);

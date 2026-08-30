@@ -393,11 +393,24 @@ export class AgentSessionCore {
       );
       await this.writeResult({
         stored,
-        result: { instanceId: session.instanceId, disconnected: true },
+        result: { instanceId: session.instanceId, undelivered: true },
       });
       return null;
     }
     return stored;
+  }
+
+  /**
+   * Records that a call frame never left the platform, so the dispatcher can
+   * run the turn on another instance. The function cannot have started.
+   */
+  async undeliver(session: SessionInfo, callId: string): Promise<void> {
+    const stored = await this.readStoredCall(callId);
+    if (!stored || stored.instanceId !== session.instanceId) return;
+    await this.writeResult({
+      stored,
+      result: { instanceId: session.instanceId, undelivered: true },
+    });
   }
 
   callFrame(stored: StoredCall): CallFrame {

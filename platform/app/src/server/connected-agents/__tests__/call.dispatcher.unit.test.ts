@@ -195,24 +195,28 @@ describe("CallDispatcher", () => {
     });
   });
 
-  describe("when the instance goes away before it acknowledges", () => {
-    /** @scenario "A call is retried on another instance only before it is acknowledged" */
+  describe("when the frame never reached the instance", () => {
+    /** @scenario "A call the platform proves never arrived runs on another instance" */
     it("dispatches the call again to the other instance", async () => {
       const first = await connectInstance({
         instanceId: "inst_1",
+        maxConcurrency: 4,
         behavior: async (_, reply) => {
-          await reply.gone();
+          // What the gateway writes when the socket went away between the
+          // nudge and the write, so the frame never left the platform.
+          await reply.result({ undelivered: true });
         },
       });
       const second = await connectInstance({
         instanceId: "inst_2",
+        maxConcurrency: 4,
         behavior: async (_, reply) => {
           await reply.ack();
           await reply.result({ output: "from the second" });
         },
       });
 
-      // Two threads: the rendezvous hash puts at least one on inst_1.
+      // Four threads: the rendezvous hash puts at least one on inst_1.
       const outcomes = await Promise.all(
         ["t1", "t2", "t3", "t4"].map((threadId) =>
           runtime.dispatcher.dispatch({
@@ -226,6 +230,40 @@ describe("CallDispatcher", () => {
       expect(first.received.length).toBeGreaterThan(0);
       expect(outcomes.every((o) => o.output === "from the second")).toBe(true);
       expect(second.received.length).toBe(4);
+    });
+  });
+
+  describe("when the instance goes away before it acknowledges", () => {
+    /** @scenario "A delivered call whose instance goes away is never repeated" */
+    it("fails with agent_disconnected and never reaches another instance", async () => {
+      await connectInstance({
+        instanceId: "inst_1",
+        maxConcurrency: 4,
+        behavior: async (_, reply) => {
+          // The frame reached the socket. The function may have started, so
+          // the turn is not placed again even with no acknowledgement.
+          await reply.gone();
+        },
+      });
+      const other = await connectInstance({
+        instanceId: "inst_2",
+        agentIds: ["agent_1"],
+        behavior: async (_, reply) => {
+          await reply.ack();
+          await reply.result({ output: "never" });
+        },
+      });
+      // Fill inst_2 so the pick lands on inst_1 for sure.
+      await runtime.registry.incrementInflight("inst_2");
+
+      await expect(
+        runtime.dispatcher.dispatch({
+          projectId,
+          agent: agent(),
+          call: call(),
+        }),
+      ).rejects.toMatchObject({ code: "agent_disconnected" });
+      expect(other.received).toEqual([]);
     });
   });
 

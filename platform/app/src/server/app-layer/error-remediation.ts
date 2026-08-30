@@ -383,7 +383,7 @@ const registry = {
   },
   agent_disconnected: {
     tips: [
-      "The turn is never sent again once the function started, since it may have side effects; start the process again and run again",
+      "The turn is never sent again once the call reached the process, since the function may have side effects; start the process again and run again",
     ],
   },
   agent_instance_lost: {
