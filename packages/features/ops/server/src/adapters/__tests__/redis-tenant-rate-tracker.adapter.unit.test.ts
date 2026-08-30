@@ -53,9 +53,7 @@ function redisFake() {
     }
     return fields.length;
   });
-  vi.spyOn(redis, "smembers").mockImplementation(async (key) => [
-    ...(sets.get(text(key)) ?? []),
-  ]);
+  vi.spyOn(redis, "smembers").mockImplementation(async (key) => [...(sets.get(text(key)) ?? [])]);
   vi.spyOn(redis, "get").mockImplementation(async (key) => values.get(text(key)) ?? null);
   vi.spyOn(redis, "set").mockImplementation(async (key, value) => {
     values.set(text(key), text(value));
@@ -118,8 +116,7 @@ describe("RedisTenantRateTrackerAdapter", () => {
         featureFlags: flags,
       });
       isEnabled.mockImplementation(
-        async (_key, target) =>
-          target.kind === "project" && target.projectId === "proj_killed",
+        async (_key, target) => target.kind === "project" && target.projectId === "proj_killed",
       );
 
       await tracker.record("proj_killed");
@@ -158,17 +155,12 @@ describe("RedisTenantRateTrackerAdapter", () => {
     });
     vi.spyOn(redis, "get").mockRejectedValueOnce(new Error("down"));
 
-    expect(await tracker.getCachedBaseline("proj_acme")).toBeNull();
+    expect(await tracker.tryGetCachedBaseline("proj_acme")).toBeNull();
     await tracker.setCachedBaseline({
       tenantId: "proj_acme",
       baseline: 0,
       ttlSeconds: 600,
     });
-    expect(redis.set).toHaveBeenCalledWith(
-      "obs:tenant_rate:baseline:proj_acme",
-      "0",
-      "EX",
-      600,
-    );
+    expect(redis.set).toHaveBeenCalledWith("obs:tenant_rate:baseline:proj_acme", "0", "EX", 600);
   });
 });

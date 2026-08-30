@@ -1,9 +1,6 @@
 import type { Anomaly } from "@langwatch/ops-contract";
 import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
-import type {
-  FeatureFlagService,
-  FeatureFlagTarget,
-} from "@langwatch/feature-flag-contract";
+import type { FeatureFlagService, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
 import { describe, expect, it, vi } from "vitest";
 import { AnomalyHardTierAlertPort } from "../../ports/anomaly-hard-tier-alert.port";
 import { AnomalyRateTrackerPort } from "../../ports/anomaly-rate-tracker.port";
@@ -25,13 +22,13 @@ function projectIdOf(target: FeatureFlagTarget): string | undefined {
 class RateTrackerFake extends AnomalyRateTrackerPort {
   readonly baselines = new Map<string, number>();
   readonly listActiveTenants = vi.fn<() => Promise<string[]>>(async () => []);
-  readonly currentWindowCount = vi.fn<
-    (tenantId: string, seconds: number) => Promise<number>
-  >(async () => 0);
-  readonly perMinuteSeries = vi.fn<
-    (tenantId: string, seconds: number) => Promise<number[]>
-  >(async () => []);
-  readonly getCachedBaseline = vi.fn<(tenantId: string) => Promise<number | null>>(
+  readonly currentWindowCount = vi.fn<(tenantId: string, seconds: number) => Promise<number>>(
+    async () => 0,
+  );
+  readonly perMinuteSeries = vi.fn<(tenantId: string, seconds: number) => Promise<number[]>>(
+    async () => [],
+  );
+  readonly tryGetCachedBaseline = vi.fn<(tenantId: string) => Promise<number | null>>(
     async (tenantId) => this.baselines.get(tenantId) ?? null,
   );
   readonly setCachedBaseline = vi.fn<
@@ -55,12 +52,10 @@ class AnomalyStateFake extends AnomalyStatePort {
       this.anomalies.delete(`${kind}:${tenantId}`);
     },
   );
-  readonly tryGet = vi.fn<
-    (tenantId: string, kind: Anomaly["kind"]) => Promise<Anomaly | null>
-  >(async (tenantId, kind) => this.anomalies.get(`${kind}:${tenantId}`) ?? null);
-  readonly list = vi.fn<() => Promise<Anomaly[]>>(async () => [
-    ...this.anomalies.values(),
-  ]);
+  readonly tryGet = vi.fn<(tenantId: string, kind: Anomaly["kind"]) => Promise<Anomaly | null>>(
+    async (tenantId, kind) => this.anomalies.get(`${kind}:${tenantId}`) ?? null,
+  );
+  readonly list = vi.fn<() => Promise<Anomaly[]>>(async () => [...this.anomalies.values()]);
 }
 
 class HardTierAlertsFake extends AnomalyHardTierAlertPort {
@@ -159,9 +154,7 @@ describe("AnomalyDetectorService", () => {
 
     await detector.tick();
 
-    expect(anomalyState.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ tier: "hard" }),
-    );
+    expect(anomalyState.upsert).toHaveBeenCalledWith(expect.objectContaining({ tier: "hard" }));
     expect(alerts.notify).toHaveBeenCalledTimes(1);
   });
 
@@ -182,9 +175,7 @@ describe("AnomalyDetectorService", () => {
     rateTracker.currentWindowCount.mockResolvedValue(500);
 
     await detector.tick();
-    expect(anomalyState.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ triggeredAt }),
-    );
+    expect(anomalyState.upsert).toHaveBeenCalledWith(expect.objectContaining({ triggeredAt }));
 
     rateTracker.currentWindowCount.mockResolvedValue(50);
     await detector.tick();
@@ -200,9 +191,7 @@ describe("AnomalyDetectorService", () => {
       rateTracker.listActiveTenants.mockResolvedValue(["proj_killed", "proj_normal"]);
       rateTracker.perMinuteSeries.mockResolvedValue(stableBaseline);
       rateTracker.currentWindowCount.mockResolvedValue(500);
-      isEnabled.mockImplementation(
-        async (_key, target) => projectIdOf(target) === "proj_killed",
-      );
+      isEnabled.mockImplementation(async (_key, target) => projectIdOf(target) === "proj_killed");
 
       const result = await detector.tick();
 

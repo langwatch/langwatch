@@ -46,7 +46,7 @@ describe("ClickHouseSuiteRunRepository", () => {
   it("maps the complete suite run state shape", async () => {
     const { repository } = setup();
     await expect(
-      repository.getSuiteRunState({
+      repository.tryGetSuiteRunState({
         projectId: "project_1",
         batchRunId: "batch_1",
       }),
@@ -55,7 +55,7 @@ describe("ClickHouseSuiteRunRepository", () => {
 
   it("deduplicates latest state by the tenant and batch tuple", async () => {
     const { repository, query } = setup([]);
-    await repository.getSuiteRunState({ projectId: "project_1", batchRunId: "batch_1" });
+    await repository.tryGetSuiteRunState({ projectId: "project_1", batchRunId: "batch_1" });
     const sql = query.mock.calls[0]?.[0]?.query as string;
     expect(sql).toContain("(t.TenantId, t.BatchRunId, t.UpdatedAt) IN");
     expect(sql).toContain("GROUP BY TenantId, BatchRunId");

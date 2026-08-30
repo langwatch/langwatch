@@ -54,7 +54,7 @@ export class ApiKeyLifecycleService {
       throw new ApiKeyReservedNameError(parsed.name);
     }
     const bindings = parsed.bindings;
-    const permissions = this.grants.validatePermissionSelection({
+    const permissions = this.grants.tryValidatePermissionSelection({
       bindings,
       permissionMode: parsed.permissionMode ?? "all",
       permissions: parsed.permissions,
@@ -76,9 +76,7 @@ export class ApiKeyLifecycleService {
             },
           ];
     if (parsed.userId && effectiveBindings.length === 0) {
-      throw new ApiKeyScopeViolationError(
-        "A personal API key needs at least one role binding",
-      );
+      throw new ApiKeyScopeViolationError("A personal API key needs at least one role binding");
     }
     const generated = this.options.tokens.generate({
       prefix: parsed.ingestSourceType ? INGEST_KEY_PREFIX : API_KEY_PREFIX,
@@ -131,11 +129,9 @@ export class ApiKeyLifecycleService {
       throw new ApiKeyAlreadyRevokedError(input.id);
     }
     const hasPermissionUpdate =
-      input.bindings !== void 0 ||
-      input.permissionMode !== void 0 ||
-      input.permissions !== void 0;
+      input.bindings !== void 0 || input.permissionMode !== void 0 || input.permissions !== void 0;
     const permissions = hasPermissionUpdate
-      ? this.grants.validatePermissionSelection({
+      ? this.grants.tryValidatePermissionSelection({
           bindings: input.bindings ?? [],
           permissionMode: input.permissionMode ?? existing.permissionMode,
           permissions: input.permissions,
@@ -219,10 +215,7 @@ export class ApiKeyLifecycleService {
     return publicApiKey(await this.repository.revoke({ id: input.id }));
   }
 
-  private async getInOrganization(
-    id: string,
-    organizationId: string,
-  ): Promise<StoredApiKey> {
+  private async getInOrganization(id: string, organizationId: string): Promise<StoredApiKey> {
     const row = await this.repository.tryFindByIdInOrganization({
       id,
       organizationId,

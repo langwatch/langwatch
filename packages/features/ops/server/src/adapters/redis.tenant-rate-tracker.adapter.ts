@@ -12,8 +12,7 @@ export class RedisTenantRateTrackerAdapter extends AnomalyRateTrackerPort {
   private static readonly activeSet = "obs:tenant_rate:active";
   private static readonly baselinePrefix = "obs:tenant_rate:baseline:";
   private static readonly ttlSeconds = 8 * 24 * 3600;
-  private static readonly retentionMinutes =
-    RedisTenantRateTrackerAdapter.ttlSeconds / 60;
+  private static readonly retentionMinutes = RedisTenantRateTrackerAdapter.ttlSeconds / 60;
   private static readonly trimBatch = 500;
   static readonly baselineTtlSeconds = 60 * 60;
 
@@ -71,9 +70,7 @@ export class RedisTenantRateTrackerAdapter extends AnomalyRateTrackerPort {
   async currentWindowCount(tenantId: string, windowSeconds: number): Promise<number> {
     const minuteNow = Math.floor(this.now() / 60_000);
     const minutesBack = Math.max(1, Math.ceil(windowSeconds / 60));
-    const fields = Array.from({ length: minutesBack }, (_, index) =>
-      String(minuteNow - index),
-    );
+    const fields = Array.from({ length: minutesBack }, (_, index) => String(minuteNow - index));
     const values = await this.redis.hmget(
       `${RedisTenantRateTrackerAdapter.keyPrefix}${tenantId}`,
       ...fields,
@@ -132,7 +129,7 @@ export class RedisTenantRateTrackerAdapter extends AnomalyRateTrackerPort {
     return await this.redis.smembers(RedisTenantRateTrackerAdapter.activeSet);
   }
 
-  async getCachedBaseline(tenantId: string): Promise<number | null> {
+  async tryGetCachedBaseline(tenantId: string): Promise<number | null> {
     try {
       const raw = await this.redis.get(
         `${RedisTenantRateTrackerAdapter.baselinePrefix}${tenantId}`,
@@ -147,7 +144,7 @@ export class RedisTenantRateTrackerAdapter extends AnomalyRateTrackerPort {
     } catch (err) {
       logger.debug(
         { tenantId, err: err instanceof Error ? err.message : String(err) },
-        "TenantRateTracker.getCachedBaseline failed (non-fatal)",
+        "TenantRateTracker.tryGetCachedBaseline failed (non-fatal)",
       );
       return null;
     }
@@ -202,11 +199,7 @@ export class RedisTenantRateTrackerAdapter extends AnomalyRateTrackerPort {
     }
 
     try {
-      for (
-        let index = 0;
-        index < fields.length;
-        index += RedisTenantRateTrackerAdapter.trimBatch
-      ) {
+      for (let index = 0; index < fields.length; index += RedisTenantRateTrackerAdapter.trimBatch) {
         await this.redis.hdel(
           key,
           ...fields.slice(index, index + RedisTenantRateTrackerAdapter.trimBatch),

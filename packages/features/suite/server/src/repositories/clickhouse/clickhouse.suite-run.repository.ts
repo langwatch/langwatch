@@ -157,7 +157,7 @@ export class ClickHouseSuiteRunRepository
     }
   }
 
-  async getSuiteRunState(input: SuiteRunStateInput): Promise<SuiteRunStateData | null> {
+  async tryGetSuiteRunState(input: SuiteRunStateInput): Promise<SuiteRunStateData | null> {
     const client = await this.options.resolveClient(input.projectId);
     const result = await client.query({
       query: `

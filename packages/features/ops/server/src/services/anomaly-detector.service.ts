@@ -111,10 +111,7 @@ export class AnomalyDetectorService {
           );
         }
       }
-      logger.error(
-        { tenantId, currentRate: hardPerMin, baseline },
-        "HARD-tier rate anomaly",
-      );
+      logger.error({ tenantId, currentRate: hardPerMin, baseline }, "HARD-tier rate anomaly");
       return "surfaced";
     }
 
@@ -127,10 +124,7 @@ export class AnomalyDetectorService {
         existing,
       });
       await this.anomalyState.upsert(anomaly);
-      logger.warn(
-        { tenantId, currentRate: surfacePerMin, baseline },
-        "SURFACE-tier rate anomaly",
-      );
+      logger.warn({ tenantId, currentRate: surfacePerMin, baseline }, "SURFACE-tier rate anomaly");
       return "surfaced";
     }
 
@@ -184,14 +178,11 @@ export class AnomalyDetectorService {
   }
 
   private async resolveBaseline(tenantId: string): Promise<number | null> {
-    const cached = await this.rateTracker.getCachedBaseline(tenantId);
+    const cached = await this.rateTracker.tryGetCachedBaseline(tenantId);
     if (cached !== null) {
       return cached < MIN_BASELINE_RATE ? null : cached;
     }
-    const series = await this.rateTracker.perMinuteSeries(
-      tenantId,
-      BASELINE_LOOKBACK_SECONDS,
-    );
+    const series = await this.rateTracker.perMinuteSeries(tenantId, BASELINE_LOOKBACK_SECONDS);
     const nonZero = series.filter((value) => value > 0);
     if (nonZero.length < 60) {
       await this.rateTracker.setCachedBaseline({

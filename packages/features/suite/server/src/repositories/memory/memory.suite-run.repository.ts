@@ -33,7 +33,7 @@ export class MemorySuiteRunRepository
     }
   }
 
-  async getSuiteRunState(_input: SuiteRunStateInput): Promise<SuiteRunStateData | null> {
+  async tryGetSuiteRunState(_input: SuiteRunStateInput): Promise<SuiteRunStateData | null> {
     return null;
   }
 

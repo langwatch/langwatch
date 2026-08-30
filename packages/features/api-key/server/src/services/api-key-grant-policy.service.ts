@@ -21,10 +21,7 @@ export class ApiKeyGrantPolicyService {
     private readonly options: ApiKeyDependencies,
   ) {}
 
-  async ensureCallerIsOrgMember(input: {
-    userId: string;
-    organizationId: string;
-  }): Promise<void> {
+  async ensureCallerIsOrgMember(input: { userId: string; organizationId: string }): Promise<void> {
     const allowed = await this.options.authz.hasPermission({
       userId: input.userId,
       organizationId: input.organizationId,
@@ -45,12 +42,7 @@ export class ApiKeyGrantPolicyService {
     for (const binding of input.bindings) {
       await this.validateScope(binding, input.organizationId);
     }
-    await this.assertCeiling(
-      input.userId,
-      input.organizationId,
-      input.bindings,
-      input.permissions,
-    );
+    await this.assertCeiling(input.userId, input.organizationId, input.bindings, input.permissions);
   }
 
   async isOrgAdmin(input: { userId: string; organizationId: string }): Promise<boolean> {
@@ -63,10 +55,7 @@ export class ApiKeyGrantPolicyService {
     );
   }
 
-  async isOrgAdminApiKey(input: {
-    apiKeyId: string;
-    organizationId: string;
-  }): Promise<boolean> {
+  async isOrgAdminApiKey(input: { apiKeyId: string; organizationId: string }): Promise<boolean> {
     const bindings = await this.options.authz.listScopeBindings({
       organizationId: input.organizationId,
       scopeType: "ORGANIZATION",
@@ -77,7 +66,7 @@ export class ApiKeyGrantPolicyService {
     );
   }
 
-  validatePermissionSelection(input: {
+  tryValidatePermissionSelection(input: {
     bindings: ApiKeyScope[];
     permissionMode: string;
     permissions?: string[];
@@ -93,14 +82,10 @@ export class ApiKeyGrantPolicyService {
         );
       }
       if (!hasCustomBinding) {
-        throw new ApiKeyScopeViolationError(
-          "restricted mode requires at least one CUSTOM binding",
-        );
+        throw new ApiKeyScopeViolationError("restricted mode requires at least one CUSTOM binding");
       }
       if (!hasPermissions) {
-        throw new ApiKeyScopeViolationError(
-          "CUSTOM bindings require at least one permission",
-        );
+        throw new ApiKeyScopeViolationError("CUSTOM bindings require at least one permission");
       }
     }
 
@@ -136,10 +121,7 @@ export class ApiKeyGrantPolicyService {
     }
   }
 
-  async validateScope(
-    binding: ApiKeyScope,
-    organizationId: string,
-  ): Promise<ResolvedScope> {
+  async validateScope(binding: ApiKeyScope, organizationId: string): Promise<ResolvedScope> {
     if (binding.scopeType === "ORGANIZATION") {
       if (binding.scopeId !== organizationId) {
         throw new ApiKeyScopeViolationError(
@@ -163,9 +145,7 @@ export class ApiKeyGrantPolicyService {
     }
     const project = await this.options.projects.getWithTeam(binding.scopeId);
     if (project.archivedAt || project.team.organizationId !== organizationId) {
-      throw new ApiKeyScopeViolationError(
-        `Project ${binding.scopeId} not found or archived`,
-      );
+      throw new ApiKeyScopeViolationError(`Project ${binding.scopeId} not found or archived`);
     }
     return {
       type: "project",
@@ -183,11 +163,7 @@ export class ApiKeyGrantPolicyService {
   ): Promise<void> {
     for (const binding of bindings) {
       const scope = await this.validateScope(binding, organizationId);
-      const checks = await this.permissionsForBinding(
-        binding,
-        organizationId,
-        permissions,
-      );
+      const checks = await this.permissionsForBinding(binding, organizationId, permissions);
       for (const permission of checks) {
         const authzScope = this.authzScope(scope, organizationId);
         const allowed = await this.options.authz.can({
@@ -249,9 +225,7 @@ export class ApiKeyGrantPolicyService {
     if (
       !role ||
       !Array.isArray(role.permissions) ||
-      !role.permissions.every(
-        (permission): permission is string => typeof permission === "string",
-      )
+      !role.permissions.every((permission): permission is string => typeof permission === "string")
     ) {
       throw new ApiKeyScopeViolationError(
         `Custom role ${binding.customRoleId} not found or has malformed permissions`,
