@@ -42,6 +42,14 @@
       "lineLength": 160
     },
     {
+      "file": "packages/features/dataset/server/src/services/dataset-chunk.service.ts",
+      "moduleLines": 1015,
+      "methodLines": 155,
+      "statements": 24,
+      "complexity": 24,
+      "lineLength": 160
+    },
+    {
       "file": "packages/features/dataset/server/src/services/dataset.service.ts",
       "moduleLines": 692,
       "methodLines": 80,
