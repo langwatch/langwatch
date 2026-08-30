@@ -19,7 +19,7 @@
  * behind, and only answers 409 `role_binding_already_exists` once the first
  * one's row has landed.
  */
-import type { RoleBindingScopeType, TeamUserRole } from "@langwatch/prisma-client/generated";
+import type { RoleBindingScopeType, TeamUserRole } from "@langwatch/authz-contract";
 
 /** One binding as both the list and the writes report it. */
 export type BindingWire = {

@@ -19,7 +19,6 @@
  */
 import type { EndpointVariables, ServiceContext } from "@langwatch/api/rest";
 import type { OrganizationLedgerActor } from "@langwatch/organization-contract";
-import type { Organization } from "@langwatch/prisma-client/generated";
 import type { Role, RoleService } from "@langwatch/role-contract";
 import type { Context, MiddlewareHandler } from "hono";
 import { z } from "zod";
@@ -76,7 +75,19 @@ const roleWire = (
   updatedAt: role.updatedAt,
 });
 
-const organizationOf = (c: Context): Organization => c.get("organization") as Organization;
+/**
+ * The organization the request is scoped to, as this transport reads it.
+ *
+ * Both routes take only `.id` off it, and typing the whole generated
+ * `Organization` model here made the transport depend on Prisma's row shape for
+ * one string — which is what `api-transport-import-boundary` reports. The
+ * middleware still puts the full record on the context; this names the part
+ * that is used.
+ */
+type RequestOrganization = { id: string };
+
+const organizationOf = (c: Context): RequestOrganization =>
+  c.get("organization") as RequestOrganization;
 
 /**
  * REST for the organization's custom roles.

@@ -19,13 +19,13 @@
  * would record the same mutation twice.
  */
 import type { EndpointVariables, ServiceContext } from "@langwatch/api/rest";
-import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
-import type { OrganizationLedgerActor } from "@langwatch/organization-contract";
 import {
-  type Organization,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@langwatch/prisma-client/generated";
+  roleBindingScopeTypeSchema,
+  teamUserRoleSchema,
+  type AuthzGrantsService,
+  type AuthzService,
+} from "@langwatch/authz-contract";
+import type { OrganizationLedgerActor } from "@langwatch/organization-contract";
 import type { Context, MiddlewareHandler } from "hono";
 import { z } from "zod";
 
@@ -52,10 +52,10 @@ const principalSchema = z.object({
 const bindingSchema = z.object({
   id: z.string(),
   principal: principalSchema,
-  role: z.nativeEnum(TeamUserRole),
+  role: teamUserRoleSchema,
   customRoleId: z.string().nullable(),
   customRoleName: z.string().nullable(),
-  scopeType: z.nativeEnum(RoleBindingScopeType),
+  scopeType: roleBindingScopeTypeSchema,
   scopeId: z.string(),
   scopeName: z.string().nullable(),
   createdAt: z.date(),
@@ -74,7 +74,7 @@ const listQuerySchema = z.object({
   userId: z.string().min(1).optional(),
   groupId: z.string().min(1).optional(),
   apiKeyId: z.string().min(1).optional(),
-  scopeType: z.nativeEnum(RoleBindingScopeType).optional(),
+  scopeType: roleBindingScopeTypeSchema.optional(),
   scopeId: z.string().min(1).optional(),
   offset: z.coerce.number().int().min(0).optional(),
   limit: z.coerce.number().int().min(1).max(200).optional(),
@@ -85,14 +85,14 @@ const createBindingSchema = z.object({
   userId: z.string().min(1).optional(),
   groupId: z.string().min(1).optional(),
   apiKeyId: z.string().min(1).optional(),
-  role: z.nativeEnum(TeamUserRole),
+  role: teamUserRoleSchema,
   customRoleId: z.string().min(1).optional(),
-  scopeType: z.nativeEnum(RoleBindingScopeType),
+  scopeType: roleBindingScopeTypeSchema,
   scopeId: z.string().min(1),
 });
 
 const updateBindingSchema = z.object({
-  role: z.nativeEnum(TeamUserRole),
+  role: teamUserRoleSchema,
   customRoleId: z.string().min(1).optional(),
 });
 
@@ -135,7 +135,19 @@ const rowMatchesFilters = (row: OrgBindingRow, query: z.infer<typeof listQuerySc
   (query.scopeType === undefined || row.scopeType === query.scopeType) &&
   (query.scopeId === undefined || row.scopeId === query.scopeId);
 
-const organizationOf = (c: Context): Organization => c.get("organization") as Organization;
+/**
+ * The organization the request is scoped to, as this transport reads it.
+ *
+ * Both routes take only `.id` off it, and typing the whole generated
+ * `Organization` model here made the transport depend on Prisma's row shape for
+ * one string — which is what `api-transport-import-boundary` reports. The
+ * middleware still puts the full record on the context; this names the part
+ * that is used.
+ */
+type RequestOrganization = { id: string };
+
+const organizationOf = (c: Context): RequestOrganization =>
+  c.get("organization") as RequestOrganization;
 
 /**
  * The just-written binding as the list reports it, so a write's response is
