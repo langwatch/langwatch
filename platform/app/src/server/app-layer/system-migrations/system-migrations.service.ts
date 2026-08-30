@@ -74,9 +74,7 @@ export interface SystemMigrationEnrollmentStore {
   isEnrolled(args: { organizationId: string; migrationName: string }): Promise<boolean>;
   countEnrolledByMigration(): Promise<Map<string, number>>;
   countOrganizations(): Promise<number>;
-  searchOrganizations(args: {
-    query: string;
-  }): Promise<Array<{ id: string; name: string }>>;
+  searchOrganizations(args: { query: string }): Promise<Array<{ id: string; name: string }>>;
   create(args: {
     organizationId: string;
     migrationName: string;
@@ -102,9 +100,7 @@ export interface SystemMigrationEnrollmentStore {
 }
 
 export interface SystemMigrationStateReader {
-  findStatusCounts(args: {
-    migrationName: string;
-  }): Promise<Record<TenantMigrationStatus, number>>;
+  findStatusCounts(args: { migrationName: string }): Promise<Record<TenantMigrationStatus, number>>;
 
   findRecordsByStatus(args: {
     migrationName: string;
@@ -274,11 +270,7 @@ export class SystemMigrationsService {
        */
       rollbackEffects?: Record<
         string,
-        (args: {
-          tenantId: string;
-          actorUserId: string;
-          decidedAt: string;
-        }) => Promise<void>
+        (args: { tenantId: string; actorUserId: string; decidedAt: string }) => Promise<void>
       >;
       /**
        * What must HOLD before a rollback may even be pinned, per migration
@@ -495,7 +487,14 @@ export class SystemMigrationsService {
     const eligible = await this.deps.enrollments.findCohortEligibleOrganizations({
       migrationName,
       enrolledForMigrationName: previous?.name,
-      excludeOrganizationIds: this.deps.privateDataplaneOrganizationIds(),
+      // Two independent switches, and both are the operator's. Naming no ids
+      // IS the private-dataplane lift: the environment's routing table stays
+      // the only place those organizations are listed, so an empty exclusion
+      // draws them rather than a second list repeating them.
+      excludeOrganizationIds: includePrivateDataplane
+        ? []
+        : this.deps.privateDataplaneOrganizationIds(),
+      includeEnterprise,
     });
     const picked = sample({ pool: eligible, count: sampleSize });
     const { insertedCount } = await this.deps.enrollments.createMany({
@@ -687,8 +686,7 @@ export class SystemMigrationsService {
     return {
       status: record?.status ?? null,
       waiting:
-        record != null &&
-        (this.deps.waitingReports?.[migrationName]?.(record.report) ?? false),
+        record != null && (this.deps.waitingReports?.[migrationName]?.(record.report) ?? false),
     };
   }
 
@@ -707,9 +705,7 @@ export class SystemMigrationsService {
   private requireRegisteredMigration(
     migrationName: string,
   ): ReturnType<SystemMigrationsService["deps"]["migrations"]>[number] {
-    const migration = this.deps
-      .migrations()
-      .find((candidate) => candidate.name === migrationName);
+    const migration = this.deps.migrations().find((candidate) => candidate.name === migrationName);
     if (!migration) throw new MigrationUnknownError();
     return migration;
   }
@@ -778,9 +774,7 @@ export class SystemMigrationsService {
    * never turns "unknown migration" into the wrong refusal.
    */
   private requireEnrollmentDecidesSomething(migrationName: string): void {
-    const migration = this.deps
-      .migrations()
-      .find((candidate) => candidate.name === migrationName);
+    const migration = this.deps.migrations().find((candidate) => candidate.name === migrationName);
     if (migration?.enrolledAutomatically) {
       throw new MigrationEnrolledAutomaticallyError({ migrationName });
     }
@@ -939,8 +933,7 @@ export class SystemMigrationsService {
     // decision that must not reuse the old moment (and so must not dedupe
     // against the old event).
     const isRetry = record?.status === "rolled_back";
-    const decidedAt =
-      (isRetry ? rollbackDecidedAt(priorReport) : null) ?? new Date().toISOString();
+    const decidedAt = (isRetry ? rollbackDecidedAt(priorReport) : null) ?? new Date().toISOString();
     const pin = {
       migrationName,
       tenantId,
@@ -1001,9 +994,7 @@ function rollbackDecidedAt(report: Record<string, unknown>): string | null {
  * A member another pass was working reads as held, for the same reason: the
  * organization is not finished, and the next pass picks that member up.
  */
-function statusOfMemberSummary(
-  summary: MigrationPassSummary,
-): TenantMigrationStatus | null {
+function statusOfMemberSummary(summary: MigrationPassSummary): TenantMigrationStatus | null {
   if (summary.parked > 0) return "parked";
   if (summary.held > 0 || summary.claimed > 0) return "migrated";
   if (summary.alreadyRolledBack > 0) return "rolled_back";
