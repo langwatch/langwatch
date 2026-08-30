@@ -337,6 +337,55 @@ describe("API-key service", () => {
     expect(tryGetIdentity).toHaveBeenCalledWith(targetProject.id);
   });
 
+  /**
+   * The self-scoping half of token resolution, which every other case here
+   * skips by passing a projectId.
+   *
+   * An ingestion key authenticates with the bearer token alone — the OTLP
+   * exporter inside a wrapped `langwatch <tool>` child sends no projectId
+   * header and no basic auth — so the resolver has to derive the bound project
+   * from the key's own PROJECT-scoped binding. When it did not, the receiver
+   * answered "Invalid auth token" to every real ingest. Found by dogfooding,
+   * because it bites at the receiver and nowhere a typecheck or a
+   * management-only test looks.
+   */
+  it("derives the project from a key bound to exactly one, with no projectId supplied", async () => {
+    const deps = dependencies();
+    const service = createService(new MemoryApiKeys(), deps);
+    const created = await service.create({
+      name: "ingestion key",
+      organizationId: "org-1",
+      permissionMode: "all",
+      bindings: [{ scopeType: "PROJECT", scopeId: resolvedIdentity.id, role: "ADMIN" }],
+    });
+
+    await expect(service.tryResolveToken({ token: created.token })).resolves.toMatchObject({
+      type: "apiKey",
+      project: { id: resolvedIdentity.id },
+    });
+  });
+
+  /**
+   * The other side of the same rule: two bindings name no single project, so
+   * self-scoping would have to guess. It refuses instead, and the caller has
+   * to say which project it means.
+   */
+  it("refuses to guess for a key bound to more than one project", async () => {
+    const deps = dependencies();
+    const service = createService(new MemoryApiKeys(), deps);
+    const created = await service.create({
+      name: "two-project key",
+      organizationId: "org-1",
+      permissionMode: "all",
+      bindings: [
+        { scopeType: "PROJECT", scopeId: resolvedIdentity.id, role: "ADMIN" },
+        { scopeType: "PROJECT", scopeId: "project-2", role: "ADMIN" },
+      ],
+    });
+
+    await expect(service.tryResolveToken({ token: created.token })).resolves.toBeNull();
+  });
+
   it("upgrades a legacy SHA-256 hash after successful verification", async () => {
     const repository = new MemoryApiKeys();
     const service = createService(repository);
