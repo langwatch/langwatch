@@ -396,6 +396,26 @@ function canonicalTestBody(source: ts.SourceFile, callback: TestCallback): strin
     .trim();
 }
 
+/**
+ * The case table of an `it.each(...)`, or "" for an ordinary test.
+ *
+ * Two `it.each` blocks over different tables share one callback by design —
+ * that is what parameterising a test IS — so keying duplicates on the callback
+ * alone reported five legitimate suites as copies of each other. In
+ * `noRawErrorToasts` two blocks both run
+ * `expect(leaksIn(source)).toBe(true)` over completely different lists of leak
+ * shapes; the tables are the tests.
+ */
+function canonicalCaseTable(source: ts.SourceFile, call: ts.CallExpression): string {
+  if (!ts.isCallExpression(call.expression)) return "";
+  const printer = ts.createPrinter({ removeComments: true });
+  return call.expression.arguments
+    .map((argument) =>
+      printer.printNode(ts.EmitHint.Unspecified, argument, source).replaceAll(/\s+/g, " "),
+    )
+    .join("|");
+}
+
 function lintTestFile(file: string): ArchitectureViolation[] {
   const source = ts.createSourceFile(
     file,
@@ -423,7 +443,11 @@ function lintTestFile(file: string): ArchitectureViolation[] {
       });
     }
 
-    const bodyKey = `${test.scope}:${canonicalTestBody(source, test.callback)}`;
+    const bodyKey = [
+      test.scope,
+      canonicalCaseTable(source, test.call),
+      canonicalTestBody(source, test.callback),
+    ].join(":");
     const duplicate = duplicateBodies.get(bodyKey);
     if (duplicate) {
       violations.push({

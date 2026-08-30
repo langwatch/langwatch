@@ -123,6 +123,36 @@ describe("test quality", () => {
     expect(policies(root, file)).toEqual(["test-quality"]);
   });
 
+  it("does not call two it.each blocks over different tables duplicates", () => {
+    const root = mkdtempSync(join(tmpdir(), "test-quality-each-tables-"));
+    // Parameterised suites share one callback by design; the tables are what
+    // make them different tests.
+    const file = writeFixture(
+      root,
+      "src/example.test.ts",
+      [
+        'it.each([["a", 1], ["b", 2]])("handles %s", (_n, v) => { expect(f(v)).toBe(true); });',
+        'it.each([["c", 3], ["d", 4]])("handles %s", (_n, v) => { expect(f(v)).toBe(true); });',
+      ].join("\n"),
+    );
+
+    expect(policies(root, file)).toEqual([]);
+  });
+
+  it("still catches two it.each blocks over the same table", () => {
+    const root = mkdtempSync(join(tmpdir(), "test-quality-each-same-table-"));
+    const file = writeFixture(
+      root,
+      "src/example.test.ts",
+      [
+        'it.each([["a", 1]])("handles %s", (_n, v) => { expect(f(v)).toBe(true); });',
+        'it.each([["a", 1]])("handles %s", (_n, v) => { expect(f(v)).toBe(true); });',
+      ].join("\n"),
+    );
+
+    expect(policies(root, file)).toEqual(["test-quality"]);
+  });
+
   it("does not accept an unfinished expect call as an assertion", () => {
     const root = mkdtempSync(join(tmpdir(), "test-quality-unfinished-expect-"));
     const file = writeFixture(
