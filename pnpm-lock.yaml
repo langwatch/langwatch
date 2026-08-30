@@ -5550,9 +5550,6 @@ importers:
       '@langwatch/annotation-contract':
         specifier: workspace:*
         version: link:../../annotation/contract
-      '@langwatch/annotation-web':
-        specifier: workspace:*
-        version: link:../../annotation/web
       '@langwatch/coding-agent-contract':
         specifier: workspace:*
         version: link:../../coding-agent/contract

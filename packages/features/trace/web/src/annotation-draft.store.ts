@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { AnnotationAnchorColumns } from "@langwatch/annotation-contract";
-import type { AnnotationMode, ScoreOptions } from "@langwatch/annotation-web";
+import type { AnnotationMode, ScoreOptions } from "@langwatch/annotation-contract";
 
 /** What the reviewer is writing, and which part of the trace it is about. */
 export interface AnnotationDraft extends AnnotationAnchorColumns {
@@ -38,10 +38,7 @@ interface AnnotationDraftState {
   openDraft: (params: OpenAnnotationDraftParams) => void;
   patchDraft: (
     patch: Partial<
-      Omit<
-        AnnotationDraft,
-        "traceId" | "mode" | "annotationId" | keyof AnnotationAnchorColumns
-      >
+      Omit<AnnotationDraft, "traceId" | "mode" | "annotationId" | keyof AnnotationAnchorColumns>
     >,
   ) => void;
   closeDraft: () => void;
@@ -58,15 +55,7 @@ interface AnnotationDraftState {
  */
 export const useAnnotationDraftStore = create<AnnotationDraftState>((set) => ({
   draft: null,
-  openDraft: ({
-    traceId,
-    mode,
-    annotationId,
-    output,
-    anchorKind,
-    anchorId,
-    anchorPath,
-  }) =>
+  openDraft: ({ traceId, mode, annotationId, output, anchorKind, anchorId, anchorPath }) =>
     set({
       draft: {
         traceId,

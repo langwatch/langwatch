@@ -15,11 +15,8 @@ import "@testing-library/jest-dom/vitest";
 
 import { ScoreFields } from "../annotation-score-fields";
 import type { AnnotationScore } from "@langwatch/annotation-contract";
-import type {
-  AnnotationFormState,
-  AnnotationScoreList,
-  ScoreOptions,
-} from "../annotation-form-types";
+import type { ScoreOptions } from "@langwatch/annotation-contract";
+import type { AnnotationFormState, AnnotationScoreList } from "../annotation-form-types";
 
 function score(over: Partial<AnnotationScore>): AnnotationScore {
   return {

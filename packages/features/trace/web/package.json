@@ -51,7 +51,6 @@
     "@chakra-ui/react": "^3.36.0",
     "@emotion/react": "^11.14.0",
     "@langwatch/annotation-contract": "workspace:*",
-    "@langwatch/annotation-web": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",

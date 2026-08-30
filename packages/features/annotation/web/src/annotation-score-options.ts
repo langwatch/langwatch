@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ScoreOptions } from "./annotation-form-types";
+import type { ScoreOptions } from "@langwatch/annotation-contract";
 
 const annotationScoreOptionSchema = z.object({
   value: z.union([z.string(), z.array(z.string())]),

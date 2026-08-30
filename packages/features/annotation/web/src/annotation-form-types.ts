@@ -1,23 +1,15 @@
 import type {
   Annotation,
   AnnotationAnchorColumns,
+  AnnotationMode,
   AnnotationScore,
   AnnotationScoreDataType,
+  ScoreOptions,
 } from "@langwatch/annotation-contract";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 
 export type AnnotationScoreList = AnnotationScore[];
 export type TraceAnnotation = Annotation;
-
-/** Rating a turn versus correcting its output. */
-export type AnnotationMode = "annotate" | "suggest";
-
-interface ScoreValue {
-  value: string | string[];
-  reason?: string;
-}
-
-export type ScoreOptions = Record<string, ScoreValue>;
 
 export interface AnnotationScoreOption {
   label: string;

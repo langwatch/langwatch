@@ -22,21 +22,16 @@ export {
   type AnnotationCommentScore,
   type AnnotationCommentScoreOptions,
 } from "./annotation-comment-editor";
-export {
-  AnnotationScoreEditor,
-  type AnnotationScoreEditorProps,
-} from "./annotation-score-editor";
+export { AnnotationScoreEditor, type AnnotationScoreEditorProps } from "./annotation-score-editor";
 export type {
   AnnotationDraftValues,
   AnnotationFormState,
-  AnnotationMode,
   AnnotationMutations,
   AnnotationPopoverRenderProps,
   AnnotationScoreList,
   AnnotationScoreOption,
   PopoverAnnotationFormInput,
   ScoreChipProps,
-  ScoreOptions,
   TraceAnnotation,
 } from "./annotation-form-types";
 export {

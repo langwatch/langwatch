@@ -61,3 +61,23 @@ export const upsertAnnotationScoreInputSchema = z
   })
   .strict();
 export type UpsertAnnotationScoreInput = z.infer<typeof upsertAnnotationScoreInputSchema>;
+
+/**
+ * Rating a turn versus correcting its output.
+ *
+ * In the contract rather than in `annotation-web` because two features read it:
+ * Annotation's own form and Trace's draft store, which was importing it from
+ * `@langwatch/annotation-web` — a web package depending on another feature's
+ * web package, which `cross-feature` refuses. It describes what a reviewer is
+ * doing, not how anything renders.
+ */
+export type AnnotationMode = "annotate" | "suggest";
+
+/** One score a reviewer entered, before it becomes a stored annotation. */
+export interface AnnotationScoreValue {
+  value: string | string[];
+  reason?: string;
+}
+
+/** A draft's scores, keyed by score name. */
+export type ScoreOptions = Record<string, AnnotationScoreValue>;

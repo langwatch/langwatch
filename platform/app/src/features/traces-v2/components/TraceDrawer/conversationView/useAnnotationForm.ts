@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   type AnnotationAnchorColumns,
+  type AnnotationMode,
+  type ScoreOptions,
   describeAnnotationAnchor,
 } from "@langwatch/annotation-contract";
 import {
   readAnnotationScoreOptions,
   type AnnotationDraftValues,
   type AnnotationFormState,
-  type AnnotationMode,
   type AnnotationMutations,
   type PopoverAnnotationFormInput,
-  type ScoreOptions,
   type TraceAnnotation,
 } from "@langwatch/annotation-web";
 import { toaster } from "~/components/ui/toaster";
@@ -219,9 +219,7 @@ function seedDraftValues({
  * Popover-flavoured form state: draft values live in local state and are
  * seeded each time the popover opens, on top of the shared server half.
  */
-export function usePopoverAnnotationForm(
-  props: PopoverAnnotationFormInput,
-): AnnotationFormState {
+export function usePopoverAnnotationForm(props: PopoverAnnotationFormInput): AnnotationFormState {
   const mutations = useAnnotationMutations({
     traceId: props.traceId,
     mode: props.mode,
