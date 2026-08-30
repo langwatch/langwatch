@@ -94,57 +94,85 @@ export class EvaluatorNativeService {
     }
   }
 
+  /**
+   * Re-fails a passing result when the content it judged had already been
+   * redacted, or was dropped, at ingestion.
+   *
+   * An evaluator that sees `<PERSON>` where a name was finds no PII and passes,
+   * which is the wrong answer about the trace: the PII was there, ingestion took
+   * it out. The same holds for content dropped entirely.
+   */
   augment(input: EvaluatorResultAugmentationInput): SingleEvaluationResult {
     const kind = AUGMENT_KIND[input.evaluatorType];
     if (!kind || input.result.status === "error") return input.result;
 
     const texts = collectStrings(input.mappedData);
-    const enabled = kind === "pii" ? enabledPiiEntities(input.settings) : null;
-    let markerHits = 0;
-    for (const text of texts) {
-      for (const [entity, count] of findRedactionMarkers(text)) {
-        if (kind === "secret" && entity === SECRET_MARKER_ENTITY) markerHits += count;
-        if (
-          kind === "pii" &&
-          entity !== SECRET_MARKER_ENTITY &&
-          (enabled === null || enabled.has(entity))
-        ) {
-          markerHits += count;
-        }
-      }
-    }
-
+    const markerHits = this.countRedactedValues(kind, texts, input.settings);
     const hasContent = texts.some((text) => text.trim().length > 0);
     const droppedFail = !hasContent && input.droppedCategories.length > 0;
     if (markerHits === 0 && !droppedFail) return input.result;
 
-    const baseScore =
-      input.result.status === "processed" && typeof input.result.score === "number"
-        ? input.result.score
-        : 0;
-    const noun = kind === "secret" ? "secret" : "PII";
-    const notes: string[] = [];
-    if (markerHits > 0) {
-      notes.push(
-        markerHits === 1
-          ? `1 ${noun} value was already redacted at ingestion`
-          : `${markerHits} ${noun} values were already redacted at ingestion`,
-      );
+    return this.reFailed(input, markerHits, droppedFail, kind);
+  }
+
+  /**
+   * How many values of this kind the redaction pass already took out.
+   *
+   * A secret evaluator counts only the secret marker; a PII evaluator counts
+   * every other entity, narrowed to the ones its settings enable — absent
+   * settings mean all of them.
+   */
+  private countRedactedValues(
+    kind: AugmentKind,
+    texts: string[],
+    settings: Record<string, unknown> | undefined,
+  ): number {
+    const enabled = kind === "pii" ? enabledPiiEntities(settings) : null;
+    let hits = 0;
+    for (const text of texts) {
+      for (const [entity, count] of findRedactionMarkers(text)) {
+        const isSecret = entity === SECRET_MARKER_ENTITY;
+        if (kind === "secret" && isSecret) hits += count;
+        if (kind === "pii" && !isSecret && (enabled === null || enabled.has(entity))) {
+          hits += count;
+        }
+      }
     }
-    if (droppedFail) notes.push("content was dropped at ingestion and could not be checked");
-    const prior =
-      input.result.status === "processed" && input.result.details ? `${input.result.details} ` : "";
+    return hits;
+  }
+
+  /** The failing result, with the original's own details kept in front. */
+  private reFailed(
+    input: EvaluatorResultAugmentationInput,
+    markerHits: number,
+    droppedFail: boolean,
+    kind: AugmentKind,
+  ): SingleEvaluationResult {
+    const processed = input.result.status === "processed" ? input.result : null;
+    const baseScore = typeof processed?.score === "number" ? processed.score : 0;
+    const prior = processed?.details ? `${processed.details} ` : "";
+    const notes = this.notesFor(markerHits, droppedFail, kind === "secret" ? "secret" : "PII");
+
     return {
       status: "processed",
+      // A drop with no markers still has to move the score off zero, or a
+      // passing result would come back with nothing to show for the re-fail.
       score: baseScore + markerHits + (droppedFail && markerHits === 0 ? 1 : 0),
       passed: false,
       details: `${prior}(${notes.join("; ")})`,
-      ...(input.result.status === "processed" && input.result.label
-        ? { label: input.result.label }
-        : {}),
-      ...(input.result.status === "processed" && input.result.cost
-        ? { cost: input.result.cost }
-        : {}),
+      ...(processed?.label ? { label: processed.label } : {}),
+      ...(processed?.cost ? { cost: processed.cost } : {}),
     };
+  }
+
+  private notesFor(markerHits: number, droppedFail: boolean, noun: string): string[] {
+    const notes: string[] = [];
+    if (markerHits === 1) {
+      notes.push(`1 ${noun} value was already redacted at ingestion`);
+    } else if (markerHits > 1) {
+      notes.push(`${markerHits} ${noun} values were already redacted at ingestion`);
+    }
+    if (droppedFail) notes.push("content was dropped at ingestion and could not be checked");
+    return notes;
   }
 }
