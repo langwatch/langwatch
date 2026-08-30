@@ -2,45 +2,33 @@
 title: Test Your Agent from the Platform
 sidebarTitle: Test from the platform
 keywords: langwatch, agent testing, agent simulations, scenarios, test suites, run plans, product managers, domain experts, no code, langy
-description: Create scenarios, run them against your agent, and read the verdict of each one, all from the LangWatch interface. Written for product managers and domain experts, no code involved.
+description: Create scenarios, run them against your agent and see the results, all from the LangWatch interface. Written for product managers and domain experts, no code needed.
 ---
 
-## What this guide covers
+## Before you start
 
-This guide shows how to test your AI agent from the LangWatch interface. You write scenarios that describe real situations, run them against your agent, and read a clear verdict for each one. No code is involved in any step.
-
-<Note>
-One technical step happens before this guide: a developer connects the agent to LangWatch, so the simulated user can talk to it and the judge can see what the agent did internally. Send your developer the [Connect your agent](/agent-testing/connect-your-agent) guide. It is a one-time setup and usually takes under an hour.
-</Note>
+A developer connects the agent to LangWatch once, so the simulated user can talk to it and the judge can see what the agent did internally. Send your developer the [Connect your agent](/agent-testing/connect-your-agent) guide. The setup usually takes under an hour.
 
 ## What a scenario is
 
-A scenario has two parts:
+A scenario is one situation and the criteria the agent must meet in it.
 
-- **Situation**: who the user is and what they want. A simulated user plays this role and talks to your agent, turn by turn, like a real customer would.
-- **Criteria**: what the agent must do, and must not do, for the conversation to pass. A judge model reads the full conversation, and the agent's internal actions, and decides each criterion.
+- **Situation**: who the user is and what they want. A simulated user plays this role and talks to your agent, turn by turn.
+- **Criteria**: what the agent must do, and must not do, for the conversation to pass. A judge model reads the full conversation and the agent's internal actions, and passes or fails each criterion.
 
-You do not write the conversation itself. The simulated user improvises within the situation, so every run exercises your agent the way real users do: with slightly different words each time.
+You do not write the conversation. The simulated user improvises within the situation, with different words on every run, the way real users do.
 
-Write criteria about outcomes, not wording. "The agent looks up the order before answering" and "The agent does not promise a refund" are strong criteria. "The agent says exactly this sentence" is not.
+Write criteria about outcomes, not wording. For example, "The agent looks up the order before answering" and "The agent does not promise a refund" are good criteria. "The agent says exactly this sentence" is not.
 
-## Your first visit
+## The Scenarios tab
 
-Open **Agent Testing** in the sidebar. A new project shows one step at a time: **Setup agent** until an agent is registered, then **Name your first test suite**, then **Write your first scenario**. The first step is the developer's; the other two are the next sections of this guide.
-
-<Frame>
-<img className="block" src="/images/agent-testing/first-run-empty-states.png" alt="The three first-visit steps of a new project, one after the other: Setup agent, Name your first test suite, Write your first scenario" />
-</Frame>
-
-## Where your scenarios live
-
-The **Scenarios** tab lists the test suites of the project in the rail on the left, and the scenarios of the open test suite in the table. A test suite is a named group of scenarios. Every project has a **Default** test suite, so a new scenario always has a place. Labels organize the scenarios inside a test suite and across test suites.
+Open **Agent Testing** in the sidebar. The **Scenarios** tab lists the test suites of the project in the rail on the left, and the scenarios of the open test suite in the table. A test suite is a named group of scenarios, for example the ones about refunds. Every project has a **Default** test suite. Labels organize scenarios inside a test suite and across test suites.
 
 <Frame>
 <img className="block" src="/images/agent-testing/scenarios-tab.png" alt="The Scenarios tab with the test suite rail on the left and the scenarios of the Refunds test suite, with their labels" />
 </Frame>
 
-Press **New Test Suite** in the rail to create one. A test suite is only a name; which agent it runs against and how often is decided when you run it.
+Press **New Test Suite** in the rail to create one. A test suite is only a name. You pick the agent when you run it.
 
 ## Create a scenario
 
@@ -50,36 +38,36 @@ Press **New scenario**. The editor asks for the title, the test suite, the situa
 <img className="block" src="/images/agent-testing/scenario-editor.png" alt="The scenario editor with a title, a situation and three criteria filled in" />
 </Frame>
 
-Two tips that make scenarios much more useful:
+Two tips:
 
-- Include at least one criterion about what the agent does internally, such as "looks up the order before answering" or "reads the tender documents". The judge verifies these against the agent's real actions, not against what the reply claims.
-- Write at least one "must not" criterion for each scenario. The most valuable tests describe the failure you are afraid of: inventing a date, quoting another customer's data, promising something the policy forbids.
+- Include at least one criterion about what the agent does internally, for example "looks up the order before answering". The judge checks it against the agent's real actions, not against what the reply claims.
+- Include at least one "must not" criterion, for the failure you want to catch: an invented date, another customer's data, a promise the policy forbids.
 
 <Note>
-A scenario is saved in your project, and everyone with access to the project can read it. Remove names, contact details, account numbers and other personal data before you paste real material, or replace them with invented equivalents. The test works the same way with invented details.
+Everyone with access to the project can read a scenario. Remove names, contact details, account numbers and other personal data before you paste real material, or replace them with invented ones. The test works the same with invented details.
 </Note>
 
-**Save** keeps the scenario. **Save & Run** keeps it and opens the run dialog at once. Every save is a version, and the editor shows the version number next to **History**.
+**Save** stores the scenario. **Save & Run** stores it and opens the run dialog. Every save is a version, and the editor shows the version number next to **History**.
 
 ## Create scenarios with Langy
 
-Langy, the assistant in the bottom corner of every page, creates scenarios for you. Paste text from documents or conversations you already have, describe what must hold, and Langy writes and saves the scenario in one step:
+Langy, the assistant in the bottom corner of every page, writes scenarios for you. Paste text from a document or a conversation, say what must hold, and Langy writes and saves the scenario:
 
 <Frame>
 <img className="block" src="/images/agent-testing/langy-creates-scenario.png" alt="Langy creating a scenario from a pasted snippet of a customer chat" />
 </Frame>
 
-Good material to paste: notes from a lost deal or an escalation, user interview quotes, acceptance criteria from a ticket, or a transcript of a conversation where the agent got it wrong. Each of these becomes a permanent test, so the same mistake cannot come back unnoticed. Remove personal data from the text first, as above.
+Good material to paste: notes from a lost deal or an escalation, user interview quotes, acceptance criteria from a ticket, or a transcript where the agent got it wrong. Remove personal data from the text first.
 
 ## Create scenarios from your own tools
 
-Your team's AI assistants can create scenarios too. Through the [LangWatch MCP integration](/integration/mcp), tools such as Claude and Cursor read and write scenarios in your project. A teammate can highlight a bug report in their editor and ask their assistant to turn it into a LangWatch scenario, without opening the platform.
+Through the [LangWatch MCP integration](/integration/mcp), coding assistants such as Claude Code and Cursor read and write the scenarios of your project. For example, a teammate selects a bug report in their editor and asks the assistant to turn it into a scenario, without opening LangWatch.
 
 ## Run your scenarios
 
 ### Run one scenario
 
-**Run** on a scenario row, or **Save & Run** in the editor, opens the run dialog. It asks for the run name and the agent to test. The name is prefilled after the scenario and the agent, and the defaults are fine for a first run.
+**Run** on a scenario row, or **Save & Run** in the editor, opens the run dialog. It asks for the run name and the agent to test. The name is prefilled, and the defaults are fine for a first run.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-dialog.png" alt="The run dialog with the run name, the agent to be tested and the Customize your run chips" />
@@ -87,37 +75,37 @@ Your team's AI assistants can create scenarios too. Through the [LangWatch MCP i
 
 ### Run a test suite
 
-A test suite runs every scenario in it against the agent you pick. This is what you run before a release, or after every change. **Run suite** at the top of the scenarios table opens the same dialog, with every scenario of the test suite in scope.
+**Run suite** at the top of the table opens the same dialog, with every scenario of the test suite in scope. Run the test suite before a release, or after every change to the agent.
 
 ### Watch it run
 
-The run opens as soon as it starts. Every row is one conversation with your agent, and its result appears when the judge is done. Press a row to watch the conversation as the simulated user and the agent talk.
+The run opens as soon as it starts. Every row is one conversation with your agent, and its result appears when the judge is done. Press a row to watch the conversation.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-detail-running.png" alt="A run in progress, with scenarios still running and the first results in" />
 </Frame>
 
-A full run of a few scenarios usually takes a few minutes. You can leave the page; the results are there when you come back. **Open recent run** at the top of the table, **Open recent runs** in a scenario's row menu, or **Open recent run** in the editor take you back to the latest run.
+A run of a few scenarios takes a few minutes. You can leave the page. **Open recent run** at the top of the table, or in a scenario's row menu, takes you back to the latest run.
 
 ## Read the results
 
-Press a row of a finished run. The drawer shows the conversation exactly as it happened, with the simulated user's messages and your agent's replies. Below it, the verdict: **PASSED CRITERIA**, **FAILED CRITERIA** and **JUDGE REASONING** in plain language. The reasoning cites what the agent actually did, such as which lookup it performed before answering.
+Press a row of a finished run. The drawer shows the conversation, then the verdict: **PASSED CRITERIA**, **FAILED CRITERIA** and **JUDGE REASONING**. The reasoning cites what the agent did, for example which lookup it made before answering.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-drawer-passed.png" alt="The conversation drawer of a passed run, with the transcript, the passed criteria and the judge reasoning" />
 </Frame>
 
-Three outcomes are possible for a criterion:
+A criterion has three possible outcomes:
 
-- **Passed**: the conversation, or the agent's internal actions, prove it.
-- **Failed**: the agent did the thing the criterion forbids, or failed to do the thing it requires. Read the reasoning, then the conversation, and share both with your team; the run page link is enough for a developer to investigate.
-- **Inconclusive**: the judge did not find evidence either way. For criteria about internal actions, this usually means the agent's traces did not arrive; ask your developer to check the connection with the [Connect your agent](/agent-testing/connect-your-agent) guide.
+- **Passed**: the conversation or the agent's internal actions prove it.
+- **Failed**: the agent did what the criterion forbids, or did not do what it requires. Read the reasoning, then the conversation. The link to the run is enough for a developer to investigate.
+- **Inconclusive**: the judge found no evidence either way. For a criterion about an internal action, this usually means the agent's traces did not arrive. Ask your developer to check the connection with the [Connect your agent](/agent-testing/connect-your-agent) guide.
 
-Each turn also has a **View trace** link, opening the exact steps the agent took for that reply. You do not need to read traces yourself, but the link is the fastest thing to hand a developer when something looks wrong.
+Each turn has a **View trace** link with the exact steps the agent took for that reply. Send it to a developer when something looks wrong.
 
 ## Follow the pass rate over time
 
-The **Results** tab lists every run plan of the project. A run plan is the history of one configuration: the same scenarios against the same agent, run again and again. Each row shows the last run, the pass rate and a trend of the recent runs, so a regression is visible the moment it happens.
+The **Results** tab lists every run plan of the project. A run plan is the history of one configuration: the same scenarios against the same agent, run again and again. Each row shows the last run, the pass rate and the trend of recent runs, so you see a regression at the next run.
 
 <Frame>
 <img className="block" src="/images/agent-testing/results-tab.png" alt="The Results tab with the run plans of the project, their pass rates and trends" />
@@ -125,8 +113,8 @@ The **Results** tab lists every run plan of the project. A run plan is the histo
 
 ## Make it a habit
 
-- Run your test suite before every release. The history on the **Results** tab shows the pass rate over time.
-- After every incident or complaint, add a scenario for it. The library becomes the collective memory of everything your agent must never do again.
-- Keep scenarios short and focused: one situation, a handful of criteria. Ten small scenarios find more than one large one.
+- Run the test suite before every release.
+- After every incident or complaint, add a scenario for it.
+- Keep scenarios short: one situation, a few criteria.
 
 Also check: [Scenarios](/agent-testing/scenarios), [Test suites](/agent-testing/test-suites), [Run plans](/agent-testing/run-plans), [Results](/agent-testing/results).

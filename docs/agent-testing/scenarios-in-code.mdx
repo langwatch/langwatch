@@ -13,11 +13,11 @@ The Scenario SDK is open source and runs inside your own test runner and CI. To 
 
 This guide will walk you through the basic setup required to run your first scenario and see the results in LangWatch.
 
-For more in-depth information and advanced use cases, please refer to the official [`scenario` library documentation](https://github.com/langwatch/scenario).
+For advanced use cases, see the [`scenario` library documentation](https://github.com/langwatch/scenario).
 
 ## 1. Installation
 
-First, you need to install the `scenario` library in your project. Choose your language below.
+Install the `scenario` library in your project:
 
 <Tabs>
   <Tab title="Python">
@@ -34,7 +34,7 @@ First, you need to install the `scenario` library in your project. Choose your l
 
 ## 2. Configure Environment Variables
 
-We recommend creating a `.env` file in the root of your project to manage your environment variables.
+Create a `.env` file in the root of your project:
 
 ```bash title=".env"
 LANGWATCH_API_KEY="your-api-key"
@@ -45,9 +45,7 @@ You can find your `LANGWATCH_API_KEY` in your [LangWatch project settings](https
 
 ## 3. Create a Basic Scenario
 
-Here's how to create and run a simple scenario to test an agent.
-
-First, you need to create an agent adapter that implements your agent logic. For detailed information about agent integration patterns, see the [agent integration guide](https://langwatch.ai/scenario/agent-integration/).
+Create an agent adapter that calls your agent, then run a scenario against it. For the integration patterns, see the [agent integration guide](https://langwatch.ai/scenario/agent-integration/).
 
 <Tabs>
   <Tab title="Python">
@@ -182,14 +180,14 @@ First, you need to create an agent adapter that implements your agent logic. For
   </Tab>
 </Tabs>
 
-Once you run this code, you will see a new scenario run appear under **Agent Testing > Results** in your LangWatch project.
+Run the test. The scenario run appears under **Agent Testing > Results** in your LangWatch project.
 
 ## 4. Grouping Your Scenarios into Test Suites and Batches
 
 Set stable identifiers for your scenarios, test suites and batches, so LangWatch groups the runs the same way every time:
 
 - **`id`**: A unique and stable identifier for your scenario. Without it, the id comes from the `name`, and renaming the test starts a new history.
-- **`setId`**: The test suite the scenario belongs to. It appears under **From Code** on the **Scenarios** tab, and its runs go under a run plan of the same name on the **Results** tab.
+- **`setId`**: The test suite of the scenario. It appears under **From Code** on the **Scenarios** tab, and its runs go under a run plan of the same name on the **Results** tab.
 - **`batchId`**: Groups every scenario run together in one execution, for example one CI job. A CI variable such as `process.env.GITHUB_RUN_ID` is a good value.
 
 <Frame>

@@ -2,7 +2,7 @@
 title: Compare Agents
 sidebarTitle: Compare agents
 keywords: langwatch, agent testing, compare agents, comparison run, targets, a/b, prod vs staging, parameters per target
-description: A comparison run sends every scenario to two or more targets in one run, so you read the pass rate, the cost and the latency of each side by side.
+description: A comparison run sends every scenario to two or more targets in one run, so you see the pass rate, the cost and the latency of each side by side.
 ---
 
 ## What a comparison run is
@@ -50,6 +50,6 @@ langwatch test-suite run "Refunds" \
   --wait
 ```
 
-On the REST API the same values go in `runParameters` on each target, and `parameters` at the run level holds what every target shares. See [Run from CI](/agent-testing/run-from-ci#compare-two-agents-or-one-agent-on-two-settings) for the request body.
+On the REST API the same values go in `runParameters` on each target, and `parameters` at the run level sets the values every target shares. See [Run from CI](/agent-testing/run-from-ci#compare-two-agents-or-one-agent-on-two-settings) for the request body.
 
 Also check: [Run plans](/agent-testing/run-plans), [Results](/agent-testing/results), [Run parameters](/agent-testing/run-parameters).

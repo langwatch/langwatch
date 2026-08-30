@@ -49,12 +49,12 @@ plan=free, locale=de
 
 <img src="/images/agent-testing/scenario-parameters-editor.png" alt="The scenario editor with the parameters block open, declaring plan and locale with their defaults, and params.plan read in the situation" width="100%" />
 
-- **Name** is what `{{ params.NAME }}` reads. Letters, digits and underscores, and the first character is a letter or an underscore.
+- **Name** is the `NAME` in `{{ params.NAME }}`. Letters, digits and underscores, and the first character is a letter or an underscore.
 - **Default value** applies when the run does not set the value. `42` is a number, `true` is a boolean, and everything else is text. Quote a value to force text: `"007"`. A name with an empty value after `=` has no default.
 
 A scenario can declare up to 20 parameters.
 
-The API accepts the same declarations with a description and the secret flag: `POST /api/scenarios` and `PATCH /api/scenarios/{id}` take a `parameters` array of `{ name, description, defaultValue, secret }` objects. A [secret parameter](#secret-parameters) is declared through the API, since the editor line holds plain values only.
+The API accepts the same declarations with a description and the secret flag: `POST /api/scenarios` and `PATCH /api/scenarios/{id}` take a `parameters` array of `{ name, description, defaultValue, secret }` objects. A [secret parameter](#secret-parameters) is declared through the API, since the editor line takes plain values only.
 
 ## Use the values in the scenario text
 
@@ -91,7 +91,7 @@ https://api.your-company.internal/{{ params.region }}/chat
 
 Auth fields read project secrets, not parameters. See [Testing agents behind authentication](/agent-testing/authenticated-agents#referencing-project-secrets-from-an-http-target).
 
-Next to `params`, the same fields render `{{ messages }}`, `{{ input }}` and `{{ threadId }}` from the conversation, and `{{ traceId }}` and `{{ traceparent }}` from the turn's trace context. See [Linking your traces](/agent-testing/linking-your-traces) for what the trace variables carry.
+Next to `params`, the same fields render `{{ messages }}`, `{{ input }}` and `{{ threadId }}` from the conversation, and `{{ traceId }}` and `{{ traceparent }}` from the turn's trace context. See [Linking your traces](/agent-testing/linking-your-traces) for what the trace variables contain.
 
 ### Prompt targets
 
@@ -127,7 +127,7 @@ The sandbox injects `params` into the module globals. Do not import a module nam
 A workflow target receives the values as entry inputs, one entry input per parameter name.
 
 <Note>
-  A parameter reaches a downstream node only if the entry node has an edge carrying it. Adding a parameter to the run does not add the edge. Open the workflow and connect the new entry field to the node that reads it.
+  A parameter reaches a downstream node only when an edge connects the entry field to that node. Adding a parameter to the run does not add the edge. Open the workflow and connect the new entry field to the node that reads it.
 </Note>
 
 Entry inputs arrive as strings. A code node inside the workflow reads `params.NAME` with the original type.
@@ -142,13 +142,13 @@ A value set at run time overrides the scenario's default. A parameter with no ru
 
 <img src="/images/agent-testing/run-dialog-parameters.png" alt="The run dialog with the parameters line set to plan=pro and the Secret parameters switch" width="100%" />
 
-The **Secret parameters** switch turns the line into rows, one per parameter, with a lock on each secret one. The secret parameters the scenarios declare are in the list already, with an empty field for the value. Once a row holds a secret value the rows stay; a secret cannot be written on one line.
+The **Secret parameters** switch turns the line into rows, one per parameter, with a lock on each secret one. The secret parameters the scenarios declare are in the list already, with an empty field for the value. Once a row has a secret value, the rows stay; a secret cannot be written on one line.
 
 **Save & Run** in the scenario editor opens the same dialog.
 
 ## Secret parameters
 
-A secret parameter is a run parameter that holds a credential. The platform encrypts the value before it writes anything down, and keeps it out of the stored run, the APIs, the exports, the audit log and everything it displays. The target under test reads the value while the run executes, which is the purpose of the parameter. Use one for an API key, a bearer token, or a password that changes per run.
+A secret parameter is a run parameter for a credential. The platform encrypts the value before it writes anything down, and keeps it out of the stored run, the APIs, the exports, the audit log and everything it displays. The target under test reads the value while the run executes, which is the purpose of the parameter. Use one for an API key, a bearer token, or a password that changes per run.
 
 Declare it in the same editor: add the row, then turn on the **Secret** switch. A secret parameter takes no default value, so the field for it is empty and disabled.
 
@@ -194,10 +194,10 @@ Also check: [Testing agents behind authentication](/agent-testing/authenticated-
 | Error | What happened | What to do |
 |---|---|---|
 | `scenario_parameter_unknown` | The run set a name that no scenario in the run declares, usually a spelling error. The message lists the rejected key and the accepted names. | Correct the spelling, or declare the parameter on the scenario that reads it. |
-| `scenario_parameter_missing` | The situation or a criterion reads a name with no value: the run set none and the scenario has no default. The message names the parameter and the field. | Set a value for the run, or give the parameter a default. |
+| `scenario_parameter_missing` | The situation or a criterion reads a name with no value: the run set none and the scenario has no default. The message says which parameter and which field. | Set a value for the run, or give the parameter a default. |
 | `scenario_parameter_template_invalid` | A field references a parameter in a form that cannot be rendered. | Write the reference as `{{ params.name }}`. |
 | `scenario_secret_parameter_missing` | A scenario declares a secret parameter and the run set no value for it. A secret has no default, so the run cannot fall back. | Set the value when you start the run. |
-| `scenario_secret_parameter_in_text` | The situation or a criterion reads a secret parameter. Scenario text is recorded with the run, so it cannot carry a secret. | Read the value from the target instead, as `{{ secrets.NAME }}`. |
+| `scenario_secret_parameter_in_text` | The situation or a criterion reads a secret parameter. Scenario text is recorded with the run, so it cannot contain a secret. | Read the value from the target instead, as `{{ secrets.NAME }}`. |
 | `scenario_secret_parameter_conflict` | One scenario in the run declares the name as secret and another declares it as plain. | Give the two parameters different names, or make both declarations agree. |
 
 The platform runs these checks before it schedules any jobs. A rejected run schedules no job at all.

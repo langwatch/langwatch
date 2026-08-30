@@ -6,7 +6,7 @@ description: Scenario tests voice agents end to end over real audio, with the sa
 ---
 
 <Tip>
-  **Fastest path:** run `/scenarios add voice testing to my agent` in your coding assistant after installing the [`/scenarios` skill](https://langwatch.ai/docs/skills/directory). It detects your transport, picks the matching adapter, and wires it to your deployed agent. Prefer to do it by hand? Follow the steps below.
+  **Fastest path:** run `/scenarios add voice testing to my agent` in your coding assistant after installing the [`/scenarios` skill](https://langwatch.ai/docs/skills/directory). It detects your transport, picks the matching adapter, and wires it to your deployed agent. To do it by hand, follow the steps below.
 </Tip>
 
 ## How a voice test runs
@@ -15,7 +15,7 @@ The user simulator synthesizes a caller, speaks to your agent through its real t
 
 <img src="/images/scenario-voice.webp" alt="Voice Agent Testing" width="100%" />
 
-## The highlights
+## What you can test
 
 <CardGroup cols={2}>
   <Card title="Real-audio, multi-turn calls" icon="phone">
@@ -28,13 +28,13 @@ The user simulator synthesizes a caller, speaks to your agent through its real t
     Script the user barging in mid-reply, with native barge-in or a VAD-driven fallback per adapter.
   </Card>
   <Card title="Latency metrics" icon="gauge-high">
-    Time-to-first-byte and p50/p95 per turn, so you catch a slow agent before users do.
+    Time-to-first-byte and p50/p95 per turn, so you catch a slow agent before a release.
   </Card>
 </CardGroup>
 
-## Works with your stack
+## Adapters per transport
 
-One API, every major voice transport. Pick the adapter that matches what you've already deployed:
+Pick the adapter that matches the transport you deployed:
 
 | Transport | Adapter |
 | --- | --- |
@@ -46,12 +46,12 @@ One API, every major voice transport. Pick the adapter that matches what you've 
 | Text-only agent (no transport yet) | `ComposableVoiceAgent` |
 
 <Note>
-  Full constructors, the per-adapter [capability matrix](https://langwatch.ai/scenario/voice/capability-matrix), and guidance on [choosing an adapter](https://langwatch.ai/scenario/voice/choosing-an-adapter) live in the Scenario docs.
+  Full constructors, the per-adapter [capability matrix](https://langwatch.ai/scenario/voice/capability-matrix), and guidance on [choosing an adapter](https://langwatch.ai/scenario/voice/choosing-an-adapter) are in the Scenario docs.
 </Note>
 
 ## Get it running
 
-New to Scenario? Start with [Getting Started](/agent-testing/scenarios-in-code) for the basics (API key, writing your agent's `call()` adapter), then come back for the voice specifics.
+If you have not used Scenario, start with [Getting Started](/agent-testing/scenarios-in-code) for the basics (API key, your agent's `call()` adapter), then come back for the voice specifics.
 
 <Steps>
   <Step title="Install Scenario">
@@ -134,7 +134,7 @@ New to Scenario? Start with [Getting Started](/agent-testing/scenarios-in-code) 
   </Step>
 </Steps>
 
-## Dig into the full docs
+## Full documentation
 
 <CardGroup cols={2}>
   <Card title="Voice quick start" icon="rocket" href="https://langwatch.ai/scenario/voice/getting-started">

@@ -7,7 +7,7 @@ description: Start a test suite from a CI job and wait for every run of the batc
 
 ## How it works
 
-A CI job starts a test suite, keeps the batch id from the response, then polls that batch until every run is finished. The CLI, the REST API and the SDKs all start the same run.
+A CI job starts a test suite, stores the batch id from the response, then polls that batch until every run is finished. The CLI, the REST API and the SDKs all start the same run.
 
 ## From the CLI
 
@@ -17,7 +17,7 @@ langwatch test-suite run "Checkout regression" --target http:agent_abc123 --wait
 
 `--wait` polls until the batch is complete and exits non-zero when a run failed, which is what fails the job. The test suite is named by its id or by its name.
 
-Add `--format json` (or `-o json`) to get one final document on stdout instead of the progress lines. It holds `outcome`, `tallies` and the per-run `results`, so a job step can read the verdict without parsing prose.
+Add `--format json` (or `-o json`) to get one final document on stdout instead of the progress lines. It contains `outcome`, `tallies` and the per-run `results`, so a job step can read the verdict without parsing prose.
 
 ## From the REST API
 
@@ -65,9 +65,9 @@ The response has the values the CI job needs:
 }
 ```
 
-`batchRunId` addresses the batch. `jobCount` is the number of runs the batch gets. `created` says whether this run created the plan or joined one that already carried the name.
+`batchRunId` identifies the batch. `jobCount` is the number of runs the batch gets. `created` says whether this run created the plan or joined one that already had the name.
 
-To run a configuration of your own instead of a whole test suite, `POST /api/v1/run-plans/run` takes a `config` object with the scope, the targets, the repeat count and the two models. The scope is one of `{ "mode": "all" }`, `{ "mode": "test_suites", "testSuiteIds": [...] }`, `{ "mode": "labels", "labels": [...] }`, or `{ "mode": "scenarios" }` with `scenarioIds` beside it. `GET /api/v1/run-plans` lists the plans, and `POST /api/v1/run-plans/{id}/run` runs one again with the configuration it holds.
+To run a configuration of your own instead of a whole test suite, `POST /api/v1/run-plans/run` takes a `config` object with the scope, the targets, the repeat count and the two models. The scope is one of `{ "mode": "all" }`, `{ "mode": "test_suites", "testSuiteIds": [...] }`, `{ "mode": "labels", "labels": [...] }`, or `{ "mode": "scenarios" }` with `scenarioIds` beside it. `GET /api/v1/run-plans` lists the plans, and `POST /api/v1/run-plans/{id}/run` runs one again with its stored configuration.
 
 <Note>
   The `/api/suites` family still answers and is deprecated. Move CI jobs to `/api/v1/test-suites` and `/api/v1/run-plans`.
@@ -108,7 +108,7 @@ console.log(result.batchRunId);
 
 ## Compare two agents, or one agent on two settings
 
-A run goes against every target you name, so naming two targets runs each scenario against both and files the results under one batch, one column per target on the results page. A target may also carry the parameter values it alone runs with, so the same agent named twice with different values is a comparison of that agent on two settings. [Compare agents](/agent-testing/compare-agents) covers how the platform shows them.
+A run goes against every target you name, so naming two targets runs each scenario against both and stores the results under one batch, one column per target on the results page. A target can also have its own parameter values, so the same agent named twice with different values is a comparison of that agent on two settings. [Compare agents](/agent-testing/compare-agents) covers how the platform shows them.
 
 ```bash
 langwatch test-suite run "Checkout regression" \
@@ -117,7 +117,7 @@ langwatch test-suite run "Checkout regression" \
   --wait
 ```
 
-The suffix after the question mark is a query string. Both halves are percent-decoded, so a value that holds `?` or `&` must be written as `%3F` or `%26`. A value is read as the type it looks like: `true` and `false` become booleans, a plain number becomes a number, everything else stays text.
+The suffix after the question mark is a query string. Both halves are percent-decoded, so a value that contains `?` or `&` must be written as `%3F` or `%26`. A value is read as the type it looks like: `true` and `false` become booleans, a plain number becomes a number, everything else stays text.
 
 On the REST API the same values go in `runParameters` on the target:
 
@@ -142,7 +142,7 @@ curl -X POST "https://app.langwatch.ai/api/v1/test-suites/suite_abc123/run" \
   }'
 ```
 
-`runParameters` are merged over the run-level `parameters`, and the target wins. Use `parameters` for what every target shares, such as a fixture id or a tenant, and `runParameters` for what tells the targets apart.
+`runParameters` are merged over the run-level `parameters`, and the target wins. Use `parameters` for what every target shares, such as a fixture id or a tenant, and `runParameters` for what differs between the targets.
 
 ## Poll the batch
 
@@ -172,12 +172,12 @@ curl "https://app.langwatch.ai/api/simulation-runs/batches/batch_xyz789" \
 
 | Field | Meaning |
 | --- | --- |
-| `totalCount` | Runs the batch holds now. |
+| `totalCount` | Runs in the batch now. |
 | `runningCount` | Runs that are queued or in progress. |
 | `settledCount` | Runs that are neither queued nor in progress: passed, failed, errored, cancelled or stalled. |
 | `isComplete` | True when `settledCount` equals `totalCount`. |
 
-Stop the poll when `isComplete` is true **and** `totalCount` is at least `jobCount`. The two conditions go together: the platform creates the runs asynchronously, so a batch read right after the trigger can hold fewer runs than `jobCount`, and a batch of two created runs out of six reports itself complete.
+Stop the poll when `isComplete` is true **and** `totalCount` is at least `jobCount`. The two conditions go together: the platform creates the runs asynchronously, so a batch read right after the trigger can have fewer runs than `jobCount`, and a batch of two created runs out of six reports itself complete.
 
 The same asynchronous creation makes the first read answer `404`. The batch becomes readable when its first run is stored, which is a moment after the trigger returns. Treat a `404` as "not stored yet" and poll again until your own timeout expires. A `404` is a missing batch only after that timeout.
 
@@ -218,17 +218,17 @@ echo "The batch did not finish before the timeout."
 exit 1
 ```
 
-The request has its own time limits, so a read that hangs cannot hold the job open. The deadline is read between requests, so the job stops within one request and one sleep of it, which is 40 seconds with the values above.
+The request has its own time limits, so a read that hangs cannot block the job. The deadline is read between requests, so the job stops within one request and one sleep of it, which is 40 seconds with the values above.
 
 `langwatch test-suite run ... --wait` does the same poll, and its exit code follows the results.
 
 ## Give the batch a note
 
-`--note` keeps one short line with the batch: why it was run, or what changed. Every run in the batch keeps it, and the platform shows it beside the run.
+`--note` stores one short line with the batch: why it was run, or what changed. Every run in the batch has it, and the platform shows it beside the run.
 
 ```bash
 langwatch test-suite run suite_abc123 --target http:agent_abc123 \
   --note "$(git log -1 --pretty=%s | cut -c1-200)" --wait
 ```
 
-The note is free text, up to 200 characters, and a longer one is refused before the batch is queued. The `cut` above keeps a long commit subject inside that limit. `langwatch simulation-run list` and `langwatch simulation-run get` show the note back.
+The note is free text, up to 200 characters, and a longer one is refused before the batch is queued. The `cut` above trims a long commit subject to that limit. `langwatch simulation-run list` and `langwatch simulation-run get` show the note back.

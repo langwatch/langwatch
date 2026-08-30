@@ -317,13 +317,13 @@ The body template renders as a Liquid template on every turn, and `outputPath` i
 
 The URL and the header values render the same variables.
 
-For the response, set `outputPath` to where the reply text lives. If the endpoint answers `{"reply": "It ships on Tuesday."}`, set `outputPath` to `$.reply`. The platform reads the reply text at that path; the response needs no other fields.
+For the response, set `outputPath` to the path of the reply text. If the endpoint answers `{"reply": "It ships on Tuesday."}`, set `outputPath` to `$.reply`. The platform reads the reply text at that path; the response needs no other fields.
 
 ## 4. Adopt the trace context
 
-The platform sends a W3C `traceparent` header on every call, one trace per conversation turn. When your server adopts it, the spans your agent produces land in that same trace, and the judge reads them before its verdict: tool calls, database writes, retrievals. A criterion like "the agent looked up the order before answering" then passes on evidence instead of on the reply's wording.
+The platform sends a W3C `traceparent` header on every call, one trace per conversation turn. When your server adopts it, the spans your agent produces go into that same trace, and the judge reads them before its verdict: tool calls, database writes, retrievals. A criterion like "the agent looked up the order before answering" then passes on evidence instead of on the reply's wording.
 
-With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens and you keep the code unchanged. Without it, attach the extracted context in a middleware that runs before any tracing starts. Do not extract inside the handler body: a handler decorated with `@langwatch.trace()` opens its root span before the body runs, so an extraction there comes too late and the agent's spans land in a separate trace. The middleware placement covers every tracing style: decorators, `with langwatch.trace()`, autotrack, community instrumentations, and plain OpenTelemetry spans.
+With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens and you keep the code unchanged. Without it, attach the extracted context in a middleware that runs before any tracing starts. Do not extract inside the handler body: a handler decorated with `@langwatch.trace()` opens its root span before the body runs, so an extraction there comes too late and the agent's spans go into a separate trace. The middleware placement covers every tracing style: decorators, `with langwatch.trace()`, autotrack, community instrumentations, and plain OpenTelemetry spans.
 
 <Tabs>
   <Tab title="Python">
@@ -408,7 +408,7 @@ Open the run in **Agent Testing > Results**. A connected setup shows:
 
 - The conversation transcript, with the reply text your `outputPath` extracted.
 - **View trace** on each turn of the conversation, opening the agent's own spans for that turn.
-- Judge reasoning that cites spans, naming the tool call or lookup that satisfied a criterion.
+- Judge reasoning that cites spans, with the tool call or lookup that satisfied a criterion.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-drawer-trace-link.png" alt="The conversation drawer with View trace on a turn and the judge reasoning citing a tool call span" />
@@ -427,6 +427,6 @@ A trace-dependent criterion that comes back inconclusive means the traces did no
 | Symptom | Cause | Fix |
 |---|---|---|
 | The run fails with a connection error | The URL is not reachable from the LangWatch backend: an internal hostname, a firewall, or a stopped service. | Deploy the endpoint to a reachable URL, or use [`langwatch agent dev`](/agent-testing/local-development) for a local process. |
-| Every turn fails with 401 or 403 | The credential is missing or wrong: no header row or `auth` block, or the `{{ secrets.NAME }}` reference names a secret the project does not have. | Add the header row or `auth` block, and check the secret's name and project in **Settings → Secrets**. |
+| Every turn fails with 401 or 403 | The credential is missing or wrong: no header row or `auth` block, or the `{{ secrets.NAME }}` reference refers to a secret the project does not have. | Add the header row or `auth` block, and check the secret's name and project in **Settings → Secrets**. |
 | The transcript shows empty replies or raw JSON | `outputPath` does not match the response shape, so no reply text is found. | Set `outputPath` to the JSONPath of the reply text in your endpoint's real response. |
 | Trace-dependent criteria come back inconclusive, and turns have no trace link | The server does not adopt the incoming `traceparent`, or it reports traces to a different LangWatch project. | Adopt the context as in step 4, and point the agent's tracing at the same project's API key. |

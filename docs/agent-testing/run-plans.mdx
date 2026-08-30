@@ -5,11 +5,11 @@ keywords: langwatch, agent testing, run plan, run dialog, run name, targets, rep
 description: A run plan is a name and a configuration, and the name is its identity. Every run under the same name joins one history on the Results tab.
 ---
 
-## What a run plan holds
+## What a run plan is
 
 The configuration of a run plan is the scope (which scenarios), the targets (which agents), the repeat count and the two models: the user simulator and the judge. A run under an existing name joins that plan and replaces its configuration with the one it ran with. A run under a new name creates a plan.
 
-For example, **Run suite** on the `Refunds` test suite against the agent `checkout-prod` names the run `Refunds checkout-prod`. The next run of the same test suite against the same agent joins it, and the Results tab shows the pass rate of `Refunds checkout-prod` over time.
+For example, **Run suite** on the `Refunds` test suite against the agent `checkout-prod` gives the run the name `Refunds checkout-prod`. The next run of the same test suite against the same agent joins it, and the Results tab shows the pass rate of `Refunds checkout-prod` over time.
 
 ## The run dialog
 
@@ -36,7 +36,7 @@ The chips, in the order the dialog shows them:
 |---|---|
 | **Add parameters** | One line of `name=value` pairs for the run parameters the scenarios declare, for example `plan=pro`. The **Secret parameters** switch turns the line into rows with a lock on each, for a credential. See [Run parameters](/agent-testing/run-parameters). |
 | **Compare agents** | One row per target, up to four. See [Compare agents](/agent-testing/compare-agents). |
-| **Add a note** | Opens **Note for the run**: up to 200 characters about this run, what changed or why it ran. The note belongs to the run, never to the plan. |
+| **Add a note** | Opens **Note for the run**: up to 200 characters about this run, what changed or why it ran. The note is stored on the run, not on the plan. |
 | **Run against a prompt** | Replaces the agent with a prompt from the project as the target. See [Targets](/agent-testing/targets). |
 | **Custom simulation models** | Opens **Simulation models**: the **User simulator** and the **Judge** for this run. Without them, the project default model plays both. A scenario's own **Override models** wins over both. |
 | **Run multiple times** | The repeat count, `times per scenario and target`, 1 to 5. Every scenario runs that many times, and the result of each repetition is its own row. |
@@ -63,7 +63,7 @@ A scope by labels is dynamic: a scenario that gets the label later is in the nex
 
 ## While it runs
 
-The run opens as soon as it starts. Each row reads `Running` until the judge is done, then `Passed` or `Failed`. **Stop all** cancels every conversation that is still running, and every running row has its own **Stop**. A cancelled run keeps the results that were already in.
+The run opens as soon as it starts. Each row shows `Running` until the judge is done, then `Passed` or `Failed`. **Stop all** cancels every conversation that is still running, and every running row has its own **Stop**. A cancelled run keeps the results that were already in.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-detail-running.png" alt="A run in progress, with rows still running and the Stop all button" />
@@ -77,7 +77,7 @@ The run opens as soon as it starts. Each row reads `Running` until the judge is 
 
 ## From the CLI and the API
 
-The CLI and the REST API name the same plan the dialog does, with `--name` and `name`. Without a name, a test suite run goes under the plan named after the test suite and the target, exactly as **Run suite** does.
+The CLI and the REST API use the same plan name as the dialog, with `--name` and `name`. Without a name, a test suite run goes under the plan named after the test suite and the target, exactly as **Run suite** does.
 
 ```bash
 langwatch test-suite run "Refunds" --target http:agent_abc123 --name "Refunds nightly" --note "after the policy fix" --wait

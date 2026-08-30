@@ -5,9 +5,9 @@ keywords: langwatch, agent testing, scenario, situation, criteria, labels, scena
 description: A scenario is a situation a simulated user acts out against your agent, and the criteria a judge scores the conversation against.
 ---
 
-## What a scenario holds
+## Situation and criteria
 
-The situation describes the user and what they want, in one or a few sentences. The simulated user plays it turn by turn and improvises the words, so a scenario is not a script. The criteria, one per line, are what the judge decides at the end of the conversation, each one passed, failed or inconclusive.
+The situation describes the user and what they want, in one or a few sentences. The simulated user plays it turn by turn and improvises the words, so a scenario is not a script. The criteria, one per line, are what the judge checks at the end of the conversation. Each one passes, fails or is inconclusive.
 
 For example, a checkout support agent gets this scenario:
 
@@ -21,7 +21,7 @@ Issues exactly one refund, not two
 States the 5 to 10 business day timeline
 ```
 
-Write criteria about outcomes and actions, not wording. A criterion about an internal action, such as "looks up the order before answering", is verified against the agent's own traces, so the judge does not take the reply's word for it. See [Linking your traces](/agent-testing/linking-your-traces).
+Write criteria about outcomes and actions, not wording. A criterion about an internal action, such as "looks up the order before answering", is verified against the agent's own traces, so the judge does not rely on what the reply claims. See [Linking your traces](/agent-testing/linking-your-traces).
 
 ## The editor
 
@@ -31,15 +31,15 @@ Write criteria about outcomes and actions, not wording. A criterion about an int
 <img className="block" src="/images/agent-testing/scenario-editor.png" alt="The scenario editor with the title, the test suite, the situation, the criteria and the labels" />
 </Frame>
 
-| Field | What it holds |
+| Field | What it is |
 |---|---|
 | **Title** | The name of the scenario, shown in every table and result. |
-| **Test suite** | The test suite the scenario belongs to. **No test suite** files it under **Default**. |
+| **Test suite** | The test suite of the scenario. **No test suite** files it under **Default**. |
 | **Situation** | Who the user is and what they are trying to do. |
 | **Criteria** | One criterion per line. Blank lines are dropped. |
 | **Labels** | Free text tags, any number. A run plan can scope by labels across test suites. |
 
-**Save** keeps the scenario. **Save & Run** keeps it and opens the [run dialog](/agent-testing/run-plans#the-run-dialog). **Open recent run** opens the latest run of this scenario.
+**Save** stores the scenario. **Save & Run** stores it and opens the [run dialog](/agent-testing/run-plans#the-run-dialog). **Open recent run** opens the latest run of this scenario.
 
 ## Customize scenario
 

@@ -35646,7 +35646,7 @@ description: Reference project secrets from an HTTP target, and connect an API p
 
 ## Static credential or token exchange
 
-Many production agents sit behind an API that requires authentication. A **static credential** (`bearer` / `api_key` / `basic`) is enough when the API accepts a fixed token, and an HTTP target reads that credential from your project's secrets. An **OAuth2 client-credentials** flow (Auth0 "machine-to-machine" is the usual example) needs more, because a token must be **exchanged** first.
+Many production agents are behind an API that requires authentication. A **static credential** (`bearer` / `api_key` / `basic`) is enough when the API accepts a fixed token, and an HTTP target reads that credential from your project's secrets. An **OAuth2 client-credentials** flow (Auth0 "machine-to-machine" is the usual example) needs more, because a token must be **exchanged** first.
 
 Start with the HTTP target below. When the credential must be exchanged, use a **custom code agent**. It is a few lines of Python that fetch the token and call your API with it. The credentials stay in your project's encrypted secret store, never in the agent's stored source.
 
@@ -35679,15 +35679,15 @@ Also check: [Secret parameters](/agent-testing/run-parameters#secret-parameters)
 
 ## How it fits together
 
-1. **Project secrets** hold the client ID and client secret, encrypted at rest. They are exposed to your code agent's Python as the injected `secrets` namespace.
+1. **Project secrets** store the client ID and client secret, encrypted at rest. They are exposed to your code agent's Python as the injected `secrets` namespace.
 2. **The code agent** exchanges the credentials for an access token and calls your protected API with it.
-3. **A scenario** drives the agent like a real user and judges the answers. The agent only passes if it got through the auth wall.
+3. **A scenario** talks to the agent like a real user and judges the answers. The agent only passes if it got through the auth wall.
 
 ## 1. Store the credentials as project secrets
 
 In **Settings → Secrets**, create the credentials **and** the endpoint coordinates. Keeping the endpoints in secrets too means the whole agent is configurable without touching its code or any API.
 
-Create **`AUTH0_CLIENT_SECRET` through the Settings → Secrets UI**, not on a command line: a secret passed as a CLI argument lands in your shell history and the process listing, and can end up in CI logs. The non-sensitive coordinates are fine to create via the CLI:
+Create **`AUTH0_CLIENT_SECRET` through the Settings → Secrets UI**, not on a command line: a secret passed as a CLI argument stays in your shell history and the process listing, and can end up in CI logs. The non-sensitive coordinates are fine to create via the CLI:
 
 ```bash
 langwatch secret create AUTH0_CLIENT_ID --value "<your client id>"
@@ -35704,7 +35704,7 @@ Secret names must be `UPPER_SNAKE_CASE` (`^[A-Z][A-Z0-9_]*$`). Values are encryp
 
 ## 2. Write the code agent
 
-Create a **code agent** with a single input `message` and a single declared output `output`: the declared output key must match the key the Python returns, or the run fails with `missing_output`. Use this Python, the reference implementation, exercised continuously against the real code-agent runtime:
+Create a **code agent** with a single input `message` and a single declared output `output`: the declared output key must match the key the Python returns, or the run fails with `missing_output`. Use this Python:
 
 ```python
 import requests
@@ -35748,11 +35748,11 @@ Things the sandbox enforces, in the order people trip on them:
 - **Return every declared output key**, or the run fails with `missing_output`.
 - **Available packages**: `requests`, `httpx`, `pydantic`, `langwatch`.
 - **Budget**: the token fetch *plus* your API call must finish inside the runner's wall-clock limit (60s by default). Keep explicit timeouts on both requests.
-- **Failure behavior**: `raise_for_status()` puts the URL and status code in the error, never the request body, so a rejected credential fails loudly without exposing the secret.
+- **Failure behavior**: `raise_for_status()` puts the URL and status code in the error, never the request body, so a rejected credential fails with a clear error and does not expose the secret.
 
 ## 3. Map the agent's input for scenarios
 
-Because every credential comes from the secrets namespace, the agent has a **single input**, the conversation message, and needs exactly one mapping: `message` from the scenario's `input`. That mapping is creatable in the agent editor today.
+Because every credential comes from the secrets namespace, the agent has a **single input**, the conversation message, and needs exactly one mapping: `message` from the scenario's `input`. You create that mapping in the agent editor.
 
 <Note>
   Keeping the endpoint coordinates in secrets is deliberate: the alternative, static `value` mappings on extra inputs, currently cannot be created from the editor UI, only via the agents API. UI support for static value mappings is tracked in [#6371](https://github.com/langwatch/langwatch/issues/6371).
@@ -35776,7 +35776,7 @@ Rows are isolated and run in parallel, so by default each row logs in on its own
 
 The cache is encrypted at rest and entries expire on their own. The platform puts a short-lived credential scoped to the cache inside the sandbox, shared by the runs of the project, so no `langwatch.setup()` call or LangWatch secret is required.
 
-This code is executed on every commit against the real runtime:
+The agent:
 
 ```python shared_session_code_agent.py
 # Log in once and share the session across the rows of a run.
@@ -35927,7 +35927,7 @@ def secret(name):
 
 ### Tuning the TTL
 
-`SESSION_TTL_SECONDS` is the session lifetime the target system returns. `REFRESH_MARGIN_SECONDS` is subtracted from it so a stored session is never about to expire when a row reads it. Set the margin between the duration of your slowest row and `SESSION_TTL_SECONDS`.
+`SESSION_TTL_SECONDS` is how long a stored session stays in the cache. Set it below the session lifetime the target system returns, minus the duration of your slowest row, so a row never reads a session that is about to expire.
 
 The agent also treats a `401` as an expired session: it logs in again and retries once, so an early expiration costs one extra login instead of failing the run.
 
@@ -35944,20 +35944,20 @@ The agent also treats a `401` as an expired session: it logs in again and retrie
 
 - Each run logs in only once. Every later row reads the stored session from the cache.
 - When rows start at the same time, one of them takes the claim and logs in. The rest wait and read the session it stores.
-- Entries belong to the project, not to a single run. A second run reuses the session the first run stored. If two concurrent runs write the same entry name, the last write wins. Use distinct names per agent (for example `BILLING_SESSION` and `SUPPORT_SESSION`) to avoid collisions.
+- Entries are scoped to the project, not to a single run. A second run reuses the session the first run stored. If two concurrent runs write the same entry name, the last write wins. Use distinct names per agent (for example `BILLING_SESSION` and `SUPPORT_SESSION`) to avoid collisions.
 - If a read fails, the row treats it as a miss and logs in. If a write fails, the row still succeeds; only the next row has to log in again.
 
 Source: [`shared_session_code_agent.py`](https://github.com/langwatch/langwatch/blob/main/services/nlpgo/app/engine/blocks/codeblock/examples/shared_session_code_agent.py).
 
 ### One login when rows start together
 
-The rows that start at the same moment all read an empty cache, so without a claim they all log in. The agent above takes a claim first. A claim writes only when the project does not hold that name yet, and answers `True` for the row that took it and `False` for the rows that did not, so one row logs in and the rest wait for the session it stores.
+The rows that start at the same moment all read an empty cache, so without a claim they all log in. The agent above takes a claim first. A claim writes only when the name does not exist yet, and answers `True` for the row that took it and `False` for the rows that did not, so one row logs in and the rest wait for the session it stores.
 
-`LOGIN_SECONDS` is the one number to set: how long a row holds the claim. Put it above the time your login takes.
+`LOGIN_SECONDS` is how long a row keeps the claim. Set it above the time your login takes.
 
-That single number also ends the wait. A row that takes the claim and then stops does not hold the others for good, because the claim expires and the next pass of a waiting row takes the name.
+The same number ends the wait. When a row takes the claim and then stops, the claim expires after `LOGIN_SECONDS` and the next waiting row takes it.
 
-Set it below your login time and the claim stops arbitrating: the name comes free while the first row is still logging in, so a second row takes it and logs in as well, and the last session written is the one the rows that follow read. Both sessions are valid, so the cost is extra logins, which is the result with no claim at all. The same applies when the cache itself cannot answer.
+If you set it below your login time, the claim expires while the first row is still logging in, so a second row takes it and logs in as well, and the rows that follow read the last session written. Both sessions are valid, so the cost is extra logins, the same as with no claim at all. The same applies when the cache cannot answer.
 
 The claim uses the entry's own name with `_CLAIM` after it, so there is no second name to pick. It has to be a separate entry: the claim is taken before the login, and the session can only be stored after it.
 
@@ -35970,7 +35970,7 @@ langwatch.cache.claim("ACME_SESSION_CLAIM", "taken", ttl_seconds=15)
 langwatch.cache.delete("ACME_SESSION")
 ```
 
-`get` returns `default` on a miss. `claim` returns `True` when it stored the value and `False` when another row already holds the name. Every other failure raises, with the rejected field in the message: `400 (validation_error: ttl_seconds: ttl_seconds must be at least 5)`.
+`get` returns `default` on a miss. `claim` returns `True` when it stored the value and `False` when another row already has the claim. Every other failure raises, with the rejected field in the message: `400 (validation_error: ttl_seconds: ttl_seconds must be at least 5)`.
 
 Pass a `str`, a `dict` or a `list` as the value. The SDK stores a `dict` or `list` as JSON and `get` returns it parsed, so JSON types apply: a tuple comes back as a `list`, a non-string key as a string, and a value JSON cannot encode (`nan`, `inf`, a set, a datetime) raises `TypeError` before the call.
 
@@ -35985,7 +35985,7 @@ Also available over REST at [`/api/agent-cache/{name}`](/api-reference/agent-cac
 | Agent answers are empty | The token exchange or API call raised. Check the credentials and endpoint URLs. (Improved error surfacing is tracked in [#6340](https://github.com/langwatch/langwatch/issues/6340).) |
 | `missing_output` error | The Python returned a dict without one of the agent's declared output keys. |
 | `langwatch.cache.set` raises `400 (validation_error: value: Expected string, received object)` | The SDK in the sandbox predates dict values; it sends the object as is and the route takes a string. Pass `json.dumps(session)` and `json.loads` it after `get`, or update the SDK. |
-| Credential works locally but not on the platform | The secret name in `secrets.NAME` doesn't match a stored project secret, or the value was stored in a different project. |
+| Credential works locally but not on the platform | The secret name in `secrets.NAME` does not match a stored project secret, or the value was stored in a different project. |
 | Timeout | Token fetch + downstream call exceeded the 60s runner budget. Check both endpoints' latency. |
 
 ---
@@ -35996,7 +35996,7 @@ Also available over REST at [`/api/agent-cache/{name}`](/api-reference/agent-cac
 title: Compare Agents
 sidebarTitle: Compare agents
 keywords: langwatch, agent testing, compare agents, comparison run, targets, a/b, prod vs staging, parameters per target
-description: A comparison run sends every scenario to two or more targets in one run, so you read the pass rate, the cost and the latency of each side by side.
+description: A comparison run sends every scenario to two or more targets in one run, so you see the pass rate, the cost and the latency of each side by side.
 ---
 
 ## What a comparison run is
@@ -36044,7 +36044,7 @@ langwatch test-suite run "Refunds" \
   --wait
 ```
 
-On the REST API the same values go in `runParameters` on each target, and `parameters` at the run level holds what every target shares. See [Run from CI](/agent-testing/run-from-ci#compare-two-agents-or-one-agent-on-two-settings) for the request body.
+On the REST API the same values go in `runParameters` on each target, and `parameters` at the run level sets the values every target shares. See [Run from CI](/agent-testing/run-from-ci#compare-two-agents-or-one-agent-on-two-settings) for the request body.
 
 Also check: [Run plans](/agent-testing/run-plans), [Results](/agent-testing/results), [Run parameters](/agent-testing/run-parameters).
 
@@ -36371,13 +36371,13 @@ The body template renders as a Liquid template on every turn, and `outputPath` i
 
 The URL and the header values render the same variables.
 
-For the response, set `outputPath` to where the reply text lives. If the endpoint answers `{"reply": "It ships on Tuesday."}`, set `outputPath` to `$.reply`. The platform reads the reply text at that path; the response needs no other fields.
+For the response, set `outputPath` to the path of the reply text. If the endpoint answers `{"reply": "It ships on Tuesday."}`, set `outputPath` to `$.reply`. The platform reads the reply text at that path; the response needs no other fields.
 
 ## 4. Adopt the trace context
 
-The platform sends a W3C `traceparent` header on every call, one trace per conversation turn. When your server adopts it, the spans your agent produces land in that same trace, and the judge reads them before its verdict: tool calls, database writes, retrievals. A criterion like "the agent looked up the order before answering" then passes on evidence instead of on the reply's wording.
+The platform sends a W3C `traceparent` header on every call, one trace per conversation turn. When your server adopts it, the spans your agent produces go into that same trace, and the judge reads them before its verdict: tool calls, database writes, retrievals. A criterion like "the agent looked up the order before answering" then passes on evidence instead of on the reply's wording.
 
-With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens and you keep the code unchanged. Without it, attach the extracted context in a middleware that runs before any tracing starts. Do not extract inside the handler body: a handler decorated with `@langwatch.trace()` opens its root span before the body runs, so an extraction there comes too late and the agent's spans land in a separate trace. The middleware placement covers every tracing style: decorators, `with langwatch.trace()`, autotrack, community instrumentations, and plain OpenTelemetry spans.
+With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens and you keep the code unchanged. Without it, attach the extracted context in a middleware that runs before any tracing starts. Do not extract inside the handler body: a handler decorated with `@langwatch.trace()` opens its root span before the body runs, so an extraction there comes too late and the agent's spans go into a separate trace. The middleware placement covers every tracing style: decorators, `with langwatch.trace()`, autotrack, community instrumentations, and plain OpenTelemetry spans.
 
 
   ### Python
@@ -36464,7 +36464,7 @@ Open the run in **Agent Testing > Results**. A connected setup shows:
 
 - The conversation transcript, with the reply text your `outputPath` extracted.
 - **View trace** on each turn of the conversation, opening the agent's own spans for that turn.
-- Judge reasoning that cites spans, naming the tool call or lookup that satisfied a criterion.
+- Judge reasoning that cites spans, with the tool call or lookup that satisfied a criterion.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-drawer-trace-link.png" alt="The conversation drawer with View trace on a turn and the judge reasoning citing a tool call span" />
@@ -36483,7 +36483,7 @@ A trace-dependent criterion that comes back inconclusive means the traces did no
 | Symptom | Cause | Fix |
 |---|---|---|
 | The run fails with a connection error | The URL is not reachable from the LangWatch backend: an internal hostname, a firewall, or a stopped service. | Deploy the endpoint to a reachable URL, or use [`langwatch agent dev`](/agent-testing/local-development) for a local process. |
-| Every turn fails with 401 or 403 | The credential is missing or wrong: no header row or `auth` block, or the `{{ secrets.NAME }}` reference names a secret the project does not have. | Add the header row or `auth` block, and check the secret's name and project in **Settings → Secrets**. |
+| Every turn fails with 401 or 403 | The credential is missing or wrong: no header row or `auth` block, or the `{{ secrets.NAME }}` reference refers to a secret the project does not have. | Add the header row or `auth` block, and check the secret's name and project in **Settings → Secrets**. |
 | The transcript shows empty replies or raw JSON | `outputPath` does not match the response shape, so no reply text is found. | Set `outputPath` to the JSONPath of the reply text in your endpoint's real response. |
 | Trace-dependent criteria come back inconclusive, and turns have no trace link | The server does not adopt the incoming `traceparent`, or it reports traces to a different LangWatch project. | Adopt the context as in step 4, and point the agent's tracing at the same project's API key. |
 
@@ -36500,13 +36500,13 @@ description: Judge scenario criteria against what your agent did, tool calls, wr
 
 ## Connecting your agent traces to the scenario run
 
-Linked traces are the agent's own execution traces, which the judge fetches from LangWatch before its verdict. An agent behind an HTTP endpoint returns final text; its traces carry what happened on the way there: the span tree, the tool calls with their inputs and outputs, the retrievals, the writes. The judge reads them next to the conversation, so it verifies a criterion about behavior against evidence.
+Linked traces are the agent's own execution traces, which the judge fetches from LangWatch before its verdict. An agent behind an HTTP endpoint returns final text; its traces record what happened on the way there: the span tree, the tool calls with their inputs and outputs, the retrievals, the writes. The judge reads them next to the conversation, so it verifies a criterion about behavior against evidence.
 
 For example, a support agent replies "your order ships Tuesday". The reply alone cannot show whether the agent looked the order up or made the date up. The trace shows the `lookup_order` tool call and its result, and the judge scores the criterion "the agent looks up the order before answering" from that span.
 
 ## One trace per conversation turn
 
-Each turn of a simulation runs as one LangWatch trace, grouped under the run's thread. On every call to an HTTP agent, the platform sends that turn's W3C `traceparent` header. When the agent's server adopts the header, the spans it produces during the turn land in the same trace, in the same project.
+Each turn of a simulation runs as one LangWatch trace, grouped under the run's thread. On every call to an HTTP agent, the platform sends that turn's W3C `traceparent` header. When the agent's server adopts the header, the spans it produces during the turn go into the same trace, in the same project.
 
 Adoption is one change on the agent's side, and no change at all when the server runs OpenTelemetry HTTP auto-instrumentation. The snippets are in [Connect your agent](/agent-testing/connect-your-agent#4-adopt-the-trace-context).
 
@@ -36531,11 +36531,11 @@ Before its verdict on a run against an HTTP agent, the judge fetches every trace
 - each tool call, with its input and its output,
 - the agent's inner model calls, retrievals and writes.
 
-The fetch filters out infrastructure spans from the call plumbing itself. The judge cites spans in its reasoning, and the run detail links each turn to its trace, so you can open exactly what the judge read.
+The platform filters out its own infrastructure spans. The judge cites spans in its reasoning, and the run detail links each turn to its trace, so you can open exactly what the judge read.
 
 ## How long the verdict waits
 
-Traces arrive with ingest delay, so the verdict waits for them, bounded. The wait ends as soon as the trace is complete: every agent span's parent is present, which is how the fetch tells a fully ingested trace from one that is still arriving. The platform sizes the maximum wait from the project's own ingest speed over the last 7 days, between 10 and 30 seconds, and uses 30 seconds when the project has few recent traces.
+Traces arrive with ingest delay, so the verdict waits for them, bounded. The wait ends as soon as the trace is complete: every agent span's parent is present, which is how the platform tells a fully ingested trace from one that is still arriving. The platform sets the maximum wait from the project's own ingest speed over the last 7 days, between 10 and 30 seconds, and uses 30 seconds when the project has few recent traces.
 
 When the wait ends with traces still incomplete, the judge gets one extra chance: a one-shot `wait_for_traces` tool it calls only when the missing spans are essential for the verdict. That waits up to 30 seconds more, once. After it, the judge must deliver its verdict on the evidence at hand.
 
@@ -36543,13 +36543,13 @@ Conversation turns never wait. Mid-conversation, the judge only decides whether 
 
 ## When traces do not arrive
 
-When no trace arrives inside the wait, the judge sees a collection error carrying the reason in place of the trace, and marks trace-dependent criteria **inconclusive**. It never marks them passed without the trace. Criteria about the conversation text alone still resolve normally: an agent that has not adopted trace propagation is judged this way on every run, with only its internal-behavior criteria needing the traces.
+When no trace arrives inside the wait, the judge sees a collection error with the reason in place of the trace, and marks trace-dependent criteria **inconclusive**. It never marks them passed without the trace. Criteria about the conversation text alone still resolve normally: an agent that has not adopted trace propagation is judged this way on every run, with only its internal-behavior criteria needing the traces.
 
 When the wait ends with a trace that is still incomplete, the judge keeps every span that arrived plus the collection error. Criteria the visible spans prove still pass; criteria that need the missing spans go inconclusive.
 
 When no trace of the run ever arrived, an inconclusive verdict ends the run instead of continuing the conversation: more turns cannot produce trace evidence, so the run does not stretch to the turn cap waiting for traces that will not come.
 
-An inconclusive behavior criterion is the signal to check propagation and the project key; the [common failures](/agent-testing/connect-your-agent#common-failures) table covers the causes.
+When a behavior criterion is inconclusive, check propagation and the project key. The [common failures](/agent-testing/connect-your-agent#common-failures) table lists the causes.
 
 ## Writing trace-aware criteria
 
@@ -36560,7 +36560,7 @@ Write the criterion about the action, in your system's own vocabulary, and the j
 - The agent created exactly one support ticket.
 - The agent did not call the payments API.
 
-A criterion that names an action your traces do not record cannot be verified. Instrument the action, or reword the criterion to something the conversation itself proves.
+The judge cannot verify a criterion about an action your traces do not record. Instrument the action, or reword the criterion to something the conversation itself proves.
 
 ## Linked traces in code-first scenarios
 
@@ -36695,7 +36695,7 @@ If the agent is not registered yet, [Connect your agent](/agent-testing/connect-
 
 ## How the tunnel is protected
 
-A tunnel URL is public, and a local agent process usually holds real model provider keys. `langwatch agent dev` therefore mints a per-session secret, fronts your local port with a proxy that rejects any request missing the `X-LangWatch-Dev-Secret` header, and writes that header onto the agent's configuration for the session. Only the platform's scenario calls carry the secret. On exit, the command removes both the proxy and the header row.
+A tunnel URL is public, and a local agent process usually has real model provider keys. `langwatch agent dev` therefore creates a per-session secret, puts a proxy in front of your local port that rejects any request without the `X-LangWatch-Dev-Secret` header, and adds that header to the agent's configuration for the session. Only the platform's scenario calls send the secret. On exit, the command removes both the proxy and the header row.
 
 `--no-auth` turns the proxy off, for a server that already authenticates every request. A bring-your-own tunnel (`--tunnel-url`) also runs without the proxy: your tunnel forwards directly to your server, so the tunnel endpoint must supply its own access control. The agent's own configured authentication headers pass through the tunnel unchanged either way.
 
@@ -36707,11 +36707,11 @@ The agents list and the run target selector show a **local tunnel** badge on the
 
 The default transport is a Cloudflare quick tunnel on `trycloudflare.com`. The command shows Cloudflare's terms notice on the first run.
 
-- Quick tunnels carry no availability guarantee. Use them for the development loop, and run the test suites you rely on against a deployed URL.
+- Quick tunnels have no availability guarantee. Use them for the development loop, and run the test suites you rely on against a deployed URL.
 - Quick tunnels buffer server-sent events. This does not affect scenario calls, which are plain JSON requests; it only affects a streaming endpoint served through the same tunnel.
 - Quick tunnels cap at around 200 concurrent requests.
 
-`--tunnel-url` swaps in your own tunnel when you hit these limits.
+Use `--tunnel-url` with your own tunnel when you hit these limits.
 
 ## When the process dies without cleanup
 
@@ -36736,19 +36736,37 @@ description: Agent testing runs your agent through multi-turn conversations with
   <source src="/media/videos/agent-testing-overview.webm" type="video/webm" />
 </video>
 
+## What agent testing is for
+
+One input and one expected output cannot test an agent. An agent calls tools, keeps state and takes several turns to reach an outcome. Agent testing checks the whole conversation, including what the agent did internally.
+
+You write a scenario: the situation the user is in, and the criteria the agent must meet. For example, a customer asks for a refund on an order from last year; the agent must look up the order and must not promise the refund.
+
+LangWatch plays the scenario against your agent and shows a pass or fail for each criterion, with the judge's reasoning and the full conversation.
+
+Use it to:
+
+- Check the agent before a release. Run the test suite and read the pass rate.
+- Turn a production incident into a permanent test, so the same mistake does not come back.
+- Catch a regression when a prompt, a model or a tool changes.
+
 ## How a test runs
 
-Three parties take part in every test. Your agent answers as it does in production. A simulated user plays the situation the scenario describes, turn by turn, with different words on every run. A judge model reads the whole conversation and the agent's own traces, and decides each criterion.
+| Part | What it does |
+|---|---|
+| Simulated user | Plays the user in the situation the scenario describes, with different wording on every run. |
+| Your agent | Answers each turn as it does in production. |
+| Judge | Reads the conversation and the agent's traces, then passes or fails each criterion and explains why. |
 
-A scenario is the unit of testing: one situation and the criteria the conversation must meet. Test suites group scenarios, run plans keep the history of every run, and the Results tab shows the pass rate over time. Every part has its own page below.
+A scenario is one situation and its criteria. A [test suite](/agent-testing/test-suites) groups the scenarios you run together. A [run plan](/agent-testing/run-plans) is the history of one configuration, and the [Results](/agent-testing/results) tab shows its pass rate over time.
 
 ## Two ways to run
 
-Both ways use the same simulated user, the same judge and the same results pages. They differ in where the scenarios are written and who runs them.
+Both use the same simulated user, the same judge and the same results pages. The difference is where you write the scenarios.
 
 <CardGroup cols={2}>
   <Card title="Test from the platform" icon="globe" href="/agent-testing/test-from-the-platform">
-    Connect your agent over HTTP and write, run and read scenarios in the LangWatch interface. No test code in your repository.
+    Connect your agent over HTTP, then write, run and see scenarios in the LangWatch interface. No code needed.
   </Card>
   <Card title="Write scenarios in code" icon="code" href="/agent-testing/scenarios-in-code">
     Write scenarios with the Scenario SDK in Python or TypeScript, run them with your test runner and in CI, and see every run in LangWatch.
@@ -36765,22 +36783,22 @@ Both ways use the same simulated user, the same judge and the same results pages
     Real audio through ElevenLabs, OpenAI Realtime, Twilio, Pipecat and Gemini Live, with background noise, interruptions and latency metrics.
   </Card>
   <Card title="Red teaming" icon="shield-halved" href="/agent-testing/red-teaming">
-    Multi-turn adversarial attacks with escalation, refusal detection and backtracking, to find security gaps first.
+    Multi-turn adversarial attacks with escalation, refusal detection and backtracking, to find security gaps before a release.
   </Card>
 </CardGroup>
 
-## Agent testing and dataset evaluation
+## Agent testing vs evaluations
 
-A dataset evaluation scores one input against one expected output. An agent is a process: it holds state, calls tools and takes several turns to reach an outcome, so a single input-output pair cannot describe what it must do in the middle of a conversation.
+An evaluation scores one input against one expected output, on a dataset. It fits one step inside the agent, such as a retrieval step or one prompt, where you optimize a metric on many examples.
 
-For example, an evaluation dataset holds rows like these:
+For example, an evaluation dataset has rows like these:
 
 | query                            | expected_answer                                                                                              |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | What is your refund policy?      | We offer a 30-day money-back guarantee on all purchases.                                                     |
 | How do I cancel my subscription? | You can cancel your subscription by logging into your account and clicking the "Cancel Subscription" button. |
 
-A scenario describes the whole conversation and checks the steps between the turns:
+An agent test scores a whole conversation. The scenario describes the user's situation, and the criteria check each step, including the tools the agent called:
 
 ```python
 script=[
@@ -36797,7 +36815,7 @@ script=[
 ]
 ```
 
-Keep both. Use evaluations for the parts inside the agent, such as one retrieval step or one prompt, where you optimize a metric on many examples. Use scenarios to prove the agent behaves correctly end to end, to reproduce an incident from production, and to catch a regression before a release.
+Use evaluations for the parts inside the agent. Use agent testing to check the agent end to end: before a release, to reproduce an incident, and to catch a regression. Both run in the same LangWatch project.
 
 {/* Founder decision: this sentence keeps the marketing superlative on purpose, so it is indexed as such. Do not rewrite it to plain language. */}
 [Scenario](https://langwatch.ai/scenario/) is the most advanced agent testing framework available. The platform and the SDKs both run on it: the same simulated user and the same judge test text, voice and adversarial conversations, in Python, TypeScript and Go, against any agent framework.
@@ -36852,9 +36870,9 @@ The attacker takes the place of the [user simulator](/agent-testing/scenarios-in
 
 <img src="/images/red-teaming-hero.png" alt="Red Teaming" width="100%" />
 
-## Why multi-turn wins
+## Why multi-turn attacks
 
-Single-turn red-teaming tools fire thousands of prompts and score each in isolation. Real attackers build rapport, reframe rejected requests, and escalate gradually until the agent drifts out of its guardrails. **Agents that hold at turn 1 often break by turn 20.**
+Single-turn red-teaming tools fire thousands of prompts and score each in isolation. Real attackers build rapport, reframe rejected requests, and escalate gradually until the agent drifts out of its guardrails. Agents that hold at turn 1 often break by turn 20.
 
 <CardGroup cols={2}>
   <Card title="Crescendo escalation" icon="arrow-trend-up">
@@ -36880,11 +36898,11 @@ Single-turn red-teaming tools fire thousands of prompts and score each in isolat
 | **Escalation** | 45 to 75% | Authority claims, roleplay, urgency, social engineering. |
 | **Direct** | 75 to 100% | Encoding tricks (Base64, ROT13), prompt injection, multi-vector. |
 
-Need maximum adaptability against a hardened agent? [**GOAT**](https://langwatch.ai/scenario/advanced/red-teaming/goat) is a drop-in alternative that picks a technique *per turn* instead of following fixed phases (based on Meta's [GOAT paper](https://arxiv.org/abs/2410.01606), ICML 2025).
+For a hardened agent, [GOAT](https://langwatch.ai/scenario/advanced/red-teaming/goat) is a drop-in alternative that picks a technique per turn instead of following fixed phases (based on Meta's [GOAT paper](https://arxiv.org/abs/2410.01606), ICML 2025).
 
 ## Get it running
 
-New to Scenario? Start with [Getting Started](/agent-testing/scenarios-in-code) to write your agent's `call()` adapter, then swap in an attacker instead of the user simulator.
+If you have not used Scenario, start with [Getting Started](/agent-testing/scenarios-in-code) to write your agent's `call()` adapter, then swap in an attacker instead of the user simulator.
 
 <Steps>
   <Step title="Install Scenario">
@@ -36967,11 +36985,11 @@ New to Scenario? Start with [Getting Started](/agent-testing/scenarios-in-code) 
 
   </Step>
   <Step title="Run it">
-    Run it alongside your test suite. We recommend **50 turns** for thorough coverage. Agents that hold early often break under sustained pressure. With `LANGWATCH_API_KEY` set, every adversarial turn appears under **Agent Testing > Results**, and `scenario redteam-report` opens the findings dashboard with severity and prioritized fixes.
+    Run it alongside your test suite. Use 50 turns for thorough coverage. Agents that hold early often break under sustained pressure. With `LANGWATCH_API_KEY` set, every adversarial turn appears under **Agent Testing > Results**, and `scenario redteam-report` opens the findings dashboard with severity and prioritized fixes.
   </Step>
 </Steps>
 
-## Dig into the full docs
+## Full documentation
 
 <CardGroup cols={2}>
   <Card title="Red teaming quick start" icon="rocket" href="https://langwatch.ai/scenario/advanced/red-teaming/quick-start">
@@ -37007,7 +37025,7 @@ description: The Results tab lists every run plan of the project with its pass r
 <img className="block" src="/images/agent-testing/results-tab.png" alt="The Results tab grouped by run plan, with the pass rate and the trend of each plan" />
 </Frame>
 
-**Group by** decides what a row is:
+**Group by** sets what a row is:
 
 | Group by | One row per | Columns |
 |---|---|---|
@@ -37028,7 +37046,7 @@ The filters narrow every grouping: **Scenario**, **Label**, **Target** and **All
 
 ## A run plan and its runs
 
-Press a run plan. The sidebar lists its runs as **Run #n** with the note, the time and the pass rate; **Load More...** reads older ones. The header of the selected run shows **Pass**, **Completed**, **Avg Agent Latency**, **Avg Agent Cost**, **Total Duration** and **Total Cost**.
+Press a run plan. The sidebar lists its runs as **Run #n** with the note, the time and the pass rate; **Load More...** loads older ones. The header of the selected run shows **Pass**, **Completed**, **Avg Agent Latency**, **Avg Agent Cost**, **Total Duration** and **Total Cost**.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-detail-table.png" alt="A run plan with its runs in the sidebar, the summary pills and the table of results" />
@@ -37058,7 +37076,7 @@ While the run is going, the drawer shows `The conversation is running…` and th
 
 ## What a status means
 
-The **Result** column of the table reads `Passed`, `Failed` or `Running`. The **Status** chip of the drawer is more precise:
+The **Result** column of the table shows `Passed`, `Failed` or `Running`. The **Status** chip of the drawer is more precise:
 
 | Status | Meaning | What to do |
 |---|---|---|
@@ -37089,7 +37107,7 @@ description: Start a test suite from a CI job and wait for every run of the batc
 
 ## How it works
 
-A CI job starts a test suite, keeps the batch id from the response, then polls that batch until every run is finished. The CLI, the REST API and the SDKs all start the same run.
+A CI job starts a test suite, stores the batch id from the response, then polls that batch until every run is finished. The CLI, the REST API and the SDKs all start the same run.
 
 ## From the CLI
 
@@ -37099,7 +37117,7 @@ langwatch test-suite run "Checkout regression" --target http:agent_abc123 --wait
 
 `--wait` polls until the batch is complete and exits non-zero when a run failed, which is what fails the job. The test suite is named by its id or by its name.
 
-Add `--format json` (or `-o json`) to get one final document on stdout instead of the progress lines. It holds `outcome`, `tallies` and the per-run `results`, so a job step can read the verdict without parsing prose.
+Add `--format json` (or `-o json`) to get one final document on stdout instead of the progress lines. It contains `outcome`, `tallies` and the per-run `results`, so a job step can read the verdict without parsing prose.
 
 ## From the REST API
 
@@ -37147,9 +37165,9 @@ The response has the values the CI job needs:
 }
 ```
 
-`batchRunId` addresses the batch. `jobCount` is the number of runs the batch gets. `created` says whether this run created the plan or joined one that already carried the name.
+`batchRunId` identifies the batch. `jobCount` is the number of runs the batch gets. `created` says whether this run created the plan or joined one that already had the name.
 
-To run a configuration of your own instead of a whole test suite, `POST /api/v1/run-plans/run` takes a `config` object with the scope, the targets, the repeat count and the two models. The scope is one of `{ "mode": "all" }`, `{ "mode": "test_suites", "testSuiteIds": [...] }`, `{ "mode": "labels", "labels": [...] }`, or `{ "mode": "scenarios" }` with `scenarioIds` beside it. `GET /api/v1/run-plans` lists the plans, and `POST /api/v1/run-plans/{id}/run` runs one again with the configuration it holds.
+To run a configuration of your own instead of a whole test suite, `POST /api/v1/run-plans/run` takes a `config` object with the scope, the targets, the repeat count and the two models. The scope is one of `{ "mode": "all" }`, `{ "mode": "test_suites", "testSuiteIds": [...] }`, `{ "mode": "labels", "labels": [...] }`, or `{ "mode": "scenarios" }` with `scenarioIds` beside it. `GET /api/v1/run-plans` lists the plans, and `POST /api/v1/run-plans/{id}/run` runs one again with its stored configuration.
 
 <Note>
   The `/api/suites` family still answers and is deprecated. Move CI jobs to `/api/v1/test-suites` and `/api/v1/run-plans`.
@@ -37190,7 +37208,7 @@ console.log(result.batchRunId);
 
 ## Compare two agents, or one agent on two settings
 
-A run goes against every target you name, so naming two targets runs each scenario against both and files the results under one batch, one column per target on the results page. A target may also carry the parameter values it alone runs with, so the same agent named twice with different values is a comparison of that agent on two settings. [Compare agents](/agent-testing/compare-agents) covers how the platform shows them.
+A run goes against every target you name, so naming two targets runs each scenario against both and stores the results under one batch, one column per target on the results page. A target can also have its own parameter values, so the same agent named twice with different values is a comparison of that agent on two settings. [Compare agents](/agent-testing/compare-agents) covers how the platform shows them.
 
 ```bash
 langwatch test-suite run "Checkout regression" \
@@ -37199,7 +37217,7 @@ langwatch test-suite run "Checkout regression" \
   --wait
 ```
 
-The suffix after the question mark is a query string. Both halves are percent-decoded, so a value that holds `?` or `&` must be written as `%3F` or `%26`. A value is read as the type it looks like: `true` and `false` become booleans, a plain number becomes a number, everything else stays text.
+The suffix after the question mark is a query string. Both halves are percent-decoded, so a value that contains `?` or `&` must be written as `%3F` or `%26`. A value is read as the type it looks like: `true` and `false` become booleans, a plain number becomes a number, everything else stays text.
 
 On the REST API the same values go in `runParameters` on the target:
 
@@ -37224,7 +37242,7 @@ curl -X POST "https://app.langwatch.ai/api/v1/test-suites/suite_abc123/run" \
   }'
 ```
 
-`runParameters` are merged over the run-level `parameters`, and the target wins. Use `parameters` for what every target shares, such as a fixture id or a tenant, and `runParameters` for what tells the targets apart.
+`runParameters` are merged over the run-level `parameters`, and the target wins. Use `parameters` for what every target shares, such as a fixture id or a tenant, and `runParameters` for what differs between the targets.
 
 ## Poll the batch
 
@@ -37254,12 +37272,12 @@ curl "https://app.langwatch.ai/api/simulation-runs/batches/batch_xyz789" \
 
 | Field | Meaning |
 | --- | --- |
-| `totalCount` | Runs the batch holds now. |
+| `totalCount` | Runs in the batch now. |
 | `runningCount` | Runs that are queued or in progress. |
 | `settledCount` | Runs that are neither queued nor in progress: passed, failed, errored, cancelled or stalled. |
 | `isComplete` | True when `settledCount` equals `totalCount`. |
 
-Stop the poll when `isComplete` is true **and** `totalCount` is at least `jobCount`. The two conditions go together: the platform creates the runs asynchronously, so a batch read right after the trigger can hold fewer runs than `jobCount`, and a batch of two created runs out of six reports itself complete.
+Stop the poll when `isComplete` is true **and** `totalCount` is at least `jobCount`. The two conditions go together: the platform creates the runs asynchronously, so a batch read right after the trigger can have fewer runs than `jobCount`, and a batch of two created runs out of six reports itself complete.
 
 The same asynchronous creation makes the first read answer `404`. The batch becomes readable when its first run is stored, which is a moment after the trigger returns. Treat a `404` as "not stored yet" and poll again until your own timeout expires. A `404` is a missing batch only after that timeout.
 
@@ -37300,20 +37318,20 @@ echo "The batch did not finish before the timeout."
 exit 1
 ```
 
-The request has its own time limits, so a read that hangs cannot hold the job open. The deadline is read between requests, so the job stops within one request and one sleep of it, which is 40 seconds with the values above.
+The request has its own time limits, so a read that hangs cannot block the job. The deadline is read between requests, so the job stops within one request and one sleep of it, which is 40 seconds with the values above.
 
 `langwatch test-suite run ... --wait` does the same poll, and its exit code follows the results.
 
 ## Give the batch a note
 
-`--note` keeps one short line with the batch: why it was run, or what changed. Every run in the batch keeps it, and the platform shows it beside the run.
+`--note` stores one short line with the batch: why it was run, or what changed. Every run in the batch has it, and the platform shows it beside the run.
 
 ```bash
 langwatch test-suite run suite_abc123 --target http:agent_abc123 \
   --note "$(git log -1 --pretty=%s | cut -c1-200)" --wait
 ```
 
-The note is free text, up to 200 characters, and a longer one is refused before the batch is queued. The `cut` above keeps a long commit subject inside that limit. `langwatch simulation-run list` and `langwatch simulation-run get` show the note back.
+The note is free text, up to 200 characters, and a longer one is refused before the batch is queued. The `cut` above trims a long commit subject to that limit. `langwatch simulation-run list` and `langwatch simulation-run get` show the note back.
 
 ---
 
@@ -37370,12 +37388,12 @@ plan=free, locale=de
 
 <img src="/images/agent-testing/scenario-parameters-editor.png" alt="The scenario editor with the parameters block open, declaring plan and locale with their defaults, and params.plan read in the situation" width="100%" />
 
-- **Name** is what `{{ params.NAME }}` reads. Letters, digits and underscores, and the first character is a letter or an underscore.
+- **Name** is the `NAME` in `{{ params.NAME }}`. Letters, digits and underscores, and the first character is a letter or an underscore.
 - **Default value** applies when the run does not set the value. `42` is a number, `true` is a boolean, and everything else is text. Quote a value to force text: `"007"`. A name with an empty value after `=` has no default.
 
 A scenario can declare up to 20 parameters.
 
-The API accepts the same declarations with a description and the secret flag: `POST /api/scenarios` and `PATCH /api/scenarios/{id}` take a `parameters` array of `{ name, description, defaultValue, secret }` objects. A [secret parameter](#secret-parameters) is declared through the API, since the editor line holds plain values only.
+The API accepts the same declarations with a description and the secret flag: `POST /api/scenarios` and `PATCH /api/scenarios/{id}` take a `parameters` array of `{ name, description, defaultValue, secret }` objects. A [secret parameter](#secret-parameters) is declared through the API, since the editor line takes plain values only.
 
 ## Use the values in the scenario text
 
@@ -37412,7 +37430,7 @@ https://api.your-company.internal/{{ params.region }}/chat
 
 Auth fields read project secrets, not parameters. See [Testing agents behind authentication](/agent-testing/authenticated-agents#referencing-project-secrets-from-an-http-target).
 
-Next to `params`, the same fields render `{{ messages }}`, `{{ input }}` and `{{ threadId }}` from the conversation, and `{{ traceId }}` and `{{ traceparent }}` from the turn's trace context. See [Linking your traces](/agent-testing/linking-your-traces) for what the trace variables carry.
+Next to `params`, the same fields render `{{ messages }}`, `{{ input }}` and `{{ threadId }}` from the conversation, and `{{ traceId }}` and `{{ traceparent }}` from the turn's trace context. See [Linking your traces](/agent-testing/linking-your-traces) for what the trace variables contain.
 
 ### Prompt targets
 
@@ -37448,7 +37466,7 @@ The sandbox injects `params` into the module globals. Do not import a module nam
 A workflow target receives the values as entry inputs, one entry input per parameter name.
 
 <Note>
-  A parameter reaches a downstream node only if the entry node has an edge carrying it. Adding a parameter to the run does not add the edge. Open the workflow and connect the new entry field to the node that reads it.
+  A parameter reaches a downstream node only when an edge connects the entry field to that node. Adding a parameter to the run does not add the edge. Open the workflow and connect the new entry field to the node that reads it.
 </Note>
 
 Entry inputs arrive as strings. A code node inside the workflow reads `params.NAME` with the original type.
@@ -37463,13 +37481,13 @@ A value set at run time overrides the scenario's default. A parameter with no ru
 
 <img src="/images/agent-testing/run-dialog-parameters.png" alt="The run dialog with the parameters line set to plan=pro and the Secret parameters switch" width="100%" />
 
-The **Secret parameters** switch turns the line into rows, one per parameter, with a lock on each secret one. The secret parameters the scenarios declare are in the list already, with an empty field for the value. Once a row holds a secret value the rows stay; a secret cannot be written on one line.
+The **Secret parameters** switch turns the line into rows, one per parameter, with a lock on each secret one. The secret parameters the scenarios declare are in the list already, with an empty field for the value. Once a row has a secret value, the rows stay; a secret cannot be written on one line.
 
 **Save & Run** in the scenario editor opens the same dialog.
 
 ## Secret parameters
 
-A secret parameter is a run parameter that holds a credential. The platform encrypts the value before it writes anything down, and keeps it out of the stored run, the APIs, the exports, the audit log and everything it displays. The target under test reads the value while the run executes, which is the purpose of the parameter. Use one for an API key, a bearer token, or a password that changes per run.
+A secret parameter is a run parameter for a credential. The platform encrypts the value before it writes anything down, and keeps it out of the stored run, the APIs, the exports, the audit log and everything it displays. The target under test reads the value while the run executes, which is the purpose of the parameter. Use one for an API key, a bearer token, or a password that changes per run.
 
 Declare it in the same editor: add the row, then turn on the **Secret** switch. A secret parameter takes no default value, so the field for it is empty and disabled.
 
@@ -37515,10 +37533,10 @@ Also check: [Testing agents behind authentication](/agent-testing/authenticated-
 | Error | What happened | What to do |
 |---|---|---|
 | `scenario_parameter_unknown` | The run set a name that no scenario in the run declares, usually a spelling error. The message lists the rejected key and the accepted names. | Correct the spelling, or declare the parameter on the scenario that reads it. |
-| `scenario_parameter_missing` | The situation or a criterion reads a name with no value: the run set none and the scenario has no default. The message names the parameter and the field. | Set a value for the run, or give the parameter a default. |
+| `scenario_parameter_missing` | The situation or a criterion reads a name with no value: the run set none and the scenario has no default. The message says which parameter and which field. | Set a value for the run, or give the parameter a default. |
 | `scenario_parameter_template_invalid` | A field references a parameter in a form that cannot be rendered. | Write the reference as `{{ params.name }}`. |
 | `scenario_secret_parameter_missing` | A scenario declares a secret parameter and the run set no value for it. A secret has no default, so the run cannot fall back. | Set the value when you start the run. |
-| `scenario_secret_parameter_in_text` | The situation or a criterion reads a secret parameter. Scenario text is recorded with the run, so it cannot carry a secret. | Read the value from the target instead, as `{{ secrets.NAME }}`. |
+| `scenario_secret_parameter_in_text` | The situation or a criterion reads a secret parameter. Scenario text is recorded with the run, so it cannot contain a secret. | Read the value from the target instead, as `{{ secrets.NAME }}`. |
 | `scenario_secret_parameter_conflict` | One scenario in the run declares the name as secret and another declares it as plain. | Give the two parameters different names, or make both declarations agree. |
 
 The platform runs these checks before it schedules any jobs. A rejected run schedules no job at all.
@@ -37558,11 +37576,11 @@ keywords: langwatch, agent testing, run plan, run dialog, run name, targets, rep
 description: A run plan is a name and a configuration, and the name is its identity. Every run under the same name joins one history on the Results tab.
 ---
 
-## What a run plan holds
+## What a run plan is
 
 The configuration of a run plan is the scope (which scenarios), the targets (which agents), the repeat count and the two models: the user simulator and the judge. A run under an existing name joins that plan and replaces its configuration with the one it ran with. A run under a new name creates a plan.
 
-For example, **Run suite** on the `Refunds` test suite against the agent `checkout-prod` names the run `Refunds checkout-prod`. The next run of the same test suite against the same agent joins it, and the Results tab shows the pass rate of `Refunds checkout-prod` over time.
+For example, **Run suite** on the `Refunds` test suite against the agent `checkout-prod` gives the run the name `Refunds checkout-prod`. The next run of the same test suite against the same agent joins it, and the Results tab shows the pass rate of `Refunds checkout-prod` over time.
 
 ## The run dialog
 
@@ -37589,7 +37607,7 @@ The chips, in the order the dialog shows them:
 |---|---|
 | **Add parameters** | One line of `name=value` pairs for the run parameters the scenarios declare, for example `plan=pro`. The **Secret parameters** switch turns the line into rows with a lock on each, for a credential. See [Run parameters](/agent-testing/run-parameters). |
 | **Compare agents** | One row per target, up to four. See [Compare agents](/agent-testing/compare-agents). |
-| **Add a note** | Opens **Note for the run**: up to 200 characters about this run, what changed or why it ran. The note belongs to the run, never to the plan. |
+| **Add a note** | Opens **Note for the run**: up to 200 characters about this run, what changed or why it ran. The note is stored on the run, not on the plan. |
 | **Run against a prompt** | Replaces the agent with a prompt from the project as the target. See [Targets](/agent-testing/targets). |
 | **Custom simulation models** | Opens **Simulation models**: the **User simulator** and the **Judge** for this run. Without them, the project default model plays both. A scenario's own **Override models** wins over both. |
 | **Run multiple times** | The repeat count, `times per scenario and target`, 1 to 5. Every scenario runs that many times, and the result of each repetition is its own row. |
@@ -37616,7 +37634,7 @@ A scope by labels is dynamic: a scenario that gets the label later is in the nex
 
 ## While it runs
 
-The run opens as soon as it starts. Each row reads `Running` until the judge is done, then `Passed` or `Failed`. **Stop all** cancels every conversation that is still running, and every running row has its own **Stop**. A cancelled run keeps the results that were already in.
+The run opens as soon as it starts. Each row shows `Running` until the judge is done, then `Passed` or `Failed`. **Stop all** cancels every conversation that is still running, and every running row has its own **Stop**. A cancelled run keeps the results that were already in.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-detail-running.png" alt="A run in progress, with rows still running and the Stop all button" />
@@ -37630,7 +37648,7 @@ The run opens as soon as it starts. Each row reads `Running` until the judge is 
 
 ## From the CLI and the API
 
-The CLI and the REST API name the same plan the dialog does, with `--name` and `name`. Without a name, a test suite run goes under the plan named after the test suite and the target, exactly as **Run suite** does.
+The CLI and the REST API use the same plan name as the dialog, with `--name` and `name`. Without a name, a test suite run goes under the plan named after the test suite and the target, exactly as **Run suite** does.
 
 ```bash
 langwatch test-suite run "Refunds" --target http:agent_abc123 --name "Refunds nightly" --note "after the policy fix" --wait
@@ -37659,11 +37677,11 @@ The Scenario SDK is open source and runs inside your own test runner and CI. To 
 
 This guide will walk you through the basic setup required to run your first scenario and see the results in LangWatch.
 
-For more in-depth information and advanced use cases, please refer to the official [`scenario` library documentation](https://github.com/langwatch/scenario).
+For advanced use cases, see the [`scenario` library documentation](https://github.com/langwatch/scenario).
 
 ## 1. Installation
 
-First, you need to install the `scenario` library in your project. Choose your language below.
+Install the `scenario` library in your project:
 
 
   ### Python
@@ -37682,7 +37700,7 @@ First, you need to install the `scenario` library in your project. Choose your l
 
 ## 2. Configure Environment Variables
 
-We recommend creating a `.env` file in the root of your project to manage your environment variables.
+Create a `.env` file in the root of your project:
 
 ```bash title=".env"
 LANGWATCH_API_KEY="your-api-key"
@@ -37693,9 +37711,7 @@ You can find your `LANGWATCH_API_KEY` in your [LangWatch project settings](https
 
 ## 3. Create a Basic Scenario
 
-Here's how to create and run a simple scenario to test an agent.
-
-First, you need to create an agent adapter that implements your agent logic. For detailed information about agent integration patterns, see the [agent integration guide](https://langwatch.ai/scenario/agent-integration/).
+Create an agent adapter that calls your agent, then run a scenario against it. For the integration patterns, see the [agent integration guide](https://langwatch.ai/scenario/agent-integration/).
 
 
   ### Python
@@ -37832,14 +37848,14 @@ First, you need to create an agent adapter that implements your agent logic. For
 
 
 
-Once you run this code, you will see a new scenario run appear under **Agent Testing > Results** in your LangWatch project.
+Run the test. The scenario run appears under **Agent Testing > Results** in your LangWatch project.
 
 ## 4. Grouping Your Scenarios into Test Suites and Batches
 
 Set stable identifiers for your scenarios, test suites and batches, so LangWatch groups the runs the same way every time:
 
 - **`id`**: A unique and stable identifier for your scenario. Without it, the id comes from the `name`, and renaming the test starts a new history.
-- **`setId`**: The test suite the scenario belongs to. It appears under **From Code** on the **Scenarios** tab, and its runs go under a run plan of the same name on the **Results** tab.
+- **`setId`**: The test suite of the scenario. It appears under **From Code** on the **Scenarios** tab, and its runs go under a run plan of the same name on the **Results** tab.
 - **`batchId`**: Groups every scenario run together in one execution, for example one CI job. A CI variable such as `process.env.GITHUB_RUN_ID` is a good value.
 
 <Frame>
@@ -37936,9 +37952,9 @@ keywords: langwatch, agent testing, scenario, situation, criteria, labels, scena
 description: A scenario is a situation a simulated user acts out against your agent, and the criteria a judge scores the conversation against.
 ---
 
-## What a scenario holds
+## Situation and criteria
 
-The situation describes the user and what they want, in one or a few sentences. The simulated user plays it turn by turn and improvises the words, so a scenario is not a script. The criteria, one per line, are what the judge decides at the end of the conversation, each one passed, failed or inconclusive.
+The situation describes the user and what they want, in one or a few sentences. The simulated user plays it turn by turn and improvises the words, so a scenario is not a script. The criteria, one per line, are what the judge checks at the end of the conversation. Each one passes, fails or is inconclusive.
 
 For example, a checkout support agent gets this scenario:
 
@@ -37952,7 +37968,7 @@ Issues exactly one refund, not two
 States the 5 to 10 business day timeline
 ```
 
-Write criteria about outcomes and actions, not wording. A criterion about an internal action, such as "looks up the order before answering", is verified against the agent's own traces, so the judge does not take the reply's word for it. See [Linking your traces](/agent-testing/linking-your-traces).
+Write criteria about outcomes and actions, not wording. A criterion about an internal action, such as "looks up the order before answering", is verified against the agent's own traces, so the judge does not rely on what the reply claims. See [Linking your traces](/agent-testing/linking-your-traces).
 
 ## The editor
 
@@ -37962,15 +37978,15 @@ Write criteria about outcomes and actions, not wording. A criterion about an int
 <img className="block" src="/images/agent-testing/scenario-editor.png" alt="The scenario editor with the title, the test suite, the situation, the criteria and the labels" />
 </Frame>
 
-| Field | What it holds |
+| Field | What it is |
 |---|---|
 | **Title** | The name of the scenario, shown in every table and result. |
-| **Test suite** | The test suite the scenario belongs to. **No test suite** files it under **Default**. |
+| **Test suite** | The test suite of the scenario. **No test suite** files it under **Default**. |
 | **Situation** | Who the user is and what they are trying to do. |
 | **Criteria** | One criterion per line. Blank lines are dropped. |
 | **Labels** | Free text tags, any number. A run plan can scope by labels across test suites. |
 
-**Save** keeps the scenario. **Save & Run** keeps it and opens the [run dialog](/agent-testing/run-plans#the-run-dialog). **Open recent run** opens the latest run of this scenario.
+**Save** stores the scenario. **Save & Run** stores it and opens the [run dialog](/agent-testing/run-plans#the-run-dialog). **Open recent run** opens the latest run of this scenario.
 
 ## Customize scenario
 
@@ -38035,7 +38051,7 @@ description: A target is the agent, prompt, code agent or workflow a run sends t
 
 ## The target types
 
-Every turn of a scenario goes to the target, which answers as the agent under test. Each type receives the conversation in its own way.
+Every turn of a scenario goes to the target, which answers as the agent under test. Each type receives the conversation in a different form.
 
 | Type | Where it is created | What it receives |
 |---|---|---|
@@ -38082,45 +38098,33 @@ Also check: [Connect your agent](/agent-testing/connect-your-agent), [Testing ag
 title: Test Your Agent from the Platform
 sidebarTitle: Test from the platform
 keywords: langwatch, agent testing, agent simulations, scenarios, test suites, run plans, product managers, domain experts, no code, langy
-description: Create scenarios, run them against your agent, and read the verdict of each one, all from the LangWatch interface. Written for product managers and domain experts, no code involved.
+description: Create scenarios, run them against your agent and see the results, all from the LangWatch interface. Written for product managers and domain experts, no code needed.
 ---
 
-## What this guide covers
+## Before you start
 
-This guide shows how to test your AI agent from the LangWatch interface. You write scenarios that describe real situations, run them against your agent, and read a clear verdict for each one. No code is involved in any step.
-
-<Note>
-One technical step happens before this guide: a developer connects the agent to LangWatch, so the simulated user can talk to it and the judge can see what the agent did internally. Send your developer the [Connect your agent](/agent-testing/connect-your-agent) guide. It is a one-time setup and usually takes under an hour.
-</Note>
+A developer connects the agent to LangWatch once, so the simulated user can talk to it and the judge can see what the agent did internally. Send your developer the [Connect your agent](/agent-testing/connect-your-agent) guide. The setup usually takes under an hour.
 
 ## What a scenario is
 
-A scenario has two parts:
+A scenario is one situation and the criteria the agent must meet in it.
 
-- **Situation**: who the user is and what they want. A simulated user plays this role and talks to your agent, turn by turn, like a real customer would.
-- **Criteria**: what the agent must do, and must not do, for the conversation to pass. A judge model reads the full conversation, and the agent's internal actions, and decides each criterion.
+- **Situation**: who the user is and what they want. A simulated user plays this role and talks to your agent, turn by turn.
+- **Criteria**: what the agent must do, and must not do, for the conversation to pass. A judge model reads the full conversation and the agent's internal actions, and passes or fails each criterion.
 
-You do not write the conversation itself. The simulated user improvises within the situation, so every run exercises your agent the way real users do: with slightly different words each time.
+You do not write the conversation. The simulated user improvises within the situation, with different words on every run, the way real users do.
 
-Write criteria about outcomes, not wording. "The agent looks up the order before answering" and "The agent does not promise a refund" are strong criteria. "The agent says exactly this sentence" is not.
+Write criteria about outcomes, not wording. For example, "The agent looks up the order before answering" and "The agent does not promise a refund" are good criteria. "The agent says exactly this sentence" is not.
 
-## Your first visit
+## The Scenarios tab
 
-Open **Agent Testing** in the sidebar. A new project shows one step at a time: **Setup agent** until an agent is registered, then **Name your first test suite**, then **Write your first scenario**. The first step is the developer's; the other two are the next sections of this guide.
-
-<Frame>
-<img className="block" src="/images/agent-testing/first-run-empty-states.png" alt="The three first-visit steps of a new project, one after the other: Setup agent, Name your first test suite, Write your first scenario" />
-</Frame>
-
-## Where your scenarios live
-
-The **Scenarios** tab lists the test suites of the project in the rail on the left, and the scenarios of the open test suite in the table. A test suite is a named group of scenarios. Every project has a **Default** test suite, so a new scenario always has a place. Labels organize the scenarios inside a test suite and across test suites.
+Open **Agent Testing** in the sidebar. The **Scenarios** tab lists the test suites of the project in the rail on the left, and the scenarios of the open test suite in the table. A test suite is a named group of scenarios, for example the ones about refunds. Every project has a **Default** test suite. Labels organize scenarios inside a test suite and across test suites.
 
 <Frame>
 <img className="block" src="/images/agent-testing/scenarios-tab.png" alt="The Scenarios tab with the test suite rail on the left and the scenarios of the Refunds test suite, with their labels" />
 </Frame>
 
-Press **New Test Suite** in the rail to create one. A test suite is only a name; which agent it runs against and how often is decided when you run it.
+Press **New Test Suite** in the rail to create one. A test suite is only a name. You pick the agent when you run it.
 
 ## Create a scenario
 
@@ -38130,36 +38134,36 @@ Press **New scenario**. The editor asks for the title, the test suite, the situa
 <img className="block" src="/images/agent-testing/scenario-editor.png" alt="The scenario editor with a title, a situation and three criteria filled in" />
 </Frame>
 
-Two tips that make scenarios much more useful:
+Two tips:
 
-- Include at least one criterion about what the agent does internally, such as "looks up the order before answering" or "reads the tender documents". The judge verifies these against the agent's real actions, not against what the reply claims.
-- Write at least one "must not" criterion for each scenario. The most valuable tests describe the failure you are afraid of: inventing a date, quoting another customer's data, promising something the policy forbids.
+- Include at least one criterion about what the agent does internally, for example "looks up the order before answering". The judge checks it against the agent's real actions, not against what the reply claims.
+- Include at least one "must not" criterion, for the failure you want to catch: an invented date, another customer's data, a promise the policy forbids.
 
 <Note>
-A scenario is saved in your project, and everyone with access to the project can read it. Remove names, contact details, account numbers and other personal data before you paste real material, or replace them with invented equivalents. The test works the same way with invented details.
+Everyone with access to the project can read a scenario. Remove names, contact details, account numbers and other personal data before you paste real material, or replace them with invented ones. The test works the same with invented details.
 </Note>
 
-**Save** keeps the scenario. **Save & Run** keeps it and opens the run dialog at once. Every save is a version, and the editor shows the version number next to **History**.
+**Save** stores the scenario. **Save & Run** stores it and opens the run dialog. Every save is a version, and the editor shows the version number next to **History**.
 
 ## Create scenarios with Langy
 
-Langy, the assistant in the bottom corner of every page, creates scenarios for you. Paste text from documents or conversations you already have, describe what must hold, and Langy writes and saves the scenario in one step:
+Langy, the assistant in the bottom corner of every page, writes scenarios for you. Paste text from a document or a conversation, say what must hold, and Langy writes and saves the scenario:
 
 <Frame>
 <img className="block" src="/images/agent-testing/langy-creates-scenario.png" alt="Langy creating a scenario from a pasted snippet of a customer chat" />
 </Frame>
 
-Good material to paste: notes from a lost deal or an escalation, user interview quotes, acceptance criteria from a ticket, or a transcript of a conversation where the agent got it wrong. Each of these becomes a permanent test, so the same mistake cannot come back unnoticed. Remove personal data from the text first, as above.
+Good material to paste: notes from a lost deal or an escalation, user interview quotes, acceptance criteria from a ticket, or a transcript where the agent got it wrong. Remove personal data from the text first.
 
 ## Create scenarios from your own tools
 
-Your team's AI assistants can create scenarios too. Through the [LangWatch MCP integration](/integration/mcp), tools such as Claude and Cursor read and write scenarios in your project. A teammate can highlight a bug report in their editor and ask their assistant to turn it into a LangWatch scenario, without opening the platform.
+Through the [LangWatch MCP integration](/integration/mcp), coding assistants such as Claude Code and Cursor read and write the scenarios of your project. For example, a teammate selects a bug report in their editor and asks the assistant to turn it into a scenario, without opening LangWatch.
 
 ## Run your scenarios
 
 ### Run one scenario
 
-**Run** on a scenario row, or **Save & Run** in the editor, opens the run dialog. It asks for the run name and the agent to test. The name is prefilled after the scenario and the agent, and the defaults are fine for a first run.
+**Run** on a scenario row, or **Save & Run** in the editor, opens the run dialog. It asks for the run name and the agent to test. The name is prefilled, and the defaults are fine for a first run.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-dialog.png" alt="The run dialog with the run name, the agent to be tested and the Customize your run chips" />
@@ -38167,37 +38171,37 @@ Your team's AI assistants can create scenarios too. Through the [LangWatch MCP i
 
 ### Run a test suite
 
-A test suite runs every scenario in it against the agent you pick. This is what you run before a release, or after every change. **Run suite** at the top of the scenarios table opens the same dialog, with every scenario of the test suite in scope.
+**Run suite** at the top of the table opens the same dialog, with every scenario of the test suite in scope. Run the test suite before a release, or after every change to the agent.
 
 ### Watch it run
 
-The run opens as soon as it starts. Every row is one conversation with your agent, and its result appears when the judge is done. Press a row to watch the conversation as the simulated user and the agent talk.
+The run opens as soon as it starts. Every row is one conversation with your agent, and its result appears when the judge is done. Press a row to watch the conversation.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-detail-running.png" alt="A run in progress, with scenarios still running and the first results in" />
 </Frame>
 
-A full run of a few scenarios usually takes a few minutes. You can leave the page; the results are there when you come back. **Open recent run** at the top of the table, **Open recent runs** in a scenario's row menu, or **Open recent run** in the editor take you back to the latest run.
+A run of a few scenarios takes a few minutes. You can leave the page. **Open recent run** at the top of the table, or in a scenario's row menu, takes you back to the latest run.
 
 ## Read the results
 
-Press a row of a finished run. The drawer shows the conversation exactly as it happened, with the simulated user's messages and your agent's replies. Below it, the verdict: **PASSED CRITERIA**, **FAILED CRITERIA** and **JUDGE REASONING** in plain language. The reasoning cites what the agent actually did, such as which lookup it performed before answering.
+Press a row of a finished run. The drawer shows the conversation, then the verdict: **PASSED CRITERIA**, **FAILED CRITERIA** and **JUDGE REASONING**. The reasoning cites what the agent did, for example which lookup it made before answering.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-drawer-passed.png" alt="The conversation drawer of a passed run, with the transcript, the passed criteria and the judge reasoning" />
 </Frame>
 
-Three outcomes are possible for a criterion:
+A criterion has three possible outcomes:
 
-- **Passed**: the conversation, or the agent's internal actions, prove it.
-- **Failed**: the agent did the thing the criterion forbids, or failed to do the thing it requires. Read the reasoning, then the conversation, and share both with your team; the run page link is enough for a developer to investigate.
-- **Inconclusive**: the judge did not find evidence either way. For criteria about internal actions, this usually means the agent's traces did not arrive; ask your developer to check the connection with the [Connect your agent](/agent-testing/connect-your-agent) guide.
+- **Passed**: the conversation or the agent's internal actions prove it.
+- **Failed**: the agent did what the criterion forbids, or did not do what it requires. Read the reasoning, then the conversation. The link to the run is enough for a developer to investigate.
+- **Inconclusive**: the judge found no evidence either way. For a criterion about an internal action, this usually means the agent's traces did not arrive. Ask your developer to check the connection with the [Connect your agent](/agent-testing/connect-your-agent) guide.
 
-Each turn also has a **View trace** link, opening the exact steps the agent took for that reply. You do not need to read traces yourself, but the link is the fastest thing to hand a developer when something looks wrong.
+Each turn has a **View trace** link with the exact steps the agent took for that reply. Send it to a developer when something looks wrong.
 
 ## Follow the pass rate over time
 
-The **Results** tab lists every run plan of the project. A run plan is the history of one configuration: the same scenarios against the same agent, run again and again. Each row shows the last run, the pass rate and a trend of the recent runs, so a regression is visible the moment it happens.
+The **Results** tab lists every run plan of the project. A run plan is the history of one configuration: the same scenarios against the same agent, run again and again. Each row shows the last run, the pass rate and the trend of recent runs, so you see a regression at the next run.
 
 <Frame>
 <img className="block" src="/images/agent-testing/results-tab.png" alt="The Results tab with the run plans of the project, their pass rates and trends" />
@@ -38205,9 +38209,9 @@ The **Results** tab lists every run plan of the project. A run plan is the histo
 
 ## Make it a habit
 
-- Run your test suite before every release. The history on the **Results** tab shows the pass rate over time.
-- After every incident or complaint, add a scenario for it. The library becomes the collective memory of everything your agent must never do again.
-- Keep scenarios short and focused: one situation, a handful of criteria. Ten small scenarios find more than one large one.
+- Run the test suite before every release.
+- After every incident or complaint, add a scenario for it.
+- Keep scenarios short: one situation, a few criteria.
 
 Also check: [Scenarios](/agent-testing/scenarios), [Test suites](/agent-testing/test-suites), [Run plans](/agent-testing/run-plans), [Results](/agent-testing/results).
 
@@ -38219,7 +38223,7 @@ Also check: [Scenarios](/agent-testing/scenarios), [Test suites](/agent-testing/
 title: Test Suites
 sidebarTitle: Test suites
 keywords: langwatch, agent testing, test suite, scenarios, default test suite, from code, labels, archive
-description: A test suite is a named group of scenarios that you run together. It holds no targets, no models and no repeat count; those belong to the run plan.
+description: A test suite is a named group of scenarios that you run together. The targets, the models and the repeat count are set on the run plan, not on the test suite.
 ---
 
 ## The rail
@@ -38236,7 +38240,7 @@ The row menu of a test suite offers:
 |---|---|
 | **New scenario** | Opens the editor with this test suite preselected. |
 | **Run suite** | Opens the run dialog with every scenario of the test suite in scope. |
-| **Rename** | Changes the name. Runs keep the name they ran under. |
+| **Rename** | Changes the name. Past runs keep the old name. |
 | **Open recent runs** | Lists the latest runs of this test suite. |
 | **Archive suite** | Archives the test suite and the scenarios in it. Test runs are preserved. |
 
@@ -38260,7 +38264,7 @@ A test suite is the group you run before a release. A label is a tag on a scenar
 
 ## From Code
 
-Scenarios written with the Scenario SDK and run from your own test runner report to the project and appear under **From Code** in the rail, one entry per `setId`. Their table is read-only and shows each scenario with its last run. Edit them in your repository; the platform shows them so their results land next to the test suites written here.
+Scenarios written with the Scenario SDK and run from your own test runner report to the project and appear under **From Code** in the rail, one entry per `setId`. Their table is read-only and shows each scenario with its last run. Edit them in your repository. The platform lists them so their results appear next to the test suites written here.
 
 <Frame>
 <img className="block" src="/images/agent-testing/from-code-suite.png" alt="A From Code test suite, with its scenarios and their last runs" />
@@ -38280,7 +38284,7 @@ description: Scenario tests voice agents end to end over real audio, with the sa
 ---
 
 <Tip>
-  **Fastest path:** run `/scenarios add voice testing to my agent` in your coding assistant after installing the [`/scenarios` skill](https://langwatch.ai/docs/skills/directory). It detects your transport, picks the matching adapter, and wires it to your deployed agent. Prefer to do it by hand? Follow the steps below.
+  **Fastest path:** run `/scenarios add voice testing to my agent` in your coding assistant after installing the [`/scenarios` skill](https://langwatch.ai/docs/skills/directory). It detects your transport, picks the matching adapter, and wires it to your deployed agent. To do it by hand, follow the steps below.
 </Tip>
 
 ## How a voice test runs
@@ -38289,7 +38293,7 @@ The user simulator synthesizes a caller, speaks to your agent through its real t
 
 <img src="/images/scenario-voice.webp" alt="Voice Agent Testing" width="100%" />
 
-## The highlights
+## What you can test
 
 <CardGroup cols={2}>
   <Card title="Real-audio, multi-turn calls" icon="phone">
@@ -38302,13 +38306,13 @@ The user simulator synthesizes a caller, speaks to your agent through its real t
     Script the user barging in mid-reply, with native barge-in or a VAD-driven fallback per adapter.
   </Card>
   <Card title="Latency metrics" icon="gauge-high">
-    Time-to-first-byte and p50/p95 per turn, so you catch a slow agent before users do.
+    Time-to-first-byte and p50/p95 per turn, so you catch a slow agent before a release.
   </Card>
 </CardGroup>
 
-## Works with your stack
+## Adapters per transport
 
-One API, every major voice transport. Pick the adapter that matches what you've already deployed:
+Pick the adapter that matches the transport you deployed:
 
 | Transport | Adapter |
 | --- | --- |
@@ -38320,12 +38324,12 @@ One API, every major voice transport. Pick the adapter that matches what you've 
 | Text-only agent (no transport yet) | `ComposableVoiceAgent` |
 
 <Note>
-  Full constructors, the per-adapter [capability matrix](https://langwatch.ai/scenario/voice/capability-matrix), and guidance on [choosing an adapter](https://langwatch.ai/scenario/voice/choosing-an-adapter) live in the Scenario docs.
+  Full constructors, the per-adapter [capability matrix](https://langwatch.ai/scenario/voice/capability-matrix), and guidance on [choosing an adapter](https://langwatch.ai/scenario/voice/choosing-an-adapter) are in the Scenario docs.
 </Note>
 
 ## Get it running
 
-New to Scenario? Start with [Getting Started](/agent-testing/scenarios-in-code) for the basics (API key, writing your agent's `call()` adapter), then come back for the voice specifics.
+If you have not used Scenario, start with [Getting Started](/agent-testing/scenarios-in-code) for the basics (API key, your agent's `call()` adapter), then come back for the voice specifics.
 
 <Steps>
   <Step title="Install Scenario">
@@ -38412,7 +38416,7 @@ New to Scenario? Start with [Getting Started](/agent-testing/scenarios-in-code) 
   </Step>
 </Steps>
 
-## Dig into the full docs
+## Full documentation
 
 <CardGroup cols={2}>
   <Card title="Voice quick start" icon="rocket" href="https://langwatch.ai/scenario/voice/getting-started">

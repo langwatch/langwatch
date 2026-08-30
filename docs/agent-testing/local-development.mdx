@@ -44,7 +44,7 @@ If the agent is not registered yet, [Connect your agent](/agent-testing/connect-
 
 ## How the tunnel is protected
 
-A tunnel URL is public, and a local agent process usually holds real model provider keys. `langwatch agent dev` therefore mints a per-session secret, fronts your local port with a proxy that rejects any request missing the `X-LangWatch-Dev-Secret` header, and writes that header onto the agent's configuration for the session. Only the platform's scenario calls carry the secret. On exit, the command removes both the proxy and the header row.
+A tunnel URL is public, and a local agent process usually has real model provider keys. `langwatch agent dev` therefore creates a per-session secret, puts a proxy in front of your local port that rejects any request without the `X-LangWatch-Dev-Secret` header, and adds that header to the agent's configuration for the session. Only the platform's scenario calls send the secret. On exit, the command removes both the proxy and the header row.
 
 `--no-auth` turns the proxy off, for a server that already authenticates every request. A bring-your-own tunnel (`--tunnel-url`) also runs without the proxy: your tunnel forwards directly to your server, so the tunnel endpoint must supply its own access control. The agent's own configured authentication headers pass through the tunnel unchanged either way.
 
@@ -56,11 +56,11 @@ The agents list and the run target selector show a **local tunnel** badge on the
 
 The default transport is a Cloudflare quick tunnel on `trycloudflare.com`. The command shows Cloudflare's terms notice on the first run.
 
-- Quick tunnels carry no availability guarantee. Use them for the development loop, and run the test suites you rely on against a deployed URL.
+- Quick tunnels have no availability guarantee. Use them for the development loop, and run the test suites you rely on against a deployed URL.
 - Quick tunnels buffer server-sent events. This does not affect scenario calls, which are plain JSON requests; it only affects a streaming endpoint served through the same tunnel.
 - Quick tunnels cap at around 200 concurrent requests.
 
-`--tunnel-url` swaps in your own tunnel when you hit these limits.
+Use `--tunnel-url` with your own tunnel when you hit these limits.
 
 ## When the process dies without cleanup
 

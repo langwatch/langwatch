@@ -15,9 +15,9 @@ The attacker takes the place of the [user simulator](/agent-testing/scenarios-in
 
 <img src="/images/red-teaming-hero.png" alt="Red Teaming" width="100%" />
 
-## Why multi-turn wins
+## Why multi-turn attacks
 
-Single-turn red-teaming tools fire thousands of prompts and score each in isolation. Real attackers build rapport, reframe rejected requests, and escalate gradually until the agent drifts out of its guardrails. **Agents that hold at turn 1 often break by turn 20.**
+Single-turn red-teaming tools fire thousands of prompts and score each in isolation. Real attackers build rapport, reframe rejected requests, and escalate gradually until the agent drifts out of its guardrails. Agents that hold at turn 1 often break by turn 20.
 
 <CardGroup cols={2}>
   <Card title="Crescendo escalation" icon="arrow-trend-up">
@@ -43,11 +43,11 @@ Single-turn red-teaming tools fire thousands of prompts and score each in isolat
 | **Escalation** | 45 to 75% | Authority claims, roleplay, urgency, social engineering. |
 | **Direct** | 75 to 100% | Encoding tricks (Base64, ROT13), prompt injection, multi-vector. |
 
-Need maximum adaptability against a hardened agent? [**GOAT**](https://langwatch.ai/scenario/advanced/red-teaming/goat) is a drop-in alternative that picks a technique *per turn* instead of following fixed phases (based on Meta's [GOAT paper](https://arxiv.org/abs/2410.01606), ICML 2025).
+For a hardened agent, [GOAT](https://langwatch.ai/scenario/advanced/red-teaming/goat) is a drop-in alternative that picks a technique per turn instead of following fixed phases (based on Meta's [GOAT paper](https://arxiv.org/abs/2410.01606), ICML 2025).
 
 ## Get it running
 
-New to Scenario? Start with [Getting Started](/agent-testing/scenarios-in-code) to write your agent's `call()` adapter, then swap in an attacker instead of the user simulator.
+If you have not used Scenario, start with [Getting Started](/agent-testing/scenarios-in-code) to write your agent's `call()` adapter, then swap in an attacker instead of the user simulator.
 
 <Steps>
   <Step title="Install Scenario">
@@ -126,11 +126,11 @@ New to Scenario? Start with [Getting Started](/agent-testing/scenarios-in-code) 
     </Tabs>
   </Step>
   <Step title="Run it">
-    Run it alongside your test suite. We recommend **50 turns** for thorough coverage. Agents that hold early often break under sustained pressure. With `LANGWATCH_API_KEY` set, every adversarial turn appears under **Agent Testing > Results**, and `scenario redteam-report` opens the findings dashboard with severity and prioritized fixes.
+    Run it alongside your test suite. Use 50 turns for thorough coverage. Agents that hold early often break under sustained pressure. With `LANGWATCH_API_KEY` set, every adversarial turn appears under **Agent Testing > Results**, and `scenario redteam-report` opens the findings dashboard with severity and prioritized fixes.
   </Step>
 </Steps>
 
-## Dig into the full docs
+## Full documentation
 
 <CardGroup cols={2}>
   <Card title="Red teaming quick start" icon="rocket" href="https://langwatch.ai/scenario/advanced/red-teaming/quick-start">
