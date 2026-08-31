@@ -824,17 +824,6 @@ export class TraceAnalyticsFoldProjection
     };
   }
 
-  /** Add a positive per-span delta onto a reserved running-sum attribute. */
-  private static addReservedTokenSum(
-    attributes: Record<string, string>,
-    key: string,
-    delta: number,
-  ): void {
-    if (delta <= 0) return;
-    const prior = Number(attributes[key] ?? "0");
-    attributes[key] = String((Number.isFinite(prior) ? prior : 0) + delta);
-  }
-
   /**
    * Roll this span's cache / reasoning token counts into the trace-level running
    * sums stored on reserved attribute keys (the drawer popover and slim's
@@ -855,17 +844,17 @@ export class TraceAnalyticsFoldProjection
       ? { cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 }
       : runtime.spanCost.extractCacheTokens(span);
 
-    TraceAnalyticsFoldProjection.addReservedTokenSum(
+    TraceSummaryFoldProjection.addReservedTokenSum(
       attributes,
       RESERVED_CACHE_READ_TOKENS,
       cacheTokens.cacheReadTokens,
     );
-    TraceAnalyticsFoldProjection.addReservedTokenSum(
+    TraceSummaryFoldProjection.addReservedTokenSum(
       attributes,
       RESERVED_CACHE_CREATION_TOKENS,
       cacheTokens.cacheCreationTokens,
     );
-    TraceAnalyticsFoldProjection.addReservedTokenSum(
+    TraceSummaryFoldProjection.addReservedTokenSum(
       attributes,
       RESERVED_REASONING_TOKENS,
       cacheTokens.reasoningTokens,

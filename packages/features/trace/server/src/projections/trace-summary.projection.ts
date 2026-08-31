@@ -512,11 +512,15 @@ export class TraceSummaryFoldProjection
   }
 
   /** Add a positive per-span delta onto a reserved running-sum attribute. */
-  private static addReservedTokenSum(
-    attributes: Record<string, string>,
-    key: string,
-    delta: number,
-  ): void {
+  /**
+   * Add to a reserved token counter held as a STRING attribute.
+   *
+   * Public because the analytics projection accumulates the same counters from
+   * the same spans, and a parity test asserts the two agree. Two copies of an
+   * accumulator that must agree is a disagreement waiting for one of them to
+   * be fixed.
+   */
+  static addReservedTokenSum(attributes: Record<string, string>, key: string, delta: number): void {
     if (delta <= 0) return;
     const prior = Number(attributes[key] ?? "0");
     attributes[key] = String((Number.isFinite(prior) ? prior : 0) + delta);
