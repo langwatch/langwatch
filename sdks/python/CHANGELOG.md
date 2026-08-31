@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.3.0](https://github.com/langwatch/langwatch/compare/python-sdk@v1.2.1...python-sdk@v1.3.0) (2026-08-31)
+
+
+### Features
+
+* **agent-cache:** take a name with a claim, so one row does the work ([#7596](https://github.com/langwatch/langwatch/issues/7596)) ([6dfa6d7](https://github.com/langwatch/langwatch/commit/6dfa6d74c824ae5e04bb97196e33911940861cb0))
+* **agent-testing:** compare agents in one run ([#7654](https://github.com/langwatch/langwatch/issues/7654)) ([3e73916](https://github.com/langwatch/langwatch/commit/3e7391698f5e9b1cac2f8c5f0d0cacc9dec4d02a))
+* **agent-testing:** v2 polish round 6 ([#7590](https://github.com/langwatch/langwatch/issues/7590)) ([1f9efad](https://github.com/langwatch/langwatch/commit/1f9efad30ab94e86d00f57ea478bf0685b437f23))
+* **agents:** connected agents, a decorated function is a simulation target ([#7655](https://github.com/langwatch/langwatch/issues/7655)) ([56922c0](https://github.com/langwatch/langwatch/commit/56922c0ee429bd5a38717960c09ede0d1905c0c3))
+
+
+### Bug Fixes
+
+* optional legacy answer fields, one vocabulary for test suites and run plans, and named targets for runs from code ([#7638](https://github.com/langwatch/langwatch/issues/7638)) ([6fd37f3](https://github.com/langwatch/langwatch/commit/6fd37f30428c9fc468230fa9e4a79e3dee8cc58f))
+* **python-sdk:** the agent cache takes a dict or list, and a refusal names the field ([#7641](https://github.com/langwatch/langwatch/issues/7641)) ([78e1cd7](https://github.com/langwatch/langwatch/commit/78e1cd7efd068ddd3c94d7eb8e713d574558fc33))
+* **scenarios:** fix the seven defects found while dogfooding a customer onboarding demo ([#7271](https://github.com/langwatch/langwatch/issues/7271)) ([7eeac5b](https://github.com/langwatch/langwatch/commit/7eeac5ba6809ed217ce3179d0a1fbb7656f2db52))
+
 ## [1.2.1](https://github.com/langwatch/langwatch/compare/python-sdk@v1.2.0...python-sdk@v1.2.1) (2026-08-26)
 
 
