@@ -1674,3 +1674,68 @@ Every rewrite hazard this cleanup has hit, in the order they bite:
 5. **Import paths** — `../index`, `@langwatch/<pkg>`, an `as` alias, and the
    module path are four different spellings of the same import.
 6. **apps/** — a fourth root, alongside packages, platform/app and the tests.
+
+## Round: the directories nobody surveyed
+
+`processes/` and `subscribers/` had never been in any survey. Between them they
+held the densest remaining code: 81 loose functions across 22 subscriber files.
+
+Six more classes — TopicClusteringProcess, TriggerSettlement,
+SimulationRunExecutionEvolution, TrackedEventSync, CustomEvaluationSync and
+ProjectMetadataSync.
+
+Topic got the full treatment: its four EventHandler consts had no consumer
+outside the file, so they became private static fields and seven of ten helpers
+are genuinely private. The other two process managers keep their handlers at
+module level and their members public, and the class docblock says why — the
+handlers are registered by a builder and another module wires them, so they are
+the module's surface. A class with only public members is a namespace, but a
+named one with a docblock beats loose functions, and it is the shape already
+accepted for TraceQueryMetaFields and GatewaySpendFilters.
+
+### A bare reference that would have reached production
+
+`trace-processing.adapter.ts` wires its pipeline with bare references:
+
+```ts
+when: hasSyncableEvaluations,
+dedupId: customEvaluationSyncDedupId,
+groupKeyFn: projectMetadataGroupKey,
+```
+
+None is followed by `(`, so the call-site rewrite left them while the import
+rewrite took their names away — a ReferenceError at pipeline construction, in
+runtime code rather than a test.
+
+My own sweep had hidden them. It skipped lines ending in a comma on the
+assumption those were import-list entries, and every one of these is a property
+in an object literal. The sweep now tracks whether it is INSIDE an import block
+rather than guessing from the line, which is the only way to tell
+`hasSyncableFeedback,` in an import from `when: hasSyncableFeedback,` in a
+pipeline.
+
+It surfaced only because a platform/app test constructs that pipeline. Nothing
+else would have: platform/app is not in the typecheck, and the reference is
+legal TypeScript right up until the module is evaluated.
+
+### One restructure abandoned rather than patched
+
+Moving scenario's handlers into its class the way topic's went in, my index
+arithmetic deleted the class declaration. It was restored from the pre-fold
+copy and redone the simpler way. A half-restructured process manager is worse
+than an unrestructured one, and the cost of starting over was a minute.
+
+### Where the loose functions are now
+
+| directory | functions | files |
+| --- | --- | --- |
+| transport | 212 | 144 |
+| adapters | 159 | 287 |
+| repositories | 158 | 259 |
+| services | 137 | 348 |
+| subscribers | 81 → ~45 | 22 |
+| everything else | < 25 each | — |
+
+`transport/` is next by volume but is mostly route handlers, which are the
+framework's shape rather than loose helpers. The three big directories now
+average well under one function per file.
