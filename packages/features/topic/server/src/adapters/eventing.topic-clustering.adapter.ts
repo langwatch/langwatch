@@ -17,7 +17,7 @@ import {
 import type { TopicClusteringProcessingEvent } from "./eventing.topic.adapter";
 import {
   TOPIC_CLUSTERING_PROCESS_NAME,
-  topicClusteringPM,
+  TopicClusteringProcess,
 } from "../processes/topic-clustering.process";
 import {
   type TopicClusteringRunHistoryData,
@@ -44,7 +44,7 @@ export type { ProjectedTopic, TopicModelData } from "../projections/topic-model.
 
 /** Only the executor dependencies are injected — the process-manager
  *  topology itself (state, intents, handlers, outbox tuning) is declared
- *  in `topicClusteringPM`, ADR-052 "Approved builder API", like automations. */
+ *  in `TopicClusteringProcess.processManager`, ADR-052 "Approved builder API", like automations. */
 export interface TopicClusteringProcessingPipelineDeps {
   /** Postgres run-status read model behind the settings page (ADR-051 §7). */
   topicClusteringRunStatusStore: StateProjectionStore<TopicClusteringRunStatusData>;
@@ -122,7 +122,10 @@ export class TopicClusteringEventingAdapter {
           ttlMs: 60_000,
         },
       })
-      .withProcessManager(TOPIC_CLUSTERING_PROCESS_NAME, topicClusteringPM(this.deps.dispatch))
+      .withProcessManager(
+        TOPIC_CLUSTERING_PROCESS_NAME,
+        TopicClusteringProcess.processManager(this.deps.dispatch),
+      )
       .build();
   }
 }

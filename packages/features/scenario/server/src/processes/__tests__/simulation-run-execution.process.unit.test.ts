@@ -16,7 +16,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import {
-  buildSimulationRunEventView,
+  SimulationRunExecutionEvolution,
   STALL_THRESHOLD_MS,
 } from "../simulation-run-execution-evolution.process";
 import { simulationRunExecutionPM } from "../simulation-run-execution.process";
@@ -134,7 +134,7 @@ function evolveEvent(
         tenantId: String(event.tenantId),
         projectId: String(event.tenantId),
         processKey: String(event.aggregateId),
-        payload: buildSimulationRunEventView(event),
+        payload: SimulationRunExecutionEvolution.buildSimulationRunEventView(event),
       },
       now: now ?? event.occurredAt,
     },
@@ -855,7 +855,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
       // merely looks like a target would throw there — and a throwing handler
       // redelivers forever. Null is the shape handleRunQueued already answers,
       // by finishing the run as unexecutable.
-      const view = buildSimulationRunEventView({
+      const view = SimulationRunExecutionEvolution.buildSimulationRunEventView({
         type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
         occurredAt: 1_000,
         data: {
@@ -872,7 +872,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
     });
 
     it("keeps a well-formed target", () => {
-      const view = buildSimulationRunEventView({
+      const view = SimulationRunExecutionEvolution.buildSimulationRunEventView({
         type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
         occurredAt: 1_000,
         data: {
@@ -891,13 +891,14 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
       // existed have no such key, and handleRunQueued re-parses them on
       // delivery. A required key here would turn every pre-upgrade row into a
       // forever-redelivering handler.
-      const { parameters: _dropped, ...legacyRow } = buildSimulationRunEventView(
-        makeEvent({
-          type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
-          occurredAt: 10_000,
-          data: queuedData(),
-        }),
-      );
+      const { parameters: _dropped, ...legacyRow } =
+        SimulationRunExecutionEvolution.buildSimulationRunEventView(
+          makeEvent({
+            type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
+            occurredAt: 10_000,
+            data: queuedData(),
+          }),
+        );
 
       const parsed = simulationRunProcessEventViewSchema.parse(legacyRow);
 
@@ -985,7 +986,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
         queuedWithContent,
         snapshotWithContent,
         finishedWithContent,
-      ].map((event) => buildSimulationRunEventView(event));
+      ].map((event) => SimulationRunExecutionEvolution.buildSimulationRunEventView(event));
 
       expect(views.flatMap((view) => contentLeaks(view))).toEqual([]);
       expect(views[1]).toEqual({

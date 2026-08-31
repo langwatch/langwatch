@@ -13,9 +13,8 @@ import type {
   TopicClusteringOutcomeCommands,
 } from "../../intents/topic-clustering.intent";
 import {
-  buildProcessEventView,
   TOPIC_CLUSTERING_PROCESS_NAME,
-  topicClusteringPM,
+  TopicClusteringProcess,
 } from "../../processes/topic-clustering.process";
 
 const PROJECT_ID = "project-1";
@@ -51,7 +50,7 @@ function toEnvelope(event: TopicClusteringProcessingEvent) {
     tenantId: String(event.tenantId),
     projectId: String(event.tenantId),
     processKey: String(event.aggregateId),
-    payload: buildProcessEventView(event),
+    payload: TopicClusteringProcess.buildProcessEventView(event),
   };
 }
 
@@ -70,7 +69,7 @@ function harness(options?: {
   // boundary all included.
   const definition = buildProcessManager<TopicClusteringProcessingEvent>({
     name: TOPIC_CLUSTERING_PROCESS_NAME,
-    applier: topicClusteringPM({
+    applier: TopicClusteringProcess.processManager({
       runPort:
         options?.runPort ??
         ({

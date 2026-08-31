@@ -54,7 +54,7 @@ export type {
   AutomationsPipelineDeps,
   TriggerMatchRecordedEvent,
 } from "./adapters/eventing.automation.adapter";
-export { settleWindowBucket } from "./processes/trigger-settlement.process";
+export { TriggerSettlement } from "./processes/trigger-settlement.process";
 export {
   GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
   createGraphTriggerActivityHandler,

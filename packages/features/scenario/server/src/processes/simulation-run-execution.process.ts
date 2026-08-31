@@ -7,11 +7,11 @@ import {
 } from "@langwatch/scenario-contract";
 
 import {
-  buildSimulationRunEventView,
   handleCancelRequested,
   handleRunActivity,
   handleRunQueued,
   handleTerminal,
+  SimulationRunExecutionEvolution,
   simulationRunExecutionWake,
 } from "./simulation-run-execution-evolution.process";
 import {
@@ -28,11 +28,11 @@ import {
 } from "../processes/simulation-run-execution-data.process";
 
 export {
-  buildSimulationRunEventView,
   handleCancelRequested,
   handleRunActivity,
   handleRunQueued,
   handleTerminal,
+  SimulationRunExecutionEvolution,
   simulationRunExecutionWake,
 } from "./simulation-run-execution-evolution.process";
 export {
@@ -61,7 +61,7 @@ export {
 /**
  * The `simulation_run_execution` process-manager topology, exported
  * standalone so tests can build the exact definition the runtime mounts via
- * `buildProcessManager` — mirroring `topicClusteringPM`.
+ * `buildProcessManager` — mirroring `TopicClusteringProcess.processManager`.
  *
  * One process per scenario run (process key = scenarioRunId). Owns:
  * - dispatch: queued -> execute intent -> this pod's execution pool;
@@ -104,7 +104,7 @@ export function simulationRunExecutionPM(
       .on(SIMULATION_RUN_EVENT_TYPES.FINISHED, handleTerminal)
       .on(SIMULATION_RUN_EVENT_TYPES.DELETED, handleTerminal)
       .onWake(simulationRunExecutionWake)
-      .toPayload(buildSimulationRunEventView)
+      .toPayload((...args) => SimulationRunExecutionEvolution.buildSimulationRunEventView(...args))
       .outbox({
         // The execute intent is the run's only dispatch path: give it more
         // attempts than the generic default so a pod without a pool (or a

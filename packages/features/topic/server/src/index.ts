@@ -76,7 +76,7 @@ export { RequestTopicClusteringTask } from "./intents/run-topic-clustering.inten
 export { TopicClusteringSchedulePort } from "./ports/topic-clustering-schedule.port";
 export {
   TOPIC_CLUSTERING_PROCESS_NAME,
-  topicClusteringPM,
+  TopicClusteringProcess,
   type TopicClusteringProcessState,
 } from "./processes/topic-clustering.process";
 export { TopicTrpcApi, type TopicTrpcContext } from "./transport/api-trpc/topic.api";
