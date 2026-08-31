@@ -25,6 +25,7 @@ import {
   ActivityMonitorTrpcApi,
   AnomalyRulesTrpcApi,
   DepartmentsTrpcApi,
+  GovernanceTrpcApi,
   IngestionKeyTrpcApi,
   IngestionTemplatesTrpcApi,
   PersonalSessionsTrpcApi,
@@ -32,6 +33,7 @@ import {
   type ActivityMonitorTrpcContext,
   type AnomalyRulesTrpcContext,
   type DepartmentsTrpcContext,
+  type GovernanceTrpcContext,
   type IngestionKeyTrpcContext,
   type IngestionTemplatesTrpcContext,
   type PersonalSessionsTrpcContext,
@@ -50,7 +52,8 @@ export type EnterpriseGovernanceTrpcContext = PersonalSessionsTrpcContext &
   DepartmentsTrpcContext &
   IngestionTemplatesTrpcContext &
   ActivityMonitorTrpcContext &
-  AnomalyRulesTrpcContext;
+  AnomalyRulesTrpcContext &
+  GovernanceTrpcContext;
 
 /** One already-composed process policy, applied after a feature's input parser. */
 type EnterpriseTrpcPolicy = <TProcedure>(procedure: TProcedure) => TProcedure;
@@ -101,6 +104,11 @@ export class EnterpriseGovernanceTrpcComposition {
         protected: protectedProcedure,
         policy,
         planGate: planGateFor(ENTERPRISE_FEATURE_ERRORS.ANOMALY_RULES),
+      }),
+      governance: GovernanceTrpcApi.create(root, {
+        protected: protectedProcedure,
+        policy,
+        ocsfExportPlanGate: planGateFor(ENTERPRISE_FEATURE_ERRORS.OCSF_EXPORT),
       }),
     };
   }

@@ -874,7 +874,10 @@ const coreRouters = {
   departments: enterpriseGovernanceRouters.departments,
   ingestionTemplates: enterpriseGovernanceRouters.ingestionTemplates,
   ingestionKey: enterpriseGovernanceRouters.ingestionKey,
-  governance: governanceRouter,
+  governance: appTrpcRoot.mergeRouters(
+    governanceRouter,
+    enterpriseGovernanceRouters.governance,
+  ),
   personalSessions: enterpriseGovernanceRouters.personalSessions,
   sessionPolicy: enterpriseGovernanceRouters.sessionPolicy,
   gatewayBudgets: gatewayRouters.gatewayBudgets,

@@ -1,68 +1,47 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * tRPC router for cross-cutting governance read-side queries that
- * don't fit neatly under the more focused governance routers
- * (routingPolicy / personalVirtualKeys / ingestionSources /
- * activityMonitor / anomalyRules).
+ * Two cross-cutting governance procedures that still live on the app router
+ * because their data-gathering reaches directly into `ctx.prisma` and
+ * composes several cross-feature services (feature flags, organizations,
+ * users, usage stats). The other four surfaces — `setupState`, `ocsfExport`,
+ * `recordWorkspaceView`, `quarantineFillStats` — moved to the governance
+ * package's `GovernanceTrpcApi` and are mounted alongside these on the
+ * `governance.*` namespace.
  *
- * Procedures:
- *   - setupState   — persona-detection signal for nav promotion
- *   - resolveHome  — picks the right `/` destination per persona
- *   - ocsfExport   — cursor-paginated SIEM forwarding pull
+ * These two will follow once their gathering is behind a `PersonaHomeApp` /
+ * `ActorResolutionApp` seam the composition can supply. Doing that now would
+ * mean an in-flight design decision about how governance reads enterprise
+ * plan status, so the split lands first and the extraction follows.
  *
- * Spec: specs/ai-gateway/governance/feature-flag-gating.feature
- *       specs/ai-gateway/governance/persona-home-resolver.feature
- *       specs/ai-gateway/governance/siem-export.feature
+ * Specs:
+ *   - specs/ai-gateway/governance/persona-home-resolver.feature
+ *   - specs/ai-gateway/governance/admin-trace-access.feature
  */
 
 import {
-  QUARANTINE_DEFAULT_THRESHOLD,
-  QUARANTINE_DEFAULT_WINDOW_SECONDS,
   PersonaHomeResolverService,
   type PersonaResolution,
 } from "@langwatch/enterprise-governance-contract";
 import { z } from "zod";
-import { ENTERPRISE_FEATURE_ERRORS, requireEnterprisePlan } from "@langwatch/enterprise-plan-gate";
+
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
 
 export const governanceRouter = createTRPCRouter({
   /**
-   * Read-only governance setup-state summary. The single boolean
-   * `governanceActive` is the persona-detection signal — UI nav
-   * promotes /governance only when this is true AND the user has
-   * `governance:view`. Per @master_orchestrator: don't auto-redirect
-   * flagged admins; only promote when actual state exists.
+   * Pick the right `/` destination for the authenticated user given the org
+   * context. Returns one of `/me`, `/<projectSlug>`, `/governance`.
    *
-   * Permission: `governance:view` — only org ADMIN (or a custom role
-   * granting it) sees the persona-detection signal. MEMBER + EXTERNAL
-   * never call this; resolveHome below uses the service directly so
-   * identity-routing for non-admins still works.
-   */
-  setupState: protectedProcedure
-    .input(z.object({ organizationId: z.string() }))
-    .permission("governance:view")
-    .query(async ({ ctx, input }) => {
-      return await ctx.app.governance.resolveSetupState(input.organizationId);
-    }),
-
-  /**
-   * Pick the right `/` destination for the authenticated user given the
-   * org context. Returns one of:
-   *   - "/me"
-   *   - "/<projectSlug>"
-   *   - "/governance"
-   *
-   * The resolver is fail-safe: any signal lookup error falls through to
-   * the project_only home (or `/me` if the user has no projects). The
-   * LLMOps majority experience is preserved on transient backend errors.
+   * The resolver is fail-safe: any signal lookup error falls through to the
+   * project_only home (or `/me` if the user has no projects). The LLMOps
+   * majority experience is preserved on transient backend errors.
    *
    * Critical invariant: an org with application traces but no governance
-   * state lands on /[project] — NOT /governance — even if the
-   * user has organization:manage and Enterprise plan. The persona-4 gate
-   * is conjunctive (manage AND Enterprise AND hasIngestionSources).
+   * state lands on /[project] — NOT /governance — even if the user has
+   * organization:manage and Enterprise plan. The persona-4 gate is
+   * conjunctive (manage AND Enterprise AND hasIngestionSources).
    */
   resolveHome: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
@@ -80,7 +59,6 @@ export const governanceRouter = createTRPCRouter({
         hasGovernanceUi,
         organizationIntent,
       ] = await Promise.all([
-        // hasApplicationTraces is part of setupState as of 9d2688c84.
         ctx.app.governance.resolveSetupState(input.organizationId),
         // The user's first project via team membership. Personal workspaces
         // are excluded outright: they are the governance data home, never a
@@ -108,7 +86,7 @@ export const governanceRouter = createTRPCRouter({
         }),
         // `/me` and `/governance` are gated behind this flag; without it both
         // 404. Gate the auto-detected destination on it so a non-governance
-        // org (e.g. a customer being impersonated) never lands on /me.
+        // org never lands on /me.
         ctx.app.featureFlags
           .isEnabled("release_ui_ai_governance_enabled", {
             kind: "organization",
@@ -116,18 +94,17 @@ export const governanceRouter = createTRPCRouter({
             organizationId: input.organizationId,
           })
           .catch(() => false),
-        // ADR-038: the org's declared intent, when set, decides the landing
-        // kind before persona detection and the user pin. Fail-safe like the
-        // sibling lookups: a transient error means "no intent", which takes
-        // the legacy path instead of 500ing the whole resolve.
+        // The org's declared intent, when set, decides the landing kind
+        // before persona detection and the user pin. Fail-safe: transient
+        // errors mean "no intent" and take the legacy path.
         ctx.app.organizations.getPrimaryIntent(input.organizationId).catch(() => null),
       ]);
 
       // Org managers routinely have NO TeamUser row on the default team
-      // (createAndAssign never adds one) — without this fallback every
-      // fresh org resolves "no project" for its own creator. Scoped to
-      // organization:manage so a low-privilege member is never routed to
-      // a project home they cannot open.
+      // (createAndAssign never adds one) — without this fallback every fresh
+      // org resolves "no project" for its own creator. Scoped to
+      // `organization:manage` so a low-privilege member is never routed to a
+      // project home they cannot open.
       let firstProjectSlug = firstProject?.slug ?? null;
       if (!firstProjectSlug && hasManage) {
         const orgWideProject = await ctx.prisma.project
@@ -160,131 +137,14 @@ export const governanceRouter = createTRPCRouter({
     }),
 
   /**
-   * SIEM forwarding pull — cursor-paginated OCSF v1.1 / OWASP AOS
-   * events for security teams. Per spec: read-only, paginated by
-   * EventTime, returns rows since cursor T.
+   * Resolves a CH-side `actor` token (typically the email stamped on spans
+   * as `langwatch.user_id`, occasionally the User.id directly) to that
+   * user's Personal Workspace inside the given org. Drives the bird's-eye
+   * `/governance/users/[id]` "View their workspace →" link.
    *
-   * Designed for cron-based pulls from Splunk HEC / Datadog Cloud
-   * SIEM / Microsoft Sentinel / AWS Security Hub / Elastic Security /
-   * Sumo Logic CSE / Google Chronicle. Returns up to N rows; client
-   * passes back the last EventTime as the next cursor.
-   *
-   * Permission: complianceExport:view (security team's role binding).
-   * Restricted because OCSF events expose actor identities + tool
-   * names — should not leak to read-only org members. Default-attached
-   * to org ADMIN; delegate to security analysts via a CustomRole
-   * granting `complianceExport:view` (no other action — the resource
-   * is read-only by design).
-   *
-   * Empty-state safe: returns events=[] + nextCursor=null when the
-   * org has no Gov Project (no governance ingest) or when no events
-   * exist past the cursor.
-   *
-   * Spec: specs/ai-gateway/governance/siem-export.feature
-   */
-  ocsfExport: protectedProcedure
-    .input(
-      z.object({
-        organizationId: z.string(),
-        /** Lower bound paired with sinceEventId — return events after this watermark. */
-        sinceMs: z.number().int().nonnegative().optional(),
-        /** EventId watermark paired with sinceMs; from the prior page's nextCursorCompound. */
-        sinceEventId: z.string().optional(),
-        /** Page size — soft cap at 1000 to keep responses bounded. */
-        limit: z.number().int().min(1).max(1000).default(500),
-      }),
-    )
-    .permission("complianceExport:view")
-    .use(requireEnterprisePlan(ENTERPRISE_FEATURE_ERRORS.OCSF_EXPORT))
-    .query(async ({ ctx, input }) => {
-      return await ctx.app.governance.ocsfList({
-        organizationId: input.organizationId,
-        sinceMs: input.sinceMs ?? 0,
-        sinceEventId: input.sinceEventId,
-        limit: input.limit,
-      });
-    }),
-
-  /**
-   * Current quarantine-fill rate for the org's hidden Gov project.
-   * Admin UI on `/governance` polls this and surfaces a warning
-   * Alert when `exceeded` is true. Per-source breakdown lets the
-   * admin pin which IngestionSource is misconfigured without a
-   * separate drill-down.
-   *
-   * Permission: `governance:view` — admin-only (members never see
-   * quarantine activity per the spec's "no member visibility on
-   * this Alert" invariant).
-   *
-   * Spec: specs/ai-gateway/governance/ingestion-attribution.feature
-   *       §"Admin warning fires when quarantine fill rate exceeds threshold"
-   */
-  /**
-   * Records the admin's bird's-eye drill-in into a target Personal
-   * or Team workspace. Idempotent within a 5-minute window so the
-   * layout-level `adminViewingAs` detection can fire on every page
-   * paint without flooding the audit log.
-   *
-   * Hook point (Lane-B): in DashboardLayout / AdminViewingAsBanner,
-   * `useEffect(() => { if (adminViewingAs) mutate({ ... }); }, [project.id])`
-   * fires this once per drill-in navigation. Backend dedup absorbs
-   * any extra calls within the window.
-   *
-   * Writes:
-   *   - `AuditLog` row (`action='governance.viewWorkspaceAs'`) — the
-   *     SOC2 / ISO27001 evidence surface; visible at /settings/audit-log
-   *     to org admins AND to the user themselves on /me/configure →
-   *     Activity (per the user-visible disclosure copy).
-   *   - `governance_ocsf_events` mirror — best-effort SIEM stream
-   *     parity; OCSF write failures don't fail the AuditLog write.
-   *
-   * Permission: `governance:view`. Self-views (own personal
-   * workspace, own team) short-circuit at the service layer with
-   * no audit row written.
-   *
-   * Spec: specs/ai-gateway/governance/admin-trace-access.feature
-   *       specs/ai-gateway/governance/ingestion-attribution.feature
-   *         §"no bypass surface that returns user traces without
-   *           firing the audit-log row"
-   */
-  recordWorkspaceView: protectedProcedure
-    .input(
-      z.object({
-        organizationId: z.string(),
-        targetTeamId: z.string(),
-        kind: z.enum(["personal", "team"]),
-        workspaceLabel: z.string().max(256).optional(),
-      }),
-    )
-    .permission("governance:view")
-    .mutation(async ({ ctx, input }) => {
-      return await ctx.app.governance.adminWorkspaceRecordView({
-        actorUserId: ctx.session.user.id,
-        organizationId: input.organizationId,
-        targetTeamId: input.targetTeamId,
-        kind: input.kind,
-        workspaceLabel: input.workspaceLabel,
-      });
-    }),
-
-  /**
-   * Resolves a CH-side `actor` token (typically the email stamped on
-   * spans as `langwatch.user_id`, occasionally the User.id directly)
-   * to that user's Personal Workspace inside the given org. Drives
-   * the bird's-eye `/governance/users/[id]` "View their
-   * workspace →" link — without this, admins can see who's been
-   * active but can't drill into their traces from the user row.
-   *
-   * Returns null when:
-   *   - the actor doesn't resolve to a User in this org, OR
-   *   - the resolved User has no Personal Workspace yet
-   * (no enumeration leak — both branches collapse to null).
-   *
-   * Permission: `governance:view`. Members never resolve other
-   * users' workspace ids.
-   *
-   * Spec: specs/ai-gateway/governance/admin-trace-access.feature
-   *       §"Admin clicks a user row + lands on their personal-workspace traces"
+   * Returns null when the actor doesn't resolve to a User in this org, or
+   * when the resolved User has no Personal Workspace yet — no enumeration
+   * leak, both branches collapse to null.
    */
   resolveActorPersonalProject: protectedProcedure
     .input(
@@ -296,12 +156,6 @@ export const governanceRouter = createTRPCRouter({
     )
     .permission("governance:view")
     .query(async ({ ctx, input }) => {
-      // Match by email (CH-stamped actor is typically the email) OR
-      // by id directly. Two-step: resolve User first, then ask
-      // PersonalWorkspaceService for the workspace under the supplied
-      // org. Cross-org probe (User exists but no membership in
-      // organizationId) collapses to null below — never confirms the
-      // user exists in another org.
       const user = await ctx.prisma.user.findFirst({
         where: {
           OR: [{ email: input.actor }, { id: input.actor }],
@@ -332,27 +186,5 @@ export const governanceRouter = createTRPCRouter({
         projectId: workspace.project.id,
         projectSlug: workspace.project.slug,
       };
-    }),
-
-  quarantineFillStats: protectedProcedure
-    .input(
-      z.object({
-        organizationId: z.string(),
-        windowSeconds: z
-          .number()
-          .int()
-          .min(10)
-          .max(3600)
-          .default(QUARANTINE_DEFAULT_WINDOW_SECONDS),
-        threshold: z.number().int().min(1).default(QUARANTINE_DEFAULT_THRESHOLD),
-      }),
-    )
-    .permission("governance:view")
-    .query(async ({ ctx, input }) => {
-      return await ctx.app.governance.quarantineFillEvaluate({
-        organizationId: input.organizationId,
-        windowSeconds: input.windowSeconds,
-        threshold: input.threshold,
-      });
     }),
 });

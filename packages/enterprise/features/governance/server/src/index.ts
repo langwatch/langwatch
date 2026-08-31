@@ -163,6 +163,10 @@ export {
   AnomalyRulesTrpcApi,
   type AnomalyRulesTrpcContext,
 } from "./transport/api-trpc/anomaly-rules.api";
+export {
+  GovernanceTrpcApi,
+  type GovernanceTrpcContext,
+} from "./transport/api-trpc/governance.api";
 
 /**
  * The public REST family this feature owns. The process supplies the bound
