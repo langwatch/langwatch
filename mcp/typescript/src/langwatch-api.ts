@@ -83,10 +83,18 @@ export interface PromptSummary {
 }
 
 export interface PromptVersion {
+  versionId?: string;
   version?: number;
   commitMessage?: string;
   model?: string;
   messages?: Array<{ role: string; content: string }>;
+  temperature?: number;
+  maxTokens?: number;
+  responseFormat?: Record<string, unknown>;
+  parameters?: Array<{ identifier: string; type: string }>;
+  inputs?: Array<{ identifier: string; type: string }>;
+  outputs?: Array<{ identifier: string; type: string }>;
+  tags?: string[];
 }
 
 export interface PromptDetailResponse extends PromptSummary {
