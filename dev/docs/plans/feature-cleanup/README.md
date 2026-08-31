@@ -1395,3 +1395,54 @@ case, the compiler caught this one.
 
 The fold's bare-reference guard required a leading word boundary but not a
 trailing one, so `selectsRole` reported as a bare `selects`.
+
+## Round: the pullers, and two guards worth reading
+
+Folded the two admin pullers (11 and 9), the Copilot Studio Dataverse puller
+(15), the activity-monitor repository (8), the coding-agent ClickHouse
+repository (2), the Databricks Genie puller (25) and the Copilot Studio trace
+mapper (34 — into a class it did not have).
+
+### The security check that explained itself to nobody
+
+`isDatabricksWorkspaceOrigin` existed twice: a URL parse in the adapter with
+twenty lines explaining why the rule exists, and a regex in
+`PullDestinationService`. Only the regex ran. The adapter's copy had no callers
+anywhere in the repo.
+
+The arrangement was deliberate — the docblock says enforcement belongs on the
+write path so the rejection reaches whoever is editing, and so the adapter can
+still be pointed at a local fixture by its tests. What was not deliberate is
+that the enforcement and the explanation had come apart.
+
+The service now calls the adapter's. Consolidating a security check is only
+safe in one direction, so the surviving one is at least as strict as the regex
+it replaces: the URL parse used to allow a path where the regex allowed only a
+bare origin, so it now refuses a port, path, query or fragment and checks the
+same hostname character shape. Every existing refusal test passes unchanged.
+
+That path-versus-origin disagreement was pinned by nothing, which is how the
+two drifted with a green suite. Five cases pin it now.
+
+### A test that looked like it covered the thing it did not
+
+Sabotaging `byBatchThenArrival` in the Copilot mapper failed nothing, and the
+suite contains a test called "orders piece 2 before piece 10".
+
+Activities are re-sorted by timestamp after the rows merge. That test gives its
+messages distinct stamps, so the timestamps alone produce the expected order —
+the batch comparator could be reversed or stubbed to zero and the test still
+passed. What the comparator actually decides is the TIE: same-millisecond
+activities keep merged-row order, which the batch number sets.
+
+A name that describes the intent is not evidence the test reaches it. The
+sabotage is.
+
+### Where coverage lives, twice more
+
+- the gateway budget ClickHouse repository: thirteen integration tests under
+  `platform/app`, none in the package.
+- `mapRow` on the coding-agent ClickHouse repository: nowhere at all. Five
+  tests now cover it, and they matter more than they look — ClickHouse returns
+  JSONEachRow numerics as strings, so the mapping is what keeps the pagination
+  cursor a number rather than text that orders "1000" before "9".
