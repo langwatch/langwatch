@@ -463,3 +463,48 @@ same model resolving fine where the licence does cover it.
 `findAlternate` on that class remains uncovered: one caller, and it is the
 "offer a different tier" path behind a picker rather than the resolve every
 request takes.
+
+## Round: one licence rule, three throw sites, one code (2026-08-31)
+
+The Codex licence — a model billing the user's ChatGPT plan may run Langy and
+the FAST assists and nothing else — is enforced at three points. Only one of
+them threw something a caller could act on.
+
+    resolver (choosing a default)   ModelRestrictedForFeatureError  ✓ coded
+    defaults writer (saving one)    ModelRestrictedForFeatureError  ✓ coded
+    execution (running one)         new Error("...")                ✗
+
+The third is exactly the case CLAUDE.md names: a knowable failure the caller
+can act on, degraded to a generic "unknown error" plus a trace id. And it
+explains a smell two features away — `scenario-infra-error.ts` classifies this
+failure by grepping the message for `CODING_ASSISTANT_SURFACES_ONLY_NEEDLE`,
+because there was no code to match on. **The needle exists because the code
+did not.**
+
+`model_restricted_for_execution` is a separate code from the feature one on
+purpose: the remedies differ. One names the feature whose default to change;
+the other is a model arriving at a surface it cannot run on, usually a value
+saved before the restriction existed. Message kept byte-identical so the
+scenario classifier's needle still matches — it can move to the code when
+someone wants to, but it no longer has to grep.
+
+Worth noting for the next one of these: adding a code is a three-file change
+the standard spells out — the error class, `logic/codes.ts` (sorted), and
+`logic/presentation.ts` in the same commit — and `codes.unit.test.ts` is
+runnable, so the registration is verifiable without a platform/app typecheck.
+
+**The execution gate runs twice and the two are not redundant**: once on the
+model reference before any lookup, once on the provider it resolved to,
+because a model id that looks ordinary can still reach the Codex provider
+through a row id (`mp_<id>/<model>`). Deleting either fails a different set of
+cases.
+
+### A red test found on the way in
+
+`presentation.unit.test`'s meta-echo guard was failing on
+`automation_trace_filter_invalid`, which rendered `meta.reason` into the
+customer's sentence — "That filter query isn't valid auth_failed". The echo
+is deliberate (it is the filter parser's own line, ours, clamped by
+`safeProse`), so it is recorded in ALLOWED_PER_CODE with the reason, which is
+what the failure message asks for. The exemption is per-code: a different
+entry echoing `reason` is still caught.
