@@ -750,3 +750,79 @@ added without a fake that can tell the difference is not a guard.
 
 `Prisma.Decimal` stays in that file. It is the money type the aggregates are
 summed in, not a database handle; replacing it is a separate decision.
+
+## Comment blocks: 0 (2026-08-31)
+
+`comment-block-size` caps a block at 60 lines. Four were over. All four were
+file headers that had grown into a table of contents, so the reader who
+arrived at the code an explanation was about to describe had to scroll back
+up to find it.
+
+Nothing was deleted. Each header kept the part that explains why the module
+exists, and each section moved onto the declaration it is about:
+
+| module | was | narrative moved onto |
+| --- | --- | --- |
+| `langy-conversation-memory.service.ts` | 68 | `extractLangyConversationMemory` |
+| `api/src/rest/validation.ts` | 63 | `SchemaFailure`, `MalformedRequestError` |
+| `server/api/idempotency.ts` | 84 | `TAKEOVER_AFTER_MS`, `readStoredBody` |
+| `app-layer/identity/birth.ts` | 66 | `bear`, `claimAddress` |
+
+The rule this leaves behind: a header says why the module exists. Anything
+that explains a decision belongs on the declaration that makes it, because
+that is where the next reader will be standing.
+
+## service-quality: 10 -> 7 (2026-08-31)
+
+The policy caps a service module at 500 lines, a method at 80, and a method's
+complexity at 24. Three came off the list, and each overrun turned out to name
+a real design problem rather than a formatting one.
+
+**`span-normalization.service.ts`** was a class plus three loose functions that
+no method of the class called. One of them, `enrichRagContextIds`, is declared
+on `TraceSpanNormalizationPort` — so the app adapter implemented the port by
+importing a free function alongside the service it already held. Two imports,
+one collaborator. They are methods now, and the package exports the class
+alone. The over-long method was `decodeOtlpSpan`, 83 lines of one object
+literal with two inline mappers buried in the middle; `decodeEvents` and
+`decodeLinks` came out.
+
+**`trace-ingestion.service.ts`**: half of `handleOtlpTraceRequest` was
+bookkeeping — five `let` counters, a five-arm switch that only incremented
+one of them, five `setAttribute` calls, and an arithmetic at the end.
+`SpanIngestionTally` holds it instead, keyed by the status the result already
+carries, so the switch disappears and one place knows that only `dropped` and
+`failed` are a rejection. Two local helpers also duplicated `TraceRequestUtils`,
+which this file's own sibling already imports.
+
+**`project.service.ts`**: 38 of its 513 lines were two module-level functions
+called once, one of which rebuilt a sixteen-entry `Set` on every call. Now
+`ProjectSlugService.mint`. It is a `.service.ts` and not a `.rules.ts` because
+that is what the strict layout admits under `services/` — a `.rules.ts` there
+would have been a new `feature-source-layout` violation, which is how the
+existing `*.rules.ts` files elsewhere in the tree got onto that list.
+
+### Tests came first where the refactor was risky
+
+`handleOtlpTraceRequest` — the whole OTLP traversal, three drop rules, the
+coding-agent filter and the tally — had no coverage at all; only
+`ingestNormalizedSpan` did. Sixteen tests were written and passing against the
+OLD implementation before any of it was touched. The two that matter most say
+a filtered span and a deduped span are **not** rejections: the transport turns
+`rejectedSpans` into the sender's HTTP answer, so counting either would tell a
+healthy SDK it is failing.
+
+Every extraction was sabotage-checked. `decodeEvents` returning nothing fails
+two tests; the rejection sum counting `filtered` fails two; a malformed
+resource throwing instead of degrading fails one; the slug's diacritic strip
+fails one, its dash trim three, its suffix length ten.
+
+### A dead guard, reported not fixed
+
+`ProjectSlugService.mint` refuses a slug that equals a reserved top-level route
+(`admin`, `api`, `settings`, ...). It cannot fire. The slug is always
+`${slugified}-${idPrefix}`, so it is `settings-`, never `settings`, and no
+reserved name contains a dash. Making it guard the slugified NAME instead
+would newly refuse a project called "Settings" — a product decision, not a
+cleanup one. The test records what the code does and says why it does not
+claim more.
