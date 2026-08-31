@@ -4,7 +4,11 @@ import { mergePath } from "hono/utils/url";
 import { ApiVersionUnavailableError } from "../errors.js";
 import { runMiddlewareStack } from "./middleware-stack.js";
 import { buildEndpointMiddlewareStack, buildWithdrawnMiddlewareStack } from "./pipeline.js";
-import { mountOptionalVersionRoutes, mountStaticVersionRoutes } from "./public-rest-routing.js";
+import {
+  mountOptionalVersionRoutes,
+  mountRoute,
+  mountStaticVersionRoutes,
+} from "./public-rest-routing.js";
 import type { BaseApp, HttpMethod, ServiceConfig, VersionStatus } from "./types.js";
 import { isDateVersion } from "./types.js";
 import { type ResolvedEndpoint, VERSION_LATEST, VERSION_PREVIEW } from "./versioning.js";
@@ -148,28 +152,6 @@ function mountVersion<TProject>({
       config: ep.config,
     });
   }
-}
-
-function mountRoute({
-  app,
-  method,
-  path,
-  stack,
-}: {
-  app: Hono;
-  method: HttpMethod;
-  path: string;
-  stack: MiddlewareHandler[];
-}): void {
-  const handlers = stack as [MiddlewareHandler, ...MiddlewareHandler[]];
-  const register: Record<HttpMethod, () => void> = {
-    get: () => void app.get(path, ...handlers),
-    post: () => void app.post(path, ...handlers),
-    put: () => void app.put(path, ...handlers),
-    delete: () => void app.delete(path, ...handlers),
-    patch: () => void app.patch(path, ...handlers),
-  };
-  register[method]();
 }
 
 function resolveVersionStatus(version: string): VersionStatus {

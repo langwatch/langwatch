@@ -232,16 +232,16 @@ import {
 } from "@langwatch/suite-server";
 import { TopicServerInstaller } from "@langwatch/topic-server";
 import {
-  TraceProcessingServerInstaller,
-  createCustomEvaluationSyncHandler,
   createExperimentMetricsSyncHandler,
-  createProjectMetadataHandler,
   createSimulationMetricsSyncHandler,
   createSpanStorageBroadcastHandler,
   createTraceUpdateBroadcastHandler,
-  createTrackedEventSyncHandler,
+  CustomEvaluationSync,
   passesTraceOriginGuards,
+  ProjectMetadataSync,
   resolveSpanCommandShardCount,
+  TraceProcessingServerInstaller,
+  TrackedEventSync,
 } from "@langwatch/trace-server";
 import {
   BILLING_ORG_CACHE_PREFIX,
@@ -1146,7 +1146,7 @@ export class PipelineRegistry {
       evaluation: evalCommands.executeEvaluation,
     });
 
-    const customEvaluationSyncHandler = createCustomEvaluationSyncHandler({
+    const customEvaluationSyncHandler = CustomEvaluationSync.createCustomEvaluationSyncHandler({
       reportEvaluation: evalCommands.reportEvaluation,
       deriveEvaluatorId: evaluationNameAutoslug,
     });
@@ -1154,7 +1154,7 @@ export class PipelineRegistry {
     // Live span feedback (langwatch.event) → tracked event. Routes through the
     // same recordTrackedEventSpan path as REST POST /api/events/track so an
     // SDK-emitted thumbs_up_down lands identically to a REST call.
-    const trackedEventSyncHandler = createTrackedEventSyncHandler({
+    const trackedEventSyncHandler = TrackedEventSync.createTrackedEventSyncHandler({
       recordTrackedEvent: ({ tenantId, body, eventId }) =>
         recordTrackedEventSpan({ project: { id: tenantId }, body, eventId }),
     });
@@ -1169,7 +1169,7 @@ export class PipelineRegistry {
       broadcast: this.deps.broadcast,
     });
 
-    const projectMetadataHandler = createProjectMetadataHandler({
+    const projectMetadataHandler = ProjectMetadataSync.createProjectMetadataHandler({
       projects: this.deps.projects,
       recordProductEvent: trackServerEvent,
       bootstrapTopicClustering: (projectId) => this.bootstrapTopicClustering.fn(projectId),

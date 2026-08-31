@@ -287,7 +287,14 @@ function endpointKey(endpoint: Pick<ResolvedEndpoint, "method" | "path">): strin
   return `${method}:${endpoint.path || "/"}`;
 }
 
-function mountRoute({
+/**
+ * Register one handler stack on one method+path.
+ *
+ * Hono's per-method registrations are separate calls with no dynamic form, so
+ * the method has to be dispatched rather than passed. Both mounters need that
+ * and had a copy each; this is the one they share.
+ */
+export function mountRoute({
   app,
   method,
   path,
