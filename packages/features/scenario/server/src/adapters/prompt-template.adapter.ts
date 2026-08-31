@@ -41,167 +41,8 @@ export interface PromptTemplateContextResult {
   unboundInputs: string[];
 }
 
-/** Placeholder rendered in place of an input nothing could be bound to. */
-function unboundInputPlaceholderValue(identifier: string): string {
-  return `[unbound input: ${identifier}]`;
-}
-
 /** Sentinel used when the runner supplies no thread id. */
 const DEFAULT_SCENARIO_THREAD_ID = "scenario-test";
-
-/**
- * The conversation as the model should see it: role and content only.
- *
- * `ScenarioState.addMessage` stamps every message with `id` and `traceId`, and
- * serialising the message objects wholesale put both into prompt text (#6590).
- * Stripping here covers the base `messages` binding and every mapping that
- * resolves to it, since both read from this value.
- */
-function conversationForPrompt(messages: AgentInput["messages"]): AgentInput["messages"] {
-  return messages.map((message) => {
-    const { role, content } = message as { role: unknown; content: unknown };
-    return { role, content } as (typeof messages)[number];
-  });
-}
-
-/**
- * The conversation rendered for a prompt: one `role: content` line per turn.
- *
- * A prompt template is prose, so history belongs in it as prose. It used to be
- * bound to `JSON.stringify(input.messages)`, which showed the model a
- * serialised payload — and a model shown a payload answers with one (#6590).
- * That reply then became the next turn's history and was serialised again, so
- * each turn's prompt carried the previous turn's escaped one level deeper: an
- * instrumented four-turn run grew ×14.5 while the conversation itself grew
- * ×3.6.
- *
- * Note this is a change in what `{{messages}}` renders. A template that parsed
- * it as JSON has to loop the turns instead — and could not have been doing so
- * safely anyway, since the array it received carried internal fields.
- */
-function transcriptForPrompt(messages: AgentInput["messages"]): string {
-  return messages
-    .map((message) => {
-      const { role, content } = message as { role: string; content: unknown };
-      const text = typeof content === "string" ? content : JSON.stringify(content);
-      return `${role}: ${text}`;
-    })
-    .join("\n");
-}
-
-function lastUserMessageText(messages: AgentInput["messages"]): string {
-  let lastUserMessage: AgentInput["messages"][number] | undefined;
-  for (const message of messages) {
-    if (message.role === "user") lastUserMessage = message;
-  }
-  if (!lastUserMessage) return "";
-  return typeof lastUserMessage.content === "string"
-    ? lastUserMessage.content
-    : JSON.stringify(lastUserMessage.content);
-}
-
-/**
- * Build the template context for one turn.
- *
- * @param input - The turn the scenario runner handed the adapter
- * @param inputs - The prompt's declared input variables
- * @param scenarioMappings - Explicit bindings configured on the suite target.
- *   These win; every declared input they leave out is matched by name.
- * @param parameters - The values the run resolved, bound as `params` so the
- *   template reads `{{ params.account_tier }}`. Bound before the declared
- *   inputs, so a prompt input named `params` still wins.
- */
-function buildPromptTemplateContextValue({
-  input,
-  inputs = [],
-  scenarioMappings,
-  parameters,
-}: {
-  input: AgentInput;
-  inputs?: PromptInputDeclaration[];
-  scenarioMappings?: Record<string, FieldMapping>;
-  parameters?: RunParameterValues;
-}): PromptTemplateContextResult {
-  const sanitized = {
-    ...input,
-    messages: conversationForPrompt(input.messages),
-  } as AgentInput;
-
-  const transcript = transcriptForPrompt(sanitized.messages);
-
-  const threadId = input.threadId ?? DEFAULT_SCENARIO_THREAD_ID;
-
-  const context: Record<string, unknown> = {
-    input: lastUserMessageText(sanitized.messages),
-    messages: transcript,
-    // The structured escape hatch for templates that parsed the pre-#6590
-    // `{{messages}}` JSON: the same array shape, minus the internal `id` /
-    // `traceId` fields that made the old value unsafe to consume. `{{messages}}`
-    // itself stays prose because a model shown a JSON transcript answers with
-    // one, and that reply re-escapes one level deeper every turn (#6590).
-    messagesJson: JSON.stringify(sanitized.messages),
-    threadId,
-    params: parameters ?? {},
-  };
-
-  const effectiveMappings: Record<string, FieldMapping> = {
-    ...computeBestMatchMappings({ inputs }),
-    ...scenarioMappings,
-  };
-
-  const resolved = resolveFieldMappings({
-    fieldMappings: effectiveMappings,
-    agentInput: sanitized,
-  });
-  for (const [identifier, value] of Object.entries(resolved)) {
-    // The shared resolver serialises the conversation as JSON, which is right
-    // for an HTTP body and wrong for prompt text. Same substitution as the base
-    // `messages` binding, so a declared input mapped to the conversation reads
-    // the same way. `threadId` likewise reads the base binding: the resolver
-    // answers "" when the runner supplies no thread id, which would render
-    // blank while `{{threadId}}` renders the sentinel.
-    const sourceField = sourceFieldOf(effectiveMappings[identifier]!);
-    context[identifier] =
-      sourceField === "messages"
-        ? transcript
-        : sourceField === "threadId"
-          ? threadId
-          : value;
-  }
-
-  const unboundInputs = inputs
-    .map((declared) => declared.identifier)
-    .filter((identifier) => resolved[identifier] === undefined);
-
-  for (const identifier of unboundInputs) {
-    context[identifier] = unboundInputPlaceholderValue(identifier);
-  }
-
-  return { context, unboundInputs };
-}
-
-/**
- * Liquid expressions — `{{ ... }}` and `{% ... %}` — with quoted literals
- * blanked, so a variable name only counts where the template could actually
- * read it.
- */
-function liquidExpressions(template: string): string[] {
-  const expressions = template.match(/\{\{[\s\S]*?\}\}|\{%[\s\S]*?%\}/g) ?? [];
-  return expressions.map((expression) => expression.replace(/"[^"]*"|'[^']*'/g, '""'));
-}
-
-/**
- * Whether a template reads the named variable.
- *
- * The check this replaces tested `/\bmessages\b/` against the raw template, so
- * a system prompt using the ordinary word "messages" in prose suppressed the
- * conversation history entirely — the model was told to discuss a conversation
- * it was never shown. Only a reference inside a Liquid expression counts now.
- */
-function templateReferencesVariableValue(template: string, variable: string): boolean {
-  const reference = new RegExp(`\\b${variable}\\b`);
-  return liquidExpressions(template).some((expression) => reference.test(expression));
-}
 
 /**
  * Every context name `buildPromptTemplateContext` binds the conversation to.
@@ -212,16 +53,6 @@ function templateReferencesVariableValue(template: string, variable: string): bo
  */
 const CONVERSATION_VARIABLES = ["messages", "messagesJson"] as const;
 
-/**
- * Whether a template places the conversation history itself, in either the
- * prose or the structured form.
- */
-function templateReferencesConversationValue(template: string): boolean {
-  return CONVERSATION_VARIABLES.some((variable) =>
-    templateReferencesVariableValue(template, variable),
-  );
-}
-
 export class PromptTemplateAdapter {
   static create(): PromptTemplateAdapter {
     return new PromptTemplateAdapter();
@@ -229,14 +60,170 @@ export class PromptTemplateAdapter {
 
   private constructor() {}
 
-  static readonly unboundInputPlaceholder = unboundInputPlaceholderValue;
-  static readonly buildContext = buildPromptTemplateContextValue;
-  static readonly referencesVariable = templateReferencesVariableValue;
-  static readonly referencesConversation = templateReferencesConversationValue;
-}
+  /** Placeholder rendered in place of an input nothing could be bound to. */
+  private static unboundInputPlaceholder(identifier: string): string {
+    return `[unbound input: ${identifier}]`;
+  }
 
-export const unboundInputPlaceholder = PromptTemplateAdapter.unboundInputPlaceholder;
-export const buildPromptTemplateContext = PromptTemplateAdapter.buildContext;
-export const templateReferencesVariable = PromptTemplateAdapter.referencesVariable;
-export const templateReferencesConversation =
-  PromptTemplateAdapter.referencesConversation;
+  /**
+   * The conversation as the model should see it: role and content only.
+   *
+   * `ScenarioState.addMessage` stamps every message with `id` and `traceId`, and
+   * serialising the message objects wholesale put both into prompt text (#6590).
+   * Stripping here covers the base `messages` binding and every mapping that
+   * resolves to it, since both read from this value.
+   */
+  private static conversationForPrompt(messages: AgentInput["messages"]): AgentInput["messages"] {
+    return messages.map((message) => {
+      const { role, content } = message as { role: unknown; content: unknown };
+      return { role, content } as (typeof messages)[number];
+    });
+  }
+
+  /**
+   * The conversation rendered for a prompt: one `role: content` line per turn.
+   *
+   * A prompt template is prose, so history belongs in it as prose. It used to be
+   * bound to `JSON.stringify(input.messages)`, which showed the model a
+   * serialised payload — and a model shown a payload answers with one (#6590).
+   * That reply then became the next turn's history and was serialised again, so
+   * each turn's prompt carried the previous turn's escaped one level deeper: an
+   * instrumented four-turn run grew ×14.5 while the conversation itself grew
+   * ×3.6.
+   *
+   * Note this is a change in what `{{messages}}` renders. A template that parsed
+   * it as JSON has to loop the turns instead — and could not have been doing so
+   * safely anyway, since the array it received carried internal fields.
+   */
+  private static transcriptForPrompt(messages: AgentInput["messages"]): string {
+    return messages
+      .map((message) => {
+        const { role, content } = message as { role: string; content: unknown };
+        const text = typeof content === "string" ? content : JSON.stringify(content);
+        return `${role}: ${text}`;
+      })
+      .join("\n");
+  }
+
+  private static lastUserMessageText(messages: AgentInput["messages"]): string {
+    let lastUserMessage: AgentInput["messages"][number] | undefined;
+    for (const message of messages) {
+      if (message.role === "user") lastUserMessage = message;
+    }
+    if (!lastUserMessage) return "";
+    return typeof lastUserMessage.content === "string"
+      ? lastUserMessage.content
+      : JSON.stringify(lastUserMessage.content);
+  }
+
+  /**
+   * Build the template context for one turn.
+   *
+   * @param input - The turn the scenario runner handed the adapter
+   * @param inputs - The prompt's declared input variables
+   * @param scenarioMappings - Explicit bindings configured on the suite target.
+   *   These win; every declared input they leave out is matched by name.
+   * @param parameters - The values the run resolved, bound as `params` so the
+   *   template reads `{{ params.account_tier }}`. Bound before the declared
+   *   inputs, so a prompt input named `params` still wins.
+   */
+  static buildContext({
+    input,
+    inputs = [],
+    scenarioMappings,
+    parameters,
+  }: {
+    input: AgentInput;
+    inputs?: PromptInputDeclaration[];
+    scenarioMappings?: Record<string, FieldMapping>;
+    parameters?: RunParameterValues;
+  }): PromptTemplateContextResult {
+    const sanitized = {
+      ...input,
+      messages: PromptTemplateAdapter.conversationForPrompt(input.messages),
+    } as AgentInput;
+
+    const transcript = PromptTemplateAdapter.transcriptForPrompt(sanitized.messages);
+
+    const threadId = input.threadId ?? DEFAULT_SCENARIO_THREAD_ID;
+
+    const context: Record<string, unknown> = {
+      input: PromptTemplateAdapter.lastUserMessageText(sanitized.messages),
+      messages: transcript,
+      // The structured escape hatch for templates that parsed the pre-#6590
+      // `{{messages}}` JSON: the same array shape, minus the internal `id` /
+      // `traceId` fields that made the old value unsafe to consume. `{{messages}}`
+      // itself stays prose because a model shown a JSON transcript answers with
+      // one, and that reply re-escapes one level deeper every turn (#6590).
+      messagesJson: JSON.stringify(sanitized.messages),
+      threadId,
+      params: parameters ?? {},
+    };
+
+    const effectiveMappings: Record<string, FieldMapping> = {
+      ...computeBestMatchMappings({ inputs }),
+      ...scenarioMappings,
+    };
+
+    const resolved = resolveFieldMappings({
+      fieldMappings: effectiveMappings,
+      agentInput: sanitized,
+    });
+    for (const [identifier, value] of Object.entries(resolved)) {
+      // The shared resolver serialises the conversation as JSON, which is right
+      // for an HTTP body and wrong for prompt text. Same substitution as the base
+      // `messages` binding, so a declared input mapped to the conversation reads
+      // the same way. `threadId` likewise reads the base binding: the resolver
+      // answers "" when the runner supplies no thread id, which would render
+      // blank while `{{threadId}}` renders the sentinel.
+      const sourceField = sourceFieldOf(effectiveMappings[identifier]!);
+      context[identifier] =
+        sourceField === "messages" ? transcript : sourceField === "threadId" ? threadId : value;
+    }
+
+    const unboundInputs = inputs
+      .map((declared) => declared.identifier)
+      .filter((identifier) => resolved[identifier] === undefined);
+
+    for (const identifier of unboundInputs) {
+      context[identifier] = PromptTemplateAdapter.unboundInputPlaceholder(identifier);
+    }
+
+    return { context, unboundInputs };
+  }
+
+  /**
+   * Liquid expressions — `{{ ... }}` and `{% ... %}` — with quoted literals
+   * blanked, so a variable name only counts where the template could actually
+   * read it.
+   */
+  private static liquidExpressions(template: string): string[] {
+    const expressions = template.match(/\{\{[\s\S]*?\}\}|\{%[\s\S]*?%\}/g) ?? [];
+    return expressions.map((expression) => expression.replace(/"[^"]*"|'[^']*'/g, '""'));
+  }
+
+  /**
+   * Whether a template reads the named variable.
+   *
+   * The check this replaces tested `/\bmessages\b/` against the raw template, so
+   * a system prompt using the ordinary word "messages" in prose suppressed the
+   * conversation history entirely — the model was told to discuss a conversation
+   * it was never shown. Only a reference inside a Liquid expression counts now.
+   */
+  static referencesVariable(template: string, variable: string): boolean {
+    const reference = new RegExp(`\\b${variable}\\b`);
+    return PromptTemplateAdapter.liquidExpressions(template).some((expression) =>
+      reference.test(expression),
+    );
+  }
+
+  /**
+   * Whether a template places the conversation history itself, in either the
+   * prose or the structured form.
+   */
+  static referencesConversation(template: string): boolean {
+    return CONVERSATION_VARIABLES.some((variable) =>
+      PromptTemplateAdapter.referencesVariable(template, variable),
+    );
+  }
+}

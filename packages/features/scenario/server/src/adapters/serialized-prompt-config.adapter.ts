@@ -13,10 +13,7 @@ import { generateText } from "ai";
 import { Liquid } from "liquidjs";
 import type { RunParameterValues } from "@langwatch/scenario-contract";
 import { createModelFromParams } from "./litellm-model.adapter";
-import {
-  buildPromptTemplateContext,
-  templateReferencesConversation,
-} from "./prompt-template.adapter";
+import { PromptTemplateAdapter } from "./prompt-template.adapter";
 import type { LiteLLMParams, PromptConfigData } from "@langwatch/scenario-contract";
 
 // Shared Liquid engine instance for template interpolation
@@ -64,7 +61,7 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
   }
 
   async call(input: AgentInput): Promise<string> {
-    const { context: templateContext, unboundInputs } = buildPromptTemplateContext({
+    const { context: templateContext, unboundInputs } = PromptTemplateAdapter.buildContext({
       input,
       inputs: this.config.inputs,
       scenarioMappings: this.config.scenarioMappings,
@@ -80,10 +77,7 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
     const templateUsesConversation = this.templateReadsConversation();
 
     // Interpolate template variables using Liquid
-    const systemPrompt = await liquid.parseAndRender(
-      this.config.systemPrompt,
-      templateContext,
-    );
+    const systemPrompt = await liquid.parseAndRender(this.config.systemPrompt, templateContext);
 
     const promptMessages = await Promise.all(
       this.config.messages.map(async (m) => ({
@@ -126,8 +120,10 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
    * turn twice.
    */
   private templateReadsConversation(): boolean {
-    if (templateReferencesConversation(this.config.systemPrompt)) return true;
-    return this.config.messages.some((m) => templateReferencesConversation(m.content));
+    if (PromptTemplateAdapter.referencesConversation(this.config.systemPrompt)) return true;
+    return this.config.messages.some((m) =>
+      PromptTemplateAdapter.referencesConversation(m.content),
+    );
   }
 
   /**

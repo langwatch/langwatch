@@ -100,8 +100,11 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordPort {
         inserted_at: summary.CreatedAtMs,
         updated_at: summary.UpdatedAtMs,
       },
-      input: fullIo?.input ?? summaryContent(summary.ComputedInput),
-      output: fullIo?.output ?? summaryContent(summary.ComputedOutput),
+      input:
+        fullIo?.input ?? ClickHouseTraceFullRecordRepository.summaryContent(summary.ComputedInput),
+      output:
+        fullIo?.output ??
+        ClickHouseTraceFullRecordRepository.summaryContent(summary.ComputedOutput),
       ...(summary.ContainsErrorStatus
         ? {
             error: {
@@ -111,7 +114,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordPort {
             },
           }
         : {}),
-      metrics: traceMetrics(summary),
+      metrics: ClickHouseTraceFullRecordRepository.traceMetrics(summary),
       spans,
       ...(events.length > 0 ? { events } : {}),
       ...(droppedCategories.length > 0 ? { privacy: { droppedCategories } } : {}),
@@ -139,8 +142,15 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordPort {
       format: "JSONEachRow",
     });
     const rows = await result.json<{ TraceId: string; OccurredAtMs: number }>();
-    const records = await mapWithConcurrency(rows, PAYLOAD_READ_CONCURRENCY, (row) =>
-      this.get({ tenantId: input.tenantId, traceId: row.TraceId, occurredAtMs: row.OccurredAtMs }),
+    const records = await ClickHouseTraceFullRecordRepository.mapWithConcurrency(
+      rows,
+      PAYLOAD_READ_CONCURRENCY,
+      (row) =>
+        this.get({
+          tenantId: input.tenantId,
+          traceId: row.TraceId,
+          occurredAtMs: row.OccurredAtMs,
+        }),
     );
     return records.sort(
       (left, right) =>
@@ -223,8 +233,8 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordPort {
     }));
     const reads = new Map<string, PayloadReference>();
     for (const plan of plans) {
-      for (const reference of eventReferences(plan.original)) {
-        reads.set(referenceKey(plan.row.TraceId, reference), {
+      for (const reference of ClickHouseTraceFullRecordRepository.eventReferences(plan.original)) {
+        reads.set(ClickHouseTraceFullRecordRepository.referenceKey(plan.row.TraceId, reference), {
           traceId: plan.row.TraceId,
           eventId: reference.eventId,
           field: reference.field,
@@ -232,7 +242,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordPort {
       }
     }
     const values = new Map<string, string | null>();
-    await mapWithConcurrency(
+    await ClickHouseTraceFullRecordRepository.mapWithConcurrency(
       [...reads.entries()],
       PAYLOAD_READ_CONCURRENCY,
       async ([key, reference]) => {
@@ -247,8 +257,10 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordPort {
     return plans.map(({ row, original }) => {
       const attributes = withoutEventReferences(original);
       let recalled = false;
-      for (const reference of eventReferences(original)) {
-        const value = values.get(referenceKey(row.TraceId, reference));
+      for (const reference of ClickHouseTraceFullRecordRepository.eventReferences(original)) {
+        const value = values.get(
+          ClickHouseTraceFullRecordRepository.referenceKey(row.TraceId, reference),
+        );
         if (value !== null && value !== void 0) {
           attributes[reference.attrKey] = deserializeStoredValue(value);
           recalled = true;
@@ -257,79 +269,87 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordPort {
       return { row, attributes, recalled };
     });
   }
-}
 
-function eventReferences(
-  attributes: NormalizedSpan["spanAttributes"],
-): Array<{ attrKey: string; eventId: string; field: string }> {
-  const prefix = "langwatch.reserved.eventref.";
-  return Object.entries(attributes).flatMap(([key, value]) => {
-    if (!key.startsWith(prefix)) return [];
-    const decoded = typeof value === "string" ? parseReference(value) : value;
-    if (!isReference(decoded)) return [];
-    return [{ attrKey: key.slice(prefix.length), eventId: decoded.eventId, field: decoded.field }];
-  });
-}
-
-function parseReference(value: string): unknown {
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
+  private static eventReferences(
+    attributes: NormalizedSpan["spanAttributes"],
+  ): Array<{ attrKey: string; eventId: string; field: string }> {
+    const prefix = "langwatch.reserved.eventref.";
+    return Object.entries(attributes).flatMap(([key, value]) => {
+      if (!key.startsWith(prefix)) return [];
+      const decoded =
+        typeof value === "string"
+          ? ClickHouseTraceFullRecordRepository.parseReference(value)
+          : value;
+      if (!ClickHouseTraceFullRecordRepository.isReference(decoded)) return [];
+      return [
+        { attrKey: key.slice(prefix.length), eventId: decoded.eventId, field: decoded.field },
+      ];
+    });
   }
-}
 
-function isReference(value: unknown): value is { eventId: string; field: string } {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  const eventId = ownString(value, "eventId");
-  const field = ownString(value, "field");
-  return eventId !== null && eventId.length > 0 && field !== null && field.length > 0;
-}
-
-function ownString(value: object, key: string): string | null {
-  const descriptor = Object.getOwnPropertyDescriptor(value, key);
-  return typeof descriptor?.value === "string" ? descriptor.value : null;
-}
-
-function referenceKey(traceId: string, reference: { eventId: string; field: string }): string {
-  return `${traceId}\u0000${reference.eventId}\u0000${reference.field}`;
-}
-
-function summaryContent(value: string | null): { type: string; value: string } | null {
-  return value === null ? null : { type: "text", value };
-}
-
-function traceMetrics(summary: SummaryRow): Record<string, number | boolean | null> {
-  return {
-    first_token_ms: summary.TimeToFirstTokenMs,
-    total_time_ms: summary.TotalDurationMs,
-    prompt_tokens: summary.TotalPromptTokenCount,
-    completion_tokens: summary.TotalCompletionTokenCount,
-    total_cost: summary.TotalCost,
-    tokens_estimated: summary.TokensEstimated,
-  };
-}
-
-async function mapWithConcurrency<Input, Output>(
-  inputs: Input[],
-  concurrency: number,
-  operation: (input: Input) => Promise<Output>,
-): Promise<Output[]> {
-  const output = new Map<number, Output>();
-  let next = 0;
-  const workers = Array.from({ length: Math.min(concurrency, inputs.length) }, async () => {
-    while (next < inputs.length) {
-      const index = next++;
-      const input = inputs[index];
-      if (input === void 0) continue;
-      output.set(index, await operation(input));
+  private static parseReference(value: string): unknown {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
     }
-  });
-  await Promise.all(workers);
-  return inputs.map((_input, index) => {
-    for (const [completedIndex, result] of output) {
-      if (completedIndex === index) return result;
-    }
-    throw new Error(`Concurrent Trace read did not produce result ${index}`);
-  });
+  }
+
+  private static isReference(value: unknown): value is { eventId: string; field: string } {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+    const eventId = ClickHouseTraceFullRecordRepository.ownString(value, "eventId");
+    const field = ClickHouseTraceFullRecordRepository.ownString(value, "field");
+    return eventId !== null && eventId.length > 0 && field !== null && field.length > 0;
+  }
+
+  private static ownString(value: object, key: string): string | null {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return typeof descriptor?.value === "string" ? descriptor.value : null;
+  }
+
+  private static referenceKey(
+    traceId: string,
+    reference: { eventId: string; field: string },
+  ): string {
+    return `${traceId}\u0000${reference.eventId}\u0000${reference.field}`;
+  }
+
+  private static summaryContent(value: string | null): { type: string; value: string } | null {
+    return value === null ? null : { type: "text", value };
+  }
+
+  private static traceMetrics(summary: SummaryRow): Record<string, number | boolean | null> {
+    return {
+      first_token_ms: summary.TimeToFirstTokenMs,
+      total_time_ms: summary.TotalDurationMs,
+      prompt_tokens: summary.TotalPromptTokenCount,
+      completion_tokens: summary.TotalCompletionTokenCount,
+      total_cost: summary.TotalCost,
+      tokens_estimated: summary.TokensEstimated,
+    };
+  }
+
+  private static async mapWithConcurrency<Input, Output>(
+    inputs: Input[],
+    concurrency: number,
+    operation: (input: Input) => Promise<Output>,
+  ): Promise<Output[]> {
+    const output = new Map<number, Output>();
+    let next = 0;
+    const workers = Array.from({ length: Math.min(concurrency, inputs.length) }, async () => {
+      while (next < inputs.length) {
+        const index = next++;
+        const input = inputs[index];
+        if (input === void 0) continue;
+        output.set(index, await operation(input));
+      }
+    });
+    await Promise.all(workers);
+    return inputs.map((_input, index) => {
+      for (const [completedIndex, result] of output) {
+        if (completedIndex === index) return result;
+      }
+      throw new Error(`Concurrent Trace read did not produce result ${index}`);
+    });
+  }
 }
