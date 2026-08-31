@@ -462,29 +462,14 @@ export class FoldProjectionExecutor {
       canRefold(projection, context)
     ) {
       // CanRefold returns false without an eventLoader.
-      const allEvents = await projection.eventLoader!({
-        tenantId: context.tenantId,
-        aggregateId: context.aggregateId,
+      state = await this.refoldWithDelivered({
+        projection,
+        delivered: [event],
+        context,
         occurredAtMs: eventOccurredAt,
+        logFields: { eventType: event.type, eventOccurredAt, prevLastOccurred },
+        message: "Out-of-order event detected, re-folding from scratch",
       });
-
-      logger.info(
-        {
-          projection: projection.name,
-          aggregateId: context.aggregateId,
-          tenantId: context.tenantId,
-          eventType: event.type,
-          eventOccurredAt,
-          prevLastOccurred,
-          refoldEventCount: allEvents.length,
-        },
-        "Out-of-order event detected, re-folding from scratch",
-      );
-
-      state = projection.init();
-      for (const e of allEvents) {
-        state = projection.apply(state, e as E);
-      }
     }
 
     await projection.store.store(
@@ -633,27 +618,20 @@ export class FoldProjectionExecutor {
     let state = loadedState;
     if (isOutOfOrder && canRefold(projection, context)) {
       // CanRefold returns false without an eventLoader.
-      const allEvents = await projection.eventLoader!({
-        tenantId: context.tenantId,
-        aggregateId: context.aggregateId,
+      // `ordered`, not `fresh`: the replay discards the loaded state, so a
+      // redelivered event the history read misses has to be folded in too.
+      state = await this.refoldWithDelivered({
+        projection,
+        delivered: ordered,
+        context,
         occurredAtMs: earliestOccurredAt,
-      });
-      logger.info(
-        {
-          projection: projection.name,
-          aggregateId: context.aggregateId,
-          tenantId: context.tenantId,
+        logFields: {
           batchSize: ordered.length,
           earliestOccurredAt,
           prevLastOccurred,
-          refoldEventCount: allEvents.length,
         },
-        "Out-of-order batch detected, re-folding from scratch",
-      );
-      state = projection.init();
-      for (const e of allEvents) {
-        state = projection.apply(state, e as E);
-      }
+        message: "Out-of-order batch detected, re-folding from scratch",
+      });
     } else {
       for (const event of fresh) {
         state = projection.apply(state, event);
@@ -676,6 +654,83 @@ export class FoldProjectionExecutor {
         }),
       ),
     );
+    return state;
+  }
+
+  /**
+   * Out-of-order re-fold: replays the aggregate's history from the event log
+   * with the delivered events merged back in when the read did not return
+   * them.
+   *
+   * The read runs moments after the delivered event was appended, and on a
+   * replicated event log it can come back without it (the store-miss re-fold
+   * guards the same lag, see `refoldUpToDelivered`). Replaying that history
+   * alone commits a state without the delivered event while its id is
+   * recorded as applied, so the event is never folded again. A simulation
+   * run's `finished` event lost that race to the `agent_instance_recorded`
+   * event stamped 63 ms after it, and the run read IN_PROGRESS forever.
+   *
+   * Only the events in hand are merged: a history read that also misses an
+   * earlier, already-folded event still replays without it, which the applied
+   * set cannot repair. The warn line is what makes that lag visible.
+   */
+  private async refoldWithDelivered<State, E extends Event>({
+    projection,
+    delivered,
+    context,
+    occurredAtMs,
+    logFields,
+    message,
+  }: {
+    projection: FoldProjectionDefinition<State, E>;
+    delivered: readonly E[];
+    context: ProjectionStoreContext;
+    occurredAtMs: number;
+    logFields: Record<string, unknown>;
+    message: string;
+  }): Promise<State> {
+    // Callers guard eventLoader is set (canRefold).
+    const history = await projection.eventLoader!({
+      tenantId: context.tenantId,
+      aggregateId: context.aggregateId,
+      occurredAtMs,
+    });
+
+    const seen = new Set(history.map((e) => e.id));
+    const missing = delivered.filter((e) => !seen.has(e.id));
+    const combined = [...(history as E[]), ...missing].sort((a, b) =>
+      compareFoldEvents(projection, a, b),
+    );
+
+    logger.info(
+      {
+        projection: projection.name,
+        aggregateId: context.aggregateId,
+        tenantId: context.tenantId,
+        ...logFields,
+        refoldEventCount: history.length,
+        missingDeliveredCount: missing.length,
+      },
+      message,
+    );
+    if (missing.length > 0) {
+      logger.warn(
+        {
+          projection: projection.name,
+          aggregateId: context.aggregateId,
+          tenantId: context.tenantId,
+          missingEventIds: missing
+            .map((e) => e.id)
+            .slice(0, MAX_LOGGED_EVENT_IDS),
+        },
+        "Re-fold history read did not return a delivered event; folding it in from the delivery",
+      );
+    }
+
+    let state = projection.init();
+    for (const e of combined) {
+      state = projection.apply(state, e);
+    }
     return state;
   }
 

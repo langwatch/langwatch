@@ -35,6 +35,28 @@ Feature: Hot-trace fold amplification is bounded
     When a batch starting before the persisted checkpoint is folded
     Then the aggregate's full history is loaded and replayed from init state
 
+  # The re-fold reads the event log moments after the delivered event was
+  # appended. On a replicated log that read can come back without it, and a
+  # replay of that history alone would commit a state without the event while
+  # its id is recorded as applied, so nothing folds it again. A simulation
+  # run's finished event lost that race in production and the run read
+  # IN_PROGRESS forever.
+  @unit
+  Scenario: A re-fold folds in a delivered event the event log has not returned yet
+    Given a fold that has not opted out of re-folding on out-of-order events
+    And the event log read does not return the delivered event yet
+    When a single event that occurred before the checkpoint is folded
+    Then the history is replayed with the delivered event merged in occurred-at order
+    And the delivered event is folded exactly once
+
+  @unit
+  Scenario: A re-fold folds in a delivered batch the event log has not returned yet
+    Given a fold that has not opted out of re-folding on out-of-order events
+    And the event log read returns only some events of the delivered batch
+    When a batch starting before the persisted checkpoint is folded
+    Then the history is replayed with every missing delivered event merged in occurred-at order
+    And an event the read did return is folded exactly once
+
   @unit
   Scenario: An order-insensitive fold never re-folds
     Given a fold that has opted out of re-folding on out-of-order events
