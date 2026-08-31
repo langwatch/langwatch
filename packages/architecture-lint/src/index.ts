@@ -14,6 +14,7 @@ import { lintLegacyFeatureFragments } from "./legacy-feature-fragments";
 import { lintManifests } from "./manifests";
 import { lintOverengineering } from "./overengineering";
 import { lintPrismaBoundaries } from "./prisma-boundaries";
+import { lintTypedPrismaSeam } from "./typed-prisma-seam";
 import { lintStrictPortModules } from "./port-modules";
 import { lintServiceResultContracts } from "./service-results";
 import { lintServiceQuality } from "./service-quality";
@@ -81,6 +82,9 @@ export { lintStrictPortBaseline } from "./port-modules";
 export { readStrictPortBaselineFile } from "./port-modules";
 export { collectStrictPortBaseline } from "./port-modules";
 export { formatStrictPortBaseline } from "./port-modules";
+export { lintTypedPrismaSeam } from "./typed-prisma-seam";
+export { lintTypedPrismaSeamBaseline } from "./typed-prisma-seam";
+export { readTypedPrismaSeamBaselineFile } from "./typed-prisma-seam";
 export {
   applyFilenameMigration,
   collectFilenameMigrationMappings,
@@ -115,6 +119,7 @@ export function lintWorkspace(
     }),
     ...lintApiTransportBoundaries(root, discovery.packages),
     ...lintPrismaBoundaries(discovery.packages),
+    ...lintTypedPrismaSeam(root, discovery.packages),
     ...lintServiceResultContracts(discovery.packages),
     ...lintServiceProjectionBoundaries(discovery.packages),
     ...lintServiceQuality(root, discovery.packages, options.serviceQualityBaselineReference),
