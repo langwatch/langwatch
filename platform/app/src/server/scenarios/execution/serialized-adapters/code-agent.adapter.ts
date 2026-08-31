@@ -17,6 +17,8 @@ import { randomBytes } from "crypto";
 import { getLangWatchTracer } from "langwatch";
 import { LATEST_SPEC_VERSION } from "../../../../optimization_studio/types/dsl";
 import {
+  createNlpFetchDispatcher,
+  type FetchInitWithDispatcher,
   NLP_FETCH_HEADROOM_MS,
   resolveFloorFetchTimeoutMs,
   resolveMaxFetchTimeoutMs,
@@ -390,12 +392,14 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
         try {
           let response: Response;
           try {
-            response = await fetch(url, {
+            const fetchInit: FetchInitWithDispatcher = {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(event),
               signal: controller.signal,
-            });
+              dispatcher: createNlpFetchDispatcher(fetchTimeoutMs),
+            };
+            response = await fetch(url, fetchInit);
           } catch (fetchError) {
             if (timedOut) {
               span.setAttribute(

@@ -23,6 +23,8 @@ import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
 import { randomBytes } from "crypto";
 import {
+  createNlpFetchDispatcher,
+  type FetchInitWithDispatcher,
   resolveFloorFetchTimeoutMs,
   resolveMaxFetchTimeoutMs,
 } from "../../../nlpgo/timeouts";
@@ -225,17 +227,23 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
     };
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), fetchTimeoutMs());
+    const timeoutMs = fetchTimeoutMs();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       let response: Response;
       try {
-        response = await fetch(`${this.nlpServiceUrl}/go/studio/execute_sync`, {
+        const fetchInit: FetchInitWithDispatcher = {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(event),
           signal: controller.signal,
-        });
+          dispatcher: createNlpFetchDispatcher(timeoutMs),
+        };
+        response = await fetch(
+          `${this.nlpServiceUrl}/go/studio/execute_sync`,
+          fetchInit,
+        );
       } catch (fetchError) {
         const cause =
           fetchError instanceof Error && "cause" in fetchError

@@ -19,6 +19,8 @@
  * headroom. One operator-set number, read on both sides of the socket.
  */
 
+import { Agent, type Dispatcher } from "undici";
+
 /**
  * The engine's own knob for the code block's execution ceiling — see
  * `services/nlpgo/config.go` (`Engine.CodeBlockTimeoutSeconds`, tag
@@ -191,6 +193,30 @@ export function resolveMaxFetchTimeoutMs(): number {
     fallbackMs: NLP_FETCH_MAX_TIMEOUT_DEFAULT_MS,
   });
 }
+
+/**
+ * Undici's own per-request timeouts — `headersTimeout`/`bodyTimeout`, default
+ * 300_000ms each — live on the DISPATCHER (the `Agent`), not on the request.
+ * An `AbortController` deadline passed as `signal` cannot raise them: past
+ * 300s of a still-open connection, undici throws `HeadersTimeoutError`
+ * regardless of how far out the abort is armed. This is what let a client
+ * deadline raised to 630s (`resolveFloorFetchTimeoutMs`, lw#7640) still get
+ * cut off at 300s in production — the abort signal was never the ceiling
+ * that mattered.
+ *
+ * Callers of the bare global `fetch` (not the named `undici` export) must
+ * pass this as `dispatcher` explicitly; the global's own `RequestInit` type
+ * (from the `dom` lib) has no `dispatcher` field, hence {@link FetchInitWithDispatcher}.
+ */
+export function createNlpFetchDispatcher(timeoutMs: number): Dispatcher {
+  return new Agent({ headersTimeout: timeoutMs, bodyTimeout: timeoutMs });
+}
+
+/**
+ * Widens the DOM-lib `RequestInit` the global `fetch` is typed with to admit
+ * the undici-only `dispatcher` option. See {@link createNlpFetchDispatcher}.
+ */
+export type FetchInitWithDispatcher = RequestInit & { dispatcher?: Dispatcher };
 
 /**
  * Lambda's own hard invocation ceiling. The code-block timeout override must

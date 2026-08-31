@@ -1,5 +1,25 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { Agent } from "undici";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// Undici's Agent does not read back the timeouts it was constructed with, so
+// the only way to assert on them is to record the constructor's arguments.
+const agentOptions = vi.hoisted(() => [] as Record<string, unknown>[]);
+
+vi.mock("undici", async () => {
+  const actual = await vi.importActual<typeof import("undici")>("undici");
+  return {
+    ...actual,
+    Agent: class RecordingAgent extends actual.Agent {
+      constructor(opts?: Record<string, unknown>) {
+        agentOptions.push(opts ?? {});
+        super(opts);
+      }
+    },
+  };
+});
+
 import {
+  createNlpFetchDispatcher,
   NLP_FETCH_HEADROOM_MS,
   NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS,
   NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV,
@@ -53,5 +73,22 @@ describe("resolveFloorFetchTimeoutMs", () => {
   ])("falls back on the unusable value %p", (raw) => {
     vi.stubEnv(NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV, raw);
     expect(resolveFloorFetchTimeoutMs()).toBe(DEFAULT_FLOOR_MS);
+  });
+});
+
+describe("createNlpFetchDispatcher", () => {
+  beforeEach(() => {
+    agentOptions.length = 0;
+  });
+
+  it("sizes undici's own headers and body timeouts to the caller's deadline", () => {
+    createNlpFetchDispatcher(500_000);
+
+    expect(agentOptions.at(-1)?.headersTimeout).toBe(500_000);
+    expect(agentOptions.at(-1)?.bodyTimeout).toBe(500_000);
+  });
+
+  it("returns an undici dispatcher", () => {
+    expect(createNlpFetchDispatcher(500_000)).toBeInstanceOf(Agent);
   });
 });

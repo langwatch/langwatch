@@ -24,6 +24,24 @@ const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
+// Undici's Agent does not read back the timeouts it was constructed with, so
+// the only way to assert on the dispatcher the adapter passes is to record the
+// constructor's arguments. The global fetch above stays the interception point.
+const agentOptions = vi.hoisted(() => [] as Record<string, unknown>[]);
+
+vi.mock("undici", async () => {
+  const actual = await vi.importActual<typeof import("undici")>("undici");
+  return {
+    ...actual,
+    Agent: class RecordingAgent extends actual.Agent {
+      constructor(opts?: Record<string, unknown>) {
+        agentOptions.push(opts ?? {});
+        super(opts);
+      }
+    },
+  };
+});
+
 describe("SerializedWorkflowAgentAdapter", () => {
   /** Minimal published workflow DSL with an entry node, a signature node, and an end node. */
   const defaultDsl: Record<string, unknown> = {
@@ -106,6 +124,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    agentOptions.length = 0;
     // Pin the timeout explicitly so the test doesn't rely on ambient env.
     // Stubbed, not assigned: a raw assignment here outlives the file and
     // reaches whatever else shares this vitest worker.
@@ -599,6 +618,24 @@ describe("SerializedWorkflowAgentAdapter", () => {
       vi.stubEnv("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", "1200");
 
       expect(await abortsWithin(900_001)).toBe(true);
+    });
+
+    // The abort deadline is only one of the two clocks on this call: undici's
+    // own headersTimeout lives on the dispatcher and defaults to 300s, which no
+    // AbortSignal can raise. A run past 300s died with HeadersTimeoutError well
+    // inside the 630s abort, so the dispatcher must carry the same deadline.
+    it("passes a dispatcher whose headers timeout matches the 630s default deadline", async () => {
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+      await adapter.call(defaultInput);
+
+      const fetchOptions = mockFetch.mock.calls[0]![1];
+      expect(fetchOptions.dispatcher).toBeDefined();
+      expect(agentOptions.at(-1)?.headersTimeout).toBe(630_000);
+      expect(agentOptions.at(-1)?.bodyTimeout).toBe(630_000);
     });
   });
 
