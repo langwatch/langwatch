@@ -4,7 +4,7 @@ Feature: PR token usage comment
   So that the cost of the work is visible next to the work itself
 
   The data comes from the LangWatch pull-request usage API
-  (GET /api/coding-agent/pull-request-usage), which rolls a pull request's
+  (GET /api/v1/coding-agent/pull-request-usage), which rolls a pull request's
   whole lifetime up into sessions, tokens and cost per contributor and agent.
   The workflow only reads and comments: it never gates a merge.
 
@@ -47,6 +47,27 @@ Feature: PR token usage comment
     When the workflow is triggered
     Then no comment is attempted
     And the workflow does not fail
+
+  @unit
+  Scenario: A manual refresh reports the pull request's own head commit
+    Given a manual refresh names a pull request number and nothing else
+    When the pull request is read
+    Then the commit named in the comment is the pull request's head commit
+    And never the branch the refresh was dispatched from
+
+  @unit
+  Scenario: A manual refresh still refuses a fork pull request
+    Given a manual refresh names a pull request whose head branch is in another repository
+    When the pull request is read
+    Then it is treated as a fork and no comment is attempted
+    And a pull request whose fork was deleted is treated the same way
+
+  @unit
+  Scenario: The whole comment listing is searched for the marker
+    Given a pull request carries more comments than one listing page holds
+    When the next page is read from the Link header
+    Then the search follows every page until the listing ends
+    And the marker is never missed into a duplicate comment
 
   Scenario: Rapid successive pushes do not create duplicate comments
     Given a pull request receives two pushes in quick succession
