@@ -14,6 +14,7 @@ import {
   type PIIRedactionLevel,
   type RecordSpanCommandData,
 } from "@langwatch/trace-contract";
+import { TraceRequestUtils } from "./otlp-trace-request.rules";
 
 export type SpanIngestionStatus = "collected" | "dropped" | "deduped" | "failed" | "filtered";
 
@@ -57,47 +58,44 @@ export abstract class TraceIngressPayloadPort {
   abstract prepare(data: RecordSpanCommandData): Promise<RecordSpanCommandData>;
 }
 
-function normalizeOtlpId(id: string | Uint8Array): string {
-  return id instanceof Uint8Array ? Buffer.from(id).toString("hex") : id;
-}
-
-function unixMillis(value: unknown): number {
-  if (typeof value === "number") {
-    return Math.floor(value / 1e6);
-  }
-
-  if (typeof value === "string") {
-    return Math.floor(Number.parseInt(value, 10) / 1e6);
-  }
-
-  if (
-    typeof value === "object" &&
-    value !== null &&
-    "high" in value &&
-    "low" in value &&
-    typeof value.high === "number" &&
-    typeof value.low === "number"
-  ) {
-    const nanos = Number((BigInt(value.high) << 32n) | (BigInt(value.low) & 0xffffffffn));
-
-    return Math.floor(nanos / 1e6);
-  }
-
-  throw new Error("Invalid Unix nano value");
-}
-
-function normalizeSpanIds(span: OtlpSpan): OtlpSpan {
-  return {
-    ...span,
-    traceId: normalizeOtlpId(span.traceId),
-    spanId: normalizeOtlpId(span.spanId),
-    parentSpanId: span.parentSpanId ? normalizeOtlpId(span.parentSpanId) : span.parentSpanId,
-    links: span.links.map((link) => ({
-      ...link,
-      traceId: normalizeOtlpId(link.traceId),
-      spanId: normalizeOtlpId(link.spanId),
-    })),
+/**
+ * The outcome of every span in one export request.
+ *
+ * Only `dropped` and `failed` are a rejection: `filtered` and `deduped` are
+ * spans we declined to store on purpose, and the transport turns
+ * `rejectedSpans` into the sender's HTTP answer.
+ */
+class SpanIngestionTally {
+  private readonly counts: Record<SpanIngestionStatus, number> = {
+    collected: 0,
+    dropped: 0,
+    deduped: 0,
+    failed: 0,
+    filtered: 0,
   };
+  private readonly errors: string[] = [];
+
+  record(result: SpanIngestionResult): void {
+    this.counts[result.status]++;
+    if (result.error) {
+      this.errors.push(result.error);
+    }
+  }
+
+  describeOn(otelSpanRef: OtelSpan): void {
+    otelSpanRef.setAttribute("spans.ingestion.successes", this.counts.collected);
+    otelSpanRef.setAttribute("spans.ingestion.failures", this.counts.failed);
+    otelSpanRef.setAttribute("spans.ingestion.drops", this.counts.dropped);
+    otelSpanRef.setAttribute("spans.ingestion.deduped", this.counts.deduped);
+    otelSpanRef.setAttribute("spans.ingestion.filtered", this.counts.filtered);
+  }
+
+  collectionResult(): TraceRequestCollectionResult {
+    return {
+      rejectedSpans: this.counts.dropped + this.counts.failed,
+      errorMessage: this.errors.join("; "),
+    };
+  }
 }
 
 /**
@@ -148,75 +146,57 @@ export class TraceIngestionService {
         },
       },
       async (otelSpanRef) => {
-        let collectedSpanCount = 0;
-        let droppedSpanCount = 0;
-        let dedupedSpanCount = 0;
-        let ingestionFailureCount = 0;
-        let filteredSpanCount = 0;
-        const errors: string[] = [];
+        const tally = new SpanIngestionTally();
 
         for (const resourceSpan of traceRequest.resourceSpans ?? []) {
-          const resourceParseResult = resourceSchema.safeParse(resourceSpan?.resource);
-          if (!resourceParseResult.success) {
-            this.logger.error(
-              { result: resourceParseResult, tenantId },
-              "Error parsing OTLP resource",
-            );
-          }
+          const resource = this.parseResource(resourceSpan?.resource, tenantId);
 
           for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
-            const scopeParseResult = instrumentationScopeSchema.safeParse(scopeSpan?.scope);
-            if (!scopeParseResult.success) {
-              this.logger.error({ result: scopeParseResult, tenantId }, "Error parsing OTLP scope");
-            }
+            const scope = this.parseScope(scopeSpan?.scope, tenantId);
 
             for (const candidate of scopeSpan?.spans ?? []) {
-              const result = await this.processSpan({
-                tenantId,
-                otelSpan: candidate,
-                resource: resourceParseResult.data ?? null,
-                scope: scopeParseResult.data ?? null,
-                piiRedactionLevel,
-                otelSpanRef,
-              });
-
-              switch (result.status) {
-                case "collected":
-                  collectedSpanCount++;
-                  break;
-                case "dropped":
-                  droppedSpanCount++;
-                  break;
-                case "deduped":
-                  dedupedSpanCount++;
-                  break;
-                case "failed":
-                  ingestionFailureCount++;
-                  break;
-                case "filtered":
-                  filteredSpanCount++;
-                  break;
-              }
-
-              if (result.error) {
-                errors.push(result.error);
-              }
+              tally.record(
+                await this.processSpan({
+                  tenantId,
+                  otelSpan: candidate,
+                  resource,
+                  scope,
+                  piiRedactionLevel,
+                  otelSpanRef,
+                }),
+              );
             }
           }
         }
 
-        otelSpanRef.setAttribute("spans.ingestion.successes", collectedSpanCount);
-        otelSpanRef.setAttribute("spans.ingestion.failures", ingestionFailureCount);
-        otelSpanRef.setAttribute("spans.ingestion.drops", droppedSpanCount);
-        otelSpanRef.setAttribute("spans.ingestion.deduped", dedupedSpanCount);
-        otelSpanRef.setAttribute("spans.ingestion.filtered", filteredSpanCount);
+        tally.describeOn(otelSpanRef);
 
-        return {
-          rejectedSpans: droppedSpanCount + ingestionFailureCount,
-          errorMessage: errors.join("; "),
-        };
+        return tally.collectionResult();
       },
     );
+  }
+
+  /**
+   * A resource or scope we cannot read is logged and treated as absent — the
+   * spans underneath it are still the sender's data, and dropping a whole
+   * batch over a malformed envelope loses more than it protects.
+   */
+  private parseResource(candidate: unknown, tenantId: string): OtlpResource | null {
+    const result = resourceSchema.safeParse(candidate);
+    if (!result.success) {
+      this.logger.error({ result, tenantId }, "Error parsing OTLP resource");
+    }
+
+    return result.data ?? null;
+  }
+
+  private parseScope(candidate: unknown, tenantId: string): OtlpInstrumentationScope | null {
+    const result = instrumentationScopeSchema.safeParse(candidate);
+    if (!result.success) {
+      this.logger.error({ result, tenantId }, "Error parsing OTLP scope");
+    }
+
+    return result.data ?? null;
   }
 
   async ingestNormalizedSpan(input: {
@@ -307,7 +287,9 @@ export class TraceIngestionService {
 
     let startTimeUnixMs: number;
     try {
-      startTimeUnixMs = unixMillis(spanParseResult.data.startTimeUnixNano);
+      startTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
+        TraceRequestUtils.normalizeOtlpUnixNano(spanParseResult.data.startTimeUnixNano),
+      );
     } catch {
       return { status: "dropped", error: "span start time is invalid" };
     }
@@ -329,11 +311,28 @@ export class TraceIngestionService {
 
     return await this.ingestNormalizedSpan({
       tenantId: input.tenantId,
-      span: normalizeSpanIds(spanParseResult.data),
+      span: this.withHexIds(spanParseResult.data),
       resource: input.resource,
       instrumentationScope: input.scope,
       piiRedactionLevel: input.piiRedactionLevel,
       otelSpanRef: input.otelSpanRef,
     });
+  }
+
+  /** Ids arrive as raw bytes over protobuf and as hex over JSON; dedup and the pipeline want one of them. */
+  private withHexIds(span: OtlpSpan): OtlpSpan {
+    const hex = TraceRequestUtils.normalizeOtlpId;
+
+    return {
+      ...span,
+      traceId: hex(span.traceId),
+      spanId: hex(span.spanId),
+      parentSpanId: span.parentSpanId ? hex(span.parentSpanId) : span.parentSpanId,
+      links: span.links.map((link) => ({
+        ...link,
+        traceId: hex(link.traceId),
+        spanId: hex(link.spanId),
+      })),
+    };
   }
 }
