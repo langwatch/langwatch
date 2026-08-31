@@ -49,6 +49,14 @@ interface SurfaceSetup {
 }
 
 export const SETUP_SURFACES = {
+  connectedAgents: {
+    skill: "connect-agent",
+    trigger: "Connect my agent to LangWatch from code",
+    langyPrompt:
+      "Connect my agent to LangWatch from code. Connect to my repository, add the connect_agent decorator (Python) or the connectAgent wrapper (TypeScript) to the function that runs my agent, and open a pull request with the change.",
+    docsUrl: "https://docs.langwatch.ai/agent-testing/connect-your-agent",
+    docsLabel: "connect your agent guide",
+  },
   traces: {
     skill: "tracing",
     trigger: "Instrument my code with LangWatch",

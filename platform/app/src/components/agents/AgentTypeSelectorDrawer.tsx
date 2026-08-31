@@ -1,5 +1,5 @@
 import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
-import { Code, Globe, Workflow } from "lucide-react";
+import { Cable, Code, Globe, Workflow } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
@@ -119,6 +119,9 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
 
             {/* Agent type cards */}
             <VStack gap={3} align="stretch" paddingX={6} paddingBottom={4}>
+              <ConnectFromCodeCard
+                onClick={() => openDrawer("agentConnectFromCode")}
+              />
               {agentTypes.map((agentType) => (
                 <AgentTypeCard
                   key={agentType.type}
@@ -136,6 +139,54 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+/**
+ * The first choice of the flow: connect the agent the project already
+ * runs instead of writing one here. The green dot is the same one an
+ * online agent wears, since that is what the choice ends as.
+ */
+function ConnectFromCodeCard({ onClick }: { onClick: () => void }) {
+  return (
+    <Box
+      as="button"
+      onClick={onClick}
+      padding={4}
+      borderRadius="lg"
+      border="1px solid"
+      borderColor="border"
+      bg="bg.panel"
+      textAlign="left"
+      width="full"
+      _hover={{ borderColor: "green.muted", bg: "green.subtle" }}
+      transition="all 0.15s"
+      data-testid="agent-type-connected"
+      cursor="pointer"
+    >
+      <HStack gap={3} align="start">
+        <Box padding={1} borderRadius="md" bg="green.subtle" color="green.fg">
+          <Cable size={18} />
+        </Box>
+        <VStack align="start" gap={1} flex={1}>
+          <HStack gap={2}>
+            <Box
+              boxSize="8px"
+              borderRadius="full"
+              background="green.500"
+              data-testid="agent-type-connected-dot"
+            />
+            <Text fontWeight="500" fontSize="sm">
+              Connect from Code
+            </Text>
+          </HStack>
+          <Text fontSize="xs" color="fg.muted">
+            One decorator on your agent function, and it appears here when the
+            process runs
+          </Text>
+        </VStack>
+      </HStack>
+    </Box>
   );
 }
 

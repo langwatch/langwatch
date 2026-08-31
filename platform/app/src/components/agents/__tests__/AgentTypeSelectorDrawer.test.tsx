@@ -96,6 +96,38 @@ describe("AgentTypeSelectorDrawer", () => {
     });
   });
 
+  describe("when the connect-from-code choice leads the list", () => {
+    /** @scenario "Connect from code is the first choice of the new agent flow" */
+    it("draws Connect from Code first, with the green dot before the words", async () => {
+      renderDrawer();
+      await waitFor(() => {
+        expect(screen.getByTestId("agent-type-connected")).toBeInTheDocument();
+      });
+
+      const cards = screen.getAllByTestId(/^agent-type-/);
+      expect(cards[0]).toHaveAttribute("data-testid", "agent-type-connected");
+      expect(
+        screen.getByTestId("agent-type-connected-dot"),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Connect from Code")).toBeInTheDocument();
+    });
+
+    /** @scenario "Connect from code opens the connect drawer" */
+    it("opens the connect drawer when clicked, without selecting a stored type", async () => {
+      const user = userEvent.setup();
+      renderDrawer();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("agent-type-connected")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByTestId("agent-type-connected"));
+
+      expect(mockOpenDrawer).toHaveBeenCalledWith("agentConnectFromCode");
+      expect(mockOnSelect).not.toHaveBeenCalled();
+    });
+  });
+
   describe("Type selection", () => {
     /** @scenario Selecting type navigates to appropriate editor */
     it("calls onSelect with 'code' and opens code editor when clicking Code Agent", async () => {
