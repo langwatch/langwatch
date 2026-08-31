@@ -714,3 +714,39 @@ spend — or, more quietly, zero.
 **One R1 violation left**: `gateway-usage.service.ts`, 366 lines, constructor
 takes a PrismaClient and it imports the `Prisma` namespace rather than only
 the client type, which suggests raw SQL. Not yet examined.
+
+## R1 is clear (2026-08-31)
+
+**No service in any feature package holds a `PrismaClient`.** The count was
+two when this tracker started listing them; both are gone.
+
+The second, `GatewayUsageService`, held one for exactly two reads — the
+organization's project ids, and a label for each key the ledger reported spend
+against. Both moved to collaborators: `listIdsByOrganization` already existed
+on ProjectService, and the virtual key repository gained `findMetaByIds`.
+
+**The service depends on neither whole interface.** It declares the one read
+it makes of each:
+
+    GatewayUsageProjectsPort     { listIdsByOrganization }
+    GatewayUsageVirtualKeysPort  { findMetaByIds }
+
+`ProjectService` and `GatewayVirtualKeysPort` satisfy those structurally, so
+composition passes what it already held — and an integration test satisfies
+them with two queries against the database it just seeded, no cast, no
+PrismaClient anywhere near the service. That is worth repeating elsewhere: a
+narrow port is what let the awkward caller stay honest instead of being handed
+a mock of a forty-method interface.
+
+The key-label read is now scoped to the organization as well as the ids. It
+was not leaking — the ids come from that org's own spend rows — but a read
+that can only answer within one tenant cannot be made to leak by a caller that
+assembles its list somewhere unexpected.
+
+**And the tightening needed a test to mean anything.** The first sabotage of
+it passed: the existing fake ignored `organizationId`, so handing the read the
+wrong organization changed nothing. The fake filters on both now. A guard
+added without a fake that can tell the difference is not a guard.
+
+`Prisma.Decimal` stays in that file. It is the money type the aggregates are
+summed in, not a database handle; replacing it is a separate decision.
