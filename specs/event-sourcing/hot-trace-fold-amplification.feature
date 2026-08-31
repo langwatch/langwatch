@@ -58,6 +58,14 @@ Feature: Hot-trace fold amplification is bounded
     And an event the read did return is folded exactly once
 
   @unit
+  Scenario: Two events of the same business time replay in the order they arrived
+    Given a fold that has not opted out of re-folding on out-of-order events
+    And the event log read does not return a delivered event that shares its occurred-at with a returned one
+    When the delivered event is folded
+    Then the two events replay in the order they arrived
+    And every replay of the same history reaches the same state
+
+  @unit
   Scenario: An order-insensitive fold never re-folds
     Given a fold that has opted out of re-folding on out-of-order events
     When a batch starting before the persisted checkpoint is folded

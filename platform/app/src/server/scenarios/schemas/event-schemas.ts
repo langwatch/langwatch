@@ -275,9 +275,15 @@ const scenarioAudioMessageSchema = z.object({
   ),
 });
 
+/**
+ * An Anthropic `text` block. `citations` is carried through because zod drops
+ * every key a schema does not declare: a block that cites the documents it
+ * answered from would otherwise reach the transcript without them.
+ */
 const anthropicTextBlockSchema = z.object({
   type: z.literal("text"),
   text: z.string(),
+  citations: z.array(z.unknown()).nullish(),
 });
 
 const anthropicToolUseBlockSchema = z.object({

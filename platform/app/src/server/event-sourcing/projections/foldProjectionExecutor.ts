@@ -30,17 +30,32 @@ const MAX_LOGGED_EVENT_IDS = 10;
  */
 const readWindowRecoveryWarned = new Set<string>();
 
+/**
+ * Arrival time, then the id: the order of two events the event log accepted,
+ * and the tie-break for two that carry the same business time. The id is what
+ * keeps two replays of one history from disagreeing.
+ */
+function compareArrival(a: Event, b: Event): number {
+  if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
 function compareFoldEvents<State, E extends Event>(
   projection: FoldProjectionDefinition<State, E>,
   a: E,
   b: E,
 ): number {
   if (projection.options?.eventOrdering === "acceptedAt") {
-    if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
-    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    return compareArrival(a, b);
   }
 
-  return a.occurredAt - b.occurredAt;
+  // Business time first, then arrival. Two events can share one `occurredAt`:
+  // a fold that re-reads its history merges the delivered events back in, and
+  // a tie there would keep whatever order the merge produced rather than the
+  // order the events arrived in, so a last-write-wins fold could commit the
+  // earlier one.
+  if (a.occurredAt !== b.occurredAt) return a.occurredAt - b.occurredAt;
+  return compareArrival(a, b);
 }
 
 /**

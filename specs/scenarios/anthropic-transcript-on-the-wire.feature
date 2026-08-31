@@ -32,6 +32,13 @@ Feature: Anthropic-format transcripts reach the run conversation
     And the tool_result block keeps its tool_use_id and content
 
   @unit
+  Scenario: A text block keeps the citations it carries
+    Given a message snapshot whose assistant turn holds a text block with citations beside a tool_use block
+    When the wire validator parses the event
+    Then the parse succeeds
+    And the text block keeps its citations
+
+  @unit
   Scenario: Thinking blocks of an assistant turn validate on the wire
     Given a message snapshot whose assistant message content holds a thinking block, a text block and a tool_use block
     When the wire validator parses the event

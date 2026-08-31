@@ -221,6 +221,88 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
       });
     });
 
+    describe("when a delivered event shares its occurred-at with a returned one", () => {
+      interface IdState {
+        ids: string[];
+        LastEventOccurredAt: number;
+      }
+
+      /** Records the ids in fold order, which is what a tie decides. */
+      function makeIdFold(history: Event[]) {
+        const store = createMockFoldProjectionStore<IdState>();
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+          ids: [],
+          LastEventOccurredAt: CHECKPOINT_MS,
+        });
+        const fold = createMockFoldProjectionDefinition("run", {
+          store,
+          init: () => ({ ids: [], LastEventOccurredAt: 0 }),
+          apply: (state: IdState, event: Event): IdState => ({
+            ids: [...state.ids, event.id],
+            LastEventOccurredAt: Math.max(
+              state.LastEventOccurredAt,
+              event.occurredAt ?? 0,
+            ),
+          }),
+        }) as FoldProjectionDefinition<IdState, Event>;
+        fold.eventLoader = vi.fn().mockResolvedValue(history);
+        return { fold, store };
+      }
+
+      /** One business time, two arrival times: the earlier arrival folds first. */
+      const tiedEvent = ({
+        id,
+        createdAt,
+      }: {
+        id: string;
+        createdAt: number;
+      }): Event => ({
+        ...eventAt(3_000),
+        id,
+        createdAt,
+        occurredAt: 3_000,
+      });
+
+      /** @scenario "Two events of the same business time replay in the order they arrived" */
+      it("folds the event that arrived first before the one that arrived later", async () => {
+        // The delivered event arrived BEFORE the one the read returned, so
+        // appending it to the history is the order the merge has to correct.
+        const returned = tiedEvent({ id: "evt-returned", createdAt: 2_000 });
+        const delivered = tiedEvent({ id: "evt-delivered", createdAt: 1_000 });
+        const { fold } = makeIdFold([returned, eventAt(CHECKPOINT_MS)]);
+
+        const result = await executor.execute(fold, delivered, context);
+
+        expect(result.ids.slice(0, 2)).toEqual([
+          "evt-delivered",
+          "evt-returned",
+        ]);
+      });
+
+      /** @scenario "Two events of the same business time replay in the order they arrived" */
+      it("reaches the same state whichever side of the merge an event came from", async () => {
+        const first = tiedEvent({ id: "evt-a", createdAt: 1_000 });
+        const second = tiedEvent({ id: "evt-b", createdAt: 1_000 });
+        const tail = eventAt(CHECKPOINT_MS);
+
+        const readReturnedFirst = await executor.execute(
+          makeIdFold([first, tail]).fold,
+          second,
+          context,
+        );
+        const readReturnedSecond = await executor.execute(
+          makeIdFold([second, tail]).fold,
+          first,
+          context,
+        );
+
+        // Equal occurred-at AND equal created-at: the id is what keeps the
+        // two replays from disagreeing.
+        expect(readReturnedFirst.ids).toEqual(readReturnedSecond.ids);
+        expect(readReturnedFirst.ids.slice(0, 2)).toEqual(["evt-a", "evt-b"]);
+      });
+    });
+
     describe("when the projection has opted out of re-folding", () => {
       /** @scenario "An order-insensitive fold never re-folds" */
       /** @scenario an out-of-order event is folded in place, not replayed */

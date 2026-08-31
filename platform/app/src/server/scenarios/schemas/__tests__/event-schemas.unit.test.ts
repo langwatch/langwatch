@@ -167,6 +167,51 @@ describe("given a MESSAGE_SNAPSHOT carrying Anthropic-format content blocks", ()
     });
   });
 
+  describe("when a text block cites the documents it answered from", () => {
+    /** @scenario "A text block keeps the citations it carries" */
+    it("ACCEPTS the turn and keeps the citations of the block", () => {
+      const citations = [
+        {
+          type: "char_location",
+          cited_text: "Refunds take five working days.",
+          document_index: 0,
+          document_title: "Refund policy",
+          start_char_index: 0,
+          end_char_index: 31,
+        },
+      ];
+      // The tool_use block is what routes the turn to the Anthropic member of
+      // the union; the assertion is on the text block beside it.
+      const parsed = parseMessages([
+        {
+          id: "msg-4",
+          role: "assistant",
+          content: [
+            {
+              type: "text",
+              text: "Refunds take five working days.",
+              citations,
+            },
+            {
+              type: "tool_use",
+              id: "toolu_02",
+              name: "SearchPolicy",
+              input: { query: "refund" },
+            },
+          ],
+        },
+      ]);
+      expect(parsed.success).toBe(true);
+      if (!parsed.success) return;
+      const content = parsed.data.messages[0]!.content as unknown[];
+      expect(content[0]).toEqual({
+        type: "text",
+        text: "Refunds take five working days.",
+        citations,
+      });
+    });
+  });
+
   describe("when a user turn holds a tool_result block", () => {
     /** @scenario "A user turn with Anthropic tool_result blocks validates on the wire" */
     it("ACCEPTS the turn and keeps the tool_use_id and content of the result", () => {
