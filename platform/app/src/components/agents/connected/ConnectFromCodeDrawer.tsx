@@ -81,7 +81,16 @@ export function ConnectFromCodeDrawer(props: ConnectFromCodeDrawerProps) {
               <SetupWithAgentButton surface="connectedAgents" />
             </HStack>
 
-            <Tabs.Root defaultValue="python" variant="line" size="sm">
+            {/* Without a colorPalette the line variant paints the selected
+                trigger with the default palette's fg, which reads fainter
+                than the unselected one. Same palette as the integrate
+                drawer's language tabs. */}
+            <Tabs.Root
+              defaultValue="python"
+              variant="line"
+              size="sm"
+              colorPalette="orange"
+            >
               <Tabs.List>
                 {SNIPPET_LANGUAGES.map((language) => (
                   <Tabs.Trigger key={language} value={language}>
