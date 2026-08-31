@@ -1019,7 +1019,9 @@ describe("<RunPlanDetail/>", () => {
     const user = userEvent.setup();
     const { props } = renderDetail({ batchRunId: "batch_just_started" });
 
-    expect(screen.getByText("Waiting for the first result")).toBeInTheDocument();
+    expect(
+      screen.getByText("Waiting for the first result"),
+    ).toBeInTheDocument();
     expect(screen.queryByText("No run in this period")).not.toBeInTheDocument();
     expect(screen.getByTestId("runs-sidebar-pending")).toBeInTheDocument();
 
