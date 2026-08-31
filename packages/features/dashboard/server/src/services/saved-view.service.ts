@@ -115,8 +115,10 @@ export class SavedViewService {
   /**
    * Deletes a saved view.
    * Personal views can only be deleted by their owner.
-   * @throws {SavedViewNotFoundError} if view doesn't exist
-   * @throws {SavedViewNotOwnedError} if view belongs to another user
+   * @throws {SavedViewNotFoundError} if the view does not exist, and equally
+   *   if it is somebody else's personal view — deliberately the same answer,
+   *   so a caller cannot use the refusal to learn that the id names a real
+   *   view belonging to another user.
    */
   async delete({
     projectId,
@@ -149,8 +151,10 @@ export class SavedViewService {
   /**
    * Renames a saved view.
    * Personal views can only be renamed by their owner.
-   * @throws {SavedViewNotFoundError} if view doesn't exist
-   * @throws {SavedViewNotOwnedError} if view belongs to another user
+   * @throws {SavedViewNotFoundError} if the view does not exist, and equally
+   *   if it is somebody else's personal view — deliberately the same answer,
+   *   so a caller cannot use the refusal to learn that the id names a real
+   *   view belonging to another user.
    */
   async rename({
     projectId,
