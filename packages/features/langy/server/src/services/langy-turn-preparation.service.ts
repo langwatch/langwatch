@@ -11,10 +11,8 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { trace } from "@opentelemetry/api";
 import {
-  extractLangyConversationMemory,
   LANGY_REFERENT_POLICY,
-  renderLangyConversationMemory,
-  renderLangyConversationTranscript,
+  LangyConversationMemoryService,
 } from "./langy-conversation-memory.service";
 import { LangyTurnAttemptService } from "./langy-turn-attempt.service";
 import { LangyTurnOverrideService } from "./langy-turn-override.service";
@@ -147,10 +145,7 @@ export class LangyTurnPreparationService {
     if (modelsAllowedResult.status === "rejected") {
       throw modelsAllowedResult.reason;
     }
-    if (
-      modelsAllowedResult.value &&
-      !modelsAllowedResult.value.includes(args.turnModel)
-    ) {
+    if (modelsAllowedResult.value && !modelsAllowedResult.value.includes(args.turnModel)) {
       logger.warn(
         {
           projectId: args.projectId,
@@ -246,12 +241,12 @@ export class LangyTurnPreparationService {
       );
     }
     const durableMessages = memoryResult.status === "fulfilled" ? memoryResult.value : [];
-    const transcript = renderLangyConversationTranscript({
+    const transcript = LangyConversationMemoryService.tryRenderTranscript({
       messages: durableMessages,
       currentPrompt: args.userText,
     });
-    const memory = renderLangyConversationMemory(
-      extractLangyConversationMemory({ messages: durableMessages }),
+    const memory = LangyConversationMemoryService.tryRender(
+      LangyConversationMemoryService.extract({ messages: durableMessages }),
     );
     const override =
       overrideResult.status === "fulfilled"
@@ -315,9 +310,7 @@ export class LangyTurnPreparationService {
           credentials: args.credentials,
           runToken,
           permitReserved,
-          ...(prepared.pendingHandoff
-            ? { resumeToken: prepared.pendingHandoff.token }
-            : {}),
+          ...(prepared.pendingHandoff ? { resumeToken: prepared.pendingHandoff.token } : {}),
         }),
       ]);
     } catch (error) {
@@ -413,9 +406,7 @@ export class LangyTurnPreparationService {
         conversationId: args.conversation.id,
         credentials: args.credentials,
         modelOverride: args.turnModel,
-        ...(prepared.pendingHandoff
-          ? { resumeToken: prepared.pendingHandoff.token }
-          : {}),
+        ...(prepared.pendingHandoff ? { resumeToken: prepared.pendingHandoff.token } : {}),
       })
       .then((outcome) => {
         if (outcome !== "accepted") {
