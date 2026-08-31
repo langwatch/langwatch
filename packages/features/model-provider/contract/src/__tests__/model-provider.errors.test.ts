@@ -18,6 +18,7 @@ import {
   ModelProviderScopeForbiddenError,
   ModelProviderScopesRequiredError,
   ModelProviderTestRateLimitedError,
+  ModelRestrictedForExecutionError,
   ModelRestrictedForFeatureError,
 } from "../model-provider.errors";
 
@@ -209,6 +210,44 @@ describe("model provider handled errors", () => {
           projectId: "project_abc",
           restrictedModels: ["openai_codex/gpt-5.6-terra"],
         },
+      },
+    );
+  });
+
+  it("words the execution refusal for whichever path caught it", () => {
+    // Both sentences are matched verbatim by the scenario infra-error
+    // classifier, which turns them into simulation copy. They are one code
+    // because the remedy is the same; they are two sentences because the
+    // gateway knows the feature it was running and the litellm path does not.
+    expectHandledWire(
+      new ModelRestrictedForExecutionError({
+        model: "openai_codex/gpt-5.6-terra",
+        provider: null,
+        featureKey: "prompt.create_default",
+      }),
+      {
+        code: "model_restricted_for_execution",
+        message:
+          '"openai_codex/gpt-5.6-terra" serves the coding-assistant surfaces only and cannot run "prompt.create_default".',
+        httpStatus: 400,
+        meta: {
+          model: "openai_codex/gpt-5.6-terra",
+          provider: null,
+          featureKey: "prompt.create_default",
+        },
+      },
+    );
+    expectHandledWire(
+      new ModelRestrictedForExecutionError({
+        model: "openai_codex/gpt-5.6-terra",
+        provider: "openai_codex",
+      }),
+      {
+        code: "model_restricted_for_execution",
+        message:
+          '"openai_codex/gpt-5.6-terra" serves the coding-assistant surfaces only and cannot run workflows, evaluations or the playground.',
+        httpStatus: 400,
+        meta: { model: "openai_codex/gpt-5.6-terra", provider: "openai_codex" },
       },
     );
   });

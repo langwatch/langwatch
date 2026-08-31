@@ -142,19 +142,32 @@ export class ModelRestrictedForExecutionError extends HandledError {
 
   readonly model: string;
   readonly provider: string | null;
+  readonly featureKey: string | null;
 
-  constructor(input: { model: string; provider: string | null }) {
+  constructor(input: { model: string; provider: string | null; featureKey?: string }) {
+    const featureKey = input.featureKey ?? null;
     super(
       "model_restricted_for_execution",
-      `"${input.model}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot run workflows, evaluations or the playground.`,
+      // Two wordings, because the two paths know different things. The
+      // gateway is running one named feature; the litellm path is preparing
+      // parameters and knows only that this is not a coding-assistant
+      // surface. Both are pinned by the scenario classifier's tests.
+      featureKey
+        ? `"${input.model}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot run "${featureKey}".`
+        : `"${input.model}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot run workflows, evaluations or the playground.`,
       {
         httpStatus: 400,
-        meta: { model: input.model, provider: input.provider },
+        meta: {
+          model: input.model,
+          provider: input.provider,
+          ...(featureKey ? { featureKey } : {}),
+        },
       },
     );
     this.name = "ModelRestrictedForExecutionError";
     this.model = input.model;
     this.provider = input.provider;
+    this.featureKey = featureKey;
   }
 }
 

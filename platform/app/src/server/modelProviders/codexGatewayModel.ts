@@ -5,7 +5,7 @@ import { ensureGatewayV1BaseUrl } from "@langwatch/langy-contract";
 import { provisionLangyVirtualKey } from "~/runtime/app/features/langy-virtual-key.adapter";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "../db";
-import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "@langwatch/model-provider-contract";
+import { ModelRestrictedForExecutionError } from "@langwatch/model-provider-contract";
 import { isModelAllowedForFeature } from "@langwatch/model-provider-contract";
 
 /**
@@ -31,9 +31,7 @@ export async function getCodexVercelAIModel({
   featureKey: string;
 }) {
   if (!isModelAllowedForFeature({ modelId: model, featureKey })) {
-    throw new Error(
-      `"${model}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot run "${featureKey}".`,
-    );
+    throw new ModelRestrictedForExecutionError({ model, provider: null, featureKey });
   }
 
   const project = await prisma.project.findUnique({
