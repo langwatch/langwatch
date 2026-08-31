@@ -70,11 +70,9 @@
 import {
   cliResultDigestSchema,
   extractLangyTextFromParts,
-} from "@langwatch/langy-contract";
-import {
-  LANGY_PROMPT_VALUE_MAX_LABEL_LENGTH,
+  MAX_LANGY_CONTEXT_LABEL_LENGTH,
   sanitizeLangyPromptValue,
-} from "./langy-prompt-value.service";
+} from "@langwatch/langy-contract";
 import type { LangyMessageRow } from "@langwatch/langy-contract";
 
 /** More entries than a follow-up could plausibly mean, and a bounded prompt. */
@@ -175,7 +173,7 @@ export function extractLangyConversationMemory({
       if (!resource || !verb) continue;
 
       const name = digest.name
-        ? sanitizeLangyPromptValue(digest.name, LANGY_PROMPT_VALUE_MAX_LABEL_LENGTH)
+        ? sanitizeLangyPromptValue(digest.name, MAX_LANGY_CONTEXT_LABEL_LENGTH)
         : "";
       const total = digest.counts?.total;
 
