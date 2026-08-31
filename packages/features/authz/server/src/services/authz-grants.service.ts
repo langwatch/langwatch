@@ -52,6 +52,7 @@ import type {
   BindingPrincipalWhere,
   RoleBindingWrite,
 } from "../repositories/authz-grant.repository";
+import { AuthzGrantGuardsService } from "./authz-grant-guards.service";
 import { AuthzBindingWriterService } from "./authz-binding-writer.service";
 import { AuthzOffboardingService } from "./authz-offboarding.service";
 
@@ -108,6 +109,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
         newBindingId: options.newBindingId,
       }),
       AuthzOffboardingService.create(options.repository),
+      new AuthzGrantGuardsService(options.repository),
     );
   }
 
@@ -115,6 +117,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     private readonly options: AuthzGrantsServiceOptions,
     private readonly bindingWriter: AuthzBindingWriterService,
     private readonly offboarding: AuthzOffboardingService,
+    private readonly guards: AuthzGrantGuardsService,
   ) {
     super();
   }
@@ -136,12 +139,8 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
 
     const organizationId = scopeOrganizationId(where);
     const { repository } = this.options;
-    await this.assertScopeBelongsToOrganization({
-      repository,
-      where,
-      organizationId,
-    });
-    await this.assertRoleUsable({ repository, role, organizationId });
+    await this.guards.assertScopeBelongsToOrganization({ where, organizationId });
+    await this.guards.assertRoleUsable({ role, organizationId });
 
     const row = this.bindingRow({ who, role, where, organizationId });
     try {
@@ -165,12 +164,8 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
   /** UPDATE the row's role — visible on the next check. */
   async update({ actor, bindingId, organizationId, role }: AuthzUpdateGrantInput): Promise<void> {
     const { repository } = this.options;
-    await this.assertBindingInOrganization({
-      repository,
-      bindingId,
-      organizationId,
-    });
-    await this.assertRoleUsable({ repository, role, organizationId });
+    await this.guards.assertBindingInOrganization({ bindingId, organizationId });
+    await this.guards.assertRoleUsable({ role, organizationId });
     try {
       await repository.updateBindingRole({
         bindingId,
@@ -191,11 +186,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
   /** DELETE the row — access gone on the next check. */
   async revoke({ actor, bindingId, organizationId }: AuthzRevokeGrantInput): Promise<void> {
     const { repository } = this.options;
-    await this.assertBindingInOrganization({
-      repository,
-      bindingId,
-      organizationId,
-    });
+    await this.guards.assertBindingInOrganization({ bindingId, organizationId });
     try {
       await repository.deleteBinding({
         bindingId,
@@ -231,12 +222,8 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     }
 
     const { repository } = this.options;
-    await this.assertScopeBelongsToOrganization({
-      repository,
-      where: to,
-      organizationId,
-    });
-    await this.assertRoleUsable({ repository, role, organizationId });
+    await this.guards.assertScopeBelongsToOrganization({ where: to, organizationId });
+    await this.guards.assertRoleUsable({ role, organizationId });
     const row = this.bindingRow({ who, role, where: to, organizationId });
     try {
       await repository.replaceBinding({
@@ -371,10 +358,6 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     return toLedgerActor("userId" in actor ? { type: "user", id: actor.userId } : actor);
   }
 
-  private bindingNotFound(meta: Record<string, unknown>): GrantValidationError {
-    return new GrantValidationError("Role binding not found", meta);
-  }
-
   private tryPortErrorCode(error: unknown): string | undefined {
     if (
       typeof error === "object" &&
@@ -403,93 +386,10 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     }
 
     if (code === "role_binding_not_found") {
-      throw this.bindingNotFound(errorMeta);
+      throw AuthzGrantGuardsService.bindingNotFound(errorMeta);
     }
 
     throw error;
-  }
-
-  private async assertBindingInOrganization({
-    repository,
-    bindingId,
-    organizationId,
-  }: {
-    repository: AuthzGrantRepository;
-    bindingId: string;
-    organizationId: string;
-  }): Promise<void> {
-    const binding = await repository.tryFindBinding({ bindingId });
-    if (!binding || binding.organizationId !== organizationId) {
-      throw this.bindingNotFound({ bindingId });
-    }
-  }
-
-  private async assertScopeBelongsToOrganization({
-    repository,
-    where,
-    organizationId,
-  }: {
-    repository: AuthzGrantRepository;
-    where: GrantableScope;
-    organizationId: string;
-  }): Promise<void> {
-    if (where.type === "organization") {
-      return;
-    }
-
-    if (where.type === "team") {
-      const team = await repository.tryFindTeamOrganization({ teamId: where.id });
-      if (team?.organizationId !== organizationId) {
-        throw new GrantValidationError("Team is not in this organization", {
-          teamId: where.id,
-        });
-      }
-
-      return;
-    }
-
-    const lineage = await repository.tryFindProjectLineage({
-      projectId: where.id,
-    });
-    if (lineage?.organizationId !== organizationId || lineage.teamId !== where.teamId) {
-      throw new GrantValidationError("Project is not in this scope", {
-        projectId: where.id,
-      });
-    }
-  }
-
-  private async assertRoleUsable({
-    repository,
-    role,
-    organizationId,
-  }: {
-    repository: AuthzGrantRepository;
-    role: GrantRole;
-    organizationId: string;
-  }): Promise<void> {
-    if (!("customRoleId" in role)) {
-      return;
-    }
-
-    const { customRoleId } = role;
-    const customRole = await repository.tryFindCustomRole({ customRoleId });
-    if (!customRole || customRole.organizationId !== organizationId) {
-      throw new GrantValidationError("Custom role does not belong to this organization", {
-        customRoleId,
-      });
-    }
-
-    const unknownPermissions = Array.isArray(customRole.permissions)
-      ? customRole.permissions
-          .filter((value) => typeof value !== "string" || !isRegistryPermission(value))
-          .map((value) => String(value))
-      : [];
-    if (unknownPermissions.length > 0) {
-      throw new GrantValidationError("Custom role lists permissions that do not exist", {
-        customRoleId,
-        unknownPermissions,
-      });
-    }
   }
 
   private principalWhere(who: GrantPrincipal): BindingPrincipalWhere {
