@@ -4,11 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type { TopicAssignedEvent } from "@langwatch/trace-contract";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
-import {
-  applySpanToAnalytics,
-  type TraceAnalyticsData,
-  TraceAnalyticsFoldProjection,
-} from "@langwatch/trace-server";
+import { type TraceAnalyticsData, TraceAnalyticsFoldProjection } from "@langwatch/trace-server";
 import { TraceSummaryFoldProjection } from "@langwatch/trace-server";
 import {
   applySpanToSummary,
@@ -65,7 +61,7 @@ function applyToBoth(
 ): { summary: TraceSummaryData; slim: TraceAnalyticsData } {
   return {
     summary: applySpanToSummary({ state: summaryState, span }),
-    slim: applySpanToAnalytics({
+    slim: TraceAnalyticsFoldProjection.applySpanToAnalytics({
       runtime: traceProjectionRuntime,
       state: slimState,
       span,
@@ -191,7 +187,7 @@ describe("traceAnalytics fold projection — parity vs trace-summary fold", () =
         },
       });
       summary = applySpanToSummary({ state: summary, span: spanA });
-      slim = applySpanToAnalytics({
+      slim = TraceAnalyticsFoldProjection.applySpanToAnalytics({
         runtime: traceProjectionRuntime,
         state: slim,
         span: spanA,
@@ -217,7 +213,7 @@ describe("traceAnalytics fold projection — parity vs trace-summary fold", () =
         },
       });
       summary = applySpanToSummary({ state: summary, span: spanRoot });
-      slim = applySpanToAnalytics({
+      slim = TraceAnalyticsFoldProjection.applySpanToAnalytics({
         runtime: traceProjectionRuntime,
         state: slim,
         span: spanRoot,
@@ -240,7 +236,7 @@ describe("traceAnalytics fold projection — parity vs trace-summary fold", () =
         },
       });
       summary = applySpanToSummary({ state: summary, span });
-      slim = applySpanToAnalytics({
+      slim = TraceAnalyticsFoldProjection.applySpanToAnalytics({
         runtime: traceProjectionRuntime,
         state: slim,
         span,
@@ -269,7 +265,7 @@ describe("traceAnalytics fold projection — parity vs trace-summary fold", () =
         state: createInitState(),
         span,
       });
-      const slim = applySpanToAnalytics({
+      const slim = TraceAnalyticsFoldProjection.applySpanToAnalytics({
         runtime: traceProjectionRuntime,
         state: createInitSlimState(),
         span,
@@ -306,7 +302,7 @@ describe("traceAnalytics fold projection — parity vs trace-summary fold", () =
         state: createInitState(),
         span,
       });
-      const slim = applySpanToAnalytics({
+      const slim = TraceAnalyticsFoldProjection.applySpanToAnalytics({
         runtime: traceProjectionRuntime,
         state: createInitSlimState(),
         span,
@@ -328,7 +324,7 @@ describe("traceAnalytics fold projection — parity vs trace-summary fold", () =
         },
       });
       summary = applySpanToSummary({ state: summary, span });
-      slim = applySpanToAnalytics({
+      slim = TraceAnalyticsFoldProjection.applySpanToAnalytics({
         runtime: traceProjectionRuntime,
         state: slim,
         span,
@@ -352,7 +348,7 @@ describe("traceAnalytics fold projection — parity vs trace-summary fold", () =
       let slim = createInitSlimState();
       const span = createTestSpan({ parentSpanId: null });
       summary = applySpanToSummary({ state: summary, span });
-      slim = applySpanToAnalytics({
+      slim = TraceAnalyticsFoldProjection.applySpanToAnalytics({
         runtime: traceProjectionRuntime,
         state: slim,
         span,

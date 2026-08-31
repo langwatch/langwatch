@@ -394,30 +394,6 @@ export interface TraceAnalyticsData {
  * Used by the projection's store adapter to derive the persisted record.
  */
 /**
- * Does this state describe a trace the PRODUCT should count? True on any real
- * telemetry: a folded span, a surviving business time (`occurredAt > 0` — only
- * a folded span ever sets it, never a phantom init state), or a log record
- * (Claude Code Path B, Codex Path B — the trace-summary fold counts these via
- * langwatch.reserved.log_record_count and this mirrors its acceptance).
- *
- * A state carrying ONLY dimension signal (topic / annotation / name) answers
- * false. That answer used to mean the row was NOT WRITTEN; now it is always
- * written and analytics readers exclude it via
- * {@link TRACE_ANALYTICS_HAS_SIGNAL_SQL} while the fold read-back still finds
- * it. `storageAnchorMs` is deliberately NOT a door: a row on this table is a
- * TRACE to every analytics read, so admitting a state whose sole signal is an
- * annotation or a classification would change what the product means by "a
- * trace" — the derived filter carries that refusal now, instead of the row's
- * absence.
- */
-export function hasPersistableSignal(state: TraceAnalyticsData): boolean {
-  if (state.spanCount > 0) return true;
-  if (state.occurredAt > 0) return true;
-  const raw = state.attributes?.["langwatch.reserved.log_record_count"];
-  return typeof raw === "string" && Number(raw) > 0;
-}
-
-/**
  * {@link hasPersistableSignal}, as a SQL predicate over the columns the row
  * already carries — which is what lets the always-write change ship with NO
  * schema migration. The doors map 1:1 onto the in-memory predicate:
@@ -444,432 +420,7 @@ export const TRACE_ANALYTICS_HAS_SIGNAL_SQL =
   ` OR Attributes['langwatch.reserved.log_record_count'] NOT IN ('', '0')` +
   ` OR Version < '${TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}')`;
 
-export function projectAnalyticsStateToRow({
-  state,
-  tenantId,
-  version,
-  now = Date.now(),
-}: {
-  state: TraceAnalyticsData;
-  tenantId: string;
-  version: string;
-  /**
-   * Fold time, injected so the function stays deterministic under test.
-   *
-   * Read by the anchor's VALIDATION as well as its last-resort fallback: every
-   * candidate is bounded against it, so a state whose committed anchor is
-   * implausibly far ahead of `now` is re-anchored on write rather than carried
-   * through. That is the one case where an already-committed row changes
-   * partition, and it is deliberate — see `MAX_ANCHOR_FUTURE_SKEW_MS` in
-   * {@link ./services/storage-anchor.ts}.
-   */
-  now?: number;
-}): TraceAnalyticsRow {
-  const attrs = state.attributes ?? {};
-  const userId = readNullableString(attrs[TRACE_ANALYTICS_ATTR_KEYS.USER_ID]);
-  const conversationId = readNullableString(attrs[TRACE_ANALYTICS_ATTR_KEYS.CONVERSATION_ID]);
-  const customerId = readNullableString(attrs[TRACE_ANALYTICS_ATTR_KEYS.CUSTOMER_ID]);
-  const origin = attrs[TRACE_ANALYTICS_ATTR_KEYS.ORIGIN] ?? "";
-  const labels = parseLabels(attrs[TRACE_ANALYTICS_ATTR_KEYS.LABELS]);
-
-  return {
-    tenantId,
-    traceId: state.traceId,
-    version,
-    // The anchor, not the timing baseline (ADR-071).
-    //
-    // The fallback chain is a last resort for a state nothing could anchor: one
-    // whose every event carried a zero `occurredAt` (the event schema permits
-    // it — `nonnegative`, not `positive`), or whose only candidate times were
-    // implausibly far in the future. It exists so the partition column can never
-    // be the epoch, and each step is validated rather than trusted —
-    // `parseClickHouseDateTimeMs` returns 0 on a parse failure, so an unchecked
-    // `state.createdAt` would put the row straight back in 196952, which is the
-    // one outcome this whole change exists to prevent.
-    //
-    // ADR-071 ("One trap for whoever implements it") names `CreatedAt` as a trap
-    // for exactly this use, and it is right: it is fold time, so a rebuild
-    // re-stamps it. That is accepted here
-    // and no worse than the alternative, because it applies ONLY to a state that
-    // has no business time at all, and because the read-back promotes whatever
-    // landed in the column to the frozen anchor — so it stops drifting after the
-    // first write. What the ADR argues for instead (the event log's accept time
-    // threaded into the row) is sequencing item 6 and needs the human sign-off
-    // recorded there; it is not this change's to take.
-    occurredAtMs: firstUsableAnchor({
-      candidates: [state.storageAnchorMs, state.createdAt],
-      now,
-    }),
-    earliestSpanStartMs: state.occurredAt,
-    createdAtMs: state.createdAt,
-    updatedAtMs: state.updatedAt,
-
-    traceName: state.traceName ?? "",
-    topicId: state.topicId,
-    subTopicId: state.subTopicId,
-    userId,
-    conversationId,
-    customerId,
-    origin,
-    models: state.models ?? [],
-    labels,
-
-    totalCost: state.totalCost,
-    nonBilledCost: state.nonBilledCost,
-    totalDurationMs: state.totalDurationMs,
-    timeToFirstTokenMs: state.timeToFirstTokenMs,
-    tokensPerSecond: state.tokensPerSecond,
-    promptTokens: state.totalPromptTokenCount,
-    completionTokens: state.totalCompletionTokenCount,
-    cacheReadTokens: readReservedTokenSum(attrs[RESERVED_CACHE_READ_TOKENS]),
-    cacheWriteTokens: readReservedTokenSum(attrs[RESERVED_CACHE_CREATION_TOKENS]),
-    reasoningTokens: readReservedTokenSum(attrs[RESERVED_REASONING_TOKENS]),
-    hasError: state.containsErrorStatus,
-    hasAnnotation: state.annotationIds && state.annotationIds.length > 0 ? true : null,
-
-    attributes: trimAttributesForAnalytics(attrs),
-
-    hasSignal: hasPersistableSignal(state),
-
-    // Read-back state (ADR-066) — round-trips the fold's working bookkeeping.
-    spanCount: state.spanCount,
-    annotationIds: state.annotationIds ?? [],
-    rootSpanStartTimeMs: state.rootSpanStartTimeMs ?? 0,
-    traceNameFromFallback: state.traceNameFromFallback ?? false,
-    rootMetadataFromFallback: state.rootMetadataFromFallback ?? false,
-    traceNameUserOverridden: state.traceNameUserOverridden ?? false,
-    lastEventOccurredAt: state.LastEventOccurredAt,
-  };
-}
-
-/**
- * Decode the fold's working state from its persisted `trace_analytics` row —
- * the `fromRow` inverse of {@link projectAnalyticsStateToRow} (ADR-066).
- *
- * This is a deserialize, NOT a rebuild. A rebuild replays the trace's spans /
- * logs / annotations from `event_log`; this only maps the columns of the last
- * committed slim row back into the fold's state shape, so `store.get()` can
- * return the state that Redis (or, on a miss, ClickHouse) already holds. It
- * derives nothing.
- *
- * The slim row is deliberately lossy on ONE axis — the Attributes map is
- * trimmed at write time. That is not a read-back gap, but only because the trim
- * is written to keep everything the fold reads back: the hoisted dimension keys
- * and the accumulators it grows by read-modify-write. The dimension keys are
- * re-injected here from their typed columns (UserId / ConversationId /
- * CustomerId / Origin / Labels), so they are faithful even when a long value
- * was trimmed out of the map. The accumulators survive by contract — every
- * `langwatch.reserved.*` key plus the named exceptions in the trim service's
- * FOLD_ACCUMULATOR_KEYS, which exists precisely because `langwatch.prompt_ids`
- * accumulates without carrying the reserved prefix. Payload / over-cap keys the
- * trim drops are never read by the fold, so their absence derives nothing.
- *
- * The coupling is real and worth stating plainly: a key that the fold reads its
- * own previous value from, and that the trim can drop, resets the accumulator
- * on the next read-back instead of merely shrinking the stored row. Adding such
- * a key means adding it to that set — the fold-equivalence suite fails if not.
- *
- * This decoder is TOTAL: handed a row whose read-back columns are absent it
- * still answers, mapping the ClickHouse column defaults to state defaults
- * (spanCount 0, empty annotation set, no root claimed, checkpoint 0, no span
- * timing baseline). Those defaults are indistinguishable from real zeroes, so
- * deciding WHETHER a row may be decoded is the store's job, not this function's:
- * `getWithApplied` admits the current stamp and the one pre-split stamp it can
- * read unambiguously, reports anything older as a store miss, and the fold's
- * `refoldOnStoreMiss` rebuilds that aggregate from `event_log` once. A caller
- * that bypasses the version gate gets the defaults above.
- *
- * The decoder is version-AWARE for exactly one field pair — see the
- * `occurredAt` branch below and
- * {@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}.
- */
-export function traceAnalyticsStateFromRow(row: TraceAnalyticsRow): TraceAnalyticsData {
-  // Start from the trimmed map the row carries — it holds the reserved
-  // accumulators (cache/reasoning sums, log_record_count, correlation count)
-  // verbatim — then re-inject the hoisted dimension keys from their columns so
-  // a dimension a long value trimmed out of the map is still present and
-  // faithful for the fold's next read.
-  const attributes: Record<string, string> = { ...row.attributes };
-  if (row.userId) attributes[TRACE_ANALYTICS_ATTR_KEYS.USER_ID] = row.userId;
-  if (row.conversationId)
-    attributes[TRACE_ANALYTICS_ATTR_KEYS.CONVERSATION_ID] = row.conversationId;
-  if (row.customerId) attributes[TRACE_ANALYTICS_ATTR_KEYS.CUSTOMER_ID] = row.customerId;
-  if (row.origin) attributes[TRACE_ANALYTICS_ATTR_KEYS.ORIGIN] = row.origin;
-  if (row.labels.length > 0)
-    attributes[TRACE_ANALYTICS_ATTR_KEYS.LABELS] = JSON.stringify(row.labels);
-
-  return {
-    traceId: row.traceId,
-    spanCount: row.spanCount,
-
-    topicId: row.topicId,
-    subTopicId: row.subTopicId,
-    traceName: row.traceName,
-    models: row.models,
-
-    // The anchor comes back frozen: whatever the column holds is what the row
-    // was partitioned and TTL'd on, so re-deriving it would be free to move it.
-    storageAnchorMs: row.occurredAtMs,
-    // …and the timing baseline comes back from its OWN column, never from the
-    // anchor. Reading it off `occurredAtMs` would hand `SpanTimingService` a
-    // log-shaped time as a span start and inflate the trace's duration — and
-    // for a log-only trace it would fabricate a span that never arrived.
-    //
-    // The one exception is a PRE-SPLIT row, where the two were the same column
-    // and `OccurredAt` is the `min(span start)` this field wants. Taking it
-    // there is what lets the population heal without a refold; taking it
-    // anywhere else is the inflation bug above
-    // ({@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}).
-    occurredAt:
-      row.version === TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT
-        ? row.occurredAtMs
-        : row.earliestSpanStartMs,
-    totalDurationMs: row.totalDurationMs,
-    totalCost: row.totalCost,
-    nonBilledCost: row.nonBilledCost,
-    totalPromptTokenCount: row.promptTokens,
-    totalCompletionTokenCount: row.completionTokens,
-    timeToFirstTokenMs: row.timeToFirstTokenMs,
-    tokensPerSecond: row.tokensPerSecond,
-    containsErrorStatus: row.hasError,
-
-    // The id set behind the row's HasAnnotation boolean; a later add/remove
-    // re-derives the boolean from it. Only rows at a DECODABLE stamp reach here,
-    // and every decodable stamp postdates migration 00056, so the set is the
-    // real one, never a column default. Adding a stamp to
-    // DECODABLE_PROJECTION_VERSIONS that predates 00056 would break that.
-    annotationIds: row.annotationIds,
-    attributes,
-
-    // Name-resolution bookkeeping — 0 root time reads back as "no root yet".
-    rootSpanStartTimeMs: row.rootSpanStartTimeMs > 0 ? row.rootSpanStartTimeMs : undefined,
-    traceNameUserOverridden: row.traceNameUserOverridden,
-    traceNameFromFallback: row.traceNameFromFallback,
-    rootMetadataFromFallback: row.rootMetadataFromFallback,
-
-    createdAt: row.createdAtMs,
-    updatedAt: row.updatedAtMs,
-    LastEventOccurredAt: row.lastEventOccurredAt,
-  };
-}
-
-function readNullableString(value: string | undefined): string | null {
-  if (typeof value !== "string" || value.length === 0) return null;
-  return value;
-}
-
-/**
- * Reserved-key cache/reasoning token sums are stamped by the fold via
- * `addReservedTokenSum` — always integer-shaped strings, but defensive
- * parsing keeps the slim row stable against bad upstream data.
- */
-function readReservedTokenSum(value: string | undefined): number | null {
-  if (typeof value !== "string" || value.length === 0) return null;
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0) return null;
-  return Math.trunc(parsed);
-}
-
-/**
- * Labels are stored on the trace attribute map as a JSON-serialised string
- * array (see TraceAttributeAccumulationService.accumulateAttributes, lines
- * 214-224). Slim's Labels column is `Array(String)`, so parse the JSON back
- * into an array. Defensive: bad JSON → empty array; non-array JSON → empty
- * array; non-string elements skipped.
- */
-function parseLabels(raw: string | undefined): string[] {
-  if (typeof raw !== "string" || raw.length === 0) return [];
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((v): v is string => typeof v === "string");
-  } catch {
-    return [];
-  }
-}
-
 // ─── Service composition ────────────────────────────────────────────
-
-/**
- * Build a `TraceSummaryData`-shaped view over the slim state for the shared
- * services that type their `state` argument as TraceSummaryData. Slim only
- * carries a subset of those fields; the rest are filled with default values
- * that the services either don't read (the common case) or read as a
- * neutral "nothing yet" — keeping service behaviour identical to a fresh
- * trace-summary state on the dropped fields.
- *
- * The view is throwaway: services consume it, slim takes the fields it
- * cares about out of the result, and the view itself is never persisted.
- */
-function asTraceSummaryStateView(state: TraceAnalyticsData): TraceSummaryData {
-  return {
-    traceId: state.traceId,
-    spanCount: state.spanCount,
-    totalDurationMs: state.totalDurationMs,
-    computedIOSchemaVersion: "",
-    computedInput: null,
-    computedOutput: null,
-    timeToFirstTokenMs: state.timeToFirstTokenMs,
-    timeToLastTokenMs: null,
-    tokensPerSecond: state.tokensPerSecond,
-    containsErrorStatus: state.containsErrorStatus,
-    containsOKStatus: false,
-    errorMessage: null,
-    models: state.models,
-    totalCost: state.totalCost,
-    nonBilledCost: state.nonBilledCost,
-    tokensEstimated: false,
-    totalPromptTokenCount: state.totalPromptTokenCount,
-    totalCompletionTokenCount: state.totalCompletionTokenCount,
-    outputFromRootSpan: false,
-    outputSpanEndTimeMs: 0,
-    blockedByGuardrail: false,
-    rootSpanType: null,
-    containsAi: false,
-    containsPrompt: false,
-    selectedPromptId: null,
-    selectedPromptSpanId: null,
-    selectedPromptStartTimeMs: null,
-    lastUsedPromptId: null,
-    lastUsedPromptVersionNumber: null,
-    lastUsedPromptVersionId: null,
-    lastUsedPromptSpanId: null,
-    lastUsedPromptStartTimeMs: null,
-    topicId: state.topicId,
-    subTopicId: state.subTopicId,
-    annotationIds: state.annotationIds,
-    attributes: state.attributes,
-    traceName: state.traceName,
-    rootSpanStartTimeMs: state.rootSpanStartTimeMs,
-    traceNameUserOverridden: state.traceNameUserOverridden,
-    traceNameFromFallback: state.traceNameFromFallback,
-    rootMetadataFromFallback: state.rootMetadataFromFallback,
-    occurredAt: state.occurredAt,
-    createdAt: state.createdAt,
-    updatedAt: state.updatedAt,
-    LastEventOccurredAt: state.LastEventOccurredAt,
-  };
-}
-
-/** Add a positive per-span delta onto a reserved running-sum attribute. */
-function addReservedTokenSum(attributes: Record<string, string>, key: string, delta: number): void {
-  if (delta <= 0) return;
-  const prior = Number(attributes[key] ?? "0");
-  attributes[key] = String((Number.isFinite(prior) ? prior : 0) + delta);
-}
-
-/**
- * Roll this span's cache / reasoning token counts into the trace-level running
- * sums stored on reserved attribute keys (the drawer popover and slim's
- * `cache*` columns both read them).
- *
- * A span flagged `skip_token_accumulation` is a redundant copy of another
- * span's usage, so it contributes nothing — the same gate
- * `SpanCostService.accumulateTokens` applies to prompt/completion tokens, and
- * the same one `traceSummary.foldProjection` applies here. Mutates
- * `attributes` in place, mirroring the trace-summary fold's bookkeeping.
- */
-function accumulateReservedTokenSums(
-  attributes: Record<string, string>,
-  span: NormalizedSpan,
-  runtime: TraceProjectionRuntimeService,
-): void {
-  const cacheTokens = runtime.spanCost.isTokenAccumulationSkipped(span)
-    ? { cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 }
-    : runtime.spanCost.extractCacheTokens(span);
-
-  addReservedTokenSum(attributes, RESERVED_CACHE_READ_TOKENS, cacheTokens.cacheReadTokens);
-  addReservedTokenSum(attributes, RESERVED_CACHE_CREATION_TOKENS, cacheTokens.cacheCreationTokens);
-  addReservedTokenSum(attributes, RESERVED_REASONING_TOKENS, cacheTokens.reasoningTokens);
-}
-
-/**
- * Apply a normalized span to the slim state — calls ONLY the services slim
- * needs (timing, cost/tokens, status, models, name resolution, attributes
- * + reserved cache/reasoning sums), and updates ONLY slim-relevant fields.
- *
- * Mirrors the orchestration in `applySpanToSummary` (trace-summary fold) but
- * skips IO accumulation, prompt accumulation, containsAi tracking, and the
- * heavy bookkeeping (errorMessage, rootSpanType, computedInput/Output,
- * tokensEstimated, blockedByGuardrail, outputFromRootSpan, …).
- *
- * @internal Exported for unit testing.
- */
-export function applySpanToAnalytics({
-  state,
-  span,
-  runtime,
-}: {
-  state: TraceAnalyticsData;
-  span: NormalizedSpan;
-  runtime: TraceProjectionRuntimeService;
-}): TraceAnalyticsData {
-  if (SYNTHETIC_TRACE_SPAN_NAMES.has(span.name)) {
-    // Synthetic spans (e.g. `langwatch.track_event`) must not contribute to
-    // timing/cost/IO. The trace-summary fold short-circuits here for the
-    // same reason; slim mirrors that contract.
-    return state;
-  }
-
-  const view = asTraceSummaryStateView(state);
-
-  const timing = runtime.spanTiming.accumulateTiming({ state: view, span });
-  const tokens = runtime.spanCost.accumulateTokens({
-    state: view,
-    span,
-    totalDurationMs: timing.totalDurationMs,
-  });
-  const status = runtime.spanStatus.accumulateStatus({ state: view, span });
-
-  // Slim does not run TraceIOAccumulationService — but
-  // `TraceAttributeAccumulationService.accumulateAttributes` requires the IO
-  // bookkeeping fields as arguments. Feed it the neutral "no IO extracted"
-  // values: the same shape the IO service returns when nothing was
-  // discovered, so the reserved output_source / *_is_fallback keys land on
-  // the attribute map identically to a trace with no IO-bearing span.
-  const attributes = runtime.traceAttributes.accumulateAttributes({
-    state: view,
-    span,
-    outputSource: OUTPUT_SOURCE.INFERRED,
-    inputIsFallback: false,
-    outputIsFallback: false,
-    inputMediaRefs: null,
-    outputMediaRefs: null,
-  });
-
-  accumulateReservedTokenSums(attributes, span, runtime);
-
-  const newModels = runtime.spanCost.extractModelsFromSpan(span);
-  const models = mergeModelsMostRecentFirst(state.models, newModels);
-
-  // Mirror the trace-summary fold's trace-level model metadata stamp so the
-  // slim table's Attributes stay consistent with trace_summaries.
-  runtime.traceAttributes.stampModelMetadata({ attributes, models });
-
-  const { traceName, rootSpanStartTimeMs, traceNameFromFallback, rootMetadataFromFallback } =
-    runtime.traceName.resolveFromSpan({ state: view, span });
-
-  return {
-    ...state,
-    traceId: state.traceId || span.traceId,
-    spanCount: state.spanCount + 1,
-    occurredAt: timing.occurredAt,
-    totalDurationMs: timing.totalDurationMs,
-    models,
-    traceName,
-    traceNameFromFallback,
-    rootMetadataFromFallback,
-    rootSpanStartTimeMs,
-    totalCost: tokens.totalCost,
-    nonBilledCost: tokens.nonBilledCost,
-    totalPromptTokenCount: tokens.totalPromptTokenCount,
-    totalCompletionTokenCount: tokens.totalCompletionTokenCount,
-    timeToFirstTokenMs: tokens.timeToFirstTokenMs,
-    tokensPerSecond: tokens.tokensPerSecond,
-    containsErrorStatus: status.containsErrorStatus,
-    attributes,
-  };
-}
 
 /**
  * A single log record's normalized contribution to the slim analytics
@@ -881,97 +432,6 @@ interface LogContribution {
   traceId: string;
   liftedAttributes: Record<string, unknown>;
   nonBillable: boolean;
-}
-
-/**
- * Fold one log contribution into slim: bump the reserved log count,
- * merge the lifted canonical langwatch.* attributes, and mirror them
- * onto slim's top-level columns. Each api_request event is its OWN
- * turn — cost + tokens are additive across turns, models are deduped.
- * Read from contribution.liftedAttributes (this event's contribution)
- * NOT mergedAttributes, so cost doesn't double-count across replays.
- */
-function applyLogContribution({
-  state,
-  contribution,
-  runtime,
-}: {
-  state: TraceAnalyticsData;
-  contribution: LogContribution;
-  runtime: TraceProjectionRuntimeService;
-}): TraceAnalyticsData {
-  const mergedAttributes = { ...state.attributes };
-  const logCount = parseInt(mergedAttributes["langwatch.reserved.log_record_count"] ?? "0", 10);
-  mergedAttributes["langwatch.reserved.log_record_count"] = String(logCount + 1);
-  for (const [key, value] of Object.entries(contribution.liftedAttributes)) {
-    mergedAttributes[key] = String(value);
-  }
-
-  let models = state.models;
-  let totalCost = state.totalCost;
-  let nonBilledCost = state.nonBilledCost;
-  let totalPromptTokenCount = state.totalPromptTokenCount;
-  let totalCompletionTokenCount = state.totalCompletionTokenCount;
-  const model = contribution.liftedAttributes["langwatch.model"];
-  if (typeof model === "string" && model.length > 0) {
-    models = mergeModelsMostRecentFirst(models, [model]);
-  }
-  const cost = Number(contribution.liftedAttributes["langwatch.cost.usd"]);
-  if (Number.isFinite(cost) && cost > 0) {
-    totalCost = (totalCost ?? 0) + cost;
-    if (contribution.nonBillable) {
-      nonBilledCost = (nonBilledCost ?? 0) + cost;
-    }
-  }
-  const inputTokens = Number(contribution.liftedAttributes["langwatch.input_tokens"]);
-  if (Number.isFinite(inputTokens) && inputTokens > 0) {
-    totalPromptTokenCount = (totalPromptTokenCount ?? 0) + inputTokens;
-  }
-  const outputTokens = Number(contribution.liftedAttributes["langwatch.output_tokens"]);
-  if (Number.isFinite(outputTokens) && outputTokens > 0) {
-    totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + outputTokens;
-  }
-
-  // Same trace-level model metadata stamp the span path applies, so
-  // log-only (Path B) traces also surface `metadata.model`.
-  runtime.traceAttributes.stampModelMetadata({
-    attributes: mergedAttributes,
-    models,
-  });
-
-  return {
-    ...state,
-    traceId: state.traceId || contribution.traceId,
-    // `occurredAt` is NOT set here, and must not be: it is the span timing
-    // baseline, span-seeded only.
-    //
-    // `SpanTimingService.accumulateTiming` reads `occurredAt > 0` as its "a span
-    // has seeded the baseline" sentinel and computes
-    // `currentEnd = occurredAt + totalDurationMs`. A log's time is the platform
-    // ACCEPT time, not producer business time, so seeding it from here inflates
-    // `TotalDurationMs` by the whole ingest lag — and `SpanCostService` divides
-    // completion tokens by that value, so `TokensPerSecond` goes with it. It is
-    // order-dependent too: the same trace would report two different latencies
-    // depending on whether the log or the span folded first. Two tests pin this.
-    //
-    // Nor can the sentinel move to `spanCount`. A span whose timestamps are
-    // unusable still increments the count — `SpanTimingService` early-returns on
-    // `!isValidTimestamp(...)` while `applySpanToAnalytics` goes on to
-    // `spanCount + 1` — so `spanCount > 0` reads as "timing seeded" when it is
-    // not. (Synthetic spans are exempt: `applySpanToAnalytics` returns before
-    // the increment, leaving both signals untouched.)
-    //
-    // What a log record DOES anchor is storage. `storageAnchorMs` is a separate
-    // field, frozen by `anchorStorageTime` from `apply` after this handler
-    // returns, so a log-only trace gets a real partition and a real TTL deadline
-    // without any of the above — ADR-071 step 3, landed.
-    attributes: mergedAttributes,
-    models,
-    totalCost,
-    nonBilledCost,
-    totalPromptTokenCount,
-    totalCompletionTokenCount,
-  };
 }
 
 // ─── Fold projection class ──────────────────────────────────────────
@@ -1116,7 +576,11 @@ export class TraceAnalyticsFoldProjection
     );
     this.runtime.spanNormalization.enrichRagContextIds(normalizedSpan);
 
-    return applySpanToAnalytics({ state, span: normalizedSpan, runtime: this.runtime });
+    return TraceAnalyticsFoldProjection.applySpanToAnalytics({
+      state,
+      span: normalizedSpan,
+      runtime: this.runtime,
+    });
   }
 
   handleTraceTopicAssigned(
@@ -1147,7 +611,7 @@ export class TraceAnalyticsFoldProjection
       attributes: event.data.attributes,
     }).attributes;
 
-    return applyLogContribution({
+    return TraceAnalyticsFoldProjection.applyLogContribution({
       state,
       runtime: this.runtime,
       contribution: {
@@ -1162,7 +626,7 @@ export class TraceAnalyticsFoldProjection
     event: LogContributedEvent,
     state: TraceAnalyticsData,
   ): TraceAnalyticsData {
-    return applyLogContribution({
+    return TraceAnalyticsFoldProjection.applyLogContribution({
       state,
       runtime: this.runtime,
       contribution: {
@@ -1261,6 +725,576 @@ export class TraceAnalyticsFoldProjection
       traceName: event.data.newName,
       traceNameUserOverridden: true,
       traceNameFromFallback: false,
+    };
+  }
+
+  private static readNullableString(value: string | undefined): string | null {
+    if (typeof value !== "string" || value.length === 0) return null;
+    return value;
+  }
+
+  /**
+   * Reserved-key cache/reasoning token sums are stamped by the fold via
+   * `addReservedTokenSum` — always integer-shaped strings, but defensive
+   * parsing keeps the slim row stable against bad upstream data.
+   */
+  private static readReservedTokenSum(value: string | undefined): number | null {
+    if (typeof value !== "string" || value.length === 0) return null;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 0) return null;
+    return Math.trunc(parsed);
+  }
+
+  /**
+   * Labels are stored on the trace attribute map as a JSON-serialised string
+   * array (see TraceAttributeAccumulationService.accumulateAttributes, lines
+   * 214-224). Slim's Labels column is `Array(String)`, so parse the JSON back
+   * into an array. Defensive: bad JSON → empty array; non-array JSON → empty
+   * array; non-string elements skipped.
+   */
+  private static parseLabels(raw: string | undefined): string[] {
+    if (typeof raw !== "string" || raw.length === 0) return [];
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((v): v is string => typeof v === "string");
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Build a `TraceSummaryData`-shaped view over the slim state for the shared
+   * services that type their `state` argument as TraceSummaryData. Slim only
+   * carries a subset of those fields; the rest are filled with default values
+   * that the services either don't read (the common case) or read as a
+   * neutral "nothing yet" — keeping service behaviour identical to a fresh
+   * trace-summary state on the dropped fields.
+   *
+   * The view is throwaway: services consume it, slim takes the fields it
+   * cares about out of the result, and the view itself is never persisted.
+   */
+  private static asTraceSummaryStateView(state: TraceAnalyticsData): TraceSummaryData {
+    return {
+      traceId: state.traceId,
+      spanCount: state.spanCount,
+      totalDurationMs: state.totalDurationMs,
+      computedIOSchemaVersion: "",
+      computedInput: null,
+      computedOutput: null,
+      timeToFirstTokenMs: state.timeToFirstTokenMs,
+      timeToLastTokenMs: null,
+      tokensPerSecond: state.tokensPerSecond,
+      containsErrorStatus: state.containsErrorStatus,
+      containsOKStatus: false,
+      errorMessage: null,
+      models: state.models,
+      totalCost: state.totalCost,
+      nonBilledCost: state.nonBilledCost,
+      tokensEstimated: false,
+      totalPromptTokenCount: state.totalPromptTokenCount,
+      totalCompletionTokenCount: state.totalCompletionTokenCount,
+      outputFromRootSpan: false,
+      outputSpanEndTimeMs: 0,
+      blockedByGuardrail: false,
+      rootSpanType: null,
+      containsAi: false,
+      containsPrompt: false,
+      selectedPromptId: null,
+      selectedPromptSpanId: null,
+      selectedPromptStartTimeMs: null,
+      lastUsedPromptId: null,
+      lastUsedPromptVersionNumber: null,
+      lastUsedPromptVersionId: null,
+      lastUsedPromptSpanId: null,
+      lastUsedPromptStartTimeMs: null,
+      topicId: state.topicId,
+      subTopicId: state.subTopicId,
+      annotationIds: state.annotationIds,
+      attributes: state.attributes,
+      traceName: state.traceName,
+      rootSpanStartTimeMs: state.rootSpanStartTimeMs,
+      traceNameUserOverridden: state.traceNameUserOverridden,
+      traceNameFromFallback: state.traceNameFromFallback,
+      rootMetadataFromFallback: state.rootMetadataFromFallback,
+      occurredAt: state.occurredAt,
+      createdAt: state.createdAt,
+      updatedAt: state.updatedAt,
+      LastEventOccurredAt: state.LastEventOccurredAt,
+    };
+  }
+
+  /** Add a positive per-span delta onto a reserved running-sum attribute. */
+  private static addReservedTokenSum(
+    attributes: Record<string, string>,
+    key: string,
+    delta: number,
+  ): void {
+    if (delta <= 0) return;
+    const prior = Number(attributes[key] ?? "0");
+    attributes[key] = String((Number.isFinite(prior) ? prior : 0) + delta);
+  }
+
+  /**
+   * Roll this span's cache / reasoning token counts into the trace-level running
+   * sums stored on reserved attribute keys (the drawer popover and slim's
+   * `cache*` columns both read them).
+   *
+   * A span flagged `skip_token_accumulation` is a redundant copy of another
+   * span's usage, so it contributes nothing — the same gate
+   * `SpanCostService.accumulateTokens` applies to prompt/completion tokens, and
+   * the same one `traceSummary.foldProjection` applies here. Mutates
+   * `attributes` in place, mirroring the trace-summary fold's bookkeeping.
+   */
+  private static accumulateReservedTokenSums(
+    attributes: Record<string, string>,
+    span: NormalizedSpan,
+    runtime: TraceProjectionRuntimeService,
+  ): void {
+    const cacheTokens = runtime.spanCost.isTokenAccumulationSkipped(span)
+      ? { cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 }
+      : runtime.spanCost.extractCacheTokens(span);
+
+    TraceAnalyticsFoldProjection.addReservedTokenSum(
+      attributes,
+      RESERVED_CACHE_READ_TOKENS,
+      cacheTokens.cacheReadTokens,
+    );
+    TraceAnalyticsFoldProjection.addReservedTokenSum(
+      attributes,
+      RESERVED_CACHE_CREATION_TOKENS,
+      cacheTokens.cacheCreationTokens,
+    );
+    TraceAnalyticsFoldProjection.addReservedTokenSum(
+      attributes,
+      RESERVED_REASONING_TOKENS,
+      cacheTokens.reasoningTokens,
+    );
+  }
+
+  /**
+   * Fold one log contribution into slim: bump the reserved log count,
+   * merge the lifted canonical langwatch.* attributes, and mirror them
+   * onto slim's top-level columns. Each api_request event is its OWN
+   * turn — cost + tokens are additive across turns, models are deduped.
+   * Read from contribution.liftedAttributes (this event's contribution)
+   * NOT mergedAttributes, so cost doesn't double-count across replays.
+   */
+  private static applyLogContribution({
+    state,
+    contribution,
+    runtime,
+  }: {
+    state: TraceAnalyticsData;
+    contribution: LogContribution;
+    runtime: TraceProjectionRuntimeService;
+  }): TraceAnalyticsData {
+    const mergedAttributes = { ...state.attributes };
+    const logCount = parseInt(mergedAttributes["langwatch.reserved.log_record_count"] ?? "0", 10);
+    mergedAttributes["langwatch.reserved.log_record_count"] = String(logCount + 1);
+    for (const [key, value] of Object.entries(contribution.liftedAttributes)) {
+      mergedAttributes[key] = String(value);
+    }
+
+    let models = state.models;
+    let totalCost = state.totalCost;
+    let nonBilledCost = state.nonBilledCost;
+    let totalPromptTokenCount = state.totalPromptTokenCount;
+    let totalCompletionTokenCount = state.totalCompletionTokenCount;
+    const model = contribution.liftedAttributes["langwatch.model"];
+    if (typeof model === "string" && model.length > 0) {
+      models = mergeModelsMostRecentFirst(models, [model]);
+    }
+    const cost = Number(contribution.liftedAttributes["langwatch.cost.usd"]);
+    if (Number.isFinite(cost) && cost > 0) {
+      totalCost = (totalCost ?? 0) + cost;
+      if (contribution.nonBillable) {
+        nonBilledCost = (nonBilledCost ?? 0) + cost;
+      }
+    }
+    const inputTokens = Number(contribution.liftedAttributes["langwatch.input_tokens"]);
+    if (Number.isFinite(inputTokens) && inputTokens > 0) {
+      totalPromptTokenCount = (totalPromptTokenCount ?? 0) + inputTokens;
+    }
+    const outputTokens = Number(contribution.liftedAttributes["langwatch.output_tokens"]);
+    if (Number.isFinite(outputTokens) && outputTokens > 0) {
+      totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + outputTokens;
+    }
+
+    // Same trace-level model metadata stamp the span path applies, so
+    // log-only (Path B) traces also surface `metadata.model`.
+    runtime.traceAttributes.stampModelMetadata({
+      attributes: mergedAttributes,
+      models,
+    });
+
+    return {
+      ...state,
+      traceId: state.traceId || contribution.traceId,
+      // `occurredAt` is NOT set here, and must not be: it is the span timing
+      // baseline, span-seeded only.
+      //
+      // `SpanTimingService.accumulateTiming` reads `occurredAt > 0` as its "a span
+      // has seeded the baseline" sentinel and computes
+      // `currentEnd = occurredAt + totalDurationMs`. A log's time is the platform
+      // ACCEPT time, not producer business time, so seeding it from here inflates
+      // `TotalDurationMs` by the whole ingest lag — and `SpanCostService` divides
+      // completion tokens by that value, so `TokensPerSecond` goes with it. It is
+      // order-dependent too: the same trace would report two different latencies
+      // depending on whether the log or the span folded first. Two tests pin this.
+      //
+      // Nor can the sentinel move to `spanCount`. A span whose timestamps are
+      // unusable still increments the count — `SpanTimingService` early-returns on
+      // `!isValidTimestamp(...)` while `applySpanToAnalytics` goes on to
+      // `spanCount + 1` — so `spanCount > 0` reads as "timing seeded" when it is
+      // not. (Synthetic spans are exempt: `applySpanToAnalytics` returns before
+      // the increment, leaving both signals untouched.)
+      //
+      // What a log record DOES anchor is storage. `storageAnchorMs` is a separate
+      // field, frozen by `anchorStorageTime` from `apply` after this handler
+      // returns, so a log-only trace gets a real partition and a real TTL deadline
+      // without any of the above — ADR-071 step 3, landed.
+      attributes: mergedAttributes,
+      models,
+      totalCost,
+      nonBilledCost,
+      totalPromptTokenCount,
+      totalCompletionTokenCount,
+    };
+  }
+
+  /**
+   * Does this state describe a trace the PRODUCT should count? True on any real
+   * telemetry: a folded span, a surviving business time (`occurredAt > 0` — only
+   * a folded span ever sets it, never a phantom init state), or a log record
+   * (Claude Code Path B, Codex Path B — the trace-summary fold counts these via
+   * langwatch.reserved.log_record_count and this mirrors its acceptance).
+   *
+   * A state carrying ONLY dimension signal (topic / annotation / name) answers
+   * false. That answer used to mean the row was NOT WRITTEN; now it is always
+   * written and analytics readers exclude it via
+   * {@link TRACE_ANALYTICS_HAS_SIGNAL_SQL} while the fold read-back still finds
+   * it. `storageAnchorMs` is deliberately NOT a door: a row on this table is a
+   * TRACE to every analytics read, so admitting a state whose sole signal is an
+   * annotation or a classification would change what the product means by "a
+   * trace" — the derived filter carries that refusal now, instead of the row's
+   * absence.
+   */
+  static hasPersistableSignal(state: TraceAnalyticsData): boolean {
+    if (state.spanCount > 0) return true;
+    if (state.occurredAt > 0) return true;
+    const raw = state.attributes?.["langwatch.reserved.log_record_count"];
+    return typeof raw === "string" && Number(raw) > 0;
+  }
+
+  static projectAnalyticsStateToRow({
+    state,
+    tenantId,
+    version,
+    now = Date.now(),
+  }: {
+    state: TraceAnalyticsData;
+    tenantId: string;
+    version: string;
+    /**
+     * Fold time, injected so the function stays deterministic under test.
+     *
+     * Read by the anchor's VALIDATION as well as its last-resort fallback: every
+     * candidate is bounded against it, so a state whose committed anchor is
+     * implausibly far ahead of `now` is re-anchored on write rather than carried
+     * through. That is the one case where an already-committed row changes
+     * partition, and it is deliberate — see `MAX_ANCHOR_FUTURE_SKEW_MS` in
+     * {@link ./services/storage-anchor.ts}.
+     */
+    now?: number;
+  }): TraceAnalyticsRow {
+    const attrs = state.attributes ?? {};
+    const userId = TraceAnalyticsFoldProjection.readNullableString(
+      attrs[TRACE_ANALYTICS_ATTR_KEYS.USER_ID],
+    );
+    const conversationId = TraceAnalyticsFoldProjection.readNullableString(
+      attrs[TRACE_ANALYTICS_ATTR_KEYS.CONVERSATION_ID],
+    );
+    const customerId = TraceAnalyticsFoldProjection.readNullableString(
+      attrs[TRACE_ANALYTICS_ATTR_KEYS.CUSTOMER_ID],
+    );
+    const origin = attrs[TRACE_ANALYTICS_ATTR_KEYS.ORIGIN] ?? "";
+    const labels = TraceAnalyticsFoldProjection.parseLabels(
+      attrs[TRACE_ANALYTICS_ATTR_KEYS.LABELS],
+    );
+
+    return {
+      tenantId,
+      traceId: state.traceId,
+      version,
+      // The anchor, not the timing baseline (ADR-071).
+      //
+      // The fallback chain is a last resort for a state nothing could anchor: one
+      // whose every event carried a zero `occurredAt` (the event schema permits
+      // it — `nonnegative`, not `positive`), or whose only candidate times were
+      // implausibly far in the future. It exists so the partition column can never
+      // be the epoch, and each step is validated rather than trusted —
+      // `parseClickHouseDateTimeMs` returns 0 on a parse failure, so an unchecked
+      // `state.createdAt` would put the row straight back in 196952, which is the
+      // one outcome this whole change exists to prevent.
+      //
+      // ADR-071 ("One trap for whoever implements it") names `CreatedAt` as a trap
+      // for exactly this use, and it is right: it is fold time, so a rebuild
+      // re-stamps it. That is accepted here
+      // and no worse than the alternative, because it applies ONLY to a state that
+      // has no business time at all, and because the read-back promotes whatever
+      // landed in the column to the frozen anchor — so it stops drifting after the
+      // first write. What the ADR argues for instead (the event log's accept time
+      // threaded into the row) is sequencing item 6 and needs the human sign-off
+      // recorded there; it is not this change's to take.
+      occurredAtMs: firstUsableAnchor({
+        candidates: [state.storageAnchorMs, state.createdAt],
+        now,
+      }),
+      earliestSpanStartMs: state.occurredAt,
+      createdAtMs: state.createdAt,
+      updatedAtMs: state.updatedAt,
+
+      traceName: state.traceName ?? "",
+      topicId: state.topicId,
+      subTopicId: state.subTopicId,
+      userId,
+      conversationId,
+      customerId,
+      origin,
+      models: state.models ?? [],
+      labels,
+
+      totalCost: state.totalCost,
+      nonBilledCost: state.nonBilledCost,
+      totalDurationMs: state.totalDurationMs,
+      timeToFirstTokenMs: state.timeToFirstTokenMs,
+      tokensPerSecond: state.tokensPerSecond,
+      promptTokens: state.totalPromptTokenCount,
+      completionTokens: state.totalCompletionTokenCount,
+      cacheReadTokens: TraceAnalyticsFoldProjection.readReservedTokenSum(
+        attrs[RESERVED_CACHE_READ_TOKENS],
+      ),
+      cacheWriteTokens: TraceAnalyticsFoldProjection.readReservedTokenSum(
+        attrs[RESERVED_CACHE_CREATION_TOKENS],
+      ),
+      reasoningTokens: TraceAnalyticsFoldProjection.readReservedTokenSum(
+        attrs[RESERVED_REASONING_TOKENS],
+      ),
+      hasError: state.containsErrorStatus,
+      hasAnnotation: state.annotationIds && state.annotationIds.length > 0 ? true : null,
+
+      attributes: trimAttributesForAnalytics(attrs),
+
+      hasSignal: TraceAnalyticsFoldProjection.hasPersistableSignal(state),
+
+      // Read-back state (ADR-066) — round-trips the fold's working bookkeeping.
+      spanCount: state.spanCount,
+      annotationIds: state.annotationIds ?? [],
+      rootSpanStartTimeMs: state.rootSpanStartTimeMs ?? 0,
+      traceNameFromFallback: state.traceNameFromFallback ?? false,
+      rootMetadataFromFallback: state.rootMetadataFromFallback ?? false,
+      traceNameUserOverridden: state.traceNameUserOverridden ?? false,
+      lastEventOccurredAt: state.LastEventOccurredAt,
+    };
+  }
+
+  /**
+   * Decode the fold's working state from its persisted `trace_analytics` row —
+   * the `fromRow` inverse of {@link projectAnalyticsStateToRow} (ADR-066).
+   *
+   * This is a deserialize, NOT a rebuild. A rebuild replays the trace's spans /
+   * logs / annotations from `event_log`; this only maps the columns of the last
+   * committed slim row back into the fold's state shape, so `store.get()` can
+   * return the state that Redis (or, on a miss, ClickHouse) already holds. It
+   * derives nothing.
+   *
+   * The slim row is deliberately lossy on ONE axis — the Attributes map is
+   * trimmed at write time. That is not a read-back gap, but only because the trim
+   * is written to keep everything the fold reads back: the hoisted dimension keys
+   * and the accumulators it grows by read-modify-write. The dimension keys are
+   * re-injected here from their typed columns (UserId / ConversationId /
+   * CustomerId / Origin / Labels), so they are faithful even when a long value
+   * was trimmed out of the map. The accumulators survive by contract — every
+   * `langwatch.reserved.*` key plus the named exceptions in the trim service's
+   * FOLD_ACCUMULATOR_KEYS, which exists precisely because `langwatch.prompt_ids`
+   * accumulates without carrying the reserved prefix. Payload / over-cap keys the
+   * trim drops are never read by the fold, so their absence derives nothing.
+   *
+   * The coupling is real and worth stating plainly: a key that the fold reads its
+   * own previous value from, and that the trim can drop, resets the accumulator
+   * on the next read-back instead of merely shrinking the stored row. Adding such
+   * a key means adding it to that set — the fold-equivalence suite fails if not.
+   *
+   * This decoder is TOTAL: handed a row whose read-back columns are absent it
+   * still answers, mapping the ClickHouse column defaults to state defaults
+   * (spanCount 0, empty annotation set, no root claimed, checkpoint 0, no span
+   * timing baseline). Those defaults are indistinguishable from real zeroes, so
+   * deciding WHETHER a row may be decoded is the store's job, not this function's:
+   * `getWithApplied` admits the current stamp and the one pre-split stamp it can
+   * read unambiguously, reports anything older as a store miss, and the fold's
+   * `refoldOnStoreMiss` rebuilds that aggregate from `event_log` once. A caller
+   * that bypasses the version gate gets the defaults above.
+   *
+   * The decoder is version-AWARE for exactly one field pair — see the
+   * `occurredAt` branch below and
+   * {@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}.
+   */
+  static traceAnalyticsStateFromRow(row: TraceAnalyticsRow): TraceAnalyticsData {
+    // Start from the trimmed map the row carries — it holds the reserved
+    // accumulators (cache/reasoning sums, log_record_count, correlation count)
+    // verbatim — then re-inject the hoisted dimension keys from their columns so
+    // a dimension a long value trimmed out of the map is still present and
+    // faithful for the fold's next read.
+    const attributes: Record<string, string> = { ...row.attributes };
+    if (row.userId) attributes[TRACE_ANALYTICS_ATTR_KEYS.USER_ID] = row.userId;
+    if (row.conversationId)
+      attributes[TRACE_ANALYTICS_ATTR_KEYS.CONVERSATION_ID] = row.conversationId;
+    if (row.customerId) attributes[TRACE_ANALYTICS_ATTR_KEYS.CUSTOMER_ID] = row.customerId;
+    if (row.origin) attributes[TRACE_ANALYTICS_ATTR_KEYS.ORIGIN] = row.origin;
+    if (row.labels.length > 0)
+      attributes[TRACE_ANALYTICS_ATTR_KEYS.LABELS] = JSON.stringify(row.labels);
+
+    return {
+      traceId: row.traceId,
+      spanCount: row.spanCount,
+
+      topicId: row.topicId,
+      subTopicId: row.subTopicId,
+      traceName: row.traceName,
+      models: row.models,
+
+      // The anchor comes back frozen: whatever the column holds is what the row
+      // was partitioned and TTL'd on, so re-deriving it would be free to move it.
+      storageAnchorMs: row.occurredAtMs,
+      // …and the timing baseline comes back from its OWN column, never from the
+      // anchor. Reading it off `occurredAtMs` would hand `SpanTimingService` a
+      // log-shaped time as a span start and inflate the trace's duration — and
+      // for a log-only trace it would fabricate a span that never arrived.
+      //
+      // The one exception is a PRE-SPLIT row, where the two were the same column
+      // and `OccurredAt` is the `min(span start)` this field wants. Taking it
+      // there is what lets the population heal without a refold; taking it
+      // anywhere else is the inflation bug above
+      // ({@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}).
+      occurredAt:
+        row.version === TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT
+          ? row.occurredAtMs
+          : row.earliestSpanStartMs,
+      totalDurationMs: row.totalDurationMs,
+      totalCost: row.totalCost,
+      nonBilledCost: row.nonBilledCost,
+      totalPromptTokenCount: row.promptTokens,
+      totalCompletionTokenCount: row.completionTokens,
+      timeToFirstTokenMs: row.timeToFirstTokenMs,
+      tokensPerSecond: row.tokensPerSecond,
+      containsErrorStatus: row.hasError,
+
+      // The id set behind the row's HasAnnotation boolean; a later add/remove
+      // re-derives the boolean from it. Only rows at a DECODABLE stamp reach here,
+      // and every decodable stamp postdates migration 00056, so the set is the
+      // real one, never a column default. Adding a stamp to
+      // DECODABLE_PROJECTION_VERSIONS that predates 00056 would break that.
+      annotationIds: row.annotationIds,
+      attributes,
+
+      // Name-resolution bookkeeping — 0 root time reads back as "no root yet".
+      rootSpanStartTimeMs: row.rootSpanStartTimeMs > 0 ? row.rootSpanStartTimeMs : undefined,
+      traceNameUserOverridden: row.traceNameUserOverridden,
+      traceNameFromFallback: row.traceNameFromFallback,
+      rootMetadataFromFallback: row.rootMetadataFromFallback,
+
+      createdAt: row.createdAtMs,
+      updatedAt: row.updatedAtMs,
+      LastEventOccurredAt: row.lastEventOccurredAt,
+    };
+  }
+
+  /**
+   * Apply a normalized span to the slim state — calls ONLY the services slim
+   * needs (timing, cost/tokens, status, models, name resolution, attributes
+   * + reserved cache/reasoning sums), and updates ONLY slim-relevant fields.
+   *
+   * Mirrors the orchestration in `applySpanToSummary` (trace-summary fold) but
+   * skips IO accumulation, prompt accumulation, containsAi tracking, and the
+   * heavy bookkeeping (errorMessage, rootSpanType, computedInput/Output,
+   * tokensEstimated, blockedByGuardrail, outputFromRootSpan, …).
+   *
+   * @internal Exported for unit testing.
+   */
+  static applySpanToAnalytics({
+    state,
+    span,
+    runtime,
+  }: {
+    state: TraceAnalyticsData;
+    span: NormalizedSpan;
+    runtime: TraceProjectionRuntimeService;
+  }): TraceAnalyticsData {
+    if (SYNTHETIC_TRACE_SPAN_NAMES.has(span.name)) {
+      // Synthetic spans (e.g. `langwatch.track_event`) must not contribute to
+      // timing/cost/IO. The trace-summary fold short-circuits here for the
+      // same reason; slim mirrors that contract.
+      return state;
+    }
+
+    const view = TraceAnalyticsFoldProjection.asTraceSummaryStateView(state);
+
+    const timing = runtime.spanTiming.accumulateTiming({ state: view, span });
+    const tokens = runtime.spanCost.accumulateTokens({
+      state: view,
+      span,
+      totalDurationMs: timing.totalDurationMs,
+    });
+    const status = runtime.spanStatus.accumulateStatus({ state: view, span });
+
+    // Slim does not run TraceIOAccumulationService — but
+    // `TraceAttributeAccumulationService.accumulateAttributes` requires the IO
+    // bookkeeping fields as arguments. Feed it the neutral "no IO extracted"
+    // values: the same shape the IO service returns when nothing was
+    // discovered, so the reserved output_source / *_is_fallback keys land on
+    // the attribute map identically to a trace with no IO-bearing span.
+    const attributes = runtime.traceAttributes.accumulateAttributes({
+      state: view,
+      span,
+      outputSource: OUTPUT_SOURCE.INFERRED,
+      inputIsFallback: false,
+      outputIsFallback: false,
+      inputMediaRefs: null,
+      outputMediaRefs: null,
+    });
+
+    TraceAnalyticsFoldProjection.accumulateReservedTokenSums(attributes, span, runtime);
+
+    const newModels = runtime.spanCost.extractModelsFromSpan(span);
+    const models = mergeModelsMostRecentFirst(state.models, newModels);
+
+    // Mirror the trace-summary fold's trace-level model metadata stamp so the
+    // slim table's Attributes stay consistent with trace_summaries.
+    runtime.traceAttributes.stampModelMetadata({ attributes, models });
+
+    const { traceName, rootSpanStartTimeMs, traceNameFromFallback, rootMetadataFromFallback } =
+      runtime.traceName.resolveFromSpan({ state: view, span });
+
+    return {
+      ...state,
+      traceId: state.traceId || span.traceId,
+      spanCount: state.spanCount + 1,
+      occurredAt: timing.occurredAt,
+      totalDurationMs: timing.totalDurationMs,
+      models,
+      traceName,
+      traceNameFromFallback,
+      rootMetadataFromFallback,
+      rootSpanStartTimeMs,
+      totalCost: tokens.totalCost,
+      nonBilledCost: tokens.nonBilledCost,
+      totalPromptTokenCount: tokens.totalPromptTokenCount,
+      totalCompletionTokenCount: tokens.totalCompletionTokenCount,
+      timeToFirstTokenMs: tokens.timeToFirstTokenMs,
+      tokensPerSecond: tokens.tokensPerSecond,
+      containsErrorStatus: status.containsErrorStatus,
+      attributes,
     };
   }
 }

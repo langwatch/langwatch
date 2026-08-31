@@ -149,14 +149,11 @@ export {
   TraceSummaryFoldProjection,
 } from "./projections/trace-summary.projection";
 export {
-  applySpanToAnalytics,
-  projectAnalyticsStateToRow,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsRow,
-  traceAnalyticsStateFromRow,
 } from "./projections/trace-derived.projection";
 export {
   TraceAnalyticsRollupMapProjection,

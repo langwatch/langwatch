@@ -1,10 +1,5 @@
 import type { MetricKind } from "@langwatch/metric-contract";
-import {
-  finiteNumber,
-  finiteNumbers,
-  integerDecimal,
-  integerDecimals,
-} from "./metric-numbers.rules";
+import { MetricNumbers } from "./metric-numbers.rules";
 import { isRecord, type UnknownRecord } from "./metric-serialization.rules";
 
 /**
@@ -38,8 +33,8 @@ function canonicalQuantiles(value: unknown): CanonicalPointValues["quantileValue
   return value.map((entry) => {
     const quantile = isRecord(entry) ? entry : {};
     return {
-      quantile: finiteNumber(quantile.quantile),
-      value: finiteNumber(quantile.value),
+      quantile: MetricNumbers.finiteNumber(quantile.quantile),
+      value: MetricNumbers.finiteNumber(quantile.value),
     };
   });
 }
@@ -65,21 +60,23 @@ function canonicalPointValues({
 
   return {
     valueType,
-    valueInt: hasInt ? integerDecimal(point.asInt, { signed: true }) : null,
-    valueDouble: hasDouble ? finiteNumber(point.asDouble) : null,
-    count: isCounted ? integerDecimal(point.count) : null,
-    sum: finiteNumber(point.sum),
-    min: finiteNumber(point.min),
-    max: finiteNumber(point.max),
-    explicitBounds: finiteNumbers(point.explicitBounds),
-    bucketCounts: integerDecimals(point.bucketCounts),
+    valueInt: hasInt ? MetricNumbers.integerDecimal(point.asInt, { signed: true }) : null,
+    valueDouble: hasDouble ? MetricNumbers.finiteNumber(point.asDouble) : null,
+    count: isCounted ? MetricNumbers.integerDecimal(point.count) : null,
+    sum: MetricNumbers.finiteNumber(point.sum),
+    min: MetricNumbers.finiteNumber(point.min),
+    max: MetricNumbers.finiteNumber(point.max),
+    explicitBounds: MetricNumbers.finiteNumbers(point.explicitBounds),
+    bucketCounts: MetricNumbers.integerDecimals(point.bucketCounts),
     exponentialScale: isExponential ? Number(point.scale ?? 0) : null,
-    exponentialZeroThreshold: isExponential ? finiteNumber(point.zeroThreshold ?? 0) : null,
-    zeroCount: isExponential ? integerDecimal(point.zeroCount) : null,
+    exponentialZeroThreshold: isExponential
+      ? MetricNumbers.finiteNumber(point.zeroThreshold ?? 0)
+      : null,
+    zeroCount: isExponential ? MetricNumbers.integerDecimal(point.zeroCount) : null,
     positiveOffset: isExponential ? Number(positive.offset ?? 0) : null,
-    positiveBucketCounts: integerDecimals(positive.bucketCounts),
+    positiveBucketCounts: MetricNumbers.integerDecimals(positive.bucketCounts),
     negativeOffset: isExponential ? Number(negative.offset ?? 0) : null,
-    negativeBucketCounts: integerDecimals(negative.bucketCounts),
+    negativeBucketCounts: MetricNumbers.integerDecimals(negative.bucketCounts),
     quantileValues: kind === "summary" ? canonicalQuantiles(point.quantileValues) : [],
   };
 }

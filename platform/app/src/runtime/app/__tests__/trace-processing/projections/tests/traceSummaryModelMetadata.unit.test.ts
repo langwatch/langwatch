@@ -14,7 +14,7 @@ import { TraceCanonicalisationService } from "@langwatch/trace-server";
  */
 import { describe, expect, it } from "vitest";
 import { mapAttributesToMetadata } from "~/server/traces/mappers/trace-summary.mapper";
-import { applySpanToAnalytics, TraceAnalyticsFoldProjection } from "@langwatch/trace-server";
+import { TraceAnalyticsFoldProjection } from "@langwatch/trace-server";
 import {
   applySpanToSummary,
   createInitState,
@@ -158,12 +158,12 @@ describe("when folding spans into slim analytics", () => {
       store: { store: async () => {}, get: async () => null },
     });
     let state = projection.init();
-    state = applySpanToAnalytics({
+    state = TraceAnalyticsFoldProjection.applySpanToAnalytics({
       runtime: traceProjectionRuntime,
       state,
       span: llmSpan("s1", "claude-opus-5"),
     });
-    state = applySpanToAnalytics({
+    state = TraceAnalyticsFoldProjection.applySpanToAnalytics({
       runtime: traceProjectionRuntime,
       state,
       span: llmSpan("s2", "claude-sonnet-4-5"),

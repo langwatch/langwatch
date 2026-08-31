@@ -1,10 +1,9 @@
 import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
 import {
-  projectAnalyticsStateToRow,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   type TraceAnalyticsData,
-  traceAnalyticsStateFromRow,
+  TraceAnalyticsFoldProjection,
 } from "../../projections/trace-derived.projection";
 import { TraceAnalyticsProjectionPort } from "../../ports/trace-analytics-projection.port";
 
@@ -80,7 +79,7 @@ export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsDa
     state: TraceAnalyticsData,
     context: ProjectionStoreContext,
   ): {
-    row: ReturnType<typeof projectAnalyticsStateToRow>;
+    row: ReturnType<typeof TraceAnalyticsFoldProjection.projectAnalyticsStateToRow>;
     retentionDays: number;
     appliedEventIds: string[];
   } | null {
@@ -97,7 +96,7 @@ export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsDa
       ? state
       : { ...state, traceId: String(context.aggregateId) };
     return {
-      row: projectAnalyticsStateToRow({
+      row: TraceAnalyticsFoldProjection.projectAnalyticsStateToRow({
         state: stateWithId,
         tenantId: String(context.tenantId),
         version: TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
@@ -186,7 +185,7 @@ export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsDa
       return { state: null, appliedEventIds: [], miss: "undecodable" };
     }
     return {
-      state: traceAnalyticsStateFromRow(found.row),
+      state: TraceAnalyticsFoldProjection.traceAnalyticsStateFromRow(found.row),
       appliedEventIds: found.appliedEventIds,
     };
   }

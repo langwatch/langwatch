@@ -8,14 +8,14 @@ import type {
 import { canonicalAttributes } from "./metric-attributes.rules";
 import { correlations } from "./metric-correlations.rules";
 import { aggregation } from "./metric-kinds.rules";
-import { integerDecimal, timestampDecimal, timestampMs } from "./metric-numbers.rules";
+import { MetricNumbers } from "./metric-numbers.rules";
 import {
   isRecord,
   sha256,
   stableStringify,
   type UnknownRecord,
 } from "./metric-serialization.rules";
-import { validatePointShape } from "./metric-validation.rules";
+import { MetricValidation } from "./metric-validation.rules";
 import { canonicalPointValues, canonicalValueSection } from "./metric-values.rules";
 
 export interface PreparedMetricPoint {
@@ -27,12 +27,12 @@ function canonicalExemplars(exemplars: unknown): unknown[] {
   if (!Array.isArray(exemplars)) return [];
   return exemplars.map((raw) => {
     const exemplar = isRecord(raw) ? raw : {};
-    const time = timestampDecimal(exemplar.timeUnixNano) ?? "0";
+    const time = MetricNumbers.timestampDecimal(exemplar.timeUnixNano) ?? "0";
     const value =
       exemplar.asInt !== undefined
         ? {
             type: "int",
-            value: integerDecimal(exemplar.asInt, { signed: true }),
+            value: MetricNumbers.integerDecimal(exemplar.asInt, { signed: true }),
           }
         : { type: "double", value: exemplar.asDouble ?? null };
     return {
@@ -66,12 +66,12 @@ function buildPoint(args: {
   acceptedAt: number;
 }): PreparedMetricPoint {
   const { point, metric, metricData, kind } = args;
-  validatePointShape({ point, kind });
+  MetricValidation.validatePointShape({ point, kind });
 
-  const timeUnixNano = timestampDecimal(point.timeUnixNano);
+  const timeUnixNano = MetricNumbers.timestampDecimal(point.timeUnixNano);
   if (!timeUnixNano) throw new Error("data point is missing timeUnixNano");
-  const startTimeUnixNano = timestampDecimal(point.startTimeUnixNano) ?? "0";
-  const occurredAt = timestampMs(timeUnixNano);
+  const startTimeUnixNano = MetricNumbers.timestampDecimal(point.startTimeUnixNano) ?? "0";
+  const occurredAt = MetricNumbers.timestampMs(timeUnixNano);
 
   const name = typeof metric.name === "string" ? metric.name : "";
   if (!name) throw new Error("metric is missing name");
@@ -115,14 +115,14 @@ function buildPoint(args: {
   const canonicalPoint = {
     resource: {
       schemaUrl: seriesIdentity.resource.schemaUrl,
-      droppedAttributesCount: integerDecimal(resource.droppedAttributesCount),
+      droppedAttributesCount: MetricNumbers.integerDecimal(resource.droppedAttributesCount),
       attributes: resourceAttributes,
     },
     scope: {
       schemaUrl: seriesIdentity.scope.schemaUrl,
       name: seriesIdentity.scope.name,
       version: seriesIdentity.scope.version,
-      droppedAttributesCount: integerDecimal(scope.droppedAttributesCount),
+      droppedAttributesCount: MetricNumbers.integerDecimal(scope.droppedAttributesCount),
       attributes: scopeAttributes,
     },
     metric: {

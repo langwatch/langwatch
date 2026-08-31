@@ -2,7 +2,7 @@ import { compareOrdinal } from "@langwatch/eventing";
 import { otlpAnyValueSchema, type OtlpAnyValue } from "@langwatch/otlp";
 
 type OtlpKeyValue = { key: string; value: OtlpAnyValue };
-import { integerDecimal } from "./metric-numbers.rules";
+import { MetricNumbers } from "./metric-numbers.rules";
 import { isRecord, stableStringify, type UnknownRecord } from "./metric-serialization.rules";
 
 function canonicalAnyValue(value: OtlpAnyValue | UnknownRecord | undefined): unknown {
@@ -24,7 +24,7 @@ function canonicalAnyValue(value: OtlpAnyValue | UnknownRecord | undefined): unk
   if (typed.intValue !== undefined && typed.intValue !== null) {
     return {
       type: "int",
-      value: integerDecimal(typed.intValue, { signed: true }),
+      value: MetricNumbers.integerDecimal(typed.intValue, { signed: true }),
     };
   }
   if (typed.doubleValue !== undefined && typed.doubleValue !== null) {

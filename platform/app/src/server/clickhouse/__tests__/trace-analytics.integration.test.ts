@@ -38,9 +38,9 @@ import {
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import {
-  projectAnalyticsStateToRow,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   type TraceAnalyticsData,
+  TraceAnalyticsFoldProjection,
   type TraceAnalyticsRow,
 } from "@langwatch/trace-server";
 
@@ -384,7 +384,7 @@ describe("trace_analytics slim fold (integration)", () => {
         updatedAt: state.updatedAt,
         LastEventOccurredAt: state.LastEventOccurredAt,
       };
-      const slimRow = projectAnalyticsStateToRow({
+      const slimRow = TraceAnalyticsFoldProjection.projectAnalyticsStateToRow({
         state: slimState,
         tenantId,
         version: TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,

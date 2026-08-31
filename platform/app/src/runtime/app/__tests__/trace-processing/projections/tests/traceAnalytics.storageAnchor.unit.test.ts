@@ -10,7 +10,6 @@ import {
 } from "@langwatch/trace-contract";
 import { anchorStorageTime } from "@langwatch/trace-server";
 import {
-  projectAnalyticsStateToRow,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
@@ -50,7 +49,7 @@ const projection = TraceAnalyticsFoldProjection.create({
 });
 
 function project(state: TraceAnalyticsData): TraceAnalyticsRow {
-  return projectAnalyticsStateToRow({
+  return TraceAnalyticsFoldProjection.projectAnalyticsStateToRow({
     state,
     tenantId: TENANT,
     version: TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
@@ -469,7 +468,7 @@ describe("traceAnalytics storage anchor", () => {
       // read-back state can carry `createdAt: 0`. Trusting it unchecked would
       // put the row straight back into the partition this change exists to
       // escape.
-      const row = projectAnalyticsStateToRow({
+      const row = TraceAnalyticsFoldProjection.projectAnalyticsStateToRow({
         state: { ...unanchored(), createdAt: 0 },
         tenantId: TENANT,
         version: TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,

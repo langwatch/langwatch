@@ -3,8 +3,6 @@ import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { describe, expect, it } from "vitest";
 import { LOG_RECORD_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import {
-  applySpanToAnalytics,
-  projectAnalyticsStateToRow,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
@@ -24,7 +22,7 @@ function createInitSlimState(): TraceAnalyticsData {
 }
 
 function projectFromState(state: TraceAnalyticsData) {
-  return projectAnalyticsStateToRow({
+  return TraceAnalyticsFoldProjection.projectAnalyticsStateToRow({
     state,
     tenantId: TENANT,
     version: TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
@@ -37,7 +35,7 @@ describe("traceAnalytics fold projection — slim row derivation", () => {
       // Two LLM spans, increasing cost. Span 2 is the root span with the real
       // langwatch.origin; the per-span fold should resolve origin to that.
       let state = createInitSlimState();
-      state = applySpanToAnalytics({
+      state = TraceAnalyticsFoldProjection.applySpanToAnalytics({
         runtime: traceProjectionRuntime,
         state,
         span: createTestSpan({
@@ -55,7 +53,7 @@ describe("traceAnalytics fold projection — slim row derivation", () => {
           },
         }),
       });
-      state = applySpanToAnalytics({
+      state = TraceAnalyticsFoldProjection.applySpanToAnalytics({
         runtime: traceProjectionRuntime,
         state,
         span: createTestSpan({
@@ -92,7 +90,7 @@ describe("traceAnalytics fold projection — slim row derivation", () => {
   describe("given a state whose attributes carry hoisted user / conversation / customer ids", () => {
     it("surfaces them onto the typed slim columns", () => {
       let state = createInitSlimState();
-      state = applySpanToAnalytics({
+      state = TraceAnalyticsFoldProjection.applySpanToAnalytics({
         runtime: traceProjectionRuntime,
         state,
         span: createTestSpan({
@@ -114,7 +112,7 @@ describe("traceAnalytics fold projection — slim row derivation", () => {
   describe("given a state whose labels are stored as a JSON-encoded array string", () => {
     it("parses Labels into a string array on the slim row", () => {
       let state = createInitSlimState();
-      state = applySpanToAnalytics({
+      state = TraceAnalyticsFoldProjection.applySpanToAnalytics({
         runtime: traceProjectionRuntime,
         state,
         span: createTestSpan({
@@ -133,7 +131,7 @@ describe("traceAnalytics fold projection — slim row derivation", () => {
     it("emits a slim Attributes map that contains the trimmed subset only", () => {
       const longBlob = "z".repeat(5000); // past metadata cap
       let state = createInitSlimState();
-      state = applySpanToAnalytics({
+      state = TraceAnalyticsFoldProjection.applySpanToAnalytics({
         runtime: traceProjectionRuntime,
         state,
         span: createTestSpan({
@@ -258,7 +256,7 @@ describe("traceAnalytics fold projection — slim row derivation", () => {
         const spanStart = logAtMs - 5_000;
         const spanEnd = logAtMs - 1_000;
 
-        const state = applySpanToAnalytics({
+        const state = TraceAnalyticsFoldProjection.applySpanToAnalytics({
           runtime: traceProjectionRuntime,
           state: foldLogRecord(createInitSlimState()),
           span: createTestSpan({
@@ -287,13 +285,13 @@ describe("traceAnalytics fold projection — slim row derivation", () => {
           durationMs: spanEnd - spanStart,
         });
 
-        const logFirst = applySpanToAnalytics({
+        const logFirst = TraceAnalyticsFoldProjection.applySpanToAnalytics({
           runtime: traceProjectionRuntime,
           state: foldLogRecord(createInitSlimState()),
           span,
         });
         const spanFirst = foldLogRecord(
-          applySpanToAnalytics({
+          TraceAnalyticsFoldProjection.applySpanToAnalytics({
             runtime: traceProjectionRuntime,
             state: createInitSlimState(),
             span,

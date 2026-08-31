@@ -83,7 +83,7 @@ export interface CodingAgentSessionEventRecord {
  * counted it where relevant, and the body events' content stays in
  * `log_records`.
  *
- * Wire names arrive bare (`api_request`) from Claude Code and namespaced
+ * Wire names arrive CodingAgentSessionEventsMapProjection.bare (`api_request`) from Claude Code and namespaced
  * (`claude_code.api_refusal`) from agents that prefix; both spellings map.
  *
  * The single declaration behind BOTH the row and the enqueue-time gate: adding
@@ -117,7 +117,7 @@ export const EVENT_KIND_BY_RAW_NAME: Record<string, string> = {
  * `null` and wrote nothing.
  *
  * It cannot disagree with `map()` because it is not a second opinion: both
- * evaluate `resolveEventKind(rawEventName(event))`, and `map()` returns `null`
+ * evaluate `CodingAgentSessionEventsMapProjection.resolveEventKind(CodingAgentSessionEventsMapProjection.rawEventName(event))`, and `map()` returns `null`
  * on exactly the answer this returns `false` on. Any future reason for `map()`
  * to decline an event must be added BELOW that check, never inside
  * `resolveEventKind`, or the gate silently narrows with it.
@@ -152,17 +152,23 @@ export class CodingAgentSessionEventsMapProjection
   }
 
   static accepts(event: Event): boolean {
-    return resolveEventKind(rawEventName(event)) !== null;
+    return (
+      CodingAgentSessionEventsMapProjection.resolveEventKind(
+        CodingAgentSessionEventsMapProjection.rawEventName(event),
+      ) !== null
+    );
   }
 
   mapCodingAgentSessionLogFactsContributed(
     event: LogFactsContributedEvent,
   ): CodingAgentSessionEventRecord | null {
     const facts = event.data.facts;
-    const eventKind = resolveEventKind(rawEventName(event));
+    const eventKind = CodingAgentSessionEventsMapProjection.resolveEventKind(
+      CodingAgentSessionEventsMapProjection.rawEventName(event),
+    );
     if (eventKind === null) return null;
 
-    const querySource = str(facts.query_source);
+    const querySource = CodingAgentSessionEventsMapProjection.str(facts.query_source);
 
     return {
       tenantId: event.data.tenantId,
@@ -174,105 +180,116 @@ export class CodingAgentSessionEventsMapProjection
       sessionKeySource: event.data.sessionKeySource,
       traceId: event.data.traceId ?? "",
       spanId: event.data.spanId ?? "",
-      promptId: str(facts["prompt.id"]),
+      promptId: CodingAgentSessionEventsMapProjection.str(facts["prompt.id"]),
       querySource,
-      agentType: resolveAgentType(facts, querySource),
-      eventSequence: int(facts["event.sequence"], -1),
-      requestId: str(facts.request_id),
-      model: str(facts.model) || str(facts["gen_ai.request.model"]),
-      inputTokens: nat(facts.input_tokens),
-      outputTokens: nat(facts.output_tokens),
-      cacheReadTokens: nat(facts.cache_read_tokens),
-      cacheCreationTokens: nat(facts.cache_creation_tokens),
-      costUsd: num(facts.cost_usd),
-      durationMs: nat(facts.duration_ms),
-      ttftMs: nat(facts.ttft_ms),
-      attempt: nat(facts.attempt),
-      speed: str(facts.speed),
-      stopReason: str(facts.stop_reason),
-      preTokens: nat(facts.pre_tokens),
-      postTokens: nat(facts.post_tokens),
-      compactionTrigger: eventKind === "compaction" ? str(facts.trigger) : "",
-      precomputeReuse: str(facts.precompute_reuse),
-      statusCode: str(facts.status_code),
-      errorType: str(facts.error_type),
+      agentType: CodingAgentSessionEventsMapProjection.resolveAgentType(facts, querySource),
+      eventSequence: CodingAgentSessionEventsMapProjection.int(facts["event.sequence"], -1),
+      requestId: CodingAgentSessionEventsMapProjection.str(facts.request_id),
+      model:
+        CodingAgentSessionEventsMapProjection.str(facts.model) ||
+        CodingAgentSessionEventsMapProjection.str(facts["gen_ai.request.model"]),
+      inputTokens: CodingAgentSessionEventsMapProjection.nat(facts.input_tokens),
+      outputTokens: CodingAgentSessionEventsMapProjection.nat(facts.output_tokens),
+      cacheReadTokens: CodingAgentSessionEventsMapProjection.nat(facts.cache_read_tokens),
+      cacheCreationTokens: CodingAgentSessionEventsMapProjection.nat(facts.cache_creation_tokens),
+      costUsd: CodingAgentSessionEventsMapProjection.num(facts.cost_usd),
+      durationMs: CodingAgentSessionEventsMapProjection.nat(facts.duration_ms),
+      ttftMs: CodingAgentSessionEventsMapProjection.nat(facts.ttft_ms),
+      attempt: CodingAgentSessionEventsMapProjection.nat(facts.attempt),
+      speed: CodingAgentSessionEventsMapProjection.str(facts.speed),
+      stopReason: CodingAgentSessionEventsMapProjection.str(facts.stop_reason),
+      preTokens: CodingAgentSessionEventsMapProjection.nat(facts.pre_tokens),
+      postTokens: CodingAgentSessionEventsMapProjection.nat(facts.post_tokens),
+      compactionTrigger:
+        eventKind === "compaction" ? CodingAgentSessionEventsMapProjection.str(facts.trigger) : "",
+      precomputeReuse: CodingAgentSessionEventsMapProjection.str(facts.precompute_reuse),
+      statusCode: CodingAgentSessionEventsMapProjection.str(facts.status_code),
+      errorType: CodingAgentSessionEventsMapProjection.str(facts.error_type),
       // `event` or `info`: which of Claude's two rate-limit carriers reported
       // this row, not the dimension that was limited.
       rateLimitCarrier:
-        eventKind === "rate_limit" ? bare(str(facts["event.name"])).replace("rate_limit_", "") : "",
-      retryDurationMs: nat(facts.total_retry_duration_ms),
-      toolName: str(facts.tool_name),
-      success: str(facts.success),
-      decision: str(facts.decision),
-      decisionSource: str(facts.decision_source),
-      toolInputBytes: nat(facts.tool_input_size_bytes),
-      toolResultBytes: nat(facts.tool_result_size_bytes),
-      promptChars: nat(facts.prompt_length),
-      totalTokens: nat(facts.total_tokens),
+        eventKind === "rate_limit"
+          ? CodingAgentSessionEventsMapProjection.bare(
+              CodingAgentSessionEventsMapProjection.str(facts["event.name"]),
+            ).replace("rate_limit_", "")
+          : "",
+      retryDurationMs: CodingAgentSessionEventsMapProjection.nat(facts.total_retry_duration_ms),
+      toolName: CodingAgentSessionEventsMapProjection.str(facts.tool_name),
+      success: CodingAgentSessionEventsMapProjection.str(facts.success),
+      decision: CodingAgentSessionEventsMapProjection.str(facts.decision),
+      decisionSource: CodingAgentSessionEventsMapProjection.str(facts.decision_source),
+      toolInputBytes: CodingAgentSessionEventsMapProjection.nat(facts.tool_input_size_bytes),
+      toolResultBytes: CodingAgentSessionEventsMapProjection.nat(facts.tool_result_size_bytes),
+      promptChars: CodingAgentSessionEventsMapProjection.nat(facts.prompt_length),
+      totalTokens: CodingAgentSessionEventsMapProjection.nat(facts.total_tokens),
     };
   }
-}
 
-function resolveEventKind(rawName: string): string | null {
-  if (rawName === "") return null;
-  return EVENT_KIND_BY_RAW_NAME[bare(rawName)] ?? null;
-}
-
-/**
- * The raw wire event name off a contribution, read totally.
- *
- * Shared by `map()` and the enqueue filter so the two read the same field the
- * same way. Structural rather than schema-parsed on purpose: the filter runs on
- * the dispatch hot path with no retry behind it, and a body shape it cannot
- * read is an event with no name, which is already the "no row" answer.
- */
-function rawEventName(event: { data?: unknown }): string {
-  const parsed = contributionEventDataSchema.safeParse(event.data);
-  return parsed.success ? str(parsed.data.facts["event.name"]) : "";
-}
-
-/** `claude_code.api_refusal` and `api_refusal` are the same wire word. */
-function bare(rawName: string): string {
-  const dot = rawName.lastIndexOf(".");
-  return dot === -1 ? rawName : rawName.slice(dot + 1);
-}
-
-/**
- * The sub-agent type for the row: an explicit agent_type/subagent_type fact
- * (sub-agent lifecycle events carry one), else parsed off an `agent:*` query
- * source (`agent:builtin:general-purpose` is a sub-agent's own model call).
- */
-function resolveAgentType(facts: ContributionFacts, querySource: string): string {
-  const explicit = str(facts.agent_type) || str(facts.subagent_type);
-  if (explicit !== "") return explicit;
-  if (querySource.startsWith("agent:")) {
-    const lastColon = querySource.lastIndexOf(":");
-    return querySource.slice(lastColon + 1);
+  private static resolveEventKind(rawName: string): string | null {
+    if (rawName === "") return null;
+    return EVENT_KIND_BY_RAW_NAME[CodingAgentSessionEventsMapProjection.bare(rawName)] ?? null;
   }
-  return "";
-}
 
-function str(value: string | number | boolean | undefined): string {
-  if (value === undefined) return "";
-  return String(value);
-}
-
-function num(value: string | number | boolean | undefined): number {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
+  /**
+   * The raw wire event name off a contribution, read totally.
+   *
+   * Shared by `map()` and the enqueue filter so the two read the same field the
+   * same way. Structural rather than schema-parsed on purpose: the filter runs on
+   * the dispatch hot path with no retry behind it, and a body shape it cannot
+   * read is an event with no name, which is already the "no row" answer.
+   */
+  private static rawEventName(event: { data?: unknown }): string {
+    const parsed = contributionEventDataSchema.safeParse(event.data);
+    return parsed.success
+      ? CodingAgentSessionEventsMapProjection.str(parsed.data.facts["event.name"])
+      : "";
   }
-  return 0;
-}
 
-function nat(value: string | number | boolean | undefined): number {
-  const parsed = num(value);
-  return parsed > 0 ? Math.round(parsed) : 0;
-}
+  /** `claude_code.api_refusal` and `api_refusal` are the same wire word. */
+  private static bare(rawName: string): string {
+    const dot = rawName.lastIndexOf(".");
+    return dot === -1 ? rawName : rawName.slice(dot + 1);
+  }
 
-function int(value: string | number | boolean | undefined, absent: number): number {
-  if (value === undefined) return absent;
-  const parsed = num(value);
-  return Number.isInteger(parsed) ? parsed : absent;
+  /**
+   * The sub-agent type for the row: an explicit agent_type/subagent_type fact
+   * (sub-agent lifecycle events carry one), else parsed off an `agent:*` query
+   * source (`agent:builtin:general-purpose` is a sub-agent's own model call).
+   */
+  private static resolveAgentType(facts: ContributionFacts, querySource: string): string {
+    const explicit =
+      CodingAgentSessionEventsMapProjection.str(facts.agent_type) ||
+      CodingAgentSessionEventsMapProjection.str(facts.subagent_type);
+    if (explicit !== "") return explicit;
+    if (querySource.startsWith("agent:")) {
+      const lastColon = querySource.lastIndexOf(":");
+      return querySource.slice(lastColon + 1);
+    }
+    return "";
+  }
+
+  private static str(value: string | number | boolean | undefined): string {
+    if (value === undefined) return "";
+    return String(value);
+  }
+
+  private static num(value: string | number | boolean | undefined): number {
+    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
+  }
+
+  private static nat(value: string | number | boolean | undefined): number {
+    const parsed = CodingAgentSessionEventsMapProjection.num(value);
+    return parsed > 0 ? Math.round(parsed) : 0;
+  }
+
+  private static int(value: string | number | boolean | undefined, absent: number): number {
+    if (value === undefined) return absent;
+    const parsed = CodingAgentSessionEventsMapProjection.num(value);
+    return Number.isInteger(parsed) ? parsed : absent;
+  }
 }

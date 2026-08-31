@@ -6,13 +6,11 @@ import { describe, expect, it, vi } from "vitest";
 import type { TraceAnalyticsRepository } from "@langwatch/trace-server";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 import {
-  projectAnalyticsStateToRow,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsRow,
-  traceAnalyticsStateFromRow,
 } from "@langwatch/trace-server";
 import { TraceAnalyticsStore } from "@langwatch/trace-server";
 import { createSpanReceivedEvent } from "./fixtures/trace-summary-test.fixtures";
@@ -36,7 +34,7 @@ const projection = TraceAnalyticsFoldProjection.create({
 });
 
 function project(state: TraceAnalyticsData): TraceAnalyticsRow {
-  return projectAnalyticsStateToRow({
+  return TraceAnalyticsFoldProjection.projectAnalyticsStateToRow({
     state,
     tenantId: TENANT,
     version: TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
@@ -93,7 +91,7 @@ describe("traceAnalytics read-back (fromRow)", () => {
   describe("given a committed slim row", () => {
     const state = committedState();
     const row = project(state);
-    const decoded = traceAnalyticsStateFromRow(row);
+    const decoded = TraceAnalyticsFoldProjection.traceAnalyticsStateFromRow(row);
 
     it("keeps the storage anchor and the span timing baseline apart", () => {
       // The anchor rides in OccurredAt (partition + sort key + TTL) and the
@@ -158,7 +156,7 @@ describe("traceAnalytics read-back (fromRow)", () => {
         earliestSpanStartMs: 0,
       };
 
-      const decoded = traceAnalyticsStateFromRow(legacyRow);
+      const decoded = TraceAnalyticsFoldProjection.traceAnalyticsStateFromRow(legacyRow);
 
       // The real analytics columns still round-trip.
       expect(decoded.traceName).toBe("My Trace");
@@ -250,7 +248,7 @@ describe("TraceAnalyticsStore read-back version gate", () => {
 
     /** @scenario "A trace recorded before the upgrade keeps its place in the timeline" */
     it("takes the timing baseline from the anchor's column, because there they are the same value", () => {
-      const state = traceAnalyticsStateFromRow(preSplitRow());
+      const state = TraceAnalyticsFoldProjection.traceAnalyticsStateFromRow(preSplitRow());
 
       // Both read off OccurredAt: pre-split, that column WAS min(span start).
       expect(state.storageAnchorMs).toBe(BASE_MS + 250);
@@ -262,7 +260,9 @@ describe("TraceAnalyticsStore read-back version gate", () => {
       // The point of decoding rather than refolding: re-projecting the decoded
       // state must reproduce the same partition column, so the row is rewritten
       // onto its own sort key rather than a second one.
-      const rewritten = project(traceAnalyticsStateFromRow(preSplitRow()));
+      const rewritten = project(
+        TraceAnalyticsFoldProjection.traceAnalyticsStateFromRow(preSplitRow()),
+      );
 
       expect(rewritten.occurredAtMs).toBe(BASE_MS + 250);
     });
@@ -271,7 +271,9 @@ describe("TraceAnalyticsStore read-back version gate", () => {
       // The 196952 row this whole change exists to rescue. It carries 0, which
       // is right twice over — no span was ever folded, and an unusable anchor
       // is what lets the next contribution freeze a real one.
-      const state = traceAnalyticsStateFromRow(preSplitRow({ occurredAtMs: 0 }));
+      const state = TraceAnalyticsFoldProjection.traceAnalyticsStateFromRow(
+        preSplitRow({ occurredAtMs: 0 }),
+      );
 
       expect(state.storageAnchorMs).toBe(0);
       expect(state.occurredAt).toBe(0);
@@ -400,7 +402,9 @@ describe("TraceAnalyticsStore read-back version gate", () => {
     describe("when a late span that would otherwise supply a name arrives", () => {
       /** @scenario a user-visible name survives a late unrelated contribution */
       it("keeps the person's name across the recovery", () => {
-        const recovered = traceAnalyticsStateFromRow(project(renamed()));
+        const recovered = TraceAnalyticsFoldProjection.traceAnalyticsStateFromRow(
+          project(renamed()),
+        );
 
         expect(projection.apply(recovered, lateNamingSpan()).traceName).toBe("Renamed by a human");
       });
@@ -418,7 +422,10 @@ describe("TraceAnalyticsStore read-back version gate", () => {
 
         // Read back, that row's own decoding lets the late span take the name.
         expect(
-          projection.apply(traceAnalyticsStateFromRow(olderShape), lateNamingSpan()).traceName,
+          projection.apply(
+            TraceAnalyticsFoldProjection.traceAnalyticsStateFromRow(olderShape),
+            lateNamingSpan(),
+          ).traceName,
         ).toBe("llm-call");
 
         // Which is why the store never hands it to the fold at all.

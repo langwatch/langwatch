@@ -2,12 +2,10 @@ import { AppTraceProjectionsAdapter } from "~/runtime/app/trace-projections.adap
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
-  projectAnalyticsStateToRow,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsRow,
-  traceAnalyticsStateFromRow,
 } from "@langwatch/trace-server";
 import { createSpanReceivedEvent, msToUnixNano } from "./fixtures/trace-summary-test.fixtures";
 
@@ -45,7 +43,7 @@ const projection = TraceAnalyticsFoldProjection.create({
 });
 
 function project(state: TraceAnalyticsData): TraceAnalyticsRow {
-  return projectAnalyticsStateToRow({
+  return TraceAnalyticsFoldProjection.projectAnalyticsStateToRow({
     state,
     tenantId: TENANT,
     version: TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
@@ -54,7 +52,7 @@ function project(state: TraceAnalyticsData): TraceAnalyticsRow {
 
 /** The persistence boundary, round-tripped: state → row → state. */
 function roundTrip(state: TraceAnalyticsData): TraceAnalyticsData {
-  return traceAnalyticsStateFromRow(project(state));
+  return TraceAnalyticsFoldProjection.traceAnalyticsStateFromRow(project(state));
 }
 
 type FoldEvent = { type: string };
