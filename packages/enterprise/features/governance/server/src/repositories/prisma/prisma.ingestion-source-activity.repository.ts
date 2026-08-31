@@ -239,23 +239,6 @@ const ATTR_INGESTION_SOURCE_ID = GOVERNANCE_ATTR.INGESTION_SOURCE_ID;
 const ATTR_USER_ID = GOVERNANCE_ATTR.USER_ID;
 const ORIGIN_KIND_VALUE = GOVERNANCE_ORIGIN_KIND_VALUE;
 
-function pctChange(current: number, previous: number): number {
-  if (previous === 0) return current === 0 ? 0 : 100;
-  return ((current - previous) / previous) * 100;
-}
-
-function extractSourceLabel(detail: unknown): string {
-  const d = (detail as Record<string, unknown>) ?? {};
-  if (typeof d.sourceLabel === "string") return d.sourceLabel;
-  if (typeof d.source === "string") return d.source;
-  return "";
-}
-
-function startOfUtcDay(ms: number): number {
-  const d = new Date(ms);
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0);
-}
-
 /**
  * The usage numbers carried on a stored pulled OCSF row's
  * `metadata.extension`.
@@ -297,26 +280,6 @@ const pulledUsageExtensionSchema = z
     tokens_output: z.coerce.number().finite().catch(0),
   })
   .catch(ZERO_PULLED_USAGE);
-
-function pulledUsageFromRawOcsf(rawPayload: string): {
-  costUsd: string;
-  tokensInput: number;
-  tokensOutput: number;
-} {
-  let extension: unknown;
-  try {
-    extension = (JSON.parse(rawPayload) as { metadata?: { extension?: unknown } })?.metadata
-      ?.extension;
-  } catch {
-    extension = null;
-  }
-  const usage = pulledUsageExtensionSchema.parse(extension ?? {});
-  return {
-    costUsd: usage.cost_usd,
-    tokensInput: usage.tokens_input,
-    tokensOutput: usage.tokens_output,
-  };
-}
 
 /** One `(sourceId, count)` pair from any of the per-source count queries. */
 type SourceEventCountRow = { sourceId: string; c: string };
@@ -363,52 +326,6 @@ type PulledEventRow = {
   createdMs: string;
   rawPayload: string;
 };
-
-function toPushedEvent(row: PushedEventRow): ActivityEventDetailRow {
-  return {
-    eventId: row.eventId,
-    eventType: row.eventType ?? "",
-    actor: row.actor ?? "",
-    action: "trace.recorded",
-    target: row.target ?? "",
-    costUsd: String(row.costUsd ?? "0"),
-    tokensInput: Number(row.tokensInput ?? 0),
-    tokensOutput: Number(row.tokensOutput ?? 0),
-    eventTimestampIso: new Date(Number(row.occurredMs)).toISOString(),
-    ingestedAtIso: new Date(Number(row.createdMs)).toISOString(),
-    rawPayload: "",
-  };
-}
-
-function toPulledEvent(row: PulledEventRow): ActivityEventDetailRow {
-  return {
-    eventId: row.eventId,
-    eventType: row.eventType ?? "",
-    actor: row.actorEmail || row.actorUserId || row.actorEnduserId || "",
-    action: row.action ?? "",
-    target: row.target ?? "",
-    ...pulledUsageFromRawOcsf(row.rawPayload),
-    eventTimestampIso: new Date(Number(row.occurredMs)).toISOString(),
-    ingestedAtIso: new Date(Number(row.createdMs)).toISOString(),
-    rawPayload: row.rawPayload,
-  };
-}
-
-function emptySourceHealthMetrics(): SourceHealthMetrics {
-  return { events24h: 0, events7d: 0, events30d: 0, lastSuccessIso: null };
-}
-
-function emptyDenseBuckets(windowStartMs: number, windowDays: number): SpendOverTimeBucket[] {
-  const dayMs = 24 * 60 * 60 * 1000;
-  const buckets: SpendOverTimeBucket[] = [];
-  for (let i = 0; i < windowDays; i++) {
-    buckets.push({
-      bucketIso: new Date(windowStartMs + i * dayMs).toISOString(),
-      points: [],
-    });
-  }
-  return buckets;
-}
 
 export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
   private constructor(
@@ -512,7 +429,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
 
     return {
       spentThisWindowUsd: thisSpend,
-      windowOverPreviousPct: pctChange(thisSpend, prevSpend),
+      windowOverPreviousPct: PrismaActivityMonitorRepository.pctChange(thisSpend, prevSpend),
       hasPriorBaseline: prevSpend > 0,
       activeUsersThisWindow: thisUsers,
       // newUsers requires a baseline-window comparison query which is a
@@ -971,7 +888,10 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
         teamName: t.teamName,
         spendUsd: nanoUsdToDecimalString(t.thisSpendNano),
         requestCount: t.requestCount,
-        deltaPctVsPriorWindow: pctChange(Number(t.thisSpendNano), Number(t.prevSpendNano)),
+        deltaPctVsPriorWindow: PrismaActivityMonitorRepository.pctChange(
+          Number(t.thisSpendNano),
+          Number(t.prevSpendNano),
+        ),
         hasPriorBaseline: t.prevSpendNano > 0n,
         lastActivityIso: t.lastActivityMs > 0 ? new Date(t.lastActivityMs).toISOString() : null,
         sourceCount: t.sourceCount,
@@ -1009,17 +929,21 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
     const windowDays = Math.max(1, Math.floor(input.windowDays));
     const dayMs = 24 * 60 * 60 * 1000;
     const now = Date.now();
-    const todayStart = startOfUtcDay(now);
+    const todayStart = PrismaActivityMonitorRepository.startOfUtcDay(now);
     const windowStart = todayStart - (windowDays - 1) * dayMs;
 
     const govProjectId = await this.tryResolveGovProjectId(input.organizationId);
     if (!govProjectId) {
-      return { buckets: emptyDenseBuckets(windowStart, windowDays) };
+      return {
+        buckets: PrismaActivityMonitorRepository.emptyDenseBuckets(windowStart, windowDays),
+      };
     }
 
     const ch = await this.tryGetClickhouse(input.organizationId);
     if (!ch) {
-      return { buckets: emptyDenseBuckets(windowStart, windowDays) };
+      return {
+        buckets: PrismaActivityMonitorRepository.emptyDenseBuckets(windowStart, windowDays),
+      };
     }
 
     const groupExpr =
@@ -1143,7 +1067,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
       aggregated.set(k, (aggregated.get(k) ?? 0n) + r.spendNanoUsd);
     }
 
-    const buckets = emptyDenseBuckets(windowStart, windowDays);
+    const buckets = PrismaActivityMonitorRepository.emptyDenseBuckets(windowStart, windowDays);
     const bucketIndexByMs = new Map(buckets.map((b, i) => [Date.parse(b.bucketIso), i] as const));
     for (const [composite, spendNanoUsd] of aggregated.entries()) {
       const sep = composite.indexOf("::");
@@ -1208,7 +1132,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
       // Back-compat aliases for the existing /governance dashboard
       // (renderer was sketched against the iter-10 mock shape).
       rule: row.ruleName,
-      sourceLabel: extractSourceLabel(row.detail),
+      sourceLabel: PrismaActivityMonitorRepository.extractSourceLabel(row.detail),
     }));
   }
 
@@ -1408,7 +1332,9 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
       },
       format: "JSONEachRow",
     });
-    return ((await result.json()) as PushedEventRow[]).map(toPushedEvent);
+    return ((await result.json()) as PushedEventRow[]).map((row) =>
+      PrismaActivityMonitorRepository.toPushedEvent(row),
+    );
   }
 
   /**
@@ -1460,7 +1386,9 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
       },
       format: "JSONEachRow",
     });
-    return ((await result.json()) as PulledEventRow[]).map(toPulledEvent);
+    return ((await result.json()) as PulledEventRow[]).map((row) =>
+      PrismaActivityMonitorRepository.toPulledEvent(row),
+    );
   }
 
   async eventsForSource(input: {
@@ -1621,10 +1549,10 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
     sourceId: string;
   }): Promise<SourceHealthMetrics> {
     const govProjectId = await this.tryResolveGovProjectId(input.organizationId);
-    if (!govProjectId) return emptySourceHealthMetrics();
+    if (!govProjectId) return PrismaActivityMonitorRepository.emptySourceHealthMetrics();
 
     const ch = await this.tryGetClickhouse(input.organizationId);
-    if (!ch) return emptySourceHealthMetrics();
+    if (!ch) return PrismaActivityMonitorRepository.emptySourceHealthMetrics();
 
     const now = Date.now();
     const day = 24 * 60 * 60 * 1000;
@@ -1654,5 +1582,91 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
       events30d: total((r) => r.c30),
       lastSuccessIso: lastMs > 0 ? new Date(lastMs).toISOString() : null,
     };
+  }
+
+  private static pctChange(current: number, previous: number): number {
+    if (previous === 0) return current === 0 ? 0 : 100;
+    return ((current - previous) / previous) * 100;
+  }
+
+  private static extractSourceLabel(detail: unknown): string {
+    const d = (detail as Record<string, unknown>) ?? {};
+    if (typeof d.sourceLabel === "string") return d.sourceLabel;
+    if (typeof d.source === "string") return d.source;
+    return "";
+  }
+
+  private static startOfUtcDay(ms: number): number {
+    const d = new Date(ms);
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0);
+  }
+
+  private static pulledUsageFromRawOcsf(rawPayload: string): {
+    costUsd: string;
+    tokensInput: number;
+    tokensOutput: number;
+  } {
+    let extension: unknown;
+    try {
+      extension = (JSON.parse(rawPayload) as { metadata?: { extension?: unknown } })?.metadata
+        ?.extension;
+    } catch {
+      extension = null;
+    }
+    const usage = pulledUsageExtensionSchema.parse(extension ?? {});
+    return {
+      costUsd: usage.cost_usd,
+      tokensInput: usage.tokens_input,
+      tokensOutput: usage.tokens_output,
+    };
+  }
+
+  private static toPushedEvent(row: PushedEventRow): ActivityEventDetailRow {
+    return {
+      eventId: row.eventId,
+      eventType: row.eventType ?? "",
+      actor: row.actor ?? "",
+      action: "trace.recorded",
+      target: row.target ?? "",
+      costUsd: String(row.costUsd ?? "0"),
+      tokensInput: Number(row.tokensInput ?? 0),
+      tokensOutput: Number(row.tokensOutput ?? 0),
+      eventTimestampIso: new Date(Number(row.occurredMs)).toISOString(),
+      ingestedAtIso: new Date(Number(row.createdMs)).toISOString(),
+      rawPayload: "",
+    };
+  }
+
+  private static toPulledEvent(row: PulledEventRow): ActivityEventDetailRow {
+    return {
+      eventId: row.eventId,
+      eventType: row.eventType ?? "",
+      actor: row.actorEmail || row.actorUserId || row.actorEnduserId || "",
+      action: row.action ?? "",
+      target: row.target ?? "",
+      ...PrismaActivityMonitorRepository.pulledUsageFromRawOcsf(row.rawPayload),
+      eventTimestampIso: new Date(Number(row.occurredMs)).toISOString(),
+      ingestedAtIso: new Date(Number(row.createdMs)).toISOString(),
+      rawPayload: row.rawPayload,
+    };
+  }
+
+  private static emptySourceHealthMetrics(): SourceHealthMetrics {
+    return { events24h: 0, events7d: 0, events30d: 0, lastSuccessIso: null };
+  }
+
+  private static emptyDenseBuckets(
+    windowStartMs: number,
+    windowDays: number,
+  ): SpendOverTimeBucket[] {
+    const dayMs = 24 * 60 * 60 * 1000;
+    const buckets: SpendOverTimeBucket[] = [];
+    for (let i = 0; i < windowDays; i++) {
+      buckets.push({
+        bucketIso: new Date(windowStartMs + i * dayMs).toISOString(),
+        points: [],
+      });
+    }
+    return buckets;
   }
 }

@@ -202,69 +202,13 @@ interface ClickHouseReadRow {
   TotalTokens: string;
 }
 
-/** One row's columns, written verbatim: the table carries typed scalars only. */
-function toWriteRecord(
-  record: CodingAgentSessionEventRecord,
-  writtenAt: Date,
-  retentionDays: number,
-): ClickHouseWriteRecord {
-  return {
-    TenantId: record.tenantId,
-    SessionId: record.sessionId,
-    TimeUnixMs: new Date(record.timeUnixMs),
-    RecordId: record.recordId,
-    EventKind: record.eventKind,
-    Agent: record.agent,
-    SessionKeySource: record.sessionKeySource,
-    TraceId: record.traceId,
-    SpanId: record.spanId,
-    PromptId: record.promptId,
-    QuerySource: record.querySource,
-    AgentType: record.agentType,
-    EventSequence: record.eventSequence,
-    RequestId: record.requestId,
-    Model: record.model,
-    InputTokens: record.inputTokens,
-    OutputTokens: record.outputTokens,
-    CacheReadTokens: record.cacheReadTokens,
-    CacheCreationTokens: record.cacheCreationTokens,
-    CostUsd: record.costUsd,
-    DurationMs: record.durationMs,
-    TtftMs: record.ttftMs,
-    Attempt: record.attempt,
-    Speed: record.speed,
-    StopReason: record.stopReason,
-    PreTokens: record.preTokens,
-    PostTokens: record.postTokens,
-    CompactionTrigger: record.compactionTrigger,
-    PrecomputeReuse: record.precomputeReuse,
-    StatusCode: record.statusCode,
-    ErrorType: record.errorType,
-    RateLimitCarrier: record.rateLimitCarrier,
-    RetryDurationMs: record.retryDurationMs,
-    ToolName: record.toolName,
-    Success: record.success,
-    Decision: record.decision,
-    DecisionSource: record.decisionSource,
-    ToolInputBytes: record.toolInputBytes,
-    ToolResultBytes: record.toolResultBytes,
-    PromptChars: record.promptChars,
-    TotalTokens: record.totalTokens,
-    UpdatedAt: writtenAt,
-    _retention_days: retentionDays,
-  };
-}
-
 export class CodingAgentSessionEventsClickHouseRepository implements SessionEventsRepository {
   constructor(
     private readonly clickHouse: CodingAgentClickHousePort,
     private readonly defaultTraceRetentionDays: number,
   ) {}
 
-  async ensure(
-    records: CodingAgentSessionEventRecord[],
-    retentionDays?: number,
-  ): Promise<void> {
+  async ensure(records: CodingAgentSessionEventRecord[], retentionDays?: number): Promise<void> {
     const [first] = records;
     if (!first) return;
 
@@ -288,7 +232,11 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
 
     const now = new Date();
     const values: ClickHouseWriteRecord[] = records.map((record) =>
-      toWriteRecord(record, now, retentionDays ?? this.defaultTraceRetentionDays),
+      CodingAgentSessionEventsClickHouseRepository.toWriteRecord(
+        record,
+        now,
+        retentionDays ?? this.defaultTraceRetentionDays,
+      ),
     );
 
     const client = await this.clickHouse.resolve(tenantId);
@@ -373,7 +321,7 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
     });
 
     const rows = await result.json<ClickHouseReadRow>();
-    const events = rows.map(mapRow);
+    const events = rows.map((row) => CodingAgentSessionEventsClickHouseRepository.mapRow(row));
     const last = events[events.length - 1];
     return {
       events,
@@ -496,6 +444,104 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       costUsd: Number(row.CostUsd),
     }));
   }
+
+  /** One row's columns, written verbatim: the table carries typed scalars only. */
+  private static toWriteRecord(
+    record: CodingAgentSessionEventRecord,
+    writtenAt: Date,
+    retentionDays: number,
+  ): ClickHouseWriteRecord {
+    return {
+      TenantId: record.tenantId,
+      SessionId: record.sessionId,
+      TimeUnixMs: new Date(record.timeUnixMs),
+      RecordId: record.recordId,
+      EventKind: record.eventKind,
+      Agent: record.agent,
+      SessionKeySource: record.sessionKeySource,
+      TraceId: record.traceId,
+      SpanId: record.spanId,
+      PromptId: record.promptId,
+      QuerySource: record.querySource,
+      AgentType: record.agentType,
+      EventSequence: record.eventSequence,
+      RequestId: record.requestId,
+      Model: record.model,
+      InputTokens: record.inputTokens,
+      OutputTokens: record.outputTokens,
+      CacheReadTokens: record.cacheReadTokens,
+      CacheCreationTokens: record.cacheCreationTokens,
+      CostUsd: record.costUsd,
+      DurationMs: record.durationMs,
+      TtftMs: record.ttftMs,
+      Attempt: record.attempt,
+      Speed: record.speed,
+      StopReason: record.stopReason,
+      PreTokens: record.preTokens,
+      PostTokens: record.postTokens,
+      CompactionTrigger: record.compactionTrigger,
+      PrecomputeReuse: record.precomputeReuse,
+      StatusCode: record.statusCode,
+      ErrorType: record.errorType,
+      RateLimitCarrier: record.rateLimitCarrier,
+      RetryDurationMs: record.retryDurationMs,
+      ToolName: record.toolName,
+      Success: record.success,
+      Decision: record.decision,
+      DecisionSource: record.decisionSource,
+      ToolInputBytes: record.toolInputBytes,
+      ToolResultBytes: record.toolResultBytes,
+      PromptChars: record.promptChars,
+      TotalTokens: record.totalTokens,
+      UpdatedAt: writtenAt,
+      _retention_days: retentionDays,
+    };
+  }
+
+  private static mapRow(row: ClickHouseReadRow): CodingAgentSessionEventRow {
+    return {
+      sessionId: row.SessionId,
+      timeUnixMs: Number(row.TimeMs),
+      recordId: row.RecordId,
+      eventKind: row.EventKind,
+      agent: row.Agent,
+      sessionKeySource: row.SessionKeySource,
+      traceId: row.TraceId,
+      spanId: row.SpanId,
+      promptId: row.PromptId,
+      querySource: row.QuerySource,
+      agentType: row.AgentType,
+      eventSequence: Number(row.EventSequence),
+      requestId: row.RequestId,
+      model: row.Model,
+      inputTokens: Number(row.InputTokens),
+      outputTokens: Number(row.OutputTokens),
+      cacheReadTokens: Number(row.CacheReadTokens),
+      cacheCreationTokens: Number(row.CacheCreationTokens),
+      costUsd: Number(row.CostUsd),
+      durationMs: Number(row.DurationMs),
+      ttftMs: Number(row.TtftMs),
+      attempt: Number(row.Attempt),
+      speed: row.Speed,
+      stopReason: row.StopReason,
+      preTokens: Number(row.PreTokens),
+      postTokens: Number(row.PostTokens),
+      compactionTrigger: row.CompactionTrigger,
+      precomputeReuse: row.PrecomputeReuse,
+      statusCode: row.StatusCode,
+      errorType: row.ErrorType,
+      rateLimitCarrier: row.RateLimitCarrier,
+      retryDurationMs: Number(row.RetryDurationMs),
+      toolName: row.ToolName,
+      success: row.Success,
+      decision: row.Decision,
+      decisionSource: row.DecisionSource,
+      toolInputBytes: Number(row.ToolInputBytes),
+      toolResultBytes: Number(row.ToolResultBytes),
+      promptChars: Number(row.PromptChars),
+      totalTokens: Number(row.TotalTokens),
+    };
+  }
 }
 
 interface ClickHouseModelTotalsRow {
@@ -507,49 +553,4 @@ interface ClickHouseModelTotalsRow {
   CacheReadTokens: string;
   CacheCreationTokens: string;
   CostUsd: number;
-}
-
-function mapRow(row: ClickHouseReadRow): CodingAgentSessionEventRow {
-  return {
-    sessionId: row.SessionId,
-    timeUnixMs: Number(row.TimeMs),
-    recordId: row.RecordId,
-    eventKind: row.EventKind,
-    agent: row.Agent,
-    sessionKeySource: row.SessionKeySource,
-    traceId: row.TraceId,
-    spanId: row.SpanId,
-    promptId: row.PromptId,
-    querySource: row.QuerySource,
-    agentType: row.AgentType,
-    eventSequence: Number(row.EventSequence),
-    requestId: row.RequestId,
-    model: row.Model,
-    inputTokens: Number(row.InputTokens),
-    outputTokens: Number(row.OutputTokens),
-    cacheReadTokens: Number(row.CacheReadTokens),
-    cacheCreationTokens: Number(row.CacheCreationTokens),
-    costUsd: Number(row.CostUsd),
-    durationMs: Number(row.DurationMs),
-    ttftMs: Number(row.TtftMs),
-    attempt: Number(row.Attempt),
-    speed: row.Speed,
-    stopReason: row.StopReason,
-    preTokens: Number(row.PreTokens),
-    postTokens: Number(row.PostTokens),
-    compactionTrigger: row.CompactionTrigger,
-    precomputeReuse: row.PrecomputeReuse,
-    statusCode: row.StatusCode,
-    errorType: row.ErrorType,
-    rateLimitCarrier: row.RateLimitCarrier,
-    retryDurationMs: Number(row.RetryDurationMs),
-    toolName: row.ToolName,
-    success: row.Success,
-    decision: row.Decision,
-    decisionSource: row.DecisionSource,
-    toolInputBytes: Number(row.ToolInputBytes),
-    toolResultBytes: Number(row.ToolResultBytes),
-    promptChars: Number(row.PromptChars),
-    totalTokens: Number(row.TotalTokens),
-  };
 }

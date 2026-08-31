@@ -204,229 +204,6 @@ const cursorSchema = z.object({
 });
 type Cursor = z.infer<typeof cursorSchema>;
 
-function parseCursor(raw: string | null): Cursor | null {
-  if (!raw) return null;
-  try {
-    const parsed = cursorSchema.safeParse(JSON.parse(raw));
-    if (parsed.success) return parsed.data;
-  } catch {
-    // A cursor we cannot read is treated as no cursor: re-reading a window is
-    // survivable because identifiers are derived, but skipping one is not.
-  }
-  return null;
-}
-
-/**
- * Exchange the application's own credentials for a token scoped to this
- * environment.
- *
- * Minted once per run rather than per request: a run walks several pages, and
- * a token per page would multiply one sign-in across the whole walk for no
- * benefit, since the token outlives any single run.
- */
-async function resolveEnvironmentToken(params: {
-  credentials: Record<string, string> | undefined;
-  environmentUrl: string;
-  signal?: AbortSignal;
-  http: GovernanceHttpPort;
-}): Promise<string> {
-  const { credentials, environmentUrl, signal, http } = params;
-  const tenantId = credentials?.tenantId;
-  const clientId = credentials?.clientId;
-  const clientSecret = credentials?.clientSecret;
-
-  if (!tenantId || !clientId || !clientSecret) {
-    throw new Error(
-      "copilot studio dataverse puller needs credentials.tenantId, " +
-        "credentials.clientId and credentials.clientSecret from the app registration",
-    );
-  }
-
-  const body = new URLSearchParams({
-    grant_type: "client_credentials",
-    client_id: clientId,
-    client_secret: clientSecret,
-    scope: `${environmentUrl.replace(/\/+$/, "")}/.default`,
-  });
-  const timeout = AbortSignal.timeout(TOKEN_TIMEOUT_MS);
-
-  const response = await http.fetch(
-    `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/oauth2/v2.0/token`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: body.toString(),
-      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-      // This request carries the client secret itself, not a token minted
-      // from it. Following a redirect would hand it to the redirect target,
-      // and the helper follows up to ten by default.
-      followRedirects: false,
-    },
-  );
-
-  if (!response.ok) {
-    // The status alone, never the body: a token endpoint may echo the request
-    // back, and this reason is logged and shown on the source.
-    throw new Error(
-      "copilot studio dataverse puller could not sign in: Microsoft refused " +
-        `the application's credentials (HTTP ${response.status})`,
-    );
-  }
-
-  const parsed = tokenResponseSchema.safeParse(await response.json());
-  if (!parsed.success) {
-    // A proxy or captive portal answering 200 with something that is not a
-    // token must not be carried forward as one — it would fail later as an
-    // unauthorised Dataverse call and read as a permissions problem.
-    throw new Error(
-      "copilot studio dataverse puller could not sign in: Microsoft answered " +
-        "the sign-in without an access token",
-    );
-  }
-  return parsed.data.access_token;
-}
-
-/**
- * Where a run picks up from, as OData.
- *
- * This is a lexicographic "everything after (T, I)" over the pair the rows are
- * sorted by, and it has to be exactly that. The obvious shorter form — every
- * row at or after T except the one already seen — is not a total order: on a
- * timestamp holding several rows it re-reads the ones with smaller ids, so a
- * run whose cursor is B hands back A, saves A, and the next run hands back B
- * again. The pair alternates forever, the same transcripts are reprocessed
- * every run, and no later row is ever reached.
- *
- * The leading `ge` says nothing the disjunction does not already say. It is
- * kept because it is the plain range bound the server can seek `createdon` on,
- * where the `or` on its own invites a scan of the window.
- */
-function continuationFilters(cursor: Cursor): string[] {
-  return [
-    `createdon ge ${cursor.createdon}`,
-    `(createdon gt ${cursor.createdon} or (createdon eq ${cursor.createdon}` +
-      ` and conversationtranscriptid gt ${cursor.conversationtranscriptid}))`,
-  ];
-}
-
-function buildFirstPageUrl(params: {
-  environmentUrl: string;
-  config: CopilotStudioDataverseConfig;
-  cursor: Cursor | null;
-  now: number;
-}): string {
-  const { environmentUrl, config, cursor, now } = params;
-  const base = `${environmentUrl.replace(/\/+$/, "")}/api/data/${API_VERSION}/conversationtranscripts`;
-
-  const filters = cursor
-    ? continuationFilters(cursor)
-    : [`createdon ge ${new Date(now - FIRST_RUN_LOOKBACK_MS).toISOString()}`];
-  if (config.botIds.length > 0) {
-    // Bare, not quoted. The lookup column is an `Edm.Guid`, and Dataverse
-    // refuses to compare one against a string literal: a quoted id answers
-    // every run with "a binary operator with incompatible types was detected",
-    // an HTTP 400 that names neither the filter nor the column. The schema
-    // requires these to be uuids, which is what makes writing them unquoted
-    // safe. Contrast the transcript id in `continuationFilters`, which is the
-    // same column type and already bare for the same reason.
-    const clause = config.botIds
-      .map((id) => `_bot_conversationtranscriptid_value eq ${id}`)
-      .join(" or ");
-    filters.push(`(${clause})`);
-  }
-
-  // Built by hand rather than with URLSearchParams, which encodes a space as
-  // `+`. That is form encoding; OData specifies percent-encoding, and a
-  // `$filter` whose spaces arrive as plus signs is at the mercy of how the
-  // server chooses to read them.
-  const query: [string, string][] = [
-    [
-      "$select",
-      "conversationtranscriptid,name,conversationstarttime,createdon,content," +
-        "metadata,schematype,schemaversion,_bot_conversationtranscriptid_value",
-    ],
-    ["$filter", filters.join(" and ")],
-    ["$orderby", TRANSCRIPT_ORDER_BY],
-    ["$top", String(PAGE_SIZE)],
-    // No `$expand` here. The agent arrives as the raw lookup id and the run
-    // reads the `bot` table once to put a name on it. Asking Dataverse to join
-    // would save that read, but it means naming a navigation property, and the
-    // reads proven against a real environment all take the lookup column and
-    // join it themselves.
-  ];
-  return `${base}?${query.map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join("&")}`;
-}
-
-/**
- * Dataverse writes lookup ids in one case and there is no promise both sides of
- * a join agree on it, so the key is folded before it is stored or read. A miss
- * here is silent — a conversation with no agent name — which is exactly the
- * kind of fault that survives a review.
- */
-function botKey(id: string): string {
-  return id.toLowerCase();
-}
-
-/** The agents on one page of the `bot` table, keyed by folded lookup id. */
-function readBotRows(rows: unknown[]): Map<string, BotRecord> {
-  const bots = new Map<string, BotRecord>();
-  for (const raw of rows) {
-    const parsed = botRowSchema.safeParse(raw);
-    if (!parsed.success) continue;
-    const row = parsed.data;
-    bots.set(botKey(row.botid), {
-      botName: row.name ?? undefined,
-      botModifiedOn: row.modifiedon ?? undefined,
-    });
-  }
-  return bots;
-}
-
-/**
- * Say so when the agent list came back short, in either of the two ways it can.
- *
- * Neither is an error — the conversations are the point and a name is a
- * nicety — so the only thing standing between the customer and unnamed
- * conversations with no explanation is a line in the log.
- */
-function warnAboutIncompleteBotList(params: { botCount: number; hasMorePages: boolean }): void {
-  const { botCount, hasMorePages } = params;
-
-  if (hasMorePages) {
-    logger.warn(
-      { read: botCount },
-      "copilot studio dataverse: more agents than one read returns; conversations belonging to the rest get no name",
-    );
-  }
-
-  // An empty list is the shape a misconfigured role arrives in, and it is
-  // the quiet one. A role that reads the agent table at the wrong depth is
-  // answered with 200 and no rows rather than a refusal, because the
-  // application user owns none of them — indistinguishable from a tenant
-  // that genuinely has no agents, except that a run reading conversations
-  // written by an agent has just been told there are none.
-  if (botCount === 0) {
-    logger.warn(
-      "copilot studio dataverse: the environment reports no agents at all; if conversations are arriving unnamed the credential most likely reads the agent table at the wrong depth",
-    );
-  }
-}
-
-function botFactsOf(params: {
-  row: z.infer<typeof transcriptRowSchema>;
-  bots: Map<string, BotRecord>;
-}): Record<string, string> {
-  const { row, bots } = params;
-  const id = row._bot_conversationtranscriptid_value;
-  if (!id) return {};
-  const record = bots.get(botKey(id));
-  if (!record) return {};
-  const facts: Record<string, string> = {};
-  if (record.botName) facts.botName = record.botName;
-  if (record.botModifiedOn) facts.botModifiedOn = record.botModifiedOn;
-  return facts;
-}
-
 /**
  * What a walk of this run's pages has read so far.
  *
@@ -444,181 +221,6 @@ interface TranscriptWalk {
   events: NormalizedPullEvent[];
   errorCount: number;
   last: Cursor | null;
-}
-
-/**
- * One transcript row as the event it becomes and the cursor it advances to,
- * or null when the row is shaped unlike the rest.
- *
- * This is where a fact read off the row turns into something a reader sees,
- * so a field added to the query is turned into an attribute here and nowhere
- * else.
- */
-function readTranscriptRow(params: {
-  raw: object;
-  previous: Cursor | null;
-  bots: Map<string, BotRecord>;
-}): { event: NormalizedPullEvent; cursor: Cursor } | null {
-  const { raw, previous, bots } = params;
-  const parsed = transcriptRowSchema.safeParse(raw);
-  if (!parsed.success) return null;
-
-  const row = parsed.data;
-  const facts = botFactsOf({ row, bots });
-  // A row with no `createdon` keeps the previous row's, so the cursor never
-  // goes backwards and never lands on an empty timestamp that the next run's
-  // filter would read as "everything".
-  const previousCreatedOn: string = previous ? previous.createdon : "";
-
-  return {
-    cursor: {
-      createdon: row.createdon ?? previousCreatedOn,
-      conversationtranscriptid: row.conversationtranscriptid,
-    },
-    event: {
-      source_event_id: row.conversationtranscriptid,
-      event_timestamp: row.conversationstarttime ?? row.createdon ?? new Date().toISOString(),
-      // Attribution lives on the turns inside the transcript, where the
-      // account identifier actually is. A row has no single author.
-      actor: "",
-      action: COPILOT_CONVERSATION_ACTION,
-      target: facts.botName ?? "",
-      cost_usd: "0",
-      tokens_input: 0,
-      tokens_output: 0,
-      raw_payload: JSON.stringify(row),
-      extra: facts,
-    },
-  };
-}
-
-/**
- * Where the walk gets to after a row it could not read as an event, or null
- * when that row cannot even say where it sits.
- *
- * Only the identifier and the timestamp go into the next run's filter, so the
- * two are read on their own here. A row whose `content` came back as a number
- * is unreadable as an event and still perfectly readable as a position, and
- * this is what lets the walk step over it. Rows arrive in `TRANSCRIPT_ORDER_BY`
- * order, so a row further down the page is always a cursor further forward.
- *
- * Null is the row whose own identifier is the unreadable part. That id is what
- * the next filter would be built from, so there is no position to move to and
- * the caller leaves the cursor where it was — the run then fails, loudly and
- * repeatedly, which is the right answer for a row nobody can name. Skipping it
- * would mean stepping over a row without being able to say which one.
- */
-function cursorPastUnreadableRow(params: { raw: object; previous: Cursor | null }): Cursor | null {
-  const { raw, previous } = params;
-  const parsed = cursorRowSchema.safeParse(raw);
-  if (!parsed.success) return null;
-
-  return {
-    // Same fallback as a readable row with no `createdon`: keep the previous
-    // timestamp rather than let an empty one through, where the next run's
-    // filter would read it as "everything".
-    createdon: parsed.data.createdon ?? (previous ? previous.createdon : ""),
-    conversationtranscriptid: parsed.data.conversationtranscriptid,
-  };
-}
-
-/** Read one page's rows into the walk. */
-function readPageRows(params: {
-  page: z.infer<typeof odataPageSchema>;
-  walk: TranscriptWalk;
-  bots: Map<string, BotRecord>;
-}): void {
-  const { page, walk, bots } = params;
-  for (const raw of page.value) {
-    // A row shaped unlike the rest is counted, not fatal: one bad row must not
-    // cost the whole window. Both arms below are that same case — an entry
-    // that is not an object at all is no more readable than one that fails the
-    // schema, and dropping it silently would report a page of rubbish as a
-    // source with nothing in it.
-    if (!raw || typeof raw !== "object") {
-      walk.errorCount += 1;
-      continue;
-    }
-    const read = readTranscriptRow({ raw, previous: walk.last, bots });
-    if (!read) {
-      walk.errorCount += 1;
-      // Step over it if it can still say where it sits. Leaving the cursor
-      // behind an unreadable row is what wedges a source: the next run asks
-      // for everything after the last good row, gets the bad one back, counts
-      // the same error against a cursor that has not moved, and the worker
-      // fails it as no progress — every run, until some later row happens to
-      // arrive and drag the window past it.
-      walk.last = cursorPastUnreadableRow({ raw, previous: walk.last }) ?? walk.last;
-      continue;
-    }
-    walk.last = read.cursor;
-    walk.events.push(read.event);
-  }
-}
-
-/**
- * Whether this run must stop before reading another page.
- *
- * Stopping here is clean and keeps what the run already read: the next run
- * resumes from the cursor rather than repeating the whole window.
- */
-function runIsOver(options: PullRunOptions): boolean {
-  if (options.signal?.aborted) return true;
-  return Boolean(options.deadlineMs && Date.now() > options.deadlineMs);
-}
-
-/**
- * Whether the server pointed the walk at a URL that is not the customer's own
- * environment, in which case the walk stops where it is.
- *
- * The next page is a URL out of the response body, and the request that
- * follows it carries the access token. `followRedirects: false` stops the
- * server bouncing the credential somewhere else, and this is the same hop by
- * another name — the check has to hold for every request that carries the
- * secret, not only the first.
- *
- * It is the configured environment that is required here, not merely a host
- * Microsoft serves. Every tenant's environment is a Microsoft host, so a
- * suffix check alone would let a link move the token from this customer's
- * environment to somebody else's.
- */
-function refusesNextLink(params: {
-  link: string | null;
-  environmentUrl: string;
-  walk: TranscriptWalk;
-}): boolean {
-  const { link, environmentUrl, walk } = params;
-  if (!link || isSameDataverseEnvironment({ value: link, environmentUrl })) return false;
-  walk.errorCount += 1;
-  // The host, not the URL: the refused link carries a skip token and query
-  // shape that add nothing here, and the host is the whole of what an
-  // operator needs to tell an attack apart from an environment that pages on
-  // a second address of its own. Without it this stall looks like a
-  // permissions problem and gets debugged as one.
-  logger.error(
-    { refusedHost: hostOf(link), environmentHost: hostOf(environmentUrl) },
-    "copilot studio dataverse: refusing a next-page link that is not the configured environment",
-  );
-  return true;
-}
-
-/** The headers every read of this environment carries. */
-function dataverseHeaders(token: string): Record<string, string> {
-  return {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/json",
-    "OData-MaxVersion": "4.0",
-    "OData-Version": "4.0",
-  };
-}
-
-/** A URL's host for logging, never throwing on one that will not parse. */
-function hostOf(value: string): string {
-  try {
-    return new URL(value).host;
-  } catch {
-    return "unparseable";
-  }
 }
 
 export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudioDataverseConfig> {
@@ -648,7 +250,7 @@ export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudio
     const walk: TranscriptWalk = { events: [], errorCount: 0, last: null };
 
     try {
-      const token = await resolveEnvironmentToken({
+      const token = await CopilotStudioDataversePuller.resolveEnvironmentToken({
         credentials: options.credentials,
         environmentUrl: config.environmentUrl,
         signal: options.signal,
@@ -709,24 +311,24 @@ export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudio
   }): Promise<void> {
     const { walk, options, config, token, bots } = params;
 
-    let url: string | null = buildFirstPageUrl({
+    let url: string | null = CopilotStudioDataversePuller.buildFirstPageUrl({
       environmentUrl: config.environmentUrl,
       config,
-      cursor: parseCursor(options.cursor),
+      cursor: CopilotStudioDataversePuller.parseCursor(options.cursor),
       now: Date.now(),
     });
     let pageCount = 0;
 
     while (url && pageCount < MAX_PAGES_PER_RUN) {
       pageCount += 1;
-      if (runIsOver(options)) break;
+      if (CopilotStudioDataversePuller.runIsOver(options)) break;
 
       const page = await this.fetchPage({ url, token, signal: options.signal });
-      readPageRows({ page, walk, bots });
+      CopilotStudioDataversePuller.readPageRows({ page, walk, bots });
 
       const nextLink = page["@odata.nextLink"] ?? null;
       if (
-        refusesNextLink({
+        CopilotStudioDataversePuller.refusesNextLink({
           link: nextLink,
           environmentUrl: config.environmentUrl,
           walk,
@@ -769,8 +371,8 @@ export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudio
       const page = await this.fetchBotsPage({ environmentUrl, token, signal });
       if (!page) return new Map();
 
-      const bots = readBotRows(page.value);
-      warnAboutIncompleteBotList({
+      const bots = CopilotStudioDataversePuller.readBotRows(page.value);
+      CopilotStudioDataversePuller.warnAboutIncompleteBotList({
         botCount: bots.size,
         hasMorePages: Boolean(page["@odata.nextLink"]),
       });
@@ -803,7 +405,7 @@ export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudio
 
     const response = await this.http.fetch(`${base}?${query}`, {
       method: "GET",
-      headers: dataverseHeaders(token),
+      headers: CopilotStudioDataversePuller.dataverseHeaders(token),
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       // Same reasoning as the transcript read: this request carries the
       // token, and a redirect would hand it to whoever answers.
@@ -829,7 +431,7 @@ export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudio
     const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
     const response = await this.http.fetch(url, {
       method: "GET",
-      headers: dataverseHeaders(token),
+      headers: CopilotStudioDataversePuller.dataverseHeaders(token),
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       // The header above carries the token minted from the customer's secret.
       // The helper follows up to ten redirects by default and re-sends
@@ -843,5 +445,418 @@ export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudio
       );
     }
     return odataPageSchema.parse(await response.json());
+  }
+
+  private static parseCursor(raw: string | null): Cursor | null {
+    if (!raw) return null;
+    try {
+      const parsed = cursorSchema.safeParse(JSON.parse(raw));
+      if (parsed.success) return parsed.data;
+    } catch {
+      // A cursor we cannot read is treated as no cursor: re-reading a window is
+      // survivable because identifiers are derived, but skipping one is not.
+    }
+    return null;
+  }
+
+  /**
+   * Exchange the application's own credentials for a token scoped to this
+   * environment.
+   *
+   * Minted once per run rather than per request: a run walks several pages, and
+   * a token per page would multiply one sign-in across the whole walk for no
+   * benefit, since the token outlives any single run.
+   */
+  private static async resolveEnvironmentToken(params: {
+    credentials: Record<string, string> | undefined;
+    environmentUrl: string;
+    signal?: AbortSignal;
+    http: GovernanceHttpPort;
+  }): Promise<string> {
+    const { credentials, environmentUrl, signal, http } = params;
+    const tenantId = credentials?.tenantId;
+    const clientId = credentials?.clientId;
+    const clientSecret = credentials?.clientSecret;
+
+    if (!tenantId || !clientId || !clientSecret) {
+      throw new Error(
+        "copilot studio dataverse puller needs credentials.tenantId, " +
+          "credentials.clientId and credentials.clientSecret from the app registration",
+      );
+    }
+
+    const body = new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: clientId,
+      client_secret: clientSecret,
+      scope: `${environmentUrl.replace(/\/+$/, "")}/.default`,
+    });
+    const timeout = AbortSignal.timeout(TOKEN_TIMEOUT_MS);
+
+    const response = await http.fetch(
+      `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/oauth2/v2.0/token`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: body.toString(),
+        signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+        // This request carries the client secret itself, not a token minted
+        // from it. Following a redirect would hand it to the redirect target,
+        // and the helper follows up to ten by default.
+        followRedirects: false,
+      },
+    );
+
+    if (!response.ok) {
+      // The status alone, never the body: a token endpoint may echo the request
+      // back, and this reason is logged and shown on the source.
+      throw new Error(
+        "copilot studio dataverse puller could not sign in: Microsoft refused " +
+          `the application's credentials (HTTP ${response.status})`,
+      );
+    }
+
+    const parsed = tokenResponseSchema.safeParse(await response.json());
+    if (!parsed.success) {
+      // A proxy or captive portal answering 200 with something that is not a
+      // token must not be carried forward as one — it would fail later as an
+      // unauthorised Dataverse call and read as a permissions problem.
+      throw new Error(
+        "copilot studio dataverse puller could not sign in: Microsoft answered " +
+          "the sign-in without an access token",
+      );
+    }
+    return parsed.data.access_token;
+  }
+
+  /**
+   * Where a run picks up from, as OData.
+   *
+   * This is a lexicographic "everything after (T, I)" over the pair the rows are
+   * sorted by, and it has to be exactly that. The obvious shorter form — every
+   * row at or after T except the one already seen — is not a total order: on a
+   * timestamp holding several rows it re-reads the ones with smaller ids, so a
+   * run whose cursor is B hands back A, saves A, and the next run hands back B
+   * again. The pair alternates forever, the same transcripts are reprocessed
+   * every run, and no later row is ever reached.
+   *
+   * The leading `ge` says nothing the disjunction does not already say. It is
+   * kept because it is the plain range bound the server can seek `createdon` on,
+   * where the `or` on its own invites a scan of the window.
+   */
+  private static continuationFilters(cursor: Cursor): string[] {
+    return [
+      `createdon ge ${cursor.createdon}`,
+      `(createdon gt ${cursor.createdon} or (createdon eq ${cursor.createdon}` +
+        ` and conversationtranscriptid gt ${cursor.conversationtranscriptid}))`,
+    ];
+  }
+
+  private static buildFirstPageUrl(params: {
+    environmentUrl: string;
+    config: CopilotStudioDataverseConfig;
+    cursor: Cursor | null;
+    now: number;
+  }): string {
+    const { environmentUrl, config, cursor, now } = params;
+    const base = `${environmentUrl.replace(/\/+$/, "")}/api/data/${API_VERSION}/conversationtranscripts`;
+
+    const filters = cursor
+      ? CopilotStudioDataversePuller.continuationFilters(cursor)
+      : [`createdon ge ${new Date(now - FIRST_RUN_LOOKBACK_MS).toISOString()}`];
+    if (config.botIds.length > 0) {
+      // Bare, not quoted. The lookup column is an `Edm.Guid`, and Dataverse
+      // refuses to compare one against a string literal: a quoted id answers
+      // every run with "a binary operator with incompatible types was detected",
+      // an HTTP 400 that names neither the filter nor the column. The schema
+      // requires these to be uuids, which is what makes writing them unquoted
+      // safe. Contrast the transcript id in `continuationFilters`, which is the
+      // same column type and already bare for the same reason.
+      const clause = config.botIds
+        .map((id) => `_bot_conversationtranscriptid_value eq ${id}`)
+        .join(" or ");
+      filters.push(`(${clause})`);
+    }
+
+    // Built by hand rather than with URLSearchParams, which encodes a space as
+    // `+`. That is form encoding; OData specifies percent-encoding, and a
+    // `$filter` whose spaces arrive as plus signs is at the mercy of how the
+    // server chooses to read them.
+    const query: [string, string][] = [
+      [
+        "$select",
+        "conversationtranscriptid,name,conversationstarttime,createdon,content," +
+          "metadata,schematype,schemaversion,_bot_conversationtranscriptid_value",
+      ],
+      ["$filter", filters.join(" and ")],
+      ["$orderby", TRANSCRIPT_ORDER_BY],
+      ["$top", String(PAGE_SIZE)],
+      // No `$expand` here. The agent arrives as the raw lookup id and the run
+      // reads the `bot` table once to put a name on it. Asking Dataverse to join
+      // would save that read, but it means naming a navigation property, and the
+      // reads proven against a real environment all take the lookup column and
+      // join it themselves.
+    ];
+    return `${base}?${query.map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join("&")}`;
+  }
+
+  /**
+   * Dataverse writes lookup ids in one case and there is no promise both sides of
+   * a join agree on it, so the key is folded before it is stored or read. A miss
+   * here is silent — a conversation with no agent name — which is exactly the
+   * kind of fault that survives a review.
+   */
+  private static botKey(id: string): string {
+    return id.toLowerCase();
+  }
+
+  /** The agents on one page of the `bot` table, keyed by folded lookup id. */
+  private static readBotRows(rows: unknown[]): Map<string, BotRecord> {
+    const bots = new Map<string, BotRecord>();
+    for (const raw of rows) {
+      const parsed = botRowSchema.safeParse(raw);
+      if (!parsed.success) continue;
+      const row = parsed.data;
+      bots.set(CopilotStudioDataversePuller.botKey(row.botid), {
+        botName: row.name ?? undefined,
+        botModifiedOn: row.modifiedon ?? undefined,
+      });
+    }
+    return bots;
+  }
+
+  /**
+   * Say so when the agent list came back short, in either of the two ways it can.
+   *
+   * Neither is an error — the conversations are the point and a name is a
+   * nicety — so the only thing standing between the customer and unnamed
+   * conversations with no explanation is a line in the log.
+   */
+  private static warnAboutIncompleteBotList(params: {
+    botCount: number;
+    hasMorePages: boolean;
+  }): void {
+    const { botCount, hasMorePages } = params;
+
+    if (hasMorePages) {
+      logger.warn(
+        { read: botCount },
+        "copilot studio dataverse: more agents than one read returns; conversations belonging to the rest get no name",
+      );
+    }
+
+    // An empty list is the shape a misconfigured role arrives in, and it is
+    // the quiet one. A role that reads the agent table at the wrong depth is
+    // answered with 200 and no rows rather than a refusal, because the
+    // application user owns none of them — indistinguishable from a tenant
+    // that genuinely has no agents, except that a run reading conversations
+    // written by an agent has just been told there are none.
+    if (botCount === 0) {
+      logger.warn(
+        "copilot studio dataverse: the environment reports no agents at all; if conversations are arriving unnamed the credential most likely reads the agent table at the wrong depth",
+      );
+    }
+  }
+
+  private static botFactsOf(params: {
+    row: z.infer<typeof transcriptRowSchema>;
+    bots: Map<string, BotRecord>;
+  }): Record<string, string> {
+    const { row, bots } = params;
+    const id = row._bot_conversationtranscriptid_value;
+    if (!id) return {};
+    const record = bots.get(CopilotStudioDataversePuller.botKey(id));
+    if (!record) return {};
+    const facts: Record<string, string> = {};
+    if (record.botName) facts.botName = record.botName;
+    if (record.botModifiedOn) facts.botModifiedOn = record.botModifiedOn;
+    return facts;
+  }
+
+  /**
+   * One transcript row as the event it becomes and the cursor it advances to,
+   * or null when the row is shaped unlike the rest.
+   *
+   * This is where a fact read off the row turns into something a reader sees,
+   * so a field added to the query is turned into an attribute here and nowhere
+   * else.
+   */
+  private static readTranscriptRow(params: {
+    raw: object;
+    previous: Cursor | null;
+    bots: Map<string, BotRecord>;
+  }): { event: NormalizedPullEvent; cursor: Cursor } | null {
+    const { raw, previous, bots } = params;
+    const parsed = transcriptRowSchema.safeParse(raw);
+    if (!parsed.success) return null;
+
+    const row = parsed.data;
+    const facts = CopilotStudioDataversePuller.botFactsOf({ row, bots });
+    // A row with no `createdon` keeps the previous row's, so the cursor never
+    // goes backwards and never lands on an empty timestamp that the next run's
+    // filter would read as "everything".
+    const previousCreatedOn: string = previous ? previous.createdon : "";
+
+    return {
+      cursor: {
+        createdon: row.createdon ?? previousCreatedOn,
+        conversationtranscriptid: row.conversationtranscriptid,
+      },
+      event: {
+        source_event_id: row.conversationtranscriptid,
+        event_timestamp: row.conversationstarttime ?? row.createdon ?? new Date().toISOString(),
+        // Attribution lives on the turns inside the transcript, where the
+        // account identifier actually is. A row has no single author.
+        actor: "",
+        action: COPILOT_CONVERSATION_ACTION,
+        target: facts.botName ?? "",
+        cost_usd: "0",
+        tokens_input: 0,
+        tokens_output: 0,
+        raw_payload: JSON.stringify(row),
+        extra: facts,
+      },
+    };
+  }
+
+  /**
+   * Where the walk gets to after a row it could not read as an event, or null
+   * when that row cannot even say where it sits.
+   *
+   * Only the identifier and the timestamp go into the next run's filter, so the
+   * two are read on their own here. A row whose `content` came back as a number
+   * is unreadable as an event and still perfectly readable as a position, and
+   * this is what lets the walk step over it. Rows arrive in `TRANSCRIPT_ORDER_BY`
+   * order, so a row further down the page is always a cursor further forward.
+   *
+   * Null is the row whose own identifier is the unreadable part. That id is what
+   * the next filter would be built from, so there is no position to move to and
+   * the caller leaves the cursor where it was — the run then fails, loudly and
+   * repeatedly, which is the right answer for a row nobody can name. Skipping it
+   * would mean stepping over a row without being able to say which one.
+   */
+  private static cursorPastUnreadableRow(params: {
+    raw: object;
+    previous: Cursor | null;
+  }): Cursor | null {
+    const { raw, previous } = params;
+    const parsed = cursorRowSchema.safeParse(raw);
+    if (!parsed.success) return null;
+
+    return {
+      // Same fallback as a readable row with no `createdon`: keep the previous
+      // timestamp rather than let an empty one through, where the next run's
+      // filter would read it as "everything".
+      createdon: parsed.data.createdon ?? (previous ? previous.createdon : ""),
+      conversationtranscriptid: parsed.data.conversationtranscriptid,
+    };
+  }
+
+  /** Read one page's rows into the walk. */
+  private static readPageRows(params: {
+    page: z.infer<typeof odataPageSchema>;
+    walk: TranscriptWalk;
+    bots: Map<string, BotRecord>;
+  }): void {
+    const { page, walk, bots } = params;
+    for (const raw of page.value) {
+      // A row shaped unlike the rest is counted, not fatal: one bad row must not
+      // cost the whole window. Both arms below are that same case — an entry
+      // that is not an object at all is no more readable than one that fails the
+      // schema, and dropping it silently would report a page of rubbish as a
+      // source with nothing in it.
+      if (!raw || typeof raw !== "object") {
+        walk.errorCount += 1;
+        continue;
+      }
+      const read = CopilotStudioDataversePuller.readTranscriptRow({
+        raw,
+        previous: walk.last,
+        bots,
+      });
+      if (!read) {
+        walk.errorCount += 1;
+        // Step over it if it can still say where it sits. Leaving the cursor
+        // behind an unreadable row is what wedges a source: the next run asks
+        // for everything after the last good row, gets the bad one back, counts
+        // the same error against a cursor that has not moved, and the worker
+        // fails it as no progress — every run, until some later row happens to
+        // arrive and drag the window past it.
+        walk.last =
+          CopilotStudioDataversePuller.cursorPastUnreadableRow({ raw, previous: walk.last }) ??
+          walk.last;
+        continue;
+      }
+      walk.last = read.cursor;
+      walk.events.push(read.event);
+    }
+  }
+
+  /**
+   * Whether this run must stop before reading another page.
+   *
+   * Stopping here is clean and keeps what the run already read: the next run
+   * resumes from the cursor rather than repeating the whole window.
+   */
+  private static runIsOver(options: PullRunOptions): boolean {
+    if (options.signal?.aborted) return true;
+    return Boolean(options.deadlineMs && Date.now() > options.deadlineMs);
+  }
+
+  /**
+   * Whether the server pointed the walk at a URL that is not the customer's own
+   * environment, in which case the walk stops where it is.
+   *
+   * The next page is a URL out of the response body, and the request that
+   * follows it carries the access token. `followRedirects: false` stops the
+   * server bouncing the credential somewhere else, and this is the same hop by
+   * another name — the check has to hold for every request that carries the
+   * secret, not only the first.
+   *
+   * It is the configured environment that is required here, not merely a host
+   * Microsoft serves. Every tenant's environment is a Microsoft host, so a
+   * suffix check alone would let a link move the token from this customer's
+   * environment to somebody else's.
+   */
+  private static refusesNextLink(params: {
+    link: string | null;
+    environmentUrl: string;
+    walk: TranscriptWalk;
+  }): boolean {
+    const { link, environmentUrl, walk } = params;
+    if (!link || isSameDataverseEnvironment({ value: link, environmentUrl })) return false;
+    walk.errorCount += 1;
+    // The host, not the URL: the refused link carries a skip token and query
+    // shape that add nothing here, and the host is the whole of what an
+    // operator needs to tell an attack apart from an environment that pages on
+    // a second address of its own. Without it this stall looks like a
+    // permissions problem and gets debugged as one.
+    logger.error(
+      {
+        refusedHost: CopilotStudioDataversePuller.hostOf(link),
+        environmentHost: CopilotStudioDataversePuller.hostOf(environmentUrl),
+      },
+      "copilot studio dataverse: refusing a next-page link that is not the configured environment",
+    );
+    return true;
+  }
+
+  /** The headers every read of this environment carries. */
+  private static dataverseHeaders(token: string): Record<string, string> {
+    return {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "OData-MaxVersion": "4.0",
+      "OData-Version": "4.0",
+    };
+  }
+
+  /** A URL's host for logging, never throwing on one that will not parse. */
+  private static hostOf(value: string): string {
+    try {
+      return new URL(value).host;
+    } catch {
+      return "unparseable";
+    }
   }
 }
