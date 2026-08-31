@@ -836,9 +836,47 @@ export function discoverFeatureFiles(
 const ANNOTATION_RE =
   /@scenario[ \t]+(?:"([^"\n]+)"|'([^'\n]+)'|([^\n*]+?))[ \t]*(?:\*\/|$)/gm;
 
-const JSDOC_BLOCK_RE = /\/\*\*[\s\S]*?\*\//g;
 const JSDOC_ANNOTATION_LINE_RE =
   /^[ \t]*\*[ \t]*@scenario[ \t]+(?:"([^"\r\n]+)"|'([^'\r\n]+)'|([^*\r\n]+?))[ \t]*(?:\r)?$/;
+
+function collectJsdocBlocks(src: string): Array<{ text: string; index: number }> {
+  const blocks: Array<{ text: string; index: number }> = [];
+  let i = 0;
+  while (i < src.length) {
+    const ch = src[i];
+    if (ch === "'" || ch === '"' || ch === "`") {
+      const quote = ch;
+      i++;
+      while (i < src.length) {
+        if (src[i] === "\\") {
+          i += 2;
+        } else if (src[i] === quote) {
+          i++;
+          break;
+        } else {
+          i++;
+        }
+      }
+      continue;
+    }
+    if (ch === "/" && src[i + 1] === "/") {
+      const newline = src.indexOf("\n", i + 2);
+      i = newline === -1 ? src.length : newline + 1;
+      continue;
+    }
+    if (ch === "/" && src[i + 1] === "*") {
+      const end = src.indexOf("*/", i + 2);
+      if (end === -1) break;
+      if (src[i + 2] === "*") {
+        blocks.push({ text: src.slice(i, end + 2), index: i });
+      }
+      i = end + 2;
+      continue;
+    }
+    i++;
+  }
+  return blocks;
+}
 
 function isFollowedByTestCall(src: string, start: number): boolean {
   const len = src.length;
@@ -883,11 +921,9 @@ export function collectMalformedJsdocAnnotations({
 
   for (const file of files) {
     const src = readFileSync(file, "utf8");
-    JSDOC_BLOCK_RE.lastIndex = 0;
-    let block: RegExpExecArray | null;
-    while ((block = JSDOC_BLOCK_RE.exec(src)) !== null) {
+    for (const block of collectJsdocBlocks(src)) {
       const blockStartLine = src.slice(0, block.index).split("\n").length;
-      const lines = block[0].split("\n");
+      const lines = block.text.split("\n");
       for (const [lineIndex, lineText] of lines.entries()) {
         const match = lineText.match(JSDOC_ANNOTATION_LINE_RE);
         if (!match) continue;

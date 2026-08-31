@@ -310,6 +310,23 @@ describe("collectMalformedJsdocAnnotations", () => {
     ]);
   });
 
+  it("ignores JSDoc examples inside template strings", () => {
+    const tests = join(root, "tests");
+    mkdirSync(tests);
+    writeFileSync(
+      join(tests, "parity.test.ts"),
+      [
+        "const example = `/**",
+        " * @scenario \\\"not a real annotation\\\"",
+        " */`;",
+        'it("covers the case", () => {});',
+      ].join("\n"),
+      "utf8",
+    );
+
+    expect(collectMalformedJsdocAnnotations({ testRoots: [tests] })).toEqual([]);
+  });
+
   it("does not report the supported single-line JSDoc form", () => {
     const tests = join(root, "tests");
     mkdirSync(tests);
