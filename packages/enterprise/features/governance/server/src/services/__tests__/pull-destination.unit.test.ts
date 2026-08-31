@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { GovernanceValidationError } from "@langwatch/enterprise-governance-contract";
 import { PullDestinationService } from "../pull-destination.service";
+import { DATABRICKS_GENIE_ADAPTER_ID } from "../../adapters/databricks-genie-puller.adapter";
 
 const pullDestination = PullDestinationService.create();
-const DATABRICKS_GENIE_ADAPTER_ID = "databricks_genie";
 
 const genie = (workspaceUrl: string) => ({
   adapter: DATABRICKS_GENIE_ADAPTER_ID,
@@ -71,6 +71,31 @@ describe("given a Genie config pointed somewhere the token must never go", () =>
       expect(() =>
         pullDestination.assertAllowed(genie("https://user:pass@adb-1.7.azuredatabricks.net")),
       ).toThrow(/Databricks workspace address/);
+    });
+
+    /**
+     * The two copies of this rule disagreed here, and nothing pinned it: the
+     * regex on the write path refused anything past the host, while the URL
+     * parse beside the reasoning allowed a path. Now that one calls the other,
+     * the answer has to be written down — a matching host reached at a path or
+     * a port is not the workspace API, and it is the shape a real workspace
+     * host gets pointed somewhere else with.
+     */
+    it.each([
+      "https://adb-1.7.azuredatabricks.net/redirect",
+      "https://adb-1.7.azuredatabricks.net:8443",
+      "https://adb-1.7.azuredatabricks.net/?to=elsewhere",
+      "https://adb-1.7.azuredatabricks.net/#elsewhere",
+    ])("refuses %s, which is more than a bare origin", (url) => {
+      expect(() => pullDestination.assertAllowed(genie(url))).toThrow(
+        /Databricks workspace address/,
+      );
+    });
+
+    it("still accepts the trailing slash a browser adds", () => {
+      expect(() =>
+        pullDestination.assertAllowed(genie("https://adb-1.7.azuredatabricks.net/")),
+      ).not.toThrow();
     });
 
     it("refuses a missing workspace URL rather than letting it through", () => {
