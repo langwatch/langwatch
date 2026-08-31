@@ -275,6 +275,70 @@ const scenarioAudioMessageSchema = z.object({
   ),
 });
 
+const anthropicTextBlockSchema = z.object({
+  type: z.literal("text"),
+  text: z.string(),
+});
+
+const anthropicToolUseBlockSchema = z.object({
+  type: z.literal("tool_use"),
+  id: z.string(),
+  name: z.string(),
+  input: z.unknown(),
+});
+
+const anthropicToolResultBlockSchema = z.object({
+  type: z.literal("tool_result"),
+  tool_use_id: z.string(),
+  content: z.union([z.string(), z.array(z.unknown())]).optional(),
+  is_error: z.boolean().optional(),
+});
+
+const anthropicThinkingBlockSchema = z.object({
+  type: z.literal("thinking"),
+  thinking: z.string(),
+  signature: z.string().optional(),
+});
+
+const anthropicRedactedThinkingBlockSchema = z.object({
+  type: z.literal("redacted_thinking"),
+  data: z.string(),
+});
+
+/**
+ * A message in the Anthropic Messages API shape: an assistant turn made of
+ * `thinking`, `text` and `tool_use` blocks, or a user turn that carries the
+ * `tool_result` blocks answering those calls. An adapter that returns the
+ * response of the Anthropic SDK, or the transcript of Claude Code, sends its
+ * snapshots in this shape, and the transcript renderer already reads
+ * `tool_use` and `tool_result` blocks.
+ *
+ * Neither the AG-UI `MessageSchema` nor the tracer `chatMessageSchema` accept a
+ * `tool_use` or `thinking` block, so every snapshot after the first tool call
+ * was 400-rejected and the run kept only the turns before it. This member sits
+ * before `chatMessageSchema` in the union on purpose: the tracer `tool_result`
+ * part carries `toolCallId` and `result`, so it would validate an Anthropic
+ * `tool_result` block and strip its `tool_use_id` and `content`. The refine
+ * keeps this member to messages that actually carry an Anthropic-only block,
+ * so a plain text array keeps validating through the members that came before.
+ */
+const scenarioAnthropicMessageSchema = z.object({
+  role: z.string().optional(),
+  content: z
+    .array(
+      z.union([
+        anthropicTextBlockSchema,
+        anthropicToolUseBlockSchema,
+        anthropicToolResultBlockSchema,
+        anthropicThinkingBlockSchema,
+        anthropicRedactedThinkingBlockSchema,
+      ]),
+    )
+    .refine((blocks) => blocks.some((block) => block.type !== "text"), {
+      message: "An Anthropic message carries at least one non-text block",
+    }),
+});
+
 /**
  * Scenario Message Snapshot Event Schema
  * Captures the conversation state at a specific point during scenario execution.
@@ -285,7 +349,12 @@ export const scenarioMessageSnapshotSchema = MessagesSnapshotEventSchema.merge(
     type: z.literal(ScenarioEventType.MESSAGE_SNAPSHOT),
     messages: z.array(
       z.intersection(
-        z.union([MessageSchema, chatMessageSchema, scenarioAudioMessageSchema]),
+        z.union([
+          MessageSchema,
+          scenarioAnthropicMessageSchema,
+          chatMessageSchema,
+          scenarioAudioMessageSchema,
+        ]),
         z.object({
           id: z.string().optional(),
           trace_id: z.string().optional(),

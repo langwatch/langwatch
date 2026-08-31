@@ -116,6 +116,138 @@ describe("scenarioMessageSnapshotSchema — regression: previously-valid shapes 
 });
 
 /**
+ * An adapter that returns Anthropic Messages API content as it is (the
+ * response of the Anthropic SDK, or the stream-json transcript of Claude Code)
+ * sends `tool_use`, `tool_result` and `thinking` blocks in its snapshots. The
+ * union used to refuse every such snapshot with 400, so a run kept only the
+ * turns before the first tool call.
+ * specs/scenarios/anthropic-transcript-on-the-wire.feature
+ */
+describe("given a MESSAGE_SNAPSHOT carrying Anthropic-format content blocks", () => {
+  function parseMessages(messages: unknown[]) {
+    const event = {
+      type: ScenarioEventType.MESSAGE_SNAPSHOT,
+      timestamp: Date.now(),
+      batchRunId: "batch-1",
+      scenarioId: "scenario-1",
+      scenarioRunId: "run-1",
+      scenarioSetId: "default",
+      messages,
+    };
+    return scenarioMessageSnapshotSchema.safeParse(event);
+  }
+
+  describe("when an assistant turn holds a tool_use block", () => {
+    /** @scenario "An assistant turn with Anthropic tool_use blocks validates on the wire" */
+    it("ACCEPTS the turn and keeps the id, name and input of the call", () => {
+      const parsed = parseMessages([
+        {
+          id: "msg-1",
+          role: "assistant",
+          content: [
+            { type: "text", text: "Reading the skill first." },
+            {
+              type: "tool_use",
+              id: "toolu_01",
+              name: "Bash",
+              input: { command: "cat .skills/scenarios/SKILL.md" },
+            },
+          ],
+        },
+      ]);
+      expect(parsed.success).toBe(true);
+      if (!parsed.success) return;
+      const content = parsed.data.messages[0]!.content as unknown[];
+      expect(content[1]).toEqual({
+        type: "tool_use",
+        id: "toolu_01",
+        name: "Bash",
+        input: { command: "cat .skills/scenarios/SKILL.md" },
+      });
+    });
+  });
+
+  describe("when a user turn holds a tool_result block", () => {
+    /** @scenario "A user turn with Anthropic tool_result blocks validates on the wire" */
+    it("ACCEPTS the turn and keeps the tool_use_id and content of the result", () => {
+      const parsed = parseMessages([
+        {
+          id: "msg-2",
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "toolu_01",
+              content: "# Scenarios skill\n...",
+            },
+          ],
+        },
+      ]);
+      expect(parsed.success).toBe(true);
+      if (!parsed.success) return;
+      const content = parsed.data.messages[0]!.content as unknown[];
+      expect(content[0]).toEqual({
+        type: "tool_result",
+        tool_use_id: "toolu_01",
+        content: "# Scenarios skill\n...",
+      });
+    });
+  });
+
+  describe("when an assistant turn holds a thinking block", () => {
+    /** @scenario "Thinking blocks of an assistant turn validate on the wire" */
+    it("ACCEPTS the turn", () => {
+      const parsed = parseMessages([
+        {
+          id: "msg-3",
+          role: "assistant",
+          content: [
+            {
+              type: "thinking",
+              thinking: "The skill asks for a run plan.",
+              signature: "sig",
+            },
+            { type: "text", text: "Creating the run plan." },
+            {
+              type: "tool_use",
+              id: "toolu_02",
+              name: "Bash",
+              input: { command: "langwatch run-plan create" },
+            },
+          ],
+        },
+      ]);
+      expect(parsed.success).toBe(true);
+    });
+  });
+
+  describe("when a message holds text blocks only and top-level tool_calls", () => {
+    /** @scenario "A plain text array still validates through the members that came before" */
+    it("ACCEPTS the message through the tracer member and keeps its tool_calls", () => {
+      const parsed = parseMessages([
+        {
+          id: "msg-4",
+          role: "assistant",
+          content: [{ type: "text", text: "Looking that up." }],
+          tool_calls: [
+            {
+              id: "call_1",
+              type: "function",
+              function: { name: "lookup", arguments: "{}" },
+            },
+          ],
+        },
+      ]);
+      expect(parsed.success).toBe(true);
+      if (!parsed.success) return;
+      expect(
+        (parsed.data.messages[0] as { tool_calls?: unknown[] }).tool_calls,
+      ).toHaveLength(1);
+    });
+  });
+});
+
+/**
  * Regression guard for the image/file attachment wire leg: the typescript
  * scenario SDK stopped JSON-stringifying array content, so the documented
  * multimodal shapes (scenario docs: multimodal-images, multimodal-files)
