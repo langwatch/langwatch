@@ -42,7 +42,7 @@ export class PrismaSecretRepository extends SecretRepository {
     });
   }
 
-  async get(projectId: string, id: string): Promise<Secret> {
+  async get({ projectId, id }: { projectId: string; id: string }): Promise<Secret> {
     const row = await this.database.projectSecret.findFirst({
       where: { id, projectId },
       select: safeSecretSelection,
@@ -107,7 +107,7 @@ export class PrismaSecretRepository extends SecretRepository {
     }
   }
 
-  async delete(projectId: string, id: string): Promise<void> {
+  async delete({ projectId, id }: { projectId: string; id: string }): Promise<void> {
     try {
       await this.database.projectSecret.delete({ where: { id, projectId } });
     } catch (error) {

@@ -41,8 +41,12 @@ class StubSecretRepository extends SecretRepository {
     return Promise.resolve(this.encryptedValues);
   }
 
-  async get(_projectId: string, id: string): Promise<Secret> {
-    const secret = this.rows.find((candidate) => candidate.id === id);
+  async get({ projectId, id }: { projectId: string; id: string }): Promise<Secret> {
+    // Scoped like the real repository: a secret is addressed by project AND
+    // id, so a lookup from the wrong project finds nothing.
+    const secret = this.rows.find(
+      (candidate) => candidate.id === id && candidate.projectId === projectId,
+    );
     if (!secret) throw new SecretNotFoundError();
     return secret;
   }
@@ -71,7 +75,7 @@ class StubSecretRepository extends SecretRepository {
     return Promise.resolve(row({ id: input.id, projectId: input.projectId }));
   }
 
-  delete(projectId: string, id: string): Promise<void> {
+  delete({ projectId, id }: { projectId: string; id: string }): Promise<void> {
     this.deleteCall(projectId, id);
     return Promise.resolve();
   }

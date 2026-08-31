@@ -5,7 +5,7 @@ export abstract class SecretRepository {
   abstract listEncryptedValues(
     projectId: string,
   ): Promise<Array<{ name: string; encryptedValue: string }>>;
-  abstract get(projectId: string, id: string): Promise<Secret>;
+  abstract get(input: { projectId: string; id: string }): Promise<Secret>;
   abstract count(projectId: string): Promise<number>;
   abstract create(input: {
     projectId: string;
@@ -19,5 +19,5 @@ export abstract class SecretRepository {
     encryptedValue: string;
     actorId: string;
   }): Promise<Secret>;
-  abstract delete(projectId: string, id: string): Promise<void>;
+  abstract delete(input: { projectId: string; id: string }): Promise<void>;
 }

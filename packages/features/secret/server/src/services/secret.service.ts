@@ -98,11 +98,14 @@ export class SecretService extends SecretServiceContract {
   async delete(input: DeleteSecretInput): Promise<void> {
     const parsed = deleteSecretInputSchema.parse(input);
     await this.getMutableSecret(parsed);
-    await this.options.repository.delete(parsed.projectId, parsed.id);
+    await this.options.repository.delete({ projectId: parsed.projectId, id: parsed.id });
   }
 
   private async getMutableSecret(input: { projectId: string; id: string }): Promise<Secret> {
-    const secret = await this.options.repository.get(input.projectId, input.id);
+    const secret = await this.options.repository.get({
+      projectId: input.projectId,
+      id: input.id,
+    });
     if (this.reservedNames.has(secret.name)) {
       throw new SecretNotFoundError();
     }
