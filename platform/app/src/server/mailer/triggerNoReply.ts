@@ -1,6 +1,5 @@
 import { createLogger } from "@langwatch/observability";
 import { createHmac } from "crypto";
-import { env } from "../../env.mjs";
 
 const logger = createLogger("langwatch:mailer:triggerNoReply");
 
@@ -20,8 +19,9 @@ const logger = createLogger("langwatch:mailer:triggerNoReply");
  *      recipients off the To header means the only string interpolated into
  *      the To header is one we control entirely (the hashed no-reply).
  *
- * The local part includes a short HMAC of the trigger id, salted with
- * NEXTAUTH_SECRET, so the address is:
+ * The local part includes a short HMAC of the trigger id, salted with the
+ * signing secret the composition root injects (NEXTAUTH_SECRET, projected once
+ * by the application mail runtime configuration), so the address is:
  *
  *   - Stable per trigger — useful for bounce attribution downstream.
  *   - Best-effort unguessable when NEXTAUTH_SECRET is set — anyone harvesting
@@ -39,8 +39,14 @@ const logger = createLogger("langwatch:mailer:triggerNoReply");
 
 const HMAC_BYTES = 6;
 
-function shortHash(triggerId: string): string {
-  const secret = env.NEXTAUTH_SECRET ?? "";
+function shortHash({
+  triggerId,
+  nextauthSecret,
+}: {
+  triggerId: string;
+  nextauthSecret: string | undefined;
+}): string {
+  const secret = nextauthSecret ?? "";
   if (!secret) {
     logger.warn(
       "NEXTAUTH_SECRET is not set; no-reply trigger tags are forgeable and not unguessable. Set NEXTAUTH_SECRET to secure trigger email addresses.",
@@ -60,12 +66,15 @@ function domainOf(defaultFrom: string): string {
 export function buildTriggerNoReplyAddress({
   defaultFrom,
   triggerId,
+  nextauthSecret,
 }: {
   defaultFrom: string;
   triggerId: string;
+  /** Injected signing key. Absent or empty degrades unguessability, never blocks. */
+  nextauthSecret?: string;
 }): string {
   const domain = domainOf(defaultFrom);
-  const tag = shortHash(triggerId);
+  const tag = shortHash({ triggerId, nextauthSecret });
   return `LangWatch Triggers <no-reply+${tag}@${domain}>`;
 }
 

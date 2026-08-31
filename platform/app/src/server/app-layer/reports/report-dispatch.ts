@@ -66,6 +66,9 @@ export interface ReportDispatchDeps {
    */
   recordFire(params: { projectId: string; triggerId: string; firedAt: Date }): Promise<void>;
   baseHost: string;
+  /** Injected unsubscribe/no-reply signing key — a report email carries the
+   *  same forge-proof footer as any other trigger email (ADR-031). */
+  nextauthSecret?: string;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -264,6 +267,8 @@ export async function dispatchScheduledReport({
         projectId: project.id,
         subject: rendered.subject,
         html: rendered.html,
+        baseHost: deps.baseHost,
+        nextauthSecret: deps.nextauthSecret,
       });
       return true;
     }

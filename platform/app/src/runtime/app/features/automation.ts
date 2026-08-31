@@ -66,8 +66,12 @@ export class AppAutomationClock extends AutomationClockPort {
 }
 
 class AppUnsubscribeTokenVerifier extends UnsubscribeTokenVerifierPort {
+  constructor(private readonly nextauthSecret: string | undefined) {
+    super();
+  }
+
   tryVerify(token: string) {
-    return verifyUnsubscribeToken(token);
+    return verifyUnsubscribeToken({ token, secret: this.nextauthSecret });
   }
 }
 
@@ -117,7 +121,7 @@ export class AppAutomationRuntime {
       database: this.database,
       jobs,
       clock: this.clock,
-      verifier: new AppUnsubscribeTokenVerifier(),
+      verifier: new AppUnsubscribeTokenVerifier(this.graph.nextauthSecret),
       wake: new AppSchedulerWake(this.redis),
       ...this.graph,
       testFire: this.testFire,

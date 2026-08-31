@@ -6,7 +6,6 @@ import { render } from "@react-email/render";
 import { createHash } from "crypto";
 import type { AlertType } from "~/generated/prisma/client";
 import type { TriggerData } from "~/runtime/app/features/automation-adapters/trigger.types";
-import { env } from "~/env.mjs";
 import { computeDefaultFrom, sendEmail } from "./emailSender";
 import type { EmailDeliveryPort } from "./providers/types";
 import { buildTriggerNoReplyAddress, TEST_FIRE_TRIGGER_ID_SENTINEL } from "./triggerNoReply";
@@ -41,22 +40,26 @@ function buildUnsubscribe({
   triggerId,
   email,
   baseHost,
+  nextauthSecret,
 }: {
   projectId: string;
   triggerId: string;
   email: string;
   baseHost: string;
+  nextauthSecret: string | undefined;
 }): { footerHtml: string; headers: Record<string, string> } {
   const footerLink = (token: string) =>
     `${baseHost}/unsubscribe?token=${encodeURIComponent(token)}`;
   const apiLink = (token: string) =>
     `${baseHost}/api/unsubscribe?token=${encodeURIComponent(token)}`;
 
-  const triggerToken = signUnsubscribeToken({ projectId, triggerId, email });
+  const triggerToken = signUnsubscribeToken({
+    payload: { projectId, triggerId, email },
+    secret: nextauthSecret,
+  });
   const projectToken = signUnsubscribeToken({
-    projectId,
-    triggerId: null,
-    email,
+    payload: { projectId, triggerId: null, email },
+    secret: nextauthSecret,
   });
 
   const triggerFooterUrl = footerLink(triggerToken);
@@ -90,6 +93,8 @@ export const sendTriggerEmail = async ({
   projectSlug,
   triggerType,
   triggerMessage,
+  baseHost,
+  nextauthSecret,
   isRecipientSent,
   recordRecipientSent,
 }: {
@@ -106,6 +111,11 @@ export const sendTriggerEmail = async ({
   projectSlug: string;
   triggerType: AlertType | null;
   triggerMessage: string;
+  /** Public application origin, injected at composition — every link this mail
+   *  carries is built from it, so nothing here reads the application env. */
+  baseHost: string;
+  /** Injected unsubscribe/no-reply signing key (NEXTAUTH_SECRET at boot). */
+  nextauthSecret?: string;
   /**
    * Optional per-recipient idempotency gate (ADR-031). Two callbacks work in
    * tandem to make the fan-out idempotent at recipient granularity:
@@ -153,7 +163,7 @@ export const sendTriggerEmail = async ({
             the messages that initiated this action.
           </p>
           {triggerMessage && <p>{triggerMessage}</p>}
-          <TriggerTable triggerData={triggerData} projectSlug={projectSlug} />
+          <TriggerTable triggerData={triggerData} projectSlug={projectSlug} baseHost={baseHost} />
         </Container>
       </Html>,
     );
@@ -173,6 +183,8 @@ export const sendTriggerEmail = async ({
       projectId,
       subject,
       html: emailHtml,
+      baseHost,
+      nextauthSecret,
       isRecipientSent,
       recordRecipientSent,
     });
@@ -198,6 +210,8 @@ async function sendPerRecipient({
   projectId,
   subject,
   html,
+  baseHost,
+  nextauthSecret,
   isRecipientSent,
   recordRecipientSent,
 }: {
@@ -207,10 +221,11 @@ async function sendPerRecipient({
   projectId: string;
   subject: string;
   html: string;
+  baseHost: string;
+  nextauthSecret: string | undefined;
   isRecipientSent?: (recipientHash: string) => Promise<boolean>;
   recordRecipientSent?: (recipientHash: string) => Promise<void>;
 }): Promise<void> {
-  const baseHost = env.BASE_HOST;
   // Defense in depth at the boundary: every template context builder strips
   // CR/LF from the fields it interpolates, but the subject is assembled from
   // free-form values in several places — a newline here becomes an injected
@@ -219,6 +234,7 @@ async function sendPerRecipient({
   const noReplyTo = buildTriggerNoReplyAddress({
     defaultFrom: computeDefaultFrom(mailer),
     triggerId,
+    nextauthSecret,
   });
   const isSentinel = triggerId === TEST_FIRE_TRIGGER_ID_SENTINEL;
 
@@ -251,6 +267,7 @@ async function sendPerRecipient({
       triggerId,
       email: recipient,
       baseHost,
+      nextauthSecret,
     });
     await sendEmail({
       mailer,
@@ -284,6 +301,8 @@ export const sendRenderedTriggerEmail = async ({
   projectId,
   subject,
   html,
+  baseHost,
+  nextauthSecret,
   isRecipientSent,
   recordRecipientSent,
 }: {
@@ -295,6 +314,10 @@ export const sendRenderedTriggerEmail = async ({
   projectId: string;
   subject: string;
   html: string;
+  /** Public application origin, injected at composition — see `sendTriggerEmail`. */
+  baseHost: string;
+  /** Injected unsubscribe/no-reply signing key (NEXTAUTH_SECRET at boot). */
+  nextauthSecret?: string;
   /** Same per-recipient idempotency gate as `sendTriggerEmail` — see its
    *  doc comment. */
   isRecipientSent?: (recipientHash: string) => Promise<boolean>;
@@ -308,6 +331,8 @@ export const sendRenderedTriggerEmail = async ({
       projectId,
       subject,
       html,
+      baseHost,
+      nextauthSecret,
       isRecipientSent,
       recordRecipientSent,
     });
@@ -321,18 +346,20 @@ export const sendRenderedTriggerEmail = async ({
 const TriggerTable = ({
   triggerData,
   projectSlug,
+  baseHost,
 }: {
   triggerData: TriggerData[];
   projectSlug: string;
+  baseHost: string;
 }) => {
   const getLink = (data: TriggerData) => {
     // Check if this is a custom graph trigger
     if (data.graphId) {
-      return `${env.BASE_HOST}/${projectSlug}/analytics/custom/${data.graphId}`;
+      return `${baseHost}/${projectSlug}/analytics/custom/${data.graphId}`;
     }
     // Regular trace link
     if (data.traceId) {
-      return `${env.BASE_HOST}/${projectSlug}/traces/${data.traceId}`;
+      return `${baseHost}/${projectSlug}/traces/${data.traceId}`;
     }
     return "#";
   };

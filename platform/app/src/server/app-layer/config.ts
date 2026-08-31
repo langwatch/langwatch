@@ -34,7 +34,7 @@ import { z } from "zod";
 import { poolSizingFromEnv, type PoolSizingInput } from "@langwatch/clickhouse-client";
 import type { GroupQueuePolicy } from "@langwatch/group-queue";
 import { PRIVATE_CH_ENV_PREFIX, parseRouteKey } from "../clickhouse/privateRouteKey";
-import { resolveAppMailerConfiguration } from "~/runtime/app/mailer.private-config";
+import { resolveAppMailConfiguration } from "~/runtime/app/mailer.private-config";
 import { resolveStripeRuntimeConfig, type StripeRuntimeConfig } from "~/runtime/app/stripe.runtime";
 import type { MailerConfiguration } from "../mailer/providers/types";
 import { createLogger } from "@langwatch/observability";
@@ -182,6 +182,13 @@ export interface AppConfig {
   evaluationExecution: EvaluationExecutionConfig;
   /** Public application origin used when rendering links in durable work. */
   baseHost: string;
+  /**
+   * Private key the mail link helpers sign with: unsubscribe tokens (which
+   * fail closed on an empty key) and the per-trigger no-reply tag (which
+   * degrades). Projected from NEXTAUTH_SECRET by the application mail runtime
+   * configuration so no helper reads the environment itself.
+   */
+  nextauthSecret?: string;
   slackPlanLimitChannel?: string;
   slackSignupsChannel?: string;
   slackSubscriptionsChannel?: string;
@@ -256,6 +263,7 @@ export function createAppConfigFromEnv(overrides?: { processRole?: ProcessRole }
     tenantConcurrencyCap: env.LANGWATCH_DISPATCH_TENANT_CAP,
     globalConcurrencyBudget: env.LANGWATCH_DISPATCH_GLOBAL_BUDGET,
   });
+  const mail = resolveAppMailConfiguration(env);
   const evaluationExecution = resolveEvaluationExecutionConfig(process.env);
   const childEnvironment = resolveScenarioChildParentEnvironment(process.env);
 
@@ -275,7 +283,8 @@ export function createAppConfigFromEnv(overrides?: { processRole?: ProcessRole }
     redisDbIndex: env.REDIS_DB_INDEX,
     groupQueue,
     outboundProxy: parseOutboundProxyConfig(process.env),
-    mailer: resolveAppMailerConfiguration(env),
+    mailer: mail.mailer,
+    nextauthSecret: mail.runtime.nextauthSecret,
     stripe: resolveStripeRuntimeConfig({ STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY }),
     langevals: resolveLangevalsRuntimeConfig(env),
     tracePrivacy: resolveTracePrivacyRuntimeConfig(

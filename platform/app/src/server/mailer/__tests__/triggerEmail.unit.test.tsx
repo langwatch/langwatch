@@ -20,6 +20,12 @@ import { TestMailer } from "./mailer.test-double";
 
 const mailer = new TestMailer();
 
+// Both are injected at composition in production (AppConfig.baseHost and the
+// mail runtime's NEXTAUTH_SECRET projection), so the tests state them too
+// rather than leaning on the process environment.
+const BASE_HOST = "https://app.langwatch.test";
+const NEXTAUTH_SECRET = "trigger-email-signing-secret";
+
 function callEmailWithDedup(sent: Set<string>, overrides?: { triggerEmails?: string[] }) {
   return sendTriggerEmail({
     mailer,
@@ -31,6 +37,8 @@ function callEmailWithDedup(sent: Set<string>, overrides?: { triggerEmails?: str
     projectSlug: "demo",
     triggerType: AlertType.WARNING,
     triggerMessage: "",
+    baseHost: BASE_HOST,
+    nextauthSecret: NEXTAUTH_SECRET,
     isRecipientSent: async (hash: string) => sent.has(hash),
     recordRecipientSent: async (hash: string) => {
       sent.add(hash);
@@ -59,6 +67,8 @@ function callEmail(overrides?: { triggerId?: string }) {
     projectSlug: "demo",
     triggerType: AlertType.WARNING,
     triggerMessage: "",
+    baseHost: BASE_HOST,
+    nextauthSecret: NEXTAUTH_SECRET,
   });
 }
 
@@ -141,8 +151,11 @@ describe("sendTriggerEmail", () => {
         expect(args.content.bcc).toEqual([expectedRecipients[i]]);
         expect(args.content.html).toContain("Stop receiving this notification");
         expect(args.content.html).toContain("Stop all notifications from this project");
-        expect(args.content.html).toContain("/unsubscribe?token=");
+        expect(args.content.html).toContain(`${BASE_HOST}/unsubscribe?token=`);
         expect(args.content.headers["List-Unsubscribe"]).toMatch(/^<.*\/api\/unsubscribe\?token=/);
+        expect(args.content.headers["List-Unsubscribe"]).toContain(
+          `<${BASE_HOST}/api/unsubscribe?token=`,
+        );
         expect(args.content.headers["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
         const match = args.content.headers["List-Unsubscribe"]!.match(/token=([^>&]+)/);
         expect(match).not.toBeNull();
@@ -213,6 +226,8 @@ describe("sendTriggerEmail", () => {
           projectSlug: "demo",
           triggerType: AlertType.WARNING,
           triggerMessage: "",
+          baseHost: BASE_HOST,
+          nextauthSecret: NEXTAUTH_SECRET,
         });
 
         expect(sendEmailMock).toHaveBeenCalledTimes(1);

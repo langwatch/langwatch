@@ -131,6 +131,9 @@ function makeDeps(
       listReportTraces: listReportTraces as unknown as ReportDispatchDeps["listReportTraces"],
       loadReportCharts: loadReportCharts as unknown as ReportDispatchDeps["loadReportCharts"],
       baseHost: "https://app.langwatch.ai",
+      // Injected at composition in production; a report email signs the same
+      // forge-proof unsubscribe footer as any other trigger email.
+      nextauthSecret: "report-dispatch-signing-secret",
     },
   };
 }

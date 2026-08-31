@@ -1756,7 +1756,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     analytics: analyticsService,
     resolveClickHouseClient,
     baseHost: config.baseHost,
-    nextauthSecret: env.NEXTAUTH_SECRET,
+    nextauthSecret: config.nextauthSecret,
     emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
     tenantDailyCap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
   });
@@ -1765,7 +1765,9 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     redis,
     graph: graphPorts,
     clock: automationClock,
-    testFire: AppAutomationTestFireAdapter.create(mailer),
+    testFire: AppAutomationTestFireAdapter.create(mailer, {
+      nextauthSecret: config.nextauthSecret,
+    }),
     persistCaps: automationPersistCaps,
   }).build();
   const billingErrorReporter = AppBillingErrorReporter.create();
@@ -2131,7 +2133,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     annotations,
     mailer,
     baseHost: config.baseHost,
-    nextauthSecret: env.NEXTAUTH_SECRET,
+    nextauthSecret: config.nextauthSecret,
     emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
     tenantDailyCap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
   });
@@ -2248,6 +2250,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
                 to,
               }),
             baseHost: config.baseHost,
+            nextauthSecret: config.nextauthSecret,
           },
           fire,
         }),

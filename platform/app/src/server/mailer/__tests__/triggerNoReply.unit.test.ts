@@ -1,10 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
-
-vi.mock("../../../env.mjs", () => ({
-  env: { NEXTAUTH_SECRET: "test-secret" },
-}));
-
+import { describe, expect, it } from "vitest";
 import { buildTriggerNoReplyAddress } from "../triggerNoReply";
+
+/** The salt is a parameter now, so no environment mutation is needed. */
+const NEXTAUTH_SECRET = "test-secret";
 
 describe("buildTriggerNoReplyAddress", () => {
   describe("when called with a langwatch defaultFrom", () => {
@@ -12,6 +10,7 @@ describe("buildTriggerNoReplyAddress", () => {
       const addr = buildTriggerNoReplyAddress({
         defaultFrom: "LangWatch <contact@langwatch.ai>",
         triggerId: "trigger_abc123",
+        nextauthSecret: NEXTAUTH_SECRET,
       });
       expect(addr).toMatch(/^LangWatch Triggers <no-reply\+[a-f0-9]{12}@langwatch\.ai>$/);
     });
@@ -22,10 +21,12 @@ describe("buildTriggerNoReplyAddress", () => {
       const a = buildTriggerNoReplyAddress({
         defaultFrom: "LangWatch <mailer@example.com>",
         triggerId: "trigger_same",
+        nextauthSecret: NEXTAUTH_SECRET,
       });
       const b = buildTriggerNoReplyAddress({
         defaultFrom: "LangWatch <mailer@example.com>",
         triggerId: "trigger_same",
+        nextauthSecret: NEXTAUTH_SECRET,
       });
       expect(a).toBe(b);
     });
@@ -36,12 +37,25 @@ describe("buildTriggerNoReplyAddress", () => {
       const a = buildTriggerNoReplyAddress({
         defaultFrom: "LangWatch <mailer@example.com>",
         triggerId: "trigger_one",
+        nextauthSecret: NEXTAUTH_SECRET,
       });
       const b = buildTriggerNoReplyAddress({
         defaultFrom: "LangWatch <mailer@example.com>",
         triggerId: "trigger_two",
+        nextauthSecret: NEXTAUTH_SECRET,
       });
       expect(a).not.toBe(b);
+    });
+  });
+
+  describe("given no signing secret", () => {
+    it("still produces an address, because the tag carries no authority", () => {
+      const addr = buildTriggerNoReplyAddress({
+        defaultFrom: "LangWatch <contact@langwatch.ai>",
+        triggerId: "trigger_abc123",
+        nextauthSecret: undefined,
+      });
+      expect(addr).toMatch(/^LangWatch Triggers <no-reply\+[a-f0-9]{12}@langwatch\.ai>$/);
     });
   });
 
@@ -50,6 +64,7 @@ describe("buildTriggerNoReplyAddress", () => {
       const addr = buildTriggerNoReplyAddress({
         defaultFrom: "bare-address@nowhere",
         triggerId: "trigger_x",
+        nextauthSecret: NEXTAUTH_SECRET,
       });
       expect(addr).toMatch(/@langwatch\.ai>$/);
     });
