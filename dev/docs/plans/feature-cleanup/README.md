@@ -683,3 +683,34 @@ They are now — nine scenarios, each bound to a case from the previous round,
 before, which is not the order the repo asks for; the behaviour predates both,
 and a spec describing what the code does beats a citation of a file nobody
 wrote.
+
+## Round: the first of the two R1 violations is gone (2026-08-31)
+
+`applicableEndUserCaps` — a free function holding a `PrismaClient` and running
+two `findMany` calls — is now `GatewayEndUserCapsService`, taking a repository
+and the ledger's spend port.
+
+The earlier note said this was **blocked on composition**: its caller had no
+budget repository in scope, only `prisma` and the ClickHouse spend port. That
+turned out to be the wrong conclusion. The block was only real if the app had
+to build the repository itself; a `GatewayEndUserCapsAdapter` inside the
+package does the wiring, the app calls that, and the Prisma repository stays
+private — the same shape `WebhookEventsAdapter` and `PrismaGatewayAdapter`
+already use here.
+
+The two reads went onto `GatewayBudgetRepository` and answer with **portable
+records**, so the port carries no generated Prisma row across the repository
+boundary. Worth noting how the record was arrived at: the first draft guessed
+its fields (`periodAnchor`, `limitUsd: unknown`) and the compiler rejected
+every wrong guess in turn — the period helpers want
+`currentPeriodStartedAt`/`resetsAt`/`lastResetAt`/`cycleAnchorAt`, the bucket
+key wants `providerKey`, and the money adapter wants something with
+`toString()`. Reading the consumers would have been faster than guessing.
+
+Twelve cases where there were none. The join between Postgres and the ledger
+is the bucket scope id, and getting it wrong shows a customer somebody else's
+spend — or, more quietly, zero.
+
+**One R1 violation left**: `gateway-usage.service.ts`, 366 lines, constructor
+takes a PrismaClient and it imports the `Prisma` namespace rather than only
+the client type, which suggests raw SQL. Not yet examined.
