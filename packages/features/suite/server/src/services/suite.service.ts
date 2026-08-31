@@ -51,35 +51,6 @@ import type { SuiteRunReadRepository } from "../repositories/suite-run.repositor
 
 const archivedSlugSuffix = "--archived";
 
-function slugify(value: string): string {
-  return (
-    value
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "") || "suite"
-  );
-}
-
-function isAgentTarget(target: SuiteTarget): boolean {
-  switch (target.type) {
-    case "http":
-    case "code":
-    case "workflow":
-      return true;
-    case "prompt":
-      return false;
-    default: {
-      const unhandledType: never = target.type;
-      throw new Error(`Unsupported suite target type: ${unhandledType}`);
-    }
-  }
-}
-
-function folderToSuite(folder: ScenarioFolder): Suite {
-  return suiteSchema.parse(folder);
-}
-
 export type SuiteServiceOptions = {
   repository: SuiteRepository;
   scenarios: ScenarioService;
@@ -90,8 +61,6 @@ export type SuiteServiceOptions = {
   generateId?: () => string;
   now?: () => Date;
 };
-
-const defaultGenerateId = (): string => `suite_${crypto.randomUUID()}`;
 
 export class SuiteService extends SuiteServiceContract {
   static create(options: SuiteServiceOptions): SuiteService {
@@ -125,16 +94,16 @@ export class SuiteService extends SuiteServiceContract {
       folderId: parsed.id,
       projectId: parsed.projectId,
     });
-    return folder ? folderToSuite(folder) : null;
+    return folder ? SuiteService.folderToSuite(folder) : null;
   }
 
   async create(input: CreateSuiteCommand): Promise<Suite> {
     const parsed = createSuiteCommandSchema.parse(input);
-    const slug = slugify(parsed.name);
+    const slug = SuiteService.slugify(parsed.name);
     await this.assertSlugAvailable({ projectId: parsed.projectId, slug });
     return this.options.repository.create({
       ...parsed,
-      id: (this.options.generateId ?? defaultGenerateId)(),
+      id: (this.options.generateId ?? SuiteService.defaultGenerateId)(),
       slug,
     });
   }
@@ -149,7 +118,7 @@ export class SuiteService extends SuiteServiceContract {
       return this.updateFolder(parsed);
     }
 
-    const slug = parsed.name === undefined ? undefined : slugify(parsed.name);
+    const slug = parsed.name === undefined ? undefined : SuiteService.slugify(parsed.name);
     if (slug !== undefined) {
       await this.assertSlugAvailable({
         projectId: parsed.projectId,
@@ -166,7 +135,7 @@ export class SuiteService extends SuiteServiceContract {
   async duplicate(input: SuiteIdInput): Promise<Suite> {
     const source = await this.get(input);
     const name = `${source.name} (copy)`;
-    const slug = slugify(name);
+    const slug = SuiteService.slugify(name);
     await this.assertSlugAvailable({ projectId: source.projectId, slug });
     return this.options.repository.create({
       projectId: source.projectId,
@@ -179,7 +148,7 @@ export class SuiteService extends SuiteServiceContract {
       labels: source.labels,
       simulatorModel: source.simulatorModel,
       judgeModel: source.judgeModel,
-      id: (this.options.generateId ?? defaultGenerateId)(),
+      id: (this.options.generateId ?? SuiteService.defaultGenerateId)(),
       slug,
     });
   }
@@ -281,10 +250,10 @@ export class SuiteService extends SuiteServiceContract {
       (scenario) => scenario.id,
     );
     const suite = await this.options.repository.saveManagedRunAll({
-      id: (this.options.generateId ?? defaultGenerateId)(),
+      id: (this.options.generateId ?? SuiteService.defaultGenerateId)(),
       projectId: parsed.projectId,
       name: RUN_ALL_SUITE_NAME,
-      baseSlug: slugify(RUN_ALL_SUITE_NAME),
+      baseSlug: SuiteService.slugify(RUN_ALL_SUITE_NAME),
       label: RUN_ALL_SUITE_LABEL,
       scenarioIds,
       targets: parsed.targets,
@@ -322,7 +291,9 @@ export class SuiteService extends SuiteServiceContract {
             ids: parsed.scenarioIds,
             projectId: parsed.projectId,
           });
-    const agentIds = parsed.targets.filter(isAgentTarget).map((target) => target.referenceId);
+    const agentIds = parsed.targets
+      .filter((target) => SuiteService.isAgentTarget(target))
+      .map((target) => target.referenceId);
     const promptIds = parsed.targets
       .filter((target) => target.type === "prompt")
       .map((target) => target.referenceId);
@@ -357,7 +328,7 @@ export class SuiteService extends SuiteServiceContract {
         simulatorModel: input.simulatorModel,
         judgeModel: input.judgeModel,
       });
-      return folderToSuite(folder);
+      return SuiteService.folderToSuite(folder);
     } catch (error) {
       if (error instanceof ScenarioFolderNotFoundError) {
         throw new SuiteNotFoundError(input.id);
@@ -372,7 +343,7 @@ export class SuiteService extends SuiteServiceContract {
         folderId: suite.id,
         projectId: suite.projectId,
       });
-      return folderToSuite(folder);
+      return SuiteService.folderToSuite(folder);
     } catch (error) {
       if (error instanceof ScenarioFolderNotFoundError) {
         throw new SuiteNotFoundError(suite.id);
@@ -450,7 +421,7 @@ export class SuiteService extends SuiteServiceContract {
     archived: SuiteTarget[];
     missing: SuiteTarget[];
   }> {
-    const agentTargets = input.targets.filter(isAgentTarget);
+    const agentTargets = input.targets.filter((target) => SuiteService.isAgentTarget(target));
     const promptTargets = input.targets.filter((target) => target.type === "prompt");
     const [agentRows, promptIds] = await Promise.all([
       agentTargets.length === 0
@@ -483,5 +454,39 @@ export class SuiteService extends SuiteServiceContract {
       else missing.push(target);
     }
     return { active, archived, missing };
+  }
+
+  /** The id a suite gets when composition did not supply a minter. */
+  private static defaultGenerateId(): string {
+    return `suite_${crypto.randomUUID()}`;
+  }
+
+  private static slugify(value: string): string {
+    return (
+      value
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "") || "suite"
+    );
+  }
+
+  private static isAgentTarget(target: SuiteTarget): boolean {
+    switch (target.type) {
+      case "http":
+      case "code":
+      case "workflow":
+        return true;
+      case "prompt":
+        return false;
+      default: {
+        const unhandledType: never = target.type;
+        throw new Error(`Unsupported suite target type: ${unhandledType}`);
+      }
+    }
+  }
+
+  private static folderToSuite(folder: ScenarioFolder): Suite {
+    return suiteSchema.parse(folder);
   }
 }

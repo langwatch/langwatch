@@ -7,10 +7,7 @@ import type {
   SignupNotificationPayload,
   SubscriptionNotificationPayload,
 } from "@langwatch/enterprise-billing-contract";
-import {
-  NullBillingErrorReporter,
-  type BillingErrorReporter,
-} from "../ports/error-reporter.port";
+import { NullBillingErrorReporter, type BillingErrorReporter } from "../ports/error-reporter.port";
 import {
   NullUsageLimitEmailAdapter,
   type UsageLimitEmailAdapter,
@@ -42,20 +39,11 @@ export interface UsageLimitEmailData {
 // Helpers (absorbed from billingNotificationRegistration.ts)
 // ---------------------------------------------------------------------------
 
-type ProspectiveNotification = Extract<
-  SubscriptionNotificationPayload,
-  { type: "prospective" }
->;
+type ProspectiveNotification = Extract<SubscriptionNotificationPayload, { type: "prospective" }>;
 
-type ConfirmedNotification = Extract<
-  SubscriptionNotificationPayload,
-  { type: "confirmed" }
->;
+type ConfirmedNotification = Extract<SubscriptionNotificationPayload, { type: "confirmed" }>;
 
-type CancelledNotification = Extract<
-  SubscriptionNotificationPayload,
-  { type: "cancelled" }
->;
+type CancelledNotification = Extract<SubscriptionNotificationPayload, { type: "cancelled" }>;
 
 type NotificationServiceOptions = {
   config: {
@@ -71,195 +59,6 @@ type NotificationServiceOptions = {
   fetchFn?: typeof fetch;
   errorReporter?: BillingErrorReporter;
   usageLimitEmail?: UsageLimitEmailAdapter;
-};
-
-const formatNumber = (value?: number | null) =>
-  typeof value === "number" ? value.toLocaleString() : "-";
-
-const formatDate = (value?: Date | null) =>
-  value
-    ? new Intl.DateTimeFormat("en-US", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }).format(value)
-    : "Now";
-
-const buildProspectiveBlocks = (
-  payload: ProspectiveNotification,
-  adminLink: string,
-): IncomingWebhookSendArguments["blocks"] => {
-  const blocks: IncomingWebhookSendArguments["blocks"] = [
-    {
-      type: "header",
-      text: { type: "plain_text", text: "Prospective subscription interest" },
-    },
-  ];
-
-  const dataBlock = {
-    type: "section",
-    fields: [
-      { type: "mrkdwn", text: `*Organization:* ${payload.organizationName}` },
-      { type: "mrkdwn", text: `*Plan:* ${payload.plan}` },
-      {
-        type: "mrkdwn",
-        text: `*Customer:* ${payload.customerName ?? "Unknown"}`,
-      },
-    ],
-  };
-
-  if (payload.note) {
-    dataBlock.fields.push({
-      type: "mrkdwn",
-      text: `_${payload.note}_`,
-    });
-  }
-
-  blocks.push(dataBlock);
-
-  blocks.push({
-    type: "context",
-    elements: [
-      {
-        type: "mrkdwn",
-        text: `Triggered by ${payload.customerName ?? "a team member"}`,
-      },
-    ],
-  });
-
-  blocks.push({
-    type: "actions",
-    elements: [
-      {
-        type: "button",
-        text: { type: "plain_text", text: "Open org in admin" },
-        url: adminLink,
-        action_id: "subscription_prospective_admin",
-        style: "primary",
-      },
-    ],
-  });
-
-  return blocks;
-};
-
-const buildConfirmedBlocks = (
-  payload: ConfirmedNotification,
-  adminLink: string,
-): IncomingWebhookSendArguments["blocks"] => {
-  const startText = payload.startDate
-    ? `Activated on ${formatDate(payload.startDate)}`
-    : "Activated just now";
-
-  return [
-    {
-      type: "header",
-      text: { type: "plain_text", text: "Subscription activated" },
-    },
-    {
-      type: "section",
-      text: {
-        type: "mrkdwn",
-        text: `*${payload.organizationName}* is live on *${payload.plan}*.`,
-      },
-    },
-    {
-      type: "section",
-      fields: [
-        {
-          type: "mrkdwn",
-          text: `*Subscription ID:* ${payload.subscriptionId}`,
-        },
-        {
-          type: "mrkdwn",
-          text: `*Start Date:* ${formatDate(payload.startDate)}`,
-        },
-        {
-          type: "mrkdwn",
-          text: `*Seats:* ${formatNumber(payload.maxMembers)}`,
-        },
-        {
-          type: "mrkdwn",
-          text: `*Traces/month:* ${formatNumber(payload.maxMessagesPerMonth)}`,
-        },
-      ],
-    },
-    {
-      type: "context",
-      elements: [
-        {
-          type: "mrkdwn",
-          text: startText,
-        },
-      ],
-    },
-    {
-      type: "actions",
-      elements: [
-        {
-          type: "button",
-          text: { type: "plain_text", text: "Open org in admin" },
-          url: adminLink,
-          action_id: "subscription_confirmed_admin",
-        },
-      ],
-    },
-  ];
-};
-
-const buildCancelledBlocks = (
-  payload: CancelledNotification,
-  adminLink: string,
-): IncomingWebhookSendArguments["blocks"] => {
-  const cancelText = payload.cancellationDate
-    ? `Cancelled on ${formatDate(payload.cancellationDate)}`
-    : "Cancelled just now";
-
-  return [
-    {
-      type: "header",
-      text: { type: "plain_text", text: "Subscription cancelled" },
-    },
-    {
-      type: "section",
-      text: {
-        type: "mrkdwn",
-        text: `*${payload.organizationName}* has cancelled *${payload.plan}*.`,
-      },
-    },
-    {
-      type: "section",
-      fields: [
-        {
-          type: "mrkdwn",
-          text: `*Subscription ID:* ${payload.subscriptionId}`,
-        },
-        {
-          type: "mrkdwn",
-          text: `*Cancellation Date:* ${formatDate(payload.cancellationDate)}`,
-        },
-      ],
-    },
-    {
-      type: "context",
-      elements: [
-        {
-          type: "mrkdwn",
-          text: cancelText,
-        },
-      ],
-    },
-    {
-      type: "actions",
-      elements: [
-        {
-          type: "button",
-          text: { type: "plain_text", text: "Open org in admin" },
-          url: adminLink,
-          action_id: "subscription_cancelled_admin",
-        },
-      ],
-    },
-  ];
 };
 
 // ---------------------------------------------------------------------------
@@ -339,9 +138,7 @@ export class NotificationService {
       await webhook.send(body);
     } catch (error) {
       logger.error({ error }, errorLog);
-      this.errorReporter.capture(
-        error instanceof Error ? error : new Error(String(error)),
-      );
+      this.errorReporter.capture(error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -393,9 +190,7 @@ export class NotificationService {
   /**
    * Sends a Slack alert when a resource limit is reached.
    */
-  async sendSlackResourceLimitAlert(
-    context: ResourceLimitNotificationContext,
-  ): Promise<void> {
+  async sendSlackResourceLimitAlert(context: ResourceLimitNotificationContext): Promise<void> {
     await this.sendSlackMessage({
       channelUrl: this.config.slackPlanLimitChannel,
       body: {
@@ -437,21 +232,19 @@ export class NotificationService {
   /**
    * Sends a Slack notification for subscription events (prospective or confirmed).
    */
-  async sendSlackSubscriptionEvent(
-    payload: SubscriptionNotificationPayload,
-  ): Promise<void> {
+  async sendSlackSubscriptionEvent(payload: SubscriptionNotificationPayload): Promise<void> {
     const adminLink = this.getAdminLink(payload.organizationId);
 
     let blocks: IncomingWebhookSendArguments["blocks"];
     switch (payload.type) {
       case "prospective":
-        blocks = buildProspectiveBlocks(payload, adminLink);
+        blocks = NotificationService.prospectiveBlocks(payload, adminLink);
         break;
       case "confirmed":
-        blocks = buildConfirmedBlocks(payload, adminLink);
+        blocks = NotificationService.confirmedBlocks(payload, adminLink);
         break;
       case "cancelled":
-        blocks = buildCancelledBlocks(payload, adminLink);
+        blocks = NotificationService.cancelledBlocks(payload, adminLink);
         break;
     }
 
@@ -480,8 +273,7 @@ export class NotificationService {
       body: {
         text: `🔔 New user registered: ${payload.userName ?? "Unknown"}, ${payload.userEmail ?? "unknown"}. Organization: ${payload.organizationName ?? "Unknown"}${organizationDetails}`,
       },
-      missingConfigLog:
-        "SLACK_CHANNEL_SIGNUPS is not configured; skipping signup notification",
+      missingConfigLog: "SLACK_CHANNEL_SIGNUPS is not configured; skipping signup notification",
       errorLog: "Failed to send Slack signup notification",
     });
   }
@@ -489,9 +281,7 @@ export class NotificationService {
   /**
    * Sends a Slack notification for a license purchase.
    */
-  async sendSlackLicensePurchase(
-    payload: LicensePurchaseNotificationPayload,
-  ): Promise<void> {
+  async sendSlackLicensePurchase(payload: LicensePurchaseNotificationPayload): Promise<void> {
     const amountFormatted = new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: payload.currency,
@@ -619,9 +409,7 @@ export class NotificationService {
       }
     } catch (error) {
       logger.error({ error }, "Failed to send HubSpot signup form notification");
-      this.errorReporter.capture(
-        error instanceof Error ? error : new Error(String(error)),
-      );
+      this.errorReporter.capture(error instanceof Error ? error : new Error(String(error)));
     } finally {
       clearTimeout(timeoutId);
     }
@@ -678,17 +466,204 @@ export class NotificationService {
       });
 
       if (!response.ok) {
-        this.errorReporter.capture(
-          new Error(`HubSpot request failed: ${response.status}`),
-        );
+        this.errorReporter.capture(new Error(`HubSpot request failed: ${response.status}`));
       }
     } catch (error) {
       logger.error({ error }, "Failed to send HubSpot plan-limit notification");
-      this.errorReporter.capture(
-        error instanceof Error ? error : new Error(String(error)),
-      );
+      this.errorReporter.capture(error instanceof Error ? error : new Error(String(error)));
     } finally {
       clearTimeout(timeoutId);
     }
+  }
+
+  private static formatNumber(value?: number | null) {
+    return typeof value === "number" ? value.toLocaleString() : "-";
+  }
+
+  private static formatDate(value?: Date | null) {
+    return value
+      ? new Intl.DateTimeFormat("en-US", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }).format(value)
+      : "Now";
+  }
+
+  private static prospectiveBlocks(
+    payload: ProspectiveNotification,
+    adminLink: string,
+  ): IncomingWebhookSendArguments["blocks"] {
+    const blocks: IncomingWebhookSendArguments["blocks"] = [
+      {
+        type: "header",
+        text: { type: "plain_text", text: "Prospective subscription interest" },
+      },
+    ];
+
+    const dataBlock = {
+      type: "section",
+      fields: [
+        { type: "mrkdwn", text: `*Organization:* ${payload.organizationName}` },
+        { type: "mrkdwn", text: `*Plan:* ${payload.plan}` },
+        {
+          type: "mrkdwn",
+          text: `*Customer:* ${payload.customerName ?? "Unknown"}`,
+        },
+      ],
+    };
+
+    if (payload.note) {
+      dataBlock.fields.push({
+        type: "mrkdwn",
+        text: `_${payload.note}_`,
+      });
+    }
+
+    blocks.push(dataBlock);
+
+    blocks.push({
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: `Triggered by ${payload.customerName ?? "a team member"}`,
+        },
+      ],
+    });
+
+    blocks.push({
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: "Open org in admin" },
+          url: adminLink,
+          action_id: "subscription_prospective_admin",
+          style: "primary",
+        },
+      ],
+    });
+
+    return blocks;
+  }
+
+  private static confirmedBlocks(
+    payload: ConfirmedNotification,
+    adminLink: string,
+  ): IncomingWebhookSendArguments["blocks"] {
+    const startText = payload.startDate
+      ? `Activated on ${NotificationService.formatDate(payload.startDate)}`
+      : "Activated just now";
+
+    return [
+      {
+        type: "header",
+        text: { type: "plain_text", text: "Subscription activated" },
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `*${payload.organizationName}* is live on *${payload.plan}*.`,
+        },
+      },
+      {
+        type: "section",
+        fields: [
+          {
+            type: "mrkdwn",
+            text: `*Subscription ID:* ${payload.subscriptionId}`,
+          },
+          {
+            type: "mrkdwn",
+            text: `*Start Date:* ${NotificationService.formatDate(payload.startDate)}`,
+          },
+          {
+            type: "mrkdwn",
+            text: `*Seats:* ${NotificationService.formatNumber(payload.maxMembers)}`,
+          },
+          {
+            type: "mrkdwn",
+            text: `*Traces/month:* ${NotificationService.formatNumber(payload.maxMessagesPerMonth)}`,
+          },
+        ],
+      },
+      {
+        type: "context",
+        elements: [
+          {
+            type: "mrkdwn",
+            text: startText,
+          },
+        ],
+      },
+      {
+        type: "actions",
+        elements: [
+          {
+            type: "button",
+            text: { type: "plain_text", text: "Open org in admin" },
+            url: adminLink,
+            action_id: "subscription_confirmed_admin",
+          },
+        ],
+      },
+    ];
+  }
+
+  private static cancelledBlocks(
+    payload: CancelledNotification,
+    adminLink: string,
+  ): IncomingWebhookSendArguments["blocks"] {
+    const cancelText = payload.cancellationDate
+      ? `Cancelled on ${NotificationService.formatDate(payload.cancellationDate)}`
+      : "Cancelled just now";
+
+    return [
+      {
+        type: "header",
+        text: { type: "plain_text", text: "Subscription cancelled" },
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `*${payload.organizationName}* has cancelled *${payload.plan}*.`,
+        },
+      },
+      {
+        type: "section",
+        fields: [
+          {
+            type: "mrkdwn",
+            text: `*Subscription ID:* ${payload.subscriptionId}`,
+          },
+          {
+            type: "mrkdwn",
+            text: `*Cancellation Date:* ${NotificationService.formatDate(payload.cancellationDate)}`,
+          },
+        ],
+      },
+      {
+        type: "context",
+        elements: [
+          {
+            type: "mrkdwn",
+            text: cancelText,
+          },
+        ],
+      },
+      {
+        type: "actions",
+        elements: [
+          {
+            type: "button",
+            text: { type: "plain_text", text: "Open org in admin" },
+            url: adminLink,
+            action_id: "subscription_cancelled_admin",
+          },
+        ],
+      },
+    ];
   }
 }

@@ -74,7 +74,7 @@ export class DatasetService extends DatasetServiceContract {
   async upsertDataset(input: UpsertDatasetInput): Promise<Dataset> {
     const parsed = upsertDatasetInputSchema.parse(input);
     const name = parsed.name.trim();
-    const slug = slugify(name);
+    const slug = DatasetService.slugify(name);
     if (parsed.datasetId) {
       const existing = await this.getBySlugOrId({
         projectId: parsed.projectId,
@@ -136,7 +136,7 @@ export class DatasetService extends DatasetServiceContract {
 
   async validateDatasetName(input: DatasetNameInput): Promise<DatasetNameResult> {
     const parsed = datasetNameInputSchema.parse(input);
-    const slug = slugify(parsed.proposedName);
+    const slug = DatasetService.slugify(parsed.proposedName);
     const conflict = await this.options.repository.tryFindBySlug({
       projectId: parsed.projectId,
       slug,
@@ -262,7 +262,7 @@ export class DatasetService extends DatasetServiceContract {
     await this.options.repository.restore({
       id: dataset.id,
       projectId: input.projectId,
-      slug: slugify(dataset.name),
+      slug: DatasetService.slugify(dataset.name),
     });
     return { success: true };
   }
@@ -378,8 +378,8 @@ export class DatasetService extends DatasetServiceContract {
       if (result.data.length < 200 || records.length >= result.pagination.total) break;
       page += 1;
     }
-    const selected = selectRecords(records, parsed.entrySelection);
-    const limited = limitRecordsByBytes(selected, parsed.limitMb ?? 5);
+    const selected = DatasetService.selectRecords(records, parsed.entrySelection);
+    const limited = DatasetService.limitRecordsByBytes(selected, parsed.limitMb ?? 5);
     return { dataset, records: limited.records, truncated: limited.truncated };
   }
 
@@ -425,7 +425,7 @@ export class DatasetService extends DatasetServiceContract {
         created: false,
       };
     } catch (error) {
-      if (!isNotFound(error)) throw error;
+      if (!DatasetService.isNotFound(error)) throw error;
     }
     const [record] = await this.options.records.createMany({
       datasetId: dataset.id,
@@ -484,7 +484,7 @@ export class DatasetService extends DatasetServiceContract {
         entry: parsed.updatedRecord,
       });
     } catch (error) {
-      if (isNotFound(error)) throw new DatasetRecordNotFoundError();
+      if (DatasetService.isNotFound(error)) throw new DatasetRecordNotFoundError();
       throw error;
     }
   }
@@ -612,53 +612,53 @@ export class DatasetService extends DatasetServiceContract {
     if (!this.options.queue) return;
     await this.options.queue.enqueueNormalize({ projectId, datasetId });
   }
-}
 
-function slugify(value: string): string {
-  const slug = value
-    .normalize("NFKD")
-    .replaceAll(/[^\p{L}\p{N}]+/gu, "-")
-    .replaceAll(/^-+|-+$/g, "")
-    .toLowerCase();
-  return slug || "dataset";
-}
-
-function isNotFound(error: unknown): boolean {
-  return error instanceof Error && error.name === "DatasetRecordNotFoundError";
-}
-
-function selectRecords(
-  records: DatasetRecord[],
-  selection: import("@langwatch/dataset-contract").DatasetEntrySelection,
-): DatasetRecord[] {
-  if (selection === "all") return records;
-  if (records.length === 0) return [];
-  const index =
-    selection === "first"
-      ? 0
-      : selection === "last"
-        ? records.length - 1
-        : selection === "random"
-          ? Math.floor(Math.random() * records.length)
-          : Math.min(Math.max(selection, 0), records.length - 1);
-  return [records[index]!];
-}
-
-function limitRecordsByBytes(
-  records: DatasetRecord[],
-  limitMb: number | null,
-): { records: DatasetRecord[]; truncated: boolean } {
-  if (limitMb === null) return { records, truncated: false };
-  const limitBytes = limitMb * 1024 * 1024;
-  let bytes = 0;
-  const result: DatasetRecord[] = [];
-  for (const record of records) {
-    const recordBytes = JSON.stringify(record.entry).length;
-    if (bytes + recordBytes >= limitBytes) {
-      return { records: result, truncated: true };
-    }
-    bytes += recordBytes;
-    result.push(record);
+  private static slugify(value: string): string {
+    const slug = value
+      .normalize("NFKD")
+      .replaceAll(/[^\p{L}\p{N}]+/gu, "-")
+      .replaceAll(/^-+|-+$/g, "")
+      .toLowerCase();
+    return slug || "dataset";
   }
-  return { records: result, truncated: false };
+
+  private static isNotFound(error: unknown): boolean {
+    return error instanceof Error && error.name === "DatasetRecordNotFoundError";
+  }
+
+  private static selectRecords(
+    records: DatasetRecord[],
+    selection: import("@langwatch/dataset-contract").DatasetEntrySelection,
+  ): DatasetRecord[] {
+    if (selection === "all") return records;
+    if (records.length === 0) return [];
+    const index =
+      selection === "first"
+        ? 0
+        : selection === "last"
+          ? records.length - 1
+          : selection === "random"
+            ? Math.floor(Math.random() * records.length)
+            : Math.min(Math.max(selection, 0), records.length - 1);
+    return [records[index]!];
+  }
+
+  private static limitRecordsByBytes(
+    records: DatasetRecord[],
+    limitMb: number | null,
+  ): { records: DatasetRecord[]; truncated: boolean } {
+    if (limitMb === null) return { records, truncated: false };
+    const limitBytes = limitMb * 1024 * 1024;
+    let bytes = 0;
+    const result: DatasetRecord[] = [];
+    for (const record of records) {
+      const recordBytes = JSON.stringify(record.entry).length;
+      if (bytes + recordBytes >= limitBytes) {
+        return { records: result, truncated: true };
+      }
+      bytes += recordBytes;
+      result.push(record);
+    }
+    return { records: result, truncated: false };
+  }
 }

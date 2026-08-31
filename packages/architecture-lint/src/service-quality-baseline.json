@@ -3,8 +3,8 @@
   "services": [
     {
       "file": "packages/enterprise/features/billing/server/src/services/notification.service.ts",
-      "moduleLines": 695,
-      "methodLines": 95,
+      "moduleLines": 670,
+      "methodLines": 93,
       "statements": 24,
       "complexity": 24,
       "lineLength": 237
