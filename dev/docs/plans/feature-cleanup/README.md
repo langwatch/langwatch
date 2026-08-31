@@ -541,3 +541,43 @@ sabotage-verified against the write-side check it exists to protect.
 differ — a path that moved, a signature that grew an argument, an assertion
 satisfied by a comment — but the failure mode is the same: the suite goes
 quiet and nothing says the rule stopped being enforced.
+
+## Finding: platform/app's server unit tests are widely red on this branch
+
+Chasing dead guards into `platform/app`, I ran
+`pnpm --filter @langwatch/web test:unit run src/server/` in the background. It
+was still going after about twenty-five minutes, 71 of roughly 557 files in,
+so I stopped it. **Of those 71 files, 66 had failing cases.**
+
+It is not one systemic cause. Three sampled:
+
+- `server/rbac/**` — "App not initialized. Call initializeDefaultApp() first."
+  `checkRoleBindingPermission` asks `getApp().permissions.isOnEngine` before
+  falling through to the binding resolution the tests exercise, and the tests
+  populate a prisma fake but not the App singleton. **Fixed** — one
+  `wireDefaultTestApp()` per file, 65 cases restored.
+- `server/gateway/__tests__/budget.service.unit.test.ts` —
+  "Cannot read properties of undefined (reading 'listIdsByOrganization')": the
+  service reaches a collaborator the test's fake does not provide.
+- `server/clickhouse/__tests__/metrics.unit.test.ts` —
+  "register.getSingleMetric is not a function": a prom-client mock that no
+  longer matches.
+
+Different shapes, one theme: **the code grew a dependency and its test did
+not follow**. Same family as the three dead guards found earlier today, and
+the same consequence — a rule stops being enforced and nothing says so.
+
+Two things I could not establish and did not assume: whether CI sees the same
+(I cannot run it), and whether this predates the branch. What I did check is
+that none of it comes from this session's work — the failing files were not
+touched by any commit here, and the symbols involved (`listIdsByOrganization`,
+prom-client's register) are nowhere near it.
+
+The RBAC cluster was worth fixing on sight because of what it guards: the
+tenant-isolation regression test, the API-key ceiling, and the poisoned-binding
+cases. Deleting the org-membership predicate from the direct-binding query now
+fails that regression test; before, it produced no failure at all, because the
+case never reached the query.
+
+**The rest is a decision, not a cleanup.** Sixty-odd files is a body of work
+whose owner should choose whether it is fixed, quarantined, or already known.
