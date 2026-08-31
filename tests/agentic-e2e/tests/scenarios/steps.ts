@@ -18,10 +18,24 @@ import { getProjectSlug } from "../helpers";
 // =============================================================================
 
 /**
+ * Keeps the browser on the Simulations interface.
+ *
+ * `release_ui_agent_testing_v2_enabled` is on by default, and with it on every
+ * simulations address redirects to Agent Testing. The specs in this directory
+ * describe the Simulations pages, so they pin the flag off for the browser
+ * context. The app reads `ff_<flag>` from the address and stores the value
+ * before the first render, so every later navigation in the same test reads it
+ * too, with no second page load.
+ *
+ * @see platform/app/src/hooks/useFeatureFlagOverrides.ts
+ */
+const SIMULATIONS_INTERFACE_PIN = "ff_release_ui_agent_testing_v2_enabled=off";
+
+/**
  * Background: Given I am logged into project "my-project"
  */
 export async function givenIAmLoggedIntoProject(page: Page) {
-  await page.goto("/");
+  await page.goto(`/?${SIMULATIONS_INTERFACE_PIN}`);
   await expect(page).not.toHaveURL(/\/auth\//);
 }
 
