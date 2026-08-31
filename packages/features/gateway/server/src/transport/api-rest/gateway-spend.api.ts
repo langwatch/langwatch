@@ -11,14 +11,6 @@
  * Every refusal leaves as the canonical envelope, so a reconciliation client
  * reads one shape here, on the platform routes, and from the Go data plane.
  */
-import { eventMatches } from "@langwatch/enterprise-api";
-import {
-  type SendBatchPayload,
-  WebhookEnvelopeService,
-  type WebhookDeliveryService,
-  type WebhookEndpointView,
-  type WebhookEventsService,
-} from "@langwatch/enterprise-api";
 import { createLogger } from "@langwatch/observability";
 import type { Context, ErrorHandler, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -28,17 +20,23 @@ import { z } from "zod";
 import {
   decodeSpendEventsCursor,
   decodeSpendSummariesCursor,
-  type GatewaySpendEventsService,
+} from "../../adapters/gateway-spend-cursor.adapter";
+import {
   GatewaySpendFilters,
+  SPEND_SUMMARY_STATUS_DESCRIPTION,
+  spendFilterQueryShape,
+  spendSummaryStatusFilter,
+} from "../../adapters/gateway-spend-filters.adapter";
+import {
   GatewaySpendGrouping,
   MAX_GROUP_BY_KEYS,
   SPEND_BUCKETS,
   SPEND_GROUP_BY_KEYS,
-  SPEND_SUMMARY_STATUS_DESCRIPTION,
-  spendFilterQueryShape,
   type SpendGroupByKey,
-  spendSummaryStatusFilter,
-} from "@langwatch/gateway-server";
+} from "../../adapters/gateway-spend-grouping.adapter";
+import type { GatewayBudgetSpendPort } from "../../ports/gateway-budget-spend.port";
+import type { GatewaySettlementPolicyPort } from "../../ports/gateway-settlement-policy.port";
+import type { GatewaySpendEventsService } from "../../services/gateway-spend-events.service";
 import { USD_DISPLAY_STRING_FORMAT } from "@langwatch/gateway-contract";
 import { requires } from "@langwatch/api";
 import {
@@ -50,14 +48,163 @@ import {
   type SecuredApp,
   validator as zValidator,
 } from "@langwatch/api/rest";
-import type { GatewaySpendRestPorts } from "./gateway-spend-rest.ports";
-import {
-  END_USER_SPEND_DESCRIPTION,
-  SPEND_EVENTS_PULL_DESCRIPTION,
-  SPEND_SUMMARIES_DESCRIPTION,
-} from "./gateway-spend-rest.contract";
 
 const logger = createLogger("langwatch:api:gateway-spend");
+
+/**
+ * Route documentation is part of the contract: the fixed 13-month window and
+ * the downstream dedup guidance are load-bearing for reconciliation
+ * consumers, so they are pinned here as constants rather than written inline
+ * at each route.
+ */
+export const SPEND_EVENTS_PULL_DESCRIPTION =
+  "Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days and Stripe meters 24h+ at the time of writing; both vendors own those numbers, so confirm the current one before you rely on it): re-pulling older ranges into a biller past its window can double-bill. Every filter here is accepted by /spend-summaries too, so a checksum that disagrees can be diffed on exactly the same narrowing; the one difference is `status=admitted`, which only this read answers, because an admitted request is still in flight and contributes no cost to a rollup. Repeat a filter to widen it (`model=a&model=b` matches either); name two different filters to narrow. `metadata` is written `key:value`, split on the first colon, and repeating a key widens that key. `team_id` and `external_id` name Postgres records and are resolved to the projects and keys they cover, so a team with no projects or an external id nobody minted answers with no spend rather than with everything.";
+
+export const SPEND_SUMMARIES_DESCRIPTION =
+  "Reconciliation checksum fast path: spend rollups with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. `group_by` takes one or two of virtual_key, end_user, project, model, provider, principal and request_type, comma-separated, and `bucket` adds an hour or day column in the `timezone` you name. `key` stays the first dimension's value for consumers written against the single-dimension surface; read `group` to tell two dimensions apart. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more. Grouping by model or provider, or into time buckets, is refused with `gateway_spend_group_by_unstable` while the window is recent enough that outcomes can still arrive, because those groups can move under a page walk and the totals would double-count some requests and miss others; ask for an older range, or send `allow_unstable` when an approximate shape is enough. Every filter here is accepted by /spend-events too, and the reverse holds apart from `status=admitted`: a rollup sums the cost of requests past admission, so an admitted request has none to contribute and that narrowing is refused rather than answered with a zero. Ask /spend-events for those.";
+
+export const END_USER_SPEND_DESCRIPTION =
+  "Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `caps` lists every attributed-user budget that applies to this end user, each with its limit and the spend against it. It is an empty array until such a budget template applies, never null.";
+
+/**
+ * The seam between the billing reconciliation REST surface and its process.
+ *
+ * Two kinds of entry. The first is a capability the process composed once and
+ * shares with the workers and the tRPC ledger screen — the spend-events
+ * reader, the budget ledger, the webhook endpoint/event/delivery trio — so
+ * this family reads exactly what the push path writes. The second is a
+ * decision the application still owns: which Postgres records a filter names
+ * and what they resolve to in ClickHouse, how long an outcome may still
+ * arrive, and what the application calls its datastore being down.
+ *
+ * The webhook half of that seam is described structurally rather than by
+ * name: the endpoint registry, the emitted-event log, the delivery path, the
+ * envelope wire format and the subscription grammar all belong to the webhook
+ * platform, which is an Enterprise feature this core package may not depend
+ * on. What is written here is exactly what these four routes call, and the
+ * process binds the real implementations to it.
+ */
+
+/** One row of the spend ledger, as the events reader hands it over. */
+type SpendLedgerRow = Awaited<
+  ReturnType<GatewaySpendEventsService["walkSpendEvents"]>
+>["rows"][number];
+
+/**
+ * One billing envelope in the canonical wire format — the SAME shape the
+ * signed webhooks deliver, so a reconciliation pull and a webhook receiver
+ * parse with one reader.
+ */
+export type GatewaySpendEnvelope = {
+  id: string;
+  type: string;
+  created: string;
+  schema_version: string;
+  data: Record<string, unknown>;
+};
+
+/** A deliverable endpoint, reduced to what a replay reads off it. */
+export type GatewaySpendWebhookEndpoint = {
+  id: string;
+  enabledEvents: readonly string[];
+};
+
+/** The endpoint registry a replay names its destination in. */
+export type GatewaySpendWebhookEndpoints = {
+  tryGetDeliverable(input: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<GatewaySpendWebhookEndpoint | null>;
+};
+
+/** The emitted-envelope log a replay walks, one page at a time. */
+export type GatewaySpendWebhookEvents = {
+  getEmittedEvents(input: {
+    organizationId: string;
+    fromMs: number;
+    toMs: number;
+    cursor: string | null;
+    limit: number;
+  }): Promise<{ events: GatewaySpendEnvelope[]; nextCursor: string | null }>;
+};
+
+/** The live delivery path a replay appends to. */
+export type GatewaySpendWebhookDelivery = {
+  appendReplayToEndpointStream(input: {
+    organizationId: string;
+    endpoint: GatewaySpendWebhookEndpoint;
+    envelope: GatewaySpendEnvelope;
+    replayId: string;
+  }): Promise<void>;
+};
+
+export type GatewaySpendRestPorts = Readonly<{
+  /**
+   * The ledger reads. Undefined on a deployment without ClickHouse, where
+   * there are no figures to report at all — the routes refuse rather than
+   * answering a reconciliation query with a confident zero.
+   */
+  spendEvents: GatewaySpendEventsService | undefined;
+  /** The budget ledger the per-end-user caps are read against. */
+  budgetSpend: GatewayBudgetSpendPort | undefined;
+
+  /** The endpoint registry a replay names its destination in. */
+  webhookEndpoints: GatewaySpendWebhookEndpoints;
+  /** The emitted-envelope log a replay walks. */
+  webhookEvents: GatewaySpendWebhookEvents | undefined;
+  /** The live delivery path a replay appends to. */
+  webhookDelivery: GatewaySpendWebhookDelivery | undefined;
+
+  /**
+   * One spend row rendered as the canonical billing envelope. The wire format
+   * is the webhook platform's, and the pull and the push must answer the same
+   * bytes, so the mapping arrives rather than being restated here.
+   */
+  spendEventEnvelope(row: SpendLedgerRow): GatewaySpendEnvelope;
+
+  /**
+   * Whether an endpoint's subscriptions cover one envelope type. The selector
+   * grammar — an exact type, a `family.*` wildcard, `*` — is the webhook
+   * platform's, and a second reading of it here could disagree with the one
+   * the push path applies.
+   */
+  endpointAcceptsEvent(input: { enabledEvents: readonly string[]; eventType: string }): boolean;
+
+  /**
+   * How long after a request an outcome may still arrive, which is what makes
+   * a recent grouping unstable under a page walk.
+   */
+  settlementPolicy: GatewaySettlementPolicyPort;
+
+  /**
+   * The spend filters that name Postgres records — projects, teams, the
+   * caller's own external ids — resolved into the tenant and virtual-key ids
+   * ClickHouse actually stores. A filter that resolves to nothing resolves to
+   * an EMPTY list, never to "unfiltered".
+   */
+  resolveSpendScope(input: {
+    organizationId: string;
+    projectIds?: string[];
+    teamIds?: string[];
+    externalIds?: string[];
+  }): Promise<{ tenantIds: string[]; virtualKeyIds?: string[] }>;
+
+  /** Every attributed-user budget that applies to one end user, with spend. */
+  endUserCaps(input: {
+    organizationId: string;
+    endUserId: string;
+    tenantIds: string[];
+    virtualKeyId?: string;
+    budgetRepository: GatewayBudgetSpendPort;
+  }): Promise<Array<Record<string, unknown>>>;
+
+  /**
+   * The application's own refusal for "the store these figures live in is not
+   * reachable". It carries the code and the status the boundary renders, and
+   * naming it here would put a second taxonomy on the same failure.
+   */
+  spendStoreUnavailable(): Error;
+}>;
 
 /**
  * The spend-events reader, or the process's own refusal.
@@ -368,12 +515,14 @@ const REPLAY_PAGE_SIZE = 200;
 async function assertReplayWindowWithinCap({
   events,
   endpoint,
+  accepts,
   organizationId,
   fromMs,
   toMs,
 }: {
-  events: WebhookEventsService;
-  endpoint: WebhookEndpointView;
+  events: GatewaySpendWebhookEvents;
+  endpoint: GatewaySpendWebhookEndpoint;
+  accepts: GatewaySpendRestPorts["endpointAcceptsEvent"];
   organizationId: string;
   fromMs: number;
   toMs: number;
@@ -389,7 +538,9 @@ async function assertReplayWindowWithinCap({
       limit: REPLAY_PAGE_SIZE,
     });
     for (const envelope of page.events) {
-      if (!eventMatches(endpoint.enabledEvents, envelope.type)) continue;
+      if (!accepts({ enabledEvents: endpoint.enabledEvents, eventType: envelope.type })) {
+        continue;
+      }
       matching++;
       if (matching > REPLAY_MAX_ENVELOPES) {
         throw new BadRequestError(
@@ -422,14 +573,16 @@ async function appendWindowToEndpointStream({
   events,
   endpoint,
   delivery,
+  accepts,
   organizationId,
   fromMs,
   toMs,
   replayId,
 }: {
-  events: WebhookEventsService;
-  endpoint: WebhookEndpointView;
-  delivery: WebhookDeliveryService;
+  events: GatewaySpendWebhookEvents;
+  endpoint: GatewaySpendWebhookEndpoint;
+  delivery: GatewaySpendWebhookDelivery;
+  accepts: GatewaySpendRestPorts["endpointAcceptsEvent"];
   organizationId: string;
   fromMs: number;
   toMs: number;
@@ -446,7 +599,7 @@ async function appendWindowToEndpointStream({
       limit: REPLAY_PAGE_SIZE,
     });
     const matching = page.events.filter((envelope) =>
-      eventMatches(endpoint.enabledEvents, envelope.type),
+      accepts({ enabledEvents: endpoint.enabledEvents, eventType: envelope.type }),
     );
     // The preflight cleared this window, but folds landing between the two
     // passes can still grow it. Ship up to the cap and stop there rather
@@ -456,7 +609,7 @@ async function appendWindowToEndpointStream({
       await delivery.appendReplayToEndpointStream({
         organizationId,
         endpoint,
-        envelope: envelope as SendBatchPayload["envelopes"][number],
+        envelope,
         replayId,
       });
       replayed++;
@@ -674,7 +827,7 @@ export function createGatewaySpendRestApp(options: {
         }),
       });
       return c.json({
-        data: page.rows.map((row) => WebhookEnvelopeService.fromSpendRow(row)),
+        data: page.rows.map((row) => ports.spendEventEnvelope(row)),
         next_cursor: page.nextCursor,
       });
     },
@@ -782,6 +935,7 @@ export function createGatewaySpendRestApp(options: {
       await assertReplayWindowWithinCap({
         events,
         endpoint,
+        accepts: ports.endpointAcceptsEvent,
         organizationId: organization.id,
         fromMs: body.from,
         toMs: body.to,
@@ -792,6 +946,7 @@ export function createGatewaySpendRestApp(options: {
         events,
         endpoint,
         delivery,
+        accepts: ports.endpointAcceptsEvent,
         organizationId: organization.id,
         fromMs: body.from,
         toMs: body.to,

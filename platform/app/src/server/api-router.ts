@@ -10,9 +10,10 @@ import { appRestSecurity } from "~/server/api/security";
 import {
   GatewayEndUserCapsAdapter,
   FixedGatewaySettlementPolicy,
+  type GatewaySpendRestPorts,
   settlementGraceMs,
 } from "@langwatch/gateway-server";
-import type { GatewaySpendRestPorts } from "@langwatch/platform-api";
+import { eventMatches, WebhookEnvelopeService } from "@langwatch/enterprise-api";
 import { createExportTracesRestApp } from "@langwatch/platform-api";
 import {
   createAppRestFeatures,
@@ -120,6 +121,8 @@ function gatewaySpendRestPorts(app: App): GatewaySpendRestPorts {
     webhookEndpoints: app.gatewayStores.webhookEndpoints,
     webhookEvents: app.gatewayStores.webhookEvents,
     webhookDelivery: app.gatewayStores.webhookDelivery,
+    spendEventEnvelope: (row) => WebhookEnvelopeService.fromSpendRow(row),
+    endpointAcceptsEvent: ({ enabledEvents, eventType }) => eventMatches(enabledEvents, eventType),
     settlementPolicy: FixedGatewaySettlementPolicy.create(
       settlementGraceMs(process.env.LW_SPEND_SETTLEMENT_GRACE_MS),
     ),

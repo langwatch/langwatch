@@ -12,11 +12,9 @@ import {
   createEventsRestApp,
   createExperimentsRestApp,
   createGatewayPlatformRestApp,
-  createGatewaySpendRestApp,
   createGovernanceRestApp,
   createGraphsRestApp,
   createGroupRestApp,
-  createMeRestApp,
   createMonitorRestApp,
   createModelDefaultsRestApp,
   createOrganizationsRestApp,
@@ -36,6 +34,8 @@ import {
   createWorkflowsRestApp,
   ORGANIZATIONS_SPEC_OPTIONS,
 } from "@langwatch/platform-api";
+import { createGatewaySpendRestApp } from "@langwatch/gateway-server";
+import { createMeRestApp } from "@langwatch/user-server";
 import {
   portsUnavailableOffRequestPath,
   servicesUnavailableOffRequestPath,
@@ -365,7 +365,7 @@ export default async function execute() {
   const meSpec = await generateSpecs(
     createMeRestApp({
       security: appRestSecurity,
-      governance: specOnlyServices.governance,
+      personalUsage: specOnlyServices.governance,
       organizations: specOnlyIdentity.organizationsWithTeamLookup,
       projects: specOnlyServices.projects,
     }).hono,

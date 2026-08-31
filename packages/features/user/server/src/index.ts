@@ -20,6 +20,11 @@ export {
   type UserTrpcPorts,
 } from "./transport/api-trpc/user.api";
 export {
+  createMeRestApp,
+  type MePersonalUsageReader,
+  type MeRestTeamOrganizationLookup,
+} from "./transport/api-rest/me.api";
+export {
   createUserAvatarRestApp,
   type UserAvatarDualAuthVariables,
   type UserAvatarObjectReader,

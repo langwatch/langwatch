@@ -138,8 +138,7 @@ export {
 // hands it in — `createGatewayPlatformRestApp({ security, gateway })` — and
 // reaches the class through `@langwatch/gateway-server`, where it is declared.
 export { createGatewayPlatformRestApp } from "@langwatch/gateway-server";
-export { createGatewaySpendRestApp } from "./features/gateway/gateway-spend-rest";
-export type { GatewaySpendRestPorts } from "./features/gateway/gateway-spend-rest.ports";
+export { createGatewaySpendRestApp, type GatewaySpendRestPorts } from "@langwatch/gateway-server";
 export { createGovernanceRestApp } from "@langwatch/enterprise-api";
 export { createGraphsRestApp } from "@langwatch/dashboard-server";
 export { type AgentPlatformUrlBuilder, createAgentLegacyRestApp } from "@langwatch/agent-server";
@@ -165,7 +164,7 @@ export {
 export { createGroupRestApp } from "@langwatch/organization-server";
 export { createModelDefaultsRestApp } from "@langwatch/model-provider-server";
 export { createModelProvidersRestApp } from "@langwatch/model-provider-server";
-export { createMeRestApp, type MeRestTeamOrganizationLookup } from "./features/user/me-rest";
+export { createMeRestApp, type MeRestTeamOrganizationLookup } from "@langwatch/user-server";
 export {
   createOrganizationsRestApp,
   ORGANIZATIONS_SPEC_OPTIONS,

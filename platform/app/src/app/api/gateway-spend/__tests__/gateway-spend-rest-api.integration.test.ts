@@ -100,6 +100,7 @@ import {
   FixedGatewaySettlementPolicy,
   settlementGraceMs,
 } from "@langwatch/gateway-server";
+import { eventMatches, WebhookEnvelopeService } from "@langwatch/enterprise-api";
 import { canonicalErrorFor } from "~/app/api/shared/canonical-error";
 import { appRestSecurity } from "~/server/api/security";
 import { ClickHouseUnavailableError } from "~/server/app-layer/traces/errors";
@@ -118,6 +119,8 @@ function gatewaySpendRestPorts(): GatewaySpendRestPorts {
     webhookEndpoints: current.gatewayStores.webhookEndpoints,
     webhookEvents: current.gatewayStores.webhookEvents,
     webhookDelivery: current.gatewayStores.webhookDelivery,
+    spendEventEnvelope: (row) => WebhookEnvelopeService.fromSpendRow(row),
+    endpointAcceptsEvent: ({ enabledEvents, eventType }) => eventMatches(enabledEvents, eventType),
     settlementPolicy: FixedGatewaySettlementPolicy.create(
       settlementGraceMs(process.env.LW_SPEND_SETTLEMENT_GRACE_MS),
     ),

@@ -52,9 +52,12 @@ import { createExperimentsRestApp, ExperimentApp } from "@langwatch/experiment-s
 import { createGovernanceRestApp, GovernanceApp } from "@langwatch/enterprise-api";
 import { createGraphsRestApp } from "@langwatch/dashboard-server";
 import { createMonitorRestApp, MonitorApp } from "@langwatch/monitor-server";
-import { createGatewayPlatformRestApp, GatewayApp } from "@langwatch/gateway-server";
-import { createGatewaySpendRestApp } from "../features/gateway/gateway-spend-rest";
-import type { GatewaySpendRestPorts } from "../features/gateway/gateway-spend-rest.ports";
+import {
+  createGatewayPlatformRestApp,
+  createGatewaySpendRestApp,
+  GatewayApp,
+  type GatewaySpendRestPorts,
+} from "@langwatch/gateway-server";
 import { createEventsRestApp, type TrackedEventPorts } from "@langwatch/trace-server";
 import { createModelDefaultsRestApp } from "@langwatch/model-provider-server";
 import { createModelProvidersRestApp } from "@langwatch/model-provider-server";
@@ -66,8 +69,12 @@ import {
 import { createTeamsRestApp } from "@langwatch/organization-server";
 import { createProjectRestApp } from "@langwatch/project-server";
 import { createRolesRestApp } from "@langwatch/role-server";
-import { createMeRestApp, type MeRestTeamOrganizationLookup } from "../features/user/me-rest";
-import { createUserAvatarRestApp, type UserAvatarObjectReader } from "@langwatch/user-server";
+import {
+  createMeRestApp,
+  createUserAvatarRestApp,
+  type MeRestTeamOrganizationLookup,
+  type UserAvatarObjectReader,
+} from "@langwatch/user-server";
 import { createWorkflowsRestApp, type WorkflowEvaluationTrigger } from "@langwatch/workflow-server";
 import {
   createScenarioEventsRestApp,
@@ -452,7 +459,7 @@ export function createAppRestFeatures(options: {
     }).hono,
     createMeRestApp({
       security,
-      governance: services.governance,
+      personalUsage: services.governance,
       organizations: services.organizations,
       projects: services.projects,
     }).hono,

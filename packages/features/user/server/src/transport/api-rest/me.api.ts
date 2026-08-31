@@ -1,7 +1,7 @@
-import type { GovernanceApp } from "@langwatch/enterprise-api";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import { describeRoute, resolver } from "hono-openapi";
+import { z } from "zod";
 
 import { requires } from "@langwatch/api";
 import {
@@ -12,11 +12,101 @@ import {
   type SecuredApp,
   validator as zValidator,
 } from "@langwatch/api/rest";
-import {
-  meProjectResponseSchema,
-  meUsageQuerySchema,
-  meUsageResponseSchema,
-} from "./me-rest.schemas";
+
+/**
+ * Wire schemas for GET /api/me/usage. Fields mirror the
+ * PersonalUsageService output (and the `api.user.personalUsage` tRPC
+ * payload the /me dashboard consumes) one-to-one, kept camelCase to
+ * match that existing surface so the two entrypoints don't drift.
+ */
+
+// Max absolute epoch-ms representable by a JS `Date` (ECMA-262); anything
+// beyond becomes `Invalid Date`, so bound the inputs before they reach
+// `new Date(...)` in the route handler.
+const MAX_DATE_MS = 8_640_000_000_000_000;
+const epochMs = z.coerce.number().int().min(-MAX_DATE_MS).max(MAX_DATE_MS);
+
+export const meUsageQuerySchema = z
+  .object({
+    /** Inclusive window start in epoch ms. Defaults to start-of-month. */
+    windowStartMs: epochMs.optional(),
+    /** Exclusive window end in epoch ms. Defaults to now. */
+    windowEndMs: epochMs.optional(),
+  })
+  // A half-specified window is ambiguous — require both bounds or neither,
+  // rather than silently dropping a lone bound and returning the default month.
+  .refine((q) => (q.windowStartMs === undefined) === (q.windowEndMs === undefined), {
+    message:
+      "windowStartMs and windowEndMs must be provided together (or both omitted for the current month).",
+  })
+  .refine(
+    (q) =>
+      q.windowStartMs === undefined ||
+      q.windowEndMs === undefined ||
+      q.windowStartMs < q.windowEndMs,
+    { message: "windowStartMs must be before windowEndMs." },
+  );
+
+const mostUsedModelSchema = z.object({ name: z.string(), usagePct: z.number() }).nullable();
+
+const summarySchema = z.object({
+  spentUsd: z.number(),
+  billedUsd: z.number(),
+  requests: z.number(),
+  promptTokens: z.number(),
+  completionTokens: z.number(),
+  mostUsedModel: mostUsedModelSchema,
+});
+
+const bucketSchema = z.object({
+  day: z.string(),
+  spentUsd: z.number(),
+  billedUsd: z.number(),
+  requests: z.number(),
+});
+
+const breakdownSchema = z.object({
+  label: z.string(),
+  spentUsd: z.number(),
+  billedUsd: z.number(),
+  requests: z.number(),
+});
+
+export const meUsageResponseSchema = z.object({
+  summary: summarySchema,
+  dailyBuckets: z.array(bucketSchema),
+  breakdownByModel: z.array(breakdownSchema),
+});
+
+/**
+ * Wire schema for GET /api/me/project: the identity of the project the
+ * calling API key belongs to. Consumed by the CLI's identity notice to
+ * name the project behind LANGWATCH_API_KEY.
+ */
+export const meProjectResponseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  slug: z.string(),
+  isPersonal: z.boolean(),
+});
+
+/**
+ * One person's own AI usage, rolled up over a window: the totals, the per-day
+ * buckets and the split by model.
+ *
+ * The rollup itself is not this feature's to compute — it reads a spend ledger
+ * `user` does not own — so it crosses as a capability the process supplies.
+ * It is named here rather than imported because the deployment that answers it
+ * lives outside this package, and a core feature may not name it.
+ */
+export interface MePersonalUsageReader {
+  personalUsage(input: {
+    personalProjectId: string;
+    userId?: string;
+    ingestionTenantId?: string;
+    window?: { startMs: number; endMs: number };
+  }): Promise<z.infer<typeof meUsageResponseSchema>>;
+}
 
 /**
  * Resolving the organization behind a personal workspace when the credential
@@ -59,7 +149,7 @@ export function createMeRestApp(options: {
    * mounting a family must not force its services to be constructed, which is
    * what lets the OpenAPI spec generator build this app with none.
    */
-  governance: () => GovernanceApp;
+  personalUsage: () => MePersonalUsageReader;
   organizations: () => OrganizationService & MeRestTeamOrganizationLookup;
   projects: () => ProjectService;
 }): SecuredApp<{ Variables: AppRestProjectVariables }> {
@@ -74,7 +164,7 @@ export function createMeRestApp(options: {
 function registerUsageRoute(
   secured: SecuredApp<{ Variables: AppRestProjectVariables }>,
   services: {
-    governance: () => GovernanceApp;
+    personalUsage: () => MePersonalUsageReader;
     organizations: () => OrganizationService & MeRestTeamOrganizationLookup;
     projects: () => ProjectService;
   },
@@ -139,7 +229,7 @@ function registerUsageRoute(
         window,
       };
 
-      return c.json(await services.governance().personalUsage(input));
+      return c.json(await services.personalUsage().personalUsage(input));
     },
   );
 }

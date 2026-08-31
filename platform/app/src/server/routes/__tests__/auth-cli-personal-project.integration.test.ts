@@ -73,7 +73,7 @@ wireDefaultTestApp();
 
 const { hono: meApp } = createMeRestApp({
   security: appRestSecurity,
-  governance: () => getApp().governance,
+  personalUsage: () => getApp().governance,
   organizations: () => getApp().organizations,
   projects: () => getApp().projects,
 });

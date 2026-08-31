@@ -120,4 +120,13 @@ export { VirtualKeyTrpcApi, type VirtualKeyTrpcContext } from "./transport/api-t
  * apart.
  */
 export { createGatewayPlatformRestApp } from "./transport/api-rest/gateway-platform.api";
+export {
+  createGatewaySpendRestApp,
+  type GatewaySpendEnvelope,
+  type GatewaySpendRestPorts,
+  type GatewaySpendWebhookDelivery,
+  type GatewaySpendWebhookEndpoint,
+  type GatewaySpendWebhookEndpoints,
+  type GatewaySpendWebhookEvents,
+} from "./transport/api-rest/gateway-spend.api";
 export { type VirtualKeyTrpcSchemas } from "./transport/api-trpc/virtual-key.api";

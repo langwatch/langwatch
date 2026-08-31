@@ -27,7 +27,7 @@ import { appRestSecurity } from "~/server/api/security";
 
 const { hono: app } = createMeRestApp({
   security: appRestSecurity,
-  governance: () => getApp().governanceApp,
+  personalUsage: () => getApp().governanceApp,
   organizations: () => getApp().organizationService,
   projects: () => getApp().projects.projectService,
 });
