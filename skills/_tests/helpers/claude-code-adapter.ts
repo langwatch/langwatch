@@ -352,7 +352,12 @@ export function createClaudeCodeAgent({
 
 						resolve(messages as any);
 					} else {
-						reject(new Error(`Command failed with exit code ${exitCode}`));
+						reject(
+							new Error(
+								`Claude Code failed with exit code ${exitCode}` +
+									`${describeFailure(output)}`,
+							),
+						);
 					}
 				});
 
@@ -362,6 +367,40 @@ export function createClaudeCodeAgent({
 			});
 		},
 	};
+}
+
+/**
+ * What the last line of the stream says about a failed run.
+ *
+ * Claude Code closes its stream with a result object that carries the reason
+ * it stopped. Without it the test reports only "exit code 1", which reads as a
+ * crash and sends the reader to the wrong place. The two that matter here are
+ * a refusal, which a red team scenario can meet because of the content it
+ * writes, and a rate limit, which means rerun the file later.
+ */
+function describeFailure(output: string): string {
+	for (const line of output.split("\n").reverse()) {
+		const text = line.trim();
+		if (!text.startsWith("{")) continue;
+		try {
+			const parsed = JSON.parse(text) as {
+				is_error?: boolean;
+				stop_reason?: string;
+				terminal_reason?: string;
+				result?: unknown;
+			};
+			if (!parsed.is_error) continue;
+			const reasons = [parsed.stop_reason, parsed.terminal_reason]
+				.filter(Boolean)
+				.join(", ");
+			const detail =
+				typeof parsed.result === "string" ? `: ${parsed.result.slice(0, 300)}` : "";
+			return reasons ? ` (${reasons})${detail}` : detail;
+		} catch {
+			continue;
+		}
+	}
+	return "";
 }
 
 type ModelMessage = {
