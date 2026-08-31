@@ -126,7 +126,7 @@ export class DatasetRecordContentRepository {
     projectId: string,
     updates: Array<{
       id: string;
-      entry: Prisma.InputJsonValue;
+      entry: unknown;
     }>,
     options?: {
       tx?: Prisma.TransactionClient;
@@ -141,7 +141,7 @@ export class DatasetRecordContentRepository {
           projectId,
         },
         data: {
-          entry: update.entry,
+          entry: update.entry as Prisma.InputJsonValue,
         },
       }),
     );
@@ -204,7 +204,7 @@ export class DatasetRecordContentRepository {
     id: string;
     datasetId: string;
     projectId: string;
-    entry: Prisma.InputJsonValue;
+    entry: unknown;
   }): Promise<DatasetRecord> {
     return await this.prisma.datasetRecord.update({
       where: {
@@ -212,7 +212,7 @@ export class DatasetRecordContentRepository {
         projectId: input.projectId,
         datasetId: input.datasetId,
       },
-      data: { entry: input.entry },
+      data: { entry: input.entry as Prisma.InputJsonValue },
     });
   }
 
@@ -223,12 +223,12 @@ export class DatasetRecordContentRepository {
     id: string;
     datasetId: string;
     projectId: string;
-    entry: Prisma.InputJsonValue;
+    entry: unknown;
   }): Promise<DatasetRecord> {
     return await this.prisma.datasetRecord.create({
       data: {
         id: input.id,
-        entry: input.entry,
+        entry: input.entry as Prisma.InputJsonValue,
         datasetId: input.datasetId,
         projectId: input.projectId,
       },
@@ -242,14 +242,14 @@ export class DatasetRecordContentRepository {
   async createMany(input: {
     records: Array<{
       id: string;
-      entry: Prisma.InputJsonValue;
+      entry: unknown;
     }>;
     datasetId: string;
     projectId: string;
   }): Promise<DatasetRecord[]> {
     const data = input.records.map((record) => ({
       id: record.id,
-      entry: record.entry,
+      entry: record.entry as Prisma.InputJsonValue,
       datasetId: input.datasetId,
       projectId: input.projectId,
     }));

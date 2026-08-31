@@ -21,11 +21,10 @@ import type {
   DatasetColumns,
 } from "@langwatch/dataset-contract";
 import type { Readable } from "node:stream";
-import type { Dataset, Prisma } from "@langwatch/prisma-client/generated";
 import { DatasetContentRepository } from "../repositories/prisma/dataset-content.repository";
 import { DatasetRecordContentRepository } from "../repositories/prisma/dataset-record-content.repository";
 import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
-import type { DatasetUploadPort } from "../ports/dataset.port";
+import type { DatasetRow, DatasetUploadPort } from "../ports/dataset.port";
 import {
   DatasetConflictError,
   DatasetNotFoundError,
@@ -98,7 +97,7 @@ export class DatasetUploadAdapter implements DatasetUploadPort {
       await this.records.createMany({
         records: entries.map(({ id, ...entry }) => ({
           id,
-          entry: stripNullBytes(entry) as Prisma.InputJsonValue,
+          entry: stripNullBytes(entry),
         })),
         datasetId: dataset.id,
         projectId: input.projectId,
@@ -145,7 +144,7 @@ export class DatasetUploadAdapter implements DatasetUploadPort {
       rowCount: initial.rowCount,
       sizeBytes: BigInt(initial.sizeBytes),
       chunkCount: initial.chunkCount,
-      chunkOffsets: initial.chunkOffsets as Prisma.InputJsonValue,
+      chunkOffsets: initial.chunkOffsets,
     });
     return {
       id: dataset.id,
@@ -275,7 +274,7 @@ export class DatasetUploadAdapter implements DatasetUploadPort {
     return { datasetId: input.datasetId, status: "processing" };
   }
 
-  private async findDataset(slugOrId: string, projectId: string): Promise<Dataset> {
+  private async findDataset(slugOrId: string, projectId: string): Promise<DatasetRow> {
     const dataset =
       (await this.datasets.tryFindOne({ id: slugOrId, projectId })) ??
       (await this.datasets.tryFindBySlug({ slug: slugOrId, projectId }));

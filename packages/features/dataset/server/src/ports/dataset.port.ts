@@ -30,6 +30,38 @@ import type {
  * separate prevents the core Dataset service from importing S3, queues, or
  * process globals.
  */
+/**
+ * A dataset row as its storage returns it.
+ *
+ * The scalar columns only — deliberately not the parsed `Dataset` the contract
+ * publishes, because the upload path reads `columnTypes` raw in some places and
+ * parses it in others, and moving that parse into the repository would newly
+ * throw on the retry and cancel paths for a row those paths never look inside.
+ * This states the shape without changing when anything is validated.
+ */
+export type DatasetRow = {
+  id: string;
+  projectId: string;
+  name: string;
+  slug: string;
+  columnTypes: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+  archivedAt: Date | null;
+  mapping: unknown;
+  useS3: boolean;
+  s3RecordCount: number | null;
+  contentLayout: string;
+  status: string;
+  statusError: string | null;
+  stagingKey: string | null;
+  uploadFilename: string | null;
+  rowCount: number | null;
+  sizeBytes: bigint | null;
+  chunkCount: number | null;
+  chunkOffsets: unknown;
+};
+
 export abstract class DatasetUploadPort {
   abstract uploadToExistingDataset(
     input: UploadExistingDatasetInput,

@@ -1,4 +1,5 @@
-import type { Dataset, Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { DatasetRow } from "../../ports/dataset.port";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
 /**
  * Input types derived from Prisma for type safety
@@ -130,7 +131,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   /**
    * Finds a single dataset by id within a project.
    */
-  async tryFindOne(input: { id: string; projectId: string }): Promise<Dataset | null> {
+  async tryFindOne(input: { id: string; projectId: string }): Promise<DatasetRow | null> {
     const client = this.prisma;
     return await client.dataset.findFirst({
       where: {
@@ -149,7 +150,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
    * counterpart to {@link findOne} so those paths surface it loudly (Prisma's
    * `NotFoundError`) instead of null-checking a "can't happen".
    */
-  async findOneOrThrow(input: { id: string; projectId: string }): Promise<Dataset> {
+  async findOneOrThrow(input: { id: string; projectId: string }): Promise<DatasetRow> {
     const client = this.prisma;
     return await client.dataset.findFirstOrThrow({
       where: {
@@ -166,7 +167,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
     slug: string;
     projectId: string;
     excludeId?: string;
-  }): Promise<Dataset | null> {
+  }): Promise<DatasetRow | null> {
     const client = this.prisma;
     return await client.dataset.findFirst({
       where: {
@@ -180,7 +181,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   /**
    * Creates a new dataset.
    */
-  async create(input: CreateDatasetInput): Promise<Dataset> {
+  async create(input: CreateDatasetInput): Promise<DatasetRow> {
     const client = this.prisma;
     return await client.dataset.create({
       data: input,
@@ -198,7 +199,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
    *
    * @throws {Prisma.PrismaClientKnownRequestError} P2025 if no row matches id+project
    */
-  async update(input: UpdateDatasetInput): Promise<Dataset> {
+  async update(input: UpdateDatasetInput): Promise<DatasetRow> {
     const client = this.prisma;
 
     return await client.dataset.update({
@@ -219,7 +220,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
     id: string;
     projectId: string;
     content: DatasetContentUpdate;
-  }): Promise<Dataset> {
+  }): Promise<DatasetRow> {
     const { chunkOffsets, columnTypes, ...scalars } = input.content;
 
     return await this.update({
@@ -338,7 +339,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
    * a retried row re-enters `processing` long after it was created, so the clock
    * must start when normalization (re)started.
    */
-  async findStaleProcessing(input: { projectId: string; olderThan: Date }): Promise<Dataset[]> {
+  async findStaleProcessing(input: { projectId: string; olderThan: Date }): Promise<DatasetRow[]> {
     return await this.prisma.dataset.findMany({
       where: {
         projectId: input.projectId,
@@ -360,7 +361,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   async tryFindPendingUploadByStagingKey(input: {
     projectId: string;
     stagingKey: string;
-  }): Promise<Dataset | null> {
+  }): Promise<DatasetRow | null> {
     return await this.prisma.dataset.findFirst({
       where: {
         projectId: input.projectId,
@@ -379,7 +380,10 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
    * scheduler. The `olderThan` cutoff is conservative (well beyond the presign
    * TTL) so a still-in-flight upload is never matched.
    */
-  async findStalePendingUploads(input: { projectId: string; olderThan: Date }): Promise<Dataset[]> {
+  async findStalePendingUploads(input: {
+    projectId: string;
+    olderThan: Date;
+  }): Promise<DatasetRow[]> {
     return await this.prisma.dataset.findMany({
       where: {
         projectId: input.projectId,
@@ -404,7 +408,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
    * Lists non-archived datasets for a project with pagination and record counts.
    */
   async listPaginated(input: { projectId: string; skip: number; take: number }): Promise<{
-    datasets: Array<Dataset & { _count: { datasetRecords: number } }>;
+    datasets: Array<DatasetRow & { _count: { datasetRecords: number } }>;
     total: number;
   }> {
     const where = { projectId: input.projectId, archivedAt: null };
