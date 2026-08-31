@@ -27,17 +27,24 @@ export type TraceRequestCollectionResult = {
   errorMessage: string;
 };
 
+/**
+ * The span a dedup key is built from. Named because all three operations take
+ * the same triple, and three bare strings in a fixed order is a lock key you
+ * can build wrong without the compiler noticing.
+ */
+export type SpanDedupRef = {
+  tenantId: string;
+  traceId: string;
+  spanId: string;
+};
+
 /** Redis-backed deduplication is app infrastructure, not Trace domain state. */
 export abstract class TraceSpanDedupPort {
-  abstract tryAcquireProcessingLock(
-    tenantId: string,
-    traceId: string,
-    spanId: string,
-  ): Promise<boolean | null>;
+  abstract tryAcquireProcessingLock(span: SpanDedupRef): Promise<boolean | null>;
 
-  abstract tryConfirmProcessed(tenantId: string, traceId: string, spanId: string): Promise<void>;
+  abstract tryConfirmProcessed(span: SpanDedupRef): Promise<void>;
 
-  abstract tryReleaseOnFailure(tenantId: string, traceId: string, spanId: string): Promise<void>;
+  abstract tryReleaseOnFailure(span: SpanDedupRef): Promise<void>;
 }
 
 /** The Trace pipeline's one named command handoff. */
@@ -223,11 +230,11 @@ export class TraceIngestionService {
     let lockAcquired = false;
 
     try {
-      const lockResult = await this.dedup.tryAcquireProcessingLock(
-        input.tenantId,
-        input.span.traceId,
-        input.span.spanId,
-      );
+      const lockResult = await this.dedup.tryAcquireProcessingLock({
+        tenantId: input.tenantId,
+        traceId: input.span.traceId,
+        spanId: input.span.spanId,
+      });
       if (lockResult === false) {
         return { status: "deduped" };
       }
@@ -245,12 +252,20 @@ export class TraceIngestionService {
       const prepared = this.payloads ? await this.payloads.prepare(commandData) : commandData;
 
       await this.commands.recordSpan(prepared);
-      await this.dedup.tryConfirmProcessed(input.tenantId, input.span.traceId, input.span.spanId);
+      await this.dedup.tryConfirmProcessed({
+        tenantId: input.tenantId,
+        traceId: input.span.traceId,
+        spanId: input.span.spanId,
+      });
 
       return { status: "collected" };
     } catch (error) {
       if (lockAcquired) {
-        await this.dedup.tryReleaseOnFailure(input.tenantId, input.span.traceId, input.span.spanId);
+        await this.dedup.tryReleaseOnFailure({
+          tenantId: input.tenantId,
+          traceId: input.span.traceId,
+          spanId: input.span.spanId,
+        });
       }
 
       input.otelSpanRef?.addEvent("span_ingestion_error", {

@@ -91,38 +91,6 @@ import {
 import { buildDisplayInput, stringifySpanIO } from "@langwatch/trace-contract";
 import { getClientIp } from "~/utils/getClientIp";
 
-type AppSpanDedup = {
-  tryAcquireProcessingLock(
-    tenantId: string,
-    traceId: string,
-    spanId: string,
-  ): Promise<boolean | null>;
-  tryConfirmProcessed(tenantId: string, traceId: string, spanId: string): Promise<void>;
-  tryReleaseOnFailure(tenantId: string, traceId: string, spanId: string): Promise<void>;
-};
-
-class AppTraceSpanDedupAdapter extends TraceSpanDedupPort {
-  private constructor(private readonly dedup: AppSpanDedup) {
-    super();
-  }
-
-  static create(dedup: AppSpanDedup): AppTraceSpanDedupAdapter {
-    return new AppTraceSpanDedupAdapter(dedup);
-  }
-
-  tryAcquireProcessingLock(tenantId: string, traceId: string, spanId: string) {
-    return this.dedup.tryAcquireProcessingLock(tenantId, traceId, spanId);
-  }
-
-  tryConfirmProcessed(tenantId: string, traceId: string, spanId: string) {
-    return this.dedup.tryConfirmProcessed(tenantId, traceId, spanId);
-  }
-
-  tryReleaseOnFailure(tenantId: string, traceId: string, spanId: string) {
-    return this.dedup.tryReleaseOnFailure(tenantId, traceId, spanId);
-  }
-}
-
 class AppTraceIngressCommandAdapter extends TraceIngressCommandPort {
   private constructor(private readonly dispatch: (data: RecordSpanCommandData) => Promise<void>) {
     super();
@@ -316,14 +284,14 @@ export class AppTraceRuntime {
   static createIngestion(options: {
     codingAgents: CodingAgentService;
     codingAgentSpanFilterEnabled: boolean;
-    dedup: AppSpanDedup;
+    dedup: TraceSpanDedupPort;
     recordSpan: (data: RecordSpanCommandData) => Promise<void>;
     payloads?: TraceIngressPayloadPort;
   }): TraceIngestionService {
     return TraceIngestionService.create({
       codingAgents: options.codingAgents,
       codingAgentSpanFilterEnabled: options.codingAgentSpanFilterEnabled,
-      dedup: AppTraceSpanDedupAdapter.create(options.dedup),
+      dedup: options.dedup,
       commands: AppTraceIngressCommandAdapter.create(options.recordSpan),
       payloads: options.payloads,
     });

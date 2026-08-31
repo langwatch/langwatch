@@ -29,7 +29,7 @@ describe("RedisSpanDedupeService", () => {
       it("returns true and passes correct key and args", async () => {
         mockSet.mockResolvedValue("OK");
 
-        const result = await service.tryAcquireProcessingLock(tenantId, traceId, spanId);
+        const result = await service.tryAcquireProcessingLock({ tenantId, traceId, spanId });
 
         expect(result).toBe(true);
         expect(mockSet).toHaveBeenCalledWith(expectedKey, "1", "EX", 60, "NX");
@@ -40,7 +40,7 @@ describe("RedisSpanDedupeService", () => {
       it("returns false", async () => {
         mockSet.mockResolvedValue(null);
 
-        const result = await service.tryAcquireProcessingLock(tenantId, traceId, spanId);
+        const result = await service.tryAcquireProcessingLock({ tenantId, traceId, spanId });
 
         expect(result).toBe(false);
       });
@@ -50,7 +50,7 @@ describe("RedisSpanDedupeService", () => {
       it("returns null and does not throw", async () => {
         mockSet.mockRejectedValue(new Error("Redis connection lost"));
 
-        const result = await service.tryAcquireProcessingLock(tenantId, traceId, spanId);
+        const result = await service.tryAcquireProcessingLock({ tenantId, traceId, spanId });
 
         expect(result).toBeNull();
       });
@@ -61,7 +61,7 @@ describe("RedisSpanDedupeService", () => {
     it("calls EXPIRE with confirmed TTL", async () => {
       mockExpire.mockResolvedValue(1);
 
-      await service.tryConfirmProcessed(tenantId, traceId, spanId);
+      await service.tryConfirmProcessed({ tenantId, traceId, spanId });
 
       expect(mockExpire).toHaveBeenCalledWith(expectedKey, 3600);
     });
@@ -71,7 +71,7 @@ describe("RedisSpanDedupeService", () => {
         mockExpire.mockRejectedValue(new Error("Redis connection lost"));
 
         await expect(
-          service.tryConfirmProcessed(tenantId, traceId, spanId),
+          service.tryConfirmProcessed({ tenantId, traceId, spanId }),
         ).resolves.toBeUndefined();
       });
     });
@@ -81,7 +81,7 @@ describe("RedisSpanDedupeService", () => {
     it("calls DEL on the key", async () => {
       mockDel.mockResolvedValue(1);
 
-      await service.tryReleaseOnFailure(tenantId, traceId, spanId);
+      await service.tryReleaseOnFailure({ tenantId, traceId, spanId });
 
       expect(mockDel).toHaveBeenCalledWith(expectedKey);
     });
@@ -91,7 +91,7 @@ describe("RedisSpanDedupeService", () => {
         mockDel.mockRejectedValue(new Error("Redis connection lost"));
 
         await expect(
-          service.tryReleaseOnFailure(tenantId, traceId, spanId),
+          service.tryReleaseOnFailure({ tenantId, traceId, spanId }),
         ).resolves.toBeUndefined();
       });
     });
@@ -102,15 +102,15 @@ describe("NullSpanDedupeService", () => {
   const service = new NullSpanDedupeService();
 
   it("tryAcquireProcessingLock returns null", async () => {
-    const result = await service.tryAcquireProcessingLock("t", "tr", "sp");
+    const result = await service.tryAcquireProcessingLock({ tenantId: "t", traceId: "tr", spanId: "sp" });
     expect(result).toBeNull();
   });
 
   it("tryConfirmProcessed resolves", async () => {
-    await expect(service.tryConfirmProcessed("t", "tr", "sp")).resolves.toBeUndefined();
+    await expect(service.tryConfirmProcessed({ tenantId: "t", traceId: "tr", spanId: "sp" })).resolves.toBeUndefined();
   });
 
   it("tryReleaseOnFailure resolves", async () => {
-    await expect(service.tryReleaseOnFailure("t", "tr", "sp")).resolves.toBeUndefined();
+    await expect(service.tryReleaseOnFailure({ tenantId: "t", traceId: "tr", spanId: "sp" })).resolves.toBeUndefined();
   });
 });

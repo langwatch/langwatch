@@ -175,6 +175,7 @@ export {
   TraceIngressCommandPort,
   TraceIngressPayloadPort,
   TraceSpanDedupPort,
+  type SpanDedupRef,
 } from "./services/trace-ingestion.service";
 export {
   DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,

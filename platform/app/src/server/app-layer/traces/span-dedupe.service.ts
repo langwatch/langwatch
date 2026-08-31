@@ -3,6 +3,7 @@
 import { createLogger } from "@langwatch/observability";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
+import type { SpanDedupRef } from "@langwatch/trace-server";
 import { traced } from "../tracing";
 
 const logger = createLogger("langwatch:trace-processing:span-dedup");
@@ -26,13 +27,9 @@ function buildKey(tenantId: string, traceId: string, spanId: string): string {
 }
 
 export interface SpanDedupService {
-  tryAcquireProcessingLock(
-    tenantId: string,
-    traceId: string,
-    spanId: string,
-  ): Promise<boolean | null>;
-  tryConfirmProcessed(tenantId: string, traceId: string, spanId: string): Promise<void>;
-  tryReleaseOnFailure(tenantId: string, traceId: string, spanId: string): Promise<void>;
+  tryAcquireProcessingLock(span: SpanDedupRef): Promise<boolean | null>;
+  tryConfirmProcessed(span: SpanDedupRef): Promise<void>;
+  tryReleaseOnFailure(span: SpanDedupRef): Promise<void>;
 }
 
 /**
@@ -50,11 +47,11 @@ export class RedisSpanDedupeService implements SpanDedupService {
    *          `false` if the key already existed (duplicate — skip it),
    *          `null` if Redis throws (proceed without dedup).
    */
-  async tryAcquireProcessingLock(
-    tenantId: string,
-    traceId: string,
-    spanId: string,
-  ): Promise<boolean | null> {
+  async tryAcquireProcessingLock({
+    tenantId,
+    traceId,
+    spanId,
+  }: SpanDedupRef): Promise<boolean | null> {
     try {
       const result = await this.redis.set(
         buildKey(tenantId, traceId, spanId),
@@ -73,7 +70,7 @@ export class RedisSpanDedupeService implements SpanDedupService {
   /**
    * Extend the key TTL after successful processing.
    */
-  async tryConfirmProcessed(tenantId: string, traceId: string, spanId: string): Promise<void> {
+  async tryConfirmProcessed({ tenantId, traceId, spanId }: SpanDedupRef): Promise<void> {
     try {
       await this.redis.expire(buildKey(tenantId, traceId, spanId), CONFIRMED_TTL_SECONDS);
     } catch (error) {
@@ -84,7 +81,7 @@ export class RedisSpanDedupeService implements SpanDedupService {
   /**
    * Delete the key so retries can proceed immediately after a failure.
    */
-  async tryReleaseOnFailure(tenantId: string, traceId: string, spanId: string): Promise<void> {
+  async tryReleaseOnFailure({ tenantId, traceId, spanId }: SpanDedupRef): Promise<void> {
     try {
       await this.redis.del(buildKey(tenantId, traceId, spanId));
     } catch (error) {
@@ -98,15 +95,11 @@ export class RedisSpanDedupeService implements SpanDedupService {
  * All operations return gracefully so ingestion proceeds without dedup.
  */
 export class NullSpanDedupeService implements SpanDedupService {
-  async tryAcquireProcessingLock(
-    _tenantId: string,
-    _traceId: string,
-    _spanId: string,
-  ): Promise<null> {
+  async tryAcquireProcessingLock(_span: SpanDedupRef): Promise<null> {
     return null;
   }
-  async tryConfirmProcessed(_tenantId: string, _traceId: string, _spanId: string): Promise<void> {}
-  async tryReleaseOnFailure(_tenantId: string, _traceId: string, _spanId: string): Promise<void> {}
+  async tryConfirmProcessed(_span: SpanDedupRef): Promise<void> {}
+  async tryReleaseOnFailure(_span: SpanDedupRef): Promise<void> {}
 }
 
 export function createSpanDedupeService(redis: IORedis | Cluster | null): SpanDedupService {
