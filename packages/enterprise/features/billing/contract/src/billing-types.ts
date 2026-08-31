@@ -131,3 +131,43 @@ export type SignupNotificationPayload = {
   utmCampaign?: string | null;
   signUpData?: SignupData | null;
 };
+
+// ---------------------------------------------------------------------------
+// Usage limits
+//
+// Read by both usage-limit services in the server package: one decides
+// whether a hard limit has been hit, the other whether an organization is
+// close enough to be warned. They live here because a type declared inside
+// either service would make the other import a service to reach it.
+// ---------------------------------------------------------------------------
+
+/** The counter cannot always answer; an unknown count is not a zero one. */
+export const USAGE_UNKNOWN = "unknown" as const;
+
+export interface UsageLimitData {
+  organizationId: string;
+  currentMonthMessagesCount: number;
+  maxMonthlyUsageLimit: number;
+}
+
+export interface BillingUsageLimitOrganization {
+  findWithAdmins(organizationId: string): Promise<{
+    id: string;
+    name: string;
+    sentPlanLimitAlert: Date | null;
+    members: Array<{ user: { id: string; name: string | null; email: string | null } }>;
+  } | null>;
+  updateSentPlanLimitAlert(organizationId: string, timestamp: Date): Promise<void>;
+  findProjectsWithName(organizationId: string): Promise<Array<{ id: string; name: string }>>;
+}
+
+export interface BillingUsageCounter {
+  getCountByProjects(input: {
+    organizationId: string;
+    projectIds: string[];
+  }): Promise<Array<{ projectId: string; count: number }> | typeof USAGE_UNKNOWN>;
+}
+
+export interface BillingPlanResolver {
+  getActivePlan(input: { organizationId: string }): Promise<{ name?: string | null }>;
+}

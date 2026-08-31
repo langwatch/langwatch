@@ -45,16 +45,13 @@ export { BillableEventsQueryService } from "./services/billable-events-query.ser
 export { CurrencyService, EUR_COUNTRIES, type CurrencyRequest } from "./services/currency.service";
 export { CustomerService } from "./services/customer.service";
 export {
-  UsageLimitService,
   planLimitCooldown,
   planLimitInFlight,
   resourceLimitCooldown,
   type BillingCooldownCache,
-  type BillingPlanResolver,
-  type BillingUsageCounter,
-  type BillingUsageLimitOrganization,
-  type UsageLimitData,
-} from "./services/usage-limit.service";
+} from "./adapters/memory.cooldown-cache.adapter";
+export { UsageLimitService } from "./services/usage-limit.service";
+export { UsageWarningService } from "./services/usage-warning.service";
 export {
   BillingSubscriptionService,
   RECENT_INVOICES_LIMIT,
