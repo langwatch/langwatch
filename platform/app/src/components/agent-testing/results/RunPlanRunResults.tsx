@@ -28,6 +28,7 @@ import {
   NoRunInPeriod,
   RunsLoadError,
   RunsLoadingSkeleton,
+  WaitingForFirstRun,
 } from "./RunPlanResultsStates";
 import { RunResultsTable } from "./RunResultsTable";
 import type { RunPlan } from "./run-plans";
@@ -240,8 +241,11 @@ export function RunPlanRunResults({
   if (batches.isLoading) return <RunsLoadingSkeleton />;
 
   if (!selection.selectedBatch) {
+    const EmptyColumn = selection.awaitedBatchRunId
+      ? WaitingForFirstRun
+      : NoRunInPeriod;
     return (
-      <NoRunInPeriod
+      <EmptyColumn
         period={periodControls.period}
         setRelativePeriod={periodControls.setRelativePeriod}
       />

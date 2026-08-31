@@ -113,6 +113,9 @@ export function useSelectedBatch({
 
   return {
     selectedBatch,
+    // The address names a run the window does not hold: one that has not
+    // reported its first scenario yet, or one older than the window.
+    awaitedBatchRunId: batchRunId && !selectedBatch ? batchRunId : null,
     summary,
     iterationMap,
     title: selectedBatch

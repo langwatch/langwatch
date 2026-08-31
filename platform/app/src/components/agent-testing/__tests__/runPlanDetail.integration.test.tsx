@@ -1014,6 +1014,19 @@ describe("<RunPlanDetail/>", () => {
     expect(props.setRelativePeriod).toHaveBeenCalledWith("90d");
   });
 
+  /** @scenario "A run opened before its first scenario reports reads as waiting" */
+  it("waits for the first result when the address names a run the window does not hold yet", async () => {
+    const user = userEvent.setup();
+    const { props } = renderDetail({ batchRunId: "batch_just_started" });
+
+    expect(screen.getByText("Waiting for the first result")).toBeInTheDocument();
+    expect(screen.queryByText("No run in this period")).not.toBeInTheDocument();
+    expect(screen.getByTestId("runs-sidebar-pending")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("widen-period-button"));
+    expect(props.setRelativePeriod).toHaveBeenCalledWith("90d");
+  });
+
   /**
    * One batch of three runs of one scenario against one target, started with
    * one parameter and both simulation models named. The repeat count is the

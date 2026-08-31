@@ -10,7 +10,7 @@ Feature: The wide run detail drawer
     stacked under the conversation, exactly as they are today.
 
     The results read as a labelled "Verdict:" line, then the criteria split
-    into a "Passed criteria" section over a "Failed criteria" section, then
+    into a "Failed criteria" section over a "Passed criteria" section, then
     what the judge said. Each section is drawn only when it has
     rows. Within a section the criteria keep the order the scenario declares them.
     Nothing there repeats the chips at the top of the drawer: no success rate,
@@ -66,7 +66,7 @@ Feature: The wide run detail drawer
   Scenario: The results split the criteria into passed and failed sections
     Given a finished run whose judge met two criteria and missed one
     When the results are read
-    Then a "Passed criteria" section reads over a "Failed criteria" section
+    Then a "Failed criteria" section reads over a "Passed criteria" section
     And each section keeps the criteria in the order the scenario declares them
     And a passed row carries a green check and a failed row a red cross
 

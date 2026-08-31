@@ -740,10 +740,10 @@ describe("the wide run detail drawer", () => {
       within(failed).getByText("names the refund window"),
     ).toBeInTheDocument();
     expect(within(failed).queryByText("stays polite")).not.toBeInTheDocument();
-    // Passed sits above failed.
+    // Failed sits above passed: it is what the reader opened the run for.
     const text = panel.textContent ?? "";
-    expect(text.indexOf("Passed criteria")).toBeLessThan(
-      text.indexOf("Failed criteria"),
+    expect(text.indexOf("Failed criteria")).toBeLessThan(
+      text.indexOf("Passed criteria"),
     );
     // Icons match: two green checks, one red cross.
     expect(panel.querySelectorAll("svg.lucide-circle-check")).toHaveLength(2);

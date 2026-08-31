@@ -27,7 +27,10 @@ export type RunsSidebarProps = {
     "batchRuns" | "totalBatchCount" | "hasMore" | "loadMore" | "isLoading"
   >;
   selectedBatchRunId: string | null;
-  /** A run of this plan that was just started and has no rows yet. */
+  /**
+   * A run of this plan that has no rows yet: one just started from this page,
+   * or one the address names before its first scenario has reported.
+   */
   pendingBatchRunId: string | null;
   onSelectRun: (batchRunId: string) => void;
   onBack: () => void;
