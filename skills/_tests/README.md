@@ -47,6 +47,17 @@ scenarios run on that login and skip when the machine has none, so run
 the sub Claude, and the probe that decides the skip runs the CLI in a directory
 of its own so `skills/.env` cannot answer for it.
 
+### Disk
+
+Most scenarios build their workspace with `fs.mkdtempSync` in the system temp
+folder, and each one carries the `node_modules` or `.venv` the agent
+installed. A run of the whole suite leaves tens of gigabytes there. A teardown
+in `vitest.config.ts` removes them at the end of a run, skipping any directory
+touched in the last ten minutes so parallel batches do not delete each other's
+work. `KEEP_SKILL_TEST_WORKDIR=1` turns the sweep off along with the rest of
+the cleanup, so a long session with that flag set needs the temp folder cleared
+by hand.
+
 `KEEP_SKILL_TEST_WORKDIR=1` keeps the working directory under `.claude/tmp/skill-tests/` after the run, so the scenarios, the suite and the run the agent created can be read back with `langwatch run-plan list` from inside it.
 
 ### What "passing" actually means
