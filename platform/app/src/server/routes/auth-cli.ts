@@ -1857,10 +1857,10 @@ secured.access(cliActivityMonitorAuth).get("/governance/ingest/sources/:id/event
   // Defensive ownership check before hitting CH — prevents the
   // "querying any source-id with a valid bearer" footgun even
   // though ActivityMonitorService also filters by OrganizationId.
-  const source = await c.var.langwatchApp.governance.ingestionSourceGetById(
-    sourceId,
-    tokenRecord.organization_id,
-  );
+  const source = await c.var.langwatchApp.governance.ingestionSourceGetById({
+    id: sourceId,
+    organizationId: tokenRecord.organization_id,
+  });
 
   const events = await c.var.langwatchApp.governance.activityEventsForSource({
     organizationId: tokenRecord.organization_id,
@@ -1900,10 +1900,10 @@ secured.access(cliActivityMonitorAuth).get("/governance/ingest/sources/:id/healt
       400,
     );
   }
-  const source = await c.var.langwatchApp.governance.ingestionSourceGetById(
-    sourceId,
-    tokenRecord.organization_id,
-  );
+  const source = await c.var.langwatchApp.governance.ingestionSourceGetById({
+    id: sourceId,
+    organizationId: tokenRecord.organization_id,
+  });
   const health = await c.var.langwatchApp.governance.activitySourceHealthMetrics({
     organizationId: tokenRecord.organization_id,
     sourceId,

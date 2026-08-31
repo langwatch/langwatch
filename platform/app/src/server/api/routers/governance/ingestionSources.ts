@@ -174,7 +174,10 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .permission("ingestionSources:view")
     .query(async ({ ctx, input }) => {
       const service = ctx.app.governance;
-      const row = await service.ingestionSourceGetById(input.id, input.organizationId);
+      const row = await service.ingestionSourceGetById({
+        id: input.id,
+        organizationId: input.organizationId,
+      });
       return dtoForRow(service, row, input.organizationId);
     }),
 
@@ -258,7 +261,10 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .permission("ingestionSources:manage")
     .mutation(async ({ ctx, input }) => {
       const service = ctx.app.governance;
-      const rotated = await service.ingestionSourceRotateSecret(input.id, input.organizationId);
+      const rotated = await service.ingestionSourceRotateSecret({
+        id: input.id,
+        organizationId: input.organizationId,
+      });
       return {
         source: await dtoForRow(service, rotated.source, input.organizationId),
         ingestSecret: rotated.ingestSecret,
@@ -270,7 +276,10 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .permission("ingestionSources:manage")
     .mutation(async ({ ctx, input }) => {
       const service = ctx.app.governance;
-      const archived = await service.ingestionSourceArchive(input.id, input.organizationId);
+      const archived = await service.ingestionSourceArchive({
+        id: input.id,
+        organizationId: input.organizationId,
+      });
       return dtoForRow(service, archived, input.organizationId);
     }),
 

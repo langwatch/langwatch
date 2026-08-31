@@ -280,7 +280,7 @@ describe("IngestionSource failure paths", () => {
     it("raises the same error when the service is called directly", async () => {
       const service = app.governance;
       await expect(
-        service.ingestionSourceArchive(missingId, organizationId),
+        service.ingestionSourceArchive({ id: missingId, organizationId }),
       ).rejects.toMatchObject({
         code: "ingestion_source_not_found",
         httpStatus: 404,

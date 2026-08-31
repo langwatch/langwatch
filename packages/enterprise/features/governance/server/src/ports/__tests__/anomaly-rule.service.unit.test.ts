@@ -70,9 +70,7 @@ class MemoryAnomalyRuleRepository extends AnomalyRuleRepository {
   }
 }
 
-function validInput(
-  overrides: Partial<CreateAnomalyRuleInput> = {},
-): CreateAnomalyRuleInput {
+function validInput(overrides: Partial<CreateAnomalyRuleInput> = {}): CreateAnomalyRuleInput {
   return {
     organizationId: "organization-1",
     name: "Spend spike",
@@ -107,9 +105,7 @@ describe("AnomalyRuleService", () => {
 
   it("persists a valid rule through the repository", async () => {
     const repository = new MemoryAnomalyRuleRepository();
-    const created = await AnomalyRuleService.create({ repository }).createRule(
-      validInput(),
-    );
+    const created = await AnomalyRuleService.create({ repository }).createRule(validInput());
 
     expect(created).toMatchObject({
       organizationId: "organization-1",
@@ -123,7 +119,9 @@ describe("AnomalyRuleService", () => {
       repository: new MemoryAnomalyRuleRepository([rule()]),
     });
 
-    await expect(service.tryFindById("rule-1", "organization-2")).resolves.toBeNull();
+    await expect(
+      service.tryFindById({ id: "rule-1", organizationId: "organization-2" }),
+    ).resolves.toBeNull();
   });
 
   it("validates the effective rule type when updating", async () => {
@@ -145,7 +143,7 @@ describe("AnomalyRuleService", () => {
     const archived = await AnomalyRuleService.create({
       repository,
       now: () => FIXED_NOW,
-    }).archive("rule-1", "organization-1");
+    }).archive({ id: "rule-1", organizationId: "organization-1" });
 
     expect(archived.archivedAt).toBe(FIXED_NOW);
     expect(archived.status).toBe("disabled");

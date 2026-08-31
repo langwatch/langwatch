@@ -67,7 +67,13 @@ export class IngestionSourceService {
     return this.repository.list(organizationId);
   }
 
-  async tryFindById(id: string, organizationId: string): Promise<GovernanceIngestionSource | null> {
+  async tryFindById({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<GovernanceIngestionSource | null> {
     const row = await this.repository.tryFindById(id);
     return row?.organizationId === organizationId ? row : null;
   }
@@ -147,7 +153,7 @@ export class IngestionSourceService {
   async updateSource(
     input: UpdateGovernanceIngestionSourceCommand,
   ): Promise<GovernanceIngestionSource> {
-    const existing = await this.getById(input.id, input.organizationId);
+    const existing = await this.getById({ id: input.id, organizationId: input.organizationId });
     this.assertPullSchedule(input.pullSchedule);
     const update: UpdateIngestionSourceRecord = {};
     let cursorMustNotMove = false;
@@ -208,11 +214,14 @@ export class IngestionSourceService {
     return source;
   }
 
-  async rotateSecret(
-    id: string,
-    organizationId: string,
-  ): Promise<CreatedGovernanceIngestionSource> {
-    const existing = await this.getById(id, organizationId);
+  async rotateSecret({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<CreatedGovernanceIngestionSource> {
+    const existing = await this.getById({ id, organizationId });
     const ingestSecret = this.secrets.generate();
     const parserConfig = this.credentials.tryEncryptParserConfig({
       ...existing.parserConfig,
@@ -228,8 +237,14 @@ export class IngestionSourceService {
     return { source, ingestSecret };
   }
 
-  async archive(id: string, organizationId: string): Promise<GovernanceIngestionSource> {
-    const existing = await this.getById(id, organizationId);
+  async archive({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<GovernanceIngestionSource> {
+    const existing = await this.getById({ id, organizationId });
     const source = await this.repository.update(existing.id, {
       archivedAt: new Date(this.now()),
       status: "disabled",
@@ -245,8 +260,14 @@ export class IngestionSourceService {
     });
   }
 
-  async getById(id: string, organizationId: string): Promise<GovernanceIngestionSource> {
-    const source = await this.tryFindById(id, organizationId);
+  async getById({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<GovernanceIngestionSource> {
+    const source = await this.tryFindById({ id, organizationId });
     if (!source) throw new IngestionSourceNotFoundError(id);
     return source;
   }

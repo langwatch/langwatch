@@ -109,11 +109,14 @@ import type {
  */
 export abstract class GovernanceService {
   abstract anomalyRuleList(organizationId: string): Promise<AnomalyRule[]>;
-  abstract tryFindAnomalyRuleById(id: string, organizationId: string): Promise<AnomalyRule | null>;
-  abstract anomalyRuleGetById(id: string, organizationId: string): Promise<AnomalyRule>;
+  abstract tryFindAnomalyRuleById(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<AnomalyRule | null>;
+  abstract anomalyRuleGetById(input: { id: string; organizationId: string }): Promise<AnomalyRule>;
   abstract anomalyRuleCreate(input: CreateAnomalyRuleInput): Promise<AnomalyRule>;
   abstract anomalyRuleUpdate(input: UpdateAnomalyRuleInput): Promise<AnomalyRule>;
-  abstract anomalyRuleArchive(id: string, organizationId: string): Promise<AnomalyRule>;
+  abstract anomalyRuleArchive(input: { id: string; organizationId: string }): Promise<AnomalyRule>;
 
   abstract departmentList(organizationId: string): Promise<Department[]>;
   abstract departmentAssignments(organizationId: string): Promise<DepartmentAssignments>;
@@ -205,14 +208,14 @@ export abstract class GovernanceService {
   }): Promise<PersonalIngestionKey[]>;
 
   abstract ingestionSourceList(organizationId: string): Promise<GovernanceIngestionSource[]>;
-  abstract tryFindIngestionSourceById(
-    id: string,
-    organizationId: string,
-  ): Promise<GovernanceIngestionSource | null>;
-  abstract ingestionSourceGetById(
-    id: string,
-    organizationId: string,
-  ): Promise<GovernanceIngestionSource>;
+  abstract tryFindIngestionSourceById(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GovernanceIngestionSource | null>;
+  abstract ingestionSourceGetById(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GovernanceIngestionSource>;
   /**
    * Of the trace destinations these sources point at, the ones still live in
    * this organization. The admin surfaces need the complement — a destination
@@ -233,14 +236,14 @@ export abstract class GovernanceService {
   abstract ingestionSourceUpdate(
     input: UpdateGovernanceIngestionSourceCommand,
   ): Promise<GovernanceIngestionSource>;
-  abstract ingestionSourceRotateSecret(
-    id: string,
-    organizationId: string,
-  ): Promise<CreatedGovernanceIngestionSource>;
-  abstract ingestionSourceArchive(
-    id: string,
-    organizationId: string,
-  ): Promise<GovernanceIngestionSource>;
+  abstract ingestionSourceRotateSecret(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<CreatedGovernanceIngestionSource>;
+  abstract ingestionSourceArchive(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GovernanceIngestionSource>;
   abstract ingestionSourceRecordEventReceived(id: string): Promise<void>;
 
   abstract templateListForUser(input: { organizationId: string }): Promise<IngestionTemplate[]>;

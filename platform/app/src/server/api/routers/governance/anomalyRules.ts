@@ -131,7 +131,10 @@ export const anomalyRulesRouter = createTRPCRouter({
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       return toDto(
-        await ctx.app.governance.anomalyRuleGetById(input.id, input.organizationId),
+        await ctx.app.governance.anomalyRuleGetById({
+          id: input.id,
+          organizationId: input.organizationId,
+        }),
       );
     }),
 
@@ -217,10 +220,10 @@ export const anomalyRulesRouter = createTRPCRouter({
     .permission("anomalyRules:manage")
     .use(enterpriseGate)
     .mutation(async ({ ctx, input }) => {
-      const archived = await ctx.app.governance.anomalyRuleArchive(
-        input.id,
-        input.organizationId,
-      );
+      const archived = await ctx.app.governance.anomalyRuleArchive({
+        id: input.id,
+        organizationId: input.organizationId,
+      });
       return toDto(archived);
     }),
 });

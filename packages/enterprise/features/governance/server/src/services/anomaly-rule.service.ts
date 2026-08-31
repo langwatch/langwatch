@@ -11,10 +11,7 @@ import {
   validateDestinationConfig,
   validateThresholdConfig,
 } from "@langwatch/enterprise-governance-contract";
-import type {
-  AnomalyRuleChanges,
-  AnomalyRuleRepository,
-} from "../ports/anomaly-rule.port";
+import type { AnomalyRuleChanges, AnomalyRuleRepository } from "../ports/anomaly-rule.port";
 
 export class AnomalyRuleService {
   private constructor(
@@ -33,7 +30,13 @@ export class AnomalyRuleService {
     return this.repository.list(organizationId);
   }
 
-  async tryFindById(id: string, organizationId: string): Promise<AnomalyRule | null> {
+  async tryFindById({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<AnomalyRule | null> {
     const row = await this.repository.tryFindById(id);
     if (!row || row.organizationId !== organizationId) return null;
     return row;
@@ -45,8 +48,14 @@ export class AnomalyRuleService {
    * Which org asked is a debugging detail — it goes to the log, not into an
    * error a customer reads (see {@link AnomalyRuleNotFoundError}).
    */
-  async getById(id: string, organizationId: string): Promise<AnomalyRule> {
-    const existing = await this.tryFindById(id, organizationId);
+  async getById({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<AnomalyRule> {
+    const existing = await this.tryFindById({ id, organizationId });
     if (!existing) {
       throw new AnomalyRuleNotFoundError(id);
     }
@@ -78,10 +87,7 @@ export class AnomalyRuleService {
     });
     // Strict destinationConfig validation (Phase 2C C3 dispatch). Empty
     // / undefined config is allowed — that's explicit log-only opt-out.
-    if (
-      input.destinationConfig !== undefined &&
-      Object.keys(input.destinationConfig).length > 0
-    ) {
+    if (input.destinationConfig !== undefined && Object.keys(input.destinationConfig).length > 0) {
       validateDestinationConfig(input.destinationConfig);
     }
     return this.repository.create({
@@ -100,7 +106,7 @@ export class AnomalyRuleService {
   }
 
   async updateRule(input: UpdateAnomalyRuleInput): Promise<AnomalyRule> {
-    const existing = await this.getById(input.id, input.organizationId);
+    const existing = await this.getById({ id: input.id, organizationId: input.organizationId });
     const changes: AnomalyRuleChanges = {};
     if (input.name !== undefined) changes.name = input.name;
     if (input.description !== undefined) changes.description = input.description;
@@ -159,8 +165,14 @@ export class AnomalyRuleService {
     return this.repository.update(existing.id, changes);
   }
 
-  async archive(id: string, organizationId: string): Promise<AnomalyRule> {
-    const existing = await this.getById(id, organizationId);
+  async archive({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<AnomalyRule> {
+    const existing = await this.getById({ id, organizationId });
     return this.repository.update(existing.id, {
       archivedAt: this.now(),
       status: "disabled",
