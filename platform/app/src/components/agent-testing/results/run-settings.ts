@@ -56,6 +56,12 @@ export type RunSettings = {
    * stamped, both read as null and print no name.
    */
   actor: RunActor | null;
+  /**
+   * The connected agent instance that served each target, keyed by target
+   * key. Only a connected agent records one, so every other target is absent
+   * and its line names no instance.
+   */
+  instanceByTarget: Map<string, string>;
 };
 
 /**
@@ -242,6 +248,38 @@ export function runActorName({
   return memberNameById?.get(actor.id) ?? null;
 }
 
+/**
+ * The connected agent instance that answered each target's runs (ADR-128).
+ *
+ * Stamped on the run by the platform when a connected agent served it. It is
+ * read off the reserved namespace defensively rather than through the parsed
+ * shape, so a run recorded before the field existed simply names none.
+ *
+ * The first run of a target answers for it: production with ten pods can
+ * spread one batch over several of them, and naming the first is what tells
+ * a reader which machine to look at.
+ */
+function readInstanceByTarget(
+  scenarioRuns: ScenarioRunData[],
+): Map<string, string> {
+  const byTarget = new Map<string, string>();
+  for (const run of scenarioRuns) {
+    const key = targetKeyOfRun(run);
+    if (!key || byTarget.has(key)) continue;
+    const served = (
+      run.metadata?.langwatch as
+        | { agentInstance?: { hostname?: string; label?: string | null } }
+        | undefined
+    )?.agentInstance;
+    if (!served?.hostname) continue;
+    byTarget.set(
+      key,
+      served.label ? `${served.hostname} (${served.label})` : served.hostname,
+    );
+  }
+  return byTarget;
+}
+
 /** Everything the run settings block reads, or null when the batch is empty. */
 export function readRunSettings(
   scenarioRuns: ScenarioRunData[],
@@ -254,5 +292,6 @@ export function readRunSettings(
     simulatorModel: readModel(scenarioRuns, "simulatorModel"),
     judgeModel: readModel(scenarioRuns, "judgeModel"),
     actor: readActor(scenarioRuns),
+    instanceByTarget: readInstanceByTarget(scenarioRuns),
   };
 }

@@ -36,7 +36,7 @@ export function buildTargetLabels({
   prompts: readonly PromptEntry[];
 }): Map<string, string> {
   return new Map<string, string>([
-    ...agents.map((agent) => [agent.id, agent.name] as const),
+    ...agents.map((agent) => [agent.id, agent.label ?? agent.name] as const),
     // A prompt with no handle yet reads as its id rather than as nothing.
     ...prompts.map(
       (prompt) => [prompt.id, prompt.handle ?? prompt.id] as const,

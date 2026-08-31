@@ -10,11 +10,13 @@
  */
 
 import { Box, VStack } from "@chakra-ui/react";
+import { useEffect, useRef } from "react";
 import { HandledErrorAlert } from "~/features/errors";
 import { CustomizeChips } from "../shared/CustomizeChips";
 import { FieldLabel } from "../shared/DialogFields";
 import { CompareAgentsSection } from "./CompareAgentsSection";
 import { MissingProviderNotice } from "./MissingProviderNotice";
+import { OfflineTargetsNotice } from "./OfflineTargetsNotice";
 import { ParameterRowsEditor } from "./ParameterRowsEditor";
 import { RunNameField } from "./RunNameField";
 import { RunNoteField } from "./RunNoteField";
@@ -108,6 +110,9 @@ function ComparisonBlocks({
         onRemove={form.removeComparison}
         hasDuplicates={form.hasDuplicateCompareRows}
         defaults={form.parameterDefaults}
+        definitions={form.parameterDefinitions}
+        declaredParametersOf={form.declaredParametersOf}
+        parameterError={form.parameterError}
         isBusy={isBusy}
       />
       <VStack align="stretch" gap={0} data-testid="run-dialog-compare-secrets">
@@ -120,6 +125,7 @@ function ComparisonBlocks({
           declaredSecrets={form.secretDefinitions}
           secretValues={form.secretValues}
           onChangeSecretValue={form.setSecretValue}
+          definitions={form.parameterDefinitions}
           disabled={isBusy}
           secretOnly
         />
@@ -128,16 +134,39 @@ function ComparisonBlocks({
   );
 }
 
-/** What the dialog says when the run cannot start, or did not. */
+/**
+ * What the dialog says when the run cannot start, or did not.
+ *
+ * The alert stands at the foot of a body that scrolls, so a refusal on a
+ * dialog with several blocks open lands out of view and the run reads as one
+ * that did nothing at all. It is brought into view the moment it appears.
+ */
 function RunDialogNotices({ form }: { form: RunDialogForm }) {
+  const alert = useRef<HTMLDivElement>(null);
+  const { inlineError } = form;
+
+  useEffect(() => {
+    if (inlineError == null) return;
+    alert.current?.scrollIntoView?.({ block: "nearest" });
+  }, [inlineError]);
+
   return (
     <>
       {form.missingProvider && <MissingProviderNotice />}
 
-      {form.inlineError != null && (
-        <Box data-testid="run-dialog-error">
+      <OfflineTargetsNotice
+        agents={form.scenarioAgents}
+        targets={
+          form.showCompare
+            ? form.compareRows.map((row) => row.target)
+            : [form.target]
+        }
+      />
+
+      {inlineError != null && (
+        <Box ref={alert} data-testid="run-dialog-error">
           <HandledErrorAlert
-            error={form.inlineError}
+            error={inlineError}
             fallbackTitle="Couldn't start the run"
           />
         </Box>

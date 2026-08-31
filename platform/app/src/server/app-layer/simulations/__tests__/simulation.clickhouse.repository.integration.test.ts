@@ -539,6 +539,9 @@ describe("SimulationClickHouseRepository (integration)", () => {
         const scenarioSetId = `__internal__allsuites_${nanoid()}__suite`;
         const batchRunId = `batch-allsuites-${nanoid()}`;
 
+        // The page is ordered by `max(CreatedAt)` and breaks ties on the batch
+        // id. Every other row of this file shares one `CreatedAt`, so a newer
+        // one here puts this batch on the first page whatever the random ids.
         await insertRow(
           ch,
           makeInsertRow({
@@ -546,6 +549,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
             BatchRunId: batchRunId,
             ScenarioSetId: scenarioSetId,
             Metadata: JSON.stringify({ all_suites: true }),
+            CreatedAt: new Date(now + 60_000),
           }),
         );
 
@@ -949,6 +953,117 @@ describe("SimulationClickHouseRepository (integration)", () => {
         expect(legacyEntry).toBeUndefined();
         expect(defaultEntry).toBeDefined();
       });
+    });
+  });
+
+  describe("given a batch in the project's agent test set", () => {
+    const agentTestSetId = `__internal__${tenantId}__agent-test`;
+    const batchRunId = `batch-agent-test-${nanoid()}`;
+    const scenarioRunId = `run-agent-test-${nanoid()}`;
+
+    beforeAll(async () => {
+      await insertRow(
+        ch,
+        makeInsertRow({
+          ScenarioRunId: scenarioRunId,
+          BatchRunId: batchRunId,
+          ScenarioSetId: agentTestSetId,
+          ScenarioId: "__internal__agent-test",
+          Status: "SUCCESS",
+          CreatedAt: new Date(now),
+          UpdatedAt: new Date(now),
+        }),
+      );
+    });
+
+    /** @scenario "The results lists leave the agent test batches out" */
+    it("is in no set list, no batch list and no last-result summary", async () => {
+      const sets = await repo.getScenarioSetsData({ projectId: tenantId });
+      expect(
+        sets.find((s) => s.scenarioSetId === agentTestSetId),
+      ).toBeUndefined();
+
+      const batches = await repo.getRunDataForAllSuites({
+        projectId: tenantId,
+        limit: 100,
+      });
+      if (!batches.changed) throw new Error("expected changed");
+      expect(
+        batches.runs.find((r) => r.batchRunId === batchRunId),
+      ).toBeUndefined();
+      expect(batches.scenarioSetIds[batchRunId]).toBeUndefined();
+
+      const internal = await repo.getInternalSuiteSummaries({
+        projectId: tenantId,
+      });
+      expect(
+        internal.find((s) => s.scenarioSetId === agentTestSetId),
+      ).toBeUndefined();
+      const external = await repo.getExternalSetSummaries({
+        projectId: tenantId,
+      });
+      expect(
+        external.find((s) => s.scenarioSetId === agentTestSetId),
+      ).toBeUndefined();
+
+      const summaries = await repo.getLastResultSummaries({
+        projectId: tenantId,
+      });
+      expect(
+        summaries.find((s) => s.scenarioId === "__internal__agent-test"),
+      ).toBeUndefined();
+    });
+
+    /** @scenario "The run drawer opens a test run by its id" */
+    it("is still read by its own run id", async () => {
+      const run = await repo.getScenarioRunData({
+        projectId: tenantId,
+        scenarioRunId,
+      });
+      expect(run?.scenarioRunId).toBe(scenarioRunId);
+      expect(run?.batchRunId).toBe(batchRunId);
+    });
+  });
+
+  describe("given an agent test batch newer than every other run", () => {
+    const freshnessTenantId = `test-sim-freshness-${nanoid()}`;
+    const lastRealUpdatedAt = now;
+    const agentTestUpdatedAt = now + 60_000;
+
+    beforeAll(async () => {
+      await insertRow(
+        ch,
+        makeInsertRow({
+          TenantId: freshnessTenantId,
+          ScenarioSetId: "default",
+          Status: "SUCCESS",
+          CreatedAt: new Date(lastRealUpdatedAt),
+          UpdatedAt: new Date(lastRealUpdatedAt),
+        }),
+      );
+      await insertRow(
+        ch,
+        makeInsertRow({
+          TenantId: freshnessTenantId,
+          ScenarioSetId: `__internal__${freshnessTenantId}__agent-test`,
+          ScenarioId: "__internal__agent-test",
+          Status: "SUCCESS",
+          CreatedAt: new Date(agentTestUpdatedAt),
+          UpdatedAt: new Date(agentTestUpdatedAt),
+        }),
+      );
+    });
+
+    /** @scenario "A test run does not make the results page look stale" */
+    it("answers that nothing changed, so the freshness cursor stays where it is", async () => {
+      const result = await repo.getRunDataForAllSuites({
+        projectId: freshnessTenantId,
+        limit: 100,
+        sinceTimestamp: lastRealUpdatedAt,
+      });
+
+      expect(result.changed).toBe(false);
+      expect(result.lastUpdatedAt).toBe(lastRealUpdatedAt);
     });
   });
 

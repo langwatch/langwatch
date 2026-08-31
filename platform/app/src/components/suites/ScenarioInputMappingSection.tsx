@@ -23,17 +23,20 @@ import type {
 import type { Variable } from "~/components/variables/VariablesSection";
 import { VariablesSection } from "~/components/variables/VariablesSection";
 
-/** The three scenario fields shown as input mapping rows. */
+/** The scenario fields shown as input mapping rows. */
 const SCENARIO_FIELDS: Variable[] = [
   { identifier: "input", type: "str" },
   { identifier: "messages", type: "str" },
   { identifier: "threadId", type: "str" },
+  { identifier: "session", type: "str" },
 ];
 
 const SCENARIO_INPUT_INFO: Record<string, string> = {
   input: "The latest message from the simulated user",
   messages: "Full conversation history as a JSON string",
   threadId: "Unique identifier for the conversation thread",
+  session:
+    "The value the agent returned as session on the previous turn of this conversation, empty on the first turn",
 };
 
 /** The single scenario output field. */

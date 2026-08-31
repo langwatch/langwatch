@@ -651,6 +651,12 @@ describe("explainHandledError", () => {
        * the list is once again only our own words.
        */
       const ALLOWED_PER_CODE: Record<string, Set<string>> = {
+        // `reason` is the sentence parameter-spec.ts wrote for this exact
+        // declaration ("it is a turn field the platform sends on every
+        // call"), authored here and never relayed from the SDK. The shape
+        // check picks its sentence from the rule that failed rather than
+        // repeating the schema's own message, which names the parameter.
+        agent_parameter_invalid: new Set(["reason"]),
         // The provider's own reason for rejecting delivery is the entire
         // value of this error — "invite the bot with /invite @LangWatch".
         // Authored server-side by `explainSlackPostError`, never relayed.
@@ -660,6 +666,11 @@ describe("explainHandledError", () => {
         // recipients to test-fire to."), and it names WHICH piece is missing.
         // Authored in `trigger-template.service.ts`, never relayed.
         test_fire_unavailable: new Set(["reason"]),
+        // `reason` is the sentence the agent test prefetch or the type check
+        // wrote for this exact agent ("Only HTTP, code, workflow and connected
+        // agents can be tested"). Authored in `agent-test-run.ts` and
+        // `agent-test-prefetch.ts`, never relayed from an SDK or a customer.
+        agent_test_refused: new Set(["reason"]),
       };
 
       /**
@@ -727,6 +738,57 @@ describe("explainHandledError", () => {
         expect(title[0], `${code} title`).toBe(title[0]?.toUpperCase());
         expect(title.endsWith("."), `${code} title`).toBe(false);
       }
+    });
+  });
+});
+
+describe("agent_payload_too_large", () => {
+  describe("when the session is what broke the cap", () => {
+    /** @scenario "A session above the cap is refused with a typed error" */
+    it("tells the reader to return a small session value", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "agent_payload_too_large",
+          httpStatus: 413,
+          meta: { what: "session", sizeBytes: 70002, limitBytes: 65536 },
+        }),
+      );
+
+      expect(description).toContain("session");
+      expect(description).toContain("conversation id");
+      expect(description).not.toContain("attachments");
+    });
+  });
+
+  describe("when the result is what broke the cap", () => {
+    it("names the result and keeps the trimming advice", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "agent_payload_too_large",
+          httpStatus: 413,
+          meta: { what: "result" },
+        }),
+      );
+
+      expect(description).toContain("The result is above the size limit");
+    });
+  });
+});
+
+describe("agent_test_refused", () => {
+  describe("when the reason is longer than a sentence", () => {
+    /** @scenario "Technical detail stops at the trace id" */
+    it("clamps it, the way every server-supplied sentence here is clamped", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "agent_test_refused",
+          httpStatus: 400,
+          meta: { reason: "a".repeat(400) },
+        }),
+      );
+
+      expect(description).toContain("\u2026");
+      expect(description.length).toBeLessThan(300);
     });
   });
 });

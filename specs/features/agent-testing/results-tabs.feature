@@ -315,6 +315,17 @@ Feature: The Results tab
     Then one row reads "dev-agent" and one row reads "prod-agent"
     And each row reads the pass rate of that agent alone
 
+  # The mark is the icon the agents page draws for the same agent, so a target
+  # reads as the agent a person knows from that page. It carries a colour only
+  # in a comparison, where the colour is what tells one target from another.
+
+  @integration
+  Scenario: A target row is marked with the kind of agent behind it
+    Given runs against a connected agent and against an HTTP agent
+    When "Target" is chosen in Group by
+    Then each row is marked with the kind of its own agent
+    And the marks carry no colour
+
   @integration
   Scenario: Grouping by none reads the flat list
     Given a filter has already narrowed the question

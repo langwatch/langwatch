@@ -27,6 +27,8 @@ export const ScenarioInfraErrorCode = {
   PlatformUnreachable: "scenario_platform_unreachable",
   /** The model provider rejected the request (bad key, unknown model, …). */
   ModelProviderError: "scenario_model_provider_error",
+  /** The provider answered, but the model wrote no text at all. */
+  ModelEmptyResponse: "scenario_model_empty_response",
   /** The resolved model is licensed for the coding-assistant surfaces only and can't run this simulation. */
   ModelNotAllowedForSurface: "scenario_model_not_allowed_for_surface",
   /** The judge combined a forced function tool with incompatible reasoning. */
@@ -42,6 +44,22 @@ export const ScenarioInfraErrorCode = {
    * identically.
    */
   AgentDevTunnelUnreachable: "agent_dev_tunnel_unreachable",
+  /**
+   * Connected agent failures (ADR-128), named with the same codes the relay
+   * route answers with so a run and a REST caller read one vocabulary.
+   */
+  AgentOffline: "agent_offline",
+  AgentCallTimeout: "agent_call_timeout",
+  AgentCallFailed: "agent_call_failed",
+  AgentDisconnected: "agent_disconnected",
+  AgentInstanceLost: "agent_instance_lost",
+  AgentBusy: "agent_busy",
+  /**
+   * The agent answered with a session, a result or an envelope above its
+   * cap. Any target that keeps a session can fail with it, not only a
+   * connected one.
+   */
+  AgentPayloadTooLarge: "agent_payload_too_large",
   /** Anything else that failed at the infrastructure level. */
   Infra: "scenario_infra_error",
 } as const;
@@ -357,7 +375,179 @@ function isOurRunnerCrash(text: string): boolean {
  * Classification rules, ordered most-specific-first: a TLS cert failure is more
  * actionable than the generic "fetch failed" it usually rides on, so it wins.
  */
+/** `Connected agent call failed (<code>): <message>`, split. */
+const CONNECTED_CALL_FAILURE =
+  /Connected agent call failed \(([a-z_0-9]+)\):\s*([^\n]*)/;
+
+/** The connected agent codes a run can fail with, and their copy. */
+const CONNECTED_AGENT_ENVELOPES: Record<
+  string,
+  { code: ScenarioInfraErrorCode; message: string; hint: string }
+> = {
+  agent_offline: {
+    code: ScenarioInfraErrorCode.AgentOffline,
+    message: "No process running the connected agent is connected.",
+    hint: "Start the process that runs the decorated function, then run again.",
+  },
+  agent_call_timeout: {
+    code: ScenarioInfraErrorCode.AgentCallTimeout,
+    message:
+      "The connected agent did not answer a turn before its call budget.",
+    hint: "Check the process for slow work, or raise the timeout on the decorated function.",
+  },
+  agent_call_failed: {
+    code: ScenarioInfraErrorCode.AgentCallFailed,
+    message: "The connected agent raised an error on a turn.",
+    hint: "The process logs carry the stack of the error the function raised.",
+  },
+  agent_disconnected: {
+    code: ScenarioInfraErrorCode.AgentDisconnected,
+    message:
+      "The connected agent instance disconnected while it was working on a turn.",
+    hint: "Start the process again, then run again. The turn was not sent twice.",
+  },
+  agent_instance_lost: {
+    code: ScenarioInfraErrorCode.AgentInstanceLost,
+    message:
+      "The instance this conversation was pinned to is no longer connected.",
+    hint: "Start the process again, then run again, or turn off sticky on the decorated function.",
+  },
+  agent_busy: {
+    code: ScenarioInfraErrorCode.AgentBusy,
+    message:
+      "Every instance of the connected agent stayed busy for the whole retry budget.",
+    hint: "Raise the concurrency on the decorated function, or connect more instances.",
+  },
+  agent_payload_too_large: {
+    code: ScenarioInfraErrorCode.AgentPayloadTooLarge,
+    message: "The connected agent answered a turn above the size limit.",
+    hint: "Trim the output or the session the function returns, or raise the limit on a self-hosted deployment.",
+  },
+};
+
+/** The marker every adapter throws a refused session with. */
+const SESSION_TOO_LARGE_NEEDLE = "Agent session too large";
+
+/** `... a session of <n> bytes, above the limit of <m> bytes`, split. */
+const SESSION_TOO_LARGE_SIZES =
+  /a session of (\d+) bytes, above the limit of (\d+) bytes/;
+
+/**
+ * A session above the cap, from any target that keeps one: the base adapter
+ * refuses it before the run reads the reply, so the agent's own words never
+ * enter the message and the sizes are the only detail to carry.
+ */
+function sessionTooLargeRule(): ClassificationRule {
+  return {
+    needles: [SESSION_TOO_LARGE_NEEDLE],
+    build: (text) => {
+      const sizes = SESSION_TOO_LARGE_SIZES.exec(text);
+      const detail = sizes
+        ? ` It is ${sizes[1]} bytes; the limit is ${sizes[2]} bytes.`
+        : "";
+      return {
+        code: ScenarioInfraErrorCode.AgentPayloadTooLarge,
+        message: `The agent returned a session value above the size limit.${detail}`,
+        hint: "Return a small value as the session, such as a conversation id or a token, not the conversation itself.",
+      };
+    },
+  };
+}
+
+function connectedAgentRules(): ClassificationRule[] {
+  return Object.entries(CONNECTED_AGENT_ENVELOPES).map(([code, envelope]) => ({
+    needles: [`Connected agent call failed (${code})`],
+    build: (text) => {
+      const remote = CONNECTED_CALL_FAILURE.exec(text)?.[2]?.trim();
+      // The function's own error is the whole point of agent_call_failed;
+      // for the other codes the relay's sentence and ours say the same thing.
+      const message =
+        code === "agent_call_failed" && remote
+          ? `The connected agent raised: ${remote.slice(0, MAX_GENERIC_MESSAGE_LENGTH)}`
+          : envelope.message;
+      return { code: envelope.code, message, hint: envelope.hint };
+    },
+  }));
+}
+
+/**
+ * The marker the scenario runner throws when a model answers with no text at
+ * all. The provider accepted the request and answered: the answer simply
+ * carried no words, which happens when a reasoning model spends its whole
+ * output budget on reasoning, or when the prompt leaves the model nothing
+ * more to say.
+ */
+const EMPTY_MODEL_RESPONSE_NEEDLE = "No response content from LLM";
+
+/**
+ * Which model went quiet, read from the `[AgentName]` prefix the scenario
+ * runner wraps every agent failure in. Naming it is most of the answer: the
+ * simulated user and the judge are models the platform chose, and the customer
+ * changes them in a different place than their own agent.
+ */
+const EMPTY_MODEL_RESPONSE_SUBJECTS: Record<string, string> = {
+  UserSimulatorAgent: "The model that plays the simulated user",
+  JudgeAgent: "The judge model",
+};
+
+/** The `[AgentName]` prefix of a wrapped agent failure. */
+const AGENT_NAME_PREFIX = /\[([A-Za-z0-9_]+)\]/;
+
+function emptyModelResponseRule(): ClassificationRule {
+  return {
+    needles: [EMPTY_MODEL_RESPONSE_NEEDLE],
+    build: (text) => {
+      const agentName = AGENT_NAME_PREFIX.exec(text)?.[1] ?? "";
+      const subject = EMPTY_MODEL_RESPONSE_SUBJECTS[agentName] ?? "The model";
+      return {
+        code: ScenarioInfraErrorCode.ModelEmptyResponse,
+        message: `${subject} answered with no text, so the simulation could not go on. The provider accepted the request and answered; the answer held no words.`,
+        hint: "A reasoning model can spend its whole answer on reasoning and write nothing. Select a different model in Settings > Model Providers, or give the scenario a clear end condition so the model always has something to say.",
+      };
+    },
+  };
+}
+
+/**
+ * What the `ai` SDK puts in front of every request that never got an answer
+ * from the model endpoint. It says nothing about why on its own: the cause,
+ * when there is one, follows the colon, and a refused certificate or a
+ * rejected key arrives under this same wrapper. So it classifies only what no
+ * other rule could name.
+ */
+const MODEL_ENDPOINT_UNREACHABLE_NEEDLE = "Cannot connect to API";
+
+function modelEndpointUnreachableRule(): ClassificationRule {
+  return {
+    needles: [MODEL_ENDPOINT_UNREACHABLE_NEEDLE],
+    build: () => ({
+      code: ScenarioInfraErrorCode.PlatformUnreachable,
+      message:
+        "The simulation could not reach the model endpoint, so no model answered.",
+      hint: "Check that the model provider is up and reachable from LangWatch, then run again.",
+    }),
+  };
+}
+
 const CLASSIFICATION_RULES: ClassificationRule[] = [
+  // Connected agent failures. The child's adapter writes
+  // `Connected agent call failed (<code>): <message>`, so the code between
+  // the brackets is the classification and the message after it is what the
+  // customer reads: the relay's own sentence, or the function's own error.
+  //
+  // Ahead of every other rule: the function's own error travels inside the
+  // message, so a handler that says it timed out, that a key is invalid, or
+  // that a session is too large would otherwise read as a platform timeout, a
+  // model-provider rejection, or a session the platform itself refused.
+  ...connectedAgentRules(),
+  // A model that answered with nothing. Ahead of the provider rule: the two
+  // read alike in the raw text, and only this one is true of a request the
+  // provider accepted.
+  emptyModelResponseRule(),
+  // A session the adapter itself refused. The connected relay writes its own
+  // `agent_payload_too_large` envelope, so this rule only ever sees the text
+  // an adapter wrote, never a connected agent's own words.
+  sessionTooLargeRule(),
   {
     // Untrusted TLS certificate — the local-dev self-signed-cert case.
     needles: [
@@ -472,6 +662,11 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
       hint: "Run `langwatch agent dev` again on the machine that started the tunnel, or restore the agent's URL in its settings.",
     }),
   },
+  // A request that never reached the model endpoint, with no cause of its
+  // own. Last of the named rules: the `ai` SDK puts this same wrapper around
+  // a refused certificate and a rejected key, so anything that names a cause
+  // must be read before it.
+  modelEndpointUnreachableRule(),
   {
     // Network unreachable (connection refused / DNS / reset / undici fetch).
     needles: [...NETWORK_UNREACHABLE_NEEDLES],
@@ -499,6 +694,21 @@ function targetHostFromTransportError(text: string): string | undefined {
 }
 
 /**
+ * The class name of the adapter, which the scenario runner writes in front of
+ * every failure it catches: `[SerializedConnectedAgentAdapter] ...`.
+ *
+ * On the platform the adapter is ours and the reader never chose it, so the
+ * name states an implementation detail and pushes the sentence that matters
+ * off the first line. The classifier reads the sentence behind it either way.
+ */
+const RUNNER_ADAPTER_PREFIX = /^\[\w*Adapter\]\s*/;
+
+/** The same text with the runner's adapter name taken off the front. */
+function withoutAdapterName(text: string): string {
+  return text.replace(RUNNER_ADAPTER_PREFIX, "");
+}
+
+/**
  * Classify a raw scenario-runner error string into a handled error envelope.
  *
  * Falls back to a trimmed generic message so we never lose information, but
@@ -507,7 +717,7 @@ function targetHostFromTransportError(text: string): string | undefined {
 export function classifyScenarioInfraError(
   raw: string | undefined,
 ): ScenarioErrorEnvelope {
-  const text = (raw ?? "").trim();
+  const text = withoutAdapterName((raw ?? "").trim());
 
   if (text.length === 0) {
     return {
@@ -578,7 +788,7 @@ export function decodeScenarioError(
  * Runs report errors in a few shapes: the scenario SDK stores a serialized
  * `{ name, message, stack }` JSON (via the ingest path), while a child crash may
  * be a plain string. We take the `message` (falling back to `stack`, then the
- * raw string) so the classifier sees the real failure text — never a bare
+ * raw string) so the classifier sees the real failure text, never a bare
  * `{name,message,stack}` wrapper.
  */
 export function extractScenarioErrorText(raw: string): string {
@@ -590,16 +800,16 @@ export function extractScenarioErrorText(raw: string): string {
         stack?: unknown;
       };
       if (typeof parsed.message === "string" && parsed.message.length > 0) {
-        return parsed.message;
+        return withoutAdapterName(parsed.message);
       }
       if (typeof parsed.stack === "string" && parsed.stack.length > 0) {
-        return parsed.stack;
+        return withoutAdapterName(parsed.stack);
       }
     } catch {
-      // Not JSON — fall through to the raw string.
+      // Not JSON: fall through to the raw string.
     }
   }
-  return raw;
+  return withoutAdapterName(raw);
 }
 
 /**
@@ -617,6 +827,48 @@ export function resolveScenarioError(raw: string): ScenarioErrorEnvelope {
   );
 }
 
+/**
+ * The raw text behind a failure, for a reader who opens the details.
+ *
+ * The customer-facing message says what happened; this says where. The
+ * scenario SDK stores `{ name, message, stack }`, so the stack is what a
+ * reader wants, with its line breaks kept. An envelope we wrote ourselves
+ * carries nothing under its message, so it answers with nothing.
+ */
+export function scenarioErrorDetail(
+  raw: string | null | undefined,
+): string | undefined {
+  const trimmed = (raw ?? "").trim();
+  if (trimmed.length === 0) return undefined;
+  if (decodeScenarioError(trimmed)) return undefined;
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    return detailOfErrorPayload(trimmed) ?? trimmed;
+  }
+  return trimmed;
+}
+
+/**
+ * The detail inside the scenario SDK's `{ name, message, stack }` payload:
+ * the stack, or the message when the runner recorded none. An object of any
+ * other shape is still shown, formatted rather than as one long line.
+ */
+function detailOfErrorPayload(trimmed: string): string | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return undefined;
+  }
+  if (!parsed || typeof parsed !== "object") return undefined;
+  const payload = parsed as { stack?: unknown; message?: unknown };
+  const stack = typeof payload.stack === "string" ? payload.stack.trim() : "";
+  if (stack.length > 0) return stack;
+  const message =
+    typeof payload.message === "string" ? payload.message.trim() : "";
+  if (message.length > 0) return message;
+  return JSON.stringify(parsed, null, 2);
+}
+
 /** Short human title for an envelope code, for the drawer's error heading. */
 export function scenarioErrorTitle(code: ScenarioInfraErrorCode): string {
   switch (code) {
@@ -626,6 +878,8 @@ export function scenarioErrorTitle(code: ScenarioInfraErrorCode): string {
       return "Couldn't reach the endpoint";
     case ScenarioInfraErrorCode.ModelProviderError:
       return "Model provider error";
+    case ScenarioInfraErrorCode.ModelEmptyResponse:
+      return "Model answered with no text";
     case ScenarioInfraErrorCode.ModelNotAllowedForSurface:
       return "Model not allowed for this simulation";
     case ScenarioInfraErrorCode.ModelToolReasoningConflict:
@@ -636,6 +890,20 @@ export function scenarioErrorTitle(code: ScenarioInfraErrorCode): string {
       return "Simulation runner unavailable";
     case ScenarioInfraErrorCode.AgentDevTunnelUnreachable:
       return "Local tunnel not responding";
+    case ScenarioInfraErrorCode.AgentOffline:
+      return "Connected agent not running";
+    case ScenarioInfraErrorCode.AgentCallTimeout:
+      return "Connected agent did not answer in time";
+    case ScenarioInfraErrorCode.AgentCallFailed:
+      return "Connected agent raised an error";
+    case ScenarioInfraErrorCode.AgentDisconnected:
+      return "Connected agent disconnected";
+    case ScenarioInfraErrorCode.AgentInstanceLost:
+      return "Pinned instance is gone";
+    case ScenarioInfraErrorCode.AgentBusy:
+      return "Connected agent busy";
+    case ScenarioInfraErrorCode.AgentPayloadTooLarge:
+      return "Agent answer too large";
     case ScenarioInfraErrorCode.Infra:
       return "Simulation failed";
     default: {

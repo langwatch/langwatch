@@ -166,6 +166,19 @@ const OFFLINE_AGENT = {
   type: "http" as const,
   config: {},
 };
+/** A connected agent whose own function declares two parameters. */
+const CONNECTED_AGENT = {
+  id: "agent_connected",
+  name: "support-agent",
+  type: "connected" as const,
+  config: {},
+  environment: "production",
+  status: "online" as const,
+  parameters: [
+    { name: "model", defaultValue: "gpt-5-mini" },
+    { name: "plan", defaultValue: "free" },
+  ],
+};
 
 const suiteSubject = (
   overrides: Partial<Extract<RunDialogSubject, { kind: "suite" }>> = {},
@@ -468,6 +481,190 @@ describe("<RunDialog/>", () => {
     await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
     expect(mockSuitesRunPlan.mock.calls[0]![0]).toMatchObject({
       parameters: { model: "gpt-5", locale: "de" },
+    });
+  });
+
+  describe("given an agent that declares its parameters", () => {
+    /** A connected agent that declares "model" with a closed list of options. */
+    const CONNECTED_AGENT = {
+      id: "agent_connected",
+      name: "support-agent",
+      type: "connected" as const,
+      config: {},
+      environment: "production",
+      owner: null,
+      parameters: [
+        {
+          name: "model",
+          type: "string" as const,
+          description: "The model the agent answers with",
+          options: ["gpt-5-mini", "gpt-5"],
+          defaultValue: "gpt-5-mini",
+        },
+        { name: "seats", type: "number" as const, defaultValue: 1 },
+      ],
+    };
+
+    describe("when the dialog opens on that agent", () => {
+      /** @scenario "Key mode lists every declared parameter with its description, default and source" */
+      it("offers the parameters the chosen agent declares, marked with its label", async () => {
+        const user = userEvent.setup();
+        mockAgentsGetAll.mockReturnValue({
+          data: [ONLINE_AGENT, CONNECTED_AGENT],
+        });
+        mockScenariosGetAll.mockReturnValue(
+          casesDeclaring([{ name: "locale", defaultValue: "de" }]),
+        );
+        renderDialog(
+          suiteSubject({
+            initialTarget: { type: "connected", id: "agent_connected" },
+          }),
+        );
+
+        await user.click(screen.getByTestId("customize-chip-params"));
+        const line = screen.getByTestId("run-dialog-parameter-line");
+        // The line opens on every declared default, the agent's included.
+        expect(line).toHaveValue("locale=de, model=gpt-5-mini, seats=1");
+
+        await user.clear(line);
+        await user.click(line);
+        const list = await screen.findByTestId(
+          "run-dialog-parameter-line-suggestions",
+        );
+        expect(
+          within(list).getByTestId("parameter-suggestion-key-locale"),
+        ).toHaveTextContent("scenario");
+        expect(
+          within(list).getByTestId("parameter-suggestion-key-model"),
+        ).toHaveTextContent("support-agent · production");
+
+        await user.type(line, "model=");
+        expect(
+          within(
+            await screen.findByTestId("run-dialog-parameter-line-suggestions"),
+          )
+            .getAllByRole("option")
+            .map((option) => option.textContent),
+        ).toEqual(["gpt-5-mini", "gpt-5"]);
+      });
+    });
+
+    describe("when the run is started", () => {
+      /** @scenario "A typed value reaches the run as the declared type" */
+      it("sends a value as the type the agent declares for it", async () => {
+        const user = userEvent.setup();
+        mockAgentsGetAll.mockReturnValue({
+          data: [ONLINE_AGENT, CONNECTED_AGENT],
+        });
+        renderDialog(
+          suiteSubject({
+            initialTarget: { type: "connected", id: "agent_connected" },
+          }),
+        );
+
+        await user.click(screen.getByTestId("customize-chip-params"));
+        const line = screen.getByTestId("run-dialog-parameter-line");
+        await user.clear(line);
+        await user.type(line, "model=007, seats=5");
+
+        await user.click(screen.getByTestId("run-dialog-run"));
+        await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+        expect(mockSuitesRunPlan.mock.calls[0]![0]).toMatchObject({
+          parameters: { model: "007", seats: 5 },
+        });
+      });
+    });
+
+    describe("when two rows are compared", () => {
+      /** @scenario "A compare row offers the options of its own agent" */
+      it("offers each compare row the options of the agent it names", async () => {
+        const user = userEvent.setup();
+        const otherAgent = {
+          ...CONNECTED_AGENT,
+          id: "agent_other",
+          name: "other-agent",
+          parameters: [
+            { name: "model", type: "string" as const, options: ["claude-4"] },
+          ],
+        };
+        mockAgentsGetAll.mockReturnValue({
+          data: [CONNECTED_AGENT, otherAgent],
+        });
+        renderDialog(
+          suiteSubject({
+            initialTarget: { type: "connected", id: "agent_connected" },
+          }),
+        );
+
+        await user.click(screen.getByTestId("customize-chip-compare"));
+        expect(screen.getByTestId("run-dialog-compare-agent-1")).toHaveValue(
+          "agent_other",
+        );
+
+        const second = screen.getByTestId("run-dialog-compare-parameters-1");
+        await user.type(second, "model=");
+        expect(
+          within(
+            await screen.findByTestId(
+              "run-dialog-compare-parameters-1-suggestions",
+            ),
+          )
+            .getAllByRole("option")
+            .map((option) => option.textContent),
+        ).toEqual(["claude-4"]);
+
+        const first = screen.getByTestId("run-dialog-compare-parameters-0");
+        await user.type(first, "model=");
+        expect(
+          within(
+            await screen.findByTestId(
+              "run-dialog-compare-parameters-0-suggestions",
+            ),
+          )
+            .getAllByRole("option")
+            .map((option) => option.textContent),
+        ).toEqual(["gpt-5-mini", "gpt-5"]);
+      });
+    });
+
+    describe("when a value outside the closed list is typed", () => {
+      /** @scenario "A value outside a closed list is refused on the field" */
+      it("reads a refused option under the parameter line, not in the alert", async () => {
+        const user = userEvent.setup();
+        mockAgentsGetAll.mockReturnValue({
+          data: [ONLINE_AGENT, CONNECTED_AGENT],
+        });
+        mockSuitesRunPlan.mockRejectedValue(
+          handledRejection("scenario_parameter_option_invalid", {
+            name: "model",
+            value: "claude",
+            options: ["gpt-5-mini", "gpt-5"],
+          }),
+        );
+        renderDialog(
+          suiteSubject({
+            initialTarget: { type: "connected", id: "agent_connected" },
+          }),
+        );
+
+        await user.click(screen.getByTestId("customize-chip-params"));
+        const line = screen.getByTestId("run-dialog-parameter-line");
+        await user.clear(line);
+        await user.type(line, "model=claude");
+        await user.click(screen.getByTestId("run-dialog-run"));
+
+        const block = screen.getByTestId("run-dialog-parameters");
+        await waitFor(() => expect(block).toHaveTextContent("gpt-5-mini"));
+        expect(block).toHaveTextContent("model");
+        expect(line).toHaveAttribute("aria-invalid", "true");
+        expect(
+          screen.queryByTestId("run-dialog-error"),
+        ).not.toBeInTheDocument();
+
+        // Editing the line takes the refusal away.
+        await user.type(line, "x");
+        expect(line).not.toHaveAttribute("aria-invalid");
+      });
     });
   });
 
@@ -1084,6 +1281,100 @@ describe("<RunDialog/>", () => {
     expect(mockSuitesRunPlan).not.toHaveBeenCalled();
   });
 
+  describe("when a run is queued", () => {
+    /** @scenario "The dialog is gone before the run drawer opens" */
+    it("closes the dialog before it says the run started", async () => {
+      const user = userEvent.setup();
+      const order: string[] = [];
+      const onClose = vi.fn(() => order.push("close"));
+      const onRunStarted = vi.fn(() => order.push("started"));
+      render(
+        <RunDialog
+          subject={suiteSubject({
+            initialTarget: { type: "http", id: "agent_1" },
+          })}
+          onClose={onClose}
+          onRunStarted={onRunStarted}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      await user.click(screen.getByTestId("run-dialog-run"));
+
+      await waitFor(() => expect(onRunStarted).toHaveBeenCalled());
+      expect(order).toEqual(["close", "started"]);
+    });
+  });
+
+  // --- Parameters the chosen agent cannot read ---
+
+  describe("when the run remembers values of a run against another agent", () => {
+    const rememberedOn = (referenceId: string) =>
+      suiteSubject({
+        initialTarget: {
+          type: referenceId === "agent_1" ? "http" : "connected",
+          id: referenceId,
+        },
+        persistedTarget: {
+          type: referenceId === "agent_1" ? "http" : "connected",
+          referenceId,
+          runParameters: { model: "gpt-5-mini", plan: "free" },
+        },
+      });
+
+    /** @scenario "A remembered value the chosen agent cannot read is dropped" */
+    it("drops them and folds the block away when the agent declares none", async () => {
+      mockAgentsGetAll.mockReturnValue({
+        data: [ONLINE_AGENT, CONNECTED_AGENT],
+      });
+      renderDialog(rememberedOn("agent_1"));
+
+      await waitFor(() =>
+        expect(
+          screen.queryByTestId("run-dialog-parameters"),
+        ).not.toBeInTheDocument(),
+      );
+      expect(screen.getByTestId("run-dialog-run")).not.toBeDisabled();
+    });
+
+    /** @scenario "A value the chosen agent declares is kept" */
+    it("keeps them when the agent that declares them is the one chosen", async () => {
+      mockAgentsGetAll.mockReturnValue({
+        data: [ONLINE_AGENT, CONNECTED_AGENT],
+      });
+      renderDialog(rememberedOn("agent_connected"));
+
+      const line = await screen.findByTestId("run-dialog-parameter-line");
+      expect(line).toHaveValue("model=gpt-5-mini, plan=free");
+      expect(screen.getByTestId("run-dialog-run")).not.toBeDisabled();
+    });
+  });
+
+  describe("when a name nothing in the run declares is typed", () => {
+    /** @scenario "A typed value nothing in the run declares is read back" */
+    it("says so under the field, and keeps the value", async () => {
+      const user = userEvent.setup();
+      mockScenariosGetAll.mockReturnValue(
+        casesDeclaring([{ name: "model", defaultValue: "gpt-5" }]),
+      );
+      renderDialog(
+        suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
+      );
+
+      await user.click(screen.getByTestId("customize-chip-params"));
+      const line = screen.getByTestId("run-dialog-parameter-line");
+      await user.click(line);
+      await user.paste(", seats=12");
+
+      expect(
+        await screen.findByText(
+          /seats is not declared by any scenario in this run, and not by prod-agent/,
+        ),
+      ).toBeInTheDocument();
+      expect(line).toHaveValue("model=gpt-5, seats=12");
+    });
+  });
+
   // --- Failure paths ---
 
   /** @scenario "A parameter value the scenarios do not declare is refused by name" */
@@ -1093,6 +1384,7 @@ describe("<RunDialog/>", () => {
       handledRejection("scenario_parameter_unknown", {
         unknownKeys: ["modle"],
         declaredNames: ["model"],
+        targetLabel: "support-agent · production",
       }),
     );
     renderDialog(
@@ -1103,10 +1395,11 @@ describe("<RunDialog/>", () => {
 
     const error = await screen.findByTestId("run-dialog-error");
     expect(error).toHaveTextContent(
-      "No scenario in this run has a parameter by that name",
+      "Nothing in this run declares a parameter by that name",
     );
     expect(error).toHaveTextContent("modle");
     expect(error).toHaveTextContent("model");
+    expect(error).toHaveTextContent("support-agent · production");
   });
 
   /** @scenario "A run refused because every scenario is archived says so in the dialog" */

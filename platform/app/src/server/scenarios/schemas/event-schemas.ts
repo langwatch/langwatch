@@ -65,7 +65,7 @@ const baseScenarioEventSchema = baseEventSchema.extend({
  */
 export const langwatchMetadataSchema = z.object({
   targetReferenceId: z.string(),
-  targetType: z.enum(["prompt", "http", "code", "workflow"]),
+  targetType: z.enum(["prompt", "http", "code", "workflow", "connected"]),
   /**
    * The key the target folds under: the reference id alone, or the reference
    * id and a hash of the target's parameter overrides when it carries any.
@@ -131,6 +131,16 @@ export const langwatchMetadataSchema = z.object({
    */
   actorId: z.string().optional(),
   actorLabel: runActorLabelSchema.optional(),
+  /**
+   * The connected agent instance that served the run, recorded when the run
+   * finished. Absent for every other kind of target, and for a run recorded
+   * before instances were.
+   *
+   * @see specs/scenarios/served-agent-instance-on-runs.feature
+   */
+  agentInstance: z
+    .object({ hostname: z.string(), label: z.string().nullable() })
+    .optional(),
 });
 
 /**

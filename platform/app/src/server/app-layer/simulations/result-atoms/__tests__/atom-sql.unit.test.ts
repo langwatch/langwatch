@@ -93,6 +93,17 @@ describe("buildAtomFilters", () => {
     });
   });
 
+  describe("when the project holds agent test runs", () => {
+    /** @scenario "The results lists leave the agent test batches out" */
+    it("keeps them out of every atom read, inside the dedup scope too", () => {
+      const filters = buildAtomFilters(base);
+
+      expect(filters.stableClause).toContain(
+        "NOT endsWith(ScenarioSetId, '__agent-test')",
+      );
+    });
+  });
+
   describe("when the query dedups a run to its latest version", () => {
     /**
      * StartedAt moves between versions of one run, so a dedup scope bounded

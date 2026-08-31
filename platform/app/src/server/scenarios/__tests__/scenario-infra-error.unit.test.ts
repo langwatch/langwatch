@@ -18,6 +18,7 @@ import {
   isTransportLevelScenarioFailure,
   resolveScenarioError,
   ScenarioInfraErrorCode,
+  scenarioErrorDetail,
   scenarioErrorTitle,
 } from "../scenario-infra-error";
 
@@ -494,6 +495,79 @@ describe("classifyScenarioInfraError", () => {
     });
   });
 
+  describe("when a model answered with no text at all", () => {
+    /** @scenario "A model that answered with no text becomes an empty-response error" */
+    it("names the model that plays the simulated user", () => {
+      const result = classifyScenarioInfraError(
+        "[UserSimulatorAgent] Error: No response content from LLM",
+      );
+      expect(result.code).toBe(ScenarioInfraErrorCode.ModelEmptyResponse);
+      expect(result.message).toContain("plays the simulated user");
+      expect(result.message).toContain("provider accepted the request");
+      expect(result.hint).toContain("Settings > Model Providers");
+      expectNoInternals(result.message);
+    });
+
+    /** @scenario "A judge model that answered with no text names the judge" */
+    it("names the judge model", () => {
+      const result = classifyScenarioInfraError(
+        "[JudgeAgent] Error: No response content from LLM",
+      );
+      expect(result.code).toBe(ScenarioInfraErrorCode.ModelEmptyResponse);
+      expect(result.message).toContain("The judge model");
+    });
+
+    /** @scenario "A model that answered with no text becomes an empty-response error" */
+    it("falls back to the model when no agent is named", () => {
+      const result = classifyScenarioInfraError(
+        "Error: No response content from LLM",
+      );
+      expect(result.code).toBe(ScenarioInfraErrorCode.ModelEmptyResponse);
+      expect(result.message).toContain("The model answered with no text");
+    });
+
+    /** @scenario "A model that answered with no text becomes an empty-response error" */
+    it("classifies the shape the runner actually stores", () => {
+      const raw = JSON.stringify({
+        name: "Error",
+        message: "[UserSimulatorAgent] Error: No response content from LLM",
+        stack:
+          "Error: [UserSimulatorAgent] Error: No response content from LLM\n    at ScenarioExecution.callAgent (/app/node_modules/@langwatch/scenario/dist/index.js:12358:13)",
+      });
+      const result = resolveScenarioError(raw);
+      expect(result.code).toBe(ScenarioInfraErrorCode.ModelEmptyResponse);
+      expectNoInternals(result.message);
+    });
+  });
+
+  describe("when the request never reached the model endpoint", () => {
+    /** @scenario "A request that never reached the model endpoint is named" */
+    it("names the model endpoint rather than the provider", () => {
+      const result = classifyScenarioInfraError(
+        "[UserSimulatorAgent] AI_RetryError: Failed after 3 attempts. Last error: Cannot connect to API: ",
+      );
+      expect(result.code).toBe(ScenarioInfraErrorCode.PlatformUnreachable);
+      expect(result.message).toContain("could not reach the model endpoint");
+      expectNoInternals(result.message);
+    });
+
+    /** @scenario "A cause inside the wrapper still wins" */
+    it("keeps the certificate reason the wrapper carries", () => {
+      const result = classifyScenarioInfraError(
+        "Cannot connect to API: self-signed certificate in certificate chain",
+      );
+      expect(result.code).toBe(ScenarioInfraErrorCode.UntrustedCertificate);
+    });
+
+    /** @scenario "A cause inside the wrapper still wins" */
+    it("keeps the provider reason the wrapper carries", () => {
+      const result = classifyScenarioInfraError(
+        "Cannot connect to API: API key is invalid.",
+      );
+      expect(result.code).toBe(ScenarioInfraErrorCode.ModelProviderError);
+    });
+  });
+
   describe("when multiple failure reasons overlap in the raw error", () => {
     it("prefers the cert reason over the fetch-failed it rides on", () => {
       const raw =
@@ -541,6 +615,25 @@ describe("extractScenarioErrorText", () => {
 
   it("returns a plain string unchanged", () => {
     expect(extractScenarioErrorText("boom")).toBe("boom");
+  });
+
+  describe("when the runner led the message with the adapter class name", () => {
+    /** @scenario "The name of the adapter is dropped from a run failure" */
+    it("drops the name and keeps the sentence behind it", () => {
+      expect(
+        extractScenarioErrorText(
+          "[SerializedConnectedAgentAdapter] ConnectedAgentCallError: boom",
+        ),
+      ).toBe("ConnectedAgentCallError: boom");
+    });
+
+    it("drops it from a serialized error too", () => {
+      const raw = JSON.stringify({
+        name: "Error",
+        message: "[SerializedHttpAgentAdapter] fetch failed",
+      });
+      expect(extractScenarioErrorText(raw)).toBe("fetch failed");
+    });
   });
 });
 
@@ -598,6 +691,127 @@ describe("resolveScenarioError", () => {
 
     expect(result.message).not.toContain("<html");
     expect(result.message).not.toContain("DOCTYPE");
+  });
+});
+
+describe("classifyScenarioInfraError adapter name", () => {
+  describe("when the failure was caught by one of our adapters", () => {
+    /** @scenario "The name of the adapter is dropped from a run failure" */
+    it("classifies it with no adapter name in the message", () => {
+      const result = classifyScenarioInfraError(
+        "[SerializedConnectedAgentAdapter] something the classifier cannot name",
+      );
+
+      expect(result.message).not.toContain("SerializedConnectedAgentAdapter");
+      expect(result.message).toContain("something the classifier cannot name");
+    });
+  });
+});
+
+describe("classifyScenarioInfraError session cap", () => {
+  describe("when an adapter refused a session above the cap", () => {
+    /** @scenario "A refused session reads as a named run error" */
+    it("names the payload code with the sizes, a hint and a title", () => {
+      const result = classifyScenarioInfraError(
+        "Child process exited with code 1: Agent session too large (agent_payload_too_large): the agent returned a session of 70002 bytes, above the limit of 65536 bytes.",
+      );
+
+      expect(result.code).toBe(ScenarioInfraErrorCode.AgentPayloadTooLarge);
+      expect(result.message).toContain("70002 bytes");
+      expect(result.message).toContain("65536 bytes");
+      expect(result.hint).toBeTruthy();
+      expect(scenarioErrorTitle(result.code)).toBe("Agent answer too large");
+    });
+  });
+
+  describe("when the relay refused a connected agent's answer", () => {
+    it("classifies agent_payload_too_large under the same code", () => {
+      const result = classifyScenarioInfraError(
+        "Connected agent call failed (agent_payload_too_large): The result is 20000000 bytes, above the limit of 16777216 bytes.",
+      );
+
+      expect(result.code).toBe(ScenarioInfraErrorCode.AgentPayloadTooLarge);
+      expect(result.hint).toBeTruthy();
+    });
+  });
+
+  describe("when the connected agent's own error reads like a generic failure", () => {
+    it("classifies a handler that timed out as a connected agent failure", () => {
+      const result = classifyScenarioInfraError(
+        "Connected agent call failed (agent_call_failed): the upstream request timed out after 30s",
+      );
+
+      expect(result.code).toBe(ScenarioInfraErrorCode.AgentCallFailed);
+      expect(result.message).toContain("the upstream request timed out");
+    });
+
+    it("classifies a handler that reports an invalid key as a connected agent failure", () => {
+      const result = classifyScenarioInfraError(
+        "Connected agent call failed (agent_call_failed): the API key is invalid for this account",
+      );
+
+      expect(result.code).toBe(ScenarioInfraErrorCode.AgentCallFailed);
+      expect(result.message).toContain("the API key is invalid");
+    });
+
+    it("classifies a handler whose words match the session rule as a connected agent failure", () => {
+      const result = classifyScenarioInfraError(
+        "Connected agent call failed (agent_call_failed): Agent session too large, the agent returned a session of 70002 bytes, above the limit of 65536 bytes.",
+      );
+
+      expect(result.code).toBe(ScenarioInfraErrorCode.AgentCallFailed);
+      expect(result.message).toContain("Agent session too large");
+    });
+  });
+});
+
+describe("scenarioErrorDetail", () => {
+  describe("when the runner recorded a stack", () => {
+    /** @scenario "The stack of a run failure is kept as the detail" */
+    it("answers with the stack the runner recorded", () => {
+      const stack =
+        "Error: boom\n    at ScenarioExecution.callAgent (/app/dist/index.js:1:1)";
+      const detail = scenarioErrorDetail(
+        JSON.stringify({ name: "Error", message: "boom", stack }),
+      );
+      expect(detail).toBe(stack);
+      expect(detail).toContain("\n");
+    });
+  });
+
+  describe("when the runner recorded no stack", () => {
+    it("falls back to the message", () => {
+      expect(
+        scenarioErrorDetail(JSON.stringify({ name: "Error", message: "boom" })),
+      ).toBe("boom");
+    });
+  });
+
+  describe("when the error is an envelope we wrote ourselves", () => {
+    /** @scenario "An envelope we wrote ourselves carries no detail" */
+    it("answers with nothing", () => {
+      const encoded = encodeScenarioError(
+        classifyScenarioInfraError(
+          "self-signed certificate in certificate chain",
+        ),
+      );
+      expect(scenarioErrorDetail(encoded)).toBeUndefined();
+    });
+  });
+
+  describe("when there is no error at all", () => {
+    it("answers with nothing", () => {
+      expect(scenarioErrorDetail("")).toBeUndefined();
+      expect(scenarioErrorDetail(null)).toBeUndefined();
+    });
+  });
+
+  describe("when the error is a plain sentence", () => {
+    it("keeps it as it is", () => {
+      expect(scenarioErrorDetail("Child process exited with code 1")).toBe(
+        "Child process exited with code 1",
+      );
+    });
   });
 });
 

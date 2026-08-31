@@ -42,8 +42,17 @@ export function AgentTestingCaseEditor() {
     [projectId],
   );
 
+  // The registration belongs to this component, which stands for as long as
+  // the page does. Save & Run opens the run drawer, and closing that drawer
+  // clears the callbacks of the flows that ran through it; without
+  // `keepOnClose` this one would go with them and the next Save & Run would
+  // only save.
   useEffect(() => {
-    setFlowCallbacks(CASE_EDITOR_DRAWER, { onSaved: handleSaved });
+    setFlowCallbacks(
+      CASE_EDITOR_DRAWER,
+      { onSaved: handleSaved },
+      { keepOnClose: true },
+    );
     return () => setFlowCallbacks(CASE_EDITOR_DRAWER, {});
   }, [handleSaved]);
 

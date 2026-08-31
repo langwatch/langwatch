@@ -1,0 +1,167 @@
+---
+title: TypeScript Connected Agent Reference
+sidebarTitle: Agent reference
+description: API reference for connectAgent from langwatch/agent, the wrapper that makes a Node handler a LangWatch simulation target, with its options, turn fields, parameter definitions and reply types.
+keywords: langwatch, typescript, sdk, api, reference, connectAgent, agent simulations, connected agent, run parameters
+icon: terminal
+---
+
+## `connectAgent()`
+
+Registers a handler as a simulation target. The SDK opens one outbound connection per process, registers the agent with its name, its environment and its declared parameters, and calls the handler once per conversation turn.
+
+```typescript
+import { z } from "zod";
+import { connectAgent } from "langwatch/agent";
+
+export const supportAgent = connectAgent(
+  {
+    name: "support-agent",
+    environment: process.env.APP_ENV ?? "development",
+    parameters: z.object({
+      model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),
+      plan: z.string().default("free").describe("Customer plan"),
+      maxTools: z.number().int().default(5),
+    }),
+  },
+  async ({ messages, params }) => {
+    // params is typed: { model: "gpt-5" | "gpt-5-mini"; plan: string; maxTools: number }
+    return await runMyAgent(messages, { model: params.model });
+  },
+);
+```
+
+The entry point is Node only, and `zod` declares the run parameters, so a project installs `langwatch zod`. `connectAgent` returns the handler, so `supportAgent({ messages })` calls it directly and a unit test needs no connection. The returned function also exposes `.disconnect()`, which closes the connection and drops the agent from the presence list.
+
+The process connects only with an API key. The SDK reads `LANGWATCH_API_KEY` from the environment, logs one line when it is absent, and lets the process run.
+
+### `ConnectAgentOptions`
+
+| Option | Type | Default | Effect |
+|---|---|---|---|
+| `name` | `string` | required | The agent's name, and the first half of a `connected:<name>@<environment>` target. |
+| `environment` | `string` | resolved, see below | The environment row this process registers under. |
+| `description` | `string` | none | One line about the agent, shown on the agents page. |
+| `parameters` | zod schema, definition map or JSON Schema | none | What the agent accepts from a run. |
+| `enabled` | `boolean` | `true`, `false` when `CI` is set | Whether this process connects. |
+| `instanceLabel` | `string` | none | A name for this instance in the instances table. |
+| `timeoutMs` | `number` | `120000` | Milliseconds one call may take. The ceiling is `300000`. |
+| `concurrency` | `number` | `1` in `development`, `4` elsewhere | Calls this instance takes at the same time. |
+| `sticky` | `boolean` | `false` | Keep every turn of one conversation on one instance. |
+| `apiKey` | `string` | `LANGWATCH_API_KEY` | The key the connection authenticates with. |
+| `endpoint` | `string` | `LANGWATCH_ENDPOINT` | The LangWatch instance to connect to. |
+| `projectId` | `string` | none | The project, for a key that covers more than one. |
+| `transport` | `"websocket" \| "http"` | `websocket` | See [Transport](#transport). |
+
+### Environment resolution
+
+`environment`, then `LANGWATCH_AGENT_ENVIRONMENT`, then `APP_ENV`, `ENVIRONMENT` and `NODE_ENV`, then `development`.
+
+`development` makes the agent personal: it belongs to the API key's owner when the key is personal, and to the machine when the key is a project key. Every other name is shared by the project. See [Environments and personal agents](/agent-testing/environments).
+
+### The handler argument
+
+The handler receives one object.
+
+| Field | Type | Value |
+|---|---|---|
+| `messages` | `Message[]` | The whole conversation so far, as OpenAI-style messages |
+| `newMessages` | `Message[]` | The messages added since the previous turn |
+| `threadId` | `string` | The platform's conversation id, the same on every turn of one run |
+| `session` | `unknown` | What the handler returned as `session` on the previous turn, `undefined` on the first |
+| `params` | typed from `parameters` | The run's values for the declared parameters |
+| `traceId` | `string` | The id of the turn's trace |
+
+### `parameters`
+
+Three forms, all of which reach the platform as the same declaration.
+
+**A zod schema**, the form the example above uses. `params` is typed from it:
+
+```typescript
+parameters: z.object({
+  model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),
+  plan: z.string().default("free").describe("Customer plan"),
+  maxTools: z.number().int().default(5),
+})
+```
+
+| In the schema | Effect |
+|---|---|
+| `z.enum([...])` | A closed list of allowed values, up to 50. A value outside it is refused. |
+| `.default(value)` | The default the run dialog prefills |
+| `.describe(text)` | Shown beside the field in the run dialog |
+| `z.string()`, `z.number()`, `z.boolean()` | The parameter's type |
+
+Give every property a default, or the run must supply a value for it. Keep the schema flat and scalar: nested objects and arrays are not run parameters.
+
+Pass the schema object itself, never `schema["~standard"].jsonSchema` and never a validator instance. The SDK reads the JSON Schema converter the object carries under `"~standard"`, so valibot, arktype and any other Standard Schema library work the same way, and the SDK imports none of them.
+
+**A definition map**, for a project with no schema library:
+
+```typescript
+parameters: {
+  model: { options: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" },
+  plan: { default: "free", description: "Customer plan" },
+  maxTools: { type: "number", default: 5 },
+}
+```
+
+| Field | Type | Effect |
+|---|---|---|
+| `type` | `"string" \| "number" \| "boolean"` | The parameter's type. Read from `default` when absent. |
+| `default` | scalar | The default the run dialog prefills |
+| `options` | scalar array | A closed list of allowed values, up to 50 |
+| `description` | `string` | Shown beside the field in the run dialog |
+
+**A plain JSON Schema object**, `{ type: "object", properties: { ... } }`.
+
+Values arrive validated against the declaration. A value the declaration refuses fails the call with `agent_parameter_invalid` before the handler runs. A parameter the run did not supply arrives as its default; one with no default that the run did not supply fails the call with the name in the message.
+
+### Return values
+
+| Return | Meaning |
+|---|---|
+| `string` | The reply text |
+| `Message` | One message |
+| `Message[]` | Several messages |
+| `{ output, session }` | A reply plus the session value for the next turn |
+
+`session` is an opaque JSON value the platform echoes on the next turn of the same conversation, up to 64 kilobytes.
+
+### Lifecycle
+
+The connection starts on the next tick after the first `connectAgent` call, once per process, and one connection carries every agent the process declares. It uses the global `WebSocket` when the runtime has one and the `ws` package otherwise. While connected, it keeps the event loop alive, so `node agent.ts` serves until Ctrl-C.
+
+SIGINT, SIGTERM and normal exit send a deregistration, so the agent reads Offline at once. A dropped connection is retried with a growing wait, from 1 second to 30 seconds.
+
+### Transport
+
+The connection is an outbound WebSocket by default. On a network that blocks WebSockets, the same frames travel over HTTP long polling: the SDK posts the registration, waits on a request for the next turn, and posts each answer, through the global `fetch` of Node 20 or later. Pass `transport: "http"` or set `LANGWATCH_AGENT_TRANSPORT=http` to use it from the start. With the default transport, a proxy that answers the WebSocket upgrade with an HTTP status makes the SDK switch to HTTP on its own, with one warning line that names the status. The `ws` package is what reports that status; the global `WebSocket` cannot, so on a runtime without `ws` set the transport explicitly.
+
+### Environment variables
+
+| Variable | Effect |
+|---|---|
+| `LANGWATCH_API_KEY` | The project key. Without it, the process does not connect. |
+| `LANGWATCH_ENDPOINT` | The LangWatch instance, for a self-hosted deployment. |
+| `LANGWATCH_PROJECT_ID` | The project, for a key that covers more than one. |
+| `LANGWATCH_AGENT_ENVIRONMENT` | The environment to register under. |
+| `LANGWATCH_AGENT_CONNECT` | `0` or `false` stops this process from connecting. |
+| `LANGWATCH_AGENT_INSTANCE_LABEL` | The instance name shown in the instances table. |
+| `LANGWATCH_AGENT_TRANSPORT` | `http` uses HTTP long polling instead of the WebSocket. |
+
+### Errors
+
+A failing call answers with a typed code rather than a stack trace. `agent_offline`, `agent_owner_only`, `agent_call_timeout`, `agent_call_failed`, `agent_disconnected`, `agent_instance_lost`, `agent_busy`, `agent_parameter_invalid`, `agent_register_refused`, `agent_payload_too_large`.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Connect your agent" icon="plug" href="/agent-testing/connect-your-agent">
+    The three-step guide, with the session and parameter recipes
+  </Card>
+  <Card title="TypeScript SDK reference" icon="terminal" href="/integration/typescript/reference">
+    Setup, tracing, spans and prompt management
+  </Card>
+</CardGroup>

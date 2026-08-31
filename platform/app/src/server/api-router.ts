@@ -8,6 +8,7 @@ import { app as webhooksApp } from "@ee/scim/webhooks";
 import { Hono } from "hono";
 import { app as adminApp } from "../../ee/admin/routes/admin";
 import { app as agentCacheApp } from "../app/api/agent-cache/[[...route]]/app";
+import { app as agentsAliasApp } from "../app/api/agents/[[...route]]/alias";
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
 import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";
@@ -114,7 +115,8 @@ export function createApiRouter() {
   api.route("/", workflowsApp); // /api/workflows/code-completion, /post_event
   api.route("/", healthChecksApp); // /api/health/collector, /evaluations, etc.
 
-  api.route("/", agentsApp);
+  api.route("/", agentsApp); // /api/v1/agents, connect and call included
+  api.route("/", agentsAliasApp); // deprecated alias: /api/agents
   api.route("/", analyticsApp);
   api.route("/", analyticsSqlApp); // /api/v1/projects/:projectId/analytics/* — governed SQL
   api.route("/", copilotKitApp);

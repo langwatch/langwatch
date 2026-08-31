@@ -17,6 +17,7 @@ import { handleExperimentResults } from "./tools/get-experiment-results.js";
 import { handleExperimentListRuns } from "./tools/list-experiment-runs.js";
 import { handleExperimentList } from "./tools/list-experiments.js";
 import { handleRunExperiment, handleExperimentStatus } from "./tools/run-experiment.js";
+import { handleTestAgent } from "./tools/test-agent.js";
 
 const modelSchema = z
   .string()
@@ -1146,7 +1147,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_list_agents",
-    "List all agents in the LangWatch project with their names, types, and IDs.",
+    "List all agents in the LangWatch project with their names, types and IDs. A connected agent (one that registered itself from code with connectAgent or connect_agent) also shows its environment, whether it is online, how many instances are connected, and its owner.",
     {},
     withToolLogging("platform_list_agents", async () => {
       requireApiKey();
@@ -1159,7 +1160,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_get_agent",
-    "Get detailed information about a specific agent by its ID, including its configuration.",
+    "Get detailed information about a specific agent by its ID, including its configuration. A connected agent also shows its environment, status, the run parameters it declared (with options and defaults) and the instances connected right now.",
     {
       id: z.string().describe("The agent ID"),
     },
@@ -1174,7 +1175,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_create_agent",
-    "Create a new agent. Supported types: 'signature' (LLM prompt), 'code' (Python), 'workflow' (sub-workflow), 'http' (external API).",
+    "Create a new agent. Supported types: 'signature' (LLM prompt), 'code' (Python), 'workflow' (sub-workflow), 'http' (external API). A 'connected' agent is not created here: it registers itself from code, with connectAgent from langwatch/agent in TypeScript or langwatch.connect_agent in Python, and appears in the list once that process runs.",
     {
       name: z.string().describe("Agent name"),
       type: z.enum(["signature", "code", "workflow", "http"]).describe("Agent type"),
@@ -1226,16 +1227,47 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_run_agent",
-    "Execute an agent with JSON input. HTTP agents call their configured URL directly; workflow-linked agents execute via the workflow engine.",
+    "Run one turn of an agent. A connected agent runs through the platform relay on a live instance: give `message` (one user turn) or `input` with a `messages` list, plus `parameters` and `threadId` to continue a conversation. HTTP agents call their configured URL directly; workflow-linked agents execute via the workflow engine.",
     {
       id: z.string().describe("The agent ID to run"),
-      input: z.string().optional().describe("Input data as a JSON object string"),
+      input: z
+        .string()
+        .optional()
+        .describe(
+          "Input data as a JSON object string. For a connected agent it is the relay body: messages (OpenAI style), and optionally threadId, session and params.",
+        ),
+      message: z
+        .string()
+        .optional()
+        .describe("One user message to send to a connected agent, instead of input"),
+      parameters: z
+        .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+        .optional()
+        .describe("Run parameter values for a connected agent, by name"),
+      threadId: z
+        .string()
+        .optional()
+        .describe("Continue a conversation on a connected agent"),
     },
     withToolLogging("platform_run_agent", async (params) => {
       requireApiKey();
       const { handleRunAgent } = await import("./tools/run-agent.js");
       return {
         content: [{ type: "text", text: await handleRunAgent(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_test_agent",
+    "Test an agent with one scripted scenario run: the user sends \"ping\", the agent answers, and the run succeeds when the answer arrives. No model is used, and no scenario, run plan or test suite is added to the project. Answers at once with the scenario run id to follow with platform_get_simulation_run; the run itself is asynchronous.",
+    {
+      id: z.string().describe("The agent ID to test"),
+    },
+    withToolLogging("platform_test_agent", async (params) => {
+      requireApiKey();
+      return {
+        content: [{ type: "text", text: await handleTestAgent(params) }],
       };
     })
   );

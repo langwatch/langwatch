@@ -75,6 +75,7 @@ const generateSpecs: typeof generateSpecsUnpinned = async (hono, options, c) =>
 const APP_DERIVED_PREFIXES = [
   "/api/agent-cache",
   "/api/agents",
+  "/api/v1/agents",
   "/api/api-keys",
   "/api/analytics",
   "/api/coding-agent",

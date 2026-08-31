@@ -97,6 +97,14 @@ Feature: The Agent Testing page
     Then "Agent Testing" is on the far left again
 
   @integration
+  Scenario: A long run plan name stays on one line
+    Given the Agent Testing page is open on a run plan with a long name
+    When the header is read
+    Then the name is cut with an ellipsis rather than wrapped
+    And the full name reads on hover
+    And what the plan is still reads in full beside it
+
+  @integration
   Scenario: Each tab name carries how many rows it holds
     Given the Agent Testing page is open
     When the header is read
@@ -158,11 +166,31 @@ Feature: The Agent Testing page
     And the streaming run keeps updating
 
   @integration
-  Scenario: Old simulations addresses keep working
+  Scenario: A saved simulations address opens in Agent Testing when the flag is on
     Given the Agent Testing release flag is on
     When a saved simulations address is opened
+    Then the person is sent to the Agent Testing address that shows the same thing
+    And the v1 page is not shown, not even for a frame
+
+  @integration
+  Scenario: A saved simulations address opens as it did when the flag is off
+    Given the Agent Testing release flag is off
+    When a saved simulations address is opened
     Then the v1 page opens as it did before
-    And no redirect to Agent Testing happens
+
+  @unit
+  Scenario: Every simulations address has an Agent Testing address
+    Given a simulations address for the run history, the scenario library, a run plan, a run set, a batch or one run
+    When it is read as an Agent Testing address
+    Then the same plan, set, batch or run is what opens
+    And the period, the grouping, an open drawer and the tab key of a handoff travel with it
+
+  @unit
+  Scenario: The addresses the platform hands out name the interface the project reads
+    Given the scenario library, the CLI, the MCP server and Langy ask the platform for the address of a run set, a batch, a run, a scenario or a run plan
+    When the project reads Agent Testing
+    Then the address is under /agent-testing
+    And when the project reads the Simulations pages the address is under /simulations
 
   # --- Empty project ---
 

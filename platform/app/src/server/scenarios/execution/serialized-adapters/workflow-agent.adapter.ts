@@ -20,11 +20,12 @@
 
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
-import { AgentAdapter, AgentRole } from "@langwatch/scenario";
+import { AgentRole } from "@langwatch/scenario";
 import { randomBytes } from "crypto";
 import type { RunParameterValues } from "../../parameters";
 import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { WorkflowAgentData } from "../types";
+import { SerializedAgentAdapter } from "./serialized-agent.adapter";
 
 /** Timeout for NLP service requests (2 minutes) — matches code adapter. */
 const NLP_FETCH_TIMEOUT_MS = 120_000;
@@ -33,7 +34,7 @@ const NLP_FETCH_TIMEOUT_MS = 120_000;
  * Serialized workflow agent adapter that uses pre-fetched workflow DSL.
  * Sends execute_flow events to the NLP service. No database access required.
  */
-export class SerializedWorkflowAgentAdapter extends AgentAdapter {
+export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
   role = AgentRole.AGENT;
 
   private readonly config: WorkflowAgentData;

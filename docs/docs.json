@@ -113,9 +113,10 @@
                 "pages": [
                   "agent-testing/connect-your-agent",
                   "agent-testing/targets",
-                  "agent-testing/local-development",
+                  "agent-testing/environments",
                   "agent-testing/linking-your-traces",
-                  "agent-testing/authenticated-agents"
+                  "agent-testing/authenticated-agents",
+                  "agent-testing/other-ways-to-connect"
                 ]
               },
               {
@@ -336,6 +337,7 @@
                 "pages": [
                   "integration/python/guide",
                   "integration/python/reference",
+                  "integration/python/agent-reference",
                   "integration/python/tutorials/manual-instrumentation",
                   "integration/python/tutorials/open-telemetry"
                 ]
@@ -346,6 +348,7 @@
                 "pages": [
                   "integration/typescript/guide",
                   "integration/typescript/reference",
+                  "integration/typescript/agent-reference",
                   "integration/typescript/tutorials/filtering-spans",
                   "integration/typescript/tutorials/manual-instrumentation",
                   "integration/typescript/tutorials/opentelemetry-migration",
@@ -1318,10 +1321,15 @@
             "pages": [
               "api-reference/agents/overview",
               "api-reference/agents/list-agents",
+              "api-reference/agents/list-poll",
               "api-reference/agents/create-agents",
+              "api-reference/agents/create-frames",
+              "api-reference/agents/create-register",
               "api-reference/agents/get-agents",
               "api-reference/agents/update-agents",
               "api-reference/agents/put-update-agents",
+              "api-reference/agents/action-call",
+              "api-reference/agents/action-test",
               "api-reference/agents/delete-agents"
             ]
           },
@@ -1778,6 +1786,10 @@
       "destination": "/self-hosting/deployment/docker-compose"
     },
     {
+      "source": "/agent-simulations/local-development",
+      "destination": "/agent-testing/other-ways-to-connect"
+    },
+    {
       "source": "/agent-simulations/overview",
       "destination": "/agent-testing/overview"
     },
@@ -1996,10 +2008,6 @@
     {
       "source": "/agent-simulations/connect-your-agent",
       "destination": "/agent-testing/connect-your-agent"
-    },
-    {
-      "source": "/agent-simulations/local-development",
-      "destination": "/agent-testing/local-development"
     },
     {
       "source": "/agent-simulations/authenticated-agents",

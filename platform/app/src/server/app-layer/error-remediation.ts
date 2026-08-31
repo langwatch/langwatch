@@ -334,6 +334,106 @@ const registry = {
     docsPath: "/agent-testing/authenticated-agents",
   },
 
+  // ---- connected agents ----
+  agent_register_only: {
+    tips: [
+      "A connected agent is created and updated by the SDK when the decorated function's process starts; change the code and start the process again",
+      "This API can archive the agent; every other field is the SDK's to write",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  agent_test_refused: {
+    tips: [
+      "A test run sends the agent one message and waits for its answer; it needs an HTTP, code, workflow or connected agent whose configuration is complete",
+      "Open the agent, fix what the message names, save it and test again",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  scenario_parameter_option_invalid: {
+    tips: [
+      "A parameter with options accepts only the values it lists; pick one of them for this run",
+      "To accept another value, widen the options on the scenario, or on the decorated function of a connected agent",
+    ],
+    docsPath: "/agent-testing/run-parameters",
+  },
+  agent_not_found: {
+    tips: [
+      "List the project's agents with `langwatch agent list` and use an id from that list",
+      "An archived agent is not found; a connected agent that registers again restores its row",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  agent_offline: {
+    tips: [
+      "Start the process that runs the decorated function; the agent shows Online in the agents list once it connects",
+      "Check that the process connects with the same project and environment as the agent you are running against",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  agent_owner_only: {
+    tips: [
+      "A development agent registered with a personal key belongs to that person; connect your own process to get your own copy",
+      "To share one development agent with the team, register it with a project key or name its environment, for example dev-shared",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  agent_call_timeout: {
+    tips: [
+      "Raise the agent's timeout, up to the platform cap of 300 seconds",
+      "Check the agent logs for the turn that did not finish",
+    ],
+  },
+  agent_call_failed: {
+    tips: [
+      "Fix the error the function raised, then test again; the process logs carry the stack",
+    ],
+  },
+  agent_disconnected: {
+    tips: [
+      "The turn is never sent again once the call reached the process, since the function may have side effects; start the process again and run again",
+    ],
+  },
+  agent_instance_lost: {
+    tips: [
+      "A sticky agent pins each conversation to one instance; when that instance is gone the conversation fails rather than moving to another one",
+      "Set `sticky` to false if the agent keeps no local state per conversation",
+    ],
+  },
+  agent_busy: {
+    tips: [
+      "Wait `meta.retryAfterMs` milliseconds and send the call again",
+      "Raise `concurrency` on the decorated function, or connect more instances",
+    ],
+  },
+  agent_parameter_invalid: {
+    tips: [
+      "Parameter names start with a letter or underscore and hold only letters, digits and underscores",
+      "Declare at most 20 parameters and at most 50 options per parameter",
+      "A secret is declared on the scenario, never on the agent",
+    ],
+    docsPath: "/agent-testing/run-parameters",
+  },
+  agent_register_refused: {
+    tips: [
+      "Read `meta.reason`: api_key_invalid, project_required, permission_denied, key_type_not_allowed, replica_count_unsupported, parameters_invalid or environment_invalid",
+      "The key needs `scenarios:manage`; an ingestion key or a Langy session key can never connect",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  agent_session_unknown: {
+    tips: [
+      "Post a new register frame to /api/v1/agents/connect/register and use the instance token it answers with",
+      "A session expires five minutes after its last poll",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  agent_payload_too_large: {
+    tips: [
+      "Read `meta.what` and `meta.limitBytes`, and `meta.sizeBytes` when the payload was measured",
+      "On a self-hosted deployment raise the cap with LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB",
+    ],
+  },
+
   // ---- agent dev tunnel ----
   agent_dev_tunnel_unreachable: {
     tips: [

@@ -15,8 +15,9 @@
  * @see specs/suites/test-suite-run-plan-reuse.feature
  */
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
+import { OpenListContext } from "../shared/OpenListContext";
 import { RunDialogFields } from "./RunDialogFields";
 import { RunDialogFooter } from "./RunDialogFooter";
 import { isNoteTooLong } from "./RunNoteField";
@@ -27,7 +28,6 @@ import {
   useRunDialogSubmit,
 } from "./useRunDialogSubmit";
 
-export { PARAMETER_LINE_PLACEHOLDER } from "./RunParametersSection";
 export type {
   RunDialogProps,
   RunDialogSubject,
@@ -90,11 +90,57 @@ function runBlockedReason({
   return null;
 }
 
+/**
+ * Gives back the set it received when the id is already on the side it asks
+ * for, so the state setter sees the same value and the dialog does not
+ * re-render on a report that changes nothing.
+ */
+function withOpenList({
+  current,
+  id,
+  isOpen,
+}: {
+  current: ReadonlySet<string>;
+  id: string;
+  isOpen: boolean;
+}): ReadonlySet<string> {
+  if (current.has(id) === isOpen) return current;
+  const next = new Set(current);
+  if (isOpen) next.add(id);
+  else next.delete(id);
+  return next;
+}
+
+function RunDialogHeader({ subject }: { subject: RunDialogSubject }) {
+  return (
+    <Dialog.Header
+      borderBottomWidth="1px"
+      borderColor="border"
+      paddingX={5}
+      paddingY={3.5}
+      display="block"
+    >
+      <Dialog.Title fontSize="14px" fontWeight="semibold">
+        {dialogTitle(subject)}
+      </Dialog.Title>
+      <Dialog.CloseTrigger />
+    </Dialog.Header>
+  );
+}
+
 export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
   // Escape belongs to the run name list while that list is open. The dialog's
   // own Escape handling listens on the document in the capture phase, so it
   // runs before the field can stop the key and has to be turned off instead.
   const [isNameListOpen, setIsNameListOpen] = useState(false);
+  // The parameter fields report their lists the same way, by id.
+  const [openLists, setOpenLists] = useState<ReadonlySet<string>>(new Set());
+  const reportOpenList = useCallback(
+    ({ id, isOpen }: { id: string; isOpen: boolean }) => {
+      setOpenLists((current) => withOpenList({ current, id, isOpen }));
+    },
+    [],
+  );
   const form = useRunDialogForm(subject);
   const controller = useRunDialogSubmit({
     subject,
@@ -113,6 +159,7 @@ export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
     onRunStarted,
     onClose,
     setInlineError: form.setInlineError,
+    setParameterError: form.setParameterError,
     setMissingProvider: form.setMissingProvider,
   });
 
@@ -125,7 +172,7 @@ export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
         if (!open && !controller.isBusy) onClose();
       }}
       placement="center"
-      closeOnEscape={!isNameListOpen}
+      closeOnEscape={!isNameListOpen && openLists.size === 0}
     >
       <Dialog.Content
         bg="bg.panel"
@@ -133,29 +180,20 @@ export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
         onClick={(event) => event.stopPropagation()}
         data-testid={subject.kind === "case" ? "run-case-dialog" : "run-dialog"}
       >
-        <Dialog.Header
-          borderBottomWidth="1px"
-          borderColor="border"
-          paddingX={5}
-          paddingY={3.5}
-          display="block"
-        >
-          <Dialog.Title fontSize="14px" fontWeight="semibold">
-            {dialogTitle(subject)}
-          </Dialog.Title>
-          <Dialog.CloseTrigger />
-        </Dialog.Header>
+        <RunDialogHeader subject={subject} />
         <Dialog.Body
           paddingX={5}
           paddingY={4}
           maxHeight="58vh"
           overflowY="auto"
         >
-          <RunDialogFields
-            form={form}
-            isBusy={controller.isBusy}
-            onNameListOpenChange={setIsNameListOpen}
-          />
+          <OpenListContext.Provider value={reportOpenList}>
+            <RunDialogFields
+              form={form}
+              isBusy={controller.isBusy}
+              onNameListOpenChange={setIsNameListOpen}
+            />
+          </OpenListContext.Provider>
         </Dialog.Body>
         <RunDialogFooter
           controller={controller}

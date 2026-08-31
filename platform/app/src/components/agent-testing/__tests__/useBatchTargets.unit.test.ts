@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import type { TargetIdentity } from "~/hooks/useTargetNameMap";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { targetKeyOf } from "~/server/suites/target-key";
@@ -16,9 +17,20 @@ import {
 } from "../results/useBatchTargets";
 import { TARGET_COLORS } from "../shared/target-colors";
 
-const NAMES = new Map([
-  ["agent_dev", "dev-agent"],
-  ["agent_prod", "prod-agent"],
+const NAMES = new Map<string, TargetIdentity>([
+  [
+    "agent_dev",
+    {
+      name: "dev-agent",
+      kind: "connected",
+      environment: null,
+      ownerName: null,
+    },
+  ],
+  [
+    "agent_prod",
+    { name: "prod-agent", kind: "http", environment: null, ownerName: null },
+  ],
 ]);
 
 /** One run against a target, with the overrides the platform stamped on it. */
@@ -70,7 +82,7 @@ describe("batchTargetsOf()", () => {
             parameters: { model: "a" },
           }),
         ],
-        targetNameMap: NAMES,
+        targetIdentities: NAMES,
       });
 
       expect(targets.map((target) => target.label)).toEqual([
@@ -99,7 +111,7 @@ describe("batchTargetsOf()", () => {
           }),
           runAgainst({ scenarioRunId: "r2", referenceId: "agent_prod" }),
         ],
-        targetNameMap: NAMES,
+        targetIdentities: NAMES,
       });
 
       expect(targets.map((target) => target.label)).toEqual([
@@ -128,7 +140,7 @@ describe("batchTargetsOf()", () => {
             parameters: { locale: "de", model: "b" },
           }),
         ],
-        targetNameMap: NAMES,
+        targetIdentities: NAMES,
       });
 
       expect(targets.map((target) => target.label)).toEqual([
@@ -156,7 +168,7 @@ describe("batchTargetsOf()", () => {
           }),
           runAgainst({ scenarioRunId: "r3", referenceId: "agent_prod" }),
         ],
-        targetNameMap: NAMES,
+        targetIdentities: NAMES,
       });
 
       expect(targets.map((target) => target.shortLabel)).toEqual([
@@ -175,7 +187,7 @@ describe("batchTargetsOf()", () => {
 
       const targets = batchTargetsOf({
         scenarioRuns: [old, { ...old, scenarioRunId: "r2" }],
-        targetNameMap: NAMES,
+        targetIdentities: NAMES,
       });
 
       expect(targets).toHaveLength(1);
@@ -200,7 +212,7 @@ describe("batchTargetsOf()", () => {
             metadata: null,
           },
         ],
-        targetNameMap: NAMES,
+        targetIdentities: NAMES,
       });
 
       expect(targets).toHaveLength(1);
@@ -224,7 +236,7 @@ describe("summaryOfTarget()", () => {
       ];
       const [dev, prod] = batchTargetsOf({
         scenarioRuns,
-        targetNameMap: NAMES,
+        targetIdentities: NAMES,
       });
 
       expect(runsOfTarget({ scenarioRuns, target: dev! })).toHaveLength(2);

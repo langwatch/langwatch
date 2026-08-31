@@ -24,6 +24,9 @@ import { SimulationModelSelect } from "~/components/scenarios/SimulationModelSel
 import { Drawer } from "~/components/ui/drawer";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { TagList } from "~/components/ui/TagList";
+import { ParameterLineField } from "../run/ParameterLineField";
+import { parameterPlaceholder } from "../run/parameter-suggestions";
+import { useAgentDeclaredParameters } from "../run/useAgentDeclaredParameters";
 import { CustomizeChips } from "../shared/CustomizeChips";
 import { DIALOG_FIELD_STYLE, FieldLabel } from "../shared/DialogFields";
 import { FG_MUTED } from "../shared/design";
@@ -204,7 +207,13 @@ function SituationAndCriteria({
   );
 }
 
-/** The declared parameters of the scenario, as one `name=value` line. */
+/**
+ * The declared parameters of the scenario, as one `name=value` line.
+ *
+ * The line offers what the agents of the project declare, so a scenario can
+ * name an agent's parameter and pick one of its options without opening the
+ * agent.
+ */
 function ParametersBlock({
   draft,
   setDraft,
@@ -214,6 +223,8 @@ function ParametersBlock({
   setDraft: (update: Partial<CaseDraft>) => void;
   onRemove: () => void;
 }) {
+  const definitions = useAgentDeclaredParameters();
+
   return (
     <Box data-testid="case-parameters-block">
       <FieldLabel>
@@ -227,14 +238,13 @@ function ParametersBlock({
         />
         <RemoveBlockButton label="Remove the parameters" onClick={onRemove} />
       </FieldLabel>
-      <Input
-        {...DIALOG_FIELD_STYLE}
-        fontFamily="mono"
-        fontSize="12px"
-        aria-label="Parameters"
-        placeholder="customer_plan=free, locale=de"
+      <ParameterLineField
+        ariaLabel="Parameters"
+        placeholder={parameterPlaceholder(definitions)}
         value={draft.parameters}
-        onChange={(event) => setDraft({ parameters: event.target.value })}
+        onChange={(parameters) => setDraft({ parameters })}
+        definitions={definitions}
+        testId="case-parameters-line"
       />
     </Box>
   );

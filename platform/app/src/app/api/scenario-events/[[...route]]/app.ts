@@ -20,6 +20,11 @@ import {
 import { extractInlineMediaFromEvent } from "~/server/stored-objects/content-extractor";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import {
+  batchRunPath,
+  readTestingInterface,
+  scenarioSetPath,
+} from "~/server/suites/platform-path";
+import {
   encodeContent,
   encodeEnd,
   encodeStart,
@@ -123,10 +128,6 @@ secured.access(requires("scenarios:create")).post(
       await broadcastStreamingEvent(project.id, event);
     }
 
-    const path = `/${project.slug}/simulations/${
-      event.scenarioSetId || DEFAULT_SET_ID
-    }`;
-
     const base = process.env.BASE_HOST;
 
     if (!base) {
@@ -137,7 +138,17 @@ secured.access(requires("scenarios:create")).post(
       return c.json({ success: false }, 500);
     }
 
-    const url = `${base}${path}`;
+    // The scenario library appends the batch run id to this and prints it as
+    // the address to follow the run at, so it names the interface the project
+    // reads.
+    const ui = await readTestingInterface({
+      projectId: project.id,
+      organizationId: c.get("apiKeyOrganizationId"),
+    });
+    const url = `${base}/${project.slug}${scenarioSetPath({
+      ui,
+      scenarioSetId: event.scenarioSetId || DEFAULT_SET_ID,
+    })}`;
 
     return c.json({ success: true, url }, 201);
   },
@@ -191,12 +202,19 @@ secured.access(requires("scenarios:create")).post(
     }
 
     // Built server-side from ids rather than accepted as a URL: a handoff can
-    // only ever point a browser at this instance's own simulations page. The
-    // ids are caller-supplied and only length-bounded, so they are encoded — a
-    // `#` or `?` in one would otherwise truncate the rest of the path.
-    const url = `${base}/${project.slug}/simulations/${encodeURIComponent(
-      scenarioSetId || DEFAULT_SET_ID,
-    )}/${encodeURIComponent(batchRunId)}`;
+    // only ever point a browser at this instance's own page for the run, in
+    // the interface the project reads. The ids are caller-supplied and only
+    // length-bounded, so they are encoded: a `#` or `?` in one would otherwise
+    // truncate the rest of the path.
+    const ui = await readTestingInterface({
+      projectId: project.id,
+      organizationId: c.get("apiKeyOrganizationId"),
+    });
+    const url = `${base}/${project.slug}${batchRunPath({
+      ui,
+      scenarioSetId: scenarioSetId || DEFAULT_SET_ID,
+      batchRunId,
+    })}`;
 
     const hasLiveTab = await scenarioTabRegistry.hasLiveTab({
       projectId: project.id,

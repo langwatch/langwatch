@@ -13,12 +13,12 @@ Classified: 76
 | specs/agents/agents-rest-api.feature | "Create an agent requires a name" | DUPLICATE | Already covered by `agents-rest-api.integration.test.ts` ("returns 422 when name is missing") |
 | specs/agents/agents-rest-api.feature | "Create an agent requires a type" | DUPLICATE | Already covered by `agents-rest-api.integration.test.ts` ("returns 422 when type is missing") |
 | specs/agents/agents-rest-api.feature | "Get an agent by id" | DUPLICATE | Already covered by `agents-rest-api.integration.test.ts` ("returns agent details by id") |
-| specs/agents/agents-rest-api.feature | "Get agent returns 404 for non-existent id" | DUPLICATE | Already covered by `agents-rest-api.integration.test.ts` ("returns 404 for non-existent agent") under GET /api/agents/:id |
+| specs/agents/agents-rest-api.feature | "Get agent returns 404 for non-existent id" | DUPLICATE | Already covered by `agents-rest-api.integration.test.ts` ("returns 404 for non-existent agent") under GET /api/v1/agents/:id |
 | specs/agents/agents-rest-api.feature | "Update an agent name" | DUPLICATE | Already covered by `agents-rest-api.integration.test.ts` ("updates agent name") |
 | specs/agents/agents-rest-api.feature | "Update an agent config" | DUPLICATE | Already covered by `agents-rest-api.integration.test.ts` ("updates agent config") |
-| specs/agents/agents-rest-api.feature | "Update a non-existent agent returns 404" | DUPLICATE | Already covered by `agents-rest-api.integration.test.ts` ("returns 404 for non-existent agent") under PATCH /api/agents/:id |
+| specs/agents/agents-rest-api.feature | "Update a non-existent agent returns 404" | DUPLICATE | Already covered by `agents-rest-api.integration.test.ts` ("returns 404 for non-existent agent") under PATCH /api/v1/agents/:id |
 | specs/agents/agents-rest-api.feature | "Delete an agent archives it" | DUPLICATE | Already covered by `agents-rest-api.integration.test.ts` ("archives the agent and returns archivedAt", "makes the agent inaccessible via GET after deletion") |
-| specs/agents/agents-rest-api.feature | "Delete a non-existent agent returns 404" | DUPLICATE | Already covered by `agents-rest-api.integration.test.ts` ("returns 404 for non-existent agent") under DELETE /api/agents/:id |
+| specs/agents/agents-rest-api.feature | "Delete a non-existent agent returns 404" | DUPLICATE | Already covered by `agents-rest-api.integration.test.ts` ("returns 404 for non-existent agent") under DELETE /api/v1/agents/:id |
 | specs/agents/agents-rest-api.feature | "Request without API key returns 401" | DUPLICATE | Already covered by `agents-rest-api.integration.test.ts` ("returns 401 without X-Auth-Token header") |
 | specs/agents/agents-rest-api.feature | "Request with invalid API key returns 401" | DUPLICATE | Already covered by `agents-rest-api.integration.test.ts` ("returns 401 with invalid X-Auth-Token") |
 | specs/agents/agent-management.feature | "Agent types available" | UPDATE | `AgentTypeSelectorDrawer.tsx` exposes three types (http, code, workflow), not the two listed in the table; scenario must be rewritten to reflect HTTP option |

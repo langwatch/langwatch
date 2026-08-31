@@ -475,6 +475,101 @@ const presentations = {
       "This agent points at a local development tunnel that seems to have ended. Run `langwatch agent dev` again on the machine that started it, or restore the agent's URL in its settings.",
   },
 
+  // ---- connected agents ----
+  agent_register_only: {
+    title: "This agent is registered from code",
+    describe: () =>
+      "Its name, environment and parameters come from the process that runs it. Change the code and start the process again.",
+  },
+  agent_test_refused: {
+    title: "This agent cannot be tested as it is set up",
+    describe: (error) => {
+      const reason = safeProse(str(error, "reason", ""));
+      return reason
+        ? `${reason}. Fix the agent and test it again.`
+        : "Check the agent's configuration and test it again.";
+    },
+  },
+  agent_not_found: {
+    title: "Agent not found",
+    describe: () =>
+      "No agent with that id is in this project. It may have been archived, or the id belongs to another project.",
+  },
+  agent_offline: {
+    title: "This agent is not running",
+    describe: (error) => {
+      const name = str(error, "agentName", "the agent");
+      const environment = str(error, "environment", "");
+      const where = environment ? ` in ${environment}` : "";
+      return `No process running ${name}${where} is connected. Start the process that runs it, then run again.`;
+    },
+  },
+  agent_owner_only: {
+    title: "This development agent belongs to someone else",
+    describe: (error) => {
+      const owner = str(error, "ownerName", "its owner");
+      return `Only ${owner} can run simulations against it. Connect your own copy of the agent, or ask them to run it.`;
+    },
+  },
+  agent_call_timeout: {
+    title: "The agent did not answer in time",
+    describe: () =>
+      "The agent took longer than its call budget to answer a turn. Check it for slow work, or raise its timeout.",
+  },
+  agent_call_failed: {
+    title: "The agent raised an error",
+    // The function's own error text rides on `meta.message` for the CLI and
+    // the run drawer's envelope; relayed prose is never rendered here.
+    describe: () =>
+      "The decorated function raised an error. The process logs carry the stack, and the run shows what it said.",
+  },
+  agent_disconnected: {
+    title: "The agent disconnected mid-call",
+    describe: () =>
+      "The process working on this turn disconnected before it answered. The turn was not sent again, since the function may have run. Check the process, then run again.",
+  },
+  agent_instance_lost: {
+    title: "The pinned instance is gone",
+    describe: () =>
+      "This agent pins each conversation to one instance, and that instance disconnected. Start the process again, then run again.",
+  },
+  agent_busy: {
+    title: "Every instance of this agent is busy",
+    describe: () =>
+      "The connected instances are at their concurrency. Wait a moment and try again, or raise the concurrency on the decorated function.",
+  },
+  agent_parameter_invalid: {
+    title: "A declared parameter cannot be used",
+    describe: (error) => {
+      const name = str(error, "name", "");
+      const reason = safeProse(str(error, "reason", ""));
+      const subject = name ? `The parameter "${name}"` : "A parameter";
+      return reason
+        ? `${subject} cannot be declared: ${reason}.`
+        : `${subject} cannot be declared. Check its name, its type and its options.`;
+    },
+  },
+  agent_register_refused: {
+    title: "The agent could not be registered",
+    describe: () =>
+      "Check the API key, the project and the permissions the process connects with. The process prints the reason at startup.",
+  },
+  agent_session_unknown: {
+    title: "The agent process needs to register again",
+    describe: () =>
+      "The platform no longer knows this instance. The SDK registers again on its own; restart the process if it does not.",
+  },
+  agent_payload_too_large: {
+    title: "This turn is too large",
+    describe: (error) => {
+      const what = str(error, "what", "payload");
+      if (what === "session") {
+        return "The session value the agent returned is above the size limit. Return a small value, such as a conversation id or a token, not the conversation itself.";
+      }
+      return `The ${what} is above the size limit. Trim the conversation or the attachments, or raise the limit on a self-hosted deployment.`;
+    },
+  },
+
   // ---- agent-submitted reports ----
   agent_report_rate_limited: {
     // The reader here is usually a coding agent's operator on the CLI or MCP,
@@ -1638,20 +1733,25 @@ const presentations = {
   },
   // ---- scenario run parameters ----
   scenario_parameter_unknown: {
-    // Both lists are our own names, not free text: the run dialog needs to
-    // show the rejected one so the typo is visible, and the declared ones so
-    // the customer can see what they meant to write.
-    title: "No scenario in this run has a parameter by that name",
+    // The lists and the target are our own names, not free text: the run
+    // dialog needs to show the rejected name so the typo is visible, the
+    // declared ones so the customer can see what they meant to write, and the
+    // target because a run against another agent can accept the same name.
+    title: "Nothing in this run declares a parameter by that name",
     describe: (error) => {
       const unknown = strList(error, "unknownKeys");
       const declared = strList(error, "declaredNames");
+      const target = str(error, "targetLabel", "");
+      const source = target
+        ? `by any scenario in this run, and not by ${target}`
+        : "by any scenario in this run, and not by the agent it runs against";
       const rejected =
         unknown.length > 0
-          ? `${listLabels(unknown)} ${unknown.length === 1 ? "isn't" : "aren't"} declared by any scenario in this run.`
-          : "One of the values supplied isn't declared by any scenario in this run.";
+          ? `${listLabels(unknown)} ${unknown.length === 1 ? "isn't" : "aren't"} declared ${source}.`
+          : `One of the values supplied isn't declared ${source}.`;
       return declared.length > 0
         ? `${rejected} You can set ${listLabels(declared)}.`
-        : `${rejected} None of its scenarios declare parameters.`;
+        : `${rejected} This run declares no parameters at all.`;
     },
   },
   scenario_test_suite_not_found: {
@@ -1672,6 +1772,33 @@ const presentations = {
         ? "Set values for this run, or give each parameter a default on the scenario."
         : "Set a value for this run, or give the parameter a default on the scenario.";
       return `${subject} ${scenarioFieldLabel(error)} reads ${plural ? "them" : "it"}. ${remedy}`;
+    },
+  },
+  scenario_parameter_option_invalid: {
+    // The name and the options are declared configuration, not free text:
+    // the dialog shows what the parameter accepts next to the refused value.
+    title: "This value is not one of the parameter's options",
+    describe: (error) => {
+      const name = str(error, "name", "");
+      const options = strList(error, "options");
+      const subject = name
+        ? `The value supplied for ${name} is not one it accepts.`
+        : "The value supplied is not one the parameter accepts.";
+      return options.length > 0
+        ? `${subject} Choose one of ${listLabels(options)}.`
+        : `${subject} Choose one of its declared options.`;
+    },
+  },
+  scenario_parameter_required: {
+    title: "This run is missing a required parameter value",
+    describe: (error) => {
+      const missing = strList(error, "names");
+      const plural = missing.length > 1;
+      const subject =
+        missing.length > 0
+          ? `${listLabels(missing)} ${plural ? "are required and have no values" : "is required and has no value"}.`
+          : "A required parameter has no value.";
+      return `${subject} Set ${plural ? "values" : "a value"} for this run, or give ${plural ? "them" : "it"} a default where the parameter is declared.`;
     },
   },
   scenario_parameter_template_invalid: {

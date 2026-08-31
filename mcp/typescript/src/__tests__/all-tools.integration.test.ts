@@ -5,6 +5,11 @@ import {
   fetchDocumentation,
   resolveDocumentationUrl,
 } from "../documentation-fetch.js";
+import {
+  deleteAgent,
+  getAgent,
+  updateAgent,
+} from "../langwatch-api-agents.js";
 
 // --- Canned responses for every API endpoint ---
 
@@ -506,19 +511,19 @@ function createMockServer(): Server {
         res.end(JSON.stringify(CANNED_MODEL_PROVIDER_SET));
       }
       // --- Agent endpoints ---
-      else if (url === "/api/agents" && method === "GET") {
+      else if (url === "/api/v1/agents" && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_AGENTS_LIST));
-      } else if (url === "/api/agents" && method === "POST") {
+      } else if (url === "/api/v1/agents" && method === "POST") {
         res.writeHead(201);
         res.end(JSON.stringify(CANNED_AGENT_DETAIL));
-      } else if (url?.match(/^\/api\/agents\/[^/]+$/) && method === "GET") {
+      } else if (url?.match(/^\/api\/v1\/agents\/[^/]+$/) && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_AGENT_DETAIL));
-      } else if (url?.match(/^\/api\/agents\/[^/]+$/) && method === "PATCH") {
+      } else if (url?.match(/^\/api\/v1\/agents\/[^/]+$/) && method === "PATCH") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_AGENT_DETAIL));
-      } else if (url?.match(/^\/api\/agents\/[^/]+$/) && method === "DELETE") {
+      } else if (url?.match(/^\/api\/v1\/agents\/[^/]+$/) && method === "DELETE") {
         res.writeHead(200);
         res.end(JSON.stringify({ id: "agent_abc", name: "Test Agent" }));
       }
@@ -1727,6 +1732,31 @@ describe("All MCP tools integration", () => {
       const result = await deleteSecret("secret_abc");
       expect(result.id).toBe("secret_abc");
       expect(result.deleted).toBe(true);
+    });
+  });
+
+  // =====================
+  // Agent Tools
+  // =====================
+  describe("platform_get_agent", () => {
+    it("returns one agent by id", async () => {
+      const agent = await getAgent("agent_abc");
+      expect(agent.id).toBe("agent_abc");
+      expect(agent.name).toBe("Test Agent");
+    });
+  });
+
+  describe("platform_update_agent", () => {
+    it("updates an agent and returns it", async () => {
+      const agent = await updateAgent({ id: "agent_abc", name: "Test Agent" });
+      expect(agent.id).toBe("agent_abc");
+    });
+  });
+
+  describe("platform_delete_agent", () => {
+    it("deletes an agent", async () => {
+      const result = await deleteAgent("agent_abc");
+      expect(result.id).toBe("agent_abc");
     });
   });
 

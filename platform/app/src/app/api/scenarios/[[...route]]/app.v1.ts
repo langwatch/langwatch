@@ -15,6 +15,11 @@ import {
 } from "~/server/scenarios/parameters";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import type { ScenarioActor } from "~/server/scenarios/scenario-versioning";
+import {
+  readTestingInterface,
+  scenarioEditorPath,
+  type TestingInterface,
+} from "~/server/suites/platform-path";
 import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
@@ -311,18 +316,39 @@ function registerListScenariosRoute(
 
       const service = getService();
       const scenarios = await service.getAll({ projectId: project.id });
+      const ui = await readTestingInterface({
+        projectId: project.id,
+        organizationId: c.get("apiKeyOrganizationId"),
+      });
 
       return c.json(
         scenarios.map((s) => ({
           ...toScenarioResponse(s),
-          platformUrl: platformUrl({
+          platformUrl: scenarioPlatformUrl({
             projectSlug: project.slug,
-            path: `/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${s.id}`,
+            scenarioId: s.id,
+            ui,
           }),
         })),
       );
     },
   );
+}
+
+/** Where a scenario opens, in the interface the project reads. */
+function scenarioPlatformUrl({
+  projectSlug,
+  scenarioId,
+  ui,
+}: {
+  projectSlug: string;
+  scenarioId: string;
+  ui: TestingInterface;
+}): string {
+  return platformUrl({
+    projectSlug,
+    path: scenarioEditorPath({ ui, scenarioId }),
+  });
 }
 
 /** Read one scenario by id. */
@@ -368,9 +394,13 @@ function registerGetScenarioRoute(
 
       return c.json({
         ...toScenarioResponse(scenario),
-        platformUrl: platformUrl({
+        platformUrl: scenarioPlatformUrl({
           projectSlug: project.slug,
-          path: `/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${scenario.id}`,
+          scenarioId: scenario.id,
+          ui: await readTestingInterface({
+            projectId: project.id,
+            organizationId: c.get("apiKeyOrganizationId"),
+          }),
         }),
       });
     },
@@ -439,9 +469,13 @@ function registerCreateScenarioRoute(
       return c.json(
         {
           ...toScenarioResponse(scenario),
-          platformUrl: platformUrl({
+          platformUrl: scenarioPlatformUrl({
             projectSlug: project.slug,
-            path: `/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${scenario.id}`,
+            scenarioId: scenario.id,
+            ui: await readTestingInterface({
+              projectId: project.id,
+              organizationId: c.get("apiKeyOrganizationId"),
+            }),
           }),
         },
         201,
@@ -521,9 +555,13 @@ function registerUpdateScenarioVerb({
 
       return c.json({
         ...toScenarioResponse(scenario),
-        platformUrl: platformUrl({
+        platformUrl: scenarioPlatformUrl({
           projectSlug: project.slug,
-          path: `/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${scenario.id}`,
+          scenarioId: scenario.id,
+          ui: await readTestingInterface({
+            projectId: project.id,
+            organizationId: c.get("apiKeyOrganizationId"),
+          }),
         }),
       });
     },

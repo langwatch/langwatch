@@ -89,7 +89,7 @@ const SCOPE_SCENARIO_FLAG_HELP =
  * eating argv until the next flag.
  */
 const TARGET_FLAG_HELP =
-  "What to run against, written <type>:<referenceId>, for example http:agent_abc123. The types are prompt, http, code and workflow. Repeat the flag for more than one. Add a query string to give that target its own parameter values, for example http:agent_abc123?model=gpt-5, and repeat the flag with the same agent and a different value to compare the two. A target value wins over the same name given with --param. The halves are percent-decoded, so a reference id or a value that holds ? or & must encode it as %3F or %26.";
+  "What to run against, written <type>:<referenceId>, for example connected:agent_abc123. The types are connected, http, code, prompt and workflow. A connected agent may also be named as connected:<name>@<environment>, for example connected:support-agent@production. Repeat the flag for more than one. Add a query string to give that target its own parameter values, for example connected:agent_abc123?model=gpt-5, and repeat the flag with the same agent and a different value to compare the two. A target value wins over the same name given with --param. The halves are percent-decoded, so a reference id or a value that holds ? or & must encode it as %3F or %26.";
 
 const RUN_NAME_FLAG_HELP =
   "The run plan to file this run under. A name already in use takes this configuration and the run joins that plan's history; a new name creates the plan. Left out, the platform derives one from what the run covers and what it runs against.";
@@ -1817,7 +1817,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     agentCmd
       .command("create <name>")
-      .description("Create a new agent")
+      .description("Create a new agent. A connected agent is not created here: it registers itself from code with connectAgent (langwatch/agent) or connect_agent (Python)")
       .requiredOption("--type <type>", "Agent type: signature, code, workflow, or http")
       .option("--config <json>", "Agent config as JSON")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
@@ -1830,12 +1830,26 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     agentCmd
       .command("run <id>")
-      .description("Execute an agent with JSON input (HTTP agents call URL directly, others use workflow engine)")
-      .option("--input <json>", "Input data as JSON string")
+      .description("Run one turn of an agent. A connected agent runs through the platform relay on a live instance; an HTTP agent is called at its URL; a workflow-linked agent runs on the workflow engine")
+      .option("--message <text>", "One user message to send (connected agents)")
+      .option("--input <json>", "The request body as JSON. For a connected agent it carries messages, and may carry threadId, session and params")
+      .option("--param <key=value>", "A run parameter value for a connected agent, repeatable", (value: string, previous: string[] = []) => [...previous, value])
+      .option("--thread-id <id>", "Continue a conversation on a connected agent")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { input?: string }) => {
+    async (id: string, options: { input?: string; message?: string; param?: string[]; threadId?: string }) => {
       const { runAgentCommand: impl } = await import("./commands/agents/run.js");
       return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    agentCmd
+      .command("test <id>")
+      .description("Test an agent with one scripted scenario run on the platform: the user sends \"ping\", the agent answers, and the run succeeds when the answer arrives. No model is used, and no scenario, run plan or test suite is added to the project")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
+      const { testAgentCommand: impl } = await import("./commands/agents/test.js");
+      return impl(id);
     },
   );
 
@@ -1845,7 +1859,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   agentCmd
     .command("dev")
     .alias("tunnel")
-    .description("Expose a local agent server through a public tunnel and point a registered HTTP agent at it (Ctrl-C restores the previous URL)")
+    .description("For HTTP agents: expose a local agent server through a public tunnel and point a registered HTTP agent at it (Ctrl-C restores the previous URL). An agent written in code needs no tunnel: wrap it with connectAgent (langwatch/agent) or connect_agent (Python) and it connects itself")
     .option("--port <number>", "Local port to expose (tunnels http://localhost:<number>)")
     .option("--url <url>", "Local URL to expose (mutually exclusive with --port)")
     .option("--agent <idOrName>", "Which registered HTTP agent to point at the tunnel (when omitted: picker, and in an interactive terminal it creates one if the project has none)")

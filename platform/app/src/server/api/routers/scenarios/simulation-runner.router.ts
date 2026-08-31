@@ -9,9 +9,11 @@ import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import { resolveConnectedTarget } from "~/server/scenarios/connected-target.service";
 import { ScenarioReservedSetIdError } from "~/server/scenarios/errors";
 import {
   createDataPrefetcherDependencies,
+  type PrefetchResult,
   prefetchScenarioData,
 } from "~/server/scenarios/execution/data-prefetcher";
 import {
@@ -21,6 +23,7 @@ import {
 import {
   type RunParameterValues,
   runParameterValuesSchema,
+  type ScenarioParameterDefinition,
 } from "~/server/scenarios/parameters";
 import { resolveRunParameters } from "~/server/scenarios/resolve-run-parameters";
 import { type RunActor, withActor } from "~/server/scenarios/run-actor";
@@ -35,21 +38,14 @@ import {
 } from "~/server/scenarios/run-secret-values";
 import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
+import {
+  type SimulationTarget,
+  simulationTargetSchema,
+} from "~/server/scenarios/simulation-target";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { projectSchema } from "./schemas";
 
 const logger = createLogger("SimulationRunnerRouter");
-
-/**
- * Target for scenario simulation.
- * Extensible: add new types as needed (llm, workflow, etc.)
- */
-export const simulationTargetSchema = z.object({
-  type: z.enum(["prompt", "http", "code", "workflow"]),
-  referenceId: z.string(),
-});
-
-export type SimulationTarget = z.infer<typeof simulationTargetSchema>;
 
 const runScenarioSchema = projectSchema.extend({
   scenarioId: z.string(),
@@ -101,8 +97,9 @@ export function assertWritableSetId(params: {
 
 /**
  * Resolves what the run reads as `params.NAME` and what it reads as
- * `secrets.NAME`: the scenario's declared defaults, with the supplied values
- * over the top, and the secret values split out and encrypted.
+ * `secrets.NAME`: the scenario's declared defaults and the target agent's
+ * own, with the supplied values over the top, and the secret values split
+ * out and encrypted.
  *
  * Runs before anything is queued, the same way a suite run does, so an unknown
  * name, a secret with no value, a reference with no value, or unrenderable text
@@ -112,11 +109,13 @@ async function resolveParametersForRun({
   prisma,
   projectId,
   scenarioId,
+  targetDefinitions,
   values,
 }: {
   prisma: PrismaClient;
   projectId: string;
   scenarioId: string;
+  targetDefinitions: ScenarioParameterDefinition[];
   values?: RunParameterValues;
 }): Promise<{
   parameters: RunParameterValues;
@@ -132,7 +131,11 @@ async function resolveParametersForRun({
     ids: [scenarioId],
     projectId,
   });
-  const resolved = await resolveRunParameters({ scenarios, values });
+  const resolved = await resolveRunParameters({
+    scenarios,
+    targetDefinitions,
+    values,
+  });
   const forScenario = resolved.get(scenarioId);
   return {
     parameters: forScenario?.parameters ?? {},
@@ -189,7 +192,7 @@ async function queueRun({
    * run says which simulator played the person and which judge decided the
    * verdict, whatever the project default becomes later.
    */
-  resolvedModels: ResolvedRunModels;
+  resolvedModels: ResolvedRunModels | null;
 }): Promise<void> {
   const secretParameterNames = Object.keys(secretParameters);
   const metadata = {
@@ -234,6 +237,56 @@ async function queueRun({
 }
 
 /**
+ * Reads back everything the run needs, so a configuration error refuses the
+ * run before a job exists.
+ *
+ * @throws {TRPCError} BAD_REQUEST when the run cannot be prepared
+ */
+async function validateRunData({
+  projectId,
+  scenarioId,
+  setId,
+  batchRunId,
+  parameters,
+  secretParameters,
+  target,
+}: {
+  projectId: string;
+  scenarioId: string;
+  setId: string;
+  batchRunId: string;
+  parameters: RunParameterValues;
+  secretParameters: RunSecretCiphertext;
+  target: SimulationTarget;
+}): Promise<Extract<PrefetchResult, { success: true }>> {
+  const prefetchResult = await prefetchScenarioData({
+    context: {
+      projectId,
+      scenarioId,
+      setId,
+      batchRunId,
+      parameters,
+      secretParameters,
+    },
+    target,
+    deps: createDataPrefetcherDependencies(),
+  });
+
+  if (!prefetchResult.success) {
+    logger.warn(
+      { projectId, scenarioId, error: prefetchResult.error },
+      "Scenario validation failed",
+    );
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: prefetchResult.error,
+    });
+  }
+
+  return prefetchResult;
+}
+
+/**
  * Simulation runner - executing scenarios against targets.
  */
 export const simulationRunnerRouter = createTRPCRouter({
@@ -251,44 +304,32 @@ export const simulationRunnerRouter = createTRPCRouter({
       const setId = input.setId ?? getOnPlatformSetId(input.projectId);
       assertWritableSetId({ setId, projectId: input.projectId });
       const batchRunId = input.batchRunId ?? generateBatchRunId();
+      const actor: RunActor = { id: ctx.session.user.id, label: "user" };
 
+      const { target, targetDefinitions } = await resolveConnectedTarget({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+        target: input.target,
+        actor,
+      });
       const { parameters, secretParameters, scenarioVersion } =
         await resolveParametersForRun({
           prisma: ctx.prisma,
           projectId: input.projectId,
           scenarioId: input.scenarioId,
+          targetDefinitions,
           values: input.parameters,
         });
 
-      // Validate early - prefetch data to catch configuration errors before scheduling
-      const deps = createDataPrefetcherDependencies();
-      const prefetchResult = await prefetchScenarioData({
-        context: {
-          projectId: input.projectId,
-          scenarioId: input.scenarioId,
-          setId,
-          batchRunId,
-          parameters,
-          secretParameters,
-        },
-        target: input.target,
-        deps,
+      const prefetchResult = await validateRunData({
+        projectId: input.projectId,
+        scenarioId: input.scenarioId,
+        setId,
+        batchRunId,
+        parameters,
+        secretParameters,
+        target,
       });
-
-      if (!prefetchResult.success) {
-        logger.warn(
-          {
-            projectId: input.projectId,
-            scenarioId: input.scenarioId,
-            error: prefetchResult.error,
-          },
-          "Scenario validation failed",
-        );
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: prefetchResult.error,
-        });
-      }
 
       const scenarioRunId = generate(KSUID_RESOURCES.SCENARIO_RUN).toString();
 
@@ -309,12 +350,12 @@ export const simulationRunnerRouter = createTRPCRouter({
         batchRunId,
         setId,
         name: prefetchResult.data.scenario.name,
-        target: input.target,
+        target,
         parameters,
         secretParameters,
         note: input.note,
         scenarioVersion,
-        actor: { id: ctx.session.user.id, label: "user" },
+        actor,
         resolvedModels: prefetchResult.resolvedModels,
       });
 

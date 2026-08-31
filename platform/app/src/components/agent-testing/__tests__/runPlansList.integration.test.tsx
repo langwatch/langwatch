@@ -28,6 +28,7 @@ import {
   type RunPlanSuite,
 } from "../results/run-plans";
 import { PASS_RATE_BAR_OPACITY } from "../shared/pass-rate-color";
+import type { TargetKind } from "../shared/TargetMark";
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({ query: {}, push: vi.fn(), isReady: true }),
@@ -94,6 +95,11 @@ const TARGET_NAMES: Record<string, string> = {
   agent_prod: "prod-agent",
 };
 
+const TARGET_KINDS: Record<string, TargetKind> = {
+  agent_dev: "connected",
+  agent_prod: "http",
+};
+
 function renderRows(
   rows: PlanRowModel[],
   overrides: Partial<React.ComponentProps<typeof PlanRowsTable>> = {},
@@ -102,6 +108,7 @@ function renderRows(
     rows,
     days: 30,
     resolveTargetName: (key) => TARGET_NAMES[key] ?? key,
+    resolveTargetKind: (key) => TARGET_KINDS[key] ?? "unknown",
     onSelectPlan: vi.fn(),
     onEditPlan: vi.fn(),
     onArchivePlan: vi.fn(),

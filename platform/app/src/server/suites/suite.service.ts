@@ -21,7 +21,10 @@ import type {
 } from "~/server/app-layer/suites/suite-run.service";
 import { isUniqueConstraintError } from "~/server/utils/prismaErrors";
 import { slugify } from "~/utils/slugify";
-import { AgentRepository } from "../agents/agent.repository";
+import {
+  type AgentIdentityRow,
+  AgentRepository,
+} from "../agents/agent.repository";
 import { LlmConfigRepository } from "../prompt-config/repositories/llm-config.repository";
 import { ScenarioNotFoundError } from "../scenarios/errors";
 import {
@@ -39,6 +42,13 @@ import {
   ScenarioRepository,
   type ScenarioRunConfig,
 } from "../scenarios/scenario.repository";
+import {
+  agentParameterDefinitionsOf,
+  assertConnectedAgentsRunnable,
+  isAgentUnseen,
+  ownerNamesOf,
+  resolveConnectedReferences,
+} from "./connected-targets";
 import { RUN_ALL_SUITE_LABEL, RUN_ALL_SUITE_NAME } from "./constants";
 import {
   AllScenariosArchivedError,
@@ -69,6 +79,7 @@ import {
 import {
   declaredDefaults,
   targetKeyOf,
+  targetLabelOf,
   targetLabels,
   withCanonicalOverrides,
 } from "./target-key";
@@ -98,6 +109,8 @@ type ResolvedTargetReferences = {
   active: SuiteTarget[];
   archived: SuiteTarget[];
   missing: SuiteTarget[];
+  /** The agent rows the active targets name, by id. */
+  agentsById: Map<string, AgentIdentityRow>;
 };
 
 /** What a run's scenario and target references resolved to. */
@@ -107,6 +120,8 @@ type ResolvedRunReferences = {
   scenarioVersionMap: Map<string, number>;
   scenarioConfigs: ScenarioRunConfig[];
   activeTargets: SuiteTarget[];
+  /** The agent rows the active targets name, by id. */
+  agentsById: Map<string, AgentIdentityRow>;
   skippedArchived: SuiteRunResult["skippedArchived"];
 };
 
@@ -173,8 +188,9 @@ function assertNoSecretOverrides(params: {
  * reads as `secrets`.
  *
  * A target's overrides are merged over the run's values, the target winning,
- * and each merged set is checked the way the run's values are: a name no
- * scenario declares is refused. Two targets with one key resolve once.
+ * and each merged set is checked the way the run's values are: a name neither
+ * a scenario nor the target's own agent declares is refused. Two targets with
+ * one key resolve once.
  *
  * The secrets are run-level, so every target resolves the same ones. They are
  * encrypted here, at the last point that holds them in clear, so the queued
@@ -184,6 +200,8 @@ function assertNoSecretOverrides(params: {
 async function resolveParametersPerTarget(params: {
   scenarios: readonly ScenarioRunConfig[];
   targets: readonly SuiteTarget[];
+  /** The agent rows the targets name, for what each declares on its own. */
+  agentsById: ReadonlyMap<string, AgentIdentityRow>;
   values?: RunParameterValues;
 }): Promise<{
   parametersByTargetKey: ParametersByTargetKey;
@@ -199,8 +217,17 @@ async function resolveParametersPerTarget(params: {
     const targetKey = targetKeyOf(target);
     if (parametersByTargetKey.has(targetKey)) continue;
 
+    const agent = params.agentsById.get(target.referenceId);
     const resolved = await resolveRunParameters({
       scenarios: params.scenarios,
+      targetDefinitions: agentParameterDefinitionsOf(agent),
+      targetLabel: agent
+        ? targetLabelOf({
+            name: agent.name,
+            environment: agent.environment,
+            differingNames: new Set(),
+          })
+        : undefined,
       values: { ...params.values, ...target.runParameters },
     });
     parametersByTargetKey.set(
@@ -307,6 +334,23 @@ function assertTestSuiteUpdate(data: UpdateSuiteInput): void {
       message: TEST_SUITE_EXECUTION_REFUSAL,
     });
   }
+}
+
+/**
+ * The plan name the caller asked for, trimmed; nothing when the caller sent
+ * none and the run derives its own.
+ *
+ * A name that holds only blanks is refused: it reads as no name at all on
+ * every screen the plan appears on.
+ */
+function readRequestedPlanName(name: string | undefined): string | undefined {
+  const trimmed = name?.trim();
+  if (name !== undefined && !trimmed) {
+    throw new ValidationError("A run needs a name", {
+      meta: { fieldErrors: { name: ["A run needs a name"] } },
+    });
+  }
+  return trimmed;
 }
 
 /**
@@ -874,6 +918,7 @@ export class SuiteService {
           targets,
           readScenarioIds: () => this.readRunMembership({ suite, projectId }),
           parameters: params.parameters,
+          actor: params.actor,
         });
 
         const result = await this.scheduleRun({
@@ -914,8 +959,12 @@ export class SuiteService {
    * @throws {InvalidTargetReferencesError} if any target references are missing (deleted)
    * @throws {AllScenariosArchivedError} if all scenarios are archived
    * @throws {AllTargetsArchivedError} if all targets are archived
+   * @throws {AgentOwnerOnlyError} if a target is a personal development agent
+   *   of someone other than the actor
    * @throws {ScenarioParameterUnknownError} if a supplied parameter name is
-   *   declared by no scenario in the run
+   *   declared by no scenario in the run and by no target's agent
+   * @throws {ScenarioParameterOptionInvalidError} if a supplied value is
+   *   outside the options a parameter declares
    * @throws {ScenarioParameterMissingError} if a scenario's text reads a
    *   parameter the run resolved no value for
    * @throws {ScenarioSecretParameterMissingError} if a declared secret has no
@@ -929,15 +978,25 @@ export class SuiteService {
     targets: SuiteTarget[];
     readScenarioIds: () => Promise<string[]>;
     parameters?: RunParameterValues;
+    /** The person starting the run; what a personal agent is matched against. */
+    actor: RunActor | undefined;
   }): Promise<PreparedRun> {
     // A suite with no target at all, a test suite before its first run,
     // is refused before anything is resolved or scheduled.
     if (params.targets.length === 0) {
       throw new SuiteTargetsRequiredError();
     }
+    // A connected agent may be named `<name>@<environment>`; from here on
+    // every target names an id, so two spellings of one agent fold together.
+    const namedTargets = await resolveConnectedReferences({
+      targets: params.targets,
+      projectId: params.projectId,
+      actor: params.actor,
+      agents: this.agentRepository,
+    });
     // Two targets with one key would run the same thing twice under one
     // column. Refused here, before any read, so no plan row is touched.
-    if (duplicateSuiteTargets(params.targets).length > 0) {
+    if (duplicateSuiteTargets(namedTargets).length > 0) {
       refuseTargets(TARGET_DUPLICATE_REFUSAL);
     }
 
@@ -946,20 +1005,31 @@ export class SuiteService {
       scenarioIds,
       projectId: params.projectId,
       organizationId: params.organizationId,
-      targets: params.targets,
+      targets: namedTargets,
+    });
+    await assertConnectedAgentsRunnable({
+      agents: [...resolved.agentsById.values()],
+      actor: params.actor,
+      users: this.prisma,
     });
 
     // The identity of a target is its overrides, and a value equal to the
-    // declared default is no override. Only the scenarios say what the
-    // defaults are, so the canonical set is known here and not before: it is
-    // what the key, the sort, the name and the stamp all read.
-    const defaults = declaredDefaults(
-      resolved.scenarioConfigs.flatMap((scenario) =>
+    // declared default is no override. The scenarios say what the defaults
+    // are, then the targets' own agents, so the canonical set is known here
+    // and not before: it is what the key, the sort, the name and the stamp
+    // all read.
+    const defaults = declaredDefaults([
+      ...resolved.scenarioConfigs.flatMap((scenario) =>
         parseScenarioParameterDefinitions(scenario.parameters),
       ),
-    );
+      ...resolved.activeTargets.flatMap((target) =>
+        agentParameterDefinitionsOf(
+          resolved.agentsById.get(target.referenceId),
+        ),
+      ),
+    ]);
     const targets = sortSuiteTargets(
-      withCanonicalOverrides({ targets: params.targets, defaults }),
+      withCanonicalOverrides({ targets: namedTargets, defaults }),
     );
     // Two targets that differ only by a typed default are one target.
     if (duplicateSuiteTargets(targets).length > 0) {
@@ -976,6 +1046,7 @@ export class SuiteService {
       await resolveParametersPerTarget({
         scenarios: references.scenarioConfigs,
         targets: references.activeTargets,
+        agentsById: references.agentsById,
         values: params.parameters,
       });
 
@@ -1201,12 +1272,7 @@ export class SuiteService {
         },
       },
       async (span) => {
-        const requestedName = params.name?.trim();
-        if (params.name !== undefined && !requestedName) {
-          throw new ValidationError("A run needs a name", {
-            meta: { fieldErrors: { name: ["A run needs a name"] } },
-          });
-        }
+        const requestedName = readRequestedPlanName(params.name);
 
         // Normalised before the plan is matched and before anything is
         // stored, so hand-picking every suite and pressing Run all reach one
@@ -1230,6 +1296,7 @@ export class SuiteService {
               scenarioIds: params.config.scenarioIds ?? [],
             }),
           parameters: params.parameters,
+          actor: params.actor,
         });
         span.setAttribute("suite.scenario_count", prepared.scenarioIds.length);
 
@@ -1435,15 +1502,18 @@ export class SuiteService {
       }),
     ]);
     // Stored order, so the name reads the columns in the order the results
-    // show them. A target the project no longer names reads as its id, and an
+    // show them. A target the project no longer names reads as its id, an
     // agent that appears more than once reads with the parameters that tell
-    // its targets apart.
+    // its targets apart, and a connected agent reads with its environment
+    // and, when personal, its owner.
     return derivePlanName({
       scopeLabel,
       targetLabels: targetLabels({
         targets: sortSuiteTargets(params.targets),
         nameOf: (target) =>
-          targetNames[target.referenceId] ?? target.referenceId,
+          targetNames[target.referenceId]?.name ?? target.referenceId,
+        environmentOf: (target) => targetNames[target.referenceId]?.environment,
+        ownerNameOf: (target) => targetNames[target.referenceId]?.ownerName,
       }),
     });
   }
@@ -1693,7 +1763,12 @@ export class SuiteService {
       organizationId,
     });
 
-    return { scenarios, targets: targetNames };
+    return {
+      scenarios,
+      targets: Object.fromEntries(
+        Object.entries(targetNames).map(([id, row]) => [id, row.name]),
+      ),
+    };
   }
 
   /**
@@ -1707,7 +1782,12 @@ export class SuiteService {
     targets: SuiteTarget[];
     projectId: string;
     organizationId: string;
-  }): Promise<Record<string, string>> {
+  }): Promise<
+    Record<
+      string,
+      { name: string; environment?: string | null; ownerName?: string | null }
+    >
+  > {
     const { targets, projectId, organizationId } = params;
 
     const agentIds = targets
@@ -1730,9 +1810,26 @@ export class SuiteService {
         : Promise.resolve([]),
     ]);
 
-    const names: Record<string, string> = {};
-    for (const row of agentRows) names[row.id] = row.name;
-    for (const row of promptRows) names[row.id] = row.name;
+    const ownerNames = await ownerNamesOf({
+      agents: agentRows.map((row) => ({
+        ownerUserId: row.ownerUserId ?? null,
+      })),
+      users: this.prisma,
+    });
+    const names: Record<
+      string,
+      { name: string; environment?: string | null; ownerName?: string | null }
+    > = {};
+    for (const row of agentRows) {
+      names[row.id] = {
+        name: row.name,
+        environment: row.environment,
+        ownerName: row.ownerUserId
+          ? (ownerNames.get(row.ownerUserId) ?? null)
+          : null,
+      };
+    }
+    for (const row of promptRows) names[row.id] = { name: row.name };
     return names;
   }
 
@@ -1868,6 +1965,7 @@ export class SuiteService {
       scenarioVersionMap,
       scenarioConfigs,
       activeTargets: targetResolution.active,
+      agentsById: targetResolution.agentsById,
       skippedArchived: {
         scenarios: scenarioResolution.archived,
         targets: targetResolution.archived.map((t) => t.referenceId),
@@ -1934,6 +2032,7 @@ export class SuiteService {
           })
         : [];
     const agentMap = new Map(agentRows.map((r) => [r.id, r]));
+    const agentsById = new Map<string, AgentIdentityRow>();
 
     // Batch prompt targets
     const promptExistingIds =
@@ -1953,10 +2052,11 @@ export class SuiteService {
       const row = agentMap.get(target.referenceId);
       if (!row) {
         missing.push(target);
-      } else if (row.archivedAt) {
+      } else if (row.archivedAt || isAgentUnseen(row)) {
         archived.push(target);
       } else {
         active.push(target);
+        agentsById.set(row.id, row);
       }
     }
 
@@ -1968,6 +2068,6 @@ export class SuiteService {
       }
     }
 
-    return { active, archived, missing };
+    return { active, archived, missing, agentsById };
   }
 }

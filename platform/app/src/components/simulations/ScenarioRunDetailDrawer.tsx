@@ -20,6 +20,7 @@ import { ConversationExpandContext } from "~/features/traces-v2/components/Trace
 import { useDejaViewLink } from "~/hooks/useDejaViewLink";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { isAgentTestScenarioId } from "~/server/scenarios/agent-test-scenario";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { Drawer } from "../ui/drawer";
@@ -223,7 +224,10 @@ function ClassicScenarioRunDetailDrawer({
     <>
       <Drawer.Root
         open={!!open}
-        onOpenChange={() => closeDrawer()}
+        // Only a close is a close; see AgentTestingRunDrawer.
+        onOpenChange={({ open: isOpen }) => {
+          if (!isOpen) closeDrawer();
+        }}
         placement="end"
         size="lg"
       >
@@ -539,11 +543,16 @@ function ClassicScenarioRunDetailDrawer({
         isLoading={isRunning}
       />
 
-      {/* Child drawer: Scenario Editor — managed via local state */}
+      {/* Child drawer: Scenario Editor, managed via local state. An agent
+          test run has no scenario row, so the editor gets no id to read. */}
       <ScenarioFormDrawer
         open={scenarioEditorOpen}
         onClose={() => setScenarioEditorOpen(false)}
-        scenarioId={scenarioId}
+        scenarioId={
+          scenarioId && isAgentTestScenarioId(scenarioId)
+            ? undefined
+            : scenarioId
+        }
       />
     </>
   );

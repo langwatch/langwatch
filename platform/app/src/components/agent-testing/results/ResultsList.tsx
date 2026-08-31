@@ -134,6 +134,7 @@ function ResultsTable({
         rows={results.planRows}
         days={days}
         resolveTargetName={results.resolveTargetName}
+        resolveTargetKind={results.resolveTargetKind}
         onSelectPlan={onSelectPlan}
         onEditPlan={onEditPlan}
         onArchivePlan={onArchivePlan}
@@ -151,6 +152,7 @@ function ResultsTable({
         onToggleOpen={onToggleOpen}
         rowsByGroupKey={results.rowsByGroupKey}
         resolveTargetName={results.resolveTargetName}
+        resolveTargetKind={results.resolveTargetKind}
         onOpenRun={onOpenRun}
       />
     );

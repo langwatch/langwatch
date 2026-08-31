@@ -686,42 +686,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/agents": {
+    "/api/v1/agents/connect/register": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** @description List all non-archived agents for the project (paginated) */
-        get: operations["getApiAgents"];
+        get?: never;
         put?: never;
-        /** @description Create a new agent */
-        post: operations["postApiAgents"];
+        /** @description Register the connected agents of a process over HTTP, for a network that blocks WebSockets. The body is the register frame of the connect protocol. Answers with the registered frame and the instance token the poll and frames endpoints are addressed with, or with a refused frame. */
+        post: operations["registerConnectedAgentInstance"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/agents/{id}": {
+    "/api/v1/agents/connect/poll": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** @description Get an agent by its id */
-        get: operations["getApiAgentsById"];
-        /** @description Update an agent by its id */
-        put: operations["putApiAgentsById"];
+        /** @description Wait for the next call and cancel frames of a registered instance, up to 25 seconds, then answer with what is waiting or with an empty list. Each poll refreshes the instance presence, so a process that polls reads Online. Addressed with the instance token in the X-Agent-Instance-Token header. */
+        get: operations["pollConnectedAgentInstance"];
+        put?: never;
         post?: never;
-        /** @description Archive an agent (soft-delete) */
-        delete: operations["deleteApiAgentsById"];
+        delete?: never;
         options?: never;
         head?: never;
-        /** @description Update an agent by its id */
-        patch: operations["patchApiAgentsById"];
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/connect/frames": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Post the ack, result and deregister frames of a registered instance. Addressed with the instance token in the X-Agent-Instance-Token header. */
+        post: operations["postConnectedAgentFrames"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the project's agents, paginated, with the presence and owner of each connected agent. Archived agents are left out. */
+        get: operations["listAgents"];
+        put?: never;
+        /** @description Create an agent from a name, a type and the configuration of that type. A connected agent is registered from code by the SDK and answers 422 agent_register_only here. */
+        post: operations["createAgent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read one agent with its presence, its owner and the run parameters it declares. An id the project does not hold answers 404 agent_not_found. */
+        get: operations["getAgent"];
+        /** @description Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes only a new description; anything else answers 422 agent_register_only. */
+        put: operations["replaceAgent"];
+        post?: never;
+        /** @description Archive an agent. It leaves the list and its runs stay. A connected agent that registers again restores its row. */
+        delete: operations["archiveAgent"];
+        options?: never;
+        head?: never;
+        /** @description Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes only a new description; anything else answers 422 agent_register_only. */
+        patch: operations["updateAgent"];
+        trace?: never;
+    };
+    "/api/v1/agents/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Run one scripted scenario against an agent: the user sends "ping", the agent answers, and the run succeeds when the answer arrives. No model is used, and no scenario, run plan or test suite is added to the project. Answers at once with the run ids; the run itself is asynchronous. */
+        post: operations["testAgent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/{id}/call": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Send one conversation turn to a connected agent and get its answer. The agent must be online: a process running the decorated function must be connected. */
+        post: operations["callConnectedAgent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/api-keys": {
@@ -4927,7 +5012,276 @@ export interface operations {
             };
         };
     };
-    getApiAgents: {
+    registerConnectedAgentInstance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @enum {number} */
+                    protocol: 1;
+                    /** @enum {string} */
+                    type: "register";
+                    sdk: {
+                        name: string;
+                        version: string;
+                        language: string;
+                    };
+                    instance: {
+                        id: string;
+                        hostname: string;
+                        username: string;
+                        pid: number;
+                        startedAt: string;
+                        label?: string;
+                        /** @default [] */
+                        inFlightCallIds?: string[];
+                        maxConcurrency?: number;
+                    };
+                    agents: {
+                        name: string;
+                        environment: string;
+                        description?: string;
+                        /** @default {} */
+                        parameters?: {
+                            [key: string]: unknown;
+                        };
+                        concurrency?: number;
+                        timeoutMs?: number;
+                        sticky?: boolean;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description The instance is registered */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The registered frame, or the refused frame with its reason. */
+                        frame: {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "registered";
+                            agents: {
+                                name: string;
+                                environment: string;
+                                id: string;
+                                url: string;
+                                parameterNotes: string[];
+                            }[];
+                            heartbeatIntervalMs: number;
+                            instanceId: string;
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "refused";
+                            /** @enum {string} */
+                            code: "api_key_invalid" | "project_required" | "permission_denied" | "key_type_not_allowed" | "replica_count_unsupported" | "parameters_invalid" | "environment_invalid" | "protocol_invalid";
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                        };
+                        /** @description The token the poll and frames endpoints are addressed with, in the X-Agent-Instance-Token header. Present when the register was accepted. */
+                        instanceToken?: string;
+                    };
+                };
+            };
+            /** @description The API key is not valid: a refused frame */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The key type or its permissions cannot connect an agent: a refused frame */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The body is not a register frame, or an agent of it is not valid: a refused frame */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The deployment runs several replicas without Redis: a refused frame */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    pollConnectedAgentInstance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The frames waiting for the instance, possibly none */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The call and cancel frames waiting for the instance; empty once the poll wait passes with none. */
+                        frames: ({
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "call";
+                            callId: string;
+                            agentId: string;
+                            threadId: string;
+                            messages: ({
+                                role: string;
+                            } & {
+                                [key: string]: unknown;
+                            })[];
+                            newMessages: ({
+                                role: string;
+                            } & {
+                                [key: string]: unknown;
+                            })[];
+                            params: {
+                                [key: string]: string | number | boolean;
+                            };
+                            session?: unknown;
+                            traceparent: string | null;
+                            deadlineAt: number;
+                            run: {
+                                scenarioRunId?: string;
+                                scenarioName?: string;
+                                batchRunId?: string;
+                            };
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "cancel";
+                            callId: string;
+                        })[];
+                    };
+                };
+            };
+            /** @description The API key is not valid: a refused frame */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The instance token is not known; register the instance again */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    postConnectedAgentFrames: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Ack, result and deregister frames, in order. */
+                    frames: ({
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "ack";
+                        callId: string;
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "result";
+                        callId: string;
+                        output?: string | ({
+                            role: string;
+                        } & {
+                            [key: string]: unknown;
+                        }) | ({
+                            role: string;
+                        } & {
+                            [key: string]: unknown;
+                        })[];
+                        session?: unknown;
+                        error?: {
+                            code: string;
+                            message: string;
+                        };
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "deregister";
+                    })[];
+                };
+            };
+        };
+        responses: {
+            /** @description The frames were taken */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description How many frames were taken. */
+                        accepted: number;
+                    };
+                };
+            };
+            /** @description The API key is not valid: a refused frame */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The instance token is not known; register the instance again */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description A frame is not one the endpoint takes */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listAgents: {
         parameters: {
             query?: {
                 page?: number;
@@ -4938,9 +5292,87 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
-        responses: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            name: string;
+                            /**
+                             * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
+                             * @enum {string}
+                             */
+                            type: "signature" | "code" | "workflow" | "http" | "connected";
+                            config: {
+                                [key: string]: unknown;
+                            } | null;
+                            /** @description The environment a connected agent registered with, for example production or development. Null for every other kind. */
+                            environment: string | null;
+                            /** @description The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared. */
+                            ownerUserId: string | null;
+                            /** @description The machine a development agent registered from with a project or service key. Null when the agent is personal or shared. */
+                            hostLabel: string | null;
+                            /** @description When an instance of a connected agent was last connected. Null for every other kind. */
+                            lastSeenAt: string | null;
+                            /** @description The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind. */
+                            parameters: {
+                                name: string;
+                                description?: string;
+                                defaultValue?: string | number | boolean;
+                                secret?: boolean;
+                                /** @enum {string} */
+                                type?: "string" | "number" | "boolean";
+                                options?: (string | number | boolean)[];
+                                required?: boolean;
+                            }[];
+                            /** @description The person a personal development agent belongs to. Null when the agent is shared or host-scoped. */
+                            owner: {
+                                userId: string;
+                                name: string | null;
+                            } | null;
+                            /**
+                             * @description online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind.
+                             * @enum {string}
+                             */
+                            status: "online" | "offline";
+                            /** @description The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind. */
+                            instances: {
+                                instanceId: string;
+                                hostname: string;
+                                username: string;
+                                pid: number;
+                                label: string | null;
+                                sdk: {
+                                    name: string;
+                                    version: string;
+                                    language: string;
+                                };
+                                connectedAt: string;
+                                inflight: number;
+                                maxConcurrency: number;
+                            }[];
+                            createdAt: string;
+                            updatedAt: string;
+                            /** Format: uri */
+                            platformUrl: string;
+                        }[];
+                        pagination: {
+                            page: number;
+                            limit: number;
+                            total: number;
+                            totalPages: number;
+                        };
+                    };
+                };
+            };
+        };
     };
-    postApiAgents: {
+    createAgent: {
         parameters: {
             query?: never;
             header?: never;
@@ -4951,8 +5383,11 @@ export interface operations {
             content: {
                 "application/json": {
                     name: string;
-                    /** @enum {string} */
-                    type: "signature" | "code" | "workflow" | "http";
+                    /**
+                     * @description The kind of agent to write. A connected agent is registered from code by the SDK, so "connected" is refused with agent_register_only.
+                     * @enum {string}
+                     */
+                    type: "signature" | "code" | "workflow" | "http" | "connected";
                     config: {
                         [key: string]: unknown;
                     };
@@ -4960,25 +5395,167 @@ export interface operations {
                 };
             };
         };
-        responses: never;
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        /**
+                         * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
+                         * @enum {string}
+                         */
+                        type: "signature" | "code" | "workflow" | "http" | "connected";
+                        config: {
+                            [key: string]: unknown;
+                        } | null;
+                        /** @description The environment a connected agent registered with, for example production or development. Null for every other kind. */
+                        environment: string | null;
+                        /** @description The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared. */
+                        ownerUserId: string | null;
+                        /** @description The machine a development agent registered from with a project or service key. Null when the agent is personal or shared. */
+                        hostLabel: string | null;
+                        /** @description When an instance of a connected agent was last connected. Null for every other kind. */
+                        lastSeenAt: string | null;
+                        /** @description The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind. */
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                            secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
+                        }[];
+                        /** @description The person a personal development agent belongs to. Null when the agent is shared or host-scoped. */
+                        owner: {
+                            userId: string;
+                            name: string | null;
+                        } | null;
+                        /**
+                         * @description online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind.
+                         * @enum {string}
+                         */
+                        status: "online" | "offline";
+                        /** @description The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind. */
+                        instances: {
+                            instanceId: string;
+                            hostname: string;
+                            username: string;
+                            pid: number;
+                            label: string | null;
+                            sdk: {
+                                name: string;
+                                version: string;
+                                language: string;
+                            };
+                            connectedAt: string;
+                            inflight: number;
+                            maxConcurrency: number;
+                        }[];
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
     };
-    getApiAgentsById: {
+    getAgent: {
         parameters: {
             query?: never;
             header?: never;
             path: {
+                /** @description The agent id. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
-        responses: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        /**
+                         * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
+                         * @enum {string}
+                         */
+                        type: "signature" | "code" | "workflow" | "http" | "connected";
+                        config: {
+                            [key: string]: unknown;
+                        } | null;
+                        /** @description The environment a connected agent registered with, for example production or development. Null for every other kind. */
+                        environment: string | null;
+                        /** @description The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared. */
+                        ownerUserId: string | null;
+                        /** @description The machine a development agent registered from with a project or service key. Null when the agent is personal or shared. */
+                        hostLabel: string | null;
+                        /** @description When an instance of a connected agent was last connected. Null for every other kind. */
+                        lastSeenAt: string | null;
+                        /** @description The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind. */
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                            secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
+                        }[];
+                        /** @description The person a personal development agent belongs to. Null when the agent is shared or host-scoped. */
+                        owner: {
+                            userId: string;
+                            name: string | null;
+                        } | null;
+                        /**
+                         * @description online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind.
+                         * @enum {string}
+                         */
+                        status: "online" | "offline";
+                        /** @description The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind. */
+                        instances: {
+                            instanceId: string;
+                            hostname: string;
+                            username: string;
+                            pid: number;
+                            label: string | null;
+                            sdk: {
+                                name: string;
+                                version: string;
+                                language: string;
+                            };
+                            connectedAt: string;
+                            inflight: number;
+                            maxConcurrency: number;
+                        }[];
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
     };
-    putApiAgentsById: {
+    replaceAgent: {
         parameters: {
             query?: never;
             header?: never;
             path: {
+                /** @description The agent id. */
                 id: string;
             };
             cookie?: never;
@@ -4987,8 +5564,11 @@ export interface operations {
             content: {
                 "application/json": {
                     name?: string;
-                    /** @enum {string} */
-                    type?: "signature" | "code" | "workflow" | "http";
+                    /**
+                     * @description The kind of agent to write. A connected agent is registered from code by the SDK, so "connected" is refused with agent_register_only.
+                     * @enum {string}
+                     */
+                    type?: "signature" | "code" | "workflow" | "http" | "connected";
                     config?: {
                         [key: string]: unknown;
                     };
@@ -4997,7 +5577,90 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Agent updated */
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        /**
+                         * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
+                         * @enum {string}
+                         */
+                        type: "signature" | "code" | "workflow" | "http" | "connected";
+                        config: {
+                            [key: string]: unknown;
+                        } | null;
+                        /** @description The environment a connected agent registered with, for example production or development. Null for every other kind. */
+                        environment: string | null;
+                        /** @description The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared. */
+                        ownerUserId: string | null;
+                        /** @description The machine a development agent registered from with a project or service key. Null when the agent is personal or shared. */
+                        hostLabel: string | null;
+                        /** @description When an instance of a connected agent was last connected. Null for every other kind. */
+                        lastSeenAt: string | null;
+                        /** @description The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind. */
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                            secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
+                        }[];
+                        /** @description The person a personal development agent belongs to. Null when the agent is shared or host-scoped. */
+                        owner: {
+                            userId: string;
+                            name: string | null;
+                        } | null;
+                        /**
+                         * @description online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind.
+                         * @enum {string}
+                         */
+                        status: "online" | "offline";
+                        /** @description The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind. */
+                        instances: {
+                            instanceId: string;
+                            hostname: string;
+                            username: string;
+                            pid: number;
+                            label: string | null;
+                            sdk: {
+                                name: string;
+                                version: string;
+                                language: string;
+                            };
+                            connectedAt: string;
+                            inflight: number;
+                            maxConcurrency: number;
+                        }[];
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
+    };
+    archiveAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5007,60 +5670,19 @@ export interface operations {
                         id: string;
                         name: string;
                         /** @enum {string} */
-                        type: "signature" | "code" | "workflow" | "http";
-                        config: {
-                            [key: string]: unknown;
-                        } | null;
-                        createdAt: string;
-                        updatedAt: string;
-                        /** Format: uri */
-                        platformUrl: string;
-                    };
-                };
-            };
-            /** @description Agent not found in this project */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description The request body does not match the expected shape */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
+                        type: "signature" | "code" | "workflow" | "http" | "connected";
+                        archivedAt: string | null;
                     };
                 };
             };
         };
     };
-    deleteApiAgentsById: {
+    updateAgent: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    patchApiAgentsById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
+                /** @description The agent id. */
                 id: string;
             };
             cookie?: never;
@@ -5069,8 +5691,11 @@ export interface operations {
             content: {
                 "application/json": {
                     name?: string;
-                    /** @enum {string} */
-                    type?: "signature" | "code" | "workflow" | "http";
+                    /**
+                     * @description The kind of agent to write. A connected agent is registered from code by the SDK, so "connected" is refused with agent_register_only.
+                     * @enum {string}
+                     */
+                    type?: "signature" | "code" | "workflow" | "http" | "connected";
                     config?: {
                         [key: string]: unknown;
                     };
@@ -5079,7 +5704,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Agent updated */
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5088,11 +5713,59 @@ export interface operations {
                     "application/json": {
                         id: string;
                         name: string;
-                        /** @enum {string} */
-                        type: "signature" | "code" | "workflow" | "http";
+                        /**
+                         * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
+                         * @enum {string}
+                         */
+                        type: "signature" | "code" | "workflow" | "http" | "connected";
                         config: {
                             [key: string]: unknown;
                         } | null;
+                        /** @description The environment a connected agent registered with, for example production or development. Null for every other kind. */
+                        environment: string | null;
+                        /** @description The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared. */
+                        ownerUserId: string | null;
+                        /** @description The machine a development agent registered from with a project or service key. Null when the agent is personal or shared. */
+                        hostLabel: string | null;
+                        /** @description When an instance of a connected agent was last connected. Null for every other kind. */
+                        lastSeenAt: string | null;
+                        /** @description The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind. */
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                            secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
+                        }[];
+                        /** @description The person a personal development agent belongs to. Null when the agent is shared or host-scoped. */
+                        owner: {
+                            userId: string;
+                            name: string | null;
+                        } | null;
+                        /**
+                         * @description online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind.
+                         * @enum {string}
+                         */
+                        status: "online" | "offline";
+                        /** @description The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind. */
+                        instances: {
+                            instanceId: string;
+                            hostname: string;
+                            username: string;
+                            pid: number;
+                            label: string | null;
+                            sdk: {
+                                name: string;
+                                version: string;
+                                language: string;
+                            };
+                            connectedAt: string;
+                            inflight: number;
+                            maxConcurrency: number;
+                        }[];
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -5100,29 +5773,153 @@ export interface operations {
                     };
                 };
             };
-            /** @description Agent not found in this project */
+        };
+    };
+    testAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The run to follow; open it in the simulations run drawer. */
+                        scenarioRunId: string;
+                        /** @description The batch the run belongs to. */
+                        batchRunId: string;
+                        /** @description The internal set that holds agent test runs. */
+                        setId: string;
+                    };
+                };
+            };
+            /** @description The agent is a personal development agent of someone else */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No agent with that id in this project */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
+                content?: never;
+            };
+            /** @description The agent cannot be tested as it is set up */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    callConnectedAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The connected agent id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The whole conversation so far, OpenAI style. */
+                    messages: ({
+                        role: string;
+                    } & {
+                        [key: string]: unknown;
+                    })[];
+                    /** @description The messages added since the agent's last turn. Defaults to the last message. */
+                    newMessages?: ({
+                        role: string;
+                    } & {
+                        [key: string]: unknown;
+                    })[];
+                    /** @description The conversation id. Turns of one conversation share it; a new id starts a new one. */
+                    threadId?: string;
+                    /** @description Run parameter values by name, as JSON scalars. */
+                    params?: {
+                        [key: string]: string | number | boolean;
+                    };
+                    /** @description The session the agent returned on its previous turn of this conversation, echoed back as is. */
+                    session?: unknown;
+                    /** @description The W3C trace context the agent adopts, so its spans join this turn's trace. */
+                    traceparent?: string;
+                    /** @description The simulation run this turn belongs to, if any. */
+                    run?: {
+                        scenarioRunId?: string;
+                        scenarioName?: string;
+                        batchRunId?: string;
                     };
                 };
             };
-            /** @description The request body does not match the expected shape */
-            422: {
+        };
+        responses: {
+            /** @description Success */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        /** @description What the function answered: text, one message, or a list of messages. */
+                        output: string | ({
+                            role: string;
+                        } & {
+                            [key: string]: unknown;
+                        }) | ({
+                            role: string;
+                        } & {
+                            [key: string]: unknown;
+                        })[];
+                        /** @description The agent's per-conversation memory, to send on the next turn. */
+                        session?: unknown;
+                        instance: {
+                            hostname: string;
+                            label: string | null;
+                        };
+                        durationMs: number;
                     };
                 };
+            };
+            /** @description No connected agent with that id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Every instance is busy; Retry-After says when to try again */
+            429: {
+                headers: {
+                    /** @description How many seconds to wait before the turn is sent again. Rounded up from the wait the platform picked. */
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No instance of the agent is connected */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -22470,7 +23267,7 @@ export interface operations {
                         langwatch?: {
                             targetReferenceId: string;
                             /** @enum {string} */
-                            targetType: "prompt" | "http" | "code" | "workflow";
+                            targetType: "prompt" | "http" | "code" | "workflow" | "connected";
                             targetKey?: string;
                             targetParameters?: {
                                 [key: string]: string | number | boolean;
@@ -22484,6 +23281,10 @@ export interface operations {
                             actorId?: string;
                             /** @enum {string} */
                             actorLabel?: "user" | "api" | "cli";
+                            agentInstance?: {
+                                hostname: string;
+                                label: string | null;
+                            };
                         };
                     } & {
                         [key: string]: unknown;
@@ -23173,6 +23974,10 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
                         }[];
                         /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
                         simulatorModel?: string | null;
@@ -23261,6 +24066,10 @@ export interface operations {
                         description?: string;
                         defaultValue?: string | number | boolean;
                         secret?: boolean;
+                        /** @enum {string} */
+                        type?: "string" | "number" | "boolean";
+                        options?: (string | number | boolean)[];
+                        required?: boolean;
                     }[];
                     /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
                     simulatorModel?: string | null;
@@ -23293,6 +24102,10 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
                         }[];
                         /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
                         simulatorModel?: string | null;
@@ -23387,6 +24200,10 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
                         }[];
                         /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
                         simulatorModel?: string | null;
@@ -23487,6 +24304,10 @@ export interface operations {
                         description?: string;
                         defaultValue?: string | number | boolean;
                         secret?: boolean;
+                        /** @enum {string} */
+                        type?: "string" | "number" | "boolean";
+                        options?: (string | number | boolean)[];
+                        required?: boolean;
                     }[];
                     /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
                     simulatorModel?: string | null;
@@ -23519,6 +24340,10 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
                         }[];
                         /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
                         simulatorModel?: string | null;
@@ -23704,6 +24529,10 @@ export interface operations {
                         description?: string;
                         defaultValue?: string | number | boolean;
                         secret?: boolean;
+                        /** @enum {string} */
+                        type?: "string" | "number" | "boolean";
+                        options?: (string | number | boolean)[];
+                        required?: boolean;
                     }[];
                     /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
                     simulatorModel?: string | null;
@@ -23736,6 +24565,10 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
                         }[];
                         /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
                         simulatorModel?: string | null;
@@ -23963,6 +24796,10 @@ export interface operations {
                                 description?: string;
                                 defaultValue?: string | number | boolean;
                                 secret?: boolean;
+                                /** @enum {string} */
+                                type?: "string" | "number" | "boolean";
+                                options?: (string | number | boolean)[];
+                                required?: boolean;
                             }[];
                             simulatorModel: string | null;
                             judgeModel: string | null;
@@ -25290,11 +26127,11 @@ export interface operations {
                         } | null;
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -25399,11 +26236,11 @@ export interface operations {
                     /** @default [] */
                     targets?: {
                         /**
-                         * @description What kind of thing the scenarios run against.
+                         * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                          * @enum {string}
                          */
-                        type: "prompt" | "http" | "code" | "workflow";
-                        /** @description The id of the prompt, agent or workflow to run against. */
+                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
                         /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                         runParameters?: {
@@ -25453,11 +26290,11 @@ export interface operations {
                         } | null;
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -25569,11 +26406,11 @@ export interface operations {
                         } | null;
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -25773,11 +26610,11 @@ export interface operations {
                     scenarioIds?: string[];
                     targets?: {
                         /**
-                         * @description What kind of thing the scenarios run against.
+                         * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                          * @enum {string}
                          */
-                        type: "prompt" | "http" | "code" | "workflow";
-                        /** @description The id of the prompt, agent or workflow to run against. */
+                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
                         /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                         runParameters?: {
@@ -25825,11 +26662,11 @@ export interface operations {
                         } | null;
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -25955,11 +26792,11 @@ export interface operations {
                         } | null;
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -26057,11 +26894,11 @@ export interface operations {
                     /** @description The prompts, agents or workflows the run goes against. Used only when the id names a test suite, which stores no target of its own. */
                     targets?: {
                         /**
-                         * @description What kind of thing the scenarios run against.
+                         * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                          * @enum {string}
                          */
-                        type: "prompt" | "http" | "code" | "workflow";
-                        /** @description The id of the prompt, agent or workflow to run against. */
+                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
                         /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                         runParameters?: {
@@ -26104,11 +26941,11 @@ export interface operations {
                             scenarioId: string;
                             target: {
                                 /**
-                                 * @description What kind of thing the scenarios run against.
+                                 * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                                  * @enum {string}
                                  */
-                                type: "prompt" | "http" | "code" | "workflow";
-                                /** @description The id of the prompt, agent or workflow to run against. */
+                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                                 referenceId: string;
                                 /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                                 runParameters?: {
@@ -26230,11 +27067,11 @@ export interface operations {
                         /** @description What the plan runs against, in the order the results show. A target carrying runParameters runs with those values. */
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -26298,11 +27135,11 @@ export interface operations {
                         /** @description The prompts, agents or workflows every scenario runs against. Every target runs every scenario, so naming more than one compares them in the same run. */
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -26361,11 +27198,11 @@ export interface operations {
                             /** @description What it was run against. */
                             target: {
                                 /**
-                                 * @description What kind of thing the scenarios run against.
+                                 * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                                  * @enum {string}
                                  */
-                                type: "prompt" | "http" | "code" | "workflow";
-                                /** @description The id of the prompt, agent or workflow to run against. */
+                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                                 referenceId: string;
                                 /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                                 runParameters?: {
@@ -26437,11 +27274,11 @@ export interface operations {
                         /** @description What the plan runs against, in the order the results show. A target carrying runParameters runs with those values. */
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -26559,11 +27396,11 @@ export interface operations {
                             /** @description What it was run against. */
                             target: {
                                 /**
-                                 * @description What kind of thing the scenarios run against.
+                                 * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                                  * @enum {string}
                                  */
-                                type: "prompt" | "http" | "code" | "workflow";
-                                /** @description The id of the prompt, agent or workflow to run against. */
+                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                                 referenceId: string;
                                 /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                                 runParameters?: {
@@ -26834,11 +27671,11 @@ export interface operations {
                     /** @description The prompts, agents or workflows the suite runs against. A test suite stores none of its own, so a run states them. Every target runs every scenario, so naming more than one compares them in the same run. */
                     targets: {
                         /**
-                         * @description What kind of thing the scenarios run against.
+                         * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                          * @enum {string}
                          */
-                        type: "prompt" | "http" | "code" | "workflow";
-                        /** @description The id of the prompt, agent or workflow to run against. */
+                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
                         /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                         runParameters?: {
@@ -26896,11 +27733,11 @@ export interface operations {
                             /** @description What it was run against. */
                             target: {
                                 /**
-                                 * @description What kind of thing the scenarios run against.
+                                 * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                                  * @enum {string}
                                  */
-                                type: "prompt" | "http" | "code" | "workflow";
-                                /** @description The id of the prompt, agent or workflow to run against. */
+                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                                 referenceId: string;
                                 /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                                 runParameters?: {

@@ -295,7 +295,7 @@
       "name": "Agent Simulations",
       "description": "Test agents with simulation-based testing using user simulators and judge evaluation",
       "surfaces": {
-        "docs": "https://langwatch.ai/docs/agent-simulations/introduction.md"
+        "docs": "https://langwatch.ai/docs/agent-testing/introduction.md"
       },
       "children": [
         {
@@ -345,7 +345,7 @@
               "docs": "https://langwatch.ai/scenario/basics/no-code-scenario.md"
             },
             "api": "/api/scenarios",
-            "docs": "https://langwatch.ai/docs/agent-simulations/introduction.md"
+            "docs": "https://langwatch.ai/docs/agent-testing/introduction.md"
           },
           "sync": null,
           "plannedSync": "bidirectional",
@@ -386,10 +386,10 @@
                 "platform_get_simulation_run"
               ],
               "skill": null,
-              "docs": "https://langwatch.ai/docs/agent-simulations/individual-run.md"
+              "docs": "https://langwatch.ai/docs/agent-testing/individual-run.md"
             },
             "api": "/api/simulation-runs",
-            "docs": "https://langwatch.ai/docs/agent-simulations/individual-run.md"
+            "docs": "https://langwatch.ai/docs/agent-testing/individual-run.md"
           },
           "sync": null,
           "produces": [
@@ -611,24 +611,25 @@
         {
           "id": "library.agents",
           "name": "Agents",
-          "description": "Agent definitions used in simulations and experiments",
+          "description": "Agent definitions used in simulations and experiments. A connected agent registers itself from code: connect_agent in Python, connectAgent from langwatch/agent in TypeScript",
           "surfaces": {
             "code": {
               "sdk": {
-                "python": "langwatch.agents",
-                "typescript": "langwatch.agents"
+                "python": "langwatch.agents, langwatch.connect_agent",
+                "typescript": "langwatch.agents, connectAgent (langwatch/agent)"
               },
               "cli": [
                 "agent list",
                 "agent get",
                 "agent create",
                 "agent run",
+                "agent test",
                 "agent dev",
                 "agent update",
                 "agent delete"
               ],
-              "skill": null,
-              "docs": null
+              "skill": "connect-agent",
+              "docs": "https://langwatch.ai/docs/agent-testing/connect-your-agent.md"
             },
             "platform": {
               "ui": "/agents",
@@ -638,13 +639,14 @@
                 "platform_create_agent",
                 "platform_update_agent",
                 "platform_run_agent",
+                "platform_test_agent",
                 "platform_delete_agent"
               ],
-              "skill": null,
-              "docs": null
+              "skill": "connect-agent",
+              "docs": "https://langwatch.ai/docs/agent-testing/connect-your-agent.md"
             },
-            "api": "/api/agents",
-            "docs": null
+            "api": "/api/v1/agents",
+            "docs": "https://langwatch.ai/docs/agent-testing/connect-your-agent.md"
           },
           "sync": null,
           "produces": [
@@ -1591,7 +1593,7 @@
               },
               "cli": null,
               "skill": null,
-              "docs": "https://langwatch.ai/docs/agent-simulations/authenticated-agents.md"
+              "docs": "https://langwatch.ai/docs/agent-testing/authenticated-agents.md"
             },
             "platform": {
               "ui": null,
@@ -1600,7 +1602,7 @@
               "docs": "https://langwatch.ai/docs/api-reference/agent-cache/overview.md"
             },
             "api": "/api/agent-cache",
-            "docs": "https://langwatch.ai/docs/agent-simulations/authenticated-agents.md"
+            "docs": "https://langwatch.ai/docs/agent-testing/authenticated-agents.md"
           },
           "sync": null,
           "produces": [

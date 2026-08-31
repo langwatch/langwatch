@@ -5,9 +5,32 @@ from .api_key_info import ApiKeyInfo
 from .api_key_info_role_bindings_item import ApiKeyInfoRoleBindingsItem
 from .api_key_info_role_bindings_item_role import ApiKeyInfoRoleBindingsItemRole
 from .api_key_info_role_bindings_item_scope_type import ApiKeyInfoRoleBindingsItemScopeType
+from .archive_agent_response_200 import ArchiveAgentResponse200
+from .archive_agent_response_200_type import ArchiveAgentResponse200Type
 from .archive_project_response_200 import ArchiveProjectResponse200
 from .archive_run_plan_response_200 import ArchiveRunPlanResponse200
 from .archive_test_suite_response_200 import ArchiveTestSuiteResponse200
+from .call_connected_agent_body import CallConnectedAgentBody
+from .call_connected_agent_body_messages_item import CallConnectedAgentBodyMessagesItem
+from .call_connected_agent_body_new_messages_item import CallConnectedAgentBodyNewMessagesItem
+from .call_connected_agent_body_params import CallConnectedAgentBodyParams
+from .call_connected_agent_body_run import CallConnectedAgentBodyRun
+from .call_connected_agent_response_200 import CallConnectedAgentResponse200
+from .call_connected_agent_response_200_instance import CallConnectedAgentResponse200Instance
+from .call_connected_agent_response_200_output_type_1 import CallConnectedAgentResponse200OutputType1
+from .call_connected_agent_response_200_output_type_2_item import CallConnectedAgentResponse200OutputType2Item
+from .create_agent_body import CreateAgentBody
+from .create_agent_body_config import CreateAgentBodyConfig
+from .create_agent_body_type import CreateAgentBodyType
+from .create_agent_response_201 import CreateAgentResponse201
+from .create_agent_response_201_config_type_0 import CreateAgentResponse201ConfigType0
+from .create_agent_response_201_instances_item import CreateAgentResponse201InstancesItem
+from .create_agent_response_201_instances_item_sdk import CreateAgentResponse201InstancesItemSdk
+from .create_agent_response_201_owner_type_0 import CreateAgentResponse201OwnerType0
+from .create_agent_response_201_parameters_item import CreateAgentResponse201ParametersItem
+from .create_agent_response_201_parameters_item_type import CreateAgentResponse201ParametersItemType
+from .create_agent_response_201_status import CreateAgentResponse201Status
+from .create_agent_response_201_type import CreateAgentResponse201Type
 from .create_api_key_body import CreateApiKeyBody
 from .create_api_key_body_bindings_item import CreateApiKeyBodyBindingsItem
 from .create_api_key_body_bindings_item_role import CreateApiKeyBodyBindingsItemRole
@@ -380,6 +403,15 @@ from .delete_role_response_200 import DeleteRoleResponse200
 from .error import Error
 from .evaluation import Evaluation
 from .evaluation_timestamps import EvaluationTimestamps
+from .get_agent_response_200 import GetAgentResponse200
+from .get_agent_response_200_config_type_0 import GetAgentResponse200ConfigType0
+from .get_agent_response_200_instances_item import GetAgentResponse200InstancesItem
+from .get_agent_response_200_instances_item_sdk import GetAgentResponse200InstancesItemSdk
+from .get_agent_response_200_owner_type_0 import GetAgentResponse200OwnerType0
+from .get_agent_response_200_parameters_item import GetAgentResponse200ParametersItem
+from .get_agent_response_200_parameters_item_type import GetAgentResponse200ParametersItemType
+from .get_agent_response_200_status import GetAgentResponse200Status
+from .get_agent_response_200_type import GetAgentResponse200Type
 from .get_api_agent_cache_by_name_response_200 import GetApiAgentCacheByNameResponse200
 from .get_api_agent_cache_by_name_response_400 import GetApiAgentCacheByNameResponse400
 from .get_api_agent_cache_by_name_response_400_error import GetApiAgentCacheByNameResponse400Error
@@ -1283,6 +1315,7 @@ from .get_api_prompts_tags_response_422 import GetApiPromptsTagsResponse422
 from .get_api_prompts_tags_response_500 import GetApiPromptsTagsResponse500
 from .get_api_scenarios_by_id_response_200 import GetApiScenariosByIdResponse200
 from .get_api_scenarios_by_id_response_200_parameters_item import GetApiScenariosByIdResponse200ParametersItem
+from .get_api_scenarios_by_id_response_200_parameters_item_type import GetApiScenariosByIdResponse200ParametersItemType
 from .get_api_scenarios_by_id_response_400 import GetApiScenariosByIdResponse400
 from .get_api_scenarios_by_id_response_401 import GetApiScenariosByIdResponse401
 from .get_api_scenarios_by_id_response_404 import GetApiScenariosByIdResponse404
@@ -1294,6 +1327,9 @@ from .get_api_scenarios_by_id_versions_by_version_response_200_snapshot import (
 )
 from .get_api_scenarios_by_id_versions_by_version_response_200_snapshot_parameters_item import (
     GetApiScenariosByIdVersionsByVersionResponse200SnapshotParametersItem,
+)
+from .get_api_scenarios_by_id_versions_by_version_response_200_snapshot_parameters_item_type import (
+    GetApiScenariosByIdVersionsByVersionResponse200SnapshotParametersItemType,
 )
 from .get_api_scenarios_by_id_versions_by_version_response_400 import GetApiScenariosByIdVersionsByVersionResponse400
 from .get_api_scenarios_by_id_versions_by_version_response_401 import GetApiScenariosByIdVersionsByVersionResponse401
@@ -1311,6 +1347,7 @@ from .get_api_scenarios_by_id_versions_response_422 import GetApiScenariosByIdVe
 from .get_api_scenarios_by_id_versions_response_500 import GetApiScenariosByIdVersionsResponse500
 from .get_api_scenarios_response_200_item import GetApiScenariosResponse200Item
 from .get_api_scenarios_response_200_item_parameters_item import GetApiScenariosResponse200ItemParametersItem
+from .get_api_scenarios_response_200_item_parameters_item_type import GetApiScenariosResponse200ItemParametersItemType
 from .get_api_scenarios_response_400 import GetApiScenariosResponse400
 from .get_api_scenarios_response_401 import GetApiScenariosResponse401
 from .get_api_scenarios_response_422 import GetApiScenariosResponse422
@@ -1935,6 +1972,17 @@ from .get_run_plan_response_200_targets_item_type import GetRunPlanResponse200Ta
 from .get_test_suite_response_200 import GetTestSuiteResponse200
 from .get_test_suite_response_200_scenarios_item import GetTestSuiteResponse200ScenariosItem
 from .input_ import Input
+from .list_agents_response_200 import ListAgentsResponse200
+from .list_agents_response_200_data_item import ListAgentsResponse200DataItem
+from .list_agents_response_200_data_item_config_type_0 import ListAgentsResponse200DataItemConfigType0
+from .list_agents_response_200_data_item_instances_item import ListAgentsResponse200DataItemInstancesItem
+from .list_agents_response_200_data_item_instances_item_sdk import ListAgentsResponse200DataItemInstancesItemSdk
+from .list_agents_response_200_data_item_owner_type_0 import ListAgentsResponse200DataItemOwnerType0
+from .list_agents_response_200_data_item_parameters_item import ListAgentsResponse200DataItemParametersItem
+from .list_agents_response_200_data_item_parameters_item_type import ListAgentsResponse200DataItemParametersItemType
+from .list_agents_response_200_data_item_status import ListAgentsResponse200DataItemStatus
+from .list_agents_response_200_data_item_type import ListAgentsResponse200DataItemType
+from .list_agents_response_200_pagination import ListAgentsResponse200Pagination
 from .list_api_keys_response_200 import ListApiKeysResponse200
 from .list_organization_invites_response_200 import ListOrganizationInvitesResponse200
 from .list_organization_invites_response_200_invites_item import ListOrganizationInvitesResponse200InvitesItem
@@ -1982,14 +2030,6 @@ from .metadata import Metadata
 from .metrics import Metrics
 from .output import Output
 from .pagination import Pagination
-from .patch_api_agents_by_id_body import PatchApiAgentsByIdBody
-from .patch_api_agents_by_id_body_config import PatchApiAgentsByIdBodyConfig
-from .patch_api_agents_by_id_body_type import PatchApiAgentsByIdBodyType
-from .patch_api_agents_by_id_response_200 import PatchApiAgentsByIdResponse200
-from .patch_api_agents_by_id_response_200_config_type_0 import PatchApiAgentsByIdResponse200ConfigType0
-from .patch_api_agents_by_id_response_200_type import PatchApiAgentsByIdResponse200Type
-from .patch_api_agents_by_id_response_404 import PatchApiAgentsByIdResponse404
-from .patch_api_agents_by_id_response_422 import PatchApiAgentsByIdResponse422
 from .patch_api_annotations_id_body import PatchApiAnnotationsIdBody
 from .patch_api_annotations_id_response_200 import PatchApiAnnotationsIdResponse200
 from .patch_api_dashboards_by_id_body import PatchApiDashboardsByIdBody
@@ -2250,8 +2290,12 @@ from .patch_api_monitors_by_id_response_422 import PatchApiMonitorsByIdResponse4
 from .patch_api_monitors_by_id_response_500 import PatchApiMonitorsByIdResponse500
 from .patch_api_scenarios_by_id_body import PatchApiScenariosByIdBody
 from .patch_api_scenarios_by_id_body_parameters_item import PatchApiScenariosByIdBodyParametersItem
+from .patch_api_scenarios_by_id_body_parameters_item_type import PatchApiScenariosByIdBodyParametersItemType
 from .patch_api_scenarios_by_id_response_200 import PatchApiScenariosByIdResponse200
 from .patch_api_scenarios_by_id_response_200_parameters_item import PatchApiScenariosByIdResponse200ParametersItem
+from .patch_api_scenarios_by_id_response_200_parameters_item_type import (
+    PatchApiScenariosByIdResponse200ParametersItemType,
+)
 from .patch_api_scenarios_by_id_response_400 import PatchApiScenariosByIdResponse400
 from .patch_api_scenarios_by_id_response_401 import PatchApiScenariosByIdResponse401
 from .patch_api_scenarios_by_id_response_404 import PatchApiScenariosByIdResponse404
@@ -2431,6 +2475,25 @@ from .patch_api_workflows_by_id_response_401 import PatchApiWorkflowsByIdRespons
 from .patch_api_workflows_by_id_response_404 import PatchApiWorkflowsByIdResponse404
 from .patch_api_workflows_by_id_response_422 import PatchApiWorkflowsByIdResponse422
 from .patch_api_workflows_by_id_response_500 import PatchApiWorkflowsByIdResponse500
+from .poll_connected_agent_instance_response_200 import PollConnectedAgentInstanceResponse200
+from .poll_connected_agent_instance_response_200_frames_item_type_0 import (
+    PollConnectedAgentInstanceResponse200FramesItemType0,
+)
+from .poll_connected_agent_instance_response_200_frames_item_type_0_messages_item import (
+    PollConnectedAgentInstanceResponse200FramesItemType0MessagesItem,
+)
+from .poll_connected_agent_instance_response_200_frames_item_type_0_new_messages_item import (
+    PollConnectedAgentInstanceResponse200FramesItemType0NewMessagesItem,
+)
+from .poll_connected_agent_instance_response_200_frames_item_type_0_params import (
+    PollConnectedAgentInstanceResponse200FramesItemType0Params,
+)
+from .poll_connected_agent_instance_response_200_frames_item_type_0_run import (
+    PollConnectedAgentInstanceResponse200FramesItemType0Run,
+)
+from .poll_connected_agent_instance_response_200_frames_item_type_1 import (
+    PollConnectedAgentInstanceResponse200FramesItemType1,
+)
 from .post_api_agent_cache_by_name_claim_body import PostApiAgentCacheByNameClaimBody
 from .post_api_agent_cache_by_name_claim_response_200 import PostApiAgentCacheByNameClaimResponse200
 from .post_api_agent_cache_by_name_claim_response_400 import PostApiAgentCacheByNameClaimResponse400
@@ -2445,9 +2508,6 @@ from .post_api_agent_cache_by_name_claim_response_403_error_meta import PostApiA
 from .post_api_agent_cache_by_name_claim_response_500 import PostApiAgentCacheByNameClaimResponse500
 from .post_api_agent_cache_by_name_claim_response_500_error import PostApiAgentCacheByNameClaimResponse500Error
 from .post_api_agent_cache_by_name_claim_response_500_error_meta import PostApiAgentCacheByNameClaimResponse500ErrorMeta
-from .post_api_agents_body import PostApiAgentsBody
-from .post_api_agents_body_config import PostApiAgentsBodyConfig
-from .post_api_agents_body_type import PostApiAgentsBodyType
 from .post_api_analytics_body import PostApiAnalyticsBody
 from .post_api_analytics_body_filters import PostApiAnalyticsBodyFilters
 from .post_api_analytics_body_filters_annotations_has_annotation_type_1 import (
@@ -4563,6 +4623,9 @@ from .post_api_scenario_events_body_type_0_metadata_langwatch import PostApiScen
 from .post_api_scenario_events_body_type_0_metadata_langwatch_actor_label import (
     PostApiScenarioEventsBodyType0MetadataLangwatchActorLabel,
 )
+from .post_api_scenario_events_body_type_0_metadata_langwatch_agent_instance import (
+    PostApiScenarioEventsBodyType0MetadataLangwatchAgentInstance,
+)
 from .post_api_scenario_events_body_type_0_metadata_langwatch_target_parameters import (
     PostApiScenarioEventsBodyType0MetadataLangwatchTargetParameters,
 )
@@ -4597,8 +4660,10 @@ from .post_api_scenario_events_response_422 import PostApiScenarioEventsResponse
 from .post_api_scenario_events_response_500 import PostApiScenarioEventsResponse500
 from .post_api_scenarios_body import PostApiScenariosBody
 from .post_api_scenarios_body_parameters_item import PostApiScenariosBodyParametersItem
+from .post_api_scenarios_body_parameters_item_type import PostApiScenariosBodyParametersItemType
 from .post_api_scenarios_response_201 import PostApiScenariosResponse201
 from .post_api_scenarios_response_201_parameters_item import PostApiScenariosResponse201ParametersItem
+from .post_api_scenarios_response_201_parameters_item_type import PostApiScenariosResponse201ParametersItemType
 from .post_api_scenarios_response_400 import PostApiScenariosResponse400
 from .post_api_scenarios_response_401 import PostApiScenariosResponse401
 from .post_api_scenarios_response_422 import PostApiScenariosResponse422
@@ -5462,6 +5527,30 @@ from .post_api_workflows_by_workflow_id_run_response_400 import PostApiWorkflows
 from .post_api_workflows_by_workflow_id_run_response_401 import PostApiWorkflowsByWorkflowIdRunResponse401
 from .post_api_workflows_by_workflow_id_run_response_403 import PostApiWorkflowsByWorkflowIdRunResponse403
 from .post_api_workflows_by_workflow_id_run_response_404 import PostApiWorkflowsByWorkflowIdRunResponse404
+from .post_connected_agent_frames_body import PostConnectedAgentFramesBody
+from .post_connected_agent_frames_body_frames_item_type_0 import PostConnectedAgentFramesBodyFramesItemType0
+from .post_connected_agent_frames_body_frames_item_type_0_protocol import (
+    PostConnectedAgentFramesBodyFramesItemType0Protocol,
+)
+from .post_connected_agent_frames_body_frames_item_type_0_type import PostConnectedAgentFramesBodyFramesItemType0Type
+from .post_connected_agent_frames_body_frames_item_type_1 import PostConnectedAgentFramesBodyFramesItemType1
+from .post_connected_agent_frames_body_frames_item_type_1_error import PostConnectedAgentFramesBodyFramesItemType1Error
+from .post_connected_agent_frames_body_frames_item_type_1_output_type_1 import (
+    PostConnectedAgentFramesBodyFramesItemType1OutputType1,
+)
+from .post_connected_agent_frames_body_frames_item_type_1_output_type_2_item import (
+    PostConnectedAgentFramesBodyFramesItemType1OutputType2Item,
+)
+from .post_connected_agent_frames_body_frames_item_type_1_protocol import (
+    PostConnectedAgentFramesBodyFramesItemType1Protocol,
+)
+from .post_connected_agent_frames_body_frames_item_type_1_type import PostConnectedAgentFramesBodyFramesItemType1Type
+from .post_connected_agent_frames_body_frames_item_type_2 import PostConnectedAgentFramesBodyFramesItemType2
+from .post_connected_agent_frames_body_frames_item_type_2_protocol import (
+    PostConnectedAgentFramesBodyFramesItemType2Protocol,
+)
+from .post_connected_agent_frames_body_frames_item_type_2_type import PostConnectedAgentFramesBodyFramesItemType2Type
+from .post_connected_agent_frames_response_200 import PostConnectedAgentFramesResponse200
 from .post_index_body import PostIndexBody
 from .post_index_body_inputs_item import PostIndexBodyInputsItem
 from .post_index_body_inputs_item_type import PostIndexBodyInputsItemType
@@ -5511,14 +5600,6 @@ from .put_api_agent_cache_by_name_response_403_error_meta import PutApiAgentCach
 from .put_api_agent_cache_by_name_response_500 import PutApiAgentCacheByNameResponse500
 from .put_api_agent_cache_by_name_response_500_error import PutApiAgentCacheByNameResponse500Error
 from .put_api_agent_cache_by_name_response_500_error_meta import PutApiAgentCacheByNameResponse500ErrorMeta
-from .put_api_agents_by_id_body import PutApiAgentsByIdBody
-from .put_api_agents_by_id_body_config import PutApiAgentsByIdBodyConfig
-from .put_api_agents_by_id_body_type import PutApiAgentsByIdBodyType
-from .put_api_agents_by_id_response_200 import PutApiAgentsByIdResponse200
-from .put_api_agents_by_id_response_200_config_type_0 import PutApiAgentsByIdResponse200ConfigType0
-from .put_api_agents_by_id_response_200_type import PutApiAgentsByIdResponse200Type
-from .put_api_agents_by_id_response_404 import PutApiAgentsByIdResponse404
-from .put_api_agents_by_id_response_422 import PutApiAgentsByIdResponse422
 from .put_api_dashboards_reorder_body import PutApiDashboardsReorderBody
 from .put_api_evaluators_by_id_body import PutApiEvaluatorsByIdBody
 from .put_api_evaluators_by_id_body_config import PutApiEvaluatorsByIdBodyConfig
@@ -5690,8 +5771,10 @@ from .put_api_prompts_tags_by_tag_response_422 import PutApiPromptsTagsByTagResp
 from .put_api_prompts_tags_by_tag_response_500 import PutApiPromptsTagsByTagResponse500
 from .put_api_scenarios_by_id_body import PutApiScenariosByIdBody
 from .put_api_scenarios_by_id_body_parameters_item import PutApiScenariosByIdBodyParametersItem
+from .put_api_scenarios_by_id_body_parameters_item_type import PutApiScenariosByIdBodyParametersItemType
 from .put_api_scenarios_by_id_response_200 import PutApiScenariosByIdResponse200
 from .put_api_scenarios_by_id_response_200_parameters_item import PutApiScenariosByIdResponse200ParametersItem
+from .put_api_scenarios_by_id_response_200_parameters_item_type import PutApiScenariosByIdResponse200ParametersItemType
 from .put_api_scenarios_by_id_response_400 import PutApiScenariosByIdResponse400
 from .put_api_scenarios_by_id_response_401 import PutApiScenariosByIdResponse401
 from .put_api_scenarios_by_id_response_404 import PutApiScenariosByIdResponse404
@@ -5765,9 +5848,46 @@ from .put_api_v1_projects_by_project_id_analytics_charts_by_chart_id_placement_r
     PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse500ErrorMeta,
 )
 from .regenerate_project_api_key_response_200 import RegenerateProjectApiKeyResponse200
+from .register_connected_agent_instance_body import RegisterConnectedAgentInstanceBody
+from .register_connected_agent_instance_body_agents_item import RegisterConnectedAgentInstanceBodyAgentsItem
+from .register_connected_agent_instance_body_agents_item_parameters import (
+    RegisterConnectedAgentInstanceBodyAgentsItemParameters,
+)
+from .register_connected_agent_instance_body_instance import RegisterConnectedAgentInstanceBodyInstance
+from .register_connected_agent_instance_body_protocol import RegisterConnectedAgentInstanceBodyProtocol
+from .register_connected_agent_instance_body_sdk import RegisterConnectedAgentInstanceBodySdk
+from .register_connected_agent_instance_body_type import RegisterConnectedAgentInstanceBodyType
+from .register_connected_agent_instance_response_200 import RegisterConnectedAgentInstanceResponse200
+from .register_connected_agent_instance_response_200_frame_type_0 import (
+    RegisterConnectedAgentInstanceResponse200FrameType0,
+)
+from .register_connected_agent_instance_response_200_frame_type_0_agents_item import (
+    RegisterConnectedAgentInstanceResponse200FrameType0AgentsItem,
+)
+from .register_connected_agent_instance_response_200_frame_type_1 import (
+    RegisterConnectedAgentInstanceResponse200FrameType1,
+)
+from .register_connected_agent_instance_response_200_frame_type_1_code import (
+    RegisterConnectedAgentInstanceResponse200FrameType1Code,
+)
+from .register_connected_agent_instance_response_200_frame_type_1_meta import (
+    RegisterConnectedAgentInstanceResponse200FrameType1Meta,
+)
 from .remove_organization_member_response_200 import RemoveOrganizationMemberResponse200
 from .rename_test_suite_body import RenameTestSuiteBody
 from .rename_test_suite_response_200 import RenameTestSuiteResponse200
+from .replace_agent_body import ReplaceAgentBody
+from .replace_agent_body_config import ReplaceAgentBodyConfig
+from .replace_agent_body_type import ReplaceAgentBodyType
+from .replace_agent_response_200 import ReplaceAgentResponse200
+from .replace_agent_response_200_config_type_0 import ReplaceAgentResponse200ConfigType0
+from .replace_agent_response_200_instances_item import ReplaceAgentResponse200InstancesItem
+from .replace_agent_response_200_instances_item_sdk import ReplaceAgentResponse200InstancesItemSdk
+from .replace_agent_response_200_owner_type_0 import ReplaceAgentResponse200OwnerType0
+from .replace_agent_response_200_parameters_item import ReplaceAgentResponse200ParametersItem
+from .replace_agent_response_200_parameters_item_type import ReplaceAgentResponse200ParametersItemType
+from .replace_agent_response_200_status import ReplaceAgentResponse200Status
+from .replace_agent_response_200_type import ReplaceAgentResponse200Type
 from .rerun_run_plan_body import RerunRunPlanBody
 from .rerun_run_plan_body_parameters import RerunRunPlanBodyParameters
 from .rerun_run_plan_response_200 import RerunRunPlanResponse200
@@ -5913,8 +6033,21 @@ from .scim_replace_user_response_404 import ScimReplaceUserResponse404
 from .search_request import SearchRequest
 from .search_request_filters import SearchRequestFilters
 from .search_response import SearchResponse
+from .test_agent_response_200 import TestAgentResponse200
 from .timestamps import Timestamps
 from .trace import Trace
+from .update_agent_body import UpdateAgentBody
+from .update_agent_body_config import UpdateAgentBodyConfig
+from .update_agent_body_type import UpdateAgentBodyType
+from .update_agent_response_200 import UpdateAgentResponse200
+from .update_agent_response_200_config_type_0 import UpdateAgentResponse200ConfigType0
+from .update_agent_response_200_instances_item import UpdateAgentResponse200InstancesItem
+from .update_agent_response_200_instances_item_sdk import UpdateAgentResponse200InstancesItemSdk
+from .update_agent_response_200_owner_type_0 import UpdateAgentResponse200OwnerType0
+from .update_agent_response_200_parameters_item import UpdateAgentResponse200ParametersItem
+from .update_agent_response_200_parameters_item_type import UpdateAgentResponse200ParametersItemType
+from .update_agent_response_200_status import UpdateAgentResponse200Status
+from .update_agent_response_200_type import UpdateAgentResponse200Type
 from .update_api_key_body import UpdateApiKeyBody
 from .update_api_key_body_bindings_item import UpdateApiKeyBodyBindingsItem
 from .update_api_key_body_bindings_item_role import UpdateApiKeyBodyBindingsItemRole
@@ -5966,9 +6099,32 @@ __all__ = (
     "ApiKeyInfoRoleBindingsItem",
     "ApiKeyInfoRoleBindingsItemRole",
     "ApiKeyInfoRoleBindingsItemScopeType",
+    "ArchiveAgentResponse200",
+    "ArchiveAgentResponse200Type",
     "ArchiveProjectResponse200",
     "ArchiveRunPlanResponse200",
     "ArchiveTestSuiteResponse200",
+    "CallConnectedAgentBody",
+    "CallConnectedAgentBodyMessagesItem",
+    "CallConnectedAgentBodyNewMessagesItem",
+    "CallConnectedAgentBodyParams",
+    "CallConnectedAgentBodyRun",
+    "CallConnectedAgentResponse200",
+    "CallConnectedAgentResponse200Instance",
+    "CallConnectedAgentResponse200OutputType1",
+    "CallConnectedAgentResponse200OutputType2Item",
+    "CreateAgentBody",
+    "CreateAgentBodyConfig",
+    "CreateAgentBodyType",
+    "CreateAgentResponse201",
+    "CreateAgentResponse201ConfigType0",
+    "CreateAgentResponse201InstancesItem",
+    "CreateAgentResponse201InstancesItemSdk",
+    "CreateAgentResponse201OwnerType0",
+    "CreateAgentResponse201ParametersItem",
+    "CreateAgentResponse201ParametersItemType",
+    "CreateAgentResponse201Status",
+    "CreateAgentResponse201Type",
     "CreateApiKeyBody",
     "CreateApiKeyBodyBindingsItem",
     "CreateApiKeyBodyBindingsItemRole",
@@ -6201,6 +6357,15 @@ __all__ = (
     "Error",
     "Evaluation",
     "EvaluationTimestamps",
+    "GetAgentResponse200",
+    "GetAgentResponse200ConfigType0",
+    "GetAgentResponse200InstancesItem",
+    "GetAgentResponse200InstancesItemSdk",
+    "GetAgentResponse200OwnerType0",
+    "GetAgentResponse200ParametersItem",
+    "GetAgentResponse200ParametersItemType",
+    "GetAgentResponse200Status",
+    "GetAgentResponse200Type",
     "GetApiAgentCacheByNameResponse200",
     "GetApiAgentCacheByNameResponse400",
     "GetApiAgentCacheByNameResponse400Error",
@@ -6736,6 +6901,7 @@ __all__ = (
     "GetApiPromptsTagsResponse500",
     "GetApiScenariosByIdResponse200",
     "GetApiScenariosByIdResponse200ParametersItem",
+    "GetApiScenariosByIdResponse200ParametersItemType",
     "GetApiScenariosByIdResponse400",
     "GetApiScenariosByIdResponse401",
     "GetApiScenariosByIdResponse404",
@@ -6744,6 +6910,7 @@ __all__ = (
     "GetApiScenariosByIdVersionsByVersionResponse200",
     "GetApiScenariosByIdVersionsByVersionResponse200Snapshot",
     "GetApiScenariosByIdVersionsByVersionResponse200SnapshotParametersItem",
+    "GetApiScenariosByIdVersionsByVersionResponse200SnapshotParametersItemType",
     "GetApiScenariosByIdVersionsByVersionResponse400",
     "GetApiScenariosByIdVersionsByVersionResponse401",
     "GetApiScenariosByIdVersionsByVersionResponse404",
@@ -6758,6 +6925,7 @@ __all__ = (
     "GetApiScenariosByIdVersionsResponse500",
     "GetApiScenariosResponse200Item",
     "GetApiScenariosResponse200ItemParametersItem",
+    "GetApiScenariosResponse200ItemParametersItemType",
     "GetApiScenariosResponse400",
     "GetApiScenariosResponse401",
     "GetApiScenariosResponse422",
@@ -7124,6 +7292,17 @@ __all__ = (
     "GetTestSuiteResponse200",
     "GetTestSuiteResponse200ScenariosItem",
     "Input",
+    "ListAgentsResponse200",
+    "ListAgentsResponse200DataItem",
+    "ListAgentsResponse200DataItemConfigType0",
+    "ListAgentsResponse200DataItemInstancesItem",
+    "ListAgentsResponse200DataItemInstancesItemSdk",
+    "ListAgentsResponse200DataItemOwnerType0",
+    "ListAgentsResponse200DataItemParametersItem",
+    "ListAgentsResponse200DataItemParametersItemType",
+    "ListAgentsResponse200DataItemStatus",
+    "ListAgentsResponse200DataItemType",
+    "ListAgentsResponse200Pagination",
     "ListApiKeysResponse200",
     "ListOrganizationInvitesResponse200",
     "ListOrganizationInvitesResponse200InvitesItem",
@@ -7165,14 +7344,6 @@ __all__ = (
     "Metrics",
     "Output",
     "Pagination",
-    "PatchApiAgentsByIdBody",
-    "PatchApiAgentsByIdBodyConfig",
-    "PatchApiAgentsByIdBodyType",
-    "PatchApiAgentsByIdResponse200",
-    "PatchApiAgentsByIdResponse200ConfigType0",
-    "PatchApiAgentsByIdResponse200Type",
-    "PatchApiAgentsByIdResponse404",
-    "PatchApiAgentsByIdResponse422",
     "PatchApiAnnotationsIdBody",
     "PatchApiAnnotationsIdResponse200",
     "PatchApiDashboardsByIdBody",
@@ -7319,8 +7490,10 @@ __all__ = (
     "PatchApiMonitorsByIdResponse500",
     "PatchApiScenariosByIdBody",
     "PatchApiScenariosByIdBodyParametersItem",
+    "PatchApiScenariosByIdBodyParametersItemType",
     "PatchApiScenariosByIdResponse200",
     "PatchApiScenariosByIdResponse200ParametersItem",
+    "PatchApiScenariosByIdResponse200ParametersItemType",
     "PatchApiScenariosByIdResponse400",
     "PatchApiScenariosByIdResponse401",
     "PatchApiScenariosByIdResponse404",
@@ -7428,6 +7601,13 @@ __all__ = (
     "PatchApiWorkflowsByIdResponse404",
     "PatchApiWorkflowsByIdResponse422",
     "PatchApiWorkflowsByIdResponse500",
+    "PollConnectedAgentInstanceResponse200",
+    "PollConnectedAgentInstanceResponse200FramesItemType0",
+    "PollConnectedAgentInstanceResponse200FramesItemType0MessagesItem",
+    "PollConnectedAgentInstanceResponse200FramesItemType0NewMessagesItem",
+    "PollConnectedAgentInstanceResponse200FramesItemType0Params",
+    "PollConnectedAgentInstanceResponse200FramesItemType0Run",
+    "PollConnectedAgentInstanceResponse200FramesItemType1",
     "PostApiAgentCacheByNameClaimBody",
     "PostApiAgentCacheByNameClaimResponse200",
     "PostApiAgentCacheByNameClaimResponse400",
@@ -7442,9 +7622,6 @@ __all__ = (
     "PostApiAgentCacheByNameClaimResponse500",
     "PostApiAgentCacheByNameClaimResponse500Error",
     "PostApiAgentCacheByNameClaimResponse500ErrorMeta",
-    "PostApiAgentsBody",
-    "PostApiAgentsBodyConfig",
-    "PostApiAgentsBodyType",
     "PostApiAnalyticsBody",
     "PostApiAnalyticsBodyFilters",
     "PostApiAnalyticsBodyFiltersAnnotationsHasAnnotationType1",
@@ -8414,6 +8591,7 @@ __all__ = (
     "PostApiScenarioEventsBodyType0MetadataAgentsItemRole",
     "PostApiScenarioEventsBodyType0MetadataLangwatch",
     "PostApiScenarioEventsBodyType0MetadataLangwatchActorLabel",
+    "PostApiScenarioEventsBodyType0MetadataLangwatchAgentInstance",
     "PostApiScenarioEventsBodyType0MetadataLangwatchTargetParameters",
     "PostApiScenarioEventsBodyType0MetadataLangwatchTargetType",
     "PostApiScenarioEventsBodyType1",
@@ -8442,8 +8620,10 @@ __all__ = (
     "PostApiScenarioEventsResponse500",
     "PostApiScenariosBody",
     "PostApiScenariosBodyParametersItem",
+    "PostApiScenariosBodyParametersItemType",
     "PostApiScenariosResponse201",
     "PostApiScenariosResponse201ParametersItem",
+    "PostApiScenariosResponse201ParametersItemType",
     "PostApiScenariosResponse400",
     "PostApiScenariosResponse401",
     "PostApiScenariosResponse422",
@@ -8855,6 +9035,20 @@ __all__ = (
     "PostApiWorkflowsByWorkflowIdRunResponse401",
     "PostApiWorkflowsByWorkflowIdRunResponse403",
     "PostApiWorkflowsByWorkflowIdRunResponse404",
+    "PostConnectedAgentFramesBody",
+    "PostConnectedAgentFramesBodyFramesItemType0",
+    "PostConnectedAgentFramesBodyFramesItemType0Protocol",
+    "PostConnectedAgentFramesBodyFramesItemType0Type",
+    "PostConnectedAgentFramesBodyFramesItemType1",
+    "PostConnectedAgentFramesBodyFramesItemType1Error",
+    "PostConnectedAgentFramesBodyFramesItemType1OutputType1",
+    "PostConnectedAgentFramesBodyFramesItemType1OutputType2Item",
+    "PostConnectedAgentFramesBodyFramesItemType1Protocol",
+    "PostConnectedAgentFramesBodyFramesItemType1Type",
+    "PostConnectedAgentFramesBodyFramesItemType2",
+    "PostConnectedAgentFramesBodyFramesItemType2Protocol",
+    "PostConnectedAgentFramesBodyFramesItemType2Type",
+    "PostConnectedAgentFramesResponse200",
     "PostIndexBody",
     "PostIndexBodyInputsItem",
     "PostIndexBodyInputsItemType",
@@ -8900,14 +9094,6 @@ __all__ = (
     "PutApiAgentCacheByNameResponse500",
     "PutApiAgentCacheByNameResponse500Error",
     "PutApiAgentCacheByNameResponse500ErrorMeta",
-    "PutApiAgentsByIdBody",
-    "PutApiAgentsByIdBodyConfig",
-    "PutApiAgentsByIdBodyType",
-    "PutApiAgentsByIdResponse200",
-    "PutApiAgentsByIdResponse200ConfigType0",
-    "PutApiAgentsByIdResponse200Type",
-    "PutApiAgentsByIdResponse404",
-    "PutApiAgentsByIdResponse422",
     "PutApiDashboardsReorderBody",
     "PutApiEvaluatorsByIdBody",
     "PutApiEvaluatorsByIdBodyConfig",
@@ -9019,8 +9205,10 @@ __all__ = (
     "PutApiPromptsTagsByTagResponse500",
     "PutApiScenariosByIdBody",
     "PutApiScenariosByIdBodyParametersItem",
+    "PutApiScenariosByIdBodyParametersItemType",
     "PutApiScenariosByIdResponse200",
     "PutApiScenariosByIdResponse200ParametersItem",
+    "PutApiScenariosByIdResponse200ParametersItemType",
     "PutApiScenariosByIdResponse400",
     "PutApiScenariosByIdResponse401",
     "PutApiScenariosByIdResponse404",
@@ -9054,9 +9242,34 @@ __all__ = (
     "PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse500Error",
     "PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse500ErrorMeta",
     "RegenerateProjectApiKeyResponse200",
+    "RegisterConnectedAgentInstanceBody",
+    "RegisterConnectedAgentInstanceBodyAgentsItem",
+    "RegisterConnectedAgentInstanceBodyAgentsItemParameters",
+    "RegisterConnectedAgentInstanceBodyInstance",
+    "RegisterConnectedAgentInstanceBodyProtocol",
+    "RegisterConnectedAgentInstanceBodySdk",
+    "RegisterConnectedAgentInstanceBodyType",
+    "RegisterConnectedAgentInstanceResponse200",
+    "RegisterConnectedAgentInstanceResponse200FrameType0",
+    "RegisterConnectedAgentInstanceResponse200FrameType0AgentsItem",
+    "RegisterConnectedAgentInstanceResponse200FrameType1",
+    "RegisterConnectedAgentInstanceResponse200FrameType1Code",
+    "RegisterConnectedAgentInstanceResponse200FrameType1Meta",
     "RemoveOrganizationMemberResponse200",
     "RenameTestSuiteBody",
     "RenameTestSuiteResponse200",
+    "ReplaceAgentBody",
+    "ReplaceAgentBodyConfig",
+    "ReplaceAgentBodyType",
+    "ReplaceAgentResponse200",
+    "ReplaceAgentResponse200ConfigType0",
+    "ReplaceAgentResponse200InstancesItem",
+    "ReplaceAgentResponse200InstancesItemSdk",
+    "ReplaceAgentResponse200OwnerType0",
+    "ReplaceAgentResponse200ParametersItem",
+    "ReplaceAgentResponse200ParametersItemType",
+    "ReplaceAgentResponse200Status",
+    "ReplaceAgentResponse200Type",
     "RerunRunPlanBody",
     "RerunRunPlanBodyParameters",
     "RerunRunPlanResponse200",
@@ -9190,8 +9403,21 @@ __all__ = (
     "SearchRequest",
     "SearchRequestFilters",
     "SearchResponse",
+    "TestAgentResponse200",
     "Timestamps",
     "Trace",
+    "UpdateAgentBody",
+    "UpdateAgentBodyConfig",
+    "UpdateAgentBodyType",
+    "UpdateAgentResponse200",
+    "UpdateAgentResponse200ConfigType0",
+    "UpdateAgentResponse200InstancesItem",
+    "UpdateAgentResponse200InstancesItemSdk",
+    "UpdateAgentResponse200OwnerType0",
+    "UpdateAgentResponse200ParametersItem",
+    "UpdateAgentResponse200ParametersItemType",
+    "UpdateAgentResponse200Status",
+    "UpdateAgentResponse200Type",
     "UpdateApiKeyBody",
     "UpdateApiKeyBodyBindingsItem",
     "UpdateApiKeyBodyBindingsItemRole",
