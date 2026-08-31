@@ -300,6 +300,33 @@ const buildDesiredLambdaEnvironmentVariables = (
   ),
 });
 
+/**
+ * Everything `reconcileProjectLambdaConfig` checks for drift (env vars,
+ * memory, timeout), reduced to one order-stable string. The ARN cache
+ * compares this on every read, the same way it already compares
+ * `imageUri` -- so a config-only rollout (e.g. raising
+ * NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS with no new image) invalidates
+ * warm cache entries instead of silently serving a stale ARN for up to
+ * LAMBDA_ARN_CACHE_TTL_MS.
+ *
+ * Built from buildDesiredLambdaEnvironmentVariables() -- the same call
+ * reconcileProjectLambdaConfig uses -- so the cache key and the reconcile
+ * drift check can never disagree. Env entries are sorted by key before
+ * joining: buildDesiredLambdaEnvironmentVariables happens to return a
+ * fixed-order literal today, but nothing enforces that, and an unsorted
+ * join would reintroduce spurious cache misses the moment it doesn't.
+ */
+const buildDesiredLambdaConfigFingerprint = (
+  config: LangWatchLambdaConfig,
+): string => {
+  const desiredEnv = buildDesiredLambdaEnvironmentVariables(config);
+  const env = Object.keys(desiredEnv)
+    .sort()
+    .map((key) => `${key}=${desiredEnv[key]}`)
+    .join("&");
+  return `env:${env}|memory:${NLP_LAMBDA_MEMORY_SIZE_MB}|timeout:${LAMBDA_INVOCATION_TIMEOUT_SECONDS}`;
+};
+
 const createProjectLambda = async (
   lambda: LambdaClient,
   functionName: string,
@@ -502,7 +529,13 @@ const reconcileProjectLambdaConfig = async ({
 // The cache key is projectId, and the cached payload includes image_uri so
 // a deploy (which bumps image_uri) auto-invalidates without any extra
 // plumbing — readers compare to the current config.image_uri and treat a
-// mismatch as a miss, re-running the UpdateFunctionCode path.
+// mismatch as a miss, re-running the UpdateFunctionCode path. The payload
+// also carries a configFingerprint (see
+// buildDesiredLambdaConfigFingerprint) covering env vars, MemorySize and
+// Timeout, so a config-only rollout (no new image_uri, e.g. raising
+// NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS) invalidates the same way instead
+// of serving a stale ARN — and skipping reconcileProjectLambdaConfig — for
+// up to the full TTL.
 //
 // Failures are NOT cached: a TooManyRequestsException must self-heal on
 // the next call so we don't pin a stale rejection cluster-wide.
@@ -512,7 +545,11 @@ const reconcileProjectLambdaConfig = async ({
 // self-heals within the window.
 export const LAMBDA_ARN_CACHE_TTL_MS = 10 * 60 * 1000;
 
-type LambdaArnCacheEntry = { arn: string; imageUri: string };
+type LambdaArnCacheEntry = {
+  arn: string;
+  imageUri: string;
+  configFingerprint: string;
+};
 
 const lambdaArnCache = new TtlCache<LambdaArnCacheEntry>(
   LAMBDA_ARN_CACHE_TTL_MS,
@@ -536,9 +573,14 @@ export const getProjectLambdaArn = async (
 ): Promise<string> => {
   const config = parseLambdaConfig();
   const functionName = `langwatch_nlp-${projectId}`;
+  const configFingerprint = buildDesiredLambdaConfigFingerprint(config);
 
   const cached = await lambdaArnCache.get(projectId);
-  if (cached && cached.imageUri === config.image_uri) {
+  if (
+    cached &&
+    cached.imageUri === config.image_uri &&
+    cached.configFingerprint === configFingerprint
+  ) {
     return cached.arn;
   }
 
@@ -557,7 +599,11 @@ export const getProjectLambdaArn = async (
         functionName,
       );
       trackedProjectIds.add(projectId);
-      await lambdaArnCache.set(projectId, { arn, imageUri: config.image_uri });
+      await lambdaArnCache.set(projectId, {
+        arn,
+        imageUri: config.image_uri,
+        configFingerprint,
+      });
       return arn;
     } finally {
       inFlightLambdaArn.delete(projectId);

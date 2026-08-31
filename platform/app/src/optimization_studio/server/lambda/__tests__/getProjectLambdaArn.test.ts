@@ -259,6 +259,117 @@ describe("getProjectLambdaArn", () => {
       expect(send.mock.calls.length).toBeGreaterThan(callsBeforeV2);
     });
 
+    /** @scenario A config-only rollout (timeout change, no new image) invalidates the cache and reconciles */
+    it("invalidates the cache when the desired timeout changes (no image change)", async () => {
+      const originalTimeoutEnv =
+        process.env.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS;
+      try {
+        delete process.env.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS;
+
+        const staleConfig = {
+          ...mockLambdaConfig,
+          Environment: { Variables: { ...desiredEnvVars } },
+        };
+
+        const _send = vi
+          .spyOn(LambdaClient.prototype as any, "send")
+          // v1 resolution: no drift, desired timeout env matches "600" default.
+          .mockResolvedValueOnce({
+            Configuration: staleConfig,
+            Code: {
+              ImageUri:
+                "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
+            },
+          })
+          .mockResolvedValueOnce({
+            Configuration: staleConfig,
+            Code: {
+              ImageUri:
+                "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
+            },
+          })
+          .mockResolvedValueOnce({ Configuration: staleConfig })
+          // v2 resolution: desired timeout changes, image_uri untouched. AWS
+          // still reports the old "600" env, so reconcile must fire.
+          .mockResolvedValueOnce({ Configuration: staleConfig })
+          .mockResolvedValueOnce({
+            Configuration: staleConfig,
+            Code: {
+              ImageUri:
+                "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
+            },
+          })
+          .mockResolvedValueOnce(mockLambdaConfig)
+          .mockResolvedValue({
+            Configuration: {
+              ...mockLambdaConfig,
+              Environment: {
+                Variables: {
+                  ...desiredEnvVars,
+                  NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS: "300",
+                },
+              },
+            },
+          });
+
+        await getProjectLambdaArn("projectTimeout");
+        const callsBeforeV2 = _send.mock.calls.length;
+
+        process.env.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS = "300";
+        const arn = await getProjectLambdaArn("projectTimeout");
+
+        expect(arn).toBe(mockLambdaConfig.FunctionArn);
+        expect(_send.mock.calls.length).toBeGreaterThan(callsBeforeV2);
+
+        const updates = _send.mock.calls.filter(
+          (call: any[]) =>
+            call[0] instanceof UpdateFunctionConfigurationCommand,
+        );
+        expect(updates).toHaveLength(1);
+        expect(
+          updates[0][0].input.Environment.Variables
+            .NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS,
+        ).toBe("300");
+      } finally {
+        if (originalTimeoutEnv === undefined) {
+          delete process.env.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS;
+        } else {
+          process.env.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS =
+            originalTimeoutEnv;
+        }
+      }
+    });
+
+    /** @scenario An unchanged desired configuration keeps serving from cache, no spurious invalidation */
+    it("keeps serving from cache when the desired configuration is unchanged", async () => {
+      const _send = vi
+        .spyOn(LambdaClient.prototype as any, "send")
+        .mockResolvedValueOnce({
+          Configuration: mockLambdaConfig,
+          Code: {
+            ImageUri:
+              "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
+          },
+        })
+        .mockResolvedValueOnce({
+          Configuration: mockLambdaConfig,
+          Code: {
+            ImageUri:
+              "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
+          },
+        })
+        .mockResolvedValueOnce({ Configuration: mockLambdaConfig });
+
+      await getProjectLambdaArn("projectStable");
+      const callsAfterFirst = _send.mock.calls.length;
+
+      // Nothing changed: same image_uri, same env, same memory/timeout.
+      const arn = await getProjectLambdaArn("projectStable");
+
+      expect(arn).toBe(mockLambdaConfig.FunctionArn);
+      expect(_send.mock.calls.length).toBe(callsAfterFirst);
+    });
+
     /** @scenario Different projects do not share cache slots */
     it("keeps cache entries independent per project", async () => {
       const arnA = "arn:aws:lambda:us-east-1:123:function:A";
