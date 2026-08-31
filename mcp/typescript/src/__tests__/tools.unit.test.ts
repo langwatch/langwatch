@@ -760,6 +760,14 @@ describe("handleUpdatePrompt()", () => {
         handle: "greeting",
         latestVersionNumber: 2,
       });
+      mockGetPrompt.mockResolvedValue({
+        id: "p1",
+        handle: "greeting",
+        latestVersionNumber: 2,
+        versions: [
+          { version: 2, versionId: "ver_002", commitMessage: "Update system prompt" },
+        ],
+      });
 
       const result = await handleUpdatePrompt({
         idOrHandle: "greeting",
@@ -824,6 +832,14 @@ describe("handleUpdatePrompt() with tags", () => {
   describe("when called with tags", () => {
     it("includes tags in the output", async () => {
       mockUpdatePrompt.mockResolvedValue({ id: "p1", handle: "test", latestVersionNumber: 2 });
+      mockGetPrompt.mockResolvedValue({
+        id: "p1",
+        handle: "test",
+        latestVersionNumber: 2,
+        versions: [
+          { version: 2, versionId: "ver_002", commitMessage: "add tags", tags: ["staging", "latest"] },
+        ],
+      });
 
       const result = await handleUpdatePrompt({
         idOrHandle: "test",
@@ -831,7 +847,7 @@ describe("handleUpdatePrompt() with tags", () => {
         tags: ["staging"],
       });
 
-      expect(result).toContain("**Tags**: staging");
+      expect(result).toContain("**Deployed to**: staging");
     });
   });
 });
