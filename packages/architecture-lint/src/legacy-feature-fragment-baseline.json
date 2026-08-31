@@ -199,8 +199,6 @@
     {"feature":"governance","file":"platform/app/src/server/api/routers/governance/ingestionKey.ts","kind":"transport"},
     {"feature":"governance","file":"platform/app/src/server/api/routers/governance/ingestionSources.ts","kind":"transport"},
     {"feature":"governance","file":"platform/app/src/server/api/routers/governance/ingestionTemplates.ts","kind":"transport"},
-    {"feature":"governance","file":"platform/app/src/server/api/routers/governance/personalSessions.ts","kind":"transport"},
-    {"feature":"governance","file":"platform/app/src/server/api/routers/governance/sessionPolicy.ts","kind":"transport"},
     {"feature":"langy","file":"platform/app/src/components/ui/messages/AddMessageButton.tsx","kind":"page-shell"},
     {"feature":"langy","file":"platform/app/src/components/ui/messages/index.ts","kind":"page-shell"},
     {"feature":"langy","file":"platform/app/src/components/ui/messages/MessageRoleLabel.tsx","kind":"page-shell"},

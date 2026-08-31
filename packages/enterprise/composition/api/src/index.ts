@@ -8,6 +8,10 @@ export {
   type EnterpriseGatewayTrpcContext,
 } from "./trpc/enterprise-gateway-trpc.composition";
 export {
+  EnterpriseGovernanceTrpcComposition,
+  type EnterpriseGovernanceTrpcContext,
+} from "./trpc/enterprise-governance-trpc.composition";
+export {
   BACK_OFFICE_NO_PERMISSION,
   BACK_OFFICE_NO_PERMISSION_FOR_ORGANIZATION,
   EnterpriseTrpcComposition,

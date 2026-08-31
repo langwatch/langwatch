@@ -7,7 +7,11 @@ import { AutomationApp } from "@langwatch/automation-server";
 import { CodingAgentApp } from "@langwatch/coding-agent-server";
 import { DashboardApp } from "@langwatch/dashboard-server";
 import { DatasetApp } from "@langwatch/dataset-server";
-import { GovernanceApp } from "@langwatch/enterprise-governance-server";
+import {
+  GovernanceApp,
+  OrganizationSessionPolicyService,
+  PostgresSessionPolicyAdapter,
+} from "@langwatch/enterprise-governance-server";
 import { ScimApp } from "@langwatch/enterprise-scim-server";
 import { WebhookApp } from "@langwatch/enterprise-webhook-server";
 import { EvaluatorApp } from "@langwatch/evaluator-server";
@@ -247,6 +251,8 @@ export class App {
   readonly governance: AppDependencies["governance"];
   /** The Governance feature's application; `governance` above is the raw capability. */
   readonly governanceApp: GovernanceApp;
+  /** The organization-scoped session-policy service the governance settings surface reads and writes. */
+  readonly sessionPolicy: OrganizationSessionPolicyService;
   readonly billableEvents: AppDependencies["billableEvents"];
   readonly billingQueries: AppDependencies["billingQueries"];
   readonly commands: AppCommands;
@@ -525,6 +531,7 @@ export class App {
           })) !== null,
       },
     });
+    this.sessionPolicy = PostgresSessionPolicyAdapter.create(prisma);
     this.billableEvents = deps.billableEvents;
     this.billingQueries = deps.billingQueries;
     this.commands = deps.commands;

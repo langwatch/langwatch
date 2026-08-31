@@ -6,8 +6,6 @@ import { governanceRouter } from "./routers/governance/governance";
 import { ingestionKeyRouter } from "./routers/governance/ingestionKey";
 import { ingestionSourcesRouter } from "./routers/governance/ingestionSources";
 import { ingestionTemplatesRouter } from "./routers/governance/ingestionTemplates";
-import { personalSessionsRouter } from "./routers/governance/personalSessions";
-import { sessionPolicyRouter } from "./routers/governance/sessionPolicy";
 import { createTRPCRouter } from "~/server/api/trpc";
 import {
   createAuthzTrpcRouter,
@@ -72,6 +70,7 @@ import {
   BACK_OFFICE_NO_PERMISSION,
   BACK_OFFICE_NO_PERMISSION_FOR_ORGANIZATION,
   EnterpriseGatewayTrpcComposition,
+  EnterpriseGovernanceTrpcComposition,
   EnterpriseTrpcComposition,
   INSTANCE_LICENSE_NO_PERMISSION,
 } from "@langwatch/enterprise-api";
@@ -794,6 +793,12 @@ const enterpriseGatewayRouters = EnterpriseGatewayTrpcComposition.create({
   resolverAuthorizedPolicy: appTrpcServiceAuthorizedPolicy(appTrpcMiddlewares),
 });
 
+const enterpriseGovernanceRouters = EnterpriseGovernanceTrpcComposition.create({
+  root: appTrpcRoot,
+  protectedProcedure: authProtectedProcedure,
+  policy: appTrpcPolicy(appTrpcMiddlewares),
+});
+
 const coreRouters = {
   agents: agentsRouter,
   evaluators: evaluatorsRouter,
@@ -875,8 +880,8 @@ const coreRouters = {
   ingestionTemplates: ingestionTemplatesRouter,
   ingestionKey: ingestionKeyRouter,
   governance: governanceRouter,
-  personalSessions: personalSessionsRouter,
-  sessionPolicy: sessionPolicyRouter,
+  personalSessions: enterpriseGovernanceRouters.personalSessions,
+  sessionPolicy: enterpriseGovernanceRouters.sessionPolicy,
   gatewayBudgets: gatewayRouters.gatewayBudgets,
   gatewayCacheRules: gatewayRouters.gatewayCacheRules,
   gatewayGuardrails: gatewayRouters.gatewayGuardrails,

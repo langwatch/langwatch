@@ -54,11 +54,25 @@ function generatedImport(specifier: string): boolean {
   return specifier === PRISMA_GENERATED || specifier.startsWith(`${PRISMA_GENERATED}/`);
 }
 
+/**
+ * Where the concrete Prisma client may be named. Two places, and only two:
+ *
+ *   1. `server/src/repositories/prisma/**` — the repository IS the Prisma
+ *      binding. It knows Prisma; the port that fronts it does not.
+ *   2. `server/src/adapters/postgres.*.adapter.ts` — the Postgres composition
+ *      seam between a process and a feature. It takes a typed `PrismaClient`
+ *      from the composition root, hands it to the repository, and returns the
+ *      service. Nothing above this file needs to know a repository class
+ *      exists.
+ *
+ * A file outside both places that imports `PrismaClient` is a leak — every
+ * other layer speaks to Prisma only through the port the repository fronts.
+ * That is the invariant `service-repository-adapter-port.md` documents.
+ */
 function isStrictPrismaAdapter(pkg: ClassifiedPackage, file: string): boolean {
-  return (
-    pkg.kind === "server" &&
-    isWithin(join(pkg.root, "src", "repositories", "prisma"), file)
-  );
+  if (pkg.kind !== "server") return false;
+  if (isWithin(join(pkg.root, "src", "repositories", "prisma"), file)) return true;
+  return /\/src\/adapters\/postgres\.[^/]+\.adapter\.ts$/.test(file);
 }
 
 export function lintPrismaBoundaries(
@@ -77,9 +91,9 @@ export function lintPrismaBoundaries(
           line: sourceImport.line,
           specifier: sourceImport.specifier,
           message:
-            "Generated Prisma may only be imported by a strict feature Prisma repository adapter.",
+            "Generated Prisma may only be imported by a repository under server/src/repositories/prisma or the Postgres composition adapter (server/src/adapters/postgres.<subject>.adapter.ts).",
           allowed:
-            "Import @langwatch/prisma-client/generated only below server/src/repositories/prisma; expose portable records through the repository port.",
+            "Below server/src/repositories/prisma: the repository binds Prisma to the port. In server/src/adapters/postgres.<subject>.adapter.ts: the adapter takes a typed PrismaClient from the composition root and hands it to the repository. Every other file speaks to Prisma through the port.",
         });
       }
 

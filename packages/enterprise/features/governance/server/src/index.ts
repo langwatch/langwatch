@@ -58,6 +58,7 @@ export * from "./ports/pulled-usage-ledger.port";
 export * from "./ports/pulled-usage-rate.port";
 export * from "./ports/quarantine-fill.port";
 export * from "./ports/routing-policy.port";
+export * from "./ports/session-policy.port";
 export * from "./ports/spend-spike-anomaly.port";
 export * from "./ports/governance-subscriber.port";
 
@@ -107,6 +108,12 @@ export { IngestionPullWorkerService } from "./services/ingestion-pull-worker.ser
 export { PullDestinationService } from "./services/pull-destination.service";
 export { PulledUsagePricingService } from "./services/pulled-usage-pricing.service";
 export { PulledUsageRecordService } from "./services/pulled-usage-record.service";
+export {
+  OrganizationSessionPolicyService,
+  SESSION_POLICY_MAX_DAYS,
+  SessionPolicyOutOfRangeError,
+} from "./services/organization-session-policy.service";
+export { PostgresSessionPolicyAdapter } from "./adapters/postgres.session-policy.adapter";
 export { GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS } from "./subscribers/governance-ocsf.subscriber";
 export {
   GOVERNANCE_KPIS_SYNC_WINDOW_MS,
@@ -128,6 +135,14 @@ export {
   RoutingPolicyTrpcApi,
   type RoutingPolicyTrpcContext,
 } from "./transport/api-trpc/routing-policy.api";
+export {
+  PersonalSessionsTrpcApi,
+  type PersonalSessionsTrpcContext,
+} from "./transport/api-trpc/personal-sessions.api";
+export {
+  SessionPolicyTrpcApi,
+  type SessionPolicyTrpcContext,
+} from "./transport/api-trpc/session-policy.api";
 
 /**
  * The public REST family this feature owns. The process supplies the bound
