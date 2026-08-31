@@ -1555,3 +1555,66 @@ Worth writing down because they recur:
    different state types; only one was being folded. Same shape as
    `collectDroppedCategories` and the generic `wrap`. A name grep finds
    definitions, not consumers — check what each file actually IMPORTS.
+
+## Round: the trace rules modules and the last of the adapters
+
+Ten more classes: the five trace rules modules (claude-code truncated-request,
+response and request, mastra-value, trace-attribute-cap — 46 functions between
+them), and conversation-trace-assembly, trace-query-meta-fields,
+simulation-clickhouse and scenario-secret-reference.
+
+Two of those five keep a second class rather than folding into it.
+`JsonScan` is a character cursor over possibly-cut JSON;
+`ClaudeCodeTruncatedRequest` is the salvage algorithm that walks with it. Two
+concerns, two classes.
+
+### A three-layer facade
+
+scenario-secret-reference was three layers deep for one function each:
+
+```
+resolveSecretRefsValue                                    (module function)
+Adapter.resolve = resolveSecretRefsValue                  (class field alias)
+export const resolveSecretRefs = Adapter.resolve          (module re-export)
+```
+
+Nothing imported the class. Both consumers used the third layer. All three are
+now one — `ScenarioSecretReferenceAdapter.resolve` — with no re-export left
+behind, the same shape removed from `prompt-template.adapter` earlier.
+
+### A structural fix the fold forces
+
+`META_FIELD_DEFS` calls `scenarioColumnDef` EAGERLY at module load, so once
+that became a class member the const had to move BELOW the class. The
+compiler catches this one; the earlier webhook-outbox case it did not, because
+that reference was inside an object literal. The rule is the same either way:
+a module const that reads a class is evaluated before the class exists.
+
+That also decides visibility. Four of the meta-field builders are public
+because the module consts build on them — pretending they were private would
+only have moved the consts somewhere less honest.
+
+### Rewrite hazards, continued
+
+Two more, on top of the prose / declaration / collision list from last round:
+
+4. **Spread calls.** `...originAttrs(` is preceded by a dot, so a plain
+   `(?<![.\w])` lookbehind skips it. The fold tool allows for this; ad-hoc
+   consumer rewrites must too.
+5. **Import paths.** A consumer importing through the package index rather
+   than the module path does not match a module-path pattern — its call sites
+   get rewritten and its import block does not, which typechecks as a missing
+   name rather than anything obvious.
+
+And the repeat from last round happened again: a fold target that is also a
+consumer of another folded module gets its OWN member declarations rewritten.
+Exclude fold targets from their own consumer list.
+
+### Where this leaves it
+
+Roughly 515 module-level functions remain across feature services, repositories
+and adapters, but the concentration is gone: the largest single file now holds
+seven, and most hold one or two — a `create` helper beside its class, or a
+genuinely shared utility. `stored-span-row.codec.ts` stays deliberately
+untouched, since its four exports reach platform/app span-storage integration
+paths that cannot be run here.
