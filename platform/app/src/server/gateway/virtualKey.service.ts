@@ -40,11 +40,7 @@ import {
   translateExternalIdConflict,
   VirtualKeyExpiryInPastError,
 } from "@langwatch/gateway-server";
-import {
-  identityPatchData,
-  metadataPatch,
-  type ResourceMetadata,
-} from "@langwatch/gateway-server";
+import { identityPatchData, type ResourceMetadata } from "@langwatch/gateway-server";
 import { scopeReachableModelProvidersForVk } from "./scopeResolver";
 import {
   defaultVirtualKeyConfig,
@@ -364,7 +360,10 @@ export class VirtualKeyService {
             principalUserId: input.principalUserId,
             config: config as Prisma.InputJsonValue,
             externalId: input.externalId ?? null,
-            metadata: metadataPatch(input.metadata),
+            // Metadata REPLACES rather than merges: a merge cannot express
+            // deleting a key without a sentinel. Absent leaves the stored map
+            // alone; `{}` empties it.
+            metadata: input.metadata,
             createdById: input.actorUserId,
             scopes: input.scopes,
             traceProjectId,
