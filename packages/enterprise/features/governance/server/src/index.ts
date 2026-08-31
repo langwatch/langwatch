@@ -159,6 +159,10 @@ export {
   ActivityMonitorTrpcApi,
   type ActivityMonitorTrpcContext,
 } from "./transport/api-trpc/activity-monitor.api";
+export {
+  AnomalyRulesTrpcApi,
+  type AnomalyRulesTrpcContext,
+} from "./transport/api-trpc/anomaly-rules.api";
 
 /**
  * The public REST family this feature owns. The process supplies the bound
