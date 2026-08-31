@@ -165,6 +165,26 @@ Feature: Scenario tests for skills quality assurance
     And the agent attempts to register the endpoint with `langwatch agent create --type http`
     And the agent does not claim a suite run succeeded when the platform is unreachable
 
+  @connect-agent @integration
+  Scenario: Connect-agent skill decorates the agent function instead of registering a URL
+    Given the fixture "python-fastapi-chat" is copied to a temp directory
+    And the skill "connect-agent" is loaded
+    When Claude Code receives "connect my agent to LangWatch simulations"
+    Then the agent adds langwatch.connect_agent to the function that runs the agent
+    And the agent reads the agent row back with `langwatch agent list` or `langwatch agent get`
+    And no `langwatch agent create` command runs
+    And the agent does not claim the agent is online without reading its status
+
+  @scenarios @connect-agent @integration
+  Scenario: The scenarios skill proposes scenarios from the levers of a connected agent
+    Given the fixture "python-connected-agent" runs and is online as a connected agent
+    And the skill "scenarios" is loaded
+    When Claude Code receives "add scenario tests for my connected agent on the platform"
+    Then the agent reads the run parameters the agent declares with `langwatch agent get` or `langwatch agent list`
+    And the agent creates the scenarios with `langwatch scenario create` and writes no test files
+    And at least one scenario depends on the customer plan and the plan travels as `--param plan=` or a `?plan=` target suffix
+    And the agent names the comparison run across the model options
+
   # ──────────────────────────────────────────────────
   # Prompts skill tests
   # ──────────────────────────────────────────────────

@@ -29,6 +29,16 @@ pnpm vitest run _tests/scenarios.scenario.test.ts
 pnpm vitest run _tests/scenarios.scenario.test.ts -t "creates voice scenario tests"
 ```
 
+### Tests that connect a real agent to the platform
+
+`scenarios.scenario.test.ts` ("run parameters of a connected agent") and `connect-agent.scenario.test.ts` ("connect_agent decorator") run against a live LangWatch project: the first starts the `fixtures/python-connected-agent` process with `uv run` and the Python SDK of this checkout, waits until `langwatch agent list` reads it Online, and archives it at the end. They skip themselves without the keys. They need:
+
+- `uv` on PATH.
+- `skills/.env` with `LANGWATCH_API_KEY` (a project key of a project you can fill with test runs) and `OPENAI_API_KEY` (the fixture agent and the judge use it).
+- The local CLI built once: `pnpm --filter langwatch build`. The sub Claude runs `sdks/typescript/dist/cli/index.js`.
+
+`KEEP_SKILL_TEST_WORKDIR=1` keeps the working directory under `.claude/tmp/skill-tests/` after the run, so the scenarios, the suite and the run the agent created can be read back with `langwatch run-plan list` from inside it.
+
 ### What "passing" actually means
 
 Green dot is necessary, not sufficient.

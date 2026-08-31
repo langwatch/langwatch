@@ -219,10 +219,18 @@ export function createClaudeCodeAgent({
 						switch (block.type) {
 							case "text":
 								return block.text ?? "";
+							case "tool-call":
 							case "tool_use": {
 								const input =
 									block.input != null ? JSON.stringify(block.input) : "";
-								return `[tool_use ${block.name ?? "?"}(${input})]`;
+								const name = block.toolName ?? block.name ?? "?";
+								return `[tool_use ${name}(${input})]`;
+							}
+							case "tool-result": {
+								const value = block.output?.value ?? block.output;
+								const inner =
+									typeof value === "string" ? value : JSON.stringify(value);
+								return `[tool_result] ${inner}`;
 							}
 							case "tool_result": {
 								const inner =
@@ -307,7 +315,7 @@ export function createClaudeCodeAgent({
 
 				child.on("close", (exitCode) => {
 					if (exitCode === 0) {
-						const messages: any = output
+						const rawMessages: any[] = output
 							.split("\n")
 							.map((line) => {
 								try {
@@ -318,9 +326,10 @@ export function createClaudeCodeAgent({
 							})
 							.filter((message) => message !== null && "message" in message)
 							.map((message) => message.message);
+						const messages = claudeCodeTranscriptToModelMessages(rawMessages);
 						console.log("messages", JSON.stringify(messages, undefined, 2));
 
-						resolve(messages);
+						resolve(messages as any);
 					} else {
 						reject(new Error(`Command failed with exit code ${exitCode}`));
 					}
@@ -332,6 +341,121 @@ export function createClaudeCodeAgent({
 			});
 		},
 	};
+}
+
+type ModelMessage = {
+	role: "user" | "assistant" | "tool";
+	content: string | Record<string, unknown>[];
+};
+
+function toolResultText(content: unknown): string {
+	if (typeof content === "string") return content;
+	if (!Array.isArray(content)) return JSON.stringify(content ?? "");
+	return content
+		.map((block: any) =>
+			block?.type === "text" && typeof block.text === "string"
+				? block.text
+				: JSON.stringify(block),
+		)
+		.join("\n");
+}
+
+/**
+ * Converts the `claude -p --output-format stream-json` transcript into AI SDK
+ * model messages, the format `@langwatch/scenario` works with.
+ *
+ * Claude Code writes Anthropic-format messages: an assistant turn is an array
+ * of `thinking`, `text` and `tool_use` blocks, and each tool result comes back
+ * as a `user` message holding `tool_result` blocks. The scenario SDK passes an
+ * adapter's array return through as is, so those blocks reached the platform
+ * unchanged, where the scenario-events validator refused every snapshot that
+ * carried one. The run then kept only the last snapshot that validated: the
+ * user message and the first assistant text. The user simulator of the SDK
+ * also only summarizes `tool-call` and `tool-result` parts, not the Anthropic
+ * blocks.
+ *
+ * Each assistant turn becomes one text part (the text blocks joined, an empty
+ * string when the turn only called tools, so the AG-UI conversion keeps the
+ * `toolCalls` next to a string content) followed by one `tool-call` part per
+ * `tool_use` block. Each `tool_result` block becomes a `tool-result` part of a
+ * `tool` message, with the tool name looked up from the call it answers.
+ * Thinking blocks are dropped: they are not part of the conversation.
+ */
+export function claudeCodeTranscriptToModelMessages(
+	rawMessages: any[],
+): ModelMessage[] {
+	const toolNamesByCallId = new Map<string, string>();
+	const messages: ModelMessage[] = [];
+
+	for (const raw of rawMessages) {
+		if (!raw || typeof raw !== "object") continue;
+		const { role, content } = raw;
+
+		if (role === "assistant") {
+			if (typeof content === "string") {
+				messages.push({ role: "assistant", content });
+				continue;
+			}
+			if (!Array.isArray(content)) continue;
+
+			const texts: string[] = [];
+			const toolCalls: Record<string, unknown>[] = [];
+			for (const block of content) {
+				if (block?.type === "text" && typeof block.text === "string") {
+					texts.push(block.text);
+				} else if (block?.type === "tool_use") {
+					toolNamesByCallId.set(block.id, block.name);
+					toolCalls.push({
+						type: "tool-call",
+						toolCallId: block.id,
+						toolName: block.name,
+						input: block.input ?? {},
+					});
+				}
+			}
+			if (texts.length === 0 && toolCalls.length === 0) continue;
+			messages.push({
+				role: "assistant",
+				content: [{ type: "text", text: texts.join("\n") }, ...toolCalls],
+			});
+			continue;
+		}
+
+		if (role === "user") {
+			if (typeof content === "string") {
+				messages.push({ role: "user", content });
+				continue;
+			}
+			if (!Array.isArray(content)) continue;
+
+			const toolResults = content
+				.filter((block: any) => block?.type === "tool_result")
+				.map((block: any) => ({
+					type: "tool-result",
+					toolCallId: block.tool_use_id,
+					toolName: toolNamesByCallId.get(block.tool_use_id) ?? "tool",
+					output: {
+						type: block.is_error ? "error-text" : "text",
+						value: toolResultText(block.content),
+					},
+				}));
+			if (toolResults.length > 0) {
+				messages.push({ role: "tool", content: toolResults });
+			}
+
+			const texts = content
+				.filter(
+					(block: any) =>
+						block?.type === "text" && typeof block.text === "string",
+				)
+				.map((block: any) => block.text);
+			if (texts.length > 0) {
+				messages.push({ role: "user", content: texts.join("\n") });
+			}
+		}
+	}
+
+	return messages;
 }
 
 /**
@@ -364,18 +488,55 @@ export function assertSkillWasRead(
 }
 
 /**
- * Fixes Anthropic tool use format in message state so it is compatible
- * with the Vercel AI SDK judge agent.
+ * The shell commands the agent ran, read from its Bash tool calls.
  *
- * Anthropic returns tool_use content blocks that the Vercel AI SDK does
- * not understand. This converts non-text blocks to text blocks containing
- * the JSON representation.
+ * A phrase in the transcript is not a command that ran: the skill text the
+ * agent read and its own explanation of what it did not do both quote
+ * commands. Reads the AI SDK `tool-call` parts the adapter emits, the
+ * Anthropic `tool_use` blocks of an unconverted transcript, and the JSON text
+ * `toolCallFix` leaves behind for either.
+ */
+export function bashCommands(state: ScenarioExecutionStateLike): string[] {
+	const commands: string[] = [];
+	for (const message of state.messages) {
+		if (!Array.isArray(message.content)) continue;
+		for (const block of message.content as any[]) {
+			let candidate: any = block;
+			if (
+				block?.type === "text" &&
+				typeof block.text === "string" &&
+				block.text.startsWith("{")
+			) {
+				try {
+					candidate = JSON.parse(block.text);
+				} catch {
+					continue;
+				}
+			}
+			const isBashCall =
+				(candidate?.type === "tool-call" && candidate.toolName === "Bash") ||
+				(candidate?.type === "tool_use" && candidate.name === "Bash");
+			if (isBashCall && typeof candidate.input?.command === "string") {
+				commands.push(candidate.input.command);
+			}
+		}
+	}
+	return commands;
+}
+
+/**
+ * Turns content parts the scenario SDK does not know into text parts holding
+ * their JSON, so a model call over the conversation never receives a part it
+ * cannot read. The AI SDK `tool-call` and `tool-result` parts stay as they
+ * are: the SDK summarizes them for the user simulator and the platform stores
+ * and renders them.
  */
 export function toolCallFix(state: ScenarioExecutionStateLike): void {
+	const knownPartTypes = new Set(["text", "tool-call", "tool-result"]);
 	state.messages.forEach((message) => {
 		if (Array.isArray(message.content)) {
 			message.content.forEach((content, index) => {
-				if (content.type !== "text") {
+				if (!knownPartTypes.has(content.type)) {
 					(message.content as any)[index] = {
 						type: "text",
 						text: JSON.stringify(content),
