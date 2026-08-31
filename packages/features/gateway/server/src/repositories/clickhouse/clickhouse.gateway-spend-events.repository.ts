@@ -18,10 +18,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { GatewayClickHouseResolver } from "../../ports/gateway-clickhouse.port";
 import type { GatewaySpendState } from "../../projections/gateway-spend.projection";
-import {
-  EMPTY_SPEND_USAGE,
-  type SpendUsage,
-} from "../../processes/gateway-spend-commands.process";
+import { EMPTY_SPEND_USAGE, type SpendUsage } from "../../processes/gateway-spend-commands.process";
 import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "../../adapters/gateway-spend-constants.adapter";
 import type { SpendFilters } from "../../adapters/gateway-spend-filters.adapter";
 import {
@@ -31,15 +28,16 @@ import {
   type SpendEventStatus,
 } from "../../adapters/gateway-spend-filters.adapter";
 import { parseSummedNanoUsd } from "../../adapters/gateway-spend-parse.adapter";
-import type {
-  SpendBucket,
-  SpendGroupByKey,
-} from "../../adapters/gateway-spend-grouping.adapter";
-import {
-  bucketExpression,
-  groupByColumn,
-} from "../../adapters/gateway-spend-grouping.adapter";
+import type { SpendBucket, SpendGroupByKey } from "../../adapters/gateway-spend-grouping.adapter";
+import { bucketExpression, groupByColumn } from "../../adapters/gateway-spend-grouping.adapter";
 import { nanoUsdToDecimalString } from "../../adapters/gateway-wire-money.adapter";
+import {
+  decodeSpendEventsCursor,
+  decodeSpendSummariesCursor,
+  encodeSpendEventsCursor,
+  encodeSpendSummariesCursor,
+  type GatewaySpendEventsCursor,
+} from "../../adapters/gateway-spend-cursor.adapter";
 import { GatewaySpendEventsPort } from "../../ports/gateway-spend-events.port";
 
 const TABLE = "gateway_spend" as const;
@@ -97,84 +95,9 @@ export const SPEND_ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, Vi
           HttpStatus, NeedsReconciliation, SettleReason, Labels, Metadata,
           DurationMS, toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs`;
 
-export function mapSpendEventRow(r: Record<string, unknown>): SpendEventRow {
-  const nano = Number(r.CostNanoUSD ?? 0);
-  const status = String(r.Status) as SpendEventStatus;
-  return {
-    tenantId: String(r.TenantId),
-    gatewayRequestId: String(r.GatewayRequestId),
-    organizationId: String(r.OrganizationId),
-    teamId: "",
-    virtualKeyId: String(r.VirtualKeyId),
-    principalUserId: String(r.PrincipalUserId),
-    endUserId: String(r.EndUserId),
-    traceId: String(r.TraceId),
-    model: String(r.Model),
-    providerKey: String(r.ProviderKey),
-    requestType: String(r.RequestType ?? ""),
-    tokensInput: Number(r.TokensInput),
-    tokensOutput: Number(r.TokensOutput),
-    tokensCacheRead: Number(r.TokensCacheRead),
-    tokensCacheWrite: Number(r.TokensCacheWrite),
-    tokensReasoning: Number(r.TokensReasoning),
-    costNanoUsd: nano,
-    costUsd: nanoUsdToDecimalString(nano),
-    rateVersion: String(r.RateVersion ?? ""),
-    status,
-    errorClass: String(r.ErrorClass),
-    httpStatus: Number(r.HttpStatus),
-    needsReconciliation: Number(r.NeedsReconciliation ?? 0) === 1,
-    settleReason: String(r.SettleReason ?? ""),
-    labels: Array.isArray(r.Labels) ? r.Labels.map(String) : [],
-    metadata: String(r.Metadata ?? ""),
-    durationMs: Number(r.DurationMS),
-    occurredAt: new Date(Number(r.OccurredAtMs)),
-  };
-}
-
 export interface SpendEventsPageCursor {
   occurredAtMs: number;
   gatewayRequestId: string;
-}
-
-/**
- * The cursor and filter predicates of a spend-events walk, as clause fragments
- * already carrying their leading AND plus the bound parameters they name. Each
- * fragment is optional; an absent filter contributes neither a clause nor a
- * parameter, so the query never binds a placeholder it does not reference.
- */
-function buildSpendEventsWalkFilter({
-  decoded,
-  fromMs,
-  toMs,
-  filters,
-}: {
-  decoded: SpendEventsCursor | null;
-  fromMs?: number;
-  toMs?: number;
-  filters: SpendFilters;
-}): { clauses: string[]; params: Record<string, unknown> } {
-  const clauses: string[] = [];
-  const params: Record<string, unknown> = {};
-  if (decoded) {
-    clauses.push(
-      "AND (EventTimestamp, GatewayRequestId) > ({cursorEventTs:UInt64}, {cursorRequestId:String})",
-    );
-    params.cursorEventTs = decoded.eventTimestampMs;
-    params.cursorRequestId = decoded.gatewayRequestId;
-  }
-  if (fromMs !== undefined) {
-    clauses.push("AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})");
-    params.fromMs = fromMs;
-  }
-  if (toMs !== undefined) {
-    clauses.push("AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})");
-    params.toMs = toMs;
-  }
-  const filterSql = buildSpendFilterClauses({ filters });
-  clauses.push(...filterSql.clauses.map((clause) => `AND ${clause}`));
-  Object.assign(params, filterSql.params);
-  return { clauses, params };
 }
 
 /** One grouping dimension: the expression to group on and the alias it is
@@ -182,71 +105,6 @@ function buildSpendEventsWalkFilter({
 interface SummaryDimension {
   alias: string;
   expression: string;
-}
-
-/**
- * The bucket leads the grouping so a walk reads the window in time order,
- * which is the shape a caller charting spend expects a page to arrive in.
- */
-function summaryDimensions({
-  groupBy,
-  bucket,
-}: {
-  groupBy: SpendGroupByKey[];
-  bucket: SpendBucket;
-}): SummaryDimension[] {
-  const dimensions: SummaryDimension[] = [];
-  if (bucket !== "none") {
-    dimensions.push({
-      alias: "GroupBucket",
-      expression: bucketExpression({ bucket, timezoneParam: "timezone" }),
-    });
-  }
-  for (const [index, key] of groupBy.entries()) {
-    dimensions.push({
-      alias: `GroupKey${index}`,
-      expression: groupByColumn(key),
-    });
-  }
-  return dimensions;
-}
-
-/**
- * Tuple comparison over the grouping expressions: the one predicate that
- * advances a multi-dimension walk without serving a boundary group twice.
- *
- * A cursor whose arity does not match the grouping names a walk over a
- * different shape entirely, and is refused. Dropping the predicate instead
- * would serve page one again under a fresh cursor, with nothing in the
- * response to say the walk had reset, and a reconciliation would fold the
- * same groups into its checksum twice. The REST boundary refuses this by
- * comparing the two before the read, so anything reaching here is a caller
- * bug.
- */
-function summariesWalkClause({
-  cursor,
-  dimensions,
-}: {
-  cursor: string[] | null;
-  dimensions: SummaryDimension[];
-}): { clause: string; params: Record<string, unknown> } | null {
-  if (cursor === null) return null;
-  if (cursor.length !== dimensions.length) {
-    throw new Error(
-      `cursor names a walk over ${cursor.length} dimension(s); this request groups by ${dimensions.length}`,
-    );
-  }
-  const left = dimensions.map((d) => d.expression).join(", ");
-  const right = cursor.map((_, index) => `{cursor${index}:String}`).join(", ");
-  const params: Record<string, unknown> = {};
-  cursor.forEach((part, index) => {
-    params[`cursor${index}`] = part;
-  });
-  return {
-    clause:
-      dimensions.length === 1 ? `AND ${left} > ${right}` : `AND (${left}) > (${right})`,
-    params,
-  };
 }
 
 export interface SpendSummaryRow {
@@ -272,111 +130,6 @@ export interface SpendSummaryRow {
   costUsd: string;
 }
 
-/**
- * Zero is the honest answer for an absent aggregate here: a group only exists
- * in the result because at least one row produced it, so a missing column is
- * a sum over rows that all carried nothing, not an unknown quantity.
- */
-function summed(raw: Record<string, unknown>, column: string): number {
-  return Number(raw[column] ?? 0);
-}
-
-/** A grouping value is a String column, so an absent one is the empty key. */
-function grouped(raw: Record<string, unknown>, column: string): string {
-  return String(raw[column] ?? "");
-}
-
-function mapSummaryRow({
-  raw,
-  groupBy,
-  bucket,
-}: {
-  raw: Record<string, unknown>;
-  groupBy: SpendGroupByKey[];
-  bucket: SpendBucket;
-}): SpendSummaryRow {
-  const nano = parseSummedNanoUsd(raw.CostNanoUSD);
-  const group: Record<string, string> = {};
-  for (const [index, key] of groupBy.entries()) {
-    group[key] = grouped(raw, `GroupKey${index}`);
-  }
-  return {
-    key: grouped(raw, "GroupKey0"),
-    group,
-    bucketStart: bucket === "none" ? null : grouped(raw, "GroupBucket"),
-    eventCount: summed(raw, "EventCount"),
-    settledCount: summed(raw, "SettledCount"),
-    tokensInput: summed(raw, "TokensInput"),
-    tokensOutput: summed(raw, "TokensOutput"),
-    tokensCacheRead: summed(raw, "TokensCacheRead"),
-    tokensCacheWrite: summed(raw, "TokensCacheWrite"),
-    tokensReasoning: summed(raw, "TokensReasoning"),
-    costNanoUsd: nano,
-    costUsd: nanoUsdToDecimalString(nano),
-  };
-}
-
-/** One quantity column per field of the vocabulary. A request with no
- *  measured usage writes zeros, which is what the column defaults hold for
- *  every row written before the quantity existed. */
-function usageColumns(usage: SpendUsage | null): Record<string, number> {
-  const quantities = usage ?? EMPTY_SPEND_USAGE;
-  return {
-    TokensInput: quantities.input_tokens,
-    TokensOutput: quantities.output_tokens,
-    TokensCacheRead: quantities.cache_read_input_tokens,
-    TokensCacheWrite: quantities.cache_creation_input_tokens,
-    TokensCacheWrite1h: quantities.cache_creation_1h_tokens,
-    TokensReasoning: quantities.reasoning_tokens,
-    TokensInputAudio: quantities.input_audio_tokens,
-    TokensOutputAudio: quantities.output_audio_tokens,
-    CharsInput: quantities.input_chars,
-    AudioMS: quantities.audio_ms,
-  };
-}
-
-/**
- * The quantities a spend row carries, or null when it measured nothing.
- *
- * The quantity columns beyond the five token classes are read straight off
- * the raw row rather than through {@link mapSpendEventRow}: the mapped row
- * shapes the REST and UI surfaces, and widening it would change those
- * response bodies. The fold needs them regardless, because a late admission
- * folding over a confirmed request rewrites the whole row from this state,
- * so a quantity that does not decode here is a quantity zeroed on the next
- * write.
- *
- * Any measured quantity counts as usage, not the token classes alone: a
- * character-priced call has zero tokens and 4000 characters, and reading it
- * back as "no usage" would drop them.
- */
-function foldUsage(row: SpendEventRow, raw: Record<string, unknown>): SpendUsage | null {
-  const quantity = (column: string): number => Number(raw[column] ?? 0);
-  const measured = [
-    row.tokensInput,
-    row.tokensOutput,
-    quantity("CharsInput"),
-    quantity("AudioMS"),
-    quantity("TokensInputAudio"),
-    quantity("TokensOutputAudio"),
-    quantity("TokensCacheWrite1h"),
-  ];
-  const outcome = row.status === "confirmed" || row.status === "failed";
-  if (!outcome && !measured.some((value) => value > 0)) return null;
-  return {
-    input_tokens: row.tokensInput,
-    output_tokens: row.tokensOutput,
-    cache_read_input_tokens: row.tokensCacheRead,
-    cache_creation_input_tokens: row.tokensCacheWrite,
-    cache_creation_1h_tokens: quantity("TokensCacheWrite1h"),
-    reasoning_tokens: row.tokensReasoning,
-    input_audio_tokens: quantity("TokensInputAudio"),
-    output_audio_tokens: quantity("TokensOutputAudio"),
-    input_chars: quantity("CharsInput"),
-    audio_ms: quantity("AudioMS"),
-  };
-}
-
 export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
   constructor(private readonly resolveClient: GatewayClickHouseResolver) {
     super();
@@ -398,9 +151,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
     if (entries.length === 0) return;
     const tenantId = entries[0]!.tenantId;
     if (entries.some((e) => e.tenantId !== tenantId)) {
-      throw new Error(
-        "GatewaySpendEventsRepository.upsertFromFold: entries span multiple tenants",
-      );
+      throw new Error("GatewaySpendEventsRepository.upsertFromFold: entries span multiple tenants");
     }
     const client = await this.resolveClient(tenantId);
     const records = entries.map(({ gatewayRequestId, state }) => ({
@@ -419,7 +170,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
       HttpStatus: state.httpStatus,
       NeedsReconciliation: state.needsReconciliation ? 1 : 0,
       SettleReason: state.settleReason,
-      ...usageColumns(state.usage),
+      ...GatewaySpendEventsRepository.usageColumns(state.usage),
       CostNanoUSD: state.costNanoUsd,
       RateVersion: state.rateVersion,
       Labels: state.labels,
@@ -484,8 +235,8 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
     if (String(r.Version) !== GATEWAY_SPEND_PROJECTION_VERSION_LATEST) {
       return null;
     }
-    const row = mapSpendEventRow(r);
-    const usage = foldUsage(row, r);
+    const row = GatewaySpendEventsRepository.mapSpendEventRow(r);
+    const usage = GatewaySpendEventsRepository.foldUsage(row, r);
     return {
       status: row.status,
       organizationId: row.organizationId,
@@ -568,7 +319,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
       format: "JSONEachRow",
     });
     const raw = (await result.json()) as Array<Record<string, unknown>>;
-    const rows = raw.map(mapSpendEventRow);
+    const rows = raw.map((row) => GatewaySpendEventsRepository.mapSpendEventRow(row));
     const last = rows[rows.length - 1];
     return {
       rows,
@@ -611,7 +362,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
       format: "JSONEachRow",
     });
     const raw = (await result.json()) as Array<Record<string, unknown>>;
-    return raw.map(mapSpendEventRow);
+    return raw.map((row) => GatewaySpendEventsRepository.mapSpendEventRow(row));
   }
 
   /**
@@ -641,7 +392,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
     const client = await this.resolveClient(tenantIds[0]!);
     const decoded = cursor ? decodeSpendEventsCursor(cursor) : null;
 
-    const { clauses, params: filterParams } = buildSpendEventsWalkFilter({
+    const { clauses, params: filterParams } = GatewaySpendEventsRepository.spendEventsWalkFilter({
       decoded,
       fromMs,
       toMs,
@@ -666,7 +417,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
       format: "JSONEachRow",
     });
     const raw = (await result.json()) as Array<Record<string, unknown>>;
-    const rows = raw.map(mapSpendEventRow);
+    const rows = raw.map((row) => GatewaySpendEventsRepository.mapSpendEventRow(row));
     const last = raw[raw.length - 1];
     return {
       rows,
@@ -738,11 +489,11 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
     const client = await this.resolveClient(tenantIds[0]!);
 
     const params: Record<string, unknown> = { tenantIds, fromMs, toMs, limit };
-    const dimensions = summaryDimensions({ groupBy, bucket });
+    const dimensions = GatewaySpendEventsRepository.summaryDimensions({ groupBy, bucket });
     if (bucket !== "none") params.timezone = timezone;
 
     const clauses: string[] = [];
-    const walk = summariesWalkClause({
+    const walk = GatewaySpendEventsRepository.summariesWalkClause({
       cursor: cursor ? decodeSpendSummariesCursor(cursor) : null,
       dimensions,
     });
@@ -755,9 +506,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
     clauses.push(...filterSql.clauses.map((clause) => `AND ${clause}`));
     Object.assign(params, filterSql.params);
 
-    const selection = dimensions
-      .map((d) => `${d.expression} AS ${d.alias}`)
-      .join(",\n          ");
+    const selection = dimensions.map((d) => `${d.expression} AS ${d.alias}`).join(",\n          ");
     const grouping = dimensions.map((d) => d.alias).join(", ");
     const ordering = dimensions.map((d) => `${d.alias} ASC`).join(", ");
 
@@ -805,7 +554,9 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
       raw.length === limit && last
         ? encodeSpendSummariesCursor(dimensions.map((d) => String(last[d.alias] ?? "")))
         : null;
-    const rows = raw.map((r) => mapSummaryRow({ raw: r, groupBy, bucket }));
+    const rows = raw.map((r) =>
+      GatewaySpendEventsRepository.mapSummaryRow({ raw: r, groupBy, bucket }),
+    );
     return { rows, nextCursor };
   }
 
@@ -843,8 +594,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
     };
     if (tenantIds.length === 0) return empty;
     const client = await this.resolveClient(tenantIds[0]!);
-    const vkClause =
-      virtualKeyId !== undefined ? "AND VirtualKeyId = {virtualKeyId:String}" : "";
+    const vkClause = virtualKeyId !== undefined ? "AND VirtualKeyId = {virtualKeyId:String}" : "";
     const result = await client.query({
       query: `
         SELECT
@@ -886,87 +636,249 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
       tokensReasoning: Number(row.TokensReasoning ?? 0),
     };
   }
-}
 
-export interface SpendEventsCursor {
-  eventTimestampMs: number;
-  gatewayRequestId: string;
-}
-
-/** Opaque, order-preserving page cursor: base64url "eventTs:requestId". */
-export function encodeSpendEventsCursor(cursor: SpendEventsCursor): string {
-  return Buffer.from(
-    `${cursor.eventTimestampMs}:${cursor.gatewayRequestId}`,
-    "utf8",
-  ).toString("base64url");
-}
-
-/**
- * Opaque page cursor for the summaries rollup: base64url of the JSON array of
- * group-key parts last served, one per grouping dimension. Same encoding
- * conventions as {@link encodeSpendEventsCursor} so a caller treats both
- * surfaces' cursors identically: opaque, and passed back verbatim.
- *
- * The parts are carried as an array rather than joined, because a group key
- * is a caller-supplied value (a model name, an end user id) and any separator
- * chosen for it is a separator some caller's data already contains.
- */
-export function encodeSpendSummariesCursor(groupKey: string[]): string {
-  return Buffer.from(JSON.stringify(groupKey), "utf8").toString("base64url");
-}
-
-/**
- * The group-key parts a summaries cursor names, or null when it is not a
- * cursor this service minted.
- *
- * Anything that is not a JSON array of strings is one part: cursors minted
- * before a rollup could group by two dimensions are plain base64url text, and
- * a caller can be mid-walk across the deploy that changed this.
- *
- * The decision is made by parsing, never by looking at the first character.
- * Group keys are caller data, so a model or end-user id may legitimately open
- * with `[`, and sniffing would refuse that caller's perfectly good cursor and
- * restart their walk from the first page.
- */
-export function decodeSpendSummariesCursor(encoded: string): string[] | null {
-  try {
-    const raw = Buffer.from(encoded, "base64url").toString("utf8");
-    if (raw.length === 0) return null;
-    return asGroupKeyParts(raw) ?? [raw];
-  } catch {
-    return null;
+  static mapSpendEventRow(r: Record<string, unknown>): SpendEventRow {
+    const nano = Number(r.CostNanoUSD ?? 0);
+    const status = String(r.Status) as SpendEventStatus;
+    return {
+      tenantId: String(r.TenantId),
+      gatewayRequestId: String(r.GatewayRequestId),
+      organizationId: String(r.OrganizationId),
+      teamId: "",
+      virtualKeyId: String(r.VirtualKeyId),
+      principalUserId: String(r.PrincipalUserId),
+      endUserId: String(r.EndUserId),
+      traceId: String(r.TraceId),
+      model: String(r.Model),
+      providerKey: String(r.ProviderKey),
+      requestType: String(r.RequestType ?? ""),
+      tokensInput: Number(r.TokensInput),
+      tokensOutput: Number(r.TokensOutput),
+      tokensCacheRead: Number(r.TokensCacheRead),
+      tokensCacheWrite: Number(r.TokensCacheWrite),
+      tokensReasoning: Number(r.TokensReasoning),
+      costNanoUsd: nano,
+      costUsd: nanoUsdToDecimalString(nano),
+      rateVersion: String(r.RateVersion ?? ""),
+      status,
+      errorClass: String(r.ErrorClass),
+      httpStatus: Number(r.HttpStatus),
+      needsReconciliation: Number(r.NeedsReconciliation ?? 0) === 1,
+      settleReason: String(r.SettleReason ?? ""),
+      labels: Array.isArray(r.Labels) ? r.Labels.map(String) : [],
+      metadata: String(r.Metadata ?? ""),
+      durationMs: Number(r.DurationMS),
+      occurredAt: new Date(Number(r.OccurredAtMs)),
+    };
   }
-}
 
-/** The parts a payload names, or null when it is not the multi-part form. */
-function asGroupKeyParts(raw: string): string[] | null {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-  if (!Array.isArray(parsed) || parsed.length === 0) return null;
-  if (!parsed.every((part) => typeof part === "string")) return null;
-  return parsed as string[];
-}
-
-export function decodeSpendEventsCursor(encoded: string): SpendEventsCursor | null {
-  try {
-    const raw = Buffer.from(encoded, "base64url").toString("utf8");
-    const sep = raw.indexOf(":");
-    if (sep <= 0) return null;
-    const eventTimestampMs = Number(raw.slice(0, sep));
-    const gatewayRequestId = raw.slice(sep + 1);
-    if (
-      !Number.isFinite(eventTimestampMs) ||
-      eventTimestampMs < 0 ||
-      gatewayRequestId.length === 0
-    ) {
-      return null;
+  /**
+   * The cursor and filter predicates of a spend-events walk, as clause fragments
+   * already carrying their leading AND plus the bound parameters they name. Each
+   * fragment is optional; an absent filter contributes neither a clause nor a
+   * parameter, so the query never binds a placeholder it does not reference.
+   */
+  private static spendEventsWalkFilter({
+    decoded,
+    fromMs,
+    toMs,
+    filters,
+  }: {
+    decoded: GatewaySpendEventsCursor | null;
+    fromMs?: number;
+    toMs?: number;
+    filters: SpendFilters;
+  }): { clauses: string[]; params: Record<string, unknown> } {
+    const clauses: string[] = [];
+    const params: Record<string, unknown> = {};
+    if (decoded) {
+      clauses.push(
+        "AND (EventTimestamp, GatewayRequestId) > ({cursorEventTs:UInt64}, {cursorRequestId:String})",
+      );
+      params.cursorEventTs = decoded.eventTimestampMs;
+      params.cursorRequestId = decoded.gatewayRequestId;
     }
-    return { eventTimestampMs, gatewayRequestId };
-  } catch {
-    return null;
+    if (fromMs !== undefined) {
+      clauses.push("AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})");
+      params.fromMs = fromMs;
+    }
+    if (toMs !== undefined) {
+      clauses.push("AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})");
+      params.toMs = toMs;
+    }
+    const filterSql = buildSpendFilterClauses({ filters });
+    clauses.push(...filterSql.clauses.map((clause) => `AND ${clause}`));
+    Object.assign(params, filterSql.params);
+    return { clauses, params };
+  }
+
+  /**
+   * The bucket leads the grouping so a walk reads the window in time order,
+   * which is the shape a caller charting spend expects a page to arrive in.
+   */
+  private static summaryDimensions({
+    groupBy,
+    bucket,
+  }: {
+    groupBy: SpendGroupByKey[];
+    bucket: SpendBucket;
+  }): SummaryDimension[] {
+    const dimensions: SummaryDimension[] = [];
+    if (bucket !== "none") {
+      dimensions.push({
+        alias: "GroupBucket",
+        expression: bucketExpression({ bucket, timezoneParam: "timezone" }),
+      });
+    }
+    for (const [index, key] of groupBy.entries()) {
+      dimensions.push({
+        alias: `GroupKey${index}`,
+        expression: groupByColumn(key),
+      });
+    }
+    return dimensions;
+  }
+
+  /**
+   * Tuple comparison over the grouping expressions: the one predicate that
+   * advances a multi-dimension walk without serving a boundary group twice.
+   *
+   * A cursor whose arity does not match the grouping names a walk over a
+   * different shape entirely, and is refused. Dropping the predicate instead
+   * would serve page one again under a fresh cursor, with nothing in the
+   * response to say the walk had reset, and a reconciliation would fold the
+   * same groups into its checksum twice. The REST boundary refuses this by
+   * comparing the two before the read, so anything reaching here is a caller
+   * bug.
+   */
+  private static summariesWalkClause({
+    cursor,
+    dimensions,
+  }: {
+    cursor: string[] | null;
+    dimensions: SummaryDimension[];
+  }): { clause: string; params: Record<string, unknown> } | null {
+    if (cursor === null) return null;
+    if (cursor.length !== dimensions.length) {
+      throw new Error(
+        `cursor names a walk over ${cursor.length} dimension(s); this request groups by ${dimensions.length}`,
+      );
+    }
+    const left = dimensions.map((d) => d.expression).join(", ");
+    const right = cursor.map((_, index) => `{cursor${index}:String}`).join(", ");
+    const params: Record<string, unknown> = {};
+    cursor.forEach((part, index) => {
+      params[`cursor${index}`] = part;
+    });
+    return {
+      clause: dimensions.length === 1 ? `AND ${left} > ${right}` : `AND (${left}) > (${right})`,
+      params,
+    };
+  }
+
+  /**
+   * Zero is the honest answer for an absent aggregate here: a group only exists
+   * in the result because at least one row produced it, so a missing column is
+   * a sum over rows that all carried nothing, not an unknown quantity.
+   */
+  private static summed(raw: Record<string, unknown>, column: string): number {
+    return Number(raw[column] ?? 0);
+  }
+
+  /** A grouping value is a String column, so an absent one is the empty key. */
+  private static grouped(raw: Record<string, unknown>, column: string): string {
+    return String(raw[column] ?? "");
+  }
+
+  private static mapSummaryRow({
+    raw,
+    groupBy,
+    bucket,
+  }: {
+    raw: Record<string, unknown>;
+    groupBy: SpendGroupByKey[];
+    bucket: SpendBucket;
+  }): SpendSummaryRow {
+    const nano = parseSummedNanoUsd(raw.CostNanoUSD);
+    const group: Record<string, string> = {};
+    for (const [index, key] of groupBy.entries()) {
+      group[key] = GatewaySpendEventsRepository.grouped(raw, `GroupKey${index}`);
+    }
+    return {
+      key: GatewaySpendEventsRepository.grouped(raw, "GroupKey0"),
+      group,
+      bucketStart:
+        bucket === "none" ? null : GatewaySpendEventsRepository.grouped(raw, "GroupBucket"),
+      eventCount: GatewaySpendEventsRepository.summed(raw, "EventCount"),
+      settledCount: GatewaySpendEventsRepository.summed(raw, "SettledCount"),
+      tokensInput: GatewaySpendEventsRepository.summed(raw, "TokensInput"),
+      tokensOutput: GatewaySpendEventsRepository.summed(raw, "TokensOutput"),
+      tokensCacheRead: GatewaySpendEventsRepository.summed(raw, "TokensCacheRead"),
+      tokensCacheWrite: GatewaySpendEventsRepository.summed(raw, "TokensCacheWrite"),
+      tokensReasoning: GatewaySpendEventsRepository.summed(raw, "TokensReasoning"),
+      costNanoUsd: nano,
+      costUsd: nanoUsdToDecimalString(nano),
+    };
+  }
+
+  /** One quantity column per field of the vocabulary. A request with no
+   *  measured usage writes zeros, which is what the column defaults hold for
+   *  every row written before the quantity existed. */
+  private static usageColumns(usage: SpendUsage | null): Record<string, number> {
+    const quantities = usage ?? EMPTY_SPEND_USAGE;
+    return {
+      TokensInput: quantities.input_tokens,
+      TokensOutput: quantities.output_tokens,
+      TokensCacheRead: quantities.cache_read_input_tokens,
+      TokensCacheWrite: quantities.cache_creation_input_tokens,
+      TokensCacheWrite1h: quantities.cache_creation_1h_tokens,
+      TokensReasoning: quantities.reasoning_tokens,
+      TokensInputAudio: quantities.input_audio_tokens,
+      TokensOutputAudio: quantities.output_audio_tokens,
+      CharsInput: quantities.input_chars,
+      AudioMS: quantities.audio_ms,
+    };
+  }
+
+  /**
+   * The quantities a spend row carries, or null when it measured nothing.
+   *
+   * The quantity columns beyond the five token classes are read straight off
+   * the raw row rather than through {@link mapSpendEventRow}: the mapped row
+   * shapes the REST and UI surfaces, and widening it would change those
+   * response bodies. The fold needs them regardless, because a late admission
+   * folding over a confirmed request rewrites the whole row from this state,
+   * so a quantity that does not decode here is a quantity zeroed on the next
+   * write.
+   *
+   * Any measured quantity counts as usage, not the token classes alone: a
+   * character-priced call has zero tokens and 4000 characters, and reading it
+   * back as "no usage" would drop them.
+   */
+  private static foldUsage(row: SpendEventRow, raw: Record<string, unknown>): SpendUsage | null {
+    const quantity = (column: string): number => Number(raw[column] ?? 0);
+    const measured = [
+      row.tokensInput,
+      row.tokensOutput,
+      quantity("CharsInput"),
+      quantity("AudioMS"),
+      quantity("TokensInputAudio"),
+      quantity("TokensOutputAudio"),
+      quantity("TokensCacheWrite1h"),
+    ];
+    const outcome = row.status === "confirmed" || row.status === "failed";
+    if (!outcome && !measured.some((value) => value > 0)) return null;
+    return {
+      input_tokens: row.tokensInput,
+      output_tokens: row.tokensOutput,
+      cache_read_input_tokens: row.tokensCacheRead,
+      cache_creation_input_tokens: row.tokensCacheWrite,
+      cache_creation_1h_tokens: quantity("TokensCacheWrite1h"),
+      reasoning_tokens: row.tokensReasoning,
+      input_audio_tokens: quantity("TokensInputAudio"),
+      output_audio_tokens: quantity("TokensOutputAudio"),
+      input_chars: quantity("CharsInput"),
+      audio_ms: quantity("AudioMS"),
+    };
   }
 }

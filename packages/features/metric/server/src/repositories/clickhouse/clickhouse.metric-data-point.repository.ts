@@ -54,78 +54,6 @@ const USAGE_DIMENSIONS: Record<MetricUsageEstimateQuery["groupBy"], string[]> = 
   hour: ["OrganizationId", "TenantId", "MetricName", "AcceptedHour"],
 };
 
-async function queryMetricUsageEstimates({
-  client,
-  query,
-}: {
-  client: MetricClickHouseClient;
-  query: MetricUsageEstimateQuery;
-}): Promise<MetricUsageEstimate[]> {
-  const dimensions = USAGE_DIMENSIONS[query.groupBy];
-  const selectDimensions = dimensions.join(", ");
-  const identityWhere = [
-    "OrganizationId = {organizationId:String}",
-    // First acceptance determines billing. The lower window bound belongs in
-    // HAVING so min(AcceptedAt) can deduplicate a point across month partitions.
-    "AcceptedAt < {to:DateTime64(3)}",
-    query.tenantId ? "TenantId = {tenantId:String}" : "",
-    query.metricName ? "MetricName = {metricName:String}" : "",
-  ]
-    .filter(Boolean)
-    .join(" AND ");
-
-  const result = await client.query({
-    query: `
-      SELECT
-        ${selectDimensions},
-        uniqExact(SeriesId) AS UniqueActiveSeries,
-        uniqExact(tuple(SeriesId, AcceptedHour)) AS ActiveSeriesHours,
-        uniqExact(PointId) AS AcceptedPoints,
-        sum(CanonicalSourceBytes) AS CanonicalRetainedBytes,
-        ActiveSeriesHours AS ProjectedEventEquivalentUsage
-        FROM (
-        SELECT
-          PointId,
-          any(OrganizationId) AS OrganizationId,
-          any(TenantId) AS TenantId,
-          any(SeriesId) AS SeriesId,
-          any(MetricName) AS MetricName,
-          min(AcceptedAt) AS AcceptedAt,
-          toStartOfHour(min(AcceptedAt)) AS AcceptedHour,
-          any(CanonicalSourceBytes) AS CanonicalSourceBytes
-        FROM metric_usage_estimates
-        WHERE ${identityWhere}
-        GROUP BY PointId
-        HAVING min(AcceptedAt) >= {from:DateTime64(3)}
-      )
-      GROUP BY ${selectDimensions}
-      ORDER BY ${selectDimensions}
-    `,
-    query_params: {
-      organizationId: query.organizationId,
-      from: query.from,
-      to: query.to,
-      ...(query.tenantId ? { tenantId: query.tenantId } : {}),
-      ...(query.metricName ? { metricName: query.metricName } : {}),
-    },
-    format: "JSONEachRow",
-  });
-
-  const rows = await result.json<Record<string, string>>();
-
-  return rows.map((row) => ({
-    organizationId: row.OrganizationId!,
-    tenantId: row.TenantId ?? null,
-    metricName: row.MetricName ?? null,
-    acceptedHour: row.AcceptedHour ?? null,
-    uniqueActiveSeries: Number(row.UniqueActiveSeries ?? 0),
-    activeSeriesHours: Number(row.ActiveSeriesHours ?? 0),
-    acceptedPoints: Number(row.AcceptedPoints ?? 0),
-    canonicalRetainedBytes: Number(row.CanonicalRetainedBytes ?? 0),
-    projectedEventEquivalentUsage: Number(row.ProjectedEventEquivalentUsage ?? 0),
-  }));
-}
-
 const logger = createLogger("langwatch:app-layer:metrics:metric-data-point-repository");
 
 const INSERT_SETTINGS = { async_insert: 1, wait_for_async_insert: 1 } as const;
@@ -160,164 +88,6 @@ const SEEKS_PER_QUERY = 64;
 const SUCCESSOR_PARAM_BUDGET_CHARS = 3500;
 
 /**
- * One fixed statement carries point spans as arrays; successorSeekChunks keeps
- * their encoded URL parameters below SUCCESSOR_PARAM_BUDGET_CHARS.
- *
- * Stored points inside each span cover every successor except the newest one.
- * The first branch reads that closed span and the second seeks one row beyond
- * it per series. affectedBucketsBySeries takes the earliest candidate.
- *
- * Tenant, series and lower-time predicates stay inside the FINAL CTE. Time is
- * part of the dedup key, so range pruning cannot hide another version of a row.
- * Keep SEEK_SELECT narrow: adding payload, attribute or bucket columns would
- * turn LIMIT 1 BY into the expensive materialisation this query avoids.
- *
- * The scan bounds remain chunk-global, not per-series. Improving that requires
- * real-server index plans and equivalence coverage because a bad upper bound
- * would lose successors rather than merely cost time.
- */
-const SUCCESSOR_SEEK_QUERY = `
-  WITH spans AS (
-    SELECT
-      span.1 AS SpanSeriesId,
-      fromUnixTimestamp64Milli(span.2) AS SpanFromTime,
-      toUInt64(span.3) AS SpanFromNano,
-      span.4 AS SpanFromPoint,
-      fromUnixTimestamp64Milli(span.5) AS SpanToTime,
-      toUInt64(span.6) AS SpanToNano,
-      span.7 AS SpanToPoint
-    FROM (
-      SELECT arrayJoin(arrayZip(
-        {seriesIds:Array(String)},
-        {fromTimes:Array(Int64)}, {fromNanos:Array(String)}, {fromPoints:Array(String)},
-        {toTimes:Array(Int64)}, {toNanos:Array(String)}, {toPoints:Array(String)}
-      )) AS span
-    )
-  ),
-  series_points AS (
-    SELECT ${SEEK_SELECT}, metric_data_points.TimeUnixMs AS SeekTime
-    FROM metric_data_points FINAL
-    WHERE TenantId = {tenantId:String}
-      AND SeriesId IN {seriesIds:Array(String)}
-      AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({scanFrom:Int64})
-  )
-  SELECT * FROM (
-    (SELECT series_points.*
-     FROM series_points INNER JOIN spans ON CAST(series_points.SeriesId AS String) = spans.SpanSeriesId
-     WHERE series_points.SeekTime <= fromUnixTimestamp64Milli({latestSpanEnd:Int64})
-       AND ${orderedAfter("From")} AND ${orderedBefore("To")})
-    UNION ALL
-    (SELECT series_points.*
-     FROM series_points INNER JOIN spans ON CAST(series_points.SeriesId AS String) = spans.SpanSeriesId
-     WHERE series_points.SeekTime >= fromUnixTimestamp64Milli({earliestSpanEnd:Int64})
-       AND ${orderedAfter("To")}
-     ORDER BY series_points.SeriesId ASC, series_points.SeekTime ASC,
-       series_points.TimeUnixNano ASC, series_points.PointId ASC
-     LIMIT 1 BY SeriesId)
-  )
-`;
-
-/**
- * The table's own row order, (TimeUnixMs, TimeUnixNano, PointId), compared
- * against one end of a joined span. Written out rather than as a tuple
- * comparison so the emitted predicate is the one the per-branch seeks already
- * proved in production.
- *
- * It reads `series_points.SeekTime` and never `TimeUnixMs`, which is why the
- * CTE keeps the raw `DateTime64` under that second name: SEEK_SELECT already
- * binds `TimeUnixMs` to its epoch-milli alias, so a comparison written against
- * that name would compare against the alias instead of the column. Do not
- * "simplify" `SeekTime` away.
- */
-function orderedAfter(bound: "From" | "To"): string {
-  return `(series_points.SeekTime > spans.Span${bound}Time
-     OR (series_points.SeekTime = spans.Span${bound}Time
-       AND (series_points.TimeUnixNano > spans.Span${bound}Nano
-         OR (series_points.TimeUnixNano = spans.Span${bound}Nano
-           AND series_points.PointId > spans.Span${bound}Point))))`;
-}
-
-function orderedBefore(bound: "From" | "To"): string {
-  return `(series_points.SeekTime < spans.Span${bound}Time
-     OR (series_points.SeekTime = spans.Span${bound}Time
-       AND (series_points.TimeUnixNano < spans.Span${bound}Nano
-         OR (series_points.TimeUnixNano = spans.Span${bound}Nano
-           AND series_points.PointId < spans.Span${bound}Point))))`;
-}
-
-function chunked<T>(items: readonly T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let index = 0; index < items.length; index += size) {
-    chunks.push(items.slice(index, index + size));
-  }
-  return chunks;
-}
-
-function groupBySeries<T extends { seriesId: string }>(points: readonly T[]): Map<string, T[]> {
-  const bySeries = new Map<string, T[]>();
-  for (const point of points) {
-    const existing = bySeries.get(point.seriesId);
-    if (existing) existing.push(point);
-    else bySeries.set(point.seriesId, [point]);
-  }
-  return bySeries;
-}
-
-/**
- * Which rollup buckets a chunk moved, per series, decided without another read.
- *
- * A chunk point's true successor is the smallest stored point after it. Every
- * chunk point is already stored by the time this runs, and the seek returned
- * the smallest stored point after each one, so the true successor is somewhere
- * in the union of the two and no stored point can sit between them. Taking the
- * minimum of that union — which is all `affectedRollupBuckets` does — therefore
- * lands on exactly the row a per-point neighbour query would have returned,
- * whatever order the chunk arrived in.
- */
-function affectedBucketsBySeries({
-  bySeries,
-  successorsBySeries,
-}: {
-  bySeries: ReadonlyMap<string, CanonicalMetricDataPoint[]>;
-  successorsBySeries: ReadonlyMap<string, MetricSequencePoint[]>;
-}): Map<string, Set<number>> {
-  const affectedBySeries = new Map<string, Set<number>>();
-  for (const [seriesId, seriesPoints] of bySeries) {
-    // Sorted once so each point's successor is a binary search, not a rescan
-    // of every candidate — the per-point scan made a single hot series cost
-    // O(N²) per chunk. `affectedRollupBuckets` stays the sole owner of the
-    // bucket semantics; it just receives the one candidate that can matter.
-    const candidates: MetricSequencePoint[] = [
-      ...seriesPoints,
-      ...(successorsBySeries.get(seriesId) ?? []),
-    ].sort(comparePoints);
-    const affected = affectedBucketsForSeries({ seriesPoints, candidates });
-    if (affected.size > 0) affectedBySeries.set(seriesId, affected);
-  }
-  return affectedBySeries;
-}
-
-function affectedBucketsForSeries({
-  seriesPoints,
-  candidates,
-}: {
-  seriesPoints: readonly CanonicalMetricDataPoint[];
-  candidates: readonly MetricSequencePoint[];
-}): Set<number> {
-  const affected = new Set<number>();
-  for (const point of seriesPoints) {
-    const successor = successorIn({ sorted: candidates, point });
-    for (const bucket of affectedRollupBuckets({
-      points: successor ? [successor] : [],
-      insertedPoint: point,
-    })) {
-      affected.add(bucket);
-    }
-  }
-  return affected;
-}
-
-/**
  * A series' chunk points reduced to the two that bound them. The successor read
  * needs nothing else: everything between them it reads wholesale, and only the
  * newest needs a look past the end of the chunk.
@@ -326,157 +96,6 @@ interface SeriesSpan {
   seriesId: string;
   first: CanonicalMetricDataPoint;
   last: CanonicalMetricDataPoint;
-}
-
-function seriesSpans(points: readonly CanonicalMetricDataPoint[]): SeriesSpan[] {
-  return [...groupBySeries(points)].map(([seriesId, seriesPoints]) => {
-    const sorted = [...seriesPoints].sort(comparePoints);
-    return {
-      seriesId,
-      first: sorted[0]!,
-      last: sorted[sorted.length - 1]!,
-    };
-  });
-}
-
-/**
- * Eleven parameters, whatever the chunk holds - seven of them arrays the server
- * zips back into one row per series.
- *
- * Three are the constant time bounds the statement prunes partitions with, and
- * they are the widest each scope can prove: `scanFrom` the earliest span start
- * for the shared CTE, `latestSpanEnd` for the branch that reads within the
- * spans, `earliestSpanEnd` for the branch that reads past them. The last two
- * are both derived from span *ends* - the earliest span start is `scanFrom` -
- * so widening either to a span start is a change of meaning, not a typo fix.
- * Nanosecond values travel as strings because they exceed what a JSON number
- * carries exactly; the statement casts them back with `toUInt64`.
- */
-function successorSeekParams({
-  tenantId,
-  spans,
-}: {
-  tenantId: string;
-  spans: readonly SeriesSpan[];
-}): Record<string, unknown> {
-  return {
-    tenantId,
-    seriesIds: spans.map((span) => span.seriesId),
-    fromTimes: spans.map((span) => span.first.timeUnixMs),
-    fromNanos: spans.map((span) => span.first.timeUnixNano),
-    fromPoints: spans.map((span) => span.first.pointId),
-    toTimes: spans.map((span) => span.last.timeUnixMs),
-    toNanos: spans.map((span) => span.last.timeUnixNano),
-    toPoints: spans.map((span) => span.last.pointId),
-    scanFrom: Math.min(...spans.map((span) => span.first.timeUnixMs)),
-    earliestSpanEnd: Math.min(...spans.map((span) => span.last.timeUnixMs)),
-    latestSpanEnd: Math.max(...spans.map((span) => span.last.timeUnixMs)),
-  };
-}
-
-/**
- * `@clickhouse/client`'s `formatQueryParams` for the value shapes this file
- * binds - strings, numbers, and arrays of either. Mirrored rather than imported
- * because the client exports it only from a path inside its `dist` tree.
- *
- * The unit test re-measures every request this chunker emits with the client's
- * own `formatQueryParams`, so a divergence that made this under-measure fails
- * there rather than silently shipping an oversized request. Over-measuring only
- * costs a smaller chunk.
- */
-function formatParamValue({
-  value,
-  isInArray = false,
-}: {
-  value: unknown;
-  isInArray?: boolean;
-}): string {
-  if (typeof value === "number") return String(value);
-  if (typeof value === "string") {
-    const escaped = value
-      .replace(/\\/g, "\\\\")
-      .replace(/'/g, "\\'")
-      .replace(/\t/g, "\\t")
-      .replace(/\n/g, "\\n")
-      .replace(/\r/g, "\\r");
-    return isInArray ? `'${escaped}'` : escaped;
-  }
-  if (Array.isArray(value)) {
-    return `[${value
-      .map((element) => formatParamValue({ value: element, isInArray: true }))
-      .join(",")}]`;
-  }
-  throw new Error(
-    `Unsupported successor-seek parameter shape: ${typeof value}. Only strings, numbers and arrays of them are measurable against the request budget.`,
-  );
-}
-
-/** How long a request's `param_*` entries encode to, in URL characters. */
-function encodedParamLength(params: Record<string, unknown>): number {
-  return new URLSearchParams(
-    Object.entries(params).map(([name, value]): [string, string] => [
-      `param_${name}`,
-      formatParamValue({ value }),
-    ]),
-  ).toString().length;
-}
-
-/**
- * Where the successor read splits: encoded parameter bytes first,
- * {@link SEEKS_PER_QUERY} series as the upper cap.
- *
- * Series count is the wrong quantity to bound a request by. A series
- * contributes seven values, three of them 64-character identifiers, so what
- * fits in one request depends on the identifiers rather than on the count -
- * which is how a shape that looked bounded at 64 series produced a request
- * larger than the per-point shape it replaced. Measuring what actually travels
- * keeps the request bounded whatever the batch holds.
- *
- * A single series whose own parameters exceed the budget is still sent alone:
- * correctness first, and this table's identifier widths cannot reach that.
- */
-function successorSeekChunks({
-  tenantId,
-  spans,
-}: {
-  tenantId: string;
-  spans: readonly SeriesSpan[];
-}): SeriesSpan[][] {
-  const chunks: SeriesSpan[][] = [];
-  let current: SeriesSpan[] = [];
-  for (const span of spans) {
-    const candidate = [...current, span];
-    const outgrown =
-      candidate.length > SEEKS_PER_QUERY ||
-      encodedParamLength(successorSeekParams({ tenantId, spans: candidate })) >
-        SUCCESSOR_PARAM_BUDGET_CHARS;
-    if (outgrown && current.length > 0) {
-      chunks.push(current);
-      current = [span];
-    } else {
-      current = candidate;
-    }
-  }
-  if (current.length > 0) chunks.push(current);
-  return chunks;
-}
-
-/** The first point ordering strictly after `point`, from a sorted array. */
-function successorIn({
-  sorted,
-  point,
-}: {
-  sorted: readonly MetricSequencePoint[];
-  point: MetricSequencePoint;
-}): MetricSequencePoint | undefined {
-  let lo = 0;
-  let hi = sorted.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >>> 1;
-    if (comparePoints(sorted[mid]!, point) > 0) hi = mid;
-    else lo = mid + 1;
-  }
-  return sorted[lo];
 }
 
 export class MetricDataPointClickHouseRepository extends MetricDataPointRepository {
@@ -632,10 +251,12 @@ export class MetricDataPointClickHouseRepository extends MetricDataPointReposito
     // raw-before-derived invariant true even if this projection wins the race.
     await this.ensureDataPoints({ points, retentionDays });
 
-    const bySeries = groupBySeries(points);
-    const affectedBySeries = affectedBucketsBySeries({
+    const bySeries = MetricDataPointClickHouseRepository.groupBySeries(points);
+    const affectedBySeries = MetricDataPointClickHouseRepository.affectedBucketsBySeries({
       bySeries,
-      successorsBySeries: groupBySeries(await this.successorsOf(points)),
+      successorsBySeries: MetricDataPointClickHouseRepository.groupBySeries(
+        await this.successorsOf(points),
+      ),
     });
 
     const authoritative = await this.pointsForAffectedBuckets({
@@ -675,7 +296,7 @@ export class MetricDataPointClickHouseRepository extends MetricDataPointReposito
     const client = query.tenantId
       ? await this.resolveClient(query.tenantId)
       : await this.resolveOrganizationClient(query.organizationId);
-    return await queryMetricUsageEstimates({ client, query });
+    return await MetricDataPointClickHouseRepository.queryMetricUsageEstimates({ client, query });
   }
 
   async getSeriesTotalsByPointAttribute({
@@ -778,13 +399,13 @@ export class MetricDataPointClickHouseRepository extends MetricDataPointReposito
     const client = await this.resolveClient(tenantId);
     const found: MetricSequencePoint[] = [];
 
-    for (const spans of successorSeekChunks({
+    for (const spans of MetricDataPointClickHouseRepository.successorSeekChunks({
       tenantId,
-      spans: seriesSpans(points),
+      spans: MetricDataPointClickHouseRepository.seriesSpans(points),
     })) {
       const result = await client.query({
-        query: SUCCESSOR_SEEK_QUERY,
-        query_params: successorSeekParams({ tenantId, spans }),
+        query: MetricDataPointClickHouseRepository.SUCCESSOR_SEEK_QUERY,
+        query_params: MetricDataPointClickHouseRepository.successorSeekParams({ tenantId, spans }),
         format: "JSONEachRow",
       });
       for (const row of await result.json<SeekMetricRow>()) {
@@ -837,7 +458,10 @@ export class MetricDataPointClickHouseRepository extends MetricDataPointReposito
     // 64-character series identifier, so 32 buckets encode to roughly 3.5k
     // characters of `param_*` entries - inside the client's own 4096-character
     // ceiling on them, where 64 buckets would be half as far outside it again.
-    for (const chunk of chunked(seeks, Math.floor(SEEKS_PER_QUERY / 2))) {
+    for (const chunk of MetricDataPointClickHouseRepository.chunked(
+      seeks,
+      Math.floor(SEEKS_PER_QUERY / 2),
+    )) {
       // Two shared scalars replace the per-seek end and cutoff bounds: both
       // were derived from the bucket start, so the server can derive them too
       // and the parameter fan-out halves without the statement changing shape.
@@ -890,5 +514,399 @@ export class MetricDataPointClickHouseRepository extends MetricDataPointReposito
       else found.set(point.seriesId, [point]);
     }
     return found;
+  }
+
+  private static async queryMetricUsageEstimates({
+    client,
+    query,
+  }: {
+    client: MetricClickHouseClient;
+    query: MetricUsageEstimateQuery;
+  }): Promise<MetricUsageEstimate[]> {
+    const dimensions = USAGE_DIMENSIONS[query.groupBy];
+    const selectDimensions = dimensions.join(", ");
+    const identityWhere = [
+      "OrganizationId = {organizationId:String}",
+      // First acceptance determines billing. The lower window bound belongs in
+      // HAVING so min(AcceptedAt) can deduplicate a point across month partitions.
+      "AcceptedAt < {to:DateTime64(3)}",
+      query.tenantId ? "TenantId = {tenantId:String}" : "",
+      query.metricName ? "MetricName = {metricName:String}" : "",
+    ]
+      .filter(Boolean)
+      .join(" AND ");
+
+    const result = await client.query({
+      query: `
+        SELECT
+          ${selectDimensions},
+          uniqExact(SeriesId) AS UniqueActiveSeries,
+          uniqExact(tuple(SeriesId, AcceptedHour)) AS ActiveSeriesHours,
+          uniqExact(PointId) AS AcceptedPoints,
+          sum(CanonicalSourceBytes) AS CanonicalRetainedBytes,
+          ActiveSeriesHours AS ProjectedEventEquivalentUsage
+          FROM (
+          SELECT
+            PointId,
+            any(OrganizationId) AS OrganizationId,
+            any(TenantId) AS TenantId,
+            any(SeriesId) AS SeriesId,
+            any(MetricName) AS MetricName,
+            min(AcceptedAt) AS AcceptedAt,
+            toStartOfHour(min(AcceptedAt)) AS AcceptedHour,
+            any(CanonicalSourceBytes) AS CanonicalSourceBytes
+          FROM metric_usage_estimates
+          WHERE ${identityWhere}
+          GROUP BY PointId
+          HAVING min(AcceptedAt) >= {from:DateTime64(3)}
+        )
+        GROUP BY ${selectDimensions}
+        ORDER BY ${selectDimensions}
+      `,
+      query_params: {
+        organizationId: query.organizationId,
+        from: query.from,
+        to: query.to,
+        ...(query.tenantId ? { tenantId: query.tenantId } : {}),
+        ...(query.metricName ? { metricName: query.metricName } : {}),
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<Record<string, string>>();
+
+    return rows.map((row) => ({
+      organizationId: row.OrganizationId!,
+      tenantId: row.TenantId ?? null,
+      metricName: row.MetricName ?? null,
+      acceptedHour: row.AcceptedHour ?? null,
+      uniqueActiveSeries: Number(row.UniqueActiveSeries ?? 0),
+      activeSeriesHours: Number(row.ActiveSeriesHours ?? 0),
+      acceptedPoints: Number(row.AcceptedPoints ?? 0),
+      canonicalRetainedBytes: Number(row.CanonicalRetainedBytes ?? 0),
+      projectedEventEquivalentUsage: Number(row.ProjectedEventEquivalentUsage ?? 0),
+    }));
+  }
+
+  /**
+   * One fixed statement carries point spans as arrays; successorSeekChunks keeps
+   * their encoded URL parameters below SUCCESSOR_PARAM_BUDGET_CHARS.
+   *
+   * Stored points inside each span cover every successor except the newest one.
+   * The first branch reads that closed span and the second seeks one row beyond
+   * it per series. affectedBucketsBySeries takes the earliest candidate.
+   *
+   * Tenant, series and lower-time predicates stay inside the FINAL CTE. Time is
+   * part of the dedup key, so range pruning cannot hide another version of a row.
+   * Keep SEEK_SELECT narrow: adding payload, attribute or bucket columns would
+   * turn LIMIT 1 BY into the expensive materialisation this query avoids.
+   *
+   * The scan bounds remain chunk-global, not per-series. Improving that requires
+   * real-server index plans and equivalence coverage because a bad upper bound
+   * would lose successors rather than merely cost time.
+   */
+  private static readonly SUCCESSOR_SEEK_QUERY = `
+    WITH spans AS (
+      SELECT
+        span.1 AS SpanSeriesId,
+        fromUnixTimestamp64Milli(span.2) AS SpanFromTime,
+        toUInt64(span.3) AS SpanFromNano,
+        span.4 AS SpanFromPoint,
+        fromUnixTimestamp64Milli(span.5) AS SpanToTime,
+        toUInt64(span.6) AS SpanToNano,
+        span.7 AS SpanToPoint
+      FROM (
+        SELECT arrayJoin(arrayZip(
+          {seriesIds:Array(String)},
+          {fromTimes:Array(Int64)}, {fromNanos:Array(String)}, {fromPoints:Array(String)},
+          {toTimes:Array(Int64)}, {toNanos:Array(String)}, {toPoints:Array(String)}
+        )) AS span
+      )
+    ),
+    series_points AS (
+      SELECT ${SEEK_SELECT}, metric_data_points.TimeUnixMs AS SeekTime
+      FROM metric_data_points FINAL
+      WHERE TenantId = {tenantId:String}
+        AND SeriesId IN {seriesIds:Array(String)}
+        AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({scanFrom:Int64})
+    )
+    SELECT * FROM (
+      (SELECT series_points.*
+       FROM series_points INNER JOIN spans ON CAST(series_points.SeriesId AS String) = spans.SpanSeriesId
+       WHERE series_points.SeekTime <= fromUnixTimestamp64Milli({latestSpanEnd:Int64})
+         AND ${MetricDataPointClickHouseRepository.orderedAfter("From")} AND ${MetricDataPointClickHouseRepository.orderedBefore("To")})
+      UNION ALL
+      (SELECT series_points.*
+       FROM series_points INNER JOIN spans ON CAST(series_points.SeriesId AS String) = spans.SpanSeriesId
+       WHERE series_points.SeekTime >= fromUnixTimestamp64Milli({earliestSpanEnd:Int64})
+         AND ${MetricDataPointClickHouseRepository.orderedAfter("To")}
+       ORDER BY series_points.SeriesId ASC, series_points.SeekTime ASC,
+         series_points.TimeUnixNano ASC, series_points.PointId ASC
+       LIMIT 1 BY SeriesId)
+    )
+  `;
+
+  /**
+   * The table's own row order, (TimeUnixMs, TimeUnixNano, PointId), compared
+   * against one end of a joined span. Written out rather than as a tuple
+   * comparison so the emitted predicate is the one the per-branch seeks already
+   * proved in production.
+   *
+   * It reads `series_points.SeekTime` and never `TimeUnixMs`, which is why the
+   * CTE keeps the raw `DateTime64` under that second name: SEEK_SELECT already
+   * binds `TimeUnixMs` to its epoch-milli alias, so a comparison written against
+   * that name would compare against the alias instead of the column. Do not
+   * "simplify" `SeekTime` away.
+   */
+  private static orderedAfter(bound: "From" | "To"): string {
+    return `(series_points.SeekTime > spans.Span${bound}Time
+       OR (series_points.SeekTime = spans.Span${bound}Time
+         AND (series_points.TimeUnixNano > spans.Span${bound}Nano
+           OR (series_points.TimeUnixNano = spans.Span${bound}Nano
+             AND series_points.PointId > spans.Span${bound}Point))))`;
+  }
+
+  private static orderedBefore(bound: "From" | "To"): string {
+    return `(series_points.SeekTime < spans.Span${bound}Time
+       OR (series_points.SeekTime = spans.Span${bound}Time
+         AND (series_points.TimeUnixNano < spans.Span${bound}Nano
+           OR (series_points.TimeUnixNano = spans.Span${bound}Nano
+             AND series_points.PointId < spans.Span${bound}Point))))`;
+  }
+
+  private static chunked<T>(items: readonly T[], size: number): T[][] {
+    const chunks: T[][] = [];
+    for (let index = 0; index < items.length; index += size) {
+      chunks.push(items.slice(index, index + size));
+    }
+    return chunks;
+  }
+
+  private static groupBySeries<T extends { seriesId: string }>(
+    points: readonly T[],
+  ): Map<string, T[]> {
+    const bySeries = new Map<string, T[]>();
+    for (const point of points) {
+      const existing = bySeries.get(point.seriesId);
+      if (existing) existing.push(point);
+      else bySeries.set(point.seriesId, [point]);
+    }
+    return bySeries;
+  }
+
+  /**
+   * Which rollup buckets a chunk moved, per series, decided without another read.
+   *
+   * A chunk point's true successor is the smallest stored point after it. Every
+   * chunk point is already stored by the time this runs, and the seek returned
+   * the smallest stored point after each one, so the true successor is somewhere
+   * in the union of the two and no stored point can sit between them. Taking the
+   * minimum of that union — which is all `affectedRollupBuckets` does — therefore
+   * lands on exactly the row a per-point neighbour query would have returned,
+   * whatever order the chunk arrived in.
+   */
+  private static affectedBucketsBySeries({
+    bySeries,
+    successorsBySeries,
+  }: {
+    bySeries: ReadonlyMap<string, CanonicalMetricDataPoint[]>;
+    successorsBySeries: ReadonlyMap<string, MetricSequencePoint[]>;
+  }): Map<string, Set<number>> {
+    const affectedBySeries = new Map<string, Set<number>>();
+    for (const [seriesId, seriesPoints] of bySeries) {
+      // Sorted once so each point's successor is a binary search, not a rescan
+      // of every candidate — the per-point scan made a single hot series cost
+      // O(N²) per chunk. `affectedRollupBuckets` stays the sole owner of the
+      // bucket semantics; it just receives the one candidate that can matter.
+      const candidates: MetricSequencePoint[] = [
+        ...seriesPoints,
+        ...(successorsBySeries.get(seriesId) ?? []),
+      ].sort(comparePoints);
+      const affected = MetricDataPointClickHouseRepository.affectedBucketsForSeries({
+        seriesPoints,
+        candidates,
+      });
+      if (affected.size > 0) affectedBySeries.set(seriesId, affected);
+    }
+    return affectedBySeries;
+  }
+
+  private static affectedBucketsForSeries({
+    seriesPoints,
+    candidates,
+  }: {
+    seriesPoints: readonly CanonicalMetricDataPoint[];
+    candidates: readonly MetricSequencePoint[];
+  }): Set<number> {
+    const affected = new Set<number>();
+    for (const point of seriesPoints) {
+      const successor = MetricDataPointClickHouseRepository.successorIn({
+        sorted: candidates,
+        point,
+      });
+      for (const bucket of affectedRollupBuckets({
+        points: successor ? [successor] : [],
+        insertedPoint: point,
+      })) {
+        affected.add(bucket);
+      }
+    }
+    return affected;
+  }
+
+  private static seriesSpans(points: readonly CanonicalMetricDataPoint[]): SeriesSpan[] {
+    return [...MetricDataPointClickHouseRepository.groupBySeries(points)].map(
+      ([seriesId, seriesPoints]) => {
+        const sorted = [...seriesPoints].sort(comparePoints);
+        return {
+          seriesId,
+          first: sorted[0]!,
+          last: sorted[sorted.length - 1]!,
+        };
+      },
+    );
+  }
+
+  /**
+   * Eleven parameters, whatever the chunk holds - seven of them arrays the server
+   * zips back into one row per series.
+   *
+   * Three are the constant time bounds the statement prunes partitions with, and
+   * they are the widest each scope can prove: `scanFrom` the earliest span start
+   * for the shared CTE, `latestSpanEnd` for the branch that reads within the
+   * spans, `earliestSpanEnd` for the branch that reads past them. The last two
+   * are both derived from span *ends* - the earliest span start is `scanFrom` -
+   * so widening either to a span start is a change of meaning, not a typo fix.
+   * Nanosecond values travel as strings because they exceed what a JSON number
+   * carries exactly; the statement casts them back with `toUInt64`.
+   */
+  private static successorSeekParams({
+    tenantId,
+    spans,
+  }: {
+    tenantId: string;
+    spans: readonly SeriesSpan[];
+  }): Record<string, unknown> {
+    return {
+      tenantId,
+      seriesIds: spans.map((span) => span.seriesId),
+      fromTimes: spans.map((span) => span.first.timeUnixMs),
+      fromNanos: spans.map((span) => span.first.timeUnixNano),
+      fromPoints: spans.map((span) => span.first.pointId),
+      toTimes: spans.map((span) => span.last.timeUnixMs),
+      toNanos: spans.map((span) => span.last.timeUnixNano),
+      toPoints: spans.map((span) => span.last.pointId),
+      scanFrom: Math.min(...spans.map((span) => span.first.timeUnixMs)),
+      earliestSpanEnd: Math.min(...spans.map((span) => span.last.timeUnixMs)),
+      latestSpanEnd: Math.max(...spans.map((span) => span.last.timeUnixMs)),
+    };
+  }
+
+  /**
+   * `@clickhouse/client`'s `formatQueryParams` for the value shapes this file
+   * binds - strings, numbers, and arrays of either. Mirrored rather than imported
+   * because the client exports it only from a path inside its `dist` tree.
+   *
+   * The unit test re-measures every request this chunker emits with the client's
+   * own `formatQueryParams`, so a divergence that made this under-measure fails
+   * there rather than silently shipping an oversized request. Over-measuring only
+   * costs a smaller chunk.
+   */
+  private static formatParamValue({
+    value,
+    isInArray = false,
+  }: {
+    value: unknown;
+    isInArray?: boolean;
+  }): string {
+    if (typeof value === "number") return String(value);
+    if (typeof value === "string") {
+      const escaped = value
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "\\'")
+        .replace(/\t/g, "\\t")
+        .replace(/\n/g, "\\n")
+        .replace(/\r/g, "\\r");
+      return isInArray ? `'${escaped}'` : escaped;
+    }
+    if (Array.isArray(value)) {
+      return `[${value
+        .map((element) =>
+          MetricDataPointClickHouseRepository.formatParamValue({ value: element, isInArray: true }),
+        )
+        .join(",")}]`;
+    }
+    throw new Error(
+      `Unsupported successor-seek parameter shape: ${typeof value}. Only strings, numbers and arrays of them are measurable against the request budget.`,
+    );
+  }
+
+  /** How long a request's `param_*` entries encode to, in URL characters. */
+  private static encodedParamLength(params: Record<string, unknown>): number {
+    return new URLSearchParams(
+      Object.entries(params).map(([name, value]): [string, string] => [
+        `param_${name}`,
+        MetricDataPointClickHouseRepository.formatParamValue({ value }),
+      ]),
+    ).toString().length;
+  }
+
+  /**
+   * Where the successor read splits: encoded parameter bytes first,
+   * {@link SEEKS_PER_QUERY} series as the upper cap.
+   *
+   * Series count is the wrong quantity to bound a request by. A series
+   * contributes seven values, three of them 64-character identifiers, so what
+   * fits in one request depends on the identifiers rather than on the count -
+   * which is how a shape that looked bounded at 64 series produced a request
+   * larger than the per-point shape it replaced. Measuring what actually travels
+   * keeps the request bounded whatever the batch holds.
+   *
+   * A single series whose own parameters exceed the budget is still sent alone:
+   * correctness first, and this table's identifier widths cannot reach that.
+   */
+  private static successorSeekChunks({
+    tenantId,
+    spans,
+  }: {
+    tenantId: string;
+    spans: readonly SeriesSpan[];
+  }): SeriesSpan[][] {
+    const chunks: SeriesSpan[][] = [];
+    let current: SeriesSpan[] = [];
+    for (const span of spans) {
+      const candidate = [...current, span];
+      const outgrown =
+        candidate.length > SEEKS_PER_QUERY ||
+        MetricDataPointClickHouseRepository.encodedParamLength(
+          MetricDataPointClickHouseRepository.successorSeekParams({ tenantId, spans: candidate }),
+        ) > SUCCESSOR_PARAM_BUDGET_CHARS;
+      if (outgrown && current.length > 0) {
+        chunks.push(current);
+        current = [span];
+      } else {
+        current = candidate;
+      }
+    }
+    if (current.length > 0) chunks.push(current);
+    return chunks;
+  }
+
+  /** The first point ordering strictly after `point`, from a sorted array. */
+  private static successorIn({
+    sorted,
+    point,
+  }: {
+    sorted: readonly MetricSequencePoint[];
+    point: MetricSequencePoint;
+  }): MetricSequencePoint | undefined {
+    let lo = 0;
+    let hi = sorted.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (comparePoints(sorted[mid]!, point) > 0) hi = mid;
+      else lo = mid + 1;
+    }
+    return sorted[lo];
   }
 }
