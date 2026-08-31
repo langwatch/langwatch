@@ -1124,6 +1124,68 @@ describe("All MCP tools integration", () => {
         expect(result).toContain("Switch to mini");
       });
     });
+
+    describe("when an update supplies only messages and a commit message", () => {
+      /** @scenario Carrying forward prior fields when an update supplies only messages and a commit message */
+      it("does not send fields that would wipe prior prompt configuration", async () => {
+        const { handleUpdatePrompt } = await import(
+          "../tools/update-prompt.js"
+        );
+        await handleUpdatePrompt({
+          idOrHandle: "greeting-bot",
+          messages: [{ role: "system", content: "You are a helpful bot." }],
+          commitMessage: "Only messages changed",
+        });
+
+        const req = lastRequests["PUT /api/prompts/greeting-bot"];
+        expect(req).toBeDefined();
+        const parsed = JSON.parse(req!.body);
+        expect(parsed).not.toHaveProperty("parameters");
+        expect(parsed).not.toHaveProperty("inputs");
+        expect(parsed).not.toHaveProperty("outputs");
+        expect(parsed).not.toHaveProperty("temperature");
+        expect(parsed).not.toHaveProperty("responseFormat");
+      });
+    });
+
+    describe("when an update omits tags", () => {
+      /** @scenario Tag-to-version mapping stays unchanged when an update omits tags */
+      it("does not send a tags field in the update request", async () => {
+        const { handleUpdatePrompt } = await import(
+          "../tools/update-prompt.js"
+        );
+        await handleUpdatePrompt({
+          idOrHandle: "greeting-bot",
+          model: "openai/gpt-4o",
+          commitMessage: "No tag change requested",
+        });
+
+        const req = lastRequests["PUT /api/prompts/greeting-bot"];
+        expect(req).toBeDefined();
+        const parsed = JSON.parse(req!.body);
+        expect(parsed).not.toHaveProperty("tags");
+      });
+    });
+
+    describe("when an update passes tags explicitly", () => {
+      /** @scenario Passing tags explicitly moves the tag to the new version */
+      it("sends the requested tags in the update request", async () => {
+        const { handleUpdatePrompt } = await import(
+          "../tools/update-prompt.js"
+        );
+        await handleUpdatePrompt({
+          idOrHandle: "greeting-bot",
+          model: "openai/gpt-4o",
+          commitMessage: "Deploy new version to production",
+          tags: ["production"],
+        });
+
+        const req = lastRequests["PUT /api/prompts/greeting-bot"];
+        expect(req).toBeDefined();
+        const parsed = JSON.parse(req!.body);
+        expect(parsed.tags).toEqual(["production"]);
+      });
+    });
   });
 
   // =====================

@@ -109,6 +109,8 @@ export interface PromptMutationResponse {
   handle?: string;
   name?: string;
   latestVersionNumber?: number;
+  versionId?: string;
+  tags?: string[];
 }
 
 // --- HTTP client ---
