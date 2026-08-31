@@ -148,3 +148,58 @@ be mistaken for this one: they are big classes whose surface a contract
 mandates (`ExperimentService` alone has ~40 methods across four subjects —
 experiments, runs, DSPy, workbench). Splitting those means splitting the
 contract and every transport that mounts it, not moving a dependency.
+
+## Round: the credential and permission services (2026-08-31)
+
+`ProjectService` joins `ExperimentService` as a confirmed contract-mandated
+surface — its contract declares 29 abstract members, the trace-destination
+cluster among them, so the 513-line class is not a mechanical split either.
+Three of the `service-quality` entries are now known to be this shape. Treat
+that list as "needs a contract change", not "needs tidying".
+
+With structure blocked there, this round went at the untested services in the
+domains where being wrong costs the most. 84 feature services still have no
+test naming them; 13 are security- or money-adjacent, and the API-key cluster
+was the largest of those.
+
+**One live defect, found and fixed.** `ApiKeyGrantPolicyService.writeBindings`
+guarded its replace-revoke on `attached.attached.length` alone. `attachBindings`
+runs with `onDuplicate: "skip"`, so a binding the caller asks for again comes
+back in `duplicates`, not `attached` — and when *every* requested binding
+already exists, `attached` is empty, the `notIn` clause is dropped, and the
+revoke runs as `where: { apiKeyId }`. Every grant on the key, gone.
+
+The path is live and reachable from the settings UI: the edit drawer always
+sends `bindings`, `ApiKeyLifecycleService.update` always passes `replace: true`,
+so renaming a key without touching its scopes silently strips its permissions.
+Change one scope and `attached` is non-empty, which is why it survived. Fixed
+by building the keep-list first, with a regression scenario in
+`specs/api-keys/scope-based-permissions.feature`.
+
+**A correction to the untested-service sweep.** It matches on class name, so a
+service covered only through its facade reads as untested. `ApiKeyService`'s
+685-line suite in `repositories/__tests__` drives seven services at once and
+already covered some of what looked uncovered. The suite is decent — a real
+in-memory `ApiKeyRepository` fake rather than mocks — but it is filed under
+`repositories/` while testing services, and its 22 `it`s are flat under one
+`describe`. Worth splitting along service lines eventually; not urgent.
+
+Now covered directly, all sabotage-verified:
+
+- `ApiKeyVisibilityService` — a key from another organization sees nothing; a
+  project a binding pulled in but authorization refuses is dropped; past the
+  candidate bound it throws rather than returning a truncated list that reads
+  as complete.
+- `ApiKeyGrantPolicyService` — the escalation ceiling, both halves: the
+  permission each role stands for, and the check that the granting user holds
+  it. Plus the tenant boundary on scopes and the personal-workspace owner
+  check. Six `@unit` scenarios in `scope-based-permissions.feature` were bound
+  to nothing; that file is now 22/22.
+- `ApiKeyTokenResolutionService` — revoked, expired and non-matching secrets;
+  the opportunistic re-hash and its tolerance of a failed write; the
+  cross-organization project boundary. Recorded there: resolution is not
+  authorization, which is why naming an unbound project still resolves — the
+  ceiling check in the auth middleware is what refuses it.
+- `AuthzGrantSnapshotService` — the cache key separates organizations and
+  callers, the epoch is what makes a revocation take effect, and the age bound
+  is the backstop for whatever fails to bump it.
