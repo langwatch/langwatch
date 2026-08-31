@@ -24,10 +24,12 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   DepartmentsTrpcApi,
   IngestionKeyTrpcApi,
+  IngestionTemplatesTrpcApi,
   PersonalSessionsTrpcApi,
   SessionPolicyTrpcApi,
   type DepartmentsTrpcContext,
   type IngestionKeyTrpcContext,
+  type IngestionTemplatesTrpcContext,
   type PersonalSessionsTrpcContext,
   type SessionPolicyTrpcContext,
 } from "@langwatch/enterprise-governance-server";
@@ -37,7 +39,8 @@ import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from 
 export type EnterpriseGovernanceTrpcContext = PersonalSessionsTrpcContext &
   SessionPolicyTrpcContext &
   IngestionKeyTrpcContext &
-  DepartmentsTrpcContext;
+  DepartmentsTrpcContext &
+  IngestionTemplatesTrpcContext;
 
 /** One already-composed process policy, applied after a feature's input parser. */
 type EnterpriseTrpcPolicy = <TProcedure>(procedure: TProcedure) => TProcedure;
@@ -72,6 +75,10 @@ export class EnterpriseGovernanceTrpcComposition {
         policy,
       }),
       departments: DepartmentsTrpcApi.create(root, {
+        protected: protectedProcedure,
+        policy,
+      }),
+      ingestionTemplates: IngestionTemplatesTrpcApi.create(root, {
         protected: protectedProcedure,
         policy,
       }),

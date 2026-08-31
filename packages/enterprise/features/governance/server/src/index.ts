@@ -151,6 +151,10 @@ export {
   DepartmentsTrpcApi,
   type DepartmentsTrpcContext,
 } from "./transport/api-trpc/departments.api";
+export {
+  IngestionTemplatesTrpcApi,
+  type IngestionTemplatesTrpcContext,
+} from "./transport/api-trpc/ingestion-templates.api";
 
 /**
  * The public REST family this feature owns. The process supplies the bound
