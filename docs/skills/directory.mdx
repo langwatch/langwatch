@@ -887,6 +887,7 @@ If the user's request is **general** ("add scenarios", "test my agent"):
 - Read the codebase to understand the agent's architecture
 - Study git history to understand what changed and why: focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Generate comprehensive coverage (happy path, edge cases, error handling)
+- When the agent is connected to the platform, read the run parameters it declares before you propose anything (`langwatch agent get <id> --format json`, under `parameters`). Each one is a lever the team built into the agent: cover it with one scenario per value that changes the expected behavior, and offer a comparison run across an option list (see Read the agent's levers in the Platform Approach)
 - For conversational agents, include multi-turn scenarios, because that's where the interesting edge cases live (context retention, topic switching, recovery from misunderstandings)
 - ALWAYS run the tests after writing them. If they fail, first decide which side is wrong. Change the test only when you have evidence that its criteria or its fixture are wrong; otherwise the agent is what needs the fix (see Improving the Agent When a Scenario Fails below). A scenario that goes green because its assertions got weaker has tested nothing.
 - After tests are green, transition to consultant mode (see Consultant Mode below) and suggest 2-3 domain-specific improvements.
@@ -905,7 +906,11 @@ If the user's request is about **voice** ("add voice testing", "test my voice ag
 
 ## Detect Context
 
-If you're in a codebase (`package.json`, `pyproject.toml`, etc.) → use the **Code approach** (Scenario SDK). If there is no codebase → use the **Platform approach** (`langwatch` CLI). If ambiguous, ask the user.
+Check two things before you pick an approach: whether you are in a codebase (`package.json`, `pyproject.toml`, etc.), and whether the agent is already connected to the platform. It is connected when the code carries `@langwatch.connect_agent` (Python) or `connectAgent` (TypeScript), or when `langwatch agent list --format json` lists a row with `type: "connected"`.
+
+- **Connected agent**, with or without a codebase → the **Platform approach** against that agent. The scenarios live on the platform, every run reaches the real process, the judge reads its traces, and the run parameters the agent declares are the levers the scenarios turn. Write code scenarios as well only when the user asks for test files in the repository.
+- **Codebase, agent not connected** → ask one question and wait: connect the agent first, or write code scenarios. Connecting is one decorator on the function that runs the agent (the `connect-agent` skill, prompt "Connect my agent to LangWatch simulations"), and it is the right answer when the team wants to run scenarios from the platform or from CI without the repository's test suite. The **Code approach** (Scenario SDK) is the right answer when the user wants tests beside the code, run with `pytest` or `vitest`. Both can coexist: the code scenarios call the same decorated function.
+- **No codebase, no agent** → the **Platform approach**; the agent has to be connected before a run can start (step 3 of the flow).
 
 ## The Agent Testing Pyramid
 
@@ -1001,7 +1006,7 @@ CRITICAL: Do NOT guess how to write scenario tests. Different frameworks have di
 ### Step 2: Install the Scenario SDK
 
 For Python: `pip install langwatch-scenario pytest pytest-asyncio` (or `uv add ...`).
-For TypeScript: `npm install @langwatch/scenario@^0.4.12 vitest` (or `pnpm add ...`).
+For TypeScript: `npm install @langwatch/scenario vitest` (or `pnpm add ...`).
 
 ### Step 3: Configure the Default Model
 
@@ -1026,6 +1031,8 @@ export default defineConfig({
 ### Step 4: Write the Scenario Test
 
 Create an agent adapter that wraps your existing agent, then use `scenario.run()` with a user simulator and judge.
+
+When the function that runs the agent is decorated with `@langwatch.connect_agent` (Python) or wrapped with `connectAgent` (TypeScript), the adapter calls that same function: it stays directly callable, so the platform runs and the code scenarios exercise one code path. In Python, `support_agent(messages=input.messages)` returns what the function returns (a string or `langwatch.AgentReply`, whose `.output` is the reply); in TypeScript, `(await supportAgent({ messages: input.messages })).output`. Do not write a second entry point for the tests.
 
 **Python:**
 
@@ -1681,6 +1688,26 @@ A `connected` agent carries an `environment` and a `status`. `status: "offline"`
 
 If the project holds no agent at all, the user's agent is not connected yet. Use the `connect-agent` skill, whose prompt is "Connect my agent to LangWatch simulations": it decorates the function that runs the agent with `langwatch.connect_agent` (Python) or `connectAgent` (TypeScript), and the running process becomes the target. If it is not installed, use `npx skills add langwatch/skills/connect-agent`.
 
+#### 3b. Read the agent's levers
+
+A connected agent declares its run parameters from its code. Read them before you propose a single scenario:
+
+```bash
+langwatch agent get <agentId> --format json
+# -> { id, name, environment, status, instances: [...],
+#      parameters: [{ name, type, options, defaultValue, description }] }
+```
+
+Each entry is a lever the team built into the agent: a model, a customer plan, a tenant, a feature switch. Use the list three ways:
+
+- **One scenario per value that changes the expected behavior.** A `plan` parameter with the default `free` means the agent answers a paying customer differently. Write the scenario whose outcome depends on the plan, and make the criteria name the behavior that has to change ("The agent does not promise a benefit the plan does not include"). The situation describes the customer and the question; the value is supplied at run time with `--param plan=pro`, never written into the situation text, so the agent really runs with it. Wrong: a scenario titled "Express shipping on the free plan" with the criterion "does not promise free next-day delivery". It hard-codes one value, and it turns false the moment the run sets `plan=pro`. Right: "Express shipping question" with the criterion "The agent states the shipping terms of the customer's plan and promises no benefit of another plan", run with `--param plan=free` and again with `--param plan=pro`.
+- **One comparison run across an option list.** `options` is a closed list, so the same test suite runs once per value and the results page shows one column per value: `--target 'connected:support-agent@development?model=gpt-5' --target 'connected:support-agent@development?model=gpt-5-mini'`. Name this comparison in your proposal and again in your summary, with the command, for every parameter that declares `options`: it is the run the team connected the agent for. When the user asks for one run, make that run the comparison: `?plan=free` and `?plan=pro` on the same agent is still one run, with one column per value, and it shows which criteria flip with the lever.
+- **The defaults as the baseline.** A run with no `--param` uses every `defaultValue`. Say which values a run used when you report it.
+
+Put the levers in the proposal itself: "The agent declares `model` (gpt-5-mini, gpt-5) and `plan` (default free). I wrote one plan-aware scenario, and the test suite can run on both models in one comparison." A name the agent does not declare is refused before anything is scheduled, and so is a value outside `options`, so read the names from `agent get` rather than from memory.
+
+One agent name with two environments is two rows, and they compare the same way: `connected:support-agent@development` on a laptop against `connected:support-agent@production` on a server, one `--target` each.
+
 #### 4. ASK: which agent(s) or prompt(s)?
 
 Show the names (with each agent's type) and let the user choose (**multiple choice**). Every scenario in the run executes against each target, so two targets double the conversations.
@@ -1690,11 +1717,11 @@ Never invent a target and never quietly default to the first row.
 #### 5. Run one scenario
 
 ```bash
-langwatch scenario run <scenarioId> --target http:<agentId> --format json
+langwatch scenario run <scenarioId> --target connected:support-agent@development --format json
 
-# With values for the parameters the scenario declares
-langwatch scenario run <scenarioId> --target http:<agentId> \
-  --param account_tier=platinum --param region=eu-central --format json
+# With values for the parameters the target agent or the scenario declares
+langwatch scenario run <scenarioId> --target connected:support-agent@development \
+  --param plan=pro --param model=gpt-5 --format json
 ```
 
 Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, `http`, `code`, `workflow`.
@@ -1707,7 +1734,7 @@ Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, 
 - Bad references are caught when the run is scheduled, not when the scenario was created: `Invalid target references: …` means you invented an id. Go back to step 3 and read a real one.
 - Add `--wait` only when the caller can afford to block: it polls and exits non-zero if any run failed, which is the point in CI. In an interactive turn, skip it, hand over the link, and let the page stream results in.
 - With `--format json` (or `-o json`) the run commands print one final document on stdout. Under `--wait` it comes after the poll and carries `outcome` (`scheduled`, `passed`, `failed`, `timeout` or `poll_failure`), `tallies` and the per-run `results`.
-- `--param name=value` is repeatable and supplies one value for a parameter the scenario **declares** (`langwatch scenario get <id> --format json` lists them under `parameters`). It overrides that parameter's default for this run only. Without any `--param`, the run uses the declared defaults. A name no scenario in the run declares is rejected before anything is scheduled, so do not invent one. `true` and `false` read as booleans and a plain number reads as a number; all other values stay text, so `007` stays the id `007`.
+- `--param name=value` is repeatable and supplies one value for a parameter the scenario **or a target agent declares** (`langwatch scenario get <id> --format json` and `langwatch agent get <id> --format json` list them under `parameters`). It overrides that parameter's default for this run only. Without any `--param`, the run uses the declared defaults. A name nothing in the run declares is rejected before anything is scheduled, and so is a value outside a declared option list, so do not invent either. `true` and `false` read as booleans and a plain number reads as a number; all other values stay text, so `007` stays the id `007`.
 - `--note "<text>"` keeps one line, up to 200 characters, saying what this run was testing. It travels with the run and never with the plan.
 
 #### 6. Run a test suite
@@ -1839,6 +1866,9 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 - Do NOT run against a `connected` agent whose `status` is `offline`. The customer's process is not connected, and the run is refused with `agent_offline`. Ask them to start it first
 - Do NOT pass `--test-suite` a test suite that does not exist. The command refuses it. Create the test suite with `langwatch test-suite create "<name>"` first, or leave the flag out and let the scenario land in `Default`
 - Do NOT mix scope flags on `run-plan run`. Exactly one of `--all`, `--test-suite`, `--label` or `--scenario` per run
+- Do NOT propose scenarios for a connected agent before reading `langwatch agent get <id> --format json`. Its `parameters` are the levers the scenarios turn, and a proposal that ignores them tests one configuration by accident
+- Do NOT write a parameter value into the situation text ("the customer is on the pro plan") when the target declares that parameter. Supply it with `--param plan=pro`, or a `?plan=pro` suffix on the target, so the agent really runs with it
+- Do NOT pass `--param` a name that no scenario and no target in the run declares, or a value outside a declared option list. Both are refused before anything is scheduled
 - Do NOT choose the agent or prompt on the user's behalf, and do NOT decide for them between one scenario and the whole test suite. Ask one short question and wait
 - Do NOT `--wait` inside an interactive turn. Trigger, hand over the link, and let results stream in. Save `--wait` for CI, where its non-zero exit on failure is the whole point
 ````
@@ -2075,7 +2105,15 @@ Then confirm from the CLI, in another terminal:
 langwatch agent list
 ```
 
-The row for the agent reads `Online` with the environment and the instance count. `Offline` means the process is not connected: check that `LANGWATCH_API_KEY` is set in the process environment, that the process is running, and that outbound WSS to the LangWatch endpoint is allowed.
+The row for the agent reads `Online` with the environment and the instance count. `Offline` means the process is not connected: check that `LANGWATCH_API_KEY` is set in the process environment, that the process is running, and that outbound WSS to the LangWatch endpoint is allowed. When the network refuses the WebSocket upgrade, the SDK falls back to HTTP long polling on its own; `LANGWATCH_AGENT_TRANSPORT=http` forces that transport from the start.
+
+Then read back what the platform registered:
+
+```bash
+langwatch agent get <agent-id> --format json
+```
+
+The answer carries `environment`, `status`, `instances` (hostname, pid, SDK and version per process) and `parameters`: one entry per run parameter with `name`, `type`, `options` (the closed list from `Literal`, `Enum` or `z.enum`), `defaultValue` and `description`. Compare it with the signature. A parameter that is missing was read as a turn field or has no default; an option list that is missing means the annotation was not a `Literal`, an `Enum` or a `z.enum`. Fix the code and restart the process; the row updates on the next registration.
 
 ## Step 5: Run the first test suite
 
@@ -2100,6 +2138,17 @@ langwatch test-suite run 'Smoke' --target connected:support-agent@development --
 - `--wait` blocks until the run finishes and exits non-zero when it fails. Use it here: the report in Step 6 needs the result.
 - Keep the agent process running for the whole run. A run against an agent with no connected instance is refused with `agent_offline`.
 
+When the first run is green and the agent declares a parameter with an option list, offer one comparison run across the options. It reuses the same test suite, and the results page shows one column per value:
+
+```bash
+langwatch run-plan run --test-suite 'Smoke' \
+  --target 'connected:support-agent@development?model=gpt-5' \
+  --target 'connected:support-agent@development?model=gpt-5-mini' \
+  --name 'Smoke: model comparison' --format json
+```
+
+`--param plan=pro` on the same command sets a value every target shares. The platform refuses a value outside the option list before anything is scheduled, and a name the agent does not declare is refused the same way, so read the names from `langwatch agent get` rather than from memory.
+
 ## Step 6: Report the result
 
 Report to the user:
@@ -2107,6 +2156,7 @@ Report to the user:
 - The Agent Testing page URL of their LangWatch project (`https://app.langwatch.ai/<project-slug>/agent-testing`, or the same path on their own instance when self-hosted).
 - What changed in the codebase: the decorated function, the parameters it declares, the environment it registers under.
 - The result of the first run.
+- The parameters the platform registered, as `langwatch agent get` lists them, so the user knows which levers the run dialog offers. The `scenarios` skill reads the same list when it proposes scenarios; its prompt is "Add scenario tests for my agent".
 
 Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and what the failure means for the user, and stop there. Do not paste the raw error text, stack trace or debug URL: those can contain secrets and tell the user nothing they can act on. Do NOT claim a scenario or a test suite ran when it did not.
 
@@ -2223,7 +2273,9 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 | Symptom | Cause | Fix |
 |---|---|---|
 | `langwatch agent list` shows no row for the agent | The process started without an API key, so the SDK opened no connection. | Set `LANGWATCH_API_KEY` in the process environment and restart the process. |
-| The row reads `Offline` | The process stopped, or its outbound WSS connection is blocked. | Restart the process. On a network that blocks WebSockets, use the HTTP fallback. |
+| The row reads `Offline` | The process stopped, or its outbound connection is blocked. | Restart the process. On a network that blocks WebSockets, set `LANGWATCH_AGENT_TRANSPORT=http`; the SDK then registers over HTTP long polling. |
+| The process logs `timed out during opening handshake` on every attempt while `curl` reaches the endpoint | The host resolves the endpoint to an IPv6 address it cannot reach, most often behind a VPN tunnel that drops IPv6, and an older SDK waited on that address alone. | Update the `langwatch` package to the latest release: it moves on to the next address after 0.25 s (`LANGWATCH_AGENT_HAPPY_EYEBALLS_DELAY` tunes it). Disconnecting the VPN also clears it. |
+| `langwatch agent get` lists a parameter without `options`, or does not list it at all | The annotation is not a `Literal`, an `Enum` or a `z.enum`, or the parameter has no default and the platform reads it as required. | Change the annotation or add the default, then restart the process. |
 | The run is refused with `agent_offline` | No instance was connected when the run started. | Start the agent process and run again. |
 | The run is refused with `agent_owner_only` | The agent registered under `development` with a personal key, so only its owner can run it. | Run it as the owner, or register it under a shared environment name such as `dev-shared`. |
 | The run is refused with `scenario_parameter_option_invalid` | A value is outside the closed option list the agent declares. | Use one of the listed options, or widen the `Literal` (Python) or `z.enum` (TypeScript) list in the code. |
@@ -3953,6 +4005,7 @@ If the user's request is **general** ("add scenarios", "test my agent"):
 - Read the codebase to understand the agent's architecture
 - Study git history to understand what changed and why: focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Generate comprehensive coverage (happy path, edge cases, error handling)
+- When the agent is connected to the platform, read the run parameters it declares before you propose anything (`langwatch agent get <id> --format json`, under `parameters`). Each one is a lever the team built into the agent: cover it with one scenario per value that changes the expected behavior, and offer a comparison run across an option list (see Read the agent's levers in the Platform Approach)
 - For conversational agents, include multi-turn scenarios, because that's where the interesting edge cases live (context retention, topic switching, recovery from misunderstandings)
 - ALWAYS run the tests after writing them. If they fail, first decide which side is wrong. Change the test only when you have evidence that its criteria or its fixture are wrong; otherwise the agent is what needs the fix (see Improving the Agent When a Scenario Fails below). A scenario that goes green because its assertions got weaker has tested nothing.
 - After tests are green, transition to consultant mode (see Consultant Mode below) and suggest 2-3 domain-specific improvements.
@@ -3971,7 +4024,11 @@ If the user's request is about **voice** ("add voice testing", "test my voice ag
 
 ## Detect Context
 
-If you're in a codebase (`package.json`, `pyproject.toml`, etc.) → use the **Code approach** (Scenario SDK). If there is no codebase → use the **Platform approach** (`langwatch` CLI). If ambiguous, ask the user.
+Check two things before you pick an approach: whether you are in a codebase (`package.json`, `pyproject.toml`, etc.), and whether the agent is already connected to the platform. It is connected when the code carries `@langwatch.connect_agent` (Python) or `connectAgent` (TypeScript), or when `langwatch agent list --format json` lists a row with `type: "connected"`.
+
+- **Connected agent**, with or without a codebase → the **Platform approach** against that agent. The scenarios live on the platform, every run reaches the real process, the judge reads its traces, and the run parameters the agent declares are the levers the scenarios turn. Write code scenarios as well only when the user asks for test files in the repository.
+- **Codebase, agent not connected** → ask one question and wait: connect the agent first, or write code scenarios. Connecting is one decorator on the function that runs the agent (the `connect-agent` skill, prompt "Connect my agent to LangWatch simulations"), and it is the right answer when the team wants to run scenarios from the platform or from CI without the repository's test suite. The **Code approach** (Scenario SDK) is the right answer when the user wants tests beside the code, run with `pytest` or `vitest`. Both can coexist: the code scenarios call the same decorated function.
+- **No codebase, no agent** → the **Platform approach**; the agent has to be connected before a run can start (step 3 of the flow).
 
 ## The Agent Testing Pyramid
 
@@ -4023,7 +4080,7 @@ CRITICAL: Do NOT guess how to write scenario tests. Different frameworks have di
 ### Step 2: Install the Scenario SDK
 
 For Python: `pip install langwatch-scenario pytest pytest-asyncio` (or `uv add ...`).
-For TypeScript: `npm install @langwatch/scenario@^0.4.12 vitest` (or `pnpm add ...`).
+For TypeScript: `npm install @langwatch/scenario vitest` (or `pnpm add ...`).
 
 ### Step 3: Configure the Default Model
 
@@ -4048,6 +4105,8 @@ export default defineConfig({
 ### Step 4: Write the Scenario Test
 
 Create an agent adapter that wraps your existing agent, then use `scenario.run()` with a user simulator and judge.
+
+When the function that runs the agent is decorated with `@langwatch.connect_agent` (Python) or wrapped with `connectAgent` (TypeScript), the adapter calls that same function: it stays directly callable, so the platform runs and the code scenarios exercise one code path. In Python, `support_agent(messages=input.messages)` returns what the function returns (a string or `langwatch.AgentReply`, whose `.output` is the reply); in TypeScript, `(await supportAgent({ messages: input.messages })).output`. Do not write a second entry point for the tests.
 
 **Python:**
 
@@ -4703,6 +4762,26 @@ A `connected` agent carries an `environment` and a `status`. `status: "offline"`
 
 If the project holds no agent at all, the user's agent is not connected yet. Use the `connect-agent` skill, whose prompt is "Connect my agent to LangWatch simulations": it decorates the function that runs the agent with `langwatch.connect_agent` (Python) or `connectAgent` (TypeScript), and the running process becomes the target. If it is not installed, use `npx skills add langwatch/skills/connect-agent`.
 
+#### 3b. Read the agent's levers
+
+A connected agent declares its run parameters from its code. Read them before you propose a single scenario:
+
+```bash
+langwatch agent get <agentId> --format json
+# -> { id, name, environment, status, instances: [...],
+#      parameters: [{ name, type, options, defaultValue, description }] }
+```
+
+Each entry is a lever the team built into the agent: a model, a customer plan, a tenant, a feature switch. Use the list three ways:
+
+- **One scenario per value that changes the expected behavior.** A `plan` parameter with the default `free` means the agent answers a paying customer differently. Write the scenario whose outcome depends on the plan, and make the criteria name the behavior that has to change ("The agent does not promise a benefit the plan does not include"). The situation describes the customer and the question; the value is supplied at run time with `--param plan=pro`, never written into the situation text, so the agent really runs with it. Wrong: a scenario titled "Express shipping on the free plan" with the criterion "does not promise free next-day delivery". It hard-codes one value, and it turns false the moment the run sets `plan=pro`. Right: "Express shipping question" with the criterion "The agent states the shipping terms of the customer's plan and promises no benefit of another plan", run with `--param plan=free` and again with `--param plan=pro`.
+- **One comparison run across an option list.** `options` is a closed list, so the same test suite runs once per value and the results page shows one column per value: `--target 'connected:support-agent@development?model=gpt-5' --target 'connected:support-agent@development?model=gpt-5-mini'`. Name this comparison in your proposal and again in your summary, with the command, for every parameter that declares `options`: it is the run the team connected the agent for. When the user asks for one run, make that run the comparison: `?plan=free` and `?plan=pro` on the same agent is still one run, with one column per value, and it shows which criteria flip with the lever.
+- **The defaults as the baseline.** A run with no `--param` uses every `defaultValue`. Say which values a run used when you report it.
+
+Put the levers in the proposal itself: "The agent declares `model` (gpt-5-mini, gpt-5) and `plan` (default free). I wrote one plan-aware scenario, and the test suite can run on both models in one comparison." A name the agent does not declare is refused before anything is scheduled, and so is a value outside `options`, so read the names from `agent get` rather than from memory.
+
+One agent name with two environments is two rows, and they compare the same way: `connected:support-agent@development` on a laptop against `connected:support-agent@production` on a server, one `--target` each.
+
 #### 4. ASK: which agent(s) or prompt(s)?
 
 Show the names (with each agent's type) and let the user choose (**multiple choice**). Every scenario in the run executes against each target, so two targets double the conversations.
@@ -4712,11 +4791,11 @@ Never invent a target and never quietly default to the first row.
 #### 5. Run one scenario
 
 ```bash
-langwatch scenario run <scenarioId> --target http:<agentId> --format json
+langwatch scenario run <scenarioId> --target connected:support-agent@development --format json
 
-# With values for the parameters the scenario declares
-langwatch scenario run <scenarioId> --target http:<agentId> \
-  --param account_tier=platinum --param region=eu-central --format json
+# With values for the parameters the target agent or the scenario declares
+langwatch scenario run <scenarioId> --target connected:support-agent@development \
+  --param plan=pro --param model=gpt-5 --format json
 ```
 
 Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, `http`, `code`, `workflow`.
@@ -4729,7 +4808,7 @@ Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, 
 - Bad references are caught when the run is scheduled, not when the scenario was created: `Invalid target references: …` means you invented an id. Go back to step 3 and read a real one.
 - Add `--wait` only when the caller can afford to block: it polls and exits non-zero if any run failed, which is the point in CI. In an interactive turn, skip it, hand over the link, and let the page stream results in.
 - With `--format json` (or `-o json`) the run commands print one final document on stdout. Under `--wait` it comes after the poll and carries `outcome` (`scheduled`, `passed`, `failed`, `timeout` or `poll_failure`), `tallies` and the per-run `results`.
-- `--param name=value` is repeatable and supplies one value for a parameter the scenario **declares** (`langwatch scenario get <id> --format json` lists them under `parameters`). It overrides that parameter's default for this run only. Without any `--param`, the run uses the declared defaults. A name no scenario in the run declares is rejected before anything is scheduled, so do not invent one. `true` and `false` read as booleans and a plain number reads as a number; all other values stay text, so `007` stays the id `007`.
+- `--param name=value` is repeatable and supplies one value for a parameter the scenario **or a target agent declares** (`langwatch scenario get <id> --format json` and `langwatch agent get <id> --format json` list them under `parameters`). It overrides that parameter's default for this run only. Without any `--param`, the run uses the declared defaults. A name nothing in the run declares is rejected before anything is scheduled, and so is a value outside a declared option list, so do not invent either. `true` and `false` read as booleans and a plain number reads as a number; all other values stay text, so `007` stays the id `007`.
 - `--note "<text>"` keeps one line, up to 200 characters, saying what this run was testing. It travels with the run and never with the plan.
 
 #### 6. Run a test suite
@@ -4853,6 +4932,9 @@ Once tests are green, summarize what you delivered and suggest 2-3 domain-specif
 - Do NOT run against a `connected` agent whose `status` is `offline`. The customer's process is not connected, and the run is refused with `agent_offline`. Ask them to start it first
 - Do NOT pass `--test-suite` a test suite that does not exist. The command refuses it. Create the test suite with `langwatch test-suite create "<name>"` first, or leave the flag out and let the scenario land in `Default`
 - Do NOT mix scope flags on `run-plan run`. Exactly one of `--all`, `--test-suite`, `--label` or `--scenario` per run
+- Do NOT propose scenarios for a connected agent before reading `langwatch agent get <id> --format json`. Its `parameters` are the levers the scenarios turn, and a proposal that ignores them tests one configuration by accident
+- Do NOT write a parameter value into the situation text ("the customer is on the pro plan") when the target declares that parameter. Supply it with `--param plan=pro`, or a `?plan=pro` suffix on the target, so the agent really runs with it
+- Do NOT pass `--param` a name that no scenario and no target in the run declares, or a value outside a declared option list. Both are refused before anything is scheduled
 - Do NOT choose the agent or prompt on the user's behalf, and do NOT decide for them between one scenario and the whole test suite. Ask one short question and wait
 - Do NOT `--wait` inside an interactive turn. Trigger, hand over the link, and let results stream in. Save `--wait` for CI, where its non-zero exit on failure is the whole point
 ````
