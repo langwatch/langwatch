@@ -148,37 +148,41 @@ describe("given an organization holding many live grants", () => {
     await prisma.$disconnect();
   });
 
-  it("answers an API-key permission check without reading every grant", async () => {
-    const repository = new GrantsAuthzReadRepository(
-      prisma as unknown as Prisma.TransactionClient,
-    );
-    const principal: AuthzPrincipalRef = { type: "apiKey", id: apiKeyId };
+  describe("when an API key asks which of its custom roles it holds alone", () => {
+    it("answers without reading every grant", async () => {
+      const repository = new GrantsAuthzReadRepository(
+        prisma as unknown as Prisma.TransactionClient,
+      );
+      const principal: AuthzPrincipalRef = { type: "apiKey", id: apiKeyId };
 
-    grantQueries.length = 0;
-    const permissions = await repository.findCustomRolePermissions({
-      organizationId,
-      principal,
-      customRoleIds: [roleId],
+      grantQueries.length = 0;
+      const permissions = await repository.findCustomRolePermissions({
+        organizationId,
+        principal,
+        customRoleIds: [roleId],
+      });
+
+      // The key holds its private role exclusively, so the role survives the
+      // filter. If this ever stops holding, the plan below is measuring the
+      // wrong query.
+      expect(permissions.map((row) => row.id)).toEqual([roleId]);
+
+      const holderQuery = grantQueries.find((query) =>
+        query.sql.includes(`"roleKey"`),
+      );
+      expect(holderQuery, "the holder lookup should have run").toBeDefined();
+
+      const explained = await prisma.$queryRawUnsafe<
+        Array<{ "QUERY PLAN": PlanNode[] | Array<{ Plan: PlanNode }> }>
+      >(
+        `EXPLAIN (ANALYZE, FORMAT JSON) ${holderQuery!.sql}`,
+        ...holderQuery!.params,
+      );
+
+      const root = explained[0]!["QUERY PLAN"][0] as { Plan: PlanNode };
+      expect(grantRowsExamined(root.Plan)).toBeLessThan(
+        ROWS_A_CHECK_MAY_EXAMINE,
+      );
     });
-
-    // The key holds its private role exclusively, so the role survives the
-    // filter. If this ever stops holding, the plan below is measuring the
-    // wrong query.
-    expect(permissions.map((row) => row.id)).toEqual([roleId]);
-
-    const holderQuery = grantQueries.find((query) =>
-      query.sql.includes(`"roleKey"`),
-    );
-    expect(holderQuery, "the holder lookup should have run").toBeDefined();
-
-    const explained = await prisma.$queryRawUnsafe<
-      Array<{ "QUERY PLAN": PlanNode[] | Array<{ Plan: PlanNode }> }>
-    >(
-      `EXPLAIN (ANALYZE, FORMAT JSON) ${holderQuery!.sql}`,
-      ...holderQuery!.params,
-    );
-
-    const root = explained[0]!["QUERY PLAN"][0] as { Plan: PlanNode };
-    expect(grantRowsExamined(root.Plan)).toBeLessThan(ROWS_A_CHECK_MAY_EXAMINE);
   });
 });
