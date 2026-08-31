@@ -68,7 +68,7 @@ function row({
   };
 }
 
-describe("allocateWarehouseCost", () => {
+describe("DatabricksWarehouseCostService.allocate", () => {
   /** @scenario "The compute behind a question is charged to the person who asked" */
   it("charges a question that used the warehouse", () => {
     const { costByStatementId } = warehouseCosts.allocate({
@@ -430,7 +430,7 @@ describe("allocateWarehouseCost", () => {
   });
 });
 
-describe("costReadFloorMs", () => {
+describe("DatabricksWarehouseCostService.costReadFloor", () => {
   const nowMs = Date.parse("2026-08-01T12:00:00.000Z");
   const sinceMs = nowMs - 5 * 60 * 1000;
 
@@ -596,7 +596,7 @@ describe("splitting the window into readable pieces", () => {
   });
 });
 
-describe("mergeWarehouseCost", () => {
+describe("DatabricksWarehouseCostService.merge", () => {
   /** @scenario "A query that outlives one billing read is charged in full" */
   it("adds a straddler's two chunks together instead of replacing one with the other", () => {
     // The window is read oldest-first in chunks, and a statement that begins

@@ -19,7 +19,7 @@
     },
     {
       "file": "packages/enterprise/features/governance/server/src/services/puller-databricks-warehouse-cost.service.ts",
-      "moduleLines": 705,
+      "moduleLines": 684,
       "methodLines": 80,
       "statements": 24,
       "complexity": 24,

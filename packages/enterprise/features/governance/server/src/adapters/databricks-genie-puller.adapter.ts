@@ -2713,7 +2713,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
     if (read.outcome === "priced") {
       // A statement is emitted for every chunk it burned compute in, carrying
       // that chunk's hours only, so a statement running across a boundary
-      // arrives here twice with a different part of itself. `mergeWarehouseCost`
+      // arrives here twice with a different part of itself. `DatabricksWarehouseCostService.merge`
       // adds rather than replaces for exactly that reason — see the ownership
       // note on the hour clip in `WAREHOUSE_COST_STATEMENT`.
       this.warehouseCosts.merge({
