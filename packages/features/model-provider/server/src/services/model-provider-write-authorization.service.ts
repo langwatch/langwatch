@@ -3,13 +3,22 @@ import {
   ModelProviderScopeForbiddenError,
   type ModelDefaultScope,
 } from "@langwatch/model-provider-contract";
-import type { AuthzService } from "@langwatch/authz-contract";
+import { ModelProviderAuthorizationService } from "./model-provider-authorization.service";
 
-/** Shared write check for the model-provider's provider and default commands. */
+/**
+ * Shared write check for the model-provider's provider and default commands.
+ *
+ * The refusing counterpart to {@link ModelProviderAuthorizationService}: that
+ * one answers whether a write is allowed, this one throws the error the
+ * command surfaces. It delegates rather than re-deciding, because a check that
+ * refuses and a check that answers must never be able to disagree.
+ */
 export class ModelProviderWriteAuthorizationService {
-  private constructor(private readonly authorization: AuthzService) {}
+  private constructor(private readonly authorization: ModelProviderAuthorizationService) {}
 
-  static create(authorization: AuthzService): ModelProviderWriteAuthorizationService {
+  static create(
+    authorization: ModelProviderAuthorizationService,
+  ): ModelProviderWriteAuthorizationService {
     return new ModelProviderWriteAuthorizationService(authorization);
   }
 
@@ -17,10 +26,7 @@ export class ModelProviderWriteAuthorizationService {
     await this.assertScopes(actorId, scopes, "provider");
   }
 
-  async assertCanWriteDefault(
-    actorId: string,
-    scopes: ModelDefaultScope[],
-  ): Promise<void> {
+  async assertCanWriteDefault(actorId: string, scopes: ModelDefaultScope[]): Promise<void> {
     await this.assertScopes(actorId, scopes, "default");
   }
 
@@ -33,14 +39,15 @@ export class ModelProviderWriteAuthorizationService {
       scopes.map((scope) => [`${scope.scopeType}:${scope.scopeId}`, scope]),
     );
     for (const scope of uniqueScopes.values()) {
-      const allowed = await canManageScope(this.authorization, actorId, scope);
-      if (allowed) {
+      if (await this.authorization.canWrite(actorId, scope)) {
         continue;
       }
 
+      // The permission named in the refusal is the one that was checked,
+      // because both come from the same mapping.
       const input = {
         scopeType: scope.scopeType,
-        requiredPermission: requiredPermission(scope.scopeType),
+        requiredPermission: ModelProviderAuthorizationService.writePermission(scope.scopeType),
       };
       if (target === "default") {
         throw new ModelDefaultScopeForbiddenError(input);
@@ -48,32 +55,4 @@ export class ModelProviderWriteAuthorizationService {
       throw new ModelProviderScopeForbiddenError(input);
     }
   }
-}
-
-async function canManageScope(
-  authorization: AuthzService,
-  actorId: string,
-  scope: ModelDefaultScope,
-): Promise<boolean> {
-  const permission = requiredPermission(scope.scopeType);
-  const tier = scope.scopeType.toLowerCase() as "organization" | "team" | "project";
-  const decision = await authorization.getDecision({
-    userId: actorId,
-    permission,
-    scope: { tier, id: scope.scopeId },
-  });
-  return decision.permitted;
-}
-
-function requiredPermission(
-  scopeType: ModelDefaultScope["scopeType"],
-): "organization:manage" | "team:manage" | "project:update" {
-  if (scopeType === "ORGANIZATION") {
-    return "organization:manage";
-  }
-  if (scopeType === "TEAM") {
-    return "team:manage";
-  }
-
-  return "project:update";
 }

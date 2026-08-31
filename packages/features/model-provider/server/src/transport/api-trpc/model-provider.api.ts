@@ -571,10 +571,15 @@ export class ModelProviderTrpcApi {
        * config attached at the scope and updates the matching key in
        * place, or creates a new config if none exists.
        *
-       * Scope-aware authz: the tier the caller names picks the permission —
-       * `requiredManagePermission` maps organization to `organization:manage`,
-       * team to `team:manage` and project to `project:manage` — and the service
-       * applies it per scope, so the declaration here names all three.
+       * Scope-aware authz: the tier the caller names picks the permission, and
+       * the SERVICE is what applies it —
+       * `ModelProviderAuthorizationService.writePermission` maps organization
+       * to `organization:manage`, team to `team:manage` and project to
+       * `project:update`. The declaration below names `project:manage`
+       * instead, so on the project tier the declared permission and the
+       * enforced one are not the same; the enforced one is what runs. Pinned
+       * by model-provider-authorization.service.unit.test.ts so the pair
+       * cannot drift further unnoticed.
        */
       setRoleAssignmentForScope: serviceAuthorizedPolicy({
         reason:

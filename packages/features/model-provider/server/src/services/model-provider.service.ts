@@ -93,8 +93,8 @@ export class ModelProviderService extends ModelProviderServiceContract {
   private constructor(private readonly options: ModelProviderServiceOptions) {
     super();
 
-    const writeAuthorization = ModelProviderWriteAuthorizationService.create(options.authorization);
     const authorization = ModelProviderAuthorizationService.create(options.authorization);
+    const writeAuthorization = ModelProviderWriteAuthorizationService.create(authorization);
     const scopes = ModelProviderScopeService.create({
       projects: options.projects,
       organizations: options.organizations,
