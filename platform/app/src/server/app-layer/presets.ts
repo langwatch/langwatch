@@ -2556,7 +2556,9 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
         release: releaseLangyGithubPrPermit,
         check: getLangyGithubPrUsage,
       },
-      harness: { resolve: resolveLangyHarness },
+      harness: {
+        resolve: (input) => resolveLangyHarness({ ...input, featureFlags }),
+      },
       perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
       sessionKeys: langySessionKeys,
       context: { render: renderLangyTurnContext },

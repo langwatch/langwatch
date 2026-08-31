@@ -63,11 +63,18 @@ export abstract class LangyWorkerMetricsPort {
 
 /** Supplies feature-flag-derived worker-harness selection. */
 export abstract class LangyHarnessPort {
-  abstract resolve(input: {
+  /**
+   * A property signature rather than a method on purpose: method parameters
+   * are bivariant, and that is exactly what let a resolver requiring an extra
+   * dependency be wired here bare — it compiled, then threw on every call and
+   * fell back to one harness for everyone. A property is contravariant, so
+   * that wiring cannot compile again.
+   */
+  abstract resolve: (input: {
     userId: string;
     projectId: string;
     organizationId: string;
-  }): Promise<"opencode" | "pi">;
+  }) => Promise<"opencode" | "pi">;
 }
 
 /** Preserves process observability without coupling domain code to app metrics. */
