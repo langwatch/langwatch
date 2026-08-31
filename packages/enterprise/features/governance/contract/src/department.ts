@@ -25,21 +25,21 @@ export const departmentAssignmentsSchema = z.object({
 });
 export type DepartmentAssignments = z.infer<typeof departmentAssignmentsSchema>;
 
-export class DepartmentNotFoundError extends Error {
-  readonly code = "department_not_found" as const;
+import { HandledError } from "@langwatch/handled-error";
 
+export class DepartmentNotFoundError extends HandledError {
   constructor() {
-    super("Department not found");
-    this.name = "DepartmentNotFoundError";
+    super("department_not_found", "Department not found", { httpStatus: 404 });
   }
 }
 
-export class DepartmentAssignmentTargetNotFoundError extends Error {
-  readonly code = "department_assignment_target_not_found" as const;
-
-  constructor(target: "user" | "team" | "project") {
-    super(`Assignment target ${target} not found in this organization`);
-    this.name = "DepartmentAssignmentTargetNotFoundError";
+export class DepartmentAssignmentTargetNotFoundError extends HandledError {
+  constructor(readonly target: "user" | "team" | "project") {
+    super(
+      "department_assignment_target_not_found",
+      `Assignment target ${target} not found in this organization`,
+      { httpStatus: 404, meta: { target } },
+    );
   }
 }
 export const traceDepartmentInputSchema = z

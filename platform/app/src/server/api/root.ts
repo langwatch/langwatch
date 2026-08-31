@@ -1,7 +1,6 @@
 import { activityMonitorRouter } from "./routers/governance/activityMonitor";
 import { aiToolsRouter } from "./routers/governance/aiTools";
 import { anomalyRulesRouter } from "./routers/governance/anomalyRules";
-import { departmentsRouter } from "./routers/governance/departments";
 import { governanceRouter } from "./routers/governance/governance";
 import { ingestionSourcesRouter } from "./routers/governance/ingestionSources";
 import { ingestionTemplatesRouter } from "./routers/governance/ingestionTemplates";
@@ -875,7 +874,7 @@ const coreRouters = {
   activityMonitor: activityMonitorRouter,
   anomalyRules: anomalyRulesRouter,
   aiTools: aiToolsRouter,
-  departments: departmentsRouter,
+  departments: enterpriseGovernanceRouters.departments,
   ingestionTemplates: ingestionTemplatesRouter,
   ingestionKey: enterpriseGovernanceRouters.ingestionKey,
   governance: governanceRouter,

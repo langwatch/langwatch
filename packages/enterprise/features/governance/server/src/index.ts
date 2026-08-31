@@ -147,6 +147,10 @@ export {
   IngestionKeyTrpcApi,
   type IngestionKeyTrpcContext,
 } from "./transport/api-trpc/ingestion-key.api";
+export {
+  DepartmentsTrpcApi,
+  type DepartmentsTrpcContext,
+} from "./transport/api-trpc/departments.api";
 
 /**
  * The public REST family this feature owns. The process supplies the bound

@@ -194,7 +194,6 @@
     {"feature":"governance","file":"platform/app/src/server/api/routers/governance/activityMonitor.ts","kind":"transport"},
     {"feature":"governance","file":"platform/app/src/server/api/routers/governance/aiTools.ts","kind":"transport"},
     {"feature":"governance","file":"platform/app/src/server/api/routers/governance/anomalyRules.ts","kind":"transport"},
-    {"feature":"governance","file":"platform/app/src/server/api/routers/governance/departments.ts","kind":"transport"},
     {"feature":"governance","file":"platform/app/src/server/api/routers/governance/governance.ts","kind":"transport"},
     {"feature":"governance","file":"platform/app/src/server/api/routers/governance/ingestionSources.ts","kind":"transport"},
     {"feature":"governance","file":"platform/app/src/server/api/routers/governance/ingestionTemplates.ts","kind":"transport"},
