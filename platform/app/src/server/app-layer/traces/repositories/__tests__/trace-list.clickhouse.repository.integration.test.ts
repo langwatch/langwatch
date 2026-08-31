@@ -154,15 +154,18 @@ async function captureFindAllQueries(
 ): Promise<{ query: string; query_params: Record<string, unknown> }[]> {
   const captured: { query: string; query_params: Record<string, unknown> }[] =
     [];
-  const recordingClient = {
-    query: async (args: {
-      query: string;
-      query_params: Record<string, unknown>;
-    }) => {
-      captured.push({ query: args.query, query_params: args.query_params });
-      return ch.query(args as Parameters<ClickHouseClient["query"]>[0]);
+  const recordingClient = new Proxy(ch, {
+    get(target, prop, receiver) {
+      if (prop !== "query") return Reflect.get(target, prop, receiver);
+      return (args: Parameters<ClickHouseClient["query"]>[0]) => {
+        captured.push({
+          query: args.query,
+          query_params: (args.query_params ?? {}) as Record<string, unknown>,
+        });
+        return target.query(args);
+      };
     },
-  } as unknown as ClickHouseClient;
+  }) as ClickHouseClient;
 
   await new TraceListClickHouseRepository(async () => recordingClient).findAll(
     query,
@@ -726,3 +729,62 @@ describe("TraceListClickHouseRepository filtering across row versions", () => {
     });
   });
 });
+
+describe("TraceListClickHouseRepository.findAll across unmerged same-version rows", () => {
+  describe("when two unmerged rows share one version identity", () => {
+    // `trace_summaries` is a ReplacingMergeTree, so a re-publish at the same
+    // `UpdatedAt` lives in its own part until a merge collapses it. Both rows
+    // then answer to the same (TenantId, TraceId, UpdatedAt), and identity
+    // alone cannot say which one the user's filter meant. The page read has to
+    // re-apply the filter after the identity handover to pick the right one.
+    const dupTenant = `test-trace-list-dup-${nanoid()}`;
+    const dupAt = new Date(base + 500);
+
+    beforeAll(async () => {
+      // Separate inserts on purpose: two rows with the same sorting key in one
+      // block are collapsed at part formation, which is not the case here.
+      for (const traceName of ["keep", "drop"]) {
+        await ch.insert({
+          table: "trace_summaries",
+          values: [
+            makeTraceSummaryRow(9001, {
+              TenantId: dupTenant,
+              TraceId: "dup-1",
+              OccurredAt: dupAt,
+              UpdatedAt: dupAt,
+              TraceName: traceName,
+            }),
+          ],
+          format: "JSONEachRow",
+          clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+        });
+      }
+    });
+
+    afterAll(async () => {
+      await ch.exec({
+        query:
+          "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+        query_params: { tenantId: dupTenant },
+      });
+    });
+
+    it("returns only the version the filter matches, and agrees with its own total", async () => {
+      const page = await repo.findAll({
+        tenantId: dupTenant,
+        timeRange: { from: base - 60_000, to: base + 3_600_000 },
+        sort: { column: "OccurredAt", direction: "desc" },
+        limit: 25,
+        offset: 0,
+        filterWhere: {
+          sql: "TraceName = {dupName:String}",
+          params: { dupName: "keep" },
+        },
+      });
+
+      expect(page.rows.map((r) => r.traceName)).toEqual(["keep"]);
+      expect(page.rows).toHaveLength(page.totalHits);
+    });
+  });
+});
+

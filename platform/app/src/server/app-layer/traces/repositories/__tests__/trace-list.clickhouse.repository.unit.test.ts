@@ -58,61 +58,80 @@ function baseQuery(overrides: Partial<TraceListQuery> = {}): TraceListQuery {
 const isPageQuery = (sql: string) => sql.includes("ComputedInput");
 const isCountQuery = (sql: string) => sql.includes("totalHits");
 
+const USER_FILTER = "AnnotationIds != []";
+
 describe("TraceListClickHouseRepository.findAll (unit)", () => {
-  it("builds the version dedup aggregate once for the page read, not once per stage", async () => {
-    const { repo, queries } = makeRepo();
+  describe("when the caller asks for a page of traces", () => {
+    it("builds the version dedup aggregate once for the page read, not once per stage", async () => {
+      const { repo, queries } = makeRepo();
 
-    await repo.findAll(baseQuery());
+      await repo.findAll(baseQuery());
 
-    const pageQuery = queries.find(isPageQuery);
-    expect(pageQuery).toBeDefined();
-    expect(occurrences(pageQuery!, DEDUP_AGGREGATE)).toBe(1);
+      const pageQuery = queries.find(isPageQuery);
+      expect(pageQuery).toBeDefined();
+      expect(occurrences(pageQuery!, DEDUP_AGGREGATE)).toBe(1);
+    });
+
+    it("carries the winning row's identity from the inner page stage to the outer read", async () => {
+      const { repo, queries } = makeRepo();
+
+      await repo.findAll(baseQuery());
+
+      const pageQuery = queries.find(isPageQuery)!;
+      // The inner stage resolved (TraceId, UpdatedAt) for the page. The outer
+      // stage selects exactly those rows, so it needs no dedup of its own.
+      expect(pageQuery).toContain("(TenantId, TraceId, UpdatedAt) IN (");
+      expect(pageQuery).toContain("SELECT TenantId, TraceId, UpdatedAt");
+    });
+
+    it("still bounds the total count by the version dedup", async () => {
+      const { repo, queries } = makeRepo();
+
+      await repo.findAll(baseQuery());
+
+      const countQuery = queries.find(isCountQuery);
+      expect(countQuery).toBeDefined();
+      expect(occurrences(countQuery!, DEDUP_AGGREGATE)).toBe(1);
+    });
   });
 
-  it("carries the winning row's identity from the inner page stage to the outer read", async () => {
-    const { repo, queries } = makeRepo();
+  describe("when the query carries a user filter", () => {
+    it("keeps it out of the dedup so a trace cannot answer to both sides of it", async () => {
+      const { repo, queries } = makeRepo();
 
-    await repo.findAll(baseQuery());
+      await repo.findAll(
+        baseQuery({
+          filterWhere: { sql: USER_FILTER, params: { unused: 1 } },
+        }),
+      );
 
-    const pageQuery = queries.find(isPageQuery)!;
-    // The inner stage resolved (TraceId, UpdatedAt) for the page. The outer
-    // stage selects exactly those rows, so it needs no dedup of its own.
-    expect(pageQuery).toContain("(TenantId, TraceId, UpdatedAt) IN (");
-    expect(pageQuery).toContain("SELECT TenantId, TraceId, UpdatedAt");
-  });
-
-  it("still bounds the total count by the version dedup", async () => {
-    const { repo, queries } = makeRepo();
-
-    await repo.findAll(baseQuery());
-
-    const countQuery = queries.find(isCountQuery);
-    expect(countQuery).toBeDefined();
-    expect(occurrences(countQuery!, DEDUP_AGGREGATE)).toBe(1);
-  });
-
-  it("keeps the user filter out of the dedup so a trace cannot answer to both sides of it", async () => {
-    const { repo, queries } = makeRepo();
-
-    await repo.findAll(
-      baseQuery({
-        filterWhere: {
-          sql: "AnnotationIds != []",
-          params: { unused: 1 },
-        },
-      }),
-    );
-
-    for (const sql of queries) {
-      // Everything between the dedup subquery's FROM and its GROUP BY is the
-      // predicate the dedup is decided on. The user filter must not be there.
-      const dedupBodies = sql
-        .split(DEDUP_AGGREGATE)
-        .slice(0, -1)
-        .map((chunk) => chunk.slice(chunk.lastIndexOf("SELECT TenantId")));
-      for (const body of dedupBodies) {
-        expect(body).not.toContain("AnnotationIds != []");
+      for (const sql of queries) {
+        // Everything between the dedup subquery's FROM and its GROUP BY is the
+        // predicate the dedup is decided on. The user filter must not be there.
+        const dedupBodies = sql
+          .split(DEDUP_AGGREGATE)
+          .slice(0, -1)
+          .map((chunk) => chunk.slice(chunk.lastIndexOf("SELECT TenantId")));
+        for (const body of dedupBodies) {
+          expect(body).not.toContain(USER_FILTER);
+        }
       }
-    }
+    });
+
+    it("applies it to both stages of the page read, so an unmerged same-version row cannot slip through", async () => {
+      const { repo, queries } = makeRepo();
+
+      await repo.findAll(
+        baseQuery({
+          filterWhere: { sql: USER_FILTER, params: { unused: 1 } },
+        }),
+      );
+
+      // Identity alone cannot separate two unmerged rows that share one
+      // (TenantId, TraceId, UpdatedAt), so the outer stage has to re-state the
+      // filter — once for the inner stage, once for the outer.
+      const pageQuery = queries.find(isPageQuery)!;
+      expect(occurrences(pageQuery, USER_FILTER)).toBe(2);
+    });
   });
 });
