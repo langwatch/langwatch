@@ -29,7 +29,7 @@ import {
   serializeRowForAudit,
   type GatewayAuditJson,
 } from "@langwatch/gateway-server";
-import { nextResetAt } from "@langwatch/gateway-server";
+import { GatewayWindow } from "@langwatch/gateway-server";
 import type { GatewayChangeEventsPort } from "@langwatch/gateway-server";
 import { createGatewayAuditPort } from "@langwatch/gateway-server/composition/gateway-audit";
 import { createGatewayChangeEventsPort } from "@langwatch/gateway-server/composition/gateway-change-events";
@@ -904,7 +904,7 @@ export class VirtualKeyService {
             // Changing the window changes what "this period" means, so the
             // reset instant has to be recomputed with it.
             ...(existing.window !== budget.window
-              ? { resetsAt: nextResetAt(budget.window) }
+              ? { resetsAt: GatewayWindow.nextResetAt(budget.window) }
               : {}),
           },
         })
@@ -916,7 +916,7 @@ export class VirtualKeyService {
             scopeId: vk.id,
             managedByVirtualKeyId: vk.id,
             createdById: actorUserId,
-            resetsAt: nextResetAt(budget.window),
+            resetsAt: GatewayWindow.nextResetAt(budget.window),
           },
         });
 

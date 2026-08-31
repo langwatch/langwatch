@@ -53,7 +53,7 @@ import {
   externalIdSchema,
   resourceMetadataSchema,
 } from "../../adapters/gateway-resource-metadata.adapter";
-import { startOfCurrentMonthUTC } from "../../adapters/gateway-window.adapter";
+import { GatewayWindow } from "../../adapters/gateway-window.adapter";
 import { toStoredEnum, toWireEnum } from "@langwatch/gateway-contract";
 import { USD_DISPLAY_STRING_FORMAT } from "@langwatch/gateway-contract";
 import {
@@ -951,7 +951,7 @@ export function createGatewayPlatformRestApp(options: {
       const fromDate =
         windowParse.data.from !== undefined
           ? new Date(windowParse.data.from)
-          : startOfCurrentMonthUTC(now);
+          : GatewayWindow.startOfCurrentMonthUTC(now);
       const toDate = windowParse.data.to !== undefined ? new Date(windowParse.data.to) : now;
       if (fromDate.getTime() >= toDate.getTime()) {
         return errorResponse(c, {

@@ -44,7 +44,7 @@ import {
 import type { GatewayBudgetSpendPort } from "@langwatch/gateway-server";
 import { scopeTargetKey, type GatewayService } from "@langwatch/gateway-contract";
 import { spendTargetsForBudgets } from "@langwatch/gateway-server";
-import { nextResetAt } from "@langwatch/gateway-server";
+import { GatewayWindow } from "@langwatch/gateway-server";
 import { resolveProviderLabels } from "@langwatch/gateway-server/composition/gateway-provider-labels";
 
 /**
@@ -438,5 +438,5 @@ function absoluteScopePhrase(scopeType: string, scopeLabel: string): string {
 
 function resetsAtFor(window: string): string | null {
   if (window === "TOTAL") return null;
-  return nextResetAt(window as Parameters<typeof nextResetAt>[0]).toISOString();
+  return GatewayWindow.nextResetAt(window as Parameters<typeof GatewayWindow.nextResetAt>[0]).toISOString();
 }

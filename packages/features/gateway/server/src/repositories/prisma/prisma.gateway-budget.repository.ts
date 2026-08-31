@@ -31,11 +31,7 @@ import { resolveApplicableBudgets } from "./prisma.gateway-budget-resolution.rep
 import { PrismaGatewayBudgetScopeReachRepository } from "./prisma.gateway-budget-scope-reach.repository";
 import type { GatewayBudgetScopeReach } from "../gateway-budget.repository";
 import { PrismaGatewayChangeEventsRepository } from "./prisma.gateway-change-event.repository";
-import {
-  isCyclicWindow,
-  nextBoundaryFor,
-  shouldResetBudget,
-} from "../../adapters/gateway-window.adapter";
+import { GatewayWindow } from "../../adapters/gateway-window.adapter";
 import {
   GatewayBudgetCycleAnchorInvalidError,
   type GatewayBudgetPageInput,
@@ -55,8 +51,7 @@ import {
 } from "../../adapters/gateway-resource-metadata.adapter";
 import {
   type BudgetScopeTargetInfo,
-  listVirtualKeyProjectScopes,
-  resolveScopeTargetsBatch,
+  PrismaGatewayBudgetScopeTargetRepository,
 } from "./prisma.gateway-budget-scope-target.repository";
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
 import { keysetAfter } from "../../adapters/gateway-wire-pagination.adapter";
@@ -321,7 +316,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     projects: ProjectIdentity[],
     virtualKeyProjectScopes: GatewayVirtualKeyProjectScope[],
   ): Promise<Map<string, GatewayBudgetScopeTarget>> {
-    const targets = await resolveScopeTargetsBatch(
+    const targets = await PrismaGatewayBudgetScopeTargetRepository.resolveScopeTargetsBatch(
       this.prisma,
       budgets,
       organizationId,
@@ -336,7 +331,11 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     organizationId: string | null;
     virtualKeyIds: string[];
   }): Promise<GatewayVirtualKeyProjectScope[]> {
-    return listVirtualKeyProjectScopes(this.prisma, input.organizationId, input.virtualKeyIds);
+    return PrismaGatewayBudgetScopeTargetRepository.listVirtualKeyProjectScopes(
+      this.prisma,
+      input.organizationId,
+      input.virtualKeyIds,
+    );
   }
 
   async list(input: GatewayOrganizationBudgetReadInput): Promise<GatewayBudgetWithSeats[]> {
@@ -777,7 +776,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     // An anchor only means something on a window that rolls. Checked before
     // any lookup, since it needs nothing but the request.
     const cycleAnchorAt = input.cycleAnchorAt ?? null;
-    if (cycleAnchorAt && !isCyclicWindow(input.window)) {
+    if (cycleAnchorAt && !GatewayWindow.isCyclicWindow(input.window)) {
       throw new GatewayBudgetCycleAnchorInvalidError(input.window.toLowerCase());
     }
 
@@ -910,7 +909,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       }
     }
 
-    const resetsAt = nextBoundaryFor({
+    const resetsAt = GatewayWindow.nextBoundaryFor({
       budget: { window: input.window, cycleAnchorAt },
     });
     const projectId = resolveProjectFromScope(input.scope);
@@ -1150,7 +1149,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
           // A reset forgives the spend so far; it does not re-phase the
           // cycle, so an anchored budget reports the next boundary on its
           // own schedule rather than one window from this instant.
-          resetsAt: nextBoundaryFor({ budget: existing, now }),
+          resetsAt: GatewayWindow.nextBoundaryFor({ budget: existing, now }),
           // The current-period figure the bundle reads; the period just
           // restarted, so it is zero by definition. Ledger rows untouched.
           spentUsd: new Prisma.Decimal(0),
@@ -1256,7 +1255,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     for (const budget of applicable) {
       const effectiveSpent = chSpendByBudgetId
         ? new Prisma.Decimal(chSpendByBudgetId.get(budget.id) ?? "0")
-        : shouldResetBudget(budget.window, budget.resetsAt, now)
+        : GatewayWindow.shouldResetBudget(budget.window, budget.resetsAt, now)
           ? new Prisma.Decimal(0)
           : budget.spentUsd;
 

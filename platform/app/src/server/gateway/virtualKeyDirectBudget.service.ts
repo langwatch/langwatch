@@ -18,7 +18,7 @@ import {
   type GatewayBudgetSpendPort,
   spendTargetsForBudgets,
 } from "@langwatch/gateway-server";
-import { nextResetAt } from "@langwatch/gateway-server";
+import { GatewayWindow } from "@langwatch/gateway-server";
 
 export type VirtualKeyDirectBudget = {
   budgetId: string;
@@ -88,7 +88,7 @@ export async function loadDirectBudgetsForKeys(args: {
       // stored instant is only rewritten when the window changes, so a
       // budget that has been running for days carries a reset moment
       // that has already passed.
-      resetsAt: nextResetAt(budget.window, now).toISOString(),
+      resetsAt: GatewayWindow.nextResetAt(budget.window, now).toISOString(),
     });
   }
   return out;

@@ -46,12 +46,8 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
-import { startOfCurrentMonthUTC } from "../../adapters/gateway-window.adapter";
-import type {
-  GatewayActor,
-  GatewayApp,
-  GatewayVirtualKeyBudgetInput,
-} from "#app/gateway.app";
+import { GatewayWindow } from "../../adapters/gateway-window.adapter";
+import type { GatewayActor, GatewayApp, GatewayVirtualKeyBudgetInput } from "#app/gateway.app";
 
 /** The process supplies authentication; authorization arrives as the policies. */
 export type VirtualKeyTrpcContext = Readonly<{
@@ -205,7 +201,7 @@ export class VirtualKeyTrpcApi {
           ctx.app.gateway.spendByVirtualKey({
             organizationId: input.organizationId,
             virtualKeyIds,
-            window: { fromDate: startOfCurrentMonthUTC(now), toDate: now },
+            window: { fromDate: GatewayWindow.startOfCurrentMonthUTC(now), toDate: now },
           }),
           ctx.app.gateway.loadDirectBudgetsForKeys({
             organizationId: input.organizationId,

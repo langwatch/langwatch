@@ -14,11 +14,7 @@
  */
 import type { GatewayBudgetWindow } from "@langwatch/gateway-contract";
 
-import {
-  anchoredPeriodStart,
-  isCyclicWindow,
-  nextBoundaryFor,
-} from "./gateway-window.adapter";
+import { GatewayWindow } from "./gateway-window.adapter";
 
 /**
  * The OccurredAt lower bound a spend read must honor for a budget whose
@@ -47,8 +43,8 @@ export function budgetPeriodFloorMs(
   if (budget.window === "MANUAL") {
     return budget.currentPeriodStartedAt.getTime();
   }
-  if (budget.cycleAnchorAt && isCyclicWindow(budget.window)) {
-    const anchored = anchoredPeriodStart({
+  if (budget.cycleAnchorAt && GatewayWindow.isCyclicWindow(budget.window)) {
+    const anchored = GatewayWindow.anchoredPeriodStart({
       window: budget.window,
       anchorAt: budget.cycleAnchorAt,
       now,
@@ -64,9 +60,7 @@ export function budgetPeriodFloorMs(
   }
   if (!budget.lastResetAt) return undefined;
   const boundary = budget.currentPeriodStartedAt.getTime();
-  return boundary > currentPeriodStart(budget.window, now).getTime()
-    ? boundary
-    : undefined;
+  return boundary > currentPeriodStart(budget.window, now).getTime() ? boundary : undefined;
 }
 
 /**
@@ -102,7 +96,7 @@ export function effectiveBudgetPeriod(
   },
   now: Date = new Date(),
 ): { currentPeriodStartedAt: Date; resetsAt: Date } {
-  if (!isCyclicWindow(budget.window)) {
+  if (!GatewayWindow.isCyclicWindow(budget.window)) {
     return {
       currentPeriodStartedAt: budget.currentPeriodStartedAt,
       resetsAt: budget.resetsAt,
@@ -112,7 +106,7 @@ export function effectiveBudgetPeriod(
   return {
     currentPeriodStartedAt:
       floorMs === undefined ? currentPeriodStart(budget.window, now) : new Date(floorMs),
-    resetsAt: nextBoundaryFor({ budget, now }),
+    resetsAt: GatewayWindow.nextBoundaryFor({ budget, now }),
   };
 }
 
@@ -137,10 +131,9 @@ export function bucketPeriodFloorMs(
   boundaryPeriodStartedAt: Date | null | undefined,
   now: Date = new Date(),
 ): number | undefined {
-  const candidates = [
-    budgetPeriodFloorMs(budget, now),
-    boundaryPeriodStartedAt?.getTime(),
-  ].filter((n): n is number => typeof n === "number");
+  const candidates = [budgetPeriodFloorMs(budget, now), boundaryPeriodStartedAt?.getTime()].filter(
+    (n): n is number => typeof n === "number",
+  );
   return candidates.length > 0 ? Math.max(...candidates) : undefined;
 }
 

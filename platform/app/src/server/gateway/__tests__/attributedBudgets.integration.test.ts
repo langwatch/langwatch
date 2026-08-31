@@ -25,7 +25,7 @@ import {
 import { GatewayService } from "@langwatch/gateway-server";
 import { bucketPeriodFloorMs, budgetPeriodFloorMs } from "@langwatch/gateway-server";
 import { attributedUserBucketScopeId } from "@langwatch/gateway-server";
-import { anchoredPeriodStart, nextAnchoredResetAt } from "@langwatch/gateway-server";
+import { GatewayWindow } from "@langwatch/gateway-server";
 
 /**
  * A month cycle phased to the 17th at 09:00 UTC: far enough in the past
@@ -449,7 +449,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
     // Created mid-cycle, it reports the anchor's next boundary rather than
     // one month from the creation instant.
     expect(anchored.resetsAt.toISOString()).toBe(
-      nextAnchoredResetAt({
+      GatewayWindow.nextAnchoredResetAt({
         window: "MONTH",
         anchorAt: CYCLE_ANCHOR,
         now: anchored.createdAt,
@@ -478,7 +478,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
     // from the period start rather than a minute before creation, which lands
     // in the PREVIOUS period whenever creation happens inside the first
     // minute of one.
-    const spentAt = anchoredPeriodStart({
+    const spentAt = GatewayWindow.anchoredPeriodStart({
       window: "MONTH",
       anchorAt: CYCLE_ANCHOR,
       now: anchored.createdAt,
@@ -513,7 +513,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
     // ...and the reported boundary is the anchor's next one, not one month
     // from the reset. A reset is a credit, not a re-phasing.
     expect(reset.resetsAt.toISOString()).toBe(
-      nextAnchoredResetAt({
+      GatewayWindow.nextAnchoredResetAt({
         window: "MONTH",
         anchorAt: CYCLE_ANCHOR,
         now: reset.lastResetAt!,
@@ -525,7 +525,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
     // private boundary forward forever.
     const afterRollover = new Date(reset.resetsAt.getTime() + 1000);
     expect(budgetPeriodFloorMs(reset, afterRollover)).toBe(
-      anchoredPeriodStart({
+      GatewayWindow.anchoredPeriodStart({
         window: "MONTH",
         anchorAt: CYCLE_ANCHOR,
         now: afterRollover,
@@ -546,7 +546,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
     });
     const bucket = attributedUserBucketScopeId(VK_ID, `seat-${suffix}`);
     const now = new Date("2026-07-15T18:00:00.000Z");
-    const periodStart = anchoredPeriodStart({
+    const periodStart = GatewayWindow.anchoredPeriodStart({
       window: "MONTH",
       anchorAt: CYCLE_ANCHOR,
       now,

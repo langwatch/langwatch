@@ -27,7 +27,7 @@ import {
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { GatewayUsageService } from "@langwatch/gateway-server/testing";
-import { GatewayVirtualKeySpendAdapter, startOfCurrentMonthUTC } from "@langwatch/gateway-server";
+import { GatewayVirtualKeySpendAdapter, GatewayWindow } from "@langwatch/gateway-server";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-spend-${suffix}`;
@@ -326,7 +326,7 @@ describe("virtual key spend (real PG + real CH)", () => {
     const spend = await usageService().spendByVirtualKey({
       organizationId: ORG_ID,
       virtualKeyIds: [VK_UNBUDGETED_ID],
-      window: { fromDate: startOfCurrentMonthUTC(now), toDate: now },
+      window: { fromDate: GatewayWindow.startOfCurrentMonthUTC(now), toDate: now },
     });
     expect(Number(spend.get(VK_UNBUDGETED_ID)?.spentUsd)).toBeCloseTo(0.4, 4);
     expect(spend.get(VK_UNBUDGETED_ID)?.requests).toBe(1);
@@ -338,7 +338,7 @@ describe("virtual key spend (real PG + real CH)", () => {
     const spend = await usageService().spendByVirtualKey({
       organizationId: ORG_ID,
       virtualKeyIds: [VK_BUDGETED_ID],
-      window: { fromDate: startOfCurrentMonthUTC(now), toDate: now },
+      window: { fromDate: GatewayWindow.startOfCurrentMonthUTC(now), toDate: now },
     });
     expect(Number(spend.get(VK_BUDGETED_ID)?.spentUsd)).toBeCloseTo(0.25, 4);
     expect(spend.get(VK_BUDGETED_ID)?.requests).toBe(1);

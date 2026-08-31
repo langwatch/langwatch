@@ -1,22 +1,17 @@
 import { describe, expect, it } from "vitest";
-import {
-  budgetPeriodFloorMs,
-  currentPeriodStart,
-  nextResetAt,
-  shouldResetBudget,
-} from "../index";
+import { budgetPeriodFloorMs, currentPeriodStart, GatewayWindow } from "../index";
 
 const NOW = new Date("2026-07-15T12:00:00.000Z");
 
 describe("MANUAL window math", () => {
   /** @scenario A MANUAL window never resets on its own */
   it("never resets on its own", () => {
-    const resetsAt = nextResetAt("MANUAL", NOW);
+    const resetsAt = GatewayWindow.nextResetAt("MANUAL", NOW);
     expect(resetsAt.getUTCFullYear()).toBe(9999);
-    expect(shouldResetBudget("MANUAL", resetsAt, NOW)).toBe(false);
+    expect(GatewayWindow.shouldResetBudget("MANUAL", resetsAt, NOW)).toBe(false);
     // Sentinel timestamps still answer no: the boundary only moves by an
     // explicit reset, whatever the clock says.
-    expect(shouldResetBudget("MANUAL", new Date("2000-01-01T00:00:00Z"), NOW)).toBe(
+    expect(GatewayWindow.shouldResetBudget("MANUAL", new Date("2000-01-01T00:00:00Z"), NOW)).toBe(
       false,
     );
   });
