@@ -3,7 +3,7 @@ import { ClickHouseExperimentRunRepository } from "../clickhouse.experiment-run.
 
 describe("ClickHouseExperimentRunRepository", () => {
   const options = {
-    database: { workflowVersion: { findMany: async () => [] } } as never,
+    workflowVersions: { findByIds: async () => ({}) } as never,
     resolveClient: async () => null,
     tupleParam: (values: string[]) => values,
     telemetry: {

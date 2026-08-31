@@ -1,3 +1,4 @@
+import type { ExperimentWorkflowVersionPort } from "../../ports/experiment-workflow-version.port";
 import type {
   ExperimentRun,
   ExperimentRunAggregate,
@@ -7,7 +8,6 @@ import type {
   ExperimentRunWithItems,
   ExperimentRunWorkflowVersion,
 } from "@langwatch/experiment-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   experimentRunSchema,
   serializedHandledErrorSchema,
@@ -31,14 +31,8 @@ type ExperimentClickHouseClient = {
   }): Promise<QueryResult>;
 };
 
-/**
- * The one Postgres delegate this ClickHouse repository reads, so composition
- * can name it without reaching for the generated client itself.
- */
-export type ExperimentRunVersionDatabase = Pick<PrismaClient, "workflowVersion">;
-
 type ClickHouseExperimentRunRepositoryOptions = {
-  database: ExperimentRunVersionDatabase;
+  workflowVersions: ExperimentWorkflowVersionPort;
   resolveClient: (projectId: string) => Promise<ExperimentClickHouseClient | null>;
   tupleParam: (values: string[]) => unknown;
   telemetry: {
@@ -543,17 +537,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
     projectId: string,
     versionIds: string[],
   ): Promise<Record<string, ExperimentRunWorkflowVersion>> {
-    if (versionIds.length === 0) return {};
-    const rows = await this.options.database.workflowVersion.findMany({
-      where: { projectId, id: { in: [...new Set(versionIds)] } },
-      select: {
-        id: true,
-        version: true,
-        commitMessage: true,
-        author: { select: { name: true, image: true } },
-      },
-    });
-    return Object.fromEntries(rows.map((row) => [row.id, row]));
+    return await this.options.workflowVersions.findByIds({ projectId, versionIds });
   }
 
   private async enrichItemCosts(

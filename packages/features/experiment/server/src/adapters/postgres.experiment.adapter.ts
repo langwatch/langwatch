@@ -1,3 +1,7 @@
+import {
+  PrismaExperimentWorkflowVersionRepository,
+  type ExperimentWorkflowVersionDatabase,
+} from "../repositories/prisma/prisma.experiment-workflow-version.repository";
 import type {
   ExperimentService as ExperimentServiceContract,
   SerializedHandledError,
@@ -11,10 +15,7 @@ import {
   PrismaExperimentRepository,
   type ExperimentDatabase,
 } from "../repositories/prisma/prisma.experiment.repository";
-import {
-  ClickHouseExperimentRunRepository,
-  type ExperimentRunVersionDatabase,
-} from "../repositories/clickhouse/clickhouse.experiment-run.repository";
+import { ClickHouseExperimentRunRepository } from "../repositories/clickhouse/clickhouse.experiment-run.repository";
 import { ClickHouseExperimentDspyRepository } from "../repositories/clickhouse/clickhouse.experiment-dspy.repository";
 import type { ExperimentDspyRetentionPort } from "../ports/experiment-dspy-retention.port";
 import type { ExperimentWorkbenchUpdatesPort } from "../ports/experiment-workbench-updates.port";
@@ -23,7 +24,7 @@ import { ExperimentService } from "../services/experiment.service";
 
 export type PostgresExperimentAdapterOptions = {
   /** The primary Postgres store plus workflow-version metadata for run reads. */
-  database: ExperimentDatabase & ExperimentRunVersionDatabase;
+  database: ExperimentDatabase & ExperimentWorkflowVersionDatabase;
   /** `null` explicitly represents a deployment without ClickHouse. */
   resolveClickHouseClient: (projectId: string) => Promise<{
     insert(input: {
@@ -165,7 +166,7 @@ export class PostgresExperimentAdapter {
       ...options,
       repository: PrismaExperimentRepository.create(options.database),
       runRepository: ClickHouseExperimentRunRepository.create({
-        database: options.database,
+        workflowVersions: PrismaExperimentWorkflowVersionRepository.create(options.database),
         resolveClient: options.resolveClickHouseClient,
         tupleParam: options.tupleParam,
         telemetry: options.runHistoryTelemetry,
