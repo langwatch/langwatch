@@ -334,7 +334,7 @@ carrying at most one scope id costs nothing.
 - `platform/app/src/server/app-layer/permissions/imperative.ts` — `require*`
   and `probe*`.
 - `platform/app/src/server/api/trpc.permission-builder.ts` — the app's
-  declaration policy builder; `@langwatch/trpc` owns generic root creation.
+  declaration policy builder; `@langwatch/api/trpc` owns generic root creation.
 - `packages/api` — the service framework and its boot checks.
 - `specs/rbac/typed-permission-declarations.feature` — the behavioural
   contract; every guarantee above is a bound scenario.

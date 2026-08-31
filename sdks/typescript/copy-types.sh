@@ -9,7 +9,7 @@ set -euo pipefail
 # source of truth and the TypeScript types are inferred with z.infer. Copy the
 # module verbatim — the SDK reuses both the schemas and the types directly, so
 # there is no schema-generation (ts-to-zod) step anymore.
-cp ../../platform/app/src/server/tracer/types.ts src/internal/generated/types/tracer.ts
+cp ../../packages/features/trace/contract/src/trace-format.schemas.ts src/internal/generated/types/tracer.ts
 
 # Copy filter types (only filterFieldsEnum is needed by the SDK)
 mkdir -p src/internal/generated/filters

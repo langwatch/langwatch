@@ -196,7 +196,7 @@ Migrations are immutable once deployed (see `feedback_never_modify_deployed_migr
 
 - **Decision record:** `dev/docs/adr/021-multi-scope-targeting-and-tenancy.md`
 - **Shared contract:** `platform/app/src/server/scopes/scope.types.ts` (`ScopeAssignment`, `SCOPE_TIERS`) and `resolveScopeChain.ts`
-- **Storage + read grouping:** `platform/app/src/server/api/routers/modelProviders.ts` → `getDefaultModelsForProject`
+- **Storage + read grouping:** `packages/features/model-provider/server/src/transport/api-trpc/model-provider.api.ts` → `getDefaultModelsForProject`
 - **Write per-scope:** `platform/app/src/server/modelProviders/modelDefaults.service.ts`
 - **Multi-scope authz:** `platform/app/src/server/modelProviders/modelProvider.authz.ts` → `assertCanManageAllScopes`
 - **UI primitive:** `platform/app/src/components/settings/ScopeChipPicker.tsx`

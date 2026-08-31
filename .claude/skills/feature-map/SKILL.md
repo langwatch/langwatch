@@ -65,7 +65,7 @@ How code and platform relate for each feature:
 
 - **Hono routes** (current): `platform/app/src/app/api/` — each `[[...route]]/app.ts` is a Hono app
   - traces: `platform/app/src/app/api/traces/[[...route]]/app.ts`
-  - scenarios: `platform/app/src/app/api/scenarios/[[...route]]/app.ts`
+  - scenarios: `packages/features/scenario/server/src/transport/api-rest/` (packaged, mounted by `createAppRestFeatures`)
   - prompts: `platform/app/src/app/api/prompts/[[...route]]/app.ts`
   - evaluators: `platform/app/src/app/api/evaluators/[[...route]]/app.ts`
   - datasets: `platform/app/src/app/api/dataset/[[...route]]/`

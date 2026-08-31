@@ -3,7 +3,7 @@
  * Machine-wide queue for the whole-repo checks: typecheck and lint.
  *
  * Both saturate the machine on purpose. A tsgo run peaks around 3 to 4 GiB and
- * uses every core; a biome run over 6,800 files spends 38 CPU-seconds in 4
+ * uses every core; a whole-tree lint over 6,800 files spends 38 CPU-seconds in 4
  * seconds of wall clock. That is the right trade for one run. The three or four
  * that a laptop driving several worktrees and agents produces are what make the
  * machine unusable, and neither command knew another was already running.
