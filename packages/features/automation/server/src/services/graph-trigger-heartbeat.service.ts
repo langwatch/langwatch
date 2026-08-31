@@ -135,7 +135,7 @@ export class GraphTriggerHeartbeatService {
     for (const projectId of projectIds) {
       try {
         candidates.push(
-          ...(await collectCandidatesForProject({
+          ...(await this.collectCandidatesForProject({
             deps,
             projectId,
             hasOpenSent: openSentProjects.has(projectId),
@@ -166,246 +166,246 @@ export class GraphTriggerHeartbeatService {
 
     return candidates;
   }
-}
 
-/**
- * Per-project, per-source pre-filter — ONE batched slim query per
- * (project, source) per sweep (at most two per project: `trace_analytics`
- * and `evaluation_analytics`). If the project's recent qualifying activity
- * for a trigger's source is fresher than that trigger's window, the
- * real-time path is already handling it and the candidate is skipped.
- *
- * Throws on an unreadable project; `decideGraphTriggerHeartbeat` isolates
- * that so the remaining projects still get their absence/resolve
- * evaluations.
- */
-async function collectCandidatesForProject({
-  deps,
-  projectId,
-  hasOpenSent,
-  now,
-}: {
-  deps: GraphTriggerHeartbeatDeps;
-  projectId: string;
-  hasOpenSent: boolean;
-  now: Date;
-}): Promise<GraphTriggerSweepCandidate[]> {
-  const candidates = await loadCandidatesForProject({
+  /**
+   * Per-project, per-source pre-filter — ONE batched slim query per
+   * (project, source) per sweep (at most two per project: `trace_analytics`
+   * and `evaluation_analytics`). If the project's recent qualifying activity
+   * for a trigger's source is fresher than that trigger's window, the
+   * real-time path is already handling it and the candidate is skipped.
+   *
+   * Throws on an unreadable project; `decideGraphTriggerHeartbeat` isolates
+   * that so the remaining projects still get their absence/resolve
+   * evaluations.
+   */
+  private async collectCandidatesForProject({
     deps,
     projectId,
     hasOpenSent,
-  });
-  if (candidates.length === 0) {
-    return [];
-  }
-
-  const candidatesBySource = groupCandidatesBySource(candidates);
-  const recencyBySource = new Map<AnalyticsMetricSource, ProjectRecency>();
-  for (const [source, sourceCandidates] of candidatesBySource.entries()) {
-    const boundMs = Math.max(...sourceCandidates.map((c) => c.windowMs));
-    const recency = await loadProjectRecency({
+    now,
+  }: {
+    deps: GraphTriggerHeartbeatDeps;
+    projectId: string;
+    hasOpenSent: boolean;
+    now: Date;
+  }): Promise<GraphTriggerSweepCandidate[]> {
+    const candidates = await this.loadCandidatesForProject({
       deps,
       projectId,
-      source,
-      boundWindowMs: Math.max(MIN_BOUND_WINDOW_MS, boundMs),
-      now,
+      hasOpenSent,
     });
-    recencyBySource.set(source, recency);
-  }
-
-  const surviving: GraphTriggerSweepCandidate[] = [];
-  for (const candidate of candidates) {
-    const recency = recencyBySource.get(candidate.source);
-    if (!recency) {
-      continue;
+    if (candidates.length === 0) {
+      return [];
     }
 
-    const cutoff = now.getTime() - candidate.windowMs;
-    if (recency.lastOccurredAtMs !== null && recency.lastOccurredAtMs > cutoff) {
-      // Real-time path is firing for this trigger; skip.
-      continue;
-    }
-
-    surviving.push({
-      triggerId: candidate.triggerId,
-      projectId,
-      reason: candidate.reasonKind === "absence" ? "heartbeat-absence" : "heartbeat-resolve",
-    });
-  }
-
-  return surviving;
-}
-
-async function loadCandidatesForProject({
-  deps,
-  projectId,
-  hasOpenSent,
-}: {
-  deps: GraphTriggerHeartbeatDeps;
-  projectId: string;
-  hasOpenSent: boolean;
-}): Promise<CandidateTrigger[]> {
-  const triggers = (await deps.triggers.findActiveForProject(projectId)).filter(
-    (trigger) => trigger.customGraphId !== null && trigger.triggerKind !== "REPORT",
-  );
-  if (triggers.length === 0) {
-    return [];
-  }
-
-  const openIds = hasOpenSent
-    ? await deps.triggerSent.findOpenTriggerIdsForProject(projectId)
-    : new Set<string>();
-
-  const candidates: CandidateTrigger[] = [];
-  for (const trigger of triggers) {
-    const parsed = heartbeatActionParamsSchema.safeParse(trigger.actionParams ?? {});
-    if (!parsed.success) {
-      continue;
-    }
-
-    const params = parsed.data;
-    const operator = params.operator;
-    const threshold = params.threshold;
-    const timePeriod = params.timePeriod;
-    if (operator === void 0 || threshold === void 0 || timePeriod === void 0) {
-      continue;
-    }
-
-    const windowMs = Math.max(MIN_BOUND_WINDOW_MS, timePeriod * 60 * 1000);
-    const isNoData = isNoDataPredicate({ operator, threshold });
-    const isOpen = openIds.has(trigger.id);
-    if (!isNoData && !isOpen) {
-      continue;
-    }
-
-    if (!trigger.customGraphId) {
-      continue;
-    }
-
-    // ADR-034 Phase 6 source classification. Unknown-source defaults to
-    // "trace" so we preserve the pre-Phase-6 behaviour for graphs whose
-    // metrics aren't in `field-availability`.
-    const lookedUp = await deps.triggerSent.tryFindGraphTriggerSource({
-      triggerId: trigger.id,
-      customGraphId: trigger.customGraphId,
-      projectId,
-      seriesName: params.seriesName,
-    });
-    const source: AnalyticsMetricSource = lookedUp ?? "trace";
-
-    candidates.push({
-      triggerId: trigger.id,
-      projectId,
-      windowMs,
-      reasonKind: isOpen ? "resolve" : "absence",
-      source,
-    });
-  }
-
-  return candidates;
-}
-
-function groupCandidatesBySource(
-  candidates: CandidateTrigger[],
-): Map<AnalyticsMetricSource, CandidateTrigger[]> {
-  const groups = new Map<AnalyticsMetricSource, CandidateTrigger[]>();
-  for (const c of candidates) {
-    const existing = groups.get(c.source);
-    if (existing) {
-      existing.push(c);
-    } else {
-      groups.set(c.source, [c]);
-    }
-  }
-
-  return groups;
-}
-
-async function loadProjectRecency({
-  deps,
-  projectId,
-  source,
-  boundWindowMs,
-  now,
-}: {
-  deps: GraphTriggerHeartbeatDeps;
-  projectId: string;
-  source: AnalyticsMetricSource;
-  boundWindowMs: number;
-  now: Date;
-}): Promise<ProjectRecency> {
-  let client: ClickHouseClient | null;
-  try {
-    client = await deps.heartbeat.tryResolveClickHouseClient(projectId);
-  } catch (error) {
-    deps.logger.warn(
-      {
+    const candidatesBySource = GraphTriggerHeartbeatService.groupCandidatesBySource(candidates);
+    const recencyBySource = new Map<AnalyticsMetricSource, ProjectRecency>();
+    for (const [source, sourceCandidates] of candidatesBySource.entries()) {
+      const boundMs = Math.max(...sourceCandidates.map((c) => c.windowMs));
+      const recency = await this.loadProjectRecency({
+        deps,
         projectId,
         source,
-        error: error instanceof Error ? error.message : String(error),
-      },
-      "graphTriggerHeartbeat: ClickHouse client unavailable, treating recency as unknown (no skip)",
+        boundWindowMs: Math.max(MIN_BOUND_WINDOW_MS, boundMs),
+        now,
+      });
+      recencyBySource.set(source, recency);
+    }
+
+    const surviving: GraphTriggerSweepCandidate[] = [];
+    for (const candidate of candidates) {
+      const recency = recencyBySource.get(candidate.source);
+      if (!recency) {
+        continue;
+      }
+
+      const cutoff = now.getTime() - candidate.windowMs;
+      if (recency.lastOccurredAtMs !== null && recency.lastOccurredAtMs > cutoff) {
+        // Real-time path is firing for this trigger; skip.
+        continue;
+      }
+
+      surviving.push({
+        triggerId: candidate.triggerId,
+        projectId,
+        reason: candidate.reasonKind === "absence" ? "heartbeat-absence" : "heartbeat-resolve",
+      });
+    }
+
+    return surviving;
+  }
+
+  private async loadCandidatesForProject({
+    deps,
+    projectId,
+    hasOpenSent,
+  }: {
+    deps: GraphTriggerHeartbeatDeps;
+    projectId: string;
+    hasOpenSent: boolean;
+  }): Promise<CandidateTrigger[]> {
+    const triggers = (await deps.triggers.findActiveForProject(projectId)).filter(
+      (trigger) => trigger.customGraphId !== null && trigger.triggerKind !== "REPORT",
     );
+    if (triggers.length === 0) {
+      return [];
+    }
 
-    return { projectId, source, lastOccurredAtMs: null };
+    const openIds = hasOpenSent
+      ? await deps.triggerSent.findOpenTriggerIdsForProject(projectId)
+      : new Set<string>();
+
+    const candidates: CandidateTrigger[] = [];
+    for (const trigger of triggers) {
+      const parsed = heartbeatActionParamsSchema.safeParse(trigger.actionParams ?? {});
+      if (!parsed.success) {
+        continue;
+      }
+
+      const params = parsed.data;
+      const operator = params.operator;
+      const threshold = params.threshold;
+      const timePeriod = params.timePeriod;
+      if (operator === void 0 || threshold === void 0 || timePeriod === void 0) {
+        continue;
+      }
+
+      const windowMs = Math.max(MIN_BOUND_WINDOW_MS, timePeriod * 60 * 1000);
+      const isNoData = isNoDataPredicate({ operator, threshold });
+      const isOpen = openIds.has(trigger.id);
+      if (!isNoData && !isOpen) {
+        continue;
+      }
+
+      if (!trigger.customGraphId) {
+        continue;
+      }
+
+      // ADR-034 Phase 6 source classification. Unknown-source defaults to
+      // "trace" so we preserve the pre-Phase-6 behaviour for graphs whose
+      // metrics aren't in `field-availability`.
+      const lookedUp = await deps.triggerSent.tryFindGraphTriggerSource({
+        triggerId: trigger.id,
+        customGraphId: trigger.customGraphId,
+        projectId,
+        seriesName: params.seriesName,
+      });
+      const source: AnalyticsMetricSource = lookedUp ?? "trace";
+
+      candidates.push({
+        triggerId: trigger.id,
+        projectId,
+        windowMs,
+        reasonKind: isOpen ? "resolve" : "absence",
+        source,
+      });
+    }
+
+    return candidates;
   }
 
-  if (!client) {
-    return { projectId, source, lastOccurredAtMs: null };
+  private static groupCandidatesBySource(
+    candidates: CandidateTrigger[],
+  ): Map<AnalyticsMetricSource, CandidateTrigger[]> {
+    const groups = new Map<AnalyticsMetricSource, CandidateTrigger[]>();
+    for (const c of candidates) {
+      const existing = groups.get(c.source);
+      if (existing) {
+        existing.push(c);
+      } else {
+        groups.set(c.source, [c]);
+      }
+    }
+
+    return groups;
   }
 
-  const startMs = now.getTime() - boundWindowMs;
-  const table = SLIM_TABLE_BY_SOURCE[source];
-  const idColumn = SLIM_AGGREGATE_ID_COLUMN_BY_SOURCE[source];
-  // One IN-tuple dedup pattern (slim is ReplacingMergeTree(UpdatedAt)),
-  // bounded on the partition column (OccurredAt) for partition pruning.
-  // TenantId is the first WHERE predicate per multitenancy rules.
-  const query = `
-    SELECT max(toUnixTimestamp64Milli(OccurredAt)) AS lastMs
-    FROM (
-      SELECT OccurredAt
-      FROM ${table}
-      WHERE TenantId = {tenantId:String}
-        AND OccurredAt >= toDateTime64({startMs:UInt64} / 1000.0, 3)
-        AND (TenantId, ${idColumn}, UpdatedAt) IN (
-          SELECT TenantId, ${idColumn}, max(UpdatedAt)
-          FROM ${table}
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= toDateTime64({startMs:UInt64} / 1000.0, 3)
-          GROUP BY TenantId, ${idColumn}
-        )
-    )
-  `;
-  try {
-    const result = await client.query({
-      query,
-      query_params: { tenantId: projectId, startMs },
-      format: "JSONEachRow",
-    });
-    const rows = (await result.json()) as Array<{
-      lastMs: string | number | null;
-    }>;
-    const row = rows[0];
-    if (!row || row.lastMs === null || row.lastMs === undefined) {
+  private async loadProjectRecency({
+    deps,
+    projectId,
+    source,
+    boundWindowMs,
+    now,
+  }: {
+    deps: GraphTriggerHeartbeatDeps;
+    projectId: string;
+    source: AnalyticsMetricSource;
+    boundWindowMs: number;
+    now: Date;
+  }): Promise<ProjectRecency> {
+    let client: ClickHouseClient | null;
+    try {
+      client = await deps.heartbeat.tryResolveClickHouseClient(projectId);
+    } catch (error) {
+      deps.logger.warn(
+        {
+          projectId,
+          source,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "graphTriggerHeartbeat: ClickHouse client unavailable, treating recency as unknown (no skip)",
+      );
+
       return { projectId, source, lastOccurredAtMs: null };
     }
 
-    const ms = typeof row.lastMs === "string" ? Number.parseInt(row.lastMs, 10) : row.lastMs;
-    if (!Number.isFinite(ms) || ms <= 0) {
+    if (!client) {
       return { projectId, source, lastOccurredAtMs: null };
     }
 
-    return { projectId, source, lastOccurredAtMs: ms };
-  } catch (error) {
-    deps.logger.warn(
-      {
-        projectId,
-        source,
-        error: error instanceof Error ? error.message : String(error),
-      },
-      "graphTriggerHeartbeat: ClickHouse recency query failed, treating recency as unknown",
-    );
+    const startMs = now.getTime() - boundWindowMs;
+    const table = SLIM_TABLE_BY_SOURCE[source];
+    const idColumn = SLIM_AGGREGATE_ID_COLUMN_BY_SOURCE[source];
+    // One IN-tuple dedup pattern (slim is ReplacingMergeTree(UpdatedAt)),
+    // bounded on the partition column (OccurredAt) for partition pruning.
+    // TenantId is the first WHERE predicate per multitenancy rules.
+    const query = `
+      SELECT max(toUnixTimestamp64Milli(OccurredAt)) AS lastMs
+      FROM (
+        SELECT OccurredAt
+        FROM ${table}
+        WHERE TenantId = {tenantId:String}
+          AND OccurredAt >= toDateTime64({startMs:UInt64} / 1000.0, 3)
+          AND (TenantId, ${idColumn}, UpdatedAt) IN (
+            SELECT TenantId, ${idColumn}, max(UpdatedAt)
+            FROM ${table}
+            WHERE TenantId = {tenantId:String}
+              AND OccurredAt >= toDateTime64({startMs:UInt64} / 1000.0, 3)
+            GROUP BY TenantId, ${idColumn}
+          )
+      )
+    `;
+    try {
+      const result = await client.query({
+        query,
+        query_params: { tenantId: projectId, startMs },
+        format: "JSONEachRow",
+      });
+      const rows = (await result.json()) as Array<{
+        lastMs: string | number | null;
+      }>;
+      const row = rows[0];
+      if (!row || row.lastMs === null || row.lastMs === undefined) {
+        return { projectId, source, lastOccurredAtMs: null };
+      }
 
-    return { projectId, source, lastOccurredAtMs: null };
+      const ms = typeof row.lastMs === "string" ? Number.parseInt(row.lastMs, 10) : row.lastMs;
+      if (!Number.isFinite(ms) || ms <= 0) {
+        return { projectId, source, lastOccurredAtMs: null };
+      }
+
+      return { projectId, source, lastOccurredAtMs: ms };
+    } catch (error) {
+      deps.logger.warn(
+        {
+          projectId,
+          source,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "graphTriggerHeartbeat: ClickHouse recency query failed, treating recency as unknown",
+      );
+
+      return { projectId, source, lastOccurredAtMs: null };
+    }
   }
 }
