@@ -6,6 +6,7 @@ import type {
   WebhookSpendEventRow,
   WebhookSpendEventStatus,
 } from "../../services/webhook-envelope.service";
+import { nanoUsdToDecimalString } from "../../adapters/nano-usd.adapter";
 
 const SPEND_TABLE = "gateway_spend";
 const SPEND_ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, VirtualKeyId,
@@ -26,17 +27,6 @@ export type WebhookClickHouseClient = {
 export type WebhookClickHouseClientResolver = (
   tenantId: string,
 ) => Promise<WebhookClickHouseClient>;
-
-function nanoUsdToDecimalString(value: number): string {
-  const negative = value < 0;
-  const absolute = BigInt(Math.abs(value));
-  const whole = absolute / 1_000_000_000n;
-  const fraction = (absolute % 1_000_000_000n)
-    .toString()
-    .padStart(9, "0")
-    .replace(/0+$/, "");
-  return `${negative ? "-" : ""}${whole}${fraction ? `.${fraction}` : ""}`;
-}
 
 function mapSpendEventRow(raw: Record<string, unknown>): WebhookSpendEventRow {
   const costNanoUsd = Number(raw.CostNanoUSD ?? 0);
@@ -91,10 +81,9 @@ export type WebhookEventsCursor = {
 };
 
 function encodeCursor(cursor: WebhookEventsCursor): string {
-  return Buffer.from(
-    `${cursor.occurredAtMs}:${cursor.gatewayRequestId}`,
-    "utf8",
-  ).toString("base64url");
+  return Buffer.from(`${cursor.occurredAtMs}:${cursor.gatewayRequestId}`, "utf8").toString(
+    "base64url",
+  );
 }
 
 function decodeCursor(encoded: string): WebhookEventsCursor | null {
@@ -112,15 +101,12 @@ function decodeCursor(encoded: string): WebhookEventsCursor | null {
   }
 }
 
-function parseEventId(
-  id: string,
-): { gatewayRequestId: string; statuses: string[] } | null {
+function parseEventId(id: string): { gatewayRequestId: string; statuses: string[] } | null {
   const separator = id.lastIndexOf(":");
   if (separator <= 0 || separator === id.length - 1) return null;
   const gatewayRequestId = id.slice(0, separator);
   const suffix = id.slice(separator + 1);
-  if (suffix === "completed")
-    return { gatewayRequestId, statuses: ["confirmed", "failed"] };
+  if (suffix === "completed") return { gatewayRequestId, statuses: ["confirmed", "failed"] };
   if (suffix === "settled") return { gatewayRequestId, statuses: ["settled"] };
   return null;
 }
@@ -130,9 +116,7 @@ export class WebhookEventsClickHouseRepository extends WebhookEventsRepositoryPo
     super();
   }
 
-  static create(
-    resolveClient: WebhookClickHouseClientResolver,
-  ): WebhookEventsClickHouseRepository {
+  static create(resolveClient: WebhookClickHouseClientResolver): WebhookEventsClickHouseRepository {
     return new WebhookEventsClickHouseRepository(resolveClient);
   }
 
@@ -144,9 +128,7 @@ export class WebhookEventsClickHouseRepository extends WebhookEventsRepositoryPo
     return decodeCursor(encoded);
   }
 
-  static tryParseEventId(
-    id: string,
-  ): { gatewayRequestId: string; statuses: string[] } | null {
+  static tryParseEventId(id: string): { gatewayRequestId: string; statuses: string[] } | null {
     return parseEventId(id);
   }
 
@@ -195,9 +177,7 @@ export class WebhookEventsClickHouseRepository extends WebhookEventsRepositoryPo
       query_params: queryParams,
       format: "JSONEachRow",
     });
-    const rows = ((await result.json()) as Array<Record<string, unknown>>).map(
-      mapSpendEventRow,
-    );
+    const rows = ((await result.json()) as Array<Record<string, unknown>>).map(mapSpendEventRow);
     const last = rows.at(-1);
     return {
       rows,

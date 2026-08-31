@@ -5,6 +5,7 @@ import {
   type PulledUsageCostStatus,
 } from "@langwatch/enterprise-governance-contract";
 import type { PulledUsageRatePort } from "../ports/pulled-usage-rate.port";
+import { usdToNanoUsd } from "../adapters/nano-usd.adapter";
 
 export type PulledUsageQuantities = {
   tokensInput: number;
@@ -32,33 +33,6 @@ export type PulledUsagePrice = {
   costStatus: PulledUsageCostStatus;
 };
 
-const DECIMAL_PATTERN = /^([+-]?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/;
-
-function usdToNanoUsd(value: string): bigint {
-  const raw = value.trim();
-  const match = DECIMAL_PATTERN.exec(raw);
-  const [, sign = "", whole = "", fraction = "", exponent] = match ?? [];
-  if (!match || (whole === "" && fraction === "")) {
-    throw new Error(`Not a decimal money amount: ${JSON.stringify(raw)}`);
-  }
-  const digits = whole + fraction;
-  const pointAt = whole.length + Number(exponent ?? 0) + 9;
-  let nanoDigits: string;
-  let remainder: string;
-  if (pointAt <= 0) {
-    nanoDigits = "0";
-    remainder = "0".repeat(-pointAt) + digits;
-  } else if (pointAt >= digits.length) {
-    nanoDigits = digits + "0".repeat(pointAt - digits.length);
-    remainder = "";
-  } else {
-    nanoDigits = digits.slice(0, pointAt);
-    remainder = digits.slice(pointAt);
-  }
-  const nano = BigInt(nanoDigits) + (/^[5-9]/.test(remainder) ? 1n : 0n);
-  return sign === "-" ? -nano : nano;
-}
-
 export class PulledUsagePricingService {
   private constructor(private readonly rates: PulledUsageRatePort) {}
 
@@ -69,10 +43,7 @@ export class PulledUsagePricingService {
   price(input: PulledUsagePriceInput): PulledUsagePrice {
     if (input.basis === PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED) {
       const exact = usdToNanoUsd(input.costUsd);
-      if (
-        exact > BigInt(Number.MAX_SAFE_INTEGER) ||
-        exact < -BigInt(Number.MAX_SAFE_INTEGER)
-      ) {
+      if (exact > BigInt(Number.MAX_SAFE_INTEGER) || exact < -BigInt(Number.MAX_SAFE_INTEGER)) {
         throw new Error(
           `pulled usage cost ${input.costUsd} exceeds the exactly-representable nano-USD range; refusing to round a money figure`,
         );

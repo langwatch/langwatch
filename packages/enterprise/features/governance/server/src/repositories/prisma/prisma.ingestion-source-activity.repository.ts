@@ -40,48 +40,9 @@ import {
   type GovernanceClickHouseClientPort,
   type GovernanceClickHouseResolverPort,
 } from "../../ports/ingestion-source-activity.port";
+import { nanoUsdToDecimalString, usdToNanoUsd } from "../../adapters/nano-usd.adapter";
 
 const INTERNAL_GOVERNANCE_PROJECT_KIND = "internal_governance";
-const NANO_PER_USD = 1_000_000_000n;
-const NANO_DIGITS = 9;
-const DECIMAL_PATTERN = /^([+-]?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/;
-
-function usdToNanoUsd(value: { toString(): string }): bigint {
-  const raw = value.toString().trim();
-  const match = DECIMAL_PATTERN.exec(raw);
-  const [, sign = "", whole = "", fraction = "", exponent] = match ?? [];
-  if (!match || (whole === "" && fraction === "")) {
-    throw new Error(`Not a decimal money amount: ${JSON.stringify(raw)}`);
-  }
-  const digits = whole + fraction;
-  const pointAt = whole.length + Number(exponent ?? 0) + NANO_DIGITS;
-  const nanoDigits =
-    pointAt <= 0
-      ? "0"
-      : pointAt >= digits.length
-        ? digits + "0".repeat(pointAt - digits.length)
-        : digits.slice(0, pointAt);
-  const remainder =
-    pointAt <= 0
-      ? "0".repeat(-pointAt) + digits
-      : pointAt >= digits.length
-        ? ""
-        : digits.slice(pointAt);
-  const nano = BigInt(nanoDigits) + (/^[5-9]/.test(remainder) ? 1n : 0n);
-  return sign === "-" ? -nano : nano;
-}
-
-function nanoUsdToDecimalString(nano: bigint | number): string {
-  const exact = typeof nano === "bigint" ? nano : BigInt(Math.round(nano));
-  const magnitude = exact < 0n ? -exact : exact;
-  const fraction = (magnitude % NANO_PER_USD)
-    .toString()
-    .padStart(NANO_DIGITS, "0")
-    .replace(/0+$/, "");
-  const sign = exact < 0n ? "-" : "";
-  const whole = magnitude / NANO_PER_USD;
-  return fraction === "" ? `${sign}${whole}` : `${sign}${whole}.${fraction}`;
-}
 
 interface SummaryResult {
   spentThisWindowUsd: number;

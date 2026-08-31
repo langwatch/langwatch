@@ -15,6 +15,7 @@ import { eventMatches, type WebhookEndpointView } from "@langwatch/enterprise-we
 import { WebhookBatchPlanner, type PendingEnvelope } from "./webhook-batch-planner.service";
 import { WebhookEnvelopeService, type WebhookSpendEventRow } from "./webhook-envelope.service";
 import type { WebhookDestinationConfig } from "./webhook-destination.service";
+import { nanoUsdToDecimalString } from "../adapters/nano-usd.adapter";
 
 export const GATEWAY_SPEND_ADMITTED_EVENT_TYPE = "lw.gateway.spend.admitted" as const;
 export const GATEWAY_SPEND_CONFIRMED_EVENT_TYPE = "lw.gateway.spend.confirmed" as const;
@@ -128,14 +129,6 @@ export interface WebhookDeliveryEndpointService {
     },
   ): Promise<void>;
   pruneDeliveries(now?: Date): Promise<number>;
-}
-
-function nanoUsdToDecimalString(value: number): string {
-  const negative = value < 0;
-  const absolute = BigInt(Math.abs(value));
-  const whole = absolute / 1_000_000_000n;
-  const fraction = (absolute % 1_000_000_000n).toString().padStart(9, "0").replace(/0+$/, "");
-  return `${negative ? "-" : ""}${whole}${fraction ? `.${fraction}` : ""}`;
 }
 
 const logger = createLogger("langwatch:webhooks:delivery-process");

@@ -34,46 +34,7 @@
  */
 
 import { z } from "zod";
-
-const NANO_PER_USD = 1_000_000_000n;
-const DECIMAL_PATTERN = /^([+-]?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/;
-
-function usdToNanoUsd(value: { toString(): string }): bigint {
-  const raw = value.toString().trim();
-  const match = DECIMAL_PATTERN.exec(raw);
-  const [, sign = "", whole = "", fraction = "", exponent] = match ?? [];
-  if (!match || (whole === "" && fraction === "")) {
-    throw new Error(`Not a decimal money amount: ${JSON.stringify(raw)}`);
-  }
-  const digits = whole + fraction;
-  const pointAt = whole.length + Number(exponent ?? 0) + 9;
-  const nanoDigits =
-    pointAt <= 0
-      ? "0"
-      : pointAt >= digits.length
-        ? digits + "0".repeat(pointAt - digits.length)
-        : digits.slice(0, pointAt);
-  const remainder =
-    pointAt <= 0
-      ? "0".repeat(-pointAt) + digits
-      : pointAt >= digits.length
-        ? ""
-        : digits.slice(pointAt);
-  const nano = BigInt(nanoDigits) + (/^[5-9]/.test(remainder) ? 1n : 0n);
-  return sign === "-" ? -nano : nano;
-}
-
-function nanoUsdToDecimalString(nano: bigint | number): string {
-  const exact = typeof nano === "bigint" ? nano : BigInt(Math.round(nano));
-  const magnitude = exact < 0n ? -exact : exact;
-  const fraction = (magnitude % NANO_PER_USD)
-    .toString()
-    .padStart(9, "0")
-    .replace(/0+$/, "");
-  const sign = exact < 0n ? "-" : "";
-  const whole = magnitude / NANO_PER_USD;
-  return fraction === "" ? `${sign}${whole}` : `${sign}${whole}.${fraction}`;
-}
+import { nanoUsdToDecimalString, usdToNanoUsd } from "../adapters/nano-usd.adapter";
 
 /**
  * How far back a cost-bearing source keeps reading questions it has already
@@ -531,11 +492,7 @@ function foldPricedLine({
  * several lines for the same hour, and a statement that ran through an hour
  * boundary is cut into one line per hour it was awake in. Both are summed.
  */
-function allocateWarehouseCost({
-  rows,
-}: {
-  rows: WarehouseCostRow[];
-}): WarehouseCostAllocation {
+function allocateWarehouseCost({ rows }: { rows: WarehouseCostRow[] }): WarehouseCostAllocation {
   const nanoByStatementId = new Map<string, PricedTotals>();
   const skipped: WarehouseCostSkip[] = [];
   // Both sides of the hold are tracked per HOUR, not per statement. A statement
@@ -666,11 +623,7 @@ function heldStatements({
  * must not be dragged forward to it, which would skip everything in between and
  * then report a complete sweep.
  */
-function costReadFloorMs({
-  sinceMs,
-  nowMs,
-  costEnabled,
-}: WarehouseCostReadFloorInput): number {
+function costReadFloorMs({ sinceMs, nowMs, costEnabled }: WarehouseCostReadFloorInput): number {
   if (!costEnabled) return sinceMs;
   return Math.min(sinceMs, nowMs - WAREHOUSE_COST_SETTLING_LAG_MS);
 }
@@ -708,9 +661,7 @@ function mergeWarehouseCost({
       continue;
     }
     into.set(statementId, {
-      costUsd: nanoUsdToDecimalString(
-        usdToNanoUsd(already.costUsd) + usdToNanoUsd(priced.costUsd),
-      ),
+      costUsd: nanoUsdToDecimalString(usdToNanoUsd(already.costUsd) + usdToNanoUsd(priced.costUsd)),
       hourTotalExecutionMs: (
         BigInt(already.hourTotalExecutionMs) + BigInt(priced.hourTotalExecutionMs)
       ).toString(),
