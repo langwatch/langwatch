@@ -1408,6 +1408,14 @@
             ]
           },
           {
+            "group": "Query",
+            "pages": [
+              "api-reference/query/overview",
+              "api-reference/query/discover-the-queryable-langwatchql-schema",
+              "api-reference/query/run-a-langwatchql-query"
+            ]
+          },
+          {
             "group": "Secrets",
             "pages": [
               "api-reference/secrets/overview",

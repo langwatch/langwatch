@@ -1,31 +1,50 @@
 /**
- * The LangWatchQL analytics SQL endpoints, driven through the real HTTP app.
+ * The tenancy-isolation, AST/SQL-policy, dedup, time-window and
+ * content-gating proofs, driven through `POST /api/v1/query`.
  *
- * Every request here goes through the shipped Hono app — auth middleware, RBAC,
- * validator, service, executor — against a ClickHouse 25.10 container carrying
- * the *shipped* migrations, the shipped provisioning, and the shipped views.
- * Nothing is stubbed between the request and the database except the executor's
- * connection details, which is the only thing a deployment would supply.
+ * This is the suite `analytics-sql/__tests__/lwqlRestApi.integration.test.ts`
+ * used to carry, ported here because the door it drove no longer exists:
+ * issue #7565 removed the old per-protocol REST endpoints in favor of this
+ * one. The proofs themselves are unchanged — every request
+ * still goes through the shipped Hono app against a real ClickHouse 25.10
+ * container carrying the shipped migrations, provisioning and views, and
+ * nothing between the request and the database is stubbed except the
+ * executor's connection details, which is the only thing a deployment would
+ * supply. Two things changed with the transport:
  *
- * That matters for one claim in particular. The isolation proof already showed
- * the row policies hold when a query is issued *directly* as the restricted
- * identity; what it could not show is that the gateway actually uses that
- * identity, sends the right tenant capability, and never substitutes the
- * application's own connection. Those are gateway facts, and this is where they
- * are checked — through the public surface, as the issue's own security-test
- * rule demands.
+ *  - **The body.** A request body IS the query (`{sql, parameters?, ...}`) and
+ *    a success reply IS the result — nothing is wrapped. Every refusal, at
+ *    every status, carries this app's canonical error body at the top level
+ *    (`body.error.code`), the same shape every other REST family answers with.
+ *    See `./queryRestApi.integration.test.ts` for where that contract is
+ *    proved directly.
+ *  - **No project id anywhere.** The old routes carried `:projectId` in the
+ *    path but the tenant always came from the credential; this family has no
+ *    project id in its paths at all, so the "another project named in the
+ *    path" cases from the old suite have nothing left to prove and are
+ *    dropped rather than reinterpreted.
  *
- * Three habits carried over from the proof suite, for the same reasons:
+ * The experimental feature switch the old routes were gated behind
+ * (`RELEASE_LWQL_WORKBENCH`) gates none of this family's routes — that gate
+ * lived in `analytics-sql`'s route guards, which were removed with the routes
+ * they guarded. The switch is left in the environment during this suite's
+ * `beforeAll` only because the workbench UI still reads it for its own
+ * surface; nothing in this file exercises it, and the flag-on/flag-off cases
+ * the old suite carried are dropped rather than ported.
  *
- *  - Every "no foreign rows" claim is paired with an administrator-side control
- *    proving the foreign rows exist. An absence check passes against an empty
- *    database.
+ * Three habits carried over from the old suite, for the same reasons:
+ *
+ *  - Every "no foreign rows" claim is paired with an administrator-side
+ *    control proving the foreign rows exist. An absence check passes against
+ *    an empty database.
  *  - Every refusal is asserted by `code`, never by message prose.
  *  - Two tenants throughout, both seeded, so an isolation assertion has
  *    something to fail on.
  *
  * @see specs/analytics/lwql-api.feature
+ * @see ./queryRestApi.integration.test.ts — the request/error contract this suite relies on but does not re-prove
  * @see ~/server/analytics/lwql — the service under test
+ * @see https://github.com/langwatch/langwatch/issues/7565#issuecomment-5424087900
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -67,7 +86,6 @@ import {
 } from "~/server/app-layer/subscription/plan-provider";
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import { prisma } from "~/server/db";
-import { getFeatureFlagStore } from "~/server/featureFlag";
 import { pinTimezone } from "~/test-utils/pinTimezone";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
@@ -391,7 +409,7 @@ async function seedTenant({
   });
 }
 
-describe("given the LangWatchQL analytics SQL REST endpoints", () => {
+describe("given the /api/v1/query REST family's service, isolation and policy proofs", () => {
   let harness: LangWatchQLClickHouseHarness;
   let postgres: LangWatchQLPostgresHarness;
   let organization: Organization;
@@ -403,61 +421,84 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
   let database: string;
   let facts: string;
 
-  const queryPath = (project: Project) =>
-    `/api/v1/projects/${project.id}/analytics/query/clickhouse`;
-  const schemaPath = (project: Project) =>
-    `/api/v1/projects/${project.id}/analytics/schema`;
+  /** The two paths this family serves. */
+  const runPath = "/api/v1/query";
+  const schemaPath = "/api/v1/query/schema";
 
-  const post = (
-    project: Project,
-    body: unknown,
-    options: { path?: string; token?: string | null } = {},
-  ) =>
-    app.request(options.path ?? queryPath(project), {
+  const authHeaders = (token?: string | null) => ({
+    "Content-Type": "application/json",
+    ...(token === null ? {} : { "X-Auth-Token": token ?? "" }),
+  });
+
+  const post = (body: unknown, options: { token?: string | null } = {}) =>
+    app.request(runPath, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(options.token === null
-          ? {}
-          : { "X-Auth-Token": options.token ?? project.apiKey }),
-      },
-      body: JSON.stringify(body),
+      headers: authHeaders(options.token),
+      body: typeof body === "string" ? body : JSON.stringify(body),
     });
 
-  /** Runs SQL through the endpoint and asserts it succeeded before returning it. */
-  const run = async (
+  /** Reads a response as a success, asserting the status before returning it. */
+  const succeed = async (response: Response, what: string) => {
+    const body = (await response.json()) as Record<string, any>;
+    if (response.status !== 200) {
+      throw new Error(`${what} failed: ${JSON.stringify(body)}`);
+    }
+    if (body.error !== undefined) {
+      throw new Error(`${what} answered an error`);
+    }
+    return body as Record<string, any>;
+  };
+
+  /**
+   * Runs SQL and asserts it succeeded before returning the result. Extended
+   * past the pattern file's two-argument helper because this suite's
+   * parameterized-query and time-window cases need to bind
+   * `parameters`/`timeWindow`/`granularitySeconds` — the old suite's `run`
+   * took a positional `parameters` argument for the same reason.
+   */
+  /** Runs a whole request body as one project, asserting it answered. */
+  const runBody = async (project: Project, body: Record<string, unknown>) =>
+    succeed(await post(body, { token: project.apiKey }), "POST /api/v1/query");
+
+  const run = (
     project: Project,
     sql: string,
     parameters?: Record<string, unknown>,
-  ) => {
-    const response = await post(project, {
-      sql,
-      ...(parameters ? { parameters } : {}),
-    });
-    const body = (await response.json()) as Record<string, any>;
-    expect(response.status, `query failed: ${JSON.stringify(body)}`).toBe(200);
-    return body;
-  };
+  ) => runBody(project, { sql, ...(parameters ? { parameters } : {}) });
 
-  /** Runs SQL expected to be refused, and returns the parsed error body. */
+  /**
+   * Runs SQL expected to be refused, and returns the canonical error body.
+   *
+   * One read for every status: this family answers the canonical envelope at
+   * the top level whichever layer refused, so a 401 and a 422 are read
+   * identically.
+   */
   const refuse = async (project: Project, sql: string) => {
-    const response = await post(project, { sql });
+    const response = await post({ sql }, { token: project.apiKey });
     const body = (await response.json()) as Record<string, any>;
-    expect(
-      response.status,
-      `expected a refusal, got ${response.status}: ${JSON.stringify(body)}`,
-    ).toBeGreaterThanOrEqual(400);
-    return body;
+    if (response.status < 400) {
+      throw new Error(
+        `expected a refusal, got ${response.status}: ${JSON.stringify(body)}`,
+      );
+    }
+    const canonical = body.error;
+    if (canonical === undefined) {
+      throw new Error(
+        `no canonical error body found in: ${JSON.stringify(body)}`,
+      );
+    }
+    return canonical as Record<string, any>;
   };
 
-  /** Reads the schema endpoint as one project, asserting it answered. */
-  const readSchema = async (project: Project) => {
-    const response = await app.request(schemaPath(project), {
-      headers: { "X-Auth-Token": project.apiKey },
-    });
-    expect(response.status).toBe(200);
-    return (await response.json()) as Record<string, any>;
-  };
+  /** Reads the queryable schema as one project, asserting it answered. */
+  const readSchema = async (project: Project) =>
+    succeed(
+      await app.request(schemaPath, {
+        method: "GET",
+        headers: authHeaders(project.apiKey),
+      }),
+      "GET /api/v1/query/schema",
+    );
 
   /**
    * Puts the process-wide service back to what a deployment would build.
@@ -506,17 +547,17 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
   };
 
   beforeAll(async () => {
-    // The surface ships behind the experimental feature switch, off by
-    // default. The suite runs with it on via the flag's own env override —
-    // the same lever a deployment uses — and the flag-off cases below unset
-    // it for exactly one request.
+    // Left on for parity with the suite this one supersedes and because the
+    // workbench UI still reads it for its own surface — but no route in this
+    // family gates on it: the gate that used to sit in front of the old REST
+    // routes was removed along with them.
     process.env.RELEASE_LWQL_WORKBENCH = "1";
 
     // The catalog spans both residences; the LangWatchQL views over the
     // PostgreSQL-resident half read engine tables that must exist first.
     postgres = await startLangWatchQLPostgres();
     harness = await startLangWatchQLClickHouse({
-      suite: "restapi",
+      suite: "queryapi-svc",
       facts: "migrated",
     });
     database = harness.names.database;
@@ -612,7 +653,9 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
         tenantId: project.id,
       })) {
         const result = await postgres.asAdmin(statement);
-        expect(result.exitCode, result.stderr).toBe(0);
+        if (result.exitCode !== 0) {
+          throw new Error(result.stderr);
+        }
       }
     }
 
@@ -648,110 +691,6 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
     }
     await harness?.stop();
     await postgres?.stop();
-  });
-
-  describe("when the LangWatchQL feature switch is off for the project", () => {
-    /** Runs one request with the switch off, whatever else the suite set. */
-    const withFlagOff = async <T>(request: () => Promise<T>): Promise<T> => {
-      process.env.RELEASE_LWQL_WORKBENCH = "0";
-      try {
-        return await request();
-      } finally {
-        process.env.RELEASE_LWQL_WORKBENCH = "1";
-      }
-    };
-
-    /** @scenario "The whole surface stays dark until the experimental feature switch is on" */
-    it("refuses the query endpoint with the named refusal and touches no data", async () => {
-      const response = await withFlagOff(async () =>
-        post(openProject, { sql: "SELECT 1" }),
-      );
-      const body = (await response.json()) as Record<string, any>;
-      expect(response.status).toBe(403);
-      expect(body.error.code).toBe("lwql_not_enabled");
-    });
-
-    /** @scenario "The whole surface stays dark until the experimental feature switch is on" */
-    it("refuses the schema endpoint the same way", async () => {
-      const response = await withFlagOff(async () =>
-        app.request(schemaPath(openProject), {
-          headers: { "X-Auth-Token": openProject.apiKey },
-        }),
-      );
-      const body = (await response.json()) as Record<string, any>;
-      expect(response.status).toBe(403);
-      expect(body.error.code).toBe("lwql_not_enabled");
-    });
-  });
-
-  describe("when a stored organization rule is the only thing enabling the switch", () => {
-    /**
-     * No environment override, a row whose default is off, and one rule keyed
-     * to an organization: the surface is on exactly for that organization's
-     * projects. Runs against the real store, so this is the whole chain —
-     * gate resolves the project's organization, rule matches it.
-     */
-    const withOrganizationRule = async <T>(
-      organizationId: string,
-      request: () => Promise<T>,
-    ): Promise<T> => {
-      const store = getFeatureFlagStore();
-      await store.setRules(
-        "release_lwql_workbench",
-        [{ match: { organizationId }, enabled: true }],
-        null,
-      );
-      // Both env doors must be shut or the rule is never consulted: the
-      // dev .env force-enables this flag, and force-enable wins before the
-      // store — leaving it in place turns both of these tests vacuous.
-      const forceEnable = process.env.FEATURE_FLAG_FORCE_ENABLE;
-      delete process.env.RELEASE_LWQL_WORKBENCH;
-      delete process.env.FEATURE_FLAG_FORCE_ENABLE;
-      try {
-        return await request();
-      } finally {
-        process.env.RELEASE_LWQL_WORKBENCH = "1";
-        if (forceEnable !== undefined) {
-          process.env.FEATURE_FLAG_FORCE_ENABLE = forceEnable;
-        }
-        await store.clear("release_lwql_workbench", null);
-      }
-    };
-
-    /** @scenario "An organization-scoped rule can switch the workbench on" */
-    it("turns the surface on for that organization's projects", async () => {
-      const response = await withOrganizationRule(organization.id, async () =>
-        app.request(schemaPath(openProject), {
-          headers: { "X-Auth-Token": openProject.apiKey },
-        }),
-      );
-      expect(response.status).toBe(200);
-    });
-
-    /** @scenario "An organization-scoped rule can switch the workbench on" */
-    it("leaves the surface off for a project outside the rule's organization", async () => {
-      const response = await withOrganizationRule(
-        "org_someone_else",
-        async () =>
-          app.request(schemaPath(openProject), {
-            headers: { "X-Auth-Token": openProject.apiKey },
-          }),
-      );
-      const body = (await response.json()) as Record<string, any>;
-      expect(response.status).toBe(403);
-      expect(body.error.code).toBe("lwql_not_enabled");
-    });
-  });
-
-  describe("when the caller is not authenticated", () => {
-    it("refuses the request before any query is considered", async () => {
-      const response = await post(
-        openProject,
-        { sql: "SELECT 1" },
-        { token: null },
-      );
-      expect(response.status).toBe(401);
-    });
   });
 
   describe("when an authenticated client submits native ClickHouse SQL", () => {
@@ -890,16 +829,16 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
 
     /** Rows a period-aware statement returns for one window. */
     const countFor = async (timeWindow: { start: Date; end: Date }) => {
-      const response = await post(openProject, {
+      const result = await runBody(openProject, {
         sql: PERIOD_SQL(),
         timeWindow,
       });
-      const body = (await response.json()) as Record<string, any>;
-      expect(response.status, `query failed: ${JSON.stringify(body)}`).toBe(
-        200,
-      );
-      expect(body.followsTimeWindow).toBe(true);
-      return Number(body.rows[0].value);
+      if (result.followsTimeWindow !== true) {
+        throw new Error(
+          `expected the reply to report followsTimeWindow: true, got ${JSON.stringify(result.followsTimeWindow)}`,
+        );
+      }
+      return Number(result.rows[0].value);
     };
 
     /**
@@ -917,10 +856,9 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
           `AND OccurredAt < toDateTime64('2026-02-20 12:01:00', 3)`,
       );
       const count = Number(body.rows[0].value);
-      expect(
-        count,
-        "nothing is seeded in the window under test",
-      ).toBeGreaterThan(0);
+      if (count <= 0) {
+        throw new Error("nothing is seeded in the window under test");
+      }
       return count;
     };
 
@@ -952,15 +890,18 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
 
     /** @scenario "A caller that supplies a reserved period parameter itself is refused" */
     it("refuses a request that pins the window under its own parameters", async () => {
-      const response = await post(openProject, {
-        sql: PERIOD_SQL(),
-        parameters: { period_start: "2020-01-01 00:00:00" },
-        timeWindow: { start: second(-60), end: second(60) },
-      });
+      const response = await post(
+        {
+          sql: PERIOD_SQL(),
+          parameters: { period_start: "2020-01-01 00:00:00" },
+          timeWindow: { start: second(-60), end: second(60) },
+        },
+        { token: openProject.apiKey },
+      );
       const body = (await response.json()) as Record<string, any>;
 
       expect(response.status).toBe(400);
-      expect(body.error.code).toBe("lwql_reserved_parameter_supplied");
+      expect(body.error?.code).toBe("lwql_reserved_parameter_supplied");
     });
 
     /** @scenario "A statement with no period parameters runs, and says so" */
@@ -1033,32 +974,22 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
         `SELECT count() FROM ${database}.traces ` +
           `SETTINGS ${harness.names.tenantSetting} = 'anything'`,
       );
-      expect(body.error.code).toBe("lwql_not_permitted");
+      expect(body.code).toBe("lwql_not_permitted");
       expect(
-        body.error.meta.violations.map((violation: any) => violation.code),
+        body.meta.violations.map((violation: any) => violation.code),
       ).toContain("SETTINGS_CLAUSE");
     });
 
     /** @scenario "Tenant scope derives exclusively from authenticated server context" */
-    it("reports another project named in the path as not found", async () => {
-      const response = await post(
-        openProject,
-        { sql: `SELECT count() FROM ${database}.traces` },
-        { path: queryPath(gatedProject), token: openProject.apiKey },
-      );
-      expect(response.status).toBe(404);
-      expect(((await response.json()) as any).error.code).toBe(
-        "project_not_found",
-      );
-    });
-
-    /** @scenario "Tenant scope derives exclusively from authenticated server context" */
     it("ignores a tenant named in the request body", async () => {
-      const response = await post(openProject, {
-        sql: `SELECT DISTINCT TenantId FROM ${database}.traces`,
-        projectId: gatedProject.id,
-        tenantId: gatedProject.id,
-      });
+      const response = await post(
+        {
+          sql: `SELECT DISTINCT TenantId FROM ${database}.traces`,
+          projectId: gatedProject.id,
+          tenantId: gatedProject.id,
+        },
+        { token: openProject.apiKey },
+      );
       const body = (await response.json()) as any;
       expect(response.status, JSON.stringify(body)).toBe(200);
       expect(body.rows.map((row: any) => row.TenantId)).toEqual([
@@ -1072,9 +1003,9 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
         openProject,
         `SELECT count() FROM ${facts}.trace_summaries`,
       );
-      expect(body.error.code).toBe("lwql_not_permitted");
+      expect(body.code).toBe("lwql_not_permitted");
       expect(
-        body.error.meta.violations.map((violation: any) => violation.code),
+        body.meta.violations.map((violation: any) => violation.code),
       ).toContain("TABLE_NOT_ALLOWED");
     });
   });
@@ -1093,9 +1024,9 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
         const body = await refuse(openProject, sql);
         // The coded refusal is itself the evidence: a rejection by the database
         // arrives as a translated or unknown failure, never as this code.
-        expect(body.error.code, sql).toBe("lwql_not_permitted");
+        expect(body.code, sql).toBe("lwql_not_permitted");
         expect(
-          body.error.meta.violations.map((violation: any) => violation.code),
+          body.meta.violations.map((violation: any) => violation.code),
           sql,
         ).toContain("TABLE_FUNCTION");
       }
@@ -1109,9 +1040,9 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
         "SELECT * FROM information_schema.tables",
       ]) {
         const body = await refuse(openProject, sql);
-        expect(body.error.code, sql).toBe("lwql_not_permitted");
+        expect(body.code, sql).toBe("lwql_not_permitted");
         expect(
-          body.error.meta.violations.map((violation: any) => violation.code),
+          body.meta.violations.map((violation: any) => violation.code),
           sql,
         ).toContain("SCHEMA_NOT_ALLOWED");
       }
@@ -1125,9 +1056,9 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
         [`SELECT 1; SELECT 2`, "MULTIPLE_STATEMENTS"],
       ] as const) {
         const body = await refuse(openProject, sql);
-        expect(body.error.code, sql).toBe("lwql_not_permitted");
+        expect(body.code, sql).toBe("lwql_not_permitted");
         expect(
-          body.error.meta.violations.map((violation: any) => violation.code),
+          body.meta.violations.map((violation: any) => violation.code),
           sql,
         ).toContain(expected);
       }
@@ -1135,8 +1066,8 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
 
     it("reports unparseable text as its own failure, not as a policy refusal", async () => {
       const body = await refuse(openProject, "SELECT FROM WHERE )(");
-      expect(body.error.code).toBe("lwql_unparseable");
-      expect(body.error.meta.violations[0].code).toBe("PARSE_FAILED");
+      expect(body.code).toBe("lwql_unparseable");
+      expect(body.meta.violations[0].code).toBe("PARSE_FAILED");
     });
   });
 
@@ -1156,9 +1087,9 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
 
       for (const sql of positions(database)) {
         const body = await refuse(gatedProject, sql);
-        expect(body.error.code, sql).toBe("lwql_not_permitted");
+        expect(body.code, sql).toBe("lwql_not_permitted");
         expect(
-          body.error.meta.violations.map((violation: any) => violation.code),
+          body.meta.violations.map((violation: any) => violation.code),
           sql,
         ).toContain("GATED_COLUMN");
       }
@@ -1166,7 +1097,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
       // The same queries for a caller who holds the permission, so the
       // refusals are about the gate rather than about the SQL.
       for (const sql of positions(database)) {
-        const response = await post(openProject, { sql });
+        const response = await post({ sql }, { token: openProject.apiKey });
         expect(response.status, sql).toBe(200);
       }
     });
@@ -1175,10 +1106,12 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
       const sql = `SELECT * FROM ${database}.traces LIMIT 1`;
       const refused = await refuse(gatedProject, sql);
       expect(
-        refused.error.meta.violations.map((violation: any) => violation.code),
+        refused.meta.violations.map((violation: any) => violation.code),
       ).toContain("WILDCARD_NOT_ALLOWED");
 
-      expect((await post(openProject, { sql })).status).toBe(200);
+      expect((await post({ sql }, { token: openProject.apiKey })).status).toBe(
+        200,
+      );
     });
 
     it("still answers ungated questions for the gated caller", async () => {
@@ -1190,7 +1123,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
     });
   });
 
-  describe("when the schema endpoint is called", () => {
+  describe("when the schema door is called", () => {
     /** @scenario "The schema endpoint names which permission unlocks each gated column" */
     it("names the permission that unlocks each withheld column, per caller", async () => {
       const permitted = await readSchema(openProject);
@@ -1230,24 +1163,17 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
     });
 
     it("publishes an example query the caller can actually run", async () => {
-      const response = await app.request(schemaPath(gatedProject), {
-        headers: { "X-Auth-Token": gatedProject.apiKey },
-      });
-      const schema = (await response.json()) as any;
+      const schema = await readSchema(gatedProject);
 
       for (const dataset of schema.datasets) {
-        const result = await post(gatedProject, { sql: dataset.exampleSql });
-        expect(result.status, `${dataset.name}: ${dataset.exampleSql}`).toBe(
+        const response = await post(
+          { sql: dataset.exampleSql },
+          { token: gatedProject.apiKey },
+        );
+        expect(response.status, `${dataset.name}: ${dataset.exampleSql}`).toBe(
           200,
         );
       }
-    });
-
-    it("reports another project named in the path as not found", async () => {
-      const response = await app.request(schemaPath(gatedProject), {
-        headers: { "X-Auth-Token": openProject.apiKey },
-      });
-      expect(response.status).toBe(404);
     });
 
     /** @scenario "Authenticated client discovers its LangWatchQL schema scoped to its own permissions" */
@@ -1417,9 +1343,9 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
         const sql = `SELECT count() AS value FROM ${database}.transcripts`;
 
         const refused = await refuse(gatedProject, sql);
-        expect(refused.error.code).toBe("lwql_not_permitted");
+        expect(refused.code).toBe("lwql_not_permitted");
         expect(
-          refused.error.meta.violations.map((violation: any) => violation.code),
+          refused.meta.violations.map((violation: any) => violation.code),
         ).toContain("TABLE_NOT_ALLOWED");
 
         // The permitted caller reads it, which is what proves the refusal was
@@ -1500,7 +1426,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
           `SELECT CapturedInput FROM ${database}.traces`,
         );
         expect(
-          refused.error.meta.violations.map((violation: any) => violation.code),
+          refused.meta.violations.map((violation: any) => violation.code),
         ).toContain("GATED_COLUMN");
       } finally {
         outage.mockRestore();
@@ -1542,14 +1468,17 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
 
     /** @scenario "A parameterized query missing a bound value is refused before execution" */
     it("refuses before execution when a declared parameter has no value", async () => {
-      const response = await post(openProject, {
-        sql: parameterized,
-        parameters: { name: "checkout" },
-      });
+      const response = await post(
+        {
+          sql: parameterized,
+          parameters: { name: "checkout" },
+        },
+        { token: openProject.apiKey },
+      );
       const body = (await response.json()) as any;
       expect(response.status).toBe(400);
-      expect(body.error.code).toBe("lwql_parameter_missing");
-      expect(body.error.meta.parameters).toEqual(["floor"]);
+      expect(body.error?.code).toBe("lwql_parameter_missing");
+      expect(body.error?.meta?.parameters).toEqual(["floor"]);
     });
   });
 
@@ -1634,9 +1563,9 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
         `SELECT ${call(harness.names.tenantSetting)} AS value FROM ${database}.traces`,
       );
 
-      expect(body.error.code).toBe("lwql_not_permitted");
+      expect(body.code).toBe("lwql_not_permitted");
       expect(
-        body.error.meta.violations.map((violation: any) => violation.code),
+        body.meta.violations.map((violation: any) => violation.code),
       ).toEqual(["FUNCTION_NOT_ALLOWED"]);
     });
 
@@ -1787,10 +1716,13 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
 
       const bodies = await Promise.all(
         probes.map(async (probe) => {
-          const response = await post(gatedProject, {
-            sql: probe.sql,
-            ...(probe.parameters ? { parameters: probe.parameters } : {}),
-          });
+          const response = await post(
+            {
+              sql: probe.sql,
+              ...(probe.parameters ? { parameters: probe.parameters } : {}),
+            },
+            { token: gatedProject.apiKey },
+          );
           expect(
             response.status === 200,
             `${probe.sql} — expected ${probe.answered ? "an answer" : "a refusal"}, got ${response.status}`,
@@ -1853,13 +1785,37 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
   });
 
   describe("when a PostgreSQL SQL endpoint is looked for", () => {
+    /**
+     * The old suite proved this by requesting two per-protocol REST paths
+     * (`.../analytics/query/postgres`, `.../analytics/query/postgresql`) and
+     * finding neither routed anywhere. This family publishes no per-protocol
+     * path at all, so what still carries the scenario's claim is that the old
+     * paths really are gone rather than moved (proven against this app, which
+     * no longer mounts the routes that used to answer them), and that no
+     * postgres-flavored sibling was minted alongside the two doors it does
+     * publish — a query always executes through the LangWatchQL/ClickHouse
+     * surface, never a raw PostgreSQL connection.
+     */
     /** @scenario "No PostgreSQL native-SQL execution endpoint exists" */
     it("finds none", async () => {
       for (const path of [
         `/api/v1/projects/${openProject.id}/analytics/query/postgres`,
         `/api/v1/projects/${openProject.id}/analytics/query/postgresql`,
+        `/api/v1/analytics/query/postgres`,
+        `/api/v1/analytics/query/postgresql`,
+        // The sibling a postgres door would most plausibly be minted as, had
+        // one been added beside this family's own two paths.
+        `/api/v1/query/postgres`,
+        `/api/v1/query/postgresql`,
       ]) {
-        const response = await post(openProject, { sql: "SELECT 1" }, { path });
+        const response = await app.request(path, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Auth-Token": openProject.apiKey,
+          },
+          body: JSON.stringify({ sql: "SELECT 1" }),
+        });
         expect(response.status, path).toBe(404);
       }
     });
