@@ -930,10 +930,11 @@ Rule: The organization-wide usage read is RBAC-scoped and numbers only
     And nothing in the refusal says whose workspace it is
 
 # The question is organization-wide, so the v1 door authenticates at the
-# organization: an sk-lw user-bound key alone, with no project named anywhere.
-# The personal-workspace indirection on the legacy path existed only to recover
-# the calling user, which the key itself already carries.
-Rule: The v1 usage read needs only an organization credential that names its user
+# organization: an sk-lw organization key alone, with no project named
+# anywhere. The personal-workspace indirection on the legacy path existed only
+# to recover a calling user, which a user-bound key already carries — and a
+# service key, which carries none, is scoped by its own bindings instead.
+Rule: The v1 usage read needs only an organization credential
 
   @integration
   Scenario: An organization key reads pull request usage without naming a project
@@ -961,14 +962,32 @@ Rule: The v1 usage read needs only an organization credential that names its use
     Then the bound project's rows carry token counts
     And every cost in the answer is absent
 
-  # An organization service key authenticates fine but answers for nobody:
-  # the rollup is the CALLER's permission cut, and a key with no user has no
-  # caller to cut by. Refused with its own stable code, not a generic 401.
+  # An organization service key acts as nobody — it is the credential a
+  # continuous integration job holds, where there is no person to mint a key
+  # for — so its scope is its own bindings alone: the projects they grant
+  # traces:view appear, and cost only where they grant cost:view. The read is
+  # still recorded, attributed to the key identity rather than an invented
+  # person.
   @integration
-  Scenario: An organization key with no bound user cannot read pull request usage
-    Given an organization API key created without a user
-    When the v1 pull request usage is read
-    Then the refusal carries a named code saying a user-bound API key is required
+  Scenario: An organization service key reads the rollup scoped by its own bindings
+    Given an organization API key created without a user, bound organization-wide
+    When the v1 pull request usage is read with that key
+    Then the answer covers every project the bindings may view
+    And the read is recorded against the key identity, the organization and the pull request
+
+  @integration
+  Scenario: A service key without the cost grant reads tokens with every cost null
+    Given a service key whose bindings grant viewing but not pricing
+    When the v1 pull request usage is read with that key
+    Then the rows carry token counts
+    And every cost in the answer is absent
+
+  @integration
+  Scenario: A service key bound to one project sees only that project's rows
+    Given a service key bound to one project of the organization
+    When the v1 pull request usage is read with that key
+    Then only the bound project's rows appear
+    And the other project is absent from the whole answer
 
   # A legacy project key carries no organization and no user, so it cannot
   # authenticate at the organization door at all. The refusal names the

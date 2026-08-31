@@ -3,11 +3,13 @@
  * @integration
  *
  * The v1 organization-key door on the pull-request usage rollup:
- * `GET /api/v1/coding-agent/pull-request-usage`. A user-bound organization API
- * key answers with the caller's organization-wide rollup and names no project
- * anywhere in the request — and the answer is cut by BOTH halves of the
- * credential: the holder's own permissions and the key's binding ceiling. A
- * deliberately narrowed key reads with its own scope, never its holder's.
+ * `GET /api/v1/coding-agent/pull-request-usage`. An organization API key
+ * answers with the caller's organization-wide rollup and names no project
+ * anywhere in the request. A user-bound key's answer is cut by BOTH halves of
+ * the credential — the holder's own permissions and the key's binding ceiling
+ * — so a deliberately narrowed key reads with its own scope, never its
+ * holder's. A service key, which owns no user, reads with its bindings alone
+ * and is audited as the key identity.
  *
  * The refusal cases live in pull-request-usage-v1-refusals.integration.test.ts;
  * the shared fixture in pullRequestUsageV1Harness.ts.
@@ -126,6 +128,68 @@ describe("Feature: Pull request usage v1 REST API", () => {
         });
         expect(body.rows[0].totalTokens).toBeGreaterThan(0);
         expect(body.totals.costUsd).toBeNull();
+      });
+    });
+  });
+
+  describe("given an organization service key bound organization-wide", () => {
+    describe("when the usage is read with that key", () => {
+      /** @scenario "An organization service key reads the rollup scoped by its own bindings" */
+      it("answers every project the bindings may view and records the read against the key", async () => {
+        const res = await app.request(USAGE_PATH, {
+          headers: bearer({ token: fixture.serviceToken }),
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(
+          body.rows.map((row: { projectId: string }) => row.projectId).sort(),
+        ).toEqual([fixture.projectAId, fixture.projectBId].sort());
+        expect(body.totals.costUsd).not.toBeNull();
+
+        // A service key acts as nobody, so the record names the key identity
+        // — one stable string per credential, never an invented person.
+        const recorded = await latestAuditRow();
+        expect(recorded?.userId).toBe(`apikey:${fixture.serviceKeyId}`);
+        expect(recorded?.targetId).toBe("github.com/acme/widgets#1");
+      });
+    });
+  });
+
+  describe("given a service key whose bindings grant viewing but not pricing", () => {
+    describe("when the usage is read with that key", () => {
+      /** @scenario "A service key without the cost grant reads tokens with every cost null" */
+      it("answers token counts with every cost absent", async () => {
+        const res = await app.request(USAGE_PATH, {
+          headers: bearer({ token: fixture.serviceViewerToken }),
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.rows).toHaveLength(2);
+        for (const row of body.rows) {
+          expect(row.totalTokens).toBeGreaterThan(0);
+          expect(row.costUsd).toBeNull();
+        }
+        expect(body.totals.costUsd).toBeNull();
+      });
+    });
+  });
+
+  describe("given a service key bound to one project of the organization", () => {
+    describe("when the usage is read with that key", () => {
+      /** @scenario "A service key bound to one project sees only that project's rows" */
+      it("answers only the bound project", async () => {
+        const res = await app.request(USAGE_PATH, {
+          headers: bearer({ token: fixture.serviceProjectToken }),
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(
+          body.rows.map((row: { projectId: string }) => row.projectId),
+        ).toEqual([fixture.projectAId]);
+        expect(JSON.stringify(body)).not.toContain(fixture.projectBId);
       });
     });
   });

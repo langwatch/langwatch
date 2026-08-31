@@ -60,8 +60,9 @@ export interface CallerProjectScope {
  * the whole point of a restricted key — so a scope resolved from the holder
  * alone would let a deliberately narrowed key read with the holder's full
  * reach. `check` is `PermissionsService.hasApiKeyPermission`
- * (`effective = key bindings ∩ owning user's bindings`), injected as a
- * function so this module does not depend on the app layer.
+ * (`effective = key bindings ∩ owning user's bindings`; for a service key,
+ * which owns no user, the key's bindings alone), injected as a function so
+ * this module does not depend on the app layer.
  */
 export interface CallerApiKeyCeiling {
   apiKeyId: string;
@@ -80,12 +81,24 @@ export async function resolveCallerProjectScope({
   prisma = defaultPrisma,
   apiKeyCeiling,
 }: {
-  userId: string;
+  /**
+   * The person the caller acts as, or null for an organization service key,
+   * which acts as nobody: its scope is then its bindings alone, so
+   * `apiKeyCeiling` is required with it.
+   */
+  userId: string | null;
   organizationId: string;
   prisma?: PrismaClient;
   /** Present when the caller is an API-key credential. @see CallerApiKeyCeiling */
   apiKeyCeiling?: CallerApiKeyCeiling;
 }): Promise<CallerProjectScope> {
+  if (userId === null && !apiKeyCeiling) {
+    // A mis-wired route, not a caller mistake: with neither a person nor a
+    // key there is nobody to scope the answer by. Fails plain (ADR-045).
+    throw new Error(
+      "resolveCallerProjectScope needs an apiKeyCeiling when no user is given — a service key's scope is its bindings",
+    );
+  }
   const projects = await prisma.project.findMany({
     where: { team: { organizationId }, archivedAt: null },
     select: {
@@ -100,30 +113,18 @@ export async function resolveCallerProjectScope({
     return { permittedProjectIds: [], costProjectIds: [], projects: {} };
   }
 
-  const projectTeamId = Object.fromEntries(
-    projects.map((project) => [project.id, project.teamId]),
-  );
-  const ctx = {
+  const { viewable, priceable } = await userPermissionCuts({
     prisma,
-    // Minimal session shape: the resolver only reads user.id.
-    session: { user: { id: userId }, expires: "" } satisfies Session,
-  };
-  const args = {
+    userId,
     organizationId,
-    teamIds: [],
-    projectIds: projects.map((project) => project.id),
-    projectTeamId,
-  };
-  const [viewable, priceable] = await Promise.all([
-    batchScopePermissions(ctx, { ...args, permission: "traces:view" }),
-    batchScopePermissions(ctx, { ...args, permission: "cost:view" }),
-  ]);
+    projects,
+  });
 
-  const userPermitted = projects.filter(
-    (project) => viewable.projects.get(project.id) === true,
-  );
+  const userPermitted = projects.filter((project) => viewable(project.id));
   // The credential's own ceiling, applied after the holder's cut: both halves
-  // must allow a project before it appears, and both before it is priced.
+  // must allow a project before it appears, and both before it is priced. For
+  // a service key the holder's cut passes everything through, so the ceiling
+  // — the key's own bindings — is the whole of the answer.
   const permitted = await withinApiKeyCeiling({
     apiKeyCeiling,
     userId,
@@ -131,9 +132,7 @@ export async function resolveCallerProjectScope({
     projects: userPermitted,
     permission: "traces:view",
   });
-  const userPriceable = permitted.filter(
-    (project) => priceable.projects.get(project.id) === true,
-  );
+  const userPriceable = permitted.filter((project) => priceable(project.id));
   const priceableWithinCeiling = await withinApiKeyCeiling({
     apiKeyCeiling,
     userId,
@@ -153,6 +152,58 @@ export async function resolveCallerProjectScope({
     permittedProjectIds: permitted.map((project) => project.id),
     costProjectIds: priceableWithinCeiling.map((project) => project.id),
     projects: projectDisplayRecord({ permitted, ownerNames }),
+  };
+}
+
+/**
+ * The holder's own per-project permissions, as predicates by project id —
+ * or an everything-passes cut when the credential acts as nobody.
+ *
+ * A service key has no user half to intersect: its bindings, checked by the
+ * ceiling, are the whole of what it may read, so the user cut must not
+ * subtract anything. A person's cut resolves through the same
+ * `batchScopePermissions` the in-app surfaces use, in a fixed number of
+ * queries, so the REST answer and the page's answer cannot drift.
+ */
+async function userPermissionCuts({
+  prisma,
+  userId,
+  organizationId,
+  projects,
+}: {
+  prisma: PrismaClient;
+  userId: string | null;
+  organizationId: string;
+  projects: Array<{ id: string; teamId: string }>;
+}): Promise<{
+  viewable: (projectId: string) => boolean;
+  priceable: (projectId: string) => boolean;
+}> {
+  if (userId === null) {
+    const everything = () => true;
+    return { viewable: everything, priceable: everything };
+  }
+
+  const ctx = {
+    prisma,
+    // Minimal session shape: the resolver only reads user.id.
+    session: { user: { id: userId }, expires: "" } satisfies Session,
+  };
+  const args = {
+    organizationId,
+    teamIds: [],
+    projectIds: projects.map((project) => project.id),
+    projectTeamId: Object.fromEntries(
+      projects.map((project) => [project.id, project.teamId]),
+    ),
+  };
+  const [viewable, priceable] = await Promise.all([
+    batchScopePermissions(ctx, { ...args, permission: "traces:view" }),
+    batchScopePermissions(ctx, { ...args, permission: "cost:view" }),
+  ]);
+  return {
+    viewable: (projectId) => viewable.projects.get(projectId) === true,
+    priceable: (projectId) => priceable.projects.get(projectId) === true,
   };
 }
 
@@ -205,7 +256,7 @@ async function withinApiKeyCeiling<P extends { id: string; teamId: string }>({
   permission,
 }: {
   apiKeyCeiling: CallerApiKeyCeiling | undefined;
-  userId: string;
+  userId: string | null;
   organizationId: string;
   projects: P[];
   permission: "traces:view" | "cost:view";
