@@ -37,6 +37,16 @@ pnpm vitest run _tests/scenarios.scenario.test.ts -t "creates voice scenario tes
 - `skills/.env` with `LANGWATCH_API_KEY` (a project key of a project you can fill with test runs) and `OPENAI_API_KEY` (the fixture agent and the judge use it).
 - The local CLI built once: `pnpm --filter langwatch build`. The sub Claude runs `sdks/typescript/dist/cli/index.js`.
 
+### Tests that need an organization login
+
+`cli-projects-api-keys.scenario.test.ts` drives `langwatch projects` and
+`langwatch api-keys`. Both reach the whole organization, so the CLI refuses a
+project API key on them and reads the credential of `langwatch login`. The two
+scenarios run on that login and skip when the machine has none, so run
+`langwatch login` once before them. They also strip `LANGWATCH_API_KEY` from
+the sub Claude, and the probe that decides the skip runs the CLI in a directory
+of its own so `skills/.env` cannot answer for it.
+
 `KEEP_SKILL_TEST_WORKDIR=1` keeps the working directory under `.claude/tmp/skill-tests/` after the run, so the scenarios, the suite and the run the agent created can be read back with `langwatch run-plan list` from inside it.
 
 ### What "passing" actually means
