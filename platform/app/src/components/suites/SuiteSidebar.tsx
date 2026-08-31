@@ -40,6 +40,7 @@ import type {
   ExternalSetSummary,
   SuiteRunSummary,
 } from "~/server/scenarios/scenario-event.types";
+import { firstGrapheme } from "~/utils/firstGrapheme";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { SearchInput } from "../ui/SearchInput";
 import { ALL_RUNS_ID, toExternalSetSelection } from "./useSuiteRouting";
@@ -258,7 +259,7 @@ export function SuiteSidebar({
                     fontSize="xs"
                     fontWeight="bold"
                   >
-                    {suite.name.charAt(0).toUpperCase()}
+                    {firstGrapheme(suite.name).toUpperCase()}
                   </Center>
                 </IconButton>
               </Tooltip>
@@ -333,7 +334,7 @@ export function SuiteSidebar({
                       fontSize="xs"
                       fontWeight="bold"
                     >
-                      {extSet.scenarioSetId.charAt(0).toUpperCase()}
+                      {firstGrapheme(extSet.scenarioSetId).toUpperCase()}
                     </Center>
                   </IconButton>
                 </Tooltip>

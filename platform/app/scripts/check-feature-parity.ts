@@ -431,7 +431,6 @@ const LEGACY_INERT: string[] = [
   "specs/features/onboarding/primary-use-setting.feature",
   "specs/features/prompt-versions-cli.feature",
   "specs/features/secret-cli.feature",
-  "specs/features/suites/collapsible-suite-sidebar.feature",
   "specs/features/suites/footer-to-header-migration.feature",
   "specs/features/suites/inline-add-target-and-scenario-buttons.feature",
   "specs/features/suites/sidebar-summary-status.feature",
