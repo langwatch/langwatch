@@ -52,6 +52,13 @@ Feature: Anthropic-format transcripts reach the run conversation
     And the message keeps its top-level tool_calls when it declares them
 
   @unit
+  Scenario: A block the transcript cannot carry leaves a line naming it
+    Given a Claude Code transcript whose turn holds an image or a document block
+    When the adapter converts the transcript
+    Then the turn stays in the conversation
+    And a line names the type of the block that is not shown
+
+  @unit
   Scenario: The Claude Code adapter of the skill tests reports tool calls as AI SDK parts
     Given a Claude Code stream-json transcript with a thinking block, a text block, a tool_use block and its tool_result
     When the adapter converts the transcript

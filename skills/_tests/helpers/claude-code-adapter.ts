@@ -331,7 +331,13 @@ export function createClaudeCodeAgent({
 							.filter((message) => message !== null && "message" in message)
 							.map((message) => message.message);
 						const messages = claudeCodeTranscriptToModelMessages(rawMessages);
-						console.log("messages", JSON.stringify(messages, undefined, 2));
+						// Roles and counts only. The messages carry tool results,
+						// which can hold file contents and keys, and this runs on
+						// a shared stdout.
+						console.log(
+							`[claude-code adapter] ${messages.length} message(s): ` +
+								messages.map((message) => message.role).join(", "),
+						);
 
 						resolve(messages as any);
 					} else {
@@ -365,6 +371,110 @@ function toolResultText(content: unknown): string {
 }
 
 /**
+ * The blocks this converter reads. Anything else is a block Claude Code can
+ * write that the conversation has no part for, most often an `image` or a
+ * `document` a tool returned.
+ */
+const KNOWN_BLOCK_TYPES = new Set([
+	"text",
+	"thinking",
+	"redacted_thinking",
+	"tool_use",
+	"tool_result",
+]);
+
+/**
+ * What a block of any other type leaves in the conversation.
+ *
+ * The judge reads this transcript, so a block that silently disappeared would
+ * read as a turn the agent never took. A line naming the type keeps the turn
+ * whole and says what is not shown, which is the honest answer for a block the
+ * AI SDK message format cannot carry.
+ */
+function unsupportedBlockText(block: any): string {
+	return `[${String(block?.type ?? "unknown")} block, not shown in the transcript]`;
+}
+
+/** One assistant turn: the text it wrote, then the tool calls it made. */
+function assistantMessageFromBlocks({
+	content,
+	toolNamesByCallId,
+}: {
+	content: any[];
+	toolNamesByCallId: Map<string, string>;
+}): ModelMessage | null {
+	const texts: string[] = [];
+	const toolCalls: Record<string, unknown>[] = [];
+
+	for (const block of content) {
+		if (block?.type === "text" && typeof block.text === "string") {
+			texts.push(block.text);
+		} else if (block?.type === "tool_use") {
+			toolNamesByCallId.set(block.id, block.name);
+			toolCalls.push({
+				type: "tool-call",
+				toolCallId: block.id,
+				toolName: block.name,
+				input: block.input ?? {},
+			});
+		} else if (!KNOWN_BLOCK_TYPES.has(block?.type)) {
+			texts.push(unsupportedBlockText(block));
+		}
+		// Thinking blocks are dropped: they are not part of the conversation.
+	}
+
+	if (texts.length === 0 && toolCalls.length === 0) return null;
+	return {
+		role: "assistant",
+		content: [{ type: "text", text: texts.join("\n") }, ...toolCalls],
+	};
+}
+
+/**
+ * One user turn: the tool results it answers with become a `tool` message, and
+ * whatever text it carries becomes a `user` message after it.
+ */
+function userMessagesFromBlocks({
+	content,
+	toolNamesByCallId,
+}: {
+	content: any[];
+	toolNamesByCallId: Map<string, string>;
+}): ModelMessage[] {
+	const messages: ModelMessage[] = [];
+
+	const toolResults = content
+		.filter((block: any) => block?.type === "tool_result")
+		.map((block: any) => ({
+			type: "tool-result",
+			toolCallId: block.tool_use_id,
+			toolName: toolNamesByCallId.get(block.tool_use_id) ?? "tool",
+			output: {
+				type: block.is_error ? "error-text" : "text",
+				value: toolResultText(block.content),
+			},
+		}));
+	if (toolResults.length > 0) {
+		messages.push({ role: "tool", content: toolResults });
+	}
+
+	const texts = content
+		.filter(
+			(block: any) =>
+				(block?.type === "text" && typeof block.text === "string") ||
+				!KNOWN_BLOCK_TYPES.has(block?.type),
+		)
+		.map((block: any) =>
+			block?.type === "text" ? block.text : unsupportedBlockText(block),
+		);
+	if (texts.length > 0) {
+		messages.push({ role: "user", content: texts.join("\n") });
+	}
+
+	return messages;
+}
+
+/**
  * Converts the `claude -p --output-format stream-json` transcript into AI SDK
  * model messages, the format `@langwatch/scenario` works with.
  *
@@ -383,7 +493,9 @@ function toolResultText(content: unknown): string {
  * `toolCalls` next to a string content) followed by one `tool-call` part per
  * `tool_use` block. Each `tool_result` block becomes a `tool-result` part of a
  * `tool` message, with the tool name looked up from the call it answers.
- * Thinking blocks are dropped: they are not part of the conversation.
+ * Thinking blocks are dropped: they are not part of the conversation. A block
+ * of any other type, such as an `image` a tool returned, leaves a line naming
+ * its type rather than disappearing from the turn.
  */
 export function claudeCodeTranscriptToModelMessages(
 	rawMessages: any[],
@@ -395,68 +507,23 @@ export function claudeCodeTranscriptToModelMessages(
 		if (!raw || typeof raw !== "object") continue;
 		const { role, content } = raw;
 
-		if (role === "assistant") {
-			if (typeof content === "string") {
-				messages.push({ role: "assistant", content });
-				continue;
-			}
-			if (!Array.isArray(content)) continue;
+		if (role !== "assistant" && role !== "user") continue;
+		if (typeof content === "string") {
+			messages.push({ role, content });
+			continue;
+		}
+		if (!Array.isArray(content)) continue;
 
-			const texts: string[] = [];
-			const toolCalls: Record<string, unknown>[] = [];
-			for (const block of content) {
-				if (block?.type === "text" && typeof block.text === "string") {
-					texts.push(block.text);
-				} else if (block?.type === "tool_use") {
-					toolNamesByCallId.set(block.id, block.name);
-					toolCalls.push({
-						type: "tool-call",
-						toolCallId: block.id,
-						toolName: block.name,
-						input: block.input ?? {},
-					});
-				}
-			}
-			if (texts.length === 0 && toolCalls.length === 0) continue;
-			messages.push({
-				role: "assistant",
-				content: [{ type: "text", text: texts.join("\n") }, ...toolCalls],
+		if (role === "assistant") {
+			const message = assistantMessageFromBlocks({
+				content,
+				toolNamesByCallId,
 			});
+			if (message) messages.push(message);
 			continue;
 		}
 
-		if (role === "user") {
-			if (typeof content === "string") {
-				messages.push({ role: "user", content });
-				continue;
-			}
-			if (!Array.isArray(content)) continue;
-
-			const toolResults = content
-				.filter((block: any) => block?.type === "tool_result")
-				.map((block: any) => ({
-					type: "tool-result",
-					toolCallId: block.tool_use_id,
-					toolName: toolNamesByCallId.get(block.tool_use_id) ?? "tool",
-					output: {
-						type: block.is_error ? "error-text" : "text",
-						value: toolResultText(block.content),
-					},
-				}));
-			if (toolResults.length > 0) {
-				messages.push({ role: "tool", content: toolResults });
-			}
-
-			const texts = content
-				.filter(
-					(block: any) =>
-						block?.type === "text" && typeof block.text === "string",
-				)
-				.map((block: any) => block.text);
-			if (texts.length > 0) {
-				messages.push({ role: "user", content: texts.join("\n") });
-			}
-		}
+		messages.push(...userMessagesFromBlocks({ content, toolNamesByCallId }));
 	}
 
 	return messages;

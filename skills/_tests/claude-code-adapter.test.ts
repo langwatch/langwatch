@@ -87,6 +87,45 @@ describe("Claude Code transcript conversion", () => {
 		});
 	});
 
+	describe("when a turn holds a block the conversation has no part for", () => {
+		/** @scenario "A block the transcript cannot carry leaves a line naming it" */
+		it("keeps the turn and names the block instead of dropping it", () => {
+			const messages = claudeCodeTranscriptToModelMessages([
+				{
+					role: "assistant",
+					content: [
+						{ type: "text", text: "Here is the screenshot." },
+						{ type: "image", source: { type: "base64", data: "iVBORw0KGgo=" } },
+					],
+				},
+			]);
+
+			expect(messages[0]?.content).toEqual([
+				{
+					type: "text",
+					text: "Here is the screenshot.\n[image block, not shown in the transcript]",
+				},
+			]);
+		});
+
+		/** @scenario "A block the transcript cannot carry leaves a line naming it" */
+		it("names the block on a user turn as well", () => {
+			const messages = claudeCodeTranscriptToModelMessages([
+				{
+					role: "user",
+					content: [{ type: "document", source: { type: "text", data: "x" } }],
+				},
+			]);
+
+			expect(messages).toEqual([
+				{
+					role: "user",
+					content: "[document block, not shown in the transcript]",
+				},
+			]);
+		});
+	});
+
 	describe("when an assistant turn only calls tools", () => {
 		it("keeps an empty text part so the tool calls stay next to a string content", () => {
 			const messages = claudeCodeTranscriptToModelMessages([
