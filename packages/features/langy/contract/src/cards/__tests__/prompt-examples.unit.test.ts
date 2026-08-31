@@ -11,16 +11,25 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
-import {
-  DERIVED_SAFE_CARD_KINDS,
-  langyDerivedCardSchema,
-} from "../derived-safe";
+import { DERIVED_SAFE_CARD_KINDS, langyDerivedCardSchema } from "../derived-safe";
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-const promptPath = path.resolve(
-  here,
-  "../../../../../../services/langyagent/internal/assets/AGENTS.md",
-);
+/**
+ * Found by walking up to the workspace root rather than by counting `../`.
+ * The count was wrong from the move that put this file under `cards/`, and a
+ * path that cannot be read makes this suite fail to load — which reads as a
+ * broken test rather than as the unguarded prompt it actually was.
+ */
+function repoRoot(): string {
+  let dir = path.dirname(fileURLToPath(import.meta.url));
+  while (!fs.existsSync(path.join(dir, "pnpm-workspace.yaml"))) {
+    const parent = path.dirname(dir);
+    if (parent === dir) throw new Error("no workspace root above this test");
+    dir = parent;
+  }
+  return dir;
+}
+
+const promptPath = path.join(repoRoot(), "services/langyagent/internal/assets/AGENTS.md");
 
 /** The backticked `{"kind": …}` objects in the prompt's "Drawing data" bullets. */
 function documentedCardExamples(prompt: string): string[] {
