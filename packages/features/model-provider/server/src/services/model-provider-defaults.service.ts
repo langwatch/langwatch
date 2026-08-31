@@ -17,7 +17,6 @@ import type {
   ModelProviderRepository,
 } from "../ports/model-provider.port";
 import { ModelProviderAuthorizationService } from "./model-provider-authorization.service";
-import { modelProviderScopeNames } from "./model-provider-defaults-scopes.service";
 import type { ModelProviderScopeService } from "./model-provider-scope.service";
 
 type DefaultScope = { id: string; name: string };
@@ -61,7 +60,7 @@ export class ModelProviderDefaultsService {
       }),
     });
     const writable = await this.writableScopes(available, parsed.actorId);
-    const names = modelProviderScopeNames(available);
+    const names = this.scopeNames(available);
 
     return modelDefaultSnapshotSchema.parse({
       projectId: parsed.projectId,
@@ -105,15 +104,11 @@ export class ModelProviderDefaultsService {
       available,
       organizationId: context.organizationId,
     });
-    const excluded = new Set(
-      input.scopes.map((scope) => `${scope.scopeType}:${scope.scopeId}`),
+    const excluded = new Set(input.scopes.map((scope) => `${scope.scopeType}:${scope.scopeId}`));
+    const tiers = chain.filter((scope) => !excluded.has(`${scope.scopeType}:${scope.scopeId}`));
+    const configs = (await this.getConfigs(input.projectId, context.organizationId)).filter(
+      (config) => config.id !== input.excludeConfigId,
     );
-    const tiers = chain.filter(
-      (scope) => !excluded.has(`${scope.scopeType}:${scope.scopeId}`),
-    );
-    const configs = (
-      await this.getConfigs(input.projectId, context.organizationId)
-    ).filter((config) => config.id !== input.excludeConfigId);
     const inherited = await this.resolveInherited({
       projectId: input.projectId,
       configs,
@@ -123,9 +118,7 @@ export class ModelProviderDefaultsService {
     return { inherited, referenceScope: reference };
   }
 
-  async tryGetResolved(
-    input: ModelDefaultResolveInput,
-  ): Promise<ModelDefaultEffective | null> {
+  async tryGetResolved(input: ModelDefaultResolveInput): Promise<ModelDefaultEffective | null> {
     const parsed = modelDefaultResolveInputSchema.parse({
       projectId: input.projectId,
       featureKey: input.featureKey,
@@ -147,6 +140,21 @@ export class ModelProviderDefaultsService {
     return parsed.featureKey === "langy.chat"
       ? (snapshot.effective["prompt.create_default"] ?? null)
       : null;
+  }
+
+  /** Every scope the caller can reach, by id, for labelling a snapshot. */
+  private scopeNames(available: {
+    organization: { id: string; name: string } | null;
+    teams: Array<{ id: string; name: string }>;
+    projects: Array<{ id: string; name: string }>;
+  }): Map<string, string> {
+    return new Map([
+      ...(available.organization
+        ? [[available.organization.id, available.organization.name] as const]
+        : []),
+      ...available.teams.map((scope) => [scope.id, scope.name] as const),
+      ...available.projects.map((scope) => [scope.id, scope.name] as const),
+    ]);
   }
 
   private async visibleConfigs(
@@ -220,13 +228,7 @@ export class ModelProviderDefaultsService {
     const inherited: ModelDefaultInheritedValues["inherited"] = {};
     for (const key of keys) {
       const role = features.find((feature) => feature.key === key)?.role ?? key;
-      const configured = this.resolveConfigured(
-        input.configs,
-        input.tiers,
-        key,
-        role,
-        false,
-      );
+      const configured = this.resolveConfigured(input.configs, input.tiers, key, role, false);
       inherited[key] = configured ?? (await this.inferDefault(input.projectId, key));
     }
     for (const feature of features) {
@@ -296,9 +298,7 @@ export class ModelProviderDefaultsService {
     expandModel: boolean,
   ): ModelDefaultEffective | null {
     const scopeIds = new Set(
-      chain
-        .filter((scope) => scope.scopeType === tier.type)
-        .map((scope) => scope.scopeId),
+      chain.filter((scope) => scope.scopeType === tier.type).map((scope) => scope.scopeId),
     );
     if (scopeIds.size === 0) {
       return null;
@@ -306,9 +306,7 @@ export class ModelProviderDefaultsService {
 
     const configsAtTier = configs
       .filter((config) =>
-        config.scopes.some(
-          (scope) => scope.scopeType === tier.type && scopeIds.has(scope.scopeId),
-        ),
+        config.scopes.some((scope) => scope.scopeType === tier.type && scopeIds.has(scope.scopeId)),
       )
       .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
     for (const config of configsAtTier) {
@@ -467,9 +465,7 @@ function inheritedChain(input: {
 
   const chain = [reference];
   if (reference.scopeType === "PROJECT") {
-    const project = available.projects.find(
-      (candidate) => candidate.id === reference.scopeId,
-    );
+    const project = available.projects.find((candidate) => candidate.id === reference.scopeId);
     if (project?.teamId) {
       chain.push({ scopeType: "TEAM", scopeId: project.teamId });
     }
@@ -481,10 +477,7 @@ function inheritedChain(input: {
   return chain;
 }
 
-async function filterScopes<T>(
-  scopes: T[],
-  canKeep: (scope: T) => Promise<boolean>,
-): Promise<T[]> {
+async function filterScopes<T>(scopes: T[], canKeep: (scope: T) => Promise<boolean>): Promise<T[]> {
   const results = await Promise.all(
     scopes.map(async (scope) => ({ scope, keep: await canKeep(scope) })),
   );
