@@ -449,7 +449,11 @@ export type AuthzUpdateGrantInput = z.infer<typeof authzUpdateGrantInputSchema>;
 
 export const authzRevokeGrantInputSchema = z
   .object({
-    actor: authzGrantActorSchema,
+    // The same widening offboard carries: a system principal (SCIM de-enroll,
+    // a migration) revokes under its own name, and writeActor already renders
+    // it here identically. Accepting only { userId } was the asymmetry, not a
+    // rule.
+    actor: z.union([authzGrantActorSchema, actorSchema]),
     bindingId: z.string().min(1),
     organizationId: z.string().min(1),
   })

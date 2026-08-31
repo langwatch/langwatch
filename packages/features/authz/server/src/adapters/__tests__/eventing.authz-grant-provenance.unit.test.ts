@@ -158,14 +158,7 @@ describe("given a grant revoked through the grants service", () => {
       });
 
       await grants.revoke({
-        // `attach` and `offboard` widen their actor to `{ userId } | Actor`;
-        // `revoke` alone still takes the contract's bare `{ userId }`, even
-        // though `writeActor` renders a system principal here exactly as it
-        // does there — which is what this assertion pins. The cast is the
-        // asymmetry made visible rather than a claim about the runtime; it
-        // held silently while this file lived outside a typechecked test
-        // project.
-        actor: { type: "system", name: "scim" } as unknown as { userId: string },
+        actor: { type: "system", name: "scim" },
         bindingId: BINDING_ID,
         organizationId: ORG_ID,
       });
