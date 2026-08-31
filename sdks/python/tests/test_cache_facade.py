@@ -298,7 +298,7 @@ class TestMessages:
         )
         assert "whatever" not in str(raised.value)
 
-    # @scenario "A refusal read from the REST envelope names the field too"
+    # @scenario "A write refused for a bad time to live names that field too"
     def test_a_refusal_under_error_meta_names_the_rejected_field(self):
         # The body the production route answers, field for field.
         def handler(request: httpx.Request) -> httpx.Response:

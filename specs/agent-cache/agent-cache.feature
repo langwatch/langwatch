@@ -328,11 +328,10 @@ Feature: The agent cache
       When the agent reads the exception
       Then it names the field and what was expected of it
 
-    # The REST routes send the refusal under "error", with the reasons beside
-    # the fields they name in "meta". A reader that only looks at the top of
-    # the envelope finds no reason there and answers the bare code again.
+    # The platform gives the same refusal in more than one form. Every form
+    # must reach the caller with the reason, not with the bare code.
     @unit
-    Scenario: A refusal read from the REST envelope names the field too
-      Given the platform refuses a write and puts the reasons under error meta
+    Scenario: A write refused for a bad time to live names that field too
+      Given the platform refuses a write because the time to live is too small
       When the agent reads the exception
       Then it names the field and what was expected of it
