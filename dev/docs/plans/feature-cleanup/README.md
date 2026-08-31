@@ -639,3 +639,45 @@ comments now say why rather than naming a fiction.
 That is a third shape of the same underlying problem this tracker keeps
 recording: **the code moved and the thing describing it did not.** A path, a
 signature, an assertion satisfied by prose — and now a docblock.
+
+## Round: the citations (2026-08-31)
+
+The `@throws {SavedViewNotOwnedError}` finding suggested a sweep: comments
+that name something the repository does not have. Two ran.
+
+**`@throws` naming a class that does not exist** — one hit across every
+feature package, and it is `@throws {Error}`, which is fine. The saved-view
+one was the only real instance.
+
+**Spec citations** — 1,588 "Spec:" / "See" references to a `.feature` file in
+comments; **23 named a path that is not there.**
+
+Twelve were the wrong root. The repository has sixty-odd spec directories —
+`specs/`, `platform/app/specs/`, one per feature package, one per SDK — and
+these cited the top-level path for a file living in another. That is the
+"second specs root" trap in a new guise, and it is worth remembering that a
+basename search under `specs/` alone reports these as GONE when they are
+merely elsewhere. Repointed.
+
+Three more had genuinely moved and were confirmed **by their `Feature:` line**
+before repointing, never by name similarity. That mattered: `agent-issue-
+reports` looked like a rename of `agent-report-discovery` by name, and is
+not — the spec `bug-reports.ts` actually wants is "Bug Reports Intake".
+
+Five are left alone, and deliberately. Two sit in generated Prisma output.
+The other three name specs with no confident equivalent. **A confident
+pointer at the wrong spec is harder to notice than a broken one**, so a guess
+would have made them worse.
+
+### The spec that was cited but never written
+
+`saved-view.api.ts` has always opened with "Spec:
+packages/features/dashboard/specs/saved-views.feature". No such file existed,
+and the dashboard spec beside it covers the shared dashboard service without
+mentioning saved views. So the service's rules were written down nowhere.
+
+They are now — nine scenarios, each bound to a case from the previous round,
+`check:feature-parity` reporting 9/9. Written after the tests rather than
+before, which is not the order the repo asks for; the behaviour predates both,
+and a spec describing what the code does beats a citation of a file nobody
+wrote.
