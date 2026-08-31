@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { createHash } from "node:crypto";
 import type {
   Event,
   IntentContext,
   JsonValue,
-  NewOutboxMessage,
   ProcessManagerApplier,
   ProcessIntent,
   ProcessStore,
@@ -14,6 +12,7 @@ import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { eventMatches, type WebhookEndpointView } from "@langwatch/enterprise-webhook-contract";
+import { WebhookBatchPlanner, type PendingEnvelope } from "./webhook-batch-planner.service";
 import { WebhookEnvelopeService, type WebhookSpendEventRow } from "./webhook-envelope.service";
 import type { WebhookDestinationConfig } from "./webhook-destination.service";
 
@@ -169,7 +168,6 @@ function webhookRetryDelayMs({ attempt }: { attempt: number }): number {
 /** How soon a stream capped on in-flight rechecks, and the floor for a
  *  delay-armed wake. Batching never waits longer than the endpoint's own
  *  max_batch_delay_ms; this only bounds the retry cadence while capped. */
-export const WEBHOOK_FLUSH_RECHECK_MS = 500;
 /** Dispatched outbox rows older than this are pruned by maintenance. */
 const OUTBOX_ROW_RETENTION_MS = 24 * 60 * 60 * 1000;
 /** Maintenance cadence: the winner of the hourly CAS runs the sweeps. */
@@ -234,12 +232,6 @@ export const INITIAL_WEBHOOK_DELIVERY_STATE: WebhookDeliveryState = {
  *  on REPLAYED entries: the batch id hashes it in so a replay of
  *  already-delivered envelopes cannot collide with the historical
  *  batch's message key and silently no-op. */
-export interface PendingEnvelope {
-  envelope: SendBatchPayload["envelopes"][number];
-  appendedAtMs: number;
-  salt?: string;
-}
-
 /**
  * The per-endpoint stream instance (processKey `endpoint:<id>`), committed
  * directly through the ProcessStore by the deliver and flush executors.
@@ -415,102 +407,6 @@ function deliverPayloadToRow(payload: DeliverPayload): WebhookSpendEventRow {
   };
 }
 
-function batchIdFor(
-  endpointId: string,
-  entries: ReadonlyArray<{ envelope: { id: string }; salt?: string }>,
-): string {
-  const hash = createHash("sha256")
-    .update(entries.map((e) => (e.salt ? `${e.envelope.id}:${e.salt}` : e.envelope.id)).join(","))
-    .digest("hex")
-    .slice(0, 16);
-  return `${endpointId}:${hash}`;
-}
-
-/** The instant a buffered envelope stops being held by the coalescing
- *  delay. */
-function coalescingDeadline(entry: PendingEnvelope, endpoint: WebhookEndpointView): number {
-  return entry.appendedAtMs + endpoint.maxBatchDelayMs;
-}
-
-/**
- * Split the stream's buffer into the batches shippable right now and what
- * stays buffered, per the adopted delivery-controls design:
- * - a batch at max_batch_size ships immediately, delay never holds a full
- *   batch back;
- * - a partial batch ships once its oldest envelope has waited
- *   max_batch_delay_ms (zero means ship on arrival);
- * - nothing ships past max_in_flight pending sends, so a slow receiver
- *   accumulates buffer instead of parallel POSTs, and because full batches
- *   ship first the batch size CLIMBS toward its cap under backpressure,
- *   draining faster exactly when the receiver is behind.
- */
-function planEndpointBatches({
-  organizationId,
-  endpoint,
-  pending,
-  outstanding,
-  now,
-}: {
-  organizationId: string;
-  endpoint: WebhookEndpointView;
-  pending: readonly PendingEnvelope[];
-  outstanding: number;
-  now: number;
-}): {
-  messages: NewOutboxMessage[];
-  remaining: PendingEnvelope[];
-  inFlight: number;
-} {
-  const messages: NewOutboxMessage[] = [];
-  const remaining = [...pending];
-  let inFlight = outstanding;
-  while (
-    remaining.length > 0 &&
-    inFlight < endpoint.maxInFlight &&
-    (remaining.length >= endpoint.maxBatchSize ||
-      endpoint.maxBatchDelayMs === 0 ||
-      coalescingDeadline(remaining[0]!, endpoint) <= now)
-  ) {
-    const batchEntries = remaining.splice(0, endpoint.maxBatchSize);
-    const batch = batchEntries.map((e) => e.envelope);
-    const batchId = batchIdFor(endpoint.id, batchEntries);
-    messages.push({
-      messageKey: `send:${batchId}`,
-      intentType: "sendBatch",
-      // Envelope data is JSON by construction (spendRowToEnvelope emits
-      // only JSON primitives); the cast crosses the JsonValue boundary.
-      payload: {
-        organizationId,
-        endpointId: endpoint.id,
-        batchId,
-        envelopes: batch,
-      } as unknown as JsonValue,
-      traceCarrier: {},
-    });
-    inFlight++;
-  }
-  return { messages, remaining, inFlight };
-}
-
-/** Anything still buffered arms a wake: the coalescing deadline when the
- *  delay is holding it, a short recheck when the in-flight cap is. */
-function nextStreamWakeAt({
-  endpoint,
-  remaining,
-  inFlight,
-  now,
-}: {
-  endpoint: WebhookEndpointView;
-  remaining: readonly PendingEnvelope[];
-  inFlight: number;
-  now: number;
-}): number | null {
-  const oldest = remaining[0];
-  if (!oldest) return null;
-  if (inFlight >= endpoint.maxInFlight) return now + WEBHOOK_FLUSH_RECHECK_MS;
-  return Math.max(coalescingDeadline(oldest, endpoint), now + WEBHOOK_FLUSH_RECHECK_MS);
-}
-
 /**
  * The coalescing core shared by the deliver and flush executors: append an
  * envelope (when given) to the endpoint's buffered stream, then ship as
@@ -561,9 +457,9 @@ async function flushEndpointStream({
     (m) => m.intentType === "sendBatch" && m.status === "pending",
   ).length;
 
-  const { messages, remaining, inFlight } = planEndpointBatches({
+  const planner = WebhookBatchPlanner.for(endpoint);
+  const { messages, remaining, inFlight } = planner.plan({
     organizationId,
-    endpoint,
     pending,
     outstanding,
     now,
@@ -575,7 +471,7 @@ async function flushEndpointStream({
     sourceEventId: sourceEventId ?? null,
     expectedRevision: existing?.revision ?? 0,
     state: { pending: remaining },
-    nextWakeAt: nextStreamWakeAt({ endpoint, remaining, inFlight, now }),
+    nextWakeAt: planner.nextWakeAt({ remaining, inFlight, now }),
     messages,
     now,
   });

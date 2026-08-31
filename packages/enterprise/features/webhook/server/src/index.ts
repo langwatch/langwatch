@@ -60,7 +60,6 @@ export {
   GATEWAY_SPEND_SETTLED_EVENT_TYPE,
   INITIAL_WEBHOOK_DELIVERY_STATE,
   WEBHOOK_DELIVERY_PROCESS_NAME,
-  WEBHOOK_FLUSH_RECHECK_MS,
   WEBHOOK_RETRY_LADDER_MS,
   WEBHOOK_SEND_MAX_ATTEMPTS,
   type AdmitSpendCommandData,
@@ -70,7 +69,6 @@ export {
   type FailSpendCommandData,
   type FlushEndpointPayload,
   type GatewaySpendProcessingEvent,
-  type PendingEnvelope,
   type SendBatchPayload,
   type SettleSpendCommandData,
   type SpendAttribution,
@@ -80,6 +78,11 @@ export {
   type WebhookDeliveryState,
   type WebhookDispatchResult,
 } from "./services/webhook-delivery.service";
+export {
+  WebhookBatchPlanner,
+  WEBHOOK_FLUSH_RECHECK_MS,
+  type PendingEnvelope,
+} from "./services/webhook-batch-planner.service";
 export {
   WebhookEnvelopeService,
   type WebhookSpendEventRow,
