@@ -4,20 +4,21 @@ Feature: Scenario tests for skills quality assurance
   We want every skill to have scenario tests proving it works
   So that we can compound improvements with confidence and catch regressions
 
-  # All `@unimplemented` scenarios in this file describe live Claude
-  # Code-driven scenario tests under `skills/_tests/*.scenario.test.ts`
-  # (e.g. `tracing.scenario.test.ts`, `evaluations.scenario.test.ts`,
+  # The scenarios in this file describe live Claude Code-driven scenario
+  # tests under `skills/_tests/*.scenario.test.ts` (e.g.
+  # `tracing.scenario.test.ts`, `evaluations.scenario.test.ts`,
   # `level-up.scenario.test.ts`, `agent-performance.scenario.test.ts`,
-  # `prompts*.scenario.test.ts`, `scenarios.scenario.test.ts`). The
-  # tests exist and are skipped in CI (`it.skipIf(isCI)`) — they
-  # spawn an actual Claude Code agent against a fixture codebase.
+  # `prompts*.scenario.test.ts`, `scenarios.scenario.test.ts`). The tests
+  # spawn an actual Claude Code agent against a fixture codebase, so they
+  # are skipped in CI (`it.skipIf(isCI)`) and run on a developer machine.
   #
-  # The `check-feature-parity` script's DEFAULT_TEST_ROOTS does not
-  # include `skills/_tests/`, so JSDoc `@scenario` annotations in
-  # those files would not currently bind. Expanding the test roots
-  # is the right structural fix for this domain — tracked outside
-  # this PR. Until then, scenarios stay `@unimplemented` (with this
-  # justifying note) rather than being orphaned.
+  # `skills/_tests` is one of the parity checker's test roots, so a
+  # `@scenario` annotation in those files binds the scenario it names.
+  #
+  # What we ship in a skill is instructions, so the outcome a scenario
+  # here observes is what the coding agent does after reading them: the
+  # commands it runs and the code it writes. Naming them is the behavior,
+  # not an implementation detail of the test.
 
   Background:
     Given scenario tests live in skills/_tests/

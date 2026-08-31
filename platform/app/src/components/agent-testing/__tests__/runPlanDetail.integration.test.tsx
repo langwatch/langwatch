@@ -1023,8 +1023,11 @@ describe("<RunPlanDetail/>", () => {
       screen.getByText("Waiting for the first result"),
     ).toBeInTheDocument();
     expect(screen.queryByText("No run in this period")).not.toBeInTheDocument();
-    expect(screen.getByTestId("runs-sidebar-pending")).toBeInTheDocument();
+    // The rail row reads "Starting", which is the status the scenario names.
+    const pendingRow = screen.getByTestId("runs-sidebar-pending");
+    expect(pendingRow).toHaveTextContent("Starting");
 
+    // The same address serves an old link, so the widen offer stays.
     await user.click(screen.getByTestId("widen-period-button"));
     expect(props.setRelativePeriod).toHaveBeenCalledWith("90d");
   });

@@ -885,101 +885,103 @@ describe("Scenarios Skill", () => {
     1_800_000
   );
 
-  /** @scenario The scenarios skill proposes scenarios from the levers of a connected agent */
-  it.skipIf(isCI || !process.env.LANGWATCH_API_KEY || !process.env.OPENAI_API_KEY)(
-    "proposes platform scenarios from the run parameters of a connected agent",
-    async () => {
-      const tempFolder = createSkillTestWorkDir("langwatch-skill-scenarios-connected-");
-      console.log(`[scenarios connected dogfood] working dir: ${tempFolder}`);
+  describe("when the agent under test is connected to the platform", () => {
+    /** @scenario The scenarios skill proposes scenarios from the levers of a connected agent */
+    it.skipIf(isCI || !process.env.LANGWATCH_API_KEY || !process.env.OPENAI_API_KEY)(
+      "proposes platform scenarios from the run parameters of a connected agent",
+      async () => {
+        const tempFolder = createSkillTestWorkDir("langwatch-skill-scenarios-connected-");
+        console.log(`[scenarios connected dogfood] working dir: ${tempFolder}`);
 
-      copyFixtureToWorkDir({
-        fixtureSubpath: "python-connected-agent",
-        workingDirectory: tempFolder,
-      });
-      copySkillToWorkDir(tempFolder);
+        copyFixtureToWorkDir({
+          fixtureSubpath: "python-connected-agent",
+          workingDirectory: tempFolder,
+        });
+        copySkillToWorkDir(tempFolder);
 
-      const apiKey = process.env.LANGWATCH_API_KEY!.trim();
-      const endpoint = process.env.LANGWATCH_ENDPOINT?.trim();
-      fs.writeFileSync(
-        path.join(tempFolder, ".env"),
-        `LANGWATCH_API_KEY=${apiKey}\n` + (endpoint ? `LANGWATCH_ENDPOINT=${endpoint}\n` : ""),
-      );
+        const apiKey = process.env.LANGWATCH_API_KEY!.trim();
+        const endpoint = process.env.LANGWATCH_ENDPOINT?.trim();
+        fs.writeFileSync(
+          path.join(tempFolder, ".env"),
+          `LANGWATCH_API_KEY=${apiKey}\n` + (endpoint ? `LANGWATCH_ENDPOINT=${endpoint}\n` : ""),
+        );
 
-      // One agent row per test run, so two runs never read each other's levers.
-      const agentName = `skill-test-support-${Date.now().toString(36)}`;
-      const running = await startConnectedAgentFixture({
-        workingDirectory: tempFolder,
-        name: agentName,
-        env: process.env,
-      });
-
-      try {
-        const result = await scenario.run({
-          setId: SKILL_TESTS_SET_ID,
-          name: "Platform scenarios from a connected agent's levers",
-          description:
-            "The user's support agent is already connected to LangWatch from code and declares two " +
-            "run parameters, model (gpt-5-mini, gpt-5) and plan (free, pro). The scenarios skill must " +
-            "read those levers from the platform before proposing scenarios, write at least one " +
-            "scenario whose expected behavior depends on the plan, supply the plan as a run parameter " +
-            "rather than in the situation text, and offer a comparison across the model options.",
-          agents: [
-            createClaudeCodeAgent({ workingDirectory: tempFolder }),
-            scenario.userSimulatorAgent({ model: judgeModel }),
-            scenario.judgeAgent({
-              model: judgeModel,
-              criteria: [
-                "Agent read the scenarios skill instructions before acting",
-                "Agent read the connected agent's declared run parameters from the platform (langwatch agent get or agent list) before proposing scenarios",
-                "Agent proposed or created at least one scenario whose expected behavior depends on the customer plan, and named the plan as a run parameter (--param plan=... or a ?plan=... target suffix) instead of writing the plan into the situation text",
-                "Agent mentioned a comparison run across the model options (gpt-5-mini and gpt-5) or ran one",
-                "Agent created the scenarios on the platform with the langwatch CLI and did not write test files",
-                "If any langwatch command failed, the agent reported the failure instead of claiming the run succeeded",
-              ],
-            }),
-          ],
-          script: [
-            scenario.user(
-              `My support agent is already connected to LangWatch as "${agentName}" and it is online right now. ` +
-                "Add scenario tests for it on the platform: propose the scenarios, create them in a test suite " +
-                "called Support smoke, and run that test suite once against the agent. Do not write test files.",
-            ),
-            scenario.agent(),
-            (state) => {
-              toolCallFix(state);
-              assertSkillWasRead(state, "scenarios");
-
-              // Read from the commands that ran, not from the transcript, so a
-              // command the agent only talked about does not count.
-              const commands = bashCommands(state).join("\n");
-
-              expect(
-                commands,
-                "Expected the agent to read the connected agent's levers with `langwatch agent get` or `langwatch agent list`",
-              ).toMatch(/langwatch agent (get|list)/);
-              expect(
-                commands,
-                "Expected the agent to create scenarios on the platform with `langwatch scenario create`",
-              ).toContain("langwatch scenario create");
-              expect(
-                commands,
-                "Expected the plan lever to travel as a run parameter (--param plan= or ?plan=)",
-              ).toMatch(/--param plan=|\?plan=|&plan=/);
-              expect(
-                findTestFiles(tempFolder, /^test_.*\.py$|\.test\.ts$/).length,
-                "Expected no test files: the platform approach uses the CLI only",
-              ).toBe(0);
-            },
-            scenario.judge(),
-          ],
+        // One agent row per test run, so two runs never read each other's levers.
+        const agentName = `skill-test-support-${Date.now().toString(36)}`;
+        const running = await startConnectedAgentFixture({
+          workingDirectory: tempFolder,
+          name: agentName,
+          env: process.env,
         });
 
-        expect(result.success).toBe(true);
-      } finally {
-        await running.stop();
-        removeSkillTestWorkDir(tempFolder);
-      }
-    },
-    1_800_000
-  );
+        try {
+          const result = await scenario.run({
+            setId: SKILL_TESTS_SET_ID,
+            name: "Platform scenarios from a connected agent's levers",
+            description:
+              "The user's support agent is already connected to LangWatch from code and declares two " +
+              "run parameters, model (gpt-5-mini, gpt-5) and plan (free, pro). The scenarios skill must " +
+              "read those levers from the platform before proposing scenarios, write at least one " +
+              "scenario whose expected behavior depends on the plan, supply the plan as a run parameter " +
+              "rather than in the situation text, and offer a comparison across the model options.",
+            agents: [
+              createClaudeCodeAgent({ workingDirectory: tempFolder }),
+              scenario.userSimulatorAgent({ model: judgeModel }),
+              scenario.judgeAgent({
+                model: judgeModel,
+                criteria: [
+                  "Agent read the scenarios skill instructions before acting",
+                  "Agent read the connected agent's declared run parameters from the platform (langwatch agent get or agent list) before proposing scenarios",
+                  "Agent proposed or created at least one scenario whose expected behavior depends on the customer plan, and named the plan as a run parameter (--param plan=... or a ?plan=... target suffix) instead of writing the plan into the situation text",
+                  "Agent mentioned a comparison run across the model options (gpt-5-mini and gpt-5) or ran one",
+                  "Agent created the scenarios on the platform with the langwatch CLI and did not write test files",
+                  "If any langwatch command failed, the agent reported the failure instead of claiming the run succeeded",
+                ],
+              }),
+            ],
+            script: [
+              scenario.user(
+                `My support agent is already connected to LangWatch as "${agentName}" and it is online right now. ` +
+                  "Add scenario tests for it on the platform: propose the scenarios, create them in a test suite " +
+                  "called Support smoke, and run that test suite once against the agent. Do not write test files.",
+              ),
+              scenario.agent(),
+              (state) => {
+                toolCallFix(state);
+                assertSkillWasRead(state, "scenarios");
+
+                // Read from the commands that ran, not from the transcript, so a
+                // command the agent only talked about does not count.
+                const commands = bashCommands(state).join("\n");
+
+                expect(
+                  commands,
+                  "Expected the agent to read the connected agent's levers with `langwatch agent get` or `langwatch agent list`",
+                ).toMatch(/langwatch agent (get|list)/);
+                expect(
+                  commands,
+                  "Expected the agent to create scenarios on the platform with `langwatch scenario create`",
+                ).toContain("langwatch scenario create");
+                expect(
+                  commands,
+                  "Expected the plan lever to travel as a run parameter (--param plan= or ?plan=)",
+                ).toMatch(/--param plan=|\?plan=|&plan=/);
+                expect(
+                  findTestFiles(tempFolder, /^test_.*\.py$|\.test\.ts$/).length,
+                  "Expected no test files: the platform approach uses the CLI only",
+                ).toBe(0);
+              },
+              scenario.judge(),
+            ],
+          });
+
+          expect(result.success).toBe(true);
+        } finally {
+          await running.stop();
+          removeSkillTestWorkDir(tempFolder);
+        }
+      },
+      1_800_000
+    );
+  });
 });

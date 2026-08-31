@@ -44,28 +44,30 @@ export interface RunningConnectedAgent {
 	stop: () => Promise<void>;
 }
 
+/** The process of the fixture, with the output it has written so far. */
+interface AgentProcess {
+	child: ChildProcess;
+	/** Everything the fixture wrote on stdout and stderr, for a failure message. */
+	output: () => string;
+	hasExited: () => boolean;
+}
+
 /**
- * Starts the `python-connected-agent` fixture from `workingDirectory` and waits
- * until the platform lists it Online. The fixture reads `LANGWATCH_API_KEY`,
- * `OPENAI_API_KEY` and `AGENT_NAME` from the environment, so the caller passes
- * the keys and a name unique to this run: two test runs in the same project
- * must never share an agent row.
+ * Runs `support_agent.py` from `workingDirectory`.
  *
  * `uv run --with ...` installs the fixture's dependencies in an ephemeral
  * environment, with the `langwatch` package taken from `sdks/python` of this
  * checkout, so the test machine needs `uv` on PATH and nothing else.
  */
-export async function startConnectedAgentFixture({
+function spawnAgentProcess({
 	workingDirectory,
 	name,
 	env,
-	timeoutMs = 120_000,
 }: {
 	workingDirectory: string;
 	name: string;
 	env: Record<string, string | undefined>;
-	timeoutMs?: number;
-}): Promise<RunningConnectedAgent> {
+}): AgentProcess {
 	const child: ChildProcess = spawn(
 		"uv",
 		[
@@ -85,63 +87,125 @@ export async function startConnectedAgentFixture({
 			stdio: ["ignore", "pipe", "pipe"],
 		},
 	);
+
 	let output = "";
-	child.stdout?.on("data", (data: Buffer) => {
+	const collect = (data: Buffer) => {
 		output += data.toString();
-	});
-	child.stderr?.on("data", (data: Buffer) => {
-		output += data.toString();
-	});
+	};
+	child.stdout?.on("data", collect);
+	child.stderr?.on("data", collect);
+
 	let exited = false;
 	child.on("exit", () => {
 		exited = true;
 	});
 
+	return { child, output: () => output, hasExited: () => exited };
+}
+
+/**
+ * Polls the platform until it lists the agent Online, and fails with the
+ * fixture's own output when it never does: a fixture that died on a missing
+ * key would otherwise read as a plain timeout.
+ */
+async function waitForAgentOnline({
+	workingDirectory,
+	name,
+	agent,
+	timeoutMs,
+}: {
+	workingDirectory: string;
+	name: string;
+	agent: AgentProcess;
+	timeoutMs: number;
+}): Promise<AgentRow> {
 	const deadline = Date.now() + timeoutMs;
-	let row: AgentRow | undefined;
 	while (Date.now() < deadline) {
-		if (exited) {
-			throw new Error(`the connected agent fixture exited before it registered:\n${output}`);
+		if (agent.hasExited()) {
+			throw new Error(
+				`the connected agent fixture exited before it registered:\n${agent.output()}`,
+			);
 		}
+		let row: AgentRow | undefined;
 		try {
 			row = listAgents(workingDirectory).find(
-				(agent) => agent.name === name && agent.status === "online",
+				(candidate) => candidate.name === name && candidate.status === "online",
 			);
 		} catch {
+			// The CLI answers an error while the row is not on the platform yet.
 			row = undefined;
 		}
-		if (row) break;
+		if (row) return row;
 		await sleep(3_000);
 	}
-	if (!row) {
-		child.kill("SIGTERM");
-		throw new Error(
-			`the connected agent "${name}" did not come online within ${timeoutMs}ms:\n${output}`,
-		);
-	}
+	agent.child.kill("SIGTERM");
+	throw new Error(
+		`the connected agent "${name}" did not come online within ${timeoutMs}ms:\n${agent.output()}`,
+	);
+}
 
-	const id = row.id;
+/** Asks the process to stop, and kills it when it does not. */
+async function stopAgentProcess(agent: AgentProcess): Promise<void> {
+	if (agent.hasExited()) return;
+	agent.child.kill("SIGTERM");
+	await Promise.race([
+		new Promise((resolve) => agent.child.once("exit", resolve)),
+		sleep(10_000),
+	]);
+	if (!agent.hasExited()) agent.child.kill("SIGKILL");
+}
+
+/** Removes the row the run created, so a project never collects fixtures. */
+function deleteAgentRow({
+	workingDirectory,
+	id,
+}: {
+	workingDirectory: string;
+	id: string;
+}): void {
+	try {
+		execFileSync("node", [cliDistPath, "agent", "delete", id, "--format", "json"], {
+			cwd: workingDirectory,
+			encoding: "utf8",
+			stdio: ["ignore", "ignore", "ignore"],
+		});
+	} catch {
+		// The row stays Offline and the daily sweep archives it later.
+	}
+}
+
+/**
+ * Starts the `python-connected-agent` fixture from `workingDirectory` and waits
+ * until the platform lists it Online. The fixture reads `LANGWATCH_API_KEY`,
+ * `OPENAI_API_KEY` and `AGENT_NAME` from the environment, so the caller passes
+ * the keys and a name unique to this run: two test runs in the same project
+ * must never share an agent row.
+ */
+export async function startConnectedAgentFixture({
+	workingDirectory,
+	name,
+	env,
+	timeoutMs = 120_000,
+}: {
+	workingDirectory: string;
+	name: string;
+	env: Record<string, string | undefined>;
+	timeoutMs?: number;
+}): Promise<RunningConnectedAgent> {
+	const agent = spawnAgentProcess({ workingDirectory, name, env });
+	const row = await waitForAgentOnline({
+		workingDirectory,
+		name,
+		agent,
+		timeoutMs,
+	});
+
 	return {
 		name,
-		id,
+		id: row.id,
 		stop: async () => {
-			if (!exited) {
-				child.kill("SIGTERM");
-				await Promise.race([
-					new Promise((resolve) => child.once("exit", resolve)),
-					sleep(10_000),
-				]);
-				if (!exited) child.kill("SIGKILL");
-			}
-			try {
-				execFileSync("node", [cliDistPath, "agent", "delete", id, "--format", "json"], {
-					cwd: workingDirectory,
-					encoding: "utf8",
-					stdio: ["ignore", "ignore", "ignore"],
-				});
-			} catch {
-				// The row stays Offline and the daily sweep archives it later.
-			}
+			await stopAgentProcess(agent);
+			deleteAgentRow({ workingDirectory, id: row.id });
 		},
 	};
 }

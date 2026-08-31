@@ -24,6 +24,7 @@ import { SuiteRunService } from "~/server/app-layer/suites/suite-run.service";
 import { prisma } from "~/server/db";
 import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
 import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/commands";
+import { featureFlagService } from "~/server/featureFlag";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
@@ -692,6 +693,22 @@ describe("Feature: Suites REST API", () => {
     });
 
     describe("when the project reads Agent Testing", () => {
+      // The interface a project reads comes from a release flag, which the
+      // service resolves from environment overrides and persisted rows before
+      // the registry default. Pinning it is what makes the precondition of
+      // this block true rather than whatever the machine happens to carry.
+      let flagSpy: ReturnType<typeof vi.spyOn>;
+
+      beforeEach(() => {
+        flagSpy = vi
+          .spyOn(featureFlagService, "isEnabled")
+          .mockResolvedValue(true);
+      });
+
+      afterEach(() => {
+        flagSpy.mockRestore();
+      });
+
       it("answers with the plan address of that interface", async () => {
         const suite = await createSuite({ name: "Address Suite" });
 

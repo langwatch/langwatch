@@ -158,7 +158,7 @@ Then read back what the platform registered:
 langwatch agent get <agent-id> --format json
 ```
 
-The answer carries `environment`, `status`, `instances` (hostname, pid, SDK and version per process) and `parameters`: one entry per run parameter with `name`, `type`, `options` (the closed list from `Literal`, `Enum` or `z.enum`), `defaultValue` and `description`. Compare it with the signature. A parameter that is missing was read as a turn field or has no default; an option list that is missing means the annotation was not a `Literal`, an `Enum` or a `z.enum`. Fix the code and restart the process; the row updates on the next registration.
+The answer carries `environment`, `status`, `instances` (hostname, pid, SDK and version per process) and `parameters`: one entry per run parameter with `name`, `type`, `options` (the closed list from `Literal`, `Enum` or `z.enum`), `defaultValue` and `description`. Compare it with the signature. A parameter that is missing was read as a turn field; one with no default is still registered, as a required parameter every run has to supply. An option list that is missing means the annotation was not a `Literal`, an `Enum` or a `z.enum`. Fix the code and restart the process; the row updates on the next registration.
 
 ## Step 5: Run the first test suite
 
@@ -192,7 +192,7 @@ langwatch run-plan run --test-suite 'Smoke' \
   --name 'Smoke: model comparison' --format json
 ```
 
-`--param plan=pro` on the same command sets a value every target shares. The platform refuses a value outside the option list before anything is scheduled, and a name the agent does not declare is refused the same way, so read the names from `langwatch agent get` rather than from memory.
+`--param plan=pro` on the same command sets a value every target shares. The platform refuses a value outside the option list before anything is scheduled, and a name that neither the scenario nor the target agent declares is refused the same way, so read the names from `langwatch scenario get` and `langwatch agent get` rather than from memory.
 
 ## Step 6: Report the result
 

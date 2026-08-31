@@ -36291,7 +36291,7 @@ Then read back what the platform registered:
 langwatch agent get <agent-id> --format json
 ```
 
-The answer carries `environment`, `status`, `instances` (hostname, pid, SDK and version per process) and `parameters`: one entry per run parameter with `name`, `type`, `options` (the closed list from `Literal`, `Enum` or `z.enum`), `defaultValue` and `description`. Compare it with the signature. A parameter that is missing was read as a turn field or has no default; an option list that is missing means the annotation was not a `Literal`, an `Enum` or a `z.enum`. Fix the code and restart the process; the row updates on the next registration.
+The answer carries `environment`, `status`, `instances` (hostname, pid, SDK and version per process) and `parameters`: one entry per run parameter with `name`, `type`, `options` (the closed list from `Literal`, `Enum` or `z.enum`), `defaultValue` and `description`. Compare it with the signature. A parameter that is missing was read as a turn field; one with no default is still registered, as a required parameter every run has to supply. An option list that is missing means the annotation was not a `Literal`, an `Enum` or a `z.enum`. Fix the code and restart the process; the row updates on the next registration.
 
 ## Step 5: Run the first test suite
 
@@ -36325,7 +36325,7 @@ langwatch run-plan run --test-suite 'Smoke' \
   --name 'Smoke: model comparison' --format json
 ```
 
-`--param plan=pro` on the same command sets a value every target shares. The platform refuses a value outside the option list before anything is scheduled, and a name the agent does not declare is refused the same way, so read the names from `langwatch agent get` rather than from memory.
+`--param plan=pro` on the same command sets a value every target shares. The platform refuses a value outside the option list before anything is scheduled, and a name that neither the scenario nor the target agent declares is refused the same way, so read the names from `langwatch scenario get` and `langwatch agent get` rather than from memory.
 
 ## Step 6: Report the result
 
@@ -53202,7 +53202,7 @@ export default defineConfig({
 
 Create an agent adapter that wraps your existing agent, then use `scenario.run()` with a user simulator and judge.
 
-When the function that runs the agent is decorated with `@langwatch.connect_agent` (Python) or wrapped with `connectAgent` (TypeScript), the adapter calls that same function: it stays directly callable, so the platform runs and the code scenarios exercise one code path. In Python, `support_agent(messages=input.messages)` returns what the function returns (a string or `langwatch.AgentReply`, whose `.output` is the reply); in TypeScript, `(await supportAgent({ messages: input.messages })).output`. Do not write a second entry point for the tests.
+When the function that runs the agent is decorated with `@langwatch.connect_agent` (Python) or wrapped with `connectAgent` (TypeScript), the adapter calls that same function: it stays directly callable, so the platform runs and the code scenarios exercise one code path. Pass every turn field the function declares, because a declared field with no default is a required argument on a direct call. In Python, `support_agent(messages=input.messages, thread_id=input.thread_id, session=None)` returns what the function returns (a string or `langwatch.AgentReply`, whose `.output` is the reply); in TypeScript, `(await supportAgent({ messages: input.messages, threadId: input.threadId })).output`. Do not write a second entry point for the tests.
 
 **Python:**
 
@@ -53874,7 +53874,7 @@ Each entry is a lever the team built into the agent: a model, a customer plan, a
 - **One comparison run across an option list.** `options` is a closed list, so the same test suite runs once per value and the results page shows one column per value: `--target 'connected:support-agent@development?model=gpt-5' --target 'connected:support-agent@development?model=gpt-5-mini'`. Name this comparison in your proposal and again in your summary, with the command, for every parameter that declares `options`: it is the run the team connected the agent for. When the user asks for one run, make that run the comparison: `?plan=free` and `?plan=pro` on the same agent is still one run, with one column per value, and it shows which criteria flip with the lever.
 - **The defaults as the baseline.** A run with no `--param` uses every `defaultValue`. Say which values a run used when you report it.
 
-Put the levers in the proposal itself: "The agent declares `model` (gpt-5-mini, gpt-5) and `plan` (default free). I wrote one plan-aware scenario, and the test suite can run on both models in one comparison." A name the agent does not declare is refused before anything is scheduled, and so is a value outside `options`, so read the names from `agent get` rather than from memory.
+Put the levers in the proposal itself: "The agent declares `model` (gpt-5-mini, gpt-5) and `plan` (default free). I wrote one plan-aware scenario, and the test suite can run on both models in one comparison." A name that neither the scenario nor the target agent declares is refused before anything is scheduled, and so is a value outside `options`, so read the names from `scenario get` and `agent get` rather than from memory.
 
 One agent name with two environments is two rows, and they compare the same way: `connected:support-agent@development` on a laptop against `connected:support-agent@production` on a server, one `--target` each.
 
@@ -54283,7 +54283,7 @@ Then read back what the platform registered:
 langwatch agent get <agent-id> --format json
 ```
 
-The answer carries `environment`, `status`, `instances` (hostname, pid, SDK and version per process) and `parameters`: one entry per run parameter with `name`, `type`, `options` (the closed list from `Literal`, `Enum` or `z.enum`), `defaultValue` and `description`. Compare it with the signature. A parameter that is missing was read as a turn field or has no default; an option list that is missing means the annotation was not a `Literal`, an `Enum` or a `z.enum`. Fix the code and restart the process; the row updates on the next registration.
+The answer carries `environment`, `status`, `instances` (hostname, pid, SDK and version per process) and `parameters`: one entry per run parameter with `name`, `type`, `options` (the closed list from `Literal`, `Enum` or `z.enum`), `defaultValue` and `description`. Compare it with the signature. A parameter that is missing was read as a turn field; one with no default is still registered, as a required parameter every run has to supply. An option list that is missing means the annotation was not a `Literal`, an `Enum` or a `z.enum`. Fix the code and restart the process; the row updates on the next registration.
 
 ## Step 5: Run the first test suite
 
@@ -54317,7 +54317,7 @@ langwatch run-plan run --test-suite 'Smoke' \
   --name 'Smoke: model comparison' --format json
 ```
 
-`--param plan=pro` on the same command sets a value every target shares. The platform refuses a value outside the option list before anything is scheduled, and a name the agent does not declare is refused the same way, so read the names from `langwatch agent get` rather than from memory.
+`--param plan=pro` on the same command sets a value every target shares. The platform refuses a value outside the option list before anything is scheduled, and a name that neither the scenario nor the target agent declares is refused the same way, so read the names from `langwatch scenario get` and `langwatch agent get` rather than from memory.
 
 ## Step 6: Report the result
 
@@ -56276,7 +56276,7 @@ export default defineConfig({
 
 Create an agent adapter that wraps your existing agent, then use `scenario.run()` with a user simulator and judge.
 
-When the function that runs the agent is decorated with `@langwatch.connect_agent` (Python) or wrapped with `connectAgent` (TypeScript), the adapter calls that same function: it stays directly callable, so the platform runs and the code scenarios exercise one code path. In Python, `support_agent(messages=input.messages)` returns what the function returns (a string or `langwatch.AgentReply`, whose `.output` is the reply); in TypeScript, `(await supportAgent({ messages: input.messages })).output`. Do not write a second entry point for the tests.
+When the function that runs the agent is decorated with `@langwatch.connect_agent` (Python) or wrapped with `connectAgent` (TypeScript), the adapter calls that same function: it stays directly callable, so the platform runs and the code scenarios exercise one code path. Pass every turn field the function declares, because a declared field with no default is a required argument on a direct call. In Python, `support_agent(messages=input.messages, thread_id=input.thread_id, session=None)` returns what the function returns (a string or `langwatch.AgentReply`, whose `.output` is the reply); in TypeScript, `(await supportAgent({ messages: input.messages, threadId: input.threadId })).output`. Do not write a second entry point for the tests.
 
 **Python:**
 
@@ -56948,7 +56948,7 @@ Each entry is a lever the team built into the agent: a model, a customer plan, a
 - **One comparison run across an option list.** `options` is a closed list, so the same test suite runs once per value and the results page shows one column per value: `--target 'connected:support-agent@development?model=gpt-5' --target 'connected:support-agent@development?model=gpt-5-mini'`. Name this comparison in your proposal and again in your summary, with the command, for every parameter that declares `options`: it is the run the team connected the agent for. When the user asks for one run, make that run the comparison: `?plan=free` and `?plan=pro` on the same agent is still one run, with one column per value, and it shows which criteria flip with the lever.
 - **The defaults as the baseline.** A run with no `--param` uses every `defaultValue`. Say which values a run used when you report it.
 
-Put the levers in the proposal itself: "The agent declares `model` (gpt-5-mini, gpt-5) and `plan` (default free). I wrote one plan-aware scenario, and the test suite can run on both models in one comparison." A name the agent does not declare is refused before anything is scheduled, and so is a value outside `options`, so read the names from `agent get` rather than from memory.
+Put the levers in the proposal itself: "The agent declares `model` (gpt-5-mini, gpt-5) and `plan` (default free). I wrote one plan-aware scenario, and the test suite can run on both models in one comparison." A name that neither the scenario nor the target agent declares is refused before anything is scheduled, and so is a value outside `options`, so read the names from `scenario get` and `agent get` rather than from memory.
 
 One agent name with two environments is two rows, and they compare the same way: `connected:support-agent@development` on a laptop against `connected:support-agent@production` on a server, one `--target` each.
 
@@ -59485,7 +59485,7 @@ export default defineConfig({
 
 Create an agent adapter that wraps your existing agent, then use `scenario.run()` with a user simulator and judge.
 
-When the function that runs the agent is decorated with `@langwatch.connect_agent` (Python) or wrapped with `connectAgent` (TypeScript), the adapter calls that same function: it stays directly callable, so the platform runs and the code scenarios exercise one code path. In Python, `support_agent(messages=input.messages)` returns what the function returns (a string or `langwatch.AgentReply`, whose `.output` is the reply); in TypeScript, `(await supportAgent({ messages: input.messages })).output`. Do not write a second entry point for the tests.
+When the function that runs the agent is decorated with `@langwatch.connect_agent` (Python) or wrapped with `connectAgent` (TypeScript), the adapter calls that same function: it stays directly callable, so the platform runs and the code scenarios exercise one code path. Pass every turn field the function declares, because a declared field with no default is a required argument on a direct call. In Python, `support_agent(messages=input.messages, thread_id=input.thread_id, session=None)` returns what the function returns (a string or `langwatch.AgentReply`, whose `.output` is the reply); in TypeScript, `(await supportAgent({ messages: input.messages, threadId: input.threadId })).output`. Do not write a second entry point for the tests.
 
 **Python:**
 
@@ -60157,7 +60157,7 @@ Each entry is a lever the team built into the agent: a model, a customer plan, a
 - **One comparison run across an option list.** `options` is a closed list, so the same test suite runs once per value and the results page shows one column per value: `--target 'connected:support-agent@development?model=gpt-5' --target 'connected:support-agent@development?model=gpt-5-mini'`. Name this comparison in your proposal and again in your summary, with the command, for every parameter that declares `options`: it is the run the team connected the agent for. When the user asks for one run, make that run the comparison: `?plan=free` and `?plan=pro` on the same agent is still one run, with one column per value, and it shows which criteria flip with the lever.
 - **The defaults as the baseline.** A run with no `--param` uses every `defaultValue`. Say which values a run used when you report it.
 
-Put the levers in the proposal itself: "The agent declares `model` (gpt-5-mini, gpt-5) and `plan` (default free). I wrote one plan-aware scenario, and the test suite can run on both models in one comparison." A name the agent does not declare is refused before anything is scheduled, and so is a value outside `options`, so read the names from `agent get` rather than from memory.
+Put the levers in the proposal itself: "The agent declares `model` (gpt-5-mini, gpt-5) and `plan` (default free). I wrote one plan-aware scenario, and the test suite can run on both models in one comparison." A name that neither the scenario nor the target agent declares is refused before anything is scheduled, and so is a value outside `options`, so read the names from `scenario get` and `agent get` rather than from memory.
 
 One agent name with two environments is two rows, and they compare the same way: `connected:support-agent@development` on a laptop against `connected:support-agent@production` on a server, one `--target` each.
 
