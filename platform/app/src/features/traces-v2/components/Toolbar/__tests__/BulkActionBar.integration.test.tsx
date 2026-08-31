@@ -6,7 +6,7 @@ import "@testing-library/jest-dom/vitest";
 
 /**
  * The trace list adds context to Langy through the selection bar, not a per-row
- * hover. Spec: specs/langy/langy-context-attach.feature.
+ * hover. Spec: platform/app/specs/langy/langy-context-attach.feature.
  */
 
 const langyMock = { showLangy: true, attach: vi.fn(), open: vi.fn() };

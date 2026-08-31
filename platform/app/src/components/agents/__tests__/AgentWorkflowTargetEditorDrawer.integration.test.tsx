@@ -8,7 +8,7 @@
  * real Studio graph editor in a new tab, plus the same input-mapping UI
  * every other agent target type already gets.
  *
- * @see specs/agents/workflow-agent-as-target.feature
+ * @see platform/app/specs/agents/workflow-agent-as-target.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

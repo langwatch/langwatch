@@ -7,7 +7,7 @@
  * key, when present, only links the report to a project. The route stays
  * thin: shape validation here, rate limiting and persistence in the service.
  *
- * See specs/support/agent-issue-reports.feature.
+ * See specs/support/bug-reports.feature.
  */
 import { HandledError } from "@langwatch/handled-error";
 import type { Context } from "hono";

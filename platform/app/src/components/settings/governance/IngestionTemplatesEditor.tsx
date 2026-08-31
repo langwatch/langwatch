@@ -23,7 +23,7 @@ import { api } from "~/utils/api";
 /**
  * Admin Ingestion Templates editor — second tab on
  * /governance/tool-catalog. Per
- * `specs/ai-governance/admin-ottl-authoring.feature`:
+ * `specs/ai-gateway/governance/template-ottl-authoring.feature`:
  *
  *   - Platform-published rows render read-only with a 'View OTTL'
  *     button + a 'Clone to customise' affordance.

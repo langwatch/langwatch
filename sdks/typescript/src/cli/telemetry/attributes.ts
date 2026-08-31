@@ -16,7 +16,7 @@
  * This vocabulary is a published contract. Add to it freely; renaming or
  * repurposing a key breaks the reader on the other side.
  *
- * Spec: specs/telemetry/langy-live-events.feature
+ * Spec: sdks/typescript/specs/telemetry/langy-live-events.feature
  */
 
 /** Attribute keys carried on every live CLI event. */

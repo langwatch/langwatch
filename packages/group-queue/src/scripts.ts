@@ -99,7 +99,7 @@ end
 // ungraceful mass death self-heals within the active TTL with no operator reset.
 // The live count GCs lapsed members first so dead-worker entries can't grow the
 // ZSET unbounded. Keys share the keyPrefix hash tag so they stay in one slot.
-// See specs/tenant-soft-cap.feature (self-heal scenario).
+// See packages/group-queue/specs/tenant-soft-cap.feature (self-heal scenario).
 const TENANT_ACTIVE_HELPER_LUA = `
 local function tenantActiveAdd(taPrefix, tenantId, groupId, expiryMs)
   redis.call("ZADD", taPrefix .. tenantId, expiryMs, groupId)

@@ -14,7 +14,7 @@
  * which is an artifact to read rather than a call sequence to verify.
  *
  * @see specs/analytics/lwql-saved-charts.feature
- * @see specs/analytics/lwql-workbench.feature
+ * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { describe, expect, it } from "vitest";

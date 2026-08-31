@@ -3218,7 +3218,7 @@ function PanelHeader({
           actions, compose, history (its own icon, which swaps the panel to the
           full-height chat list), the layout toggle, more, and finally Minimise,
           held apart by a divider so it is unmistakably the last control.
-          Spec: specs/langy/langy-panel-header.feature */}
+          Spec: platform/app/specs/langy/langy-panel-header.feature */}
       <HStack
         paddingTop="13px"
         paddingBottom="10px"

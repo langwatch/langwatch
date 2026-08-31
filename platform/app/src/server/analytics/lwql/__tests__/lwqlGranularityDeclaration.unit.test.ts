@@ -8,7 +8,7 @@
  * surface one value to inject. If the parser or policy refuses that shape,
  * the contract collapses and this test is the first thing to say so.
  *
- * @see specs/analytics/lwql-workbench.feature
+ * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { describe, expect, it } from "vitest";

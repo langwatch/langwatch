@@ -3,7 +3,7 @@
  *
  * Unit tests for usePeriodSelector hook.
  *
- * @see specs/period-selector.feature
+ * @see platform/app/specs/period-selector.feature
  */
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";

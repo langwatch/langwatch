@@ -14,7 +14,7 @@
  * `body.error.code` with its structured detail at `body.error.meta` — by code,
  * never by message prose.
  *
- * @see specs/analytics/lwql-workbench.feature
+ * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  * @see ~/server/analytics/lwql/resolveTimeWindow.ts — the budget contract
  */
 

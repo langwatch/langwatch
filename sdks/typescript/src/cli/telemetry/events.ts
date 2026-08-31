@@ -25,7 +25,7 @@
  *
  * The wire itself is deliberately not this module's business; see `sink.ts`.
  *
- * Spec: specs/telemetry/langy-live-events.feature
+ * Spec: sdks/typescript/specs/telemetry/langy-live-events.feature
  */
 
 // The zod-free subpath, deliberately: this module is on the hot path of every

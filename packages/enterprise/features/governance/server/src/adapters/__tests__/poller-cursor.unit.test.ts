@@ -13,7 +13,7 @@
  * ingestionPullLifecycle.ts still handles object-shaped cursors, so they are
  * not hypothetical.
  *
- * Spec: specs/governance/edit-pull-source-config.feature
+ * Spec: platform/app/specs/governance/edit-pull-source-config.feature
  */
 
 import { describe, expect, it } from "vitest";

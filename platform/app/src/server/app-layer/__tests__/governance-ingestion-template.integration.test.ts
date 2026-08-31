@@ -13,7 +13,7 @@
  *     so the admin can edit without touching the platform default.
  *   - Audit log rows land for every mutation.
  *
- * Spec: specs/ai-governance/admin-ottl-authoring.feature
+ * Spec: specs/ai-gateway/governance/template-ottl-authoring.feature
  *       specs/ai-gateway/governance/template-ottl-principal-guard.feature
  */
 import { nanoid } from "nanoid";

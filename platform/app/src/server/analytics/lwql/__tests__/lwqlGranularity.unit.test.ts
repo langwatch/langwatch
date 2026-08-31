@@ -8,7 +8,7 @@
  * the dashboard coarsens where `coarsen` is passed, and neither can restate
  * the budget arithmetic.
  *
- * @see specs/analytics/lwql-workbench.feature
+ * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { describe, expect, it } from "vitest";

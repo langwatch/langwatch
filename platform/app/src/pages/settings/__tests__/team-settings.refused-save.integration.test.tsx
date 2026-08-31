@@ -12,7 +12,7 @@
  * real page over a real react-hook-form and only stands in for the network,
  * the router and the form's chakra view.
  *
- * Spec: specs/licensing/enforcement-resources.feature
+ * Spec: platform/app/specs/licensing/enforcement-resources.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
