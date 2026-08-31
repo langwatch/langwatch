@@ -42,7 +42,8 @@ jobs:
   comment:
     # Fork PRs get a read-only GITHUB_TOKEN and no secrets, so the LangWatch
     # read and the comment POST would both fail. Skip quietly rather than
-    # paint a red X on a contributor's first PR.
+    # paint a red X on a contributor's first PR. A dispatch has no event
+    # payload to read, so the script re-checks the fork question itself.
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
@@ -62,5 +63,8 @@ jobs:
           LANGWATCH_API_KEY: ${{ secrets.LANGWATCH_PR_USAGE_API_KEY }}
           PR_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pull_request }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          # Empty on a manual refresh, where `github.sha` would be the default
+          # branch rather than the pull request. The script then reads the head
+          # sha from the pull request, and refuses it if it is a fork.
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node --experimental-strip-types .github/scripts/pr-token-usage.ts

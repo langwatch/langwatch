@@ -10,6 +10,8 @@ import {
   formatCount,
   humanizeCount,
   interpretUsageResponse,
+  nextPageUrl,
+  readPullRequestHead,
   type PullRequestUsage,
   type UsageRow,
 } from "./pr-token-usage.ts";
@@ -267,6 +269,67 @@ describe("given a rollup with no sessions", () => {
       );
       assert.ok(body.includes("No coding agent sessions recorded"));
       assert.ok(!body.includes("| Contributor |"));
+    });
+  });
+});
+
+describe("given a comment listing that spans more pages than a fixed cap", () => {
+  describe("when the next page is read from the Link header", () => {
+    /** @scenario "The whole comment listing is searched for the marker" */
+    it("follows rel=next until the listing ends", () => {
+      assert.equal(
+        nextPageUrl(
+          '<https://api.github.com/repositories/1/issues/2/comments?page=12>; rel="next", ' +
+            '<https://api.github.com/repositories/1/issues/2/comments?page=40>; rel="last"',
+        ),
+        "https://api.github.com/repositories/1/issues/2/comments?page=12",
+      );
+      // The last page carries prev and first, never next: that ends the walk.
+      assert.equal(
+        nextPageUrl(
+          '<https://api.github.com/repositories/1/issues/2/comments?page=39>; rel="prev", ' +
+            '<https://api.github.com/repositories/1/issues/2/comments?page=1>; rel="first"',
+        ),
+        null,
+      );
+      assert.equal(nextPageUrl(null), null);
+    });
+  });
+});
+
+describe("given a manual refresh, which names only a pull request number", () => {
+  describe("when the pull request is read", () => {
+    /** @scenario "A manual refresh reports the pull request's own head commit" */
+    it("takes the head sha from the pull request, not from the dispatch ref", () => {
+      const head = readPullRequestHead({
+        repository: "acme/widgets",
+        pullRequest: {
+          head: { sha: "f00ba12345", repo: { full_name: "acme/widgets" } },
+        },
+      });
+      assert.equal(head.headSha, "f00ba12345");
+      assert.equal(head.isFork, false);
+    });
+
+    /** @scenario "A manual refresh still refuses a fork pull request" */
+    it("reads a head branch from another repository as a fork", () => {
+      assert.equal(
+        readPullRequestHead({
+          repository: "acme/widgets",
+          pullRequest: {
+            head: { sha: "f00ba12", repo: { full_name: "contributor/widgets" } },
+          },
+        }).isFork,
+        true,
+      );
+      // A deleted fork leaves no head repository at all.
+      assert.equal(
+        readPullRequestHead({
+          repository: "acme/widgets",
+          pullRequest: { head: { sha: "f00ba12", repo: null } },
+        }).isFork,
+        true,
+      );
     });
   });
 });

@@ -1,6 +1,6 @@
 // Builds and upserts the sticky "coding agent usage" comment on a pull
 // request, from the LangWatch pull-request usage API
-// (GET /api/coding-agent/pull-request-usage): sessions, tokens and estimated
+// (GET /api/v1/coding-agent/pull-request-usage): sessions, tokens and estimated
 // cost per contributor and agent, plus a per-model breakdown, over the pull
 // request's whole lifetime.
 //
@@ -343,6 +343,42 @@ type GithubComment = {
   user?: { login?: string };
 };
 
+export type PullRequestHead = { headSha: string; isFork: boolean };
+
+/** A manual refresh names a pull request number and nothing else. The
+ * dispatch ref's sha belongs to the default branch rather than to the pull
+ * request, and the workflow's fork guard reads an event payload that a
+ * dispatch does not have. Both answers come from the pull request itself. */
+export const readPullRequestHead = ({
+  repository,
+  pullRequest,
+}: {
+  repository: string;
+  pullRequest: {
+    head?: { sha?: string; repo?: { full_name?: string } | null } | null;
+  };
+}): PullRequestHead => {
+  const head = pullRequest.head ?? {};
+  return {
+    headSha: head.sha ?? "",
+    // An absent head repository means the fork was deleted. Treating that as
+    // a fork is the safe reading: there is no branch here to trust.
+    isFork: (head.repo?.full_name ?? "") !== repository,
+  };
+};
+
+/** GitHub's `Link` header is the only reliable end-of-listing signal. A fixed
+ * page cap stops looking while the marker may still be ahead, and the upsert
+ * then POSTs a second comment onto a pull request that already carries one. */
+export const nextPageUrl = (linkHeader: string | null): string | null => {
+  if (!linkHeader) return null;
+  for (const part of linkHeader.split(",")) {
+    const match = part.match(/<([^>]+)>\s*;\s*rel="next"/);
+    if (match?.[1]) return match[1];
+  }
+  return null;
+};
+
 const githubHeaders = (token: string) => ({
   Authorization: `Bearer ${token}`,
   Accept: "application/vnd.github+json",
@@ -361,11 +397,12 @@ const findExistingComment = async ({
   repository: string;
   prNumber: number;
 }): Promise<GithubComment | null> => {
-  for (let page = 1; page <= 10; page++) {
-    const response = await fetch(
-      `${apiUrl}/repos/${repository}/issues/${prNumber}/comments?per_page=100&page=${page}`,
-      { headers: githubHeaders(token) },
-    );
+  let url: string | null =
+    `${apiUrl}/repos/${repository}/issues/${prNumber}/comments?per_page=100`;
+  while (url) {
+    const response: Response = await fetch(url, {
+      headers: githubHeaders(token),
+    });
     if (!response.ok) {
       throw new Error(`Listing comments failed with ${response.status}`);
     }
@@ -376,9 +413,32 @@ const findExistingComment = async ({
         comment.body?.includes(MARKER),
     );
     if (existing) return existing;
-    if (comments.length < 100) return null;
+    url = nextPageUrl(response.headers.get("link"));
   }
   return null;
+};
+
+const fetchPullRequest = async ({
+  apiUrl,
+  token,
+  repository,
+  prNumber,
+}: {
+  apiUrl: string;
+  token: string;
+  repository: string;
+  prNumber: number;
+}): Promise<Parameters<typeof readPullRequestHead>[0]["pullRequest"]> => {
+  const response = await fetch(
+    `${apiUrl}/repos/${repository}/pulls/${prNumber}`,
+    { headers: githubHeaders(token) },
+  );
+  if (!response.ok) {
+    throw new Error(`Reading the pull request failed with ${response.status}`);
+  }
+  return (await response.json()) as Parameters<
+    typeof readPullRequestHead
+  >[0]["pullRequest"];
 };
 
 const upsertComment = async ({
@@ -425,8 +485,30 @@ const run = async (): Promise<void> => {
   const dryRun = process.argv.includes("--dry-run");
   const repository = requireEnv("PR_REPOSITORY");
   const prNumber = Number(requireEnv("PR_NUMBER"));
-  const shortSha = requireEnv("PR_HEAD_SHA").slice(0, 7);
   const endpoint = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
+  const apiUrl = process.env.GITHUB_API_URL ?? "https://api.github.com";
+
+  // A `pull_request` run carries its own head sha and the workflow has
+  // already refused fork pull requests from the event payload. A manual
+  // refresh carries neither, so the pull request answers both questions.
+  let headSha = process.env.PR_HEAD_SHA ?? "";
+  if (!headSha) {
+    const head = readPullRequestHead({
+      repository,
+      pullRequest: await fetchPullRequest({
+        apiUrl,
+        token: requireEnv("GITHUB_TOKEN"),
+        repository,
+        prNumber,
+      }),
+    });
+    if (head.isFork) {
+      console.log(`${repository}#${prNumber} comes from a fork; skipping.`);
+      return;
+    }
+    headSha = head.headSha;
+  }
+  const shortSha = headSha.slice(0, 7);
 
   const outcome = await fetchUsage({
     endpoint,
@@ -459,7 +541,6 @@ const run = async (): Promise<void> => {
   }
 
   const token = requireEnv("GITHUB_TOKEN");
-  const apiUrl = process.env.GITHUB_API_URL ?? "https://api.github.com";
   const existing = await findExistingComment({ apiUrl, token, repository, prNumber });
 
   // No usage and no comment: stay silent rather than stamp every dependency
