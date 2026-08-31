@@ -1,3 +1,5 @@
+import type { SpanDetail } from "@langwatch/trace-contract";
+import { extractedSystemText } from "./coding-agent-transcript-content";
 import type { CodingAgentTranscript, TranscriptEntry } from "./coding-agent-transcript";
 import { parseMaybeJson, readString } from "./coding-agent-transcript-value";
 
@@ -73,4 +75,28 @@ export function indexCodexToolLogsByCallId(
   }
 
   return byCallId;
+}
+
+/**
+ * Record the conversation's system prompt, once.
+ *
+ * Every transcript builder wants it emitted at the first span that carries
+ * one, and none of them wants it emitted twice — the accumulator's flag is
+ * what makes "once" hold across a walk that visits many spans. It lives here,
+ * with the accumulator whose flag it sets, because it existed in two builders
+ * byte for byte and a third would have copied it again.
+ */
+export function emitSystemPrompt(span: SpanDetail, accumulator: SpanEntryAccumulator): void {
+  if (accumulator.hasEmittedSystemPrompt) return;
+
+  const systemText = extractedSystemText(span.input);
+  if (systemText === null) return;
+
+  accumulator.hasEmittedSystemPrompt = true;
+  accumulator.entries.push({
+    kind: "system_prompt",
+    atMs: span.startTimeMs,
+    text: systemText,
+    chars: systemText.length,
+  });
 }

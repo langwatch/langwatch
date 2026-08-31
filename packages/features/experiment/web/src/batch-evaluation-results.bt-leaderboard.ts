@@ -8,10 +8,8 @@
  * Tie convention: 0.5 win + 0.5 loss to each side (LMSYS Arena).
  */
 
-import {
-  type Comparability,
-  computeComparability,
-} from "./batch-evaluation-results.comparability";
+import { quantile } from "./batch-evaluation-results.metric-stats";
+import { type Comparability, computeComparability } from "./batch-evaluation-results.comparability";
 import { mulberry32 } from "./random.mulberry32";
 
 export type PairwiseComparison = {
@@ -311,13 +309,7 @@ function byScoreDegenerateLast(a: BTLeaderboardEntry, b: BTLeaderboardEntry): nu
 }
 
 /** Index-keyed win counts re-keyed by variantId for the heatmap. */
-function toWinMatrix({
-  W,
-  variantIds,
-}: {
-  W: number[][];
-  variantIds: string[];
-}): WinMatrix {
+function toWinMatrix({ W, variantIds }: { W: number[][]; variantIds: string[] }): WinMatrix {
   const n = variantIds.length;
   const winMatrix: WinMatrix = {};
   for (let i = 0; i < n; i++) {
@@ -399,9 +391,7 @@ function buildWinMatrix({
   resolved: ResolvedComparison[];
   n: number;
 }): number[][] {
-  const W: number[][] = Array.from({ length: n }, () =>
-    Array.from({ length: n }, () => 0),
-  );
+  const W: number[][] = Array.from({ length: n }, () => Array.from({ length: n }, () => 0));
   for (const r of resolved) {
     if (r.winner === TIE) {
       const [i, j] = r.candIdxs;
@@ -485,15 +475,7 @@ function fitBT({
 }
 
 /** One MM iteration: the update applied to every variant at once. */
-function mmSweep({
-  W,
-  p,
-  smooth,
-}: {
-  W: number[][];
-  p: number[];
-  smooth: number;
-}): number[] {
+function mmSweep({ W, p, smooth }: { W: number[][]; p: number[]; smooth: number }): number[] {
   const n = W.length;
   const next: number[] = Array.from({ length: n }, () => 0);
   for (let i = 0; i < n; i++) {
@@ -540,13 +522,7 @@ function normalizeToGeometricMean(values: number[]): void {
 }
 
 /** Largest relative move across the field — the MM convergence test. */
-function maxRelativeChange({
-  next,
-  previous,
-}: {
-  next: number[];
-  previous: number[];
-}): number {
+function maxRelativeChange({ next, previous }: { next: number[]; previous: number[] }): number {
   let delta = 0;
   for (let i = 0; i < next.length; i++) {
     const d = Math.abs(next[i]! - previous[i]!) / Math.max(previous[i]!, 1e-12);
@@ -782,15 +758,4 @@ function finiteDifferences({
     if (Number.isFinite(d)) diffs.push(d);
   }
   return diffs;
-}
-
-function quantile(sorted: number[], q: number): number {
-  if (sorted.length === 0) return 0;
-  if (sorted.length === 1) return sorted[0]!;
-  const pos = q * (sorted.length - 1);
-  const lo = Math.floor(pos);
-  const hi = Math.ceil(pos);
-  if (lo === hi) return sorted[lo]!;
-  const frac = pos - lo;
-  return sorted[lo]! * (1 - frac) + sorted[hi]! * frac;
 }

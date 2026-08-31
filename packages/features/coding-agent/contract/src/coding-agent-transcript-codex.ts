@@ -1,4 +1,5 @@
 import type { SpanDetail } from "@langwatch/trace-contract";
+import { emitSystemPrompt } from "./coding-agent-transcript-state";
 import { isInjectedContextOnly } from "./coding-agent-transcript-context";
 import {
   extractedOutputText,
@@ -6,10 +7,7 @@ import {
   isSameRecoveredReply,
   parsedChatMessages,
 } from "./coding-agent-transcript-content";
-import type {
-  RenderedToolCall,
-  SpanEntryAccumulator,
-} from "./coding-agent-transcript-state";
+import type { RenderedToolCall, SpanEntryAccumulator } from "./coding-agent-transcript-state";
 import { modelOf } from "./coding-agent-transcript-value";
 
 export const CODEX_RECOVERED_CONTENT_SPAN_NAME = "codex.turn.response";
@@ -50,21 +48,6 @@ export function collectRecoveredCodexTurn(
     },
     windowStartMs: span.startTimeMs,
     windowEndMs: span.endTimeMs ?? span.startTimeMs,
-  });
-}
-
-function emitSystemPrompt(span: SpanDetail, accumulator: SpanEntryAccumulator): void {
-  if (accumulator.hasEmittedSystemPrompt) return;
-
-  const systemText = extractedSystemText(span.input);
-  if (systemText === null) return;
-
-  accumulator.hasEmittedSystemPrompt = true;
-  accumulator.entries.push({
-    kind: "system_prompt",
-    atMs: span.startTimeMs,
-    text: systemText,
-    chars: systemText.length,
   });
 }
 

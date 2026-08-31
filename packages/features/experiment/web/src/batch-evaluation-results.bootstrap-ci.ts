@@ -8,6 +8,7 @@
  */
 
 import { mulberry32 } from "./random.mulberry32";
+import { quantile } from "./batch-evaluation-results.metric-stats";
 
 /** Resamples per interval. Matches the score bootstrap for the same reason. */
 const DEFAULT_SAMPLES = 1000;
@@ -42,15 +43,3 @@ export const bootstrapMeanCI = ({
   means.sort((a, b) => a - b);
   return [quantile(means, 0.025), quantile(means, 0.975)];
 };
-
-/** R's type-7 quantile, matching the score bootstrap's interpolation. */
-function quantile(sorted: number[], q: number): number {
-  if (sorted.length === 0) return 0;
-  if (sorted.length === 1) return sorted[0]!;
-  const pos = q * (sorted.length - 1);
-  const lo = Math.floor(pos);
-  const hi = Math.ceil(pos);
-  if (lo === hi) return sorted[lo]!;
-  const frac = pos - lo;
-  return sorted[lo]! * (1 - frac) + sorted[hi]! * frac;
-}

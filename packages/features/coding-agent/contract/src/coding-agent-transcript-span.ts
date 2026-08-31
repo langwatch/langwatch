@@ -1,8 +1,5 @@
 import { isModelCallSpan } from "./telemetry";
-import {
-  parseMcpToolName,
-  resolveToolName,
-} from "./telemetry/coding-agent-normalization";
+import { parseMcpToolName, resolveToolName } from "./telemetry/coding-agent-normalization";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import {
   CODEX_RECOVERED_CONTENT_SPAN_NAME,
@@ -15,9 +12,10 @@ import {
 } from "./coding-agent-transcript-content";
 import {
   type CodexToolLogContent,
-  type SpanEntryAccumulator,
   createSpanEntryAccumulator,
+  emitSystemPrompt,
   fillToolCallGaps,
+  type SpanEntryAccumulator,
 } from "./coding-agent-transcript-state";
 import { modelOf, readNumber, readString } from "./coding-agent-transcript-value";
 
@@ -47,10 +45,7 @@ export function collectSpanEntries(
   return accumulator;
 }
 
-function collectRecoveredTurns(
-  spans: SpanDetail[],
-  accumulator: SpanEntryAccumulator,
-): void {
+function collectRecoveredTurns(spans: SpanDetail[], accumulator: SpanEntryAccumulator): void {
   const recovered = spans
     .filter((span) => span.name === CODEX_RECOVERED_CONTENT_SPAN_NAME)
     .sort((left, right) => left.startTimeMs - right.startTimeMs);
@@ -84,21 +79,6 @@ function collectModelCallSpan(span: SpanDetail, accumulator: SpanEntryAccumulato
   });
 }
 
-function emitSystemPrompt(span: SpanDetail, accumulator: SpanEntryAccumulator): void {
-  if (accumulator.hasEmittedSystemPrompt) return;
-
-  const systemText = extractedSystemText(span.input);
-  if (systemText === null) return;
-
-  accumulator.hasEmittedSystemPrompt = true;
-  accumulator.entries.push({
-    kind: "system_prompt",
-    atMs: span.startTimeMs,
-    text: systemText,
-    chars: systemText.length,
-  });
-}
-
 function collectToolSpan(
   span: SpanDetail,
   accumulator: SpanEntryAccumulator,
@@ -112,8 +92,7 @@ function collectToolSpan(
 
   const callId = readString(span.params, "call_id");
   const logContent = callId !== null ? codexToolLogs.get(callId) : void 0;
-  const failed =
-    span.status === "error" || span.error != null || (logContent?.failed ?? false);
+  const failed = span.status === "error" || span.error != null || (logContent?.failed ?? false);
   const claimed = callId !== null ? accumulator.claimedToolCalls.get(callId) : void 0;
 
   if (claimed !== void 0) {
@@ -142,10 +121,7 @@ function collectToolSpan(
   accumulator.entries.push(entry);
 }
 
-function countSubAgentTool(
-  agentId: string | null,
-  accumulator: SpanEntryAccumulator,
-): void {
+function countSubAgentTool(agentId: string | null, accumulator: SpanEntryAccumulator): void {
   if (agentId === null) return;
 
   const count = accumulator.subAgentToolCounts.get(agentId) ?? 0;
@@ -159,11 +135,9 @@ function spanDurationMs(span: SpanDetail): number | null {
 function modelCallEntry(span: SpanDetail) {
   const inputTokens = inputTokensOf(span);
   const outputTokens = outputTokensOf(span);
-  const metricTokens =
-    (span.metrics?.promptTokens ?? 0) + (span.metrics?.completionTokens ?? 0);
+  const metricTokens = (span.metrics?.promptTokens ?? 0) + (span.metrics?.completionTokens ?? 0);
   const reportedTotal = readNumber(span.params, "codex.turn.token_usage.total_tokens");
-  const tokens =
-    metricTokens > 0 ? metricTokens : (reportedTotal ?? inputTokens + outputTokens);
+  const tokens = metricTokens > 0 ? metricTokens : (reportedTotal ?? inputTokens + outputTokens);
 
   return {
     kind: "model_call" as const,
