@@ -1,19 +1,16 @@
 /**
  * @vitest-environment node
  *
- * Unit tests for the featureFlag.isEnabledForAnyOrganization tRPC procedure.
+ * Unit tests for the featureFlag.isEnabledForEachOrganization tRPC procedure.
  *
- * The procedure receives a list of organization ids from the client. It MUST
- * intersect that list with the caller's actual `OrganizationUser` memberships
- * before evaluating the flag — otherwise an authenticated user could probe
- * the flag state of arbitrary organizations they don't belong to, which leaks
- * business information (e.g. which organizations use governance).
+ * This is the variant every client surface actually calls (the workspace
+ * switcher and the product shell), so the membership filtering and the
+ * single-read membership resolution are pinned here as well as on the
+ * `isEnabledForAnyOrganization` sibling — both procedures share one resolver.
  *
- * Failure mode under test (pre-fix regression): the resolver fanned out
- * `featureFlagService.isEnabled` over every input id without a membership
- * check, so an attacker who knew (or guessed) another org's id could read
- * its flag state. The fix silently drops non-member ids and returns
- * `{ enabled: false }` when the filtered set is empty.
+ * Organizations the caller does not belong to must be absent from the result
+ * map entirely, never present as `false`: a `false` entry would tell the
+ * caller the organization exists and they are not in it.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -91,14 +88,14 @@ function buildCaller(prisma: PrismaClient) {
   return featureFlagRouter.createCaller(ctx);
 }
 
-describe("featureFlag.isEnabledForAnyOrganization", () => {
+describe("featureFlag.isEnabledForEachOrganization", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsEnabled.mockResolvedValue(false);
   });
 
   describe("when the user is a member of every input organization", () => {
-    it("evaluates the flag for those organizations", async () => {
+    it("returns the flag state per organization", async () => {
       const caller = buildCaller(
         buildMockPrisma(new Set([OWN_ORG_A, OWN_ORG_B])),
       );
@@ -106,71 +103,38 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
         async (_flag, opts: any) => opts.organizationId === OWN_ORG_B,
       );
 
-      const result = await caller.isEnabledForAnyOrganization({
+      const result = await caller.isEnabledForEachOrganization({
         flag: FLAG,
         organizationIds: [OWN_ORG_A, OWN_ORG_B],
       });
 
-      expect(result).toEqual({ enabled: true });
-      const evaluatedOrgIds = mockIsEnabled.mock.calls.map(
-        ([, opts]: any) => opts.organizationId,
-      );
-      expect(evaluatedOrgIds.sort()).toEqual([OWN_ORG_A, OWN_ORG_B].sort());
+      expect(result).toEqual({
+        enabledByOrganizationId: {
+          [OWN_ORG_A]: false,
+          [OWN_ORG_B]: true,
+        },
+      });
     });
   });
 
   describe("when the input mixes member and non-member organizations", () => {
-    it("silently filters non-member ids before evaluating the flag", async () => {
+    it("omits non-member ids from the map rather than reporting them false", async () => {
       const caller = buildCaller(buildMockPrisma(new Set([OWN_ORG_A])));
-      mockIsEnabled.mockImplementation(
-        async (_flag, opts: any) => opts.organizationId === OWN_ORG_A,
-      );
+      mockIsEnabled.mockResolvedValue(true);
 
-      const result = await caller.isEnabledForAnyOrganization({
+      const result = await caller.isEnabledForEachOrganization({
         flag: FLAG,
         organizationIds: [OWN_ORG_A, FOREIGN_ORG],
       });
 
-      expect(result).toEqual({ enabled: true });
+      expect(result).toEqual({
+        enabledByOrganizationId: { [OWN_ORG_A]: true },
+      });
+      expect(result.enabledByOrganizationId).not.toHaveProperty(FOREIGN_ORG);
       const evaluatedOrgIds = mockIsEnabled.mock.calls.map(
         ([, opts]: any) => opts.organizationId,
       );
       expect(evaluatedOrgIds).toEqual([OWN_ORG_A]);
-      expect(evaluatedOrgIds).not.toContain(FOREIGN_ORG);
-    });
-  });
-
-  describe("when the user is a member of none of the input organizations", () => {
-    it("returns enabled:false without evaluating the flag", async () => {
-      const caller = buildCaller(buildMockPrisma(new Set()));
-
-      const result = await caller.isEnabledForAnyOrganization({
-        flag: FLAG,
-        organizationIds: [FOREIGN_ORG, "org_other_foreign"],
-      });
-
-      expect(result).toEqual({ enabled: false });
-      expect(mockIsEnabled).not.toHaveBeenCalled();
-    });
-
-    it("returns the same shape as a member with the flag off, so the response cannot oracle membership", async () => {
-      const nonMemberCaller = buildCaller(buildMockPrisma(new Set()));
-      const memberCaller = buildCaller(buildMockPrisma(new Set([OWN_ORG_A])));
-      mockIsEnabled.mockResolvedValue(false);
-
-      const nonMemberResult = await nonMemberCaller.isEnabledForAnyOrganization(
-        {
-          flag: FLAG,
-          organizationIds: [FOREIGN_ORG],
-        },
-      );
-      const memberResult = await memberCaller.isEnabledForAnyOrganization({
-        flag: FLAG,
-        organizationIds: [OWN_ORG_A],
-      });
-
-      expect(nonMemberResult).toEqual(memberResult);
-      expect(nonMemberResult).toEqual({ enabled: false });
     });
   });
 
@@ -183,7 +147,7 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
       const prisma = buildMockPrisma(new Set(organizationIds));
       const caller = buildCaller(prisma);
 
-      await caller.isEnabledForAnyOrganization({
+      await caller.isEnabledForEachOrganization({
         flag: FLAG,
         organizationIds,
       });
@@ -193,16 +157,16 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
   });
 
   describe("when the input list is empty", () => {
-    it("returns enabled:false without touching prisma or featureFlagService", async () => {
+    it("returns an empty map without touching prisma or featureFlagService", async () => {
       const prisma = buildMockPrisma(new Set([OWN_ORG_A]));
       const caller = buildCaller(prisma);
 
-      const result = await caller.isEnabledForAnyOrganization({
+      const result = await caller.isEnabledForEachOrganization({
         flag: FLAG,
         organizationIds: [],
       });
 
-      expect(result).toEqual({ enabled: false });
+      expect(result).toEqual({ enabledByOrganizationId: {} });
       expect(prisma.user.findUnique).not.toHaveBeenCalled();
       expect(mockIsEnabled).not.toHaveBeenCalled();
     });
