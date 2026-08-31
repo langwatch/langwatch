@@ -603,6 +603,11 @@ export class AgentClient {
     try {
       const result = await context.with(parent, () => runtime.run(call));
       if (entry.cancelled) return;
+      // The handler answered, so its deadline is over. Disarming it before
+      // the export matters: an export slower than what is left of the limit
+      // would otherwise let the timer answer the call, and this branch would
+      // then answer it a second time.
+      this.releaseCall({ callId: frame.callId, entry });
       await this.flushSpans();
       this.send({
         type: "result",
@@ -616,6 +621,7 @@ export class AgentClient {
       const code = error instanceof AgentParameterError ? error.code : "agent_call_failed";
       const message = describeError(error);
       this.logger.warn(`agent "${runtime.name}" call ${frame.callId} failed: ${message}`);
+      this.releaseCall({ callId: frame.callId, entry });
       await this.flushSpans();
       this.sendError({ callId: frame.callId, code, message });
     } finally {

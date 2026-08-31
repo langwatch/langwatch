@@ -632,6 +632,49 @@ describe("the agent client, given a fake platform", () => {
       expect(handler).toHaveBeenCalledTimes(1);
     });
 
+    /** @scenario "The spans of a call reach the platform before its result" */
+    it("answers once when the export outlives what is left of the deadline", async () => {
+      // The handler answers inside the limit and the export then runs past
+      // it. The deadline belongs to the handler, so the timer must not
+      // answer a call that already has a result on the way.
+      let releaseFlush: () => void = () => undefined;
+      const flushing = new Promise<void>((resolve) => {
+        releaseFlush = resolve;
+      });
+      const forceFlush = vi.fn(() => flushing);
+      const providerSpy = vi
+        .spyOn(trace, "getTracerProvider")
+        .mockReturnValue({ getDelegate: () => ({ forceFlush }) } as never);
+      try {
+        const { connection } = await connectSupport(async () => "hello", {
+          timeoutMs: 60,
+        });
+
+        connection.send(callFrame({ callId: "call_1" }));
+        await connection.nextFrame("ack");
+        await vi.waitFor(() => expect(forceFlush).toHaveBeenCalledTimes(1));
+
+        // Well past the 60 ms limit, with the export still pending.
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        expect(connection.frames.some((frame) => frame.type === "result")).toBe(
+          false,
+        );
+
+        releaseFlush();
+        expect(await connection.nextFrame("result")).toMatchObject({
+          callId: "call_1",
+          output: "hello",
+        });
+        // One frame for one call: no timeout error beside the result.
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(connection.frames.filter((frame) => frame.type === "result")).toHaveLength(
+          0,
+        );
+      } finally {
+        providerSpy.mockRestore();
+      }
+    });
+
     it("refuses a call whose deadline already passed", async () => {
       const handler = vi.fn(async () => "never");
       const { connection } = await connectSupport(handler);
