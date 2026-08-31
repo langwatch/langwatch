@@ -1331,3 +1331,67 @@ bare reference, that a name inside a string literal (`Record["bodyType"]`) is
 data, that a parameter type literal's `;` does not end an expression-bodied
 arrow — the first `=>` decides that — and that a spread call `...name(` is
 still a call even though `...` ends in a dot.
+
+## Round: repositories, and five copies of a money rule
+
+Folded five more: the gateway spend-events (9), metric-data-point (13),
+trace-list (7), gateway-budget (16) and webhook-endpoint (14) repositories,
+plus the two admin pullers (11 and 9). But the folds were the smaller half of
+this round.
+
+### The duplication the folds exposed
+
+Folding forces you to read a file end to end, which is how these surfaced.
+
+| duplicated | copies | where |
+| --- | --- | --- |
+| the gateway spend cursor | 2 | spend-events repository and its adapter |
+| `isStorageAnchoredVersion` + the `"2026-05-07"` anchor | 2 | trace contract and trace-list |
+| `nanoUsdToDecimalString` | 4 | gateway, governance, webhooks, enterprise API |
+| `parseSummedNanoUsd` | 5 | the same four, plus a second copy inside the gateway |
+| `usdToNanoUsd` | 2 | gateway and governance |
+| `dimension` / `dimensionPath` / `safeResponseText` | 2 | the two admin pullers |
+
+Every copy agreed. That is the reason to fix it now rather than later: these
+are rounding rules for money and a version boundary that decides which branch
+a trace is read on, and the first fix applied to one copy is what makes the
+same value read two ways depending on which surface is asked.
+
+The money conversions now live in `@langwatch/gateway-contract`, which
+governance, webhooks and the enterprise API composition can all legally depend
+on — enterprise features already import feature contracts. No re-export shims;
+every consumer was repointed, including two `platform/app` tests and
+`ingestionRoutes` that were reaching through `@langwatch/gateway-server`.
+
+### A comparison that nearly deleted real behaviour
+
+Nine helpers are same-named across the two admin pullers. An `awk` range
+ending at `/^}/` terminates on the `}: {` that closes a destructured parameter
+list, so for the five helpers taking destructured parameters it compared four
+lines of boilerplate and reported "identical". Six of the nine actually
+differ, carrying each provider's own cursor shape, watermark rewind and
+adapter id. Whole-body comparison is the only kind that answers this question.
+
+### Where the coverage actually is
+
+Two sabotages passed, and neither meant the code was unguarded:
+
+- `trace-list`'s helpers are covered by thirteen ClickHouse integration tests
+  under `platform/app`, not by the package suite.
+- so is the whole gateway budget repository.
+
+Same lesson as `SpanCostService` earlier: a green package suite under sabotage
+says the package suite does not reach that path, never that nothing does.
+
+### One more temporal dead zone
+
+`SUCCESSOR_SEEK_QUERY` was a module const interpolating `orderedAfter` and
+`orderedBefore`. Folding those onto the class made the const a read of a class
+that does not exist yet. It is now a `private static readonly` field, which
+initialises after the static methods are installed. Unlike the webhook outbox
+case, the compiler caught this one.
+
+### Tool fix
+
+The fold's bare-reference guard required a leading word boundary but not a
+trailing one, so `selectsRole` reported as a bare `selects`.
