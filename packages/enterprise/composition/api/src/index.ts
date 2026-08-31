@@ -14,6 +14,7 @@ export {
 export {
   BACK_OFFICE_NO_PERMISSION,
   BACK_OFFICE_NO_PERMISSION_FOR_ORGANIZATION,
+  CURRENCY_NO_PERMISSION,
   EnterpriseTrpcComposition,
   INSTANCE_LICENSE_NO_PERMISSION,
   type EnterpriseTrpcContext,

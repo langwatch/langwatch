@@ -29,3 +29,8 @@ export {
   type HomeTrpcPorts,
   type RecentItem,
 } from "./transport/api-trpc/home.api";
+export {
+  IntegrationsChecksTrpcApi,
+  type IntegrationsChecksTrpcContext,
+  type IntegrationsChecksTrpcPorts,
+} from "./transport/api-trpc/integrations-checks.api";

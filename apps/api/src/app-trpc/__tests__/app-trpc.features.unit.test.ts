@@ -29,6 +29,7 @@ import type { DashboardTrpcContext, GraphTrpcContext } from "@langwatch/dashboar
 import type { EvaluationTrpcContext } from "@langwatch/evaluation-server";
 import type { ExperimentTrpcContext } from "@langwatch/experiment-server";
 import type { GroupTrpcContext, JoinRequestTrpcContext } from "@langwatch/organization-server";
+import type { IntegrationsChecksTrpcContext } from "@langwatch/project-server";
 import type { IdentityTrpcContext, UserTrpcContext } from "@langwatch/user-server";
 import type {
   WorkflowOptimizationTrpcContext,
@@ -54,6 +55,7 @@ type TestContext = AnnotationTrpcContext &
   GraphTrpcContext &
   GroupTrpcContext &
   IdentityTrpcContext &
+  IntegrationsChecksTrpcContext &
   JoinRequestTrpcContext &
   PublicEnvTrpcContext &
   UserTrpcContext &
@@ -91,6 +93,7 @@ const middlewares: AppTrpcPolicyMiddlewares = {
  */
 function refusingPorts(): AppTrpcFeaturePorts<
   AnnotationTrpcPorts,
+  Record<string, unknown>,
   string,
   Record<string, unknown>,
   Record<string, unknown>,
@@ -123,6 +126,7 @@ function refusingPorts(): AppTrpcFeaturePorts<
     } as never,
     group: refuseEvery("group"),
     identity: refuseEvery("identity"),
+    integrationsChecks: refuseEvery("integrationsChecks"),
     joinRequests: refuseEvery("joinRequests"),
     prisma: refuseEvery("prisma"),
     user: refuseEvery("user"),
@@ -165,6 +169,7 @@ describe("the app tRPC feature list", () => {
         "graphs",
         "group",
         "identity",
+        "integrationsChecks",
         "joinRequests",
         "optimization",
         "publicEnv",
@@ -196,6 +201,10 @@ describe("the app tRPC feature list", () => {
         "update",
       ]);
       expect(procedureNamesOf(features.identity)).toEqual(["completeVerification"]);
+      // The project's setup rollup. Its evidence comes from nine other
+      // verticals through a port, so the one thing this pins is that the
+      // procedure the onboarding surfaces call is the packaged one.
+      expect(procedureNamesOf(features.integrationsChecks)).toEqual(["getCheckStatus"]);
       // The account surface only. `personalUsage`, `budgetOverview` and
       // `cliBootstrap` answer on the same `user.*` name in the app, but they
       // read governance data and are mounted from the Enterprise composition,

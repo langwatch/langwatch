@@ -37,6 +37,10 @@ import type {
 } from "@langwatch/organization-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
+  IntegrationsChecksTrpcContext,
+  IntegrationsChecksTrpcPorts,
+} from "@langwatch/project-server";
+import type {
   IdentityTrpcContext,
   IdentityTrpcPorts,
   UserTrpcContext,
@@ -75,6 +79,7 @@ import {
   createGroupTrpcRouter,
   createJoinRequestTrpcRouter,
 } from "../features/organization/organization-trpc.mount";
+import { createIntegrationsChecksTrpcRouter } from "../features/project/project-trpc.mount";
 import { createIdentityTrpcRouter, createUserTrpcRouter } from "../features/user/user-trpc.mount";
 import {
   createWorkflowOptimizationTrpcRouter,
@@ -93,6 +98,7 @@ import {
  */
 export interface AppTrpcFeaturePorts<
   TAnnotationPorts extends AnnotationTrpcPorts,
+  TCheckStatus,
   TFilterField extends string,
   TMappingsIn,
   TMappingsOut,
@@ -141,6 +147,12 @@ export interface AppTrpcFeaturePorts<
   group: GroupTrpcPorts;
   /** The verification ceremony that spends the caller's own record. */
   identity: IdentityTrpcPorts;
+  /**
+   * The project setup rollup the onboarding surfaces render: nine other
+   * verticals' evidence plus the project's own two columns, fanned out by the
+   * process because no one feature package holds it.
+   */
+  integrationsChecks: IntegrationsChecksTrpcPorts<TCheckStatus>;
   /**
    * The join-request service, composed over the identity ledger, the
    * membership writer that emits authorization grants, the organization's join
@@ -199,6 +211,7 @@ export function createAppTrpcFeatures<
     GraphTrpcContext &
     GroupTrpcContext &
     IdentityTrpcContext &
+    IntegrationsChecksTrpcContext &
     JoinRequestTrpcContext &
     PublicEnvTrpcContext &
     UserTrpcContext &
@@ -207,6 +220,7 @@ export function createAppTrpcFeatures<
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
   TAnnotationPorts extends AnnotationTrpcPorts,
+  TCheckStatus,
   TFilterField extends string,
   TMappingsIn,
   TMappingsOut,
@@ -217,6 +231,7 @@ export function createAppTrpcFeatures<
   mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPublicMount<TContext, TOptions, TRoot>;
   ports: AppTrpcFeaturePorts<
     TAnnotationPorts,
+    TCheckStatus,
     TFilterField,
     TMappingsIn,
     TMappingsOut,
@@ -242,6 +257,10 @@ export function createAppTrpcFeatures<
     graphs: createGraphTrpcRouter({ ...mount, ports: ports.graphs }),
     group: createGroupTrpcRouter({ ...mount, ports: ports.group }),
     identity: createIdentityTrpcRouter({ ...mount, ports: ports.identity }),
+    integrationsChecks: createIntegrationsChecksTrpcRouter({
+      ...mount,
+      ports: ports.integrationsChecks,
+    }),
     joinRequests: createJoinRequestTrpcRouter({ ...mount, ports: ports.joinRequests }),
     // A procedure rather than a router: the client calls `publicEnv({})` at
     // the root, and giving it a namespace would rename it.

@@ -1,4 +1,5 @@
 export { SubscriptionTrpcApi, type SubscriptionTrpcContext } from "./transport/api-trpc/subscription.api";
+export { CurrencyTrpcApi, type CurrencyTrpcContext } from "./transport/api-trpc/currency.api";
 export { StripeErrorAdapter } from "./adapters/stripe-error.stripe-error.adapter";
 export {
   ClickHouseBillingAdapter,

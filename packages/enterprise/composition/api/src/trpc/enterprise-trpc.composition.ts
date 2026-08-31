@@ -2,23 +2,28 @@
  * The Enterprise tRPC surfaces, composed for the legacy web application's
  * router root.
  *
- * Four transports live here: licensing (`license`, `licenseEnforcement`), SCIM
+ * Five transports live here: licensing (`license`, `licenseEnforcement`), SCIM
  * tokens (`scimToken`), the back office's single sign-on connections
- * (`ssoConnections`) and billing (`subscription`). Each router's behaviour —
- * procedure names, input and output shapes, refusals — belongs to its Enterprise
- * feature package. What this composition owns is the wiring: which policy wraps
- * which permission, and which process capability answers each port.
+ * (`ssoConnections`) and billing's two — the paid subscription
+ * (`subscription`) and the currency a visitor is quoted in (`currency`). Each
+ * router's behaviour — procedure names, input and output shapes, refusals —
+ * belongs to its Enterprise feature package. What this composition owns is the
+ * wiring: which policy wraps which permission, and which process capability
+ * answers each port.
  *
  * It sits in the Enterprise API composition rather than in `apps/api` because a
  * core package may not depend on an Enterprise one. Everything the process must
  * supply arrives through `create`, so this package never imports an
  * application.
  *
- * `subscription` is SaaS-only: a self-hosted installation gets an empty router
- * of the same type rather than a surface that pretends to bill.
+ * `subscription` and `currency` are SaaS-only: a self-hosted installation gets
+ * an empty router of the same type rather than a surface that pretends to bill,
+ * or one that guesses a currency from CDN headers only the hosted edge injects.
  */
 import {
+  CurrencyTrpcApi,
   SubscriptionTrpcApi,
+  type CurrencyTrpcContext,
   type SubscriptionTrpcContext,
 } from "@langwatch/enterprise-billing-server";
 import {
@@ -39,8 +44,9 @@ import {
 } from "@langwatch/enterprise-sso-server";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 
-/** Every context requirement the four surfaces place on the process. */
-export type EnterpriseTrpcContext = LicenseTrpcContext &
+/** Every context requirement these surfaces place on the process. */
+export type EnterpriseTrpcContext = CurrencyTrpcContext &
+  LicenseTrpcContext &
   LicenseEnforcementTrpcContext &
   ScimTokenTrpcContext &
   SsoConnectionTrpcContext &
@@ -84,6 +90,15 @@ export const INSTANCE_LICENSE_NO_PERMISSION = {
   reason: "instance license status is deployment-wide and read-only for any signed-in user",
 } as const;
 
+/**
+ * Why the quoted currency has nothing to check: the answer is read from the
+ * request's own CDN headers, is identical for every caller in the same place,
+ * and names no tenant. The declaration is the written record of that.
+ */
+export const CURRENCY_NO_PERMISSION = {
+  reason: "currency catalog is public reference data",
+} as const;
+
 /** Explicit Enterprise tRPC transports; mounting stays application-owned. */
 export class EnterpriseTrpcComposition {
   static create<
@@ -101,6 +116,8 @@ export class EnterpriseTrpcComposition {
     policy(permission: "organization:view" | "organization:manage"): EnterpriseTrpcPolicy;
     /** The chain declaring `INSTANCE_LICENSE_NO_PERMISSION`. */
     instanceLicensePolicy: EnterpriseTrpcPolicy;
+    /** The chain declaring `CURRENCY_NO_PERMISSION`. */
+    currencyPolicy: EnterpriseTrpcPolicy;
     /** The chain declaring `BACK_OFFICE_NO_PERMISSION`. */
     backOfficePolicy: EnterpriseTrpcPolicy;
     /** The chain declaring `BACK_OFFICE_NO_PERMISSION_FOR_ORGANIZATION`. */
@@ -153,7 +170,20 @@ export class EnterpriseTrpcComposition {
       ? billing
       : (root.router({}) as unknown as typeof billing);
 
+    const currencyDetection = CurrencyTrpcApi.create(root, {
+      protected: protectedProcedure,
+      noPermission: options.currencyPolicy,
+    });
+
+    // SaaS-only for the same reason and by the same construction: geo-IP
+    // detection reads headers only the hosted CDN injects, so a self-hosted
+    // installation serves the shape and none of the guessing.
+    const currency: typeof currencyDetection = options.saasBilling
+      ? currencyDetection
+      : (root.router({}) as unknown as typeof currencyDetection);
+
     return {
+      currency,
       license,
       licenseEnforcement,
       scimToken,

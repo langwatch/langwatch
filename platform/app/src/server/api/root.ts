@@ -66,6 +66,7 @@ import { scopeLineageGuard } from "./trpc.scope-lineage-middleware";
 import {
   BACK_OFFICE_NO_PERMISSION,
   BACK_OFFICE_NO_PERMISSION_FOR_ORGANIZATION,
+  CURRENCY_NO_PERMISSION,
   EnterpriseGatewayTrpcComposition,
   EnterpriseGovernanceTrpcComposition,
   EnterpriseTrpcComposition,
@@ -185,6 +186,7 @@ import { RecentItemsService } from "~/server/home/recent-items.service";
 import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
 import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRequestEmail";
 import { wrapAiCall } from "~/server/modelProviders/aiCallFailedError";
+import { OnboardingChecksService, type OnboardingCheckStatus } from "~/server/onboarding-checks";
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 import { rateLimit } from "~/server/rateLimit";
@@ -193,7 +195,6 @@ import { getClientIp } from "~/utils/getClientIp";
 import { batchRecordRouter } from "~/runtime/app/internal-api/batch-record.router";
 import { bugReportsRouter } from "./routers/bugReports";
 import { costsRouter } from "./routers/costs";
-import { currencyRouter } from "./routers/currency";
 import { dataPrivacyRouter } from "./routers/dataPrivacy";
 import { dataRetentionRouter } from "~/runtime/app/internal-api/data-retention.router";
 import { datasetRouter } from "~/runtime/app/internal-api/dataset.router";
@@ -201,7 +202,6 @@ import { datasetRecordRouter } from "~/runtime/app/internal-api/dataset-record.r
 import { evaluatorsRouter } from "~/runtime/app/internal-api/evaluator.router";
 import { featureFlagRouter } from "~/runtime/app/internal-api/feature-flag.router";
 import { githubRouter } from "~/runtime/app/internal-api/github.router";
-import { integrationsChecksRouter } from "./routers/integrationsChecks";
 import { langyRouter } from "~/runtime/app/internal-api/langy.router";
 import { langyEgressRouter } from "~/runtime/app/internal-api/langy.router";
 import { llmModelCostsRouter } from "~/runtime/app/internal-api/model-provider.router";
@@ -315,6 +315,17 @@ const personalWorkspaceFeaturesRouter = createPersonalWorkspaceFeaturesTrpcRoute
 const translateRouter = createTranslateTrpcRouter({ ...appTrpcMount, ports: { wrapAiCall } });
 
 const recentItems = new RecentItemsService();
+
+/**
+ * The setup rollup behind `integrationsChecks.getCheckStatus`.
+ *
+ * It stays here rather than in the project package because of what it reads:
+ * nine other verticals' storage — workflows, custom graphs, datasets, online
+ * evaluations, triggers, team members, model providers, simulations and
+ * prompts — beside the project's own two columns. That fan-out is the
+ * application's, exactly as the recent-items reader above it is.
+ */
+const onboardingChecks = new OnboardingChecksService();
 
 const homeRouter = createHomeTrpcRouter({
   ...appTrpcMount,
@@ -798,6 +809,7 @@ const enterpriseRouters = EnterpriseTrpcComposition.create({
   protectedProcedure: authProtectedProcedure,
   policy: appTrpcPolicy(appTrpcMiddlewares),
   instanceLicensePolicy: noPermissionPolicy(INSTANCE_LICENSE_NO_PERMISSION),
+  currencyPolicy: noPermissionPolicy(CURRENCY_NO_PERMISSION),
   backOfficePolicy: noPermissionPolicy(BACK_OFFICE_NO_PERMISSION),
   backOfficePolicyForOrganization: noPermissionPolicy(BACK_OFFICE_NO_PERMISSION_FOR_ORGANIZATION),
   saasBilling: env.IS_SAAS,
@@ -1291,6 +1303,18 @@ const appTrpcFeatures = createAppTrpcFeatures({
     // Spec: specs/identity/identifier-model.feature.
     identity: {
       completeEmailVerification: (input) => verificationCeremony().completeEmailVerification(input),
+    },
+
+    integrationsChecks: {
+      // Annotated rather than inferred from the port: an unannotated arrow is
+      // context-sensitive, so the checklist's own shape would be resolved after
+      // the call's type arguments were fixed and the client would be handed
+      // `{}` instead of the rollup. Every other generic-carrying port here
+      // states its parameters for the same reason.
+      getCheckStatus: (
+        _ctx: TRPCContext,
+        input: Readonly<{ projectId: string }>,
+      ): Promise<OnboardingCheckStatus> => onboardingChecks.getCheckStatus(input.projectId),
     },
 
     joinRequests: {
@@ -1859,7 +1883,6 @@ const coreRouters = {
   emailSuppression: emailSuppressionRouter,
   dataPrivacy: dataPrivacyRouter,
   translate: translateRouter,
-  integrationsChecks: integrationsChecksRouter,
   onboarding: onboardingRouter,
   scenarios: scenarioRouter,
   suites: suiteRouter,
@@ -1901,7 +1924,7 @@ const coreRouters = {
 
 const eeRouters = {
   subscription: enterpriseRouters.subscription,
-  currency: currencyRouter,
+  currency: enterpriseRouters.currency,
 };
 
 /**
