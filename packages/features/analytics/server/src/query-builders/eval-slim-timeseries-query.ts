@@ -29,7 +29,9 @@ import type { AnalyticsTimeseriesBuilderInput, BuiltAnalyticsQuery } from "../ty
 import {
   collectStringValues,
   dateTrunc,
+  type EvalMetricKey,
   hasFilterValues,
+  isEvalMetricKey,
   isPercentile,
   percentileFor,
 } from "./shared";
@@ -45,18 +47,6 @@ export type EvalSlimGroupByKey =
   | "evaluations.evaluation_status";
 
 /** Eval-slim eligible metric keys (must match SLIM_ELIGIBLE_EVAL_METRIC_KEYS). */
-export type EvalSlimMetricKey =
-  | "evaluations.evaluation_score"
-  | "evaluations.evaluation_pass_rate"
-  | "evaluations.evaluation_runs";
-
-function isEvalSlimMetricKey(metric: string): metric is EvalSlimMetricKey {
-  return (
-    metric === "evaluations.evaluation_score" ||
-    metric === "evaluations.evaluation_pass_rate" ||
-    metric === "evaluations.evaluation_runs"
-  );
-}
 
 /**
  * Map an eval metric to its slim column expression.
@@ -71,7 +61,7 @@ function isEvalSlimMetricKey(metric: string): metric is EvalSlimMetricKey {
  * `Status = 'processed'` condition, and covers slim rows written before the
  * fold gated Passed/Score at write time.
  */
-function evalSlimColumnFor(metric: EvalSlimMetricKey): string {
+function evalSlimColumnFor(metric: EvalMetricKey): string {
   switch (metric) {
     case "evaluations.evaluation_score":
       return `if(${ea}.Status = 'processed', ${ea}.Score, NULL)`;
@@ -261,7 +251,7 @@ export function buildEvalSlimTimeseriesQuery(
 
   for (let i = 0; i < input.series.length; i++) {
     const s = input.series[i]!;
-    if (!isEvalSlimMetricKey(s.metric)) {
+    if (!isEvalMetricKey(s.metric)) {
       throw new Error(
         `Eval slim builder cannot serve metric "${s.metric}". The router should have routed this to evaluation_runs.`,
       );

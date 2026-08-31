@@ -19,7 +19,7 @@
 import { buildMetricAlias } from "../clickhouse/metric-translator";
 import type { AnalyticsAggregation } from "@langwatch/analytics-contract";
 import type { AnalyticsTimeseriesBuilderInput, BuiltAnalyticsQuery } from "../types";
-import { dateTrunc } from "./shared";
+import { dateTrunc, type EvalMetricKey, isEvalMetricKey } from "./shared";
 
 const ROLLUP_TABLE = "evaluation_analytics_rollup" as const;
 const ra = "ra";
@@ -40,19 +40,6 @@ const ra = "ra";
 export type EvalRollupAggregation = Extract<AnalyticsAggregation, "sum" | "avg" | "cardinality">;
 
 export type EvalRollupGroupByKey = "evaluations.evaluator_type" | "evaluations.evaluation_status";
-
-export type EvalRollupMetricKey =
-  | "evaluations.evaluation_score"
-  | "evaluations.evaluation_pass_rate"
-  | "evaluations.evaluation_runs";
-
-function isEvalRollupMetricKey(metric: string): metric is EvalRollupMetricKey {
-  return (
-    metric === "evaluations.evaluation_score" ||
-    metric === "evaluations.evaluation_pass_rate" ||
-    metric === "evaluations.evaluation_runs"
-  );
-}
 
 function isEvalRollupGroupByKey(groupBy: string): groupBy is EvalRollupGroupByKey {
   return groupBy === "evaluations.evaluator_type" || groupBy === "evaluations.evaluation_status";
@@ -86,7 +73,7 @@ function isEvalRollupAggregation(agg: AnalyticsAggregation): agg is EvalRollupAg
  * Mirrors the metric-translator's behaviour for the trace rollup builder:
  * each (metric, agg) pair maps to a single SQL expression.
  */
-function evalRollupAggExpression(metric: EvalRollupMetricKey, agg: EvalRollupAggregation): string {
+function evalRollupAggExpression(metric: EvalMetricKey, agg: EvalRollupAggregation): string {
   // Verdict metrics (score, pass-rate) only read rows whose evaluation
   // actually ran to completion — an errored run's stray verdict must not
   // shift the chart (#6833). Matches the legacy per-evaluator path's
@@ -177,7 +164,7 @@ export function buildEvalRollupTimeseriesQuery(
   // rollup; see `rollupHandlesSeries` in `routing/route-table.ts`.
   for (let i = 0; i < input.series.length; i++) {
     const s = input.series[i]!;
-    if (!isEvalRollupMetricKey(s.metric)) {
+    if (!isEvalMetricKey(s.metric)) {
       throw new Error(
         `Eval rollup builder cannot serve metric "${s.metric}". The router should have routed this to slim or evaluation_runs.`,
       );

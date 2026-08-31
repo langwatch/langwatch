@@ -136,3 +136,26 @@ export function percentileFor(agg: string): number {
       throw new Error(`Not a percentile aggregation: ${agg}`);
   }
 }
+
+/**
+ * The evaluation metrics both timeseries builders can answer.
+ *
+ * One list, and the type and the check both derive from it. It used to be
+ * three: a const list in the route table with `EvalRollupMetricKey` derived
+ * from it, and a hand-written union of the same three members in EACH query
+ * builder — one of them under the same type name — with a hand-written
+ * predicate beside it. Adding a fourth evaluation metric meant remembering
+ * five places, and forgetting one of the predicates would route the metric and
+ * then refuse it.
+ */
+export const EVAL_METRIC_KEYS = [
+  "evaluations.evaluation_score",
+  "evaluations.evaluation_pass_rate",
+  "evaluations.evaluation_runs",
+] as const;
+
+export type EvalMetricKey = (typeof EVAL_METRIC_KEYS)[number];
+
+export function isEvalMetricKey(metric: string): metric is EvalMetricKey {
+  return (EVAL_METRIC_KEYS as readonly string[]).includes(metric);
+}

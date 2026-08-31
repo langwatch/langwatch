@@ -43,7 +43,12 @@
 import type { AnalyticsSeries } from "@langwatch/analytics-contract";
 import type { AnalyticsAggregation } from "@langwatch/analytics-contract";
 import { PAYLOAD_BLOCKLIST_EXACT, PAYLOAD_BLOCKLIST_PREFIXES } from "./payload-blocklist";
-import { collectStringValues, hasFilterValues } from "../query-builders/shared";
+import {
+  collectStringValues,
+  EVAL_METRIC_KEYS,
+  type EvalMetricKey,
+  hasFilterValues,
+} from "../query-builders/shared";
 import { type AnalyticsMetricSource, getMetricSource } from "./field-availability";
 
 /** The six destination tables routed between. */
@@ -141,19 +146,14 @@ export type TraceRollupMetricKey = (typeof ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIS
  * uses `sum(ScoreSum) / nullIf(sum(ScoreCount), 0)` for `avg`. Pass rate
  * uses `sum(PassCount) / nullIf(sum(PassCount) + sum(FailCount), 0)`.
  */
-const ROLLUP_ROLLABLE_EVAL_METRIC_KEYS_LIST = [
-  "evaluations.evaluation_score",
-  "evaluations.evaluation_pass_rate",
-  "evaluations.evaluation_runs",
-] as const;
-export type EvalRollupMetricKey = (typeof ROLLUP_ROLLABLE_EVAL_METRIC_KEYS_LIST)[number];
+export type EvalRollupMetricKey = EvalMetricKey;
 
 /** Backwards-compatible union — all rollup-rollable metric keys, any source. */
 export type RollupRollableMetricKey = TraceRollupMetricKey | EvalRollupMetricKey;
 
 export const ROLLUP_ROLLABLE_METRIC_KEYS: ReadonlySet<string> = new Set<string>([
   ...ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST,
-  ...ROLLUP_ROLLABLE_EVAL_METRIC_KEYS_LIST,
+  ...EVAL_METRIC_KEYS,
 ]);
 
 export function isRollupRollableMetricKey(metric: string): metric is RollupRollableMetricKey {
@@ -163,9 +163,7 @@ export function isRollupRollableMetricKey(metric: string): metric is RollupRolla
 const ROLLUP_ROLLABLE_TRACE_METRIC_KEYS: ReadonlySet<string> = new Set<string>(
   ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST,
 );
-const ROLLUP_ROLLABLE_EVAL_METRIC_KEYS: ReadonlySet<string> = new Set<string>(
-  ROLLUP_ROLLABLE_EVAL_METRIC_KEYS_LIST,
-);
+const ROLLUP_ROLLABLE_EVAL_METRIC_KEYS: ReadonlySet<string> = new Set<string>(EVAL_METRIC_KEYS);
 
 /**
  * Narrower guards for callers that only want trace- or eval-scoped rollable
