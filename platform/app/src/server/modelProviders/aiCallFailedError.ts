@@ -1,7 +1,11 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
-import { ModelNotConfiguredError, type ModelRole } from "@langwatch/model-provider-contract";
+import {
+  ModelNotConfiguredError,
+  ModelProviderDisabledError,
+  type ModelRole,
+} from "@langwatch/model-provider-contract";
 
 const logger = createLogger("langwatch:modelProviders:aiCall");
 
@@ -86,10 +90,12 @@ export class AiCallFailedError extends HandledError {
 
 /**
  * Wraps a function performing an AI call (generateText, embeddings,
- * stream, etc.) so a failure that is not `model_not_configured` rethrows as a
- * typed `AiCallFailedError` carrying the feature context.
- * `ModelNotConfiguredError`s pass through untouched — they have their own
- * toast surface.
+ * stream, etc.) so a failure the caller cannot name rethrows as a typed
+ * `AiCallFailedError` carrying the feature context.
+ * `ModelNotConfiguredError` and `ModelProviderDisabledError` pass through
+ * untouched — both are raised by model resolution, which now happens inside
+ * the wrapped call, and each has its own remediation copy the generic
+ * ai_call_failed message would bury.
  */
 export async function wrapAiCall<T>(
   feature: { key: string; role: ModelRole; displayName: string },
@@ -99,6 +105,7 @@ export async function wrapAiCall<T>(
     return await fn();
   } catch (err) {
     if (err instanceof ModelNotConfiguredError) throw err;
+    if (err instanceof ModelProviderDisabledError) throw err;
     const message = err instanceof Error ? err.message : String(err);
     // The provider's own words are diagnostic, not copy: they go in the log
     // line, correlated by trace id, and nowhere a customer can read them.

@@ -226,22 +226,13 @@ describe("translateRouter.translate()", () => {
     });
 
     /**
-     * KNOWN GAP, pinned as it behaves rather than as it should.
-     *
-     * `wrapAiCall` lets `ModelNotConfiguredError` through and re-raises
-     * everything else as `ai_call_failed`. Model RESOLUTION now happens inside
-     * the wrapped call — the transport hands the whole request to
-     * `app.modelProviders.translate`, which resolves the model and then asks
-     * it — so a disabled provider, raised from the same resolution step as the
-     * missing-model refusal one test above, is flattened on the way out. The
-     * customer gets the generic "check your model configuration" copy instead
-     * of the provider-disabled copy naming the alternate model.
-     *
-     * Asserted as it is so the wire shape is pinned and the divergence is
-     * visible; teaching `wrapAiCall` to pass `ModelProviderDisabledError`
-     * through must flip this test back to the MODEL_PROVIDER_DISABLED cause.
+     * Model resolution happens inside the wrapped call, so the disabled
+     * provider is raised from the same step as the missing-model refusal one
+     * test above — and it must reach the wire under its own cause, because
+     * the provider-disabled toast reads `providerKey` and names the
+     * alternate, which the generic ai_call_failed copy would bury.
      */
-    it("flattens a disabled provider into the generic AI-call failure", async () => {
+    it("keeps a disabled provider's own refusal on the wire", async () => {
       const modelError = new ModelProviderDisabledError(
         "translate.text",
         "Inline translation",
@@ -266,12 +257,10 @@ describe("translateRouter.translate()", () => {
         error: error as { cause?: unknown },
       });
       expect(wire.data.cause).toMatchObject({
-        code: "AI_CALL_FAILED",
+        code: "MODEL_PROVIDER_DISABLED",
         featureKey: "translate.text",
+        providerKey: "openai",
       });
-      // The provider the refusal named is not on the wire, which is what the
-      // provider-disabled toast needs and no longer receives.
-      expect(wire.data.cause).not.toHaveProperty("providerKey");
     });
   });
 });
