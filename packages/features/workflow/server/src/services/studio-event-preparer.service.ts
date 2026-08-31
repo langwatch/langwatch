@@ -31,7 +31,7 @@ export class StudioEventPreparerService implements StudioEventPreparer {
     return new StudioEventPreparerService(options);
   }
 
-  private constructor(private readonly options: StudioEventPreparerOptions) {
+  private constructor(options: StudioEventPreparerOptions) {
     this.enricher = StudioWorkflowEventEnricherService.create({
       projectEnvironment: options.projectEnvironment,
       llmParameters: options.llmParameters,

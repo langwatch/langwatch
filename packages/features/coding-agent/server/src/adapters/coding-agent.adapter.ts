@@ -58,10 +58,7 @@ const projectionClocks = new WeakMap<CodingAgentProjectionPersistence, CodingAge
  * CodingAgentService.
  */
 export class CodingAgentProjectionPersistenceAdapter extends CodingAgentProjectionPersistence {
-  private constructor(
-    private readonly repositories: CodingAgentRepositories,
-    private readonly clock: CodingAgentClockPort,
-  ) {
+  private constructor(private readonly repositories: CodingAgentRepositories) {
     super();
   }
 
@@ -71,7 +68,6 @@ export class CodingAgentProjectionPersistenceAdapter extends CodingAgentProjecti
     const clock = options.clock ?? SystemCodingAgentClock.create();
     const persistence = new CodingAgentProjectionPersistenceAdapter(
       createRepositories({ ...options, clock }),
-      clock,
     );
     projectionRepositories.set(persistence, persistence.repositories);
     projectionClocks.set(persistence, clock);

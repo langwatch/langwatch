@@ -55,15 +55,13 @@ export class ApiKeyService extends ApiKeyCapability {
   private readonly cli: ApiKeyCliService;
   private readonly enrichment: ApiKeyEnrichmentService;
 
-  static create(
-    options: ApiKeyDependencies & { repository: ApiKeyRepository },
-  ): ApiKeyService {
+  static create(options: ApiKeyDependencies & { repository: ApiKeyRepository }): ApiKeyService {
     return new ApiKeyService(options.repository, options);
   }
 
   private constructor(
     private readonly repository: ApiKeyRepository,
-    private readonly options: ApiKeyDependencies,
+    options: ApiKeyDependencies,
   ) {
     super();
     const dependencies = { repository, ...options };
@@ -99,9 +97,7 @@ export class ApiKeyService extends ApiKeyCapability {
     return this.tokens.regenerateLegacyProjectKey(input);
   }
 
-  async resolveOrganizationToken(input: {
-    token: string;
-  }): Promise<OrganizationApiKeyResolution> {
+  async resolveOrganizationToken(input: { token: string }): Promise<OrganizationApiKeyResolution> {
     return this.tokens.resolveOrganizationToken(input);
   }
 
@@ -128,10 +124,7 @@ export class ApiKeyService extends ApiKeyCapability {
     return this.lifecycle.revoke(input);
   }
 
-  async ensureCallerIsOrgMember(input: {
-    userId: string;
-    organizationId: string;
-  }): Promise<void> {
+  async ensureCallerIsOrgMember(input: { userId: string; organizationId: string }): Promise<void> {
     return this.policy.ensureCallerIsOrgMember(input);
   }
 
@@ -148,10 +141,7 @@ export class ApiKeyService extends ApiKeyCapability {
     return this.policy.isOrgAdmin(input);
   }
 
-  async isOrgAdminApiKey(input: {
-    apiKeyId: string;
-    organizationId: string;
-  }): Promise<boolean> {
+  async isOrgAdminApiKey(input: { apiKeyId: string; organizationId: string }): Promise<boolean> {
     return this.policy.isOrgAdminApiKey(input);
   }
 

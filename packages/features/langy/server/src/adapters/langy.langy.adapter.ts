@@ -46,16 +46,10 @@ import {
   type LangySessionKeyMetricsPort,
 } from "../services/langy-session-key.service";
 import { PrismaLangySessionKeyRepository } from "../repositories/prisma/prisma.langy-session-key.repository";
-import {
-  LangyTurnService,
-  type LangyTurnTechnicalPorts,
-} from "../services/langy-turn.service";
+import { LangyTurnService, type LangyTurnTechnicalPorts } from "../services/langy-turn.service";
 
 export abstract class LangyTrustedMessagePort {
-  abstract getRecordsByConversation(input: {
-    conversationId: string;
-    projectId: string;
-  }): Promise<
+  abstract getRecordsByConversation(input: { conversationId: string; projectId: string }): Promise<
     Array<{
       id: string;
       role: "user" | "assistant" | "tool" | "system";
@@ -116,15 +110,13 @@ export class PostgresLangyAdapter {
   private service: LangyServiceContract | null = null;
   private sessionKeys: LangySessionKeyService | null = null;
 
-  private constructor(private readonly options: PostgresLangyAdapterOptions) {
+  private constructor(options: PostgresLangyAdapterOptions) {
     this.repositories = {
       conversations: PrismaLangyConversationRepository.create(options.database),
       messages: PrismaLangyMessageRepository.create(options.database),
       credentials: PrismaLangyCredentialRepository.create(options.database),
       admission: PrismaLangyTurnAdmissionRepository.create(options.database),
-      conversationState: PrismaLangyConversationProjectionRepository.create(
-        options.database,
-      ),
+      conversationState: PrismaLangyConversationProjectionRepository.create(options.database),
       conversationTurnState: PrismaLangyConversationTurnProjectionRepository.create(
         options.database,
       ),

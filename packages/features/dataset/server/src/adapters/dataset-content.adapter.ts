@@ -23,7 +23,6 @@ export class DatasetContentAdapter extends DatasetContentPort {
 
   private constructor(
     private readonly datasets: DatasetContentRepository,
-    private readonly records: DatasetRecordContentRepository,
     private readonly storageResolver: DatasetStorageResolver,
   ) {
     super();
@@ -32,10 +31,9 @@ export class DatasetContentAdapter extends DatasetContentPort {
 
   static create(options: {
     datasets: DatasetContentRepository;
-    records: DatasetRecordContentRepository;
     storageResolver: DatasetStorageResolver;
   }): DatasetContentAdapter {
-    return new DatasetContentAdapter(options.datasets, options.records, options.storageResolver);
+    return new DatasetContentAdapter(options.datasets, options.storageResolver);
   }
 
   async listRecords({ dataset, input }: { dataset: Dataset; input: DatasetPageInput }) {

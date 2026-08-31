@@ -76,7 +76,6 @@ export class PostgresDatasetAdapter {
         (options.storageResolver
           ? DatasetContentAdapter.create({
               datasets: contentRepository,
-              records: recordContentRepository,
               storageResolver: options.storageResolver,
             })
           : undefined),
