@@ -250,3 +250,54 @@ with six cases that fail if the call is removed again.
 is a wiring bug, not dead code. A sweep for other process managers missing
 `.outbox(...)` found one more candidate, which turned out to configure it in
 its pipeline file instead — so webhook delivery was the only one.
+
+## Round: the automation graph-trigger cluster (2026-08-31)
+
+Eight files under `automation/server/src/services/` implement one thing:
+evaluating a graph trigger. Two of them implemented nothing.
+
+`graph-trigger-evaluation.service.ts` was a re-export of
+`graph-trigger-evaluator.service.ts`, which re-exported eight symbols from
+`trigger-evaluator.service.ts` — three files to reach one implementation,
+against CLAUDE.md's rule that consumers name the module owning the symbol.
+The class it also held bound a deps object and forwarded one call; its
+instance method had one caller and its static, commented *"Test seam for
+characterisation coverage"*, had one: the test. **A layer that exists so a
+test can get in is the test telling you the layer is in the way.** The
+evaluator takes its own deps now and the barrel file is gone.
+
+`TriggerEvaluatorService` was a bag of six unrelated statics behind a
+`create()` nothing had ever called — every member was static, so the instance
+it minted had no methods. Five of the six had exactly one caller and moved to
+it. One pass-through went away entirely: its caller already held the deps it
+was forwarding.
+
+**Sabotage found the one relocation that was unguarded.** Four of five were
+already covered. The fifth — whether a ClickHouse "too many rows" refusal
+becomes a skipped evaluation or an error — could be disabled with nothing
+failing. It now has six cases, including that a *different* failure still
+propagates: a classification that widened would turn an outage into a quiet
+"skipped" and the trigger would stop alerting with no sign.
+
+**A tension worth knowing about.** `trigger-evaluator.service.ts` is now
+sixteen shared types plus one shared helper — a types module wearing a
+service name. It cannot be renamed while it lives there: `lintServer` requires
+every path under `services/` to match `<subject>.service.ts`. The real home
+for those types is the contract package; that is a larger move than this
+round, and until then a `*.service.ts` holding no service is sometimes the
+layout policy's doing rather than a smell.
+
+### Webhook delivery, continued
+
+`webhook-delivery.service.ts` went from 3 tests to 83 across four suites. The
+send path is covered through the real intent handler rather than by exporting
+internals — including that a receiver's Retry-After is honoured on a retryable
+failure and DROPPED on a terminal one, and that a disabled endpoint drops its
+batch silently on purpose. `payloadToRow` is covered too: the cost is integer
+nano-USD rendered to a decimal string, and one case pins why that is integer
+arithmetic and not a divide — at nine million dollars of spend, `value / 1e9`
+answers a different amount from the one billed.
+
+The class also stopped declaring its methods as `ReturnType<typeof runDeliver>`;
+they are `IntentExecutor<DeliverPayload>` and friends now, so a reader can see
+which payload each executor accepts.
