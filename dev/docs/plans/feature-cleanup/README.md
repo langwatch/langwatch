@@ -1266,3 +1266,68 @@ package's code is untested.
 architecture-lint **845 -> 822** across 30 commits. `comment-block-size` 0,
 `service-quality` 3, `service-quality-baseline` 4. Every touched package
 typechecks and its tests pass, and no violation was traded for another.
+
+## The same fold, in repositories and adapters (2026-08-31)
+
+`services/` was only the first third. `repositories/` and `adapters/` hold the
+same shape, and — usefully — carry no `service-quality` ceiling, so nothing
+blocks them the way it blocks the last three services.
+
+| module | helpers folded | what it was |
+| --- | --- | --- |
+| `canonical-log.adapter.ts` | 26 | a 12-line class forwarding to 26 functions, plus **two** `export {}` blocks re-exposing six |
+| `prisma.model-provider.repository.ts` | 11 | row mappers and JSON coercions |
+| `prompt-template.adapter.ts` | 8 | **three** layers of the same thing |
+| `webhook-provider.adapter.ts` | 7 | secret encrypt/decrypt/redact |
+| `trace-full-record.repository.ts` | 8 | reference resolution and metrics |
+
+### Three names for one function
+
+`prompt-template.adapter.ts` is the clearest specimen of the pattern this
+whole cleanup is about:
+
+```
+function buildPromptTemplateContextValue(...)                       // 1
+static readonly buildContext = buildPromptTemplateContextValue      // 2
+export const buildPromptTemplateContext = Adapter.buildContext      // 3
+```
+
+Three names, and the class owned none of them. Layers 2 and 3 are gone and
+the two consumers call the class, per the repo's own rule against
+re-exporting for compatibility. `unboundInputPlaceholder` had no consumer at
+any layer and is private.
+
+### Two callers that were already wrong
+
+Folding surfaces these because the compiler starts checking what a re-export
+was hiding:
+
+- `session-groups.clickhouse.repository.integration.test.ts` called
+  `prepareCanonicalLogRecords({...})` with one argument where two were
+  required. It worked by accident — `redaction` was `undefined` and nothing
+  touched it, because that fixture runs with PII redaction DISABLED.
+- `sha256` and `stableStringify` were exported from the log adapter with no
+  importer anywhere.
+
+### Coverage, again where it counts
+
+| what nothing guarded | why it matters | tests |
+| --- | --- | --- |
+| webhook secret redact/persist | `redact` is what stops header values and the signing secret going back to the settings screen | 13 |
+| `LOG_PROCESSING_SHARDS` clamp | zero makes the lane modulo divide by zero | 6 |
+
+The webhook one is worth reading. The `__kept__` marker is both the redaction
+placeholder AND the write protocol — submitting it back means "leave this one
+alone" — which makes redact/persist a round trip. The case that matters most
+is the refusal: a `__kept__` arriving with a CHANGED url must be rejected,
+because "leave it alone" would otherwise send the old destination's
+credentials to a new one. Dropping redaction fails five tests; accepting a
+kept marker on a changed url fails one.
+
+### Four more tool fixes
+
+The fold tool now also knows that a generic declaration `name<T>(` is not a
+bare reference, that a name inside a string literal (`Record["bodyType"]`) is
+data, that a parameter type literal's `;` does not end an expression-bodied
+arrow — the first `=>` decides that — and that a spread call `...name(` is
+still a call even though `...` ends in a dot.
