@@ -115,16 +115,3 @@ export class AppPersonalUsageReader extends PersonalUsageReaderPort {
     return { ...this.toAppInput(input), userId: input.userId };
   }
 }
-
-/** Binds the app's ClickHouse client to the server installation reader port. */
-export class AppPersonalUsageAdapter {
-  private constructor(private readonly repository: AppPersonalUsageReadAdapter | undefined) {}
-
-  static create(repository: AppPersonalUsageReadAdapter | undefined): AppPersonalUsageAdapter {
-    return new AppPersonalUsageAdapter(repository);
-  }
-
-  buildReader(): AppPersonalUsageReader | undefined {
-    return this.repository ? AppPersonalUsageReader.create(this.repository) : undefined;
-  }
-}

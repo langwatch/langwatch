@@ -17,7 +17,7 @@ import { AppAdminWorkspaceViewAuditAdapter } from "./admin-workspace-view-audit.
 import { AppCliTokenRevocationAdapter } from "./cli-token-revocation.adapter";
 import { AppIngestionKeyAdapter } from "./ingestion-key.adapter";
 import { AppGovernanceOttlGateway } from "./ottl-gateway.client";
-import { AppPersonalUsageAdapter } from "./personal-usage.adapter";
+import { AppPersonalUsageReader } from "./personal-usage.adapter";
 import type { AppPersonalUsageReadAdapter } from "./personal-usage.clickhouse.repository";
 import {
   AppAiToolProviderCatalogPort,
@@ -106,7 +106,9 @@ export class AppGovernanceRuntime {
       ingestionEncryption: options.ingestionEncryption,
       ingestionSecretPepper: options.ingestionSecretPepper,
       ingestionDiagnostics: options.ingestionDiagnostics,
-      personalUsageReader: AppPersonalUsageAdapter.create(options.personalUsage).buildReader(),
+      personalUsageReader: options.personalUsage
+        ? AppPersonalUsageReader.create(options.personalUsage)
+        : undefined,
       personalVirtualKeyIssuer: AppPersonalVirtualKeyIssuerPort.create(options.virtualKeys),
       budgetOverview: options.budgetOverview,
       aiToolSlugs: new AppAiToolSlugPort(),
