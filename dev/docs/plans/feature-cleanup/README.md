@@ -301,3 +301,53 @@ answers a different amount from the one billed.
 The class also stopped declaring its methods as `ReturnType<typeof runDeliver>`;
 they are `IntentExecutor<DeliverPayload>` and friends now, so a reader can see
 which payload each executor accepts.
+
+## Round: an id and a tenant id, side by side (2026-08-31)
+
+A sweep for methods taking two or more **same-typed** positional parameters
+found 23 across feature services and repositories. Nearly all pair a resource
+id with a tenant id — two strings in a fixed order, where transposing them
+still compiles.
+
+What the swap actually costs is worth being precise about, because it is not
+a leak. Both governance services scope correctly (read by id, then compare the
+row's organizationId), so a transposed call looks a row up *by an organization
+id*, finds nothing, and reports "not found" — quietly, forever. The gateway
+and secret repositories put both values in the `where`, so the query simply
+misses. Wrong, silent, and hard to spot in review.
+
+The layering made it easy to see: in gateway and in secret, everything ABOVE
+the repository already took a single input object, and the positional pair
+survived on the last hop — the one nearest the query.
+
+Converted, with the compiler enumerating call sites rather than a grep:
+
+- **gateway** — `tryGet`, `tryGetWithHealth`, `tryGetDetail`, `tryCacheRuleGet`,
+  `tryGuardrailGet` on the contract and service, plus the cache-rule and
+  guardrail repositories. Fully inside the package.
+- **governance** — the anomaly-rule and ingestion-source lookups, archive, and
+  `ingestionSourceRotateSecret`. These are contract-declared, so the change
+  reached three tRPC procedures and two CLI route handlers in `platform/app`.
+  Those were read one at a time: the package typechecks, `platform/app` does
+  not, so none was rewritten by pattern alone.
+- **secret** — `get` and `delete` on the repository.
+
+One finding fell out of it: the secret suite's stub repository ignored
+projectId (`get(_projectId, id)`), so nothing there could have caught a lookup
+crossing projects. It scopes by both now and the suite still passes.
+
+Named parameters do not stop a *deliberate* mis-assignment. They stop an
+accidental one, and they make the call site say which value is which — the
+`auth-cli.ts` ingest-source handlers carry a comment worrying about exactly
+this, and now read `{ id: sourceId, organizationId: tokenRecord.organization_id }`.
+
+Seven pairs remain, in scenario, presence, scim, managed-provider and ops.
+
+### Also this round
+
+`data-retention.service.ts` forwarded an error class from its contract that
+nothing imported from there. Most of what the re-export sweep flagged is
+legitimate and should not be "fixed": `testing.ts` files are a package's test
+surface, and the langy `eventing.*-index.adapter.ts` files look like barrels
+but are the targets of declared `exports` subpaths, imported by seventeen
+files. Deleting those would have broken all of them.
