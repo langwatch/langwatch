@@ -161,6 +161,7 @@ export function pythonSnippet({
     ? `name=${quoted(name)}, environment=${quoted(environment)}`
     : `name=${quoted(name)}`;
   return [
+    "# main.py, beside your server startup",
     "import langwatch",
     "",
     `@langwatch.connect_agent(${options})`,
@@ -178,6 +179,7 @@ export function typescriptSnippet({
   environment?: string | null;
 } = {}): string {
   return [
+    "// server.ts, beside your server startup",
     'import { z } from "zod";',
     'import { connectAgent } from "langwatch/agent";',
     "",

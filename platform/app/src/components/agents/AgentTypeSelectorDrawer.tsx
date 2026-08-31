@@ -145,7 +145,9 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
 /**
  * The first choice of the flow: connect the agent the project already
  * runs instead of writing one here. The green dot is the same one an
- * online agent wears, since that is what the choice ends as.
+ * online agent wears, since that is what the choice ends as. The copy
+ * follows the connect-your-agent docs page: a small connect function
+ * beside the service startup calls the agent that already exists.
  */
 function ConnectFromCodeCard({ onClick }: { onClick: () => void }) {
   return (
@@ -181,8 +183,7 @@ function ConnectFromCodeCard({ onClick }: { onClick: () => void }) {
             </Text>
           </HStack>
           <Text fontSize="xs" color="fg.muted">
-            One decorator on your agent function, and it appears here when the
-            process runs
+            Call your agent from a connect function beside your service startup
           </Text>
         </VStack>
       </HStack>

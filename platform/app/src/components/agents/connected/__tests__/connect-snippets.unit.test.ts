@@ -31,7 +31,7 @@ describe("connect snippets", () => {
       const python = pythonSnippet({ name: "one\ntwo" });
 
       expect(python).toContain('name="one\\ntwo"');
-      expect(python.split("\n")).toHaveLength(5);
+      expect(python.split("\n")).toHaveLength(6);
     });
   });
 

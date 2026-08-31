@@ -75,7 +75,8 @@ export function ConnectFromCodeDrawer(props: ConnectFromCodeDrawerProps) {
           >
             <HStack justify="space-between" gap={3}>
               <Text fontSize="sm" color="fg.muted">
-                One decorator on the function that runs your agent.
+                Write a small function beside your service startup that calls
+                the agent you already have.
               </Text>
               <SetupWithAgentButton surface="connectedAgents" />
             </HStack>
