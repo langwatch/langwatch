@@ -191,7 +191,6 @@
     {"feature":"governance","file":"platform/app/src/pages/governance/teams/[id].tsx","kind":"page-shell"},
     {"feature":"governance","file":"platform/app/src/pages/governance/users.tsx","kind":"page-shell"},
     {"feature":"governance","file":"platform/app/src/pages/governance/users/[id].tsx","kind":"page-shell"},
-    {"feature":"governance","file":"platform/app/src/server/api/routers/governance/activityMonitor.ts","kind":"transport"},
     {"feature":"governance","file":"platform/app/src/server/api/routers/governance/aiTools.ts","kind":"transport"},
     {"feature":"governance","file":"platform/app/src/server/api/routers/governance/anomalyRules.ts","kind":"transport"},
     {"feature":"governance","file":"platform/app/src/server/api/routers/governance/governance.ts","kind":"transport"},

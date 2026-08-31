@@ -155,6 +155,10 @@ export {
   IngestionTemplatesTrpcApi,
   type IngestionTemplatesTrpcContext,
 } from "./transport/api-trpc/ingestion-templates.api";
+export {
+  ActivityMonitorTrpcApi,
+  type ActivityMonitorTrpcContext,
+} from "./transport/api-trpc/activity-monitor.api";
 
 /**
  * The public REST family this feature owns. The process supplies the bound

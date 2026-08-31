@@ -1,4 +1,3 @@
-import { activityMonitorRouter } from "./routers/governance/activityMonitor";
 import { aiToolsRouter } from "./routers/governance/aiTools";
 import { anomalyRulesRouter } from "./routers/governance/anomalyRules";
 import { governanceRouter } from "./routers/governance/governance";
@@ -870,7 +869,7 @@ const coreRouters = {
   personalWorkspaceFeatures: personalWorkspaceFeaturesRouter,
   routingPolicy: enterpriseGatewayRouters.routingPolicy,
   ingestionSources: ingestionSourcesRouter,
-  activityMonitor: activityMonitorRouter,
+  activityMonitor: enterpriseGovernanceRouters.activityMonitor,
   anomalyRules: anomalyRulesRouter,
   aiTools: aiToolsRouter,
   departments: enterpriseGovernanceRouters.departments,

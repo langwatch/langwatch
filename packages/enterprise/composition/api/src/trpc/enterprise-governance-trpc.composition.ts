@@ -22,17 +22,23 @@
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
+  ActivityMonitorTrpcApi,
   DepartmentsTrpcApi,
   IngestionKeyTrpcApi,
   IngestionTemplatesTrpcApi,
   PersonalSessionsTrpcApi,
   SessionPolicyTrpcApi,
+  type ActivityMonitorTrpcContext,
   type DepartmentsTrpcContext,
   type IngestionKeyTrpcContext,
   type IngestionTemplatesTrpcContext,
   type PersonalSessionsTrpcContext,
   type SessionPolicyTrpcContext,
 } from "@langwatch/enterprise-governance-server";
+import {
+  ENTERPRISE_FEATURE_ERRORS,
+  requireEnterprisePlan,
+} from "@langwatch/enterprise-plan-gate";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 
 /** Every context requirement the surfaces place on the process. */
@@ -40,7 +46,8 @@ export type EnterpriseGovernanceTrpcContext = PersonalSessionsTrpcContext &
   SessionPolicyTrpcContext &
   IngestionKeyTrpcContext &
   DepartmentsTrpcContext &
-  IngestionTemplatesTrpcContext;
+  IngestionTemplatesTrpcContext &
+  ActivityMonitorTrpcContext;
 
 /** One already-composed process policy, applied after a feature's input parser. */
 type EnterpriseTrpcPolicy = <TProcedure>(procedure: TProcedure) => TProcedure;
@@ -82,6 +89,29 @@ export class EnterpriseGovernanceTrpcComposition {
         protected: protectedProcedure,
         policy,
       }),
+      activityMonitor: ActivityMonitorTrpcApi.create(root, {
+        protected: protectedProcedure,
+        policy,
+        planGate: planGateFor(ENTERPRISE_FEATURE_ERRORS.ACTIVITY_MONITOR),
+      }),
     };
   }
+}
+
+/**
+ * The one place the tRPC plan-gate middleware is turned into a
+ * ProcedureDecorator the feature transports can accept as a port. Each
+ * feature-refusal sentence yields a distinct gate; the transport declares
+ * which one it wants and the composition supplies it, so the feature
+ * package never imports `@langwatch/enterprise-plan-gate` directly.
+ */
+function planGateFor(featureRefusal: string) {
+  const middleware = requireEnterprisePlan(featureRefusal);
+  // tRPC v11's `.use` accepts the middleware regardless of the procedure's
+  // current chain shape (`.input()` applied or not); typing that generically
+  // for every possible caller means widening to a call the compiler cannot
+  // narrow, so the decorator returns the wrapped procedure with its shape
+  // preserved.
+  return <TProcedure>(procedure: TProcedure): TProcedure =>
+    (procedure as unknown as { use: (m: unknown) => TProcedure }).use(middleware);
 }

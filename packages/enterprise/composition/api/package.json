@@ -122,6 +122,7 @@
     "@langwatch/enterprise-billing-server": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/enterprise-governance-server": "workspace:*",
+    "@langwatch/enterprise-plan-gate": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/enterprise-licensing-server": "workspace:*",
     "@langwatch/enterprise-scim-contract": "workspace:*",
