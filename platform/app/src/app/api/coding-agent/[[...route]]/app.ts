@@ -7,13 +7,19 @@ import { getApp } from "~/server/app-layer/app";
 import { MAX_SESSION_EVENTS_PAGE_SIZE } from "~/server/app-layer/coding-agent/coding-agent-session.service";
 import type { SessionEventsCursor } from "~/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository";
 import { GithubPullRequestNotMappedError } from "~/server/app-layer/github/errors";
-import { getGithubHost } from "~/server/app-layer/github/githubHost";
-import { resolveCallerProjectScope } from "~/server/organizations/resolveCallerProjectScope";
+import {
+  type CallerApiKeyCeiling,
+  resolveCallerProjectScope,
+} from "~/server/organizations/resolveCallerProjectScope";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 
 import { baseResponses } from "../../shared/base-responses";
 import { resolvePersonalCaller } from "../../shared/personal-project-caller";
+import {
+  pullRequestUsageQuerySchema,
+  pullRequestUsageResponseSchema,
+} from "./pull-request-usage-wire";
 
 patchZodOpenapi();
 
@@ -262,92 +268,6 @@ function decodeCursor(raw: string): SessionEventsCursor | null {
   }
 }
 
-// The three cost numbers each row and the totals carry: what a bundled plan
-// already covered, what is priced per token, and the list-price total of both.
-// All three are null together for a project the caller may read but not price.
-const costSplitShape = {
-  costUsd: z.number().nullable(),
-  billedCostUsd: z.number().nullable(),
-  nonBilledCostUsd: z.number().nullable(),
-};
-
-// One contributor's line. A contributor is a project: a personal workspace is
-// named by the person who owns it, a shared one by itself. There is no
-// per-person split inside a shared project, because the only per-person key a
-// session carries is an opaque id the agent reported about itself.
-const usageRowSchema = z.object({
-  projectId: z.string(),
-  projectSlug: z.string(),
-  contributorLabel: z.string(),
-  contributorIsProject: z.boolean(),
-  agent: z.string(),
-  models: z.array(z.string()),
-  sessionsCount: z.number(),
-  inputTokens: z.number(),
-  outputTokens: z.number(),
-  cacheReadTokens: z.number(),
-  cacheCreationTokens: z.number(),
-  totalTokens: z.number(),
-  ...costSplitShape,
-});
-
-const modelUsageSchema = z.object({
-  model: z.string(),
-  inputTokens: z.number(),
-  outputTokens: z.number(),
-  cacheReadTokens: z.number(),
-  cacheCreationTokens: z.number(),
-  totalTokens: z.number(),
-  costUsd: z.number().nullable(),
-  /** False when only the model's name is known: the totals above are not real. */
-  tokensKnown: z.boolean(),
-});
-
-const pullRequestUsageResponseSchema = z.object({
-  pullRequest: z.object({
-    repositoryHost: z.string(),
-    repositoryFullName: z.string(),
-    prNumber: z.number(),
-    headBranch: z.string(),
-    htmlUrl: z.string(),
-    state: z.string(),
-    isDraft: z.boolean(),
-    authorLogin: z.string().nullable(),
-    prCreatedAtMs: z.number(),
-    prClosedAtMs: z.number().nullable(),
-    prMergedAtMs: z.number().nullable(),
-  }),
-  rows: z.array(usageRowSchema),
-  totals: z.object({
-    sessionsCount: z.number(),
-    inputTokens: z.number(),
-    outputTokens: z.number(),
-    cacheReadTokens: z.number(),
-    cacheCreationTokens: z.number(),
-    totalTokens: z.number(),
-    ...costSplitShape,
-  }),
-  modelBreakdown: z.array(modelUsageSchema),
-});
-
-const usageQuerySchema = z.object({
-  /** "owner/name". Case is folded by the mapping store, so either works. */
-  repository: z.string().regex(/^[^/\s]+\/[^/\s]+$/, {
-    message: "repository must be owner/name",
-  }),
-  pullRequest: z.coerce.number().int().positive(),
-  /**
-   * Defaults to the GitHub host this instance is bound to, which is github.com
-   * unless an operator named an Enterprise Server. The published document
-   * states github.com, which is the default every instance has until it names
-   * another host.
-   */
-  host: z
-    .string()
-    .min(1)
-    .default(() => getGithubHost()),
-});
-
 // GET /pull-request-usage: what one pull request cost in assistant usage,
 // across every project of the organization the CALLER may read. Numbers and
 // names only: no session title, no prompt, no file list.
@@ -366,7 +286,10 @@ secured.access(requires("traces:view")).get(
       "model prices, so it estimates spend rather than restating a provider " +
       "invoice. " +
       "Requires a personal-project API key; rows appear only for projects the " +
-      "calling user may view, and cost only for those they may price.",
+      "calling user may view, and cost only for those they may price. " +
+      "Prefer `GET /api/v1/coding-agent/pull-request-usage`, which answers the " +
+      "same question with an organization API key alone and needs no " +
+      "X-Project-Id header.",
     parameters: [
       {
         name: "repository",
@@ -410,7 +333,7 @@ secured.access(requires("traces:view")).get(
       apiKeyUserId: c.get("apiKeyUserId"),
     });
 
-    const query = usageQuerySchema.safeParse({
+    const query = pullRequestUsageQuerySchema.safeParse({
       repository: c.req.query("repository"),
       pullRequest: c.req.query("pullRequest"),
       host: c.req.query("host"),
@@ -428,10 +351,23 @@ secured.access(requires("traces:view")).get(
     // The same permission cut the in-app surfaces resolve, names included: a
     // caller reading this rollup is building something that has to say WHO the
     // usage belongs to, and the agent-reported id it used to get instead
-    // resolved to nobody.
+    // resolved to nobody. A user-bound API key also brings its own binding
+    // ceiling: a deliberately narrowed key reads with its own scope, never
+    // its holder's full one. A legacy project key carries no ceiling by
+    // design, so none is applied for it.
+    const apiKeyId = c.get("apiKeyId");
     const scope = await resolveCallerProjectScope({
       userId: callerUserId,
       organizationId,
+      ...(apiKeyId
+        ? {
+            apiKeyCeiling: {
+              apiKeyId,
+              check: (check: Parameters<CallerApiKeyCeiling["check"]>[0]) =>
+                getApp().permissions.hasApiKeyPermission(check),
+            },
+          }
+        : {}),
     });
 
     const usage =

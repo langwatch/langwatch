@@ -248,7 +248,7 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
   {
     name: "Coding Agents",
     dirName: "coding-agents",
-    pathPrefixes: ["/api/coding-agent"],
+    pathPrefixes: ["/api/v1/coding-agent", "/api/coding-agent"],
     overviewDescription:
       "Read what a coding agent session did and what it cost. Walk one session's events call by call, with the tokens, cost and compactions of each, or roll a whole pull request up into sessions, tokens and cost per project, user and agent.",
   },

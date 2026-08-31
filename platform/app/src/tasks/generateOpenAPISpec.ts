@@ -10,6 +10,7 @@ import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
 import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";
 import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
 import { app as codingAgentApp } from "../app/api/coding-agent/[[...route]]/app";
+import { app as codingAgentV1App } from "../app/api/coding-agent/[[...route]]/app.v1";
 import { app as dashboardsApp } from "../app/api/dashboards/[[...route]]/app";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
 import { app as evaluatorsApp } from "../app/api/evaluators/[[...route]]/app";
@@ -79,6 +80,7 @@ const APP_DERIVED_PREFIXES = [
   "/api/api-keys",
   "/api/analytics",
   "/api/coding-agent",
+  "/api/v1/coding-agent",
   "/api/v1/projects",
   "/api/dashboards",
   "/api/evaluators",
@@ -200,6 +202,8 @@ export default async function execute() {
   const analyticsSqlSpec = await generateSpecs(analyticsSqlApp);
   console.log("Building coding agent spec...");
   const codingAgentSpec = await generateSpecs(codingAgentApp);
+  console.log("Building coding agent v1 spec...");
+  const codingAgentV1Spec = await generateSpecs(codingAgentV1App);
   console.log("Building dashboards spec...");
   const dashboardsSpec = await generateSpecs(dashboardsApp);
   console.log("Building dataset spec...");
@@ -290,6 +294,7 @@ export default async function execute() {
       analyticsSpec,
       analyticsSqlSpec,
       codingAgentSpec,
+      codingAgentV1Spec,
       dashboardsSpec,
       datasetSpec,
       evaluatorsSpec,
