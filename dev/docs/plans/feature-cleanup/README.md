@@ -111,3 +111,40 @@ top-level method that reads as the list.
 Refactor behind a test net in the package, not the one in `platform/app`, and
 sabotage it first — a `GROUP BY` replaced inside a comment passed 368 tests and
 proved nothing.
+
+## R1 (a repository, not a client, comes into the service) — where it stands
+
+`prisma-containment` is at 25. Most entries are `adapters/postgres.*.adapter.ts`
+naming `PrismaClient` only to type the option they hand a repository; the fix
+there is the one applied to saved views — the repository declares
+`Pick<PrismaClient, "…">` for the delegates it uses, and the port carries a
+portable record so nothing above the repository names a generated type.
+
+Two are the real thing, services that take the client itself:
+
+- `gateway/server/src/services/gateway-end-user-caps.service.ts` — a free
+  function taking `prisma: PrismaClient` and running two `findMany`s
+  (`gatewayBudget` filtered to `ATTRIBUTED_USER`, then
+  `gatewayBudgetBucketBoundary` for those ids). Both tables already have reads
+  on `PrismaGatewayBudgetRepository`, and everything the function computes from
+  a row is already covered by `GatewayBudgetResource` in the contract, so the
+  port methods can return that and need no mapper.
+
+  **What blocks it is composition, not the package.** Its caller,
+  `platform/app/src/server/api-router.ts:128`, binds `prisma` because it has no
+  budget repository in scope: `app.gatewayStores.budgets` is
+  `GatewayBudgetSpendPort | undefined` — the ClickHouse spend reader — and the
+  Postgres `GatewayBudgetRepository` is not on the App at all. Finishing this
+  means adding it as an app dependency, which is a `platform/app` change with no
+  local typecheck, and its only test is an integration one needing containers.
+  Landing the package half alone would leave a service nothing constructs.
+
+- `gateway/server/src/services/gateway-usage.service.ts` — 366 lines,
+  constructor takes `PrismaClient`, and it imports the `Prisma` namespace rather
+  than only the client type, so it is likely writing raw SQL. Not yet examined.
+
+The remaining `service-quality` entries are a different problem and should not
+be mistaken for this one: they are big classes whose surface a contract
+mandates (`ExperimentService` alone has ~40 methods across four subjects —
+experiments, runs, DSPy, workbench). Splitting those means splitting the
+contract and every transport that mounts it, not moving a dependency.
