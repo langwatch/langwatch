@@ -15,22 +15,35 @@ import { afterEach, beforeEach, vi } from "vitest";
  * unit config runs with `isolate: false`: a stub left in place would reach
  * every later file in the same worker.
  *
- * It removes every global stub, so do not use it in a suite that installs
- * other globals with `vi.stubGlobal` and expects them to survive a test.
+ * It saves and restores the fetch property itself rather than calling
+ * `vi.stubGlobal` and `vi.unstubAllGlobals`, for the same reason: those work on
+ * one shared registry, so the cleanup would also drop globals that another file
+ * in the worker installed.
  */
 export function guardAgainstGlobalFetch(): void {
+  let original: PropertyDescriptor | undefined;
+
   beforeEach(() => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() => {
+    original = Object.getOwnPropertyDescriptor(globalThis, "fetch");
+    Object.defineProperty(globalThis, "fetch", {
+      value: vi.fn(() => {
         throw new Error(
           "this code must call undici's fetch, not the global fetch",
         );
       }),
-    );
+      configurable: true,
+      writable: true,
+    });
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    if (original) {
+      Object.defineProperty(globalThis, "fetch", original);
+    } else {
+      // The runtime had no fetch of its own, so leaving the stub behind would
+      // invent one for every later file in the worker.
+      delete (globalThis as { fetch?: unknown }).fetch;
+    }
+    original = undefined;
   });
 }
