@@ -71,6 +71,15 @@ async function renderUpdateSuccess(
     lines.push(`**Version ID**: ${newVersion.versionId}`);
   lines.push(`**Commit**: ${params.commitMessage}`);
 
+  if (!newVersion) {
+    // The update succeeded but the re-fetch could not identify the new
+    // version by commit message — say so instead of silently omitting the
+    // version and deployment lines.
+    lines.push(
+      `**Note**: update succeeded, but the new version could not be identified in the re-fetched prompt — version and deployment details are unavailable. Run platform_get_prompt to inspect the current state.`
+    );
+  }
+
   if (newVersion) {
     const newTags = deploymentTagsOf(newVersion);
     if (newTags.length > 0) {

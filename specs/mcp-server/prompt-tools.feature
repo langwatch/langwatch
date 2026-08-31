@@ -160,6 +160,14 @@ Feature: MCP Prompt Tools
     Then the response reports a plain failure
     And the response includes no versionId
 
+  @unit
+  Scenario: Signalling when the new version cannot be identified after a successful update
+    Given platform_update_prompt succeeds
+    And a re-fetch of the prompt finds no version whose commitMessage matches the request's commitMessage
+    When the agent calls platform_update_prompt
+    Then the response states that version and deployment details are unavailable
+    And the response includes no version number and no deployment line
+
   # --- Write path continued: field carry-forward and tag stability (issue #5666 AC10-11) ---
 
   @integration

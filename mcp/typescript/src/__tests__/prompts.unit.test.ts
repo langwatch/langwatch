@@ -588,6 +588,42 @@ describe("handleUpdatePrompt()", () => {
     });
   });
 
+  describe("when the new version cannot be identified after a successful update", () => {
+    /** @scenario "Signalling when the new version cannot be identified after a successful update" */
+    it("states that version and deployment details are unavailable instead of silently omitting them", async () => {
+      mockUpdatePrompt.mockResolvedValue({
+        id: "prompt_1",
+        handle: "my-prompt",
+        latestVersionNumber: 10,
+      } as any);
+      mockedGetPrompt.mockResolvedValue({
+        id: "prompt_1",
+        handle: "my-prompt",
+        latestVersionNumber: 10,
+        versions: [
+          {
+            version: 9,
+            versionId: "ver_stale009",
+            commitMessage: "Some earlier commit",
+            tags: ["latest"],
+          },
+        ],
+      } as any);
+
+      const result = await handleUpdatePrompt({
+        idOrHandle: "my-prompt",
+        commitMessage: "Unfindable commit",
+      });
+
+      expect(result).toContain("Prompt updated successfully!");
+      expect(result).toMatch(/could not be identified/i);
+      expect(result).toMatch(/version and deployment details are unavailable/i);
+      expect(result).not.toContain("**Version**:");
+      expect(result).not.toContain("**Deployed to**:");
+      expect(result).not.toContain("**Deployment**:");
+    });
+  });
+
   describe("when tag assignment fails but the version was committed", () => {
     /** @scenario "Reporting a version as created but untagged when tag assignment fails and a matching version is found" */
     it("reports the version as created and untagged, with its versionId and the failed tag", async () => {
