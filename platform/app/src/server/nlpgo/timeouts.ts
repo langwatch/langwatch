@@ -208,7 +208,11 @@ export function resolveMaxFetchTimeoutMs(): number {
  * pass this as `dispatcher` explicitly; the global's own `RequestInit` type
  * (from the `dom` lib) has no `dispatcher` field, hence {@link FetchInitWithDispatcher}.
  */
-export function createNlpFetchDispatcher(timeoutMs: number): Dispatcher {
+export function createNlpFetchDispatcher({
+  timeoutMs,
+}: {
+  timeoutMs: number;
+}): Dispatcher {
   return new Agent({ headersTimeout: timeoutMs, bodyTimeout: timeoutMs });
 }
 

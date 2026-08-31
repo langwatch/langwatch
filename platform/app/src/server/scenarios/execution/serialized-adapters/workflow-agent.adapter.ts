@@ -231,11 +231,11 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const response = await this.postExecuteSync(
-        JSON.stringify(event),
-        controller.signal,
+      const response = await this.postExecuteSync({
+        body: JSON.stringify(event),
+        signal: controller.signal,
         timeoutMs,
-      );
+      });
 
       if (!response.ok) {
         let errorMessage = "";
@@ -268,18 +268,22 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
     }
   }
 
-  private async postExecuteSync(
-    body: string,
-    signal: AbortSignal,
-    timeoutMs: number,
-  ): Promise<Response> {
+  private async postExecuteSync({
+    body,
+    signal,
+    timeoutMs,
+  }: {
+    body: string;
+    signal: AbortSignal;
+    timeoutMs: number;
+  }): Promise<Response> {
     try {
       const fetchInit: FetchInitWithDispatcher = {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body,
         signal,
-        dispatcher: createNlpFetchDispatcher(timeoutMs),
+        dispatcher: createNlpFetchDispatcher({ timeoutMs }),
       };
       return await fetch(
         `${this.nlpServiceUrl}/go/studio/execute_sync`,

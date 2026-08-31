@@ -82,13 +82,15 @@ describe("createNlpFetchDispatcher", () => {
   });
 
   it("sizes undici's own headers and body timeouts to the caller's deadline", () => {
-    createNlpFetchDispatcher(500_000);
+    createNlpFetchDispatcher({ timeoutMs: 500_000 });
 
     expect(agentOptions.at(-1)?.headersTimeout).toBe(500_000);
     expect(agentOptions.at(-1)?.bodyTimeout).toBe(500_000);
   });
 
   it("returns an undici dispatcher", () => {
-    expect(createNlpFetchDispatcher(500_000)).toBeInstanceOf(Agent);
+    expect(createNlpFetchDispatcher({ timeoutMs: 500_000 })).toBeInstanceOf(
+      Agent,
+    );
   });
 });

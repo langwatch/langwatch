@@ -397,7 +397,9 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(event),
               signal: controller.signal,
-              dispatcher: createNlpFetchDispatcher(fetchTimeoutMs),
+              dispatcher: createNlpFetchDispatcher({
+                timeoutMs: fetchTimeoutMs,
+              }),
             };
             response = await fetch(url, fetchInit);
           } catch (fetchError) {
