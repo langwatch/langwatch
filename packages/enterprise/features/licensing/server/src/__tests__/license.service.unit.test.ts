@@ -178,10 +178,10 @@ describe("LicenseService", () => {
       },
     ];
 
-    const result = await service.validateAndStoreLicense(
-      ORGANIZATION_ID,
-      VALID_LICENSE_KEY,
-    );
+    const result = await service.validateAndStoreLicense({
+      organizationId: ORGANIZATION_ID,
+      licenseKey: VALID_LICENSE_KEY,
+    });
 
     expect(result.success).toBe(true);
     expect(repository.stored.get(ORGANIZATION_ID)).toMatchObject({
@@ -198,17 +198,20 @@ describe("LicenseService", () => {
   });
 
   it("rejects invalid licenses without writing", async () => {
-    const result = await service.validateAndStoreLicense(
-      ORGANIZATION_ID,
-      TAMPERED_LICENSE_KEY,
-    );
+    const result = await service.validateAndStoreLicense({
+      organizationId: ORGANIZATION_ID,
+      licenseKey: TAMPERED_LICENSE_KEY,
+    });
     expect(result).toEqual({ success: false, error: "Invalid signature" });
     expect(repository.stored.size).toBe(0);
   });
 
   it("raises a handled not-found error for an unknown organization", async () => {
     await expect(
-      service.validateAndStoreLicense("missing", VALID_LICENSE_KEY),
+      service.validateAndStoreLicense({
+        organizationId: "missing",
+        licenseKey: VALID_LICENSE_KEY,
+      }),
     ).rejects.toMatchObject({ code: "organization_not_found" });
   });
 
@@ -248,7 +251,10 @@ describe("LicenseService", () => {
     retention.failListing = true;
 
     await expect(
-      service.validateAndStoreLicense(ORGANIZATION_ID, VALID_LICENSE_KEY),
+      service.validateAndStoreLicense({
+        organizationId: ORGANIZATION_ID,
+        licenseKey: VALID_LICENSE_KEY,
+      }),
     ).resolves.toMatchObject({ success: true });
     expect(repository.stored.has(ORGANIZATION_ID)).toBe(true);
     expect(logger.errors).toHaveLength(1);

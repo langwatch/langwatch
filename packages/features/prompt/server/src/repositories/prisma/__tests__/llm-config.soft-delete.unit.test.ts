@@ -46,7 +46,11 @@ describe("LlmConfigRepository", () => {
           latestVersion: {} as any,
         });
 
-        await repo.deleteConfig("prompt_1", "proj_1", "org_1");
+        await repo.deleteConfig({
+          idOrHandle: "prompt_1",
+          projectId: "proj_1",
+          organizationId: "org_1",
+        });
 
         // Handle is nulled out to free it for future reuse; deletedAt is set;
         // the existing display name is preserved (not overwritten with the
@@ -80,7 +84,11 @@ describe("LlmConfigRepository", () => {
           latestVersion: {} as any,
         });
 
-        await repo.deleteConfig("prompt_1", "proj_1", "org_1");
+        await repo.deleteConfig({
+          idOrHandle: "prompt_1",
+          projectId: "proj_1",
+          organizationId: "org_1",
+        });
 
         expect(mockUpdate).toHaveBeenCalledWith({
           where: { id: "prompt_1", projectId: "proj_1" },
@@ -115,7 +123,11 @@ describe("LlmConfigRepository", () => {
           latestVersion: {} as any,
         });
 
-        await repo.deleteConfig("prompt_1", "proj_1", "org_1");
+        await repo.deleteConfig({
+          idOrHandle: "prompt_1",
+          projectId: "proj_1",
+          organizationId: "org_1",
+        });
 
         expect(mockDelete).not.toHaveBeenCalled();
       });

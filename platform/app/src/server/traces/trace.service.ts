@@ -667,10 +667,13 @@ export class TraceService {
    * @param evaluationId - The evaluation to fetch inputs for
    * @returns The parsed inputs, or null when none are available
    */
-  async getEvaluationInputs(
-    projectId: string,
-    evaluationId: string,
-  ): Promise<Record<string, unknown> | null> {
+  async getEvaluationInputs({
+    projectId,
+    evaluationId,
+  }: {
+    projectId: string;
+    evaluationId: string;
+  }): Promise<Record<string, unknown> | null> {
     return this.tracer.withActiveSpan(
       "TraceService.getEvaluationInputs",
       {
@@ -807,20 +810,24 @@ export class TraceService {
    * @param protections - Field redaction protections
    * @returns PromptStudioSpanResult or null if not found
    */
-  async getSpanForPromptStudio(
-    projectId: string,
-    spanId: string,
-    protections: Protections,
-  ): Promise<PromptStudioSpanResult | null> {
+  async getSpanForPromptStudio({
+    projectId,
+    spanId,
+    protections,
+  }: {
+    projectId: string;
+    spanId: string;
+    protections: Protections;
+  }): Promise<PromptStudioSpanResult | null> {
     return this.tracer.withActiveSpan(
       "TraceService.getSpanForPromptStudio",
       { attributes: { "tenant.id": projectId, "span.id": spanId } },
       async () => {
-        return this.clickHouseService.getSpanForPromptStudio(
+        return this.clickHouseService.getSpanForPromptStudio({
           projectId,
           spanId,
           protections,
-        );
+        });
       },
     );
   }

@@ -84,10 +84,10 @@ export abstract class TraceLegacyReadPort {
   ): Promise<Record<string, Evaluation[]>>;
 
   /** One evaluation's inputs, resolved lazily when its card is expanded. */
-  abstract getEvaluationInputs(
-    projectId: string,
-    evaluationId: string,
-  ): Promise<Record<string, unknown> | null>;
+  abstract getEvaluationInputs(input: {
+    projectId: string;
+    evaluationId: string;
+  }): Promise<Record<string, unknown> | null>;
 
   /** Topic and subtopic counts for the filtered window. */
   abstract getTopicCounts(input: TraceLegacyFilterInput): Promise<TopicCountsResult>;
@@ -103,9 +103,9 @@ export abstract class TraceLegacyReadPort {
   ): Promise<DistinctFieldNamesResult>;
 
   /** One LLM span reshaped for the prompt studio, or null when it is not one. */
-  abstract getSpanForPromptStudio(
-    projectId: string,
-    spanId: string,
-    protections: unknown,
-  ): Promise<PromptStudioSpanResult | null>;
+  abstract getSpanForPromptStudio(input: {
+    projectId: string;
+    spanId: string;
+    protections: unknown;
+  }): Promise<PromptStudioSpanResult | null>;
 }

@@ -17,10 +17,10 @@ export abstract class LicensingService {
   }): Promise<PlatformLicenseAccess>;
   abstract getActivePlan(organizationId: string): Promise<PlanInfo>;
   abstract getSelfHostedPlan(organizationId: string): Promise<PlanInfo>;
-  abstract validateAndStoreLicense(
-    organizationId: string,
-    licenseKey: string,
-  ): Promise<StoreLicenseResult>;
+  abstract validateAndStoreLicense(input: {
+    organizationId: string;
+    licenseKey: string;
+  }): Promise<StoreLicenseResult>;
   abstract getLicenseStatus(organizationId: string): Promise<LicenseStatus>;
   abstract removeLicense(organizationId: string): Promise<RemoveLicenseResult>;
 }

@@ -135,9 +135,10 @@ export class LicensingApp {
    * against is a decision about the domain, not about the transport.
    */
   async uploadLicense(input: Readonly<{ organizationId: string; licenseKey: string }>) {
-    const result = await this.dependencies
-      .licenses()
-      .validateAndStoreLicense(input.organizationId, input.licenseKey);
+    const result = await this.dependencies.licenses().validateAndStoreLicense({
+      organizationId: input.organizationId,
+      licenseKey: input.licenseKey,
+    });
 
     if (!result.success) throw licenseValidationError(result.error);
 

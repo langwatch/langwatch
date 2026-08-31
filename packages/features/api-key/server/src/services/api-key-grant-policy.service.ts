@@ -42,7 +42,7 @@ export class ApiKeyGrantPolicyService {
     for (const binding of input.bindings) {
       await this.validateScope(binding, input.organizationId);
     }
-    await this.assertCeiling(input.userId, input.organizationId, input.bindings, input.permissions);
+    await this.assertCeiling(input);
   }
 
   async isOrgAdmin(input: { userId: string; organizationId: string }): Promise<boolean> {
@@ -155,12 +155,17 @@ export class ApiKeyGrantPolicyService {
     };
   }
 
-  async assertCeiling(
-    userId: string,
-    organizationId: string,
-    bindings: ApiKeyScope[],
-    permissions: string[],
-  ): Promise<void> {
+  async assertCeiling({
+    userId,
+    organizationId,
+    bindings,
+    permissions,
+  }: {
+    userId: string;
+    organizationId: string;
+    bindings: ApiKeyScope[];
+    permissions: string[];
+  }): Promise<void> {
     for (const binding of bindings) {
       const scope = await this.validateScope(binding, organizationId);
       const checks = await this.permissionsForBinding(binding, organizationId, permissions);

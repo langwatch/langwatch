@@ -35,13 +35,8 @@ export class LicenseServiceConfiguration {
     readonly now: () => Date,
   ) {}
 
-  static create(
-    input: LicenseServiceConfigurationInput = {},
-  ): LicenseServiceConfiguration {
-    return new LicenseServiceConfiguration(
-      input.retention,
-      input.now ?? (() => new Date()),
-    );
+  static create(input: LicenseServiceConfigurationInput = {}): LicenseServiceConfiguration {
+    return new LicenseServiceConfiguration(input.retention, input.now ?? (() => new Date()));
   }
 }
 
@@ -133,10 +128,13 @@ export class LicenseService extends LicensingServiceContract {
     return mapToPlanInfo(signedLicense.data);
   }
 
-  async validateAndStoreLicense(
-    organizationId: string,
-    licenseKey: string,
-  ): Promise<StoreLicenseResult> {
+  async validateAndStoreLicense({
+    organizationId,
+    licenseKey,
+  }: {
+    organizationId: string;
+    licenseKey: string;
+  }): Promise<StoreLicenseResult> {
     const result = this.cryptography.validateLicense({ licenseKey });
     if (!result.valid) return { success: false, error: result.error };
     if (!(await this.repository.organizationExists(organizationId))) {
@@ -206,12 +204,11 @@ export class LicenseService extends LicensingServiceContract {
           .getCurrentMonthCount({ organizationId })
           .then((count) => (typeof count === "number" ? count : 0))
       : Promise.resolve(0);
-    const [currentMembers, currentMembersLite, currentMessagesPerMonth] =
-      await Promise.all([
-        this.repository.getMemberCount(organizationId),
-        this.repository.getMembersLiteCount(organizationId),
-        messagesPromise,
-      ]);
+    const [currentMembers, currentMembersLite, currentMessagesPerMonth] = await Promise.all([
+      this.repository.getMemberCount(organizationId),
+      this.repository.getMembersLiteCount(organizationId),
+      messagesPromise,
+    ]);
     return {
       currentMembers,
       maxMembers: resolved.maxMembers,
@@ -250,10 +247,7 @@ export class LicenseService extends LicensingServiceContract {
       const existing = await this.retention.listOrganizationRules(organizationId);
       const covered = new Set(
         existing
-          .filter(
-            (rule) =>
-              rule.scopeType === "ORGANIZATION" && rule.scopeId === organizationId,
-          )
+          .filter((rule) => rule.scopeType === "ORGANIZATION" && rule.scopeId === organizationId)
           .map((rule) => rule.category),
       );
       for (const category of retentionConfiguration.categories) {

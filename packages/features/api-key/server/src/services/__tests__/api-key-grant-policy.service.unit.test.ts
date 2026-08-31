@@ -91,7 +91,12 @@ describe("ApiKeyGrantPolicyService", () => {
         const { service } = policyWith({ can: false });
 
         await expect(
-          service.assertCeiling("user-1", ORG, [scope({ role: "ADMIN" })], []),
+          service.assertCeiling({
+            userId: "user-1",
+            organizationId: ORG,
+            bindings: [scope({ role: "ADMIN" })],
+            permissions: [],
+          }),
         ).rejects.toBeInstanceOf(ApiKeyScopeViolationError);
       });
     });
@@ -105,12 +110,22 @@ describe("ApiKeyGrantPolicyService", () => {
       it("may mint a Member key but not an Admin one", async () => {
         const member = policyWith(memberCeiling);
         await expect(
-          member.service.assertCeiling("user-1", ORG, [scope({ role: "MEMBER" })], []),
+          member.service.assertCeiling({
+            userId: "user-1",
+            organizationId: ORG,
+            bindings: [scope({ role: "MEMBER" })],
+            permissions: [],
+          }),
         ).resolves.toBeUndefined();
 
         const admin = policyWith(memberCeiling);
         await expect(
-          admin.service.assertCeiling("user-1", ORG, [scope({ role: "ADMIN" })], []),
+          admin.service.assertCeiling({
+            userId: "user-1",
+            organizationId: ORG,
+            bindings: [scope({ role: "ADMIN" })],
+            permissions: [],
+          }),
         ).rejects.toBeInstanceOf(ApiKeyScopeViolationError);
       });
     });
@@ -120,14 +135,24 @@ describe("ApiKeyGrantPolicyService", () => {
         const { service } = policyWith({ can: true });
 
         await expect(
-          service.assertCeiling("user-1", ORG, [scope({ role: "ADMIN" })], []),
+          service.assertCeiling({
+            userId: "user-1",
+            organizationId: ORG,
+            bindings: [scope({ role: "ADMIN" })],
+            permissions: [],
+          }),
         ).resolves.toBeUndefined();
       });
 
       it("checks the ceiling at the binding's own scope, not the organization", async () => {
         const { service, calls } = policyWith({});
 
-        await service.assertCeiling("user-1", ORG, [scope()], []);
+        await service.assertCeiling({
+          userId: "user-1",
+          organizationId: ORG,
+          bindings: [scope()],
+          permissions: [],
+        });
 
         expect(calls.filter((call) => call.method === "can")).toHaveLength(1);
       });
@@ -149,12 +174,14 @@ describe("ApiKeyGrantPolicyService", () => {
         it(`requires ${permission} to grant ${role} on a ${scopeType.toLowerCase()}`, async () => {
           const { service, calls } = policyWith({});
 
-          await service.assertCeiling(
-            "user-1",
-            ORG,
-            [scope({ role, scopeType, scopeId: scopeType === "ORGANIZATION" ? ORG : "project-1" })],
-            [],
-          );
+          await service.assertCeiling({
+            userId: "user-1",
+            organizationId: ORG,
+            bindings: [
+              scope({ role, scopeType, scopeId: scopeType === "ORGANIZATION" ? ORG : "project-1" }),
+            ],
+            permissions: [],
+          });
 
           expect(calls.find((call) => call.method === "can")?.permission).toBe(permission);
         });
@@ -167,12 +194,12 @@ describe("ApiKeyGrantPolicyService", () => {
           customRoles: [{ id: "role-1", permissions: ["project:manage", "project:view"] }],
         });
 
-        await service.assertCeiling(
-          "user-1",
-          ORG,
-          [scope({ role: "CUSTOM", customRoleId: "role-1" })],
-          [],
-        );
+        await service.assertCeiling({
+          userId: "user-1",
+          organizationId: ORG,
+          bindings: [scope({ role: "CUSTOM", customRoleId: "role-1" })],
+          permissions: [],
+        });
 
         expect(
           calls.filter((call) => call.method === "can").map((call) => call.permission),
@@ -183,12 +210,12 @@ describe("ApiKeyGrantPolicyService", () => {
         const { service } = policyWith({ customRoles: [] });
 
         await expect(
-          service.assertCeiling(
-            "user-1",
-            ORG,
-            [scope({ role: "CUSTOM", customRoleId: "role-1" })],
-            [],
-          ),
+          service.assertCeiling({
+            userId: "user-1",
+            organizationId: ORG,
+            bindings: [scope({ role: "CUSTOM", customRoleId: "role-1" })],
+            permissions: [],
+          }),
         ).rejects.toBeInstanceOf(ApiKeyScopeViolationError);
       });
 
@@ -196,12 +223,12 @@ describe("ApiKeyGrantPolicyService", () => {
         const { service } = policyWith({ customRoles: [{ id: "role-1", permissions: [{}, 7] }] });
 
         await expect(
-          service.assertCeiling(
-            "user-1",
-            ORG,
-            [scope({ role: "CUSTOM", customRoleId: "role-1" })],
-            [],
-          ),
+          service.assertCeiling({
+            userId: "user-1",
+            organizationId: ORG,
+            bindings: [scope({ role: "CUSTOM", customRoleId: "role-1" })],
+            permissions: [],
+          }),
         ).rejects.toBeInstanceOf(ApiKeyScopeViolationError);
       });
     });

@@ -147,12 +147,12 @@ export class ApiKeyLifecycleService {
         ownerUserId: existing.userId,
       });
       if (existing.userId) {
-        await this.grants.assertCeiling(
-          existing.userId,
-          input.organizationId,
-          input.bindings,
-          permissions ?? [],
-        );
+        await this.grants.assertCeiling({
+          userId: existing.userId,
+          organizationId: input.organizationId,
+          bindings: input.bindings,
+          permissions: permissions ?? [],
+        });
       }
     }
     const effectiveBindings =
@@ -247,12 +247,12 @@ export class ApiKeyLifecycleService {
       ownerUserId: input.userId,
     });
     if (input.userId) {
-      await this.grants.assertCeiling(
-        input.userId,
-        input.organizationId,
-        input.bindings,
-        input.permissions ?? [],
-      );
+      await this.grants.assertCeiling({
+        userId: input.userId,
+        organizationId: input.organizationId,
+        bindings: input.bindings,
+        permissions: input.permissions ?? [],
+      });
     }
   }
 }

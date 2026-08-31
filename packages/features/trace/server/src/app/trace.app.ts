@@ -387,10 +387,15 @@ export class TraceApp {
     protections: unknown;
     withEditOverlay?: boolean;
   }): Promise<Trace | undefined> {
-    return this.dependencies.traces.read.getById(input.projectId, input.traceId, input.protections, {
-      full: true,
-      ...(input.withEditOverlay !== undefined ? { withEditOverlay: input.withEditOverlay } : {}),
-    });
+    return this.dependencies.traces.read.getById(
+      input.projectId,
+      input.traceId,
+      input.protections,
+      {
+        full: true,
+        ...(input.withEditOverlay !== undefined ? { withEditOverlay: input.withEditOverlay } : {}),
+      },
+    );
   }
 
   /** Named traces with their spans, resolved in full (#4991). */
@@ -553,7 +558,7 @@ export class TraceApp {
     projectId: string;
     evaluationId: string;
   }): Promise<Record<string, unknown> | null> {
-    return this.dependencies.traces.read.getEvaluationInputs(input.projectId, input.evaluationId);
+    return this.dependencies.traces.read.getEvaluationInputs(input);
   }
 
   /** Topic and subtopic counts for the filtered window. */
@@ -585,11 +590,7 @@ export class TraceApp {
     spanId: string;
     protections: unknown;
   }): Promise<PromptStudioSpanResult | null> {
-    return this.dependencies.traces.read.getSpanForPromptStudio(
-      input.projectId,
-      input.spanId,
-      input.protections,
-    );
+    return this.dependencies.traces.read.getSpanForPromptStudio(input);
   }
 
   // -------------------------------------------------------------------------
@@ -1013,10 +1014,7 @@ export class TraceApp {
   }
 
   /** The cached share payload for this token AND these redactions, if any. */
-  readCachedSharePayload(input: {
-    token: string;
-    protections: Protections;
-  }): Promise<unknown> {
+  readCachedSharePayload(input: { token: string; protections: Protections }): Promise<unknown> {
     return this.dependencies.share.tryGetCachedPayload(input);
   }
 

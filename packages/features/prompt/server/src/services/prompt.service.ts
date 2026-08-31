@@ -1155,11 +1155,11 @@ export class PromptService extends PromptServiceContract {
       organizationId,
     });
 
-    const result = await this.repository.deleteConfig(
-      params.idOrHandle,
-      params.projectId,
+    const result = await this.repository.deleteConfig({
+      idOrHandle: params.idOrHandle,
+      projectId: params.projectId,
       organizationId,
-    );
+    });
     return result;
   }
 

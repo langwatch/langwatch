@@ -1468,11 +1468,15 @@ export class ClickHouseTraceService {
    * @param protections - Field redaction protections
    * @returns PromptStudioSpanResult or null
    */
-  async getSpanForPromptStudio(
-    projectId: string,
-    spanId: string,
-    protections: Protections,
-  ): Promise<PromptStudioSpanResult | null> {
+  async getSpanForPromptStudio({
+    projectId,
+    spanId,
+    protections,
+  }: {
+    projectId: string;
+    spanId: string;
+    protections: Protections;
+  }): Promise<PromptStudioSpanResult | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getSpanForPromptStudio",
       { attributes: { "tenant.id": projectId, "span.id": spanId } },

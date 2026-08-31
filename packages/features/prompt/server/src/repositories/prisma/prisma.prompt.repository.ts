@@ -565,11 +565,15 @@ export class LlmConfigRepository {
    * NOTE: This will only delete the config if the provided projectId matches the config's projectId
    * otherwise it will throw.
    */
-  async deleteConfig(
-    idOrHandle: string,
-    projectId: string,
-    organizationId: string,
-  ): Promise<{ success: boolean }> {
+  async deleteConfig({
+    idOrHandle,
+    projectId,
+    organizationId,
+  }: {
+    idOrHandle: string;
+    projectId: string;
+    organizationId: string;
+  }): Promise<{ success: boolean }> {
     const config = await this.tryGetConfigByIdOrHandleWithLatestVersion({
       idOrHandle,
       projectId,
