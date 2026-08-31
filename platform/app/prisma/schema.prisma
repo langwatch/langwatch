@@ -3184,6 +3184,16 @@ model Grant {
   // the partiality and rebuild it over every share-link row, which is the one
   // thing the WHERE clause exists to avoid.
   //
+  // The API-key permission check's holder lookup - who else holds this key's
+  // private role - is served by "Grant_organizationId_roleKey_live_idx",
+  // partial on `WHERE "revokedAt" IS NULL`, from migration
+  // 20260831120000_grant_role_key_live_index. Partial for the same reason and
+  // undeclarable here for the same reason as the principal scan above: every
+  // read that decides access fences on the mark, and an `@@index` would strip
+  // the WHERE on the next `prisma migrate dev`. Without it the leading column
+  // selects the whole organization and the read degrades to a full scan on
+  // every check.
+  //
   // "Grant_resource_terms_check" is an all-or-nothing CHECK over the tier's
   // four identity columns (token, permission, resourceKind, projectId), tied
   // to scopeType = 'RESOURCE'. Added over two columns in
