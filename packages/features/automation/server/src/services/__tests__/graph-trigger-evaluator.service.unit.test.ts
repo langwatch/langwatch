@@ -1,15 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { CustomGraph, Trigger, AutomationService } from "@langwatch/automation-contract";
+import type {
+  CustomGraph,
+  GraphTriggerEvaluationReason,
+  Trigger,
+} from "@langwatch/automation-contract";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import {
   GRAPH_TRIGGER_MAX_RESULT_ROWS,
   type GraphTriggerEvaluationDeps,
-  type GraphAlertDispatchResult,
   type TimeseriesResult,
   type ProjectIdentity,
-  GraphTriggerEvaluationService,
-} from "../graph-trigger-evaluation.service";
+} from "../trigger-evaluator.service";
+import { GraphTriggerEvaluatorService } from "../graph-trigger-evaluator.service";
+import type { GraphAlertDispatchResult } from "../../ports/automation-graph.port";
 import {
   type GraphTriggerSentRepository,
   type OpenGraphTriggerSent,
@@ -29,7 +33,12 @@ const TriggerAction = {
   SEND_SLACK_MESSAGE: "SEND_SLACK_MESSAGE",
 } as const;
 
-const evaluateGraphTrigger = GraphTriggerEvaluationService.evaluate;
+const evaluateGraphTrigger = (input: {
+  deps: GraphTriggerEvaluationDeps;
+  triggerId: string;
+  projectId: string;
+  reason: GraphTriggerEvaluationReason;
+}) => GraphTriggerEvaluatorService.create(input.deps).evaluate(input);
 
 const PROJECT_ID = "proj-1";
 const TRIGGER_ID = "trig-1";

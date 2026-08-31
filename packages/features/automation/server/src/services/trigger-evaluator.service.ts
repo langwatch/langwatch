@@ -154,10 +154,6 @@ export const GRAPH_TRIGGER_MAX_RESULT_ROWS = 10_000;
 export class TriggerEvaluatorService {
   private constructor() {}
 
-  static create(): TriggerEvaluatorService {
-    return new TriggerEvaluatorService();
-  }
-
   static buildGraphSeriesName(series: GraphSeries, index: number): string {
     const aggregation = series.aggregation === "terms" ? "cardinality" : series.aggregation;
     if (series.pipeline) {

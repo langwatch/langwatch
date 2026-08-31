@@ -18,14 +18,14 @@ import type {
 } from "../ports/automation-graph.port";
 import { AutomationRunawayPort } from "../ports/automation-runaway.port";
 import { AutomationClockPort } from "../ports/automation-clock.port";
-import { GraphTriggerEvaluationService } from "./graph-trigger-evaluation.service";
+import { GraphTriggerEvaluatorService } from "./graph-trigger-evaluator.service";
 import { GraphTriggerHeartbeatService } from "./graph-trigger-heartbeat.service";
 import { RunawayContainmentService } from "./runaway-containment.service";
 
 /** Private graph-alert collaborator, assembled once with Automation's service. */
 export class AutomationGraphService {
   private constructor(
-    private readonly evaluator: GraphTriggerEvaluationService,
+    private readonly evaluator: GraphTriggerEvaluatorService,
     private readonly heartbeat: GraphTriggerHeartbeatService,
     private readonly containment: RunawayContainmentService,
   ) {}
@@ -46,7 +46,7 @@ export class AutomationGraphService {
     baseHost: string;
   }): AutomationGraphService {
     return new AutomationGraphService(
-      GraphTriggerEvaluationService.create({
+      GraphTriggerEvaluatorService.create({
         triggers: input.triggers,
         customGraphs: input.customGraphs,
         projects: input.projects,
