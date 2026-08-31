@@ -91,7 +91,7 @@ export class ModelProviderDefaultsService {
     excludeConfigId?: string;
   }): Promise<ModelDefaultInheritedValues> {
     const context = await this.options.scopes.getProjectContext(input.projectId);
-    const reference = firstScope(input.scopes);
+    const reference = ModelProviderDefaultsService.firstScope(input.scopes);
     const available = await this.getAvailableScopes({
       projectId: input.projectId,
       teamId: context.teamId,
@@ -99,7 +99,7 @@ export class ModelProviderDefaultsService {
     });
     this.assertScopesBelongToProject(input.scopes, available, context.organizationId);
 
-    const chain = inheritedChain({
+    const chain = ModelProviderDefaultsService.inheritedChain({
       reference,
       available,
       organizationId: context.organizationId,
@@ -167,7 +167,7 @@ export class ModelProviderDefaultsService {
 
     const visible = await Promise.all(
       configs.map(async (config) => {
-        const scopes = await filterScopes(config.scopes, (scope) =>
+        const scopes = await ModelProviderDefaultsService.filterScopes(config.scopes, (scope) =>
           this.options.authorization.canRead(actorId, scope),
         );
 
@@ -384,10 +384,10 @@ export class ModelProviderDefaultsService {
           scopeId: organization.id,
         })
       : false;
-    const teams = await filterScopes(available.teams, (scope) =>
+    const teams = await ModelProviderDefaultsService.filterScopes(available.teams, (scope) =>
       authorization.canWrite(actorId, { scopeType: "TEAM", scopeId: scope.id }),
     );
-    const projects = await filterScopes(available.projects, (scope) =>
+    const projects = await ModelProviderDefaultsService.filterScopes(available.projects, (scope) =>
       authorization.canWrite(actorId, { scopeType: "PROJECT", scopeId: scope.id }),
     );
 
@@ -433,6 +433,53 @@ export class ModelProviderDefaultsService {
         : []),
     ];
   }
+
+  private static firstScope(scopes: ModelDefaultScope[]): ModelDefaultScope {
+    const order = { PROJECT: 0, TEAM: 1, ORGANIZATION: 2 };
+    const reference = [...scopes].sort(
+      (left, right) => order[left.scopeType] - order[right.scopeType],
+    )[0];
+    if (!reference) {
+      throw new ModelProviderInvalidError("At least one scope is required");
+    }
+
+    return reference;
+  }
+
+  private static inheritedChain(input: {
+    reference: ModelDefaultScope;
+    available: DefaultAvailableScopes;
+    organizationId: string | null;
+  }): ModelDefaultScope[] {
+    const { reference, available, organizationId } = input;
+    if (reference.scopeType === "ORGANIZATION") {
+      return [reference];
+    }
+
+    const chain = [reference];
+    if (reference.scopeType === "PROJECT") {
+      const project = available.projects.find((candidate) => candidate.id === reference.scopeId);
+      if (project?.teamId) {
+        chain.push({ scopeType: "TEAM", scopeId: project.teamId });
+      }
+    }
+    if (organizationId) {
+      chain.push({ scopeType: "ORGANIZATION", scopeId: organizationId });
+    }
+
+    return chain;
+  }
+
+  private static async filterScopes<T>(
+    scopes: T[],
+    canKeep: (scope: T) => Promise<boolean>,
+  ): Promise<T[]> {
+    const results = await Promise.all(
+      scopes.map(async (scope) => ({ scope, keep: await canKeep(scope) })),
+    );
+
+    return results.filter(({ keep }) => keep).map(({ scope }) => scope);
+  }
 }
 
 const DEFAULT_TIERS = [
@@ -440,47 +487,3 @@ const DEFAULT_TIERS = [
   { type: "TEAM" as const, label: "team" as const },
   { type: "ORGANIZATION" as const, label: "organization" as const },
 ];
-
-function firstScope(scopes: ModelDefaultScope[]): ModelDefaultScope {
-  const order = { PROJECT: 0, TEAM: 1, ORGANIZATION: 2 };
-  const reference = [...scopes].sort(
-    (left, right) => order[left.scopeType] - order[right.scopeType],
-  )[0];
-  if (!reference) {
-    throw new ModelProviderInvalidError("At least one scope is required");
-  }
-
-  return reference;
-}
-
-function inheritedChain(input: {
-  reference: ModelDefaultScope;
-  available: DefaultAvailableScopes;
-  organizationId: string | null;
-}): ModelDefaultScope[] {
-  const { reference, available, organizationId } = input;
-  if (reference.scopeType === "ORGANIZATION") {
-    return [reference];
-  }
-
-  const chain = [reference];
-  if (reference.scopeType === "PROJECT") {
-    const project = available.projects.find((candidate) => candidate.id === reference.scopeId);
-    if (project?.teamId) {
-      chain.push({ scopeType: "TEAM", scopeId: project.teamId });
-    }
-  }
-  if (organizationId) {
-    chain.push({ scopeType: "ORGANIZATION", scopeId: organizationId });
-  }
-
-  return chain;
-}
-
-async function filterScopes<T>(scopes: T[], canKeep: (scope: T) => Promise<boolean>): Promise<T[]> {
-  const results = await Promise.all(
-    scopes.map(async (scope) => ({ scope, keep: await canKeep(scope) })),
-  );
-
-  return results.filter(({ keep }) => keep).map(({ scope }) => scope);
-}

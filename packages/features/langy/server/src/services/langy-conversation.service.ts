@@ -208,51 +208,6 @@ const defaultRuntime: LangyConversationRuntime = {
 export const ADOPTABLE_CONVERSATION_ID = /^[A-Za-z0-9_-]{6,120}$/;
 
 /**
- * Adopt a caller-chosen id as a NEW conversation, or refuse loudly. The id
- * becomes an aggregate key, so its shape is gated before anything durable is
- * written under it. Archived is a refusal, not a resume: adopting would append
- * fresh events to a closed aggregate.
- */
-function adoptConversationId(
-  conversationId: string,
-  ownership: "archived" | "missing",
-): { id: string; isNew: boolean } {
-  if (!ADOPTABLE_CONVERSATION_ID.test(conversationId)) {
-    throw new LangyConversationIdUnadoptableError(conversationId, "invalid_shape");
-  }
-  if (ownership === "archived") {
-    throw new LangyConversationIdUnadoptableError(conversationId, "archived");
-  }
-  return { id: conversationId, isNew: true };
-}
-
-/**
- * The assistant message id for a turn — deterministic, so however many times a
- * turn's finalize lands (live relay + durable backup, retries), it is always
- * the SAME message and dedups on MessageId everywhere. Ordering is unaffected:
- * the messages read sorts by CreatedAt first (MessageId is only a tiebreak).
- */
-function turnMessageId(turnId: string): string {
-  return `langymsg_turn-${turnId}`;
-}
-
-/**
- * Module-level (not a method) so the traced() proxy in presets.ts never wraps
- * it: it is sync and its results are spread/mapped — an async wrapper would
- * silently turn them into Promises.
- */
-function toListItem(row: LangyConversationRow, userId: string): ConversationListItem {
-  return {
-    id: row.id,
-    title: row.title,
-    isShared: row.isShared,
-    isOwn: row.userId === userId,
-    lastActivityAt: new Date(row.lastActivityAtMs > 0 ? row.lastActivityAtMs : row.createdAtMs),
-    messageCount: row.messageCount,
-  };
-}
-
-/**
  * Langy application service. Reads come from the Postgres operational
  * projection; writes remain event-sourcing commands.
  */
@@ -349,7 +304,7 @@ export class LangyConversationService {
     });
     if (!row) throw new LangyConversationNotFoundError(id);
     return {
-      ...toListItem(row, userId),
+      ...LangyConversationService.toListItem(row, userId),
       status: row.status,
       currentTurnId: row.currentTurnId,
       lastError: row.lastError,
@@ -482,7 +437,7 @@ export class LangyConversationService {
       userId,
       limit,
     });
-    return rows.map((r) => toListItem(r, userId));
+    return rows.map((r) => LangyConversationService.toListItem(r, userId));
   }
 
   /**
@@ -520,7 +475,7 @@ export class LangyConversationService {
         : last.cursorActivityAtMs;
 
     return {
-      items: pageRows.map((row) => toListItem(row, userId)),
+      items: pageRows.map((row) => LangyConversationService.toListItem(row, userId)),
       nextCursor: hasMore && last ? { lastActivityAtMs: rawCursorActivity, id: last.id } : null,
     };
   }
@@ -567,7 +522,7 @@ export class LangyConversationService {
       throw new LangyConversationNotOwnedError(conversationId);
     }
     if (adoptUnknownId) {
-      return adoptConversationId(conversationId, ownership);
+      return LangyConversationService.adoptConversationId(conversationId, ownership);
     }
     // Archived / never existed: mint a fresh id — a stale id is legitimate
     // client state, unlike one owned by another user.
@@ -1158,7 +1113,7 @@ export class LangyConversationService {
     outcome?: "completed" | "failed" | "stopped";
     error?: string | null;
   }): Promise<{ messageId: string }> {
-    const messageId = turnMessageId(turnId);
+    const messageId = LangyConversationService.turnMessageId(turnId);
     await this.commands.recordAgentResponse({
       tenantId: projectId,
       occurredAt: this.runtime.now(),
@@ -1270,5 +1225,50 @@ export class LangyConversationService {
       runtime,
       turnOrder,
     );
+  }
+
+  /**
+   * Adopt a caller-chosen id as a NEW conversation, or refuse loudly. The id
+   * becomes an aggregate key, so its shape is gated before anything durable is
+   * written under it. Archived is a refusal, not a resume: adopting would append
+   * fresh events to a closed aggregate.
+   */
+  private static adoptConversationId(
+    conversationId: string,
+    ownership: "archived" | "missing",
+  ): { id: string; isNew: boolean } {
+    if (!ADOPTABLE_CONVERSATION_ID.test(conversationId)) {
+      throw new LangyConversationIdUnadoptableError(conversationId, "invalid_shape");
+    }
+    if (ownership === "archived") {
+      throw new LangyConversationIdUnadoptableError(conversationId, "archived");
+    }
+    return { id: conversationId, isNew: true };
+  }
+
+  /**
+   * The assistant message id for a turn — deterministic, so however many times a
+   * turn's finalize lands (live relay + durable backup, retries), it is always
+   * the SAME message and dedups on MessageId everywhere. Ordering is unaffected:
+   * the messages read sorts by CreatedAt first (MessageId is only a tiebreak).
+   */
+  private static turnMessageId(turnId: string): string {
+    return `langymsg_turn-${turnId}`;
+  }
+
+  /**
+   * Module-level (not a method) so the traced() proxy in presets.ts never wraps
+   * it: it is sync and its results are spread/mapped — an async wrapper would
+   * silently turn them into Promises.
+   */
+  private static toListItem(row: LangyConversationRow, userId: string): ConversationListItem {
+    return {
+      id: row.id,
+      title: row.title,
+      isShared: row.isShared,
+      isOwn: row.userId === userId,
+      lastActivityAt: new Date(row.lastActivityAtMs > 0 ? row.lastActivityAtMs : row.createdAtMs),
+      messageCount: row.messageCount,
+    };
   }
 }

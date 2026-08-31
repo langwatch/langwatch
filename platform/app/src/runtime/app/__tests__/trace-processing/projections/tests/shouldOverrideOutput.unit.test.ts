@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { shouldOverrideOutput } from "@langwatch/trace-server";
+import { TraceIOAccumulationService } from "@langwatch/trace-server";
 
 describe("shouldOverrideOutput", () => {
   describe("when the incoming span is the root span", () => {
     it("overrides a non-root output regardless of other factors", () => {
       expect(
-        shouldOverrideOutput({
+        TraceIOAccumulationService.shouldOverrideOutput({
           isRoot: true,
           outputFromRoot: false,
           isExplicit: false,
@@ -23,7 +23,7 @@ describe("shouldOverrideOutput", () => {
   describe("when both the new and current output came from a root", () => {
     it("overrides when the new root ends later", () => {
       expect(
-        shouldOverrideOutput({
+        TraceIOAccumulationService.shouldOverrideOutput({
           isRoot: true,
           outputFromRoot: true,
           isExplicit: false,
@@ -36,7 +36,7 @@ describe("shouldOverrideOutput", () => {
 
     it("does not override when the new root ends earlier", () => {
       expect(
-        shouldOverrideOutput({
+        TraceIOAccumulationService.shouldOverrideOutput({
           isRoot: true,
           outputFromRoot: true,
           isExplicit: false,
@@ -51,7 +51,7 @@ describe("shouldOverrideOutput", () => {
   describe("when the existing output came from root", () => {
     it("does not override", () => {
       expect(
-        shouldOverrideOutput({
+        TraceIOAccumulationService.shouldOverrideOutput({
           isRoot: false,
           outputFromRoot: true,
           isExplicit: true,
@@ -66,7 +66,7 @@ describe("shouldOverrideOutput", () => {
   describe("when explicit source beats inferred", () => {
     it("overrides when new is explicit and current is inferred", () => {
       expect(
-        shouldOverrideOutput({
+        TraceIOAccumulationService.shouldOverrideOutput({
           isRoot: false,
           outputFromRoot: false,
           isExplicit: true,
@@ -79,7 +79,7 @@ describe("shouldOverrideOutput", () => {
 
     it("does not override when new is inferred and current is explicit", () => {
       expect(
-        shouldOverrideOutput({
+        TraceIOAccumulationService.shouldOverrideOutput({
           isRoot: false,
           outputFromRoot: false,
           isExplicit: false,
@@ -94,7 +94,7 @@ describe("shouldOverrideOutput", () => {
   describe("when both have the same explicitness", () => {
     it("overrides when new span ends later", () => {
       expect(
-        shouldOverrideOutput({
+        TraceIOAccumulationService.shouldOverrideOutput({
           isRoot: false,
           outputFromRoot: false,
           isExplicit: false,
@@ -107,7 +107,7 @@ describe("shouldOverrideOutput", () => {
 
     it("does not override when new span ends earlier", () => {
       expect(
-        shouldOverrideOutput({
+        TraceIOAccumulationService.shouldOverrideOutput({
           isRoot: false,
           outputFromRoot: false,
           isExplicit: false,
@@ -120,7 +120,7 @@ describe("shouldOverrideOutput", () => {
 
     it("overrides when end times are equal (>= semantics)", () => {
       expect(
-        shouldOverrideOutput({
+        TraceIOAccumulationService.shouldOverrideOutput({
           isRoot: false,
           outputFromRoot: false,
           isExplicit: true,

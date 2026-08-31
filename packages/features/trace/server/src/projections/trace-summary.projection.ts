@@ -32,7 +32,10 @@ import {
   METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
 } from "@langwatch/trace-contract";
-import { OUTPUT_SOURCE, shouldOverrideOutput } from "../services/trace-io-accumulation.service";
+import {
+  OUTPUT_SOURCE,
+  TraceIOAccumulationService,
+} from "../services/trace-io-accumulation.service";
 import { TraceLogRecordIOService } from "../services/trace-log-record-io.service";
 import { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service";
 import { anchorStorageTime } from "../services/trace-storage-anchor.rules";
@@ -308,7 +311,7 @@ function applyLogContribution({
   if (contribution.output !== null) {
     const shouldReplace =
       currentOutputIsFallback ||
-      shouldOverrideOutput({
+      TraceIOAccumulationService.shouldOverrideOutput({
         isRoot: false,
         outputFromRoot: state.outputFromRootSpan,
         isExplicit: false,

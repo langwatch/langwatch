@@ -199,10 +199,7 @@ export { trimAttributesForAnalytics } from "./services/analytics-attribute-trim.
 export { TraceAttributeAccumulationService } from "./services/trace-attribute-accumulation.service";
 export { TraceAttributeExtractionService } from "./services/trace-attribute-extraction.service";
 export { TraceOriginService } from "./services/trace-origin.service";
-export {
-  shouldOverrideOutput,
-  TraceIOAccumulationService,
-} from "./services/trace-io-accumulation.service";
+export { TraceIOAccumulationService } from "./services/trace-io-accumulation.service";
 export { TraceLogRecordIOService } from "./services/trace-log-record-io.service";
 
 export { SpanTimingService } from "./services/span-timing.service";
