@@ -787,4 +787,3 @@ describe("TraceListClickHouseRepository.findAll across unmerged same-version row
     });
   });
 });
-
