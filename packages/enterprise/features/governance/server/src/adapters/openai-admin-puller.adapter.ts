@@ -51,6 +51,7 @@ import type {
   PullRunOptions,
 } from "@langwatch/enterprise-governance-contract";
 import type { GovernanceHttpPort } from "../ports/governance-http.port";
+import { AdminUsageReport } from "./admin-usage-report.adapter";
 
 const logger = createLogger("langwatch:governance:openai-admin-puller");
 
@@ -172,182 +173,6 @@ interface ParsedCursor {
   hasKeyGrouping: boolean;
 }
 
-/**
- * The configuration a cursor is bound to: everything that rides beside `page`
- * in the request, plus the configured `startingAt`.
- *
- * `startingAt` is in here for the repair lever. It decides how far back a
- * stale-cursor rewind reaches, so widening it on a source that has already run
- * must mint a new identity — otherwise the cursor matches forever and the
- * deeper history is unreachable without deleting the cursor by hand. That
- * lever is the operator's answer to a correction that arrived later than
- * `RESTATEMENT_LOOKBACK_DAYS`.
- *
- * The floor fallback is deliberately NOT part of this. It is decided per
- * request from the provider's own refusal and carried on the cursor, so
- * binding it here would mint a new identity mid-window and discard a live
- * token over something the config never said.
- */
-function queryIdentity(config: OpenAiAdminPullConfig): string {
-  return `cost:${COST_REPORT_BUCKET_WIDTH}:${COST_GROUP_BY.join(",")}:${config.startingAt ?? ""}`;
-}
-
-function parseCursor({
-  cursor,
-  config,
-}: {
-  cursor: string | null;
-  config: OpenAiAdminPullConfig;
-}): ParsedCursor {
-  if (cursor) {
-    try {
-      const parsed = cursorSchema.parse(JSON.parse(cursor));
-      if (parsed.query === queryIdentity(config)) {
-        return {
-          // Mid-window (a page token in hand) the start must stay exactly what
-          // the token was minted against. Only a cursor with no token in hand
-          // gets the trailing re-read applied to it — UNLESS a key-grouping
-          // upgrade is pending, in which case the lookback is skipped so the
-          // first keyed window cannot overlap with user-only data.
-          windowStart:
-            parsed.page === null && !parsed.keyGroupingUpgrade
-              ? windowStartFor({ stored: parsed.startingAt, config })
-              : parsed.startingAt,
-          storedStart: parsed.startingAt,
-          page: parsed.page,
-          watermark: parsed.watermark,
-          hasKeyGrouping: parsed.hasKeyGrouping,
-        };
-      }
-      return staleCursorRestart({ parsed, config });
-    } catch {
-      logger.warn(
-        { adapter: OPENAI_ADMIN_ADAPTER_ID },
-        "unreadable openai admin cursor; restarting from the configured start",
-      );
-    }
-  }
-  const fresh = config.startingAt ?? defaultStartingAt();
-  return {
-    windowStart: fresh,
-    storedStart: fresh,
-    page: null,
-    watermark: null,
-    hasKeyGrouping: true,
-  };
-}
-
-/**
- * Where a run resumes after its cursor failed the query-identity check.
- *
- * Cost identity is independent of config — the dimensions come off the
- * provider's rows and the bucket width is pinned — so a re-read emits the same
- * `source_event_id`s and restatement replaces the old rows in place rather
- * than landing beside them. That makes rewinding safe, which is what turns
- * "widen the backfill start" into a working repair.
- */
-function staleCursorRestart({
-  parsed,
-  config,
-}: {
-  parsed: z.infer<typeof cursorSchema>;
-  config: OpenAiAdminPullConfig;
-}): ParsedCursor {
-  logger.warn(
-    { adapter: OPENAI_ADMIN_ADAPTER_ID },
-    "openai admin cursor was minted under a different query or repair window; discarding it and re-reading from the start",
-  );
-  const configuredStart = config.startingAt ?? defaultStartingAt();
-  // The EARLIER of the stored watermark and the configured start: a rewind
-  // must never move the watermark FORWARD. A source that fell behind holds a
-  // watermark older than the default window, and snapping it forward would
-  // silently skip everything in between.
-  const storedMs = Date.parse(parsed.startingAt);
-  const rewound =
-    Number.isNaN(storedMs) || Date.parse(configuredStart) <= storedMs
-      ? configuredStart
-      : parsed.startingAt;
-  return {
-    windowStart: rewound,
-    storedStart: rewound,
-    page: null,
-    watermark: null,
-    hasKeyGrouping: true,
-  };
-}
-
-/**
- * The window a drained cursor's next run reads from: the watermark, moved back
- * by the restatement look-back, but never before the configured start and
- * never forward of the watermark itself.
- */
-function windowStartFor({
-  stored,
-  config,
-}: {
-  stored: string;
-  config: OpenAiAdminPullConfig;
-}): string {
-  const storedMs = Date.parse(stored);
-  if (Number.isNaN(storedMs)) return config.startingAt ?? defaultStartingAt();
-
-  const floorMs = Date.parse(config.startingAt ?? defaultStartingAt());
-  const lookedBack = storedMs - RESTATEMENT_LOOKBACK_DAYS * MS_PER_DAY;
-  const notBeforeConfigured = Number.isNaN(floorMs) ? lookedBack : Math.max(lookedBack, floorMs);
-  return new Date(Math.min(notBeforeConfigured, storedMs)).toISOString();
-}
-
-/**
- * A first run with no configured start.
- *
- * Daily buckets with a processing lag, so three days back guarantees at least
- * one settled bucket. Snapped to midnight UTC to align with bucket boundaries.
- */
-function defaultStartingAt(): string {
-  const d = new Date(Date.now() - 3 * MS_PER_DAY);
-  d.setUTCHours(0, 0, 0, 0);
-  return d.toISOString();
-}
-
-/** Cap on how much of an error response body we log. */
-const MAX_ERROR_BODY_BYTES = 4_096;
-
-async function safeResponseText(response: { text(): Promise<string> }): Promise<string> {
-  try {
-    const raw = await response.text();
-    if (raw.length <= MAX_ERROR_BODY_BYTES) return raw;
-    return `${raw.slice(0, MAX_ERROR_BODY_BYTES)}… [truncated]`;
-  } catch {
-    return "";
-  }
-}
-
-/**
- * Whether a 400 is the provider refusing to group by API key this far back.
- *
- * Gated on `param` AND `code` together, and never on the message. Both halves
- * are load-bearing: the endpoint's other rejections carry `param: "start_time"`
- * with `code: "invalid_type"` (an unparseable date), or `code:
- * "invalid_request_error"` with `param: null` (a missing date, an over-ceiling
- * limit). Only this refusal carries both. Reading the English instead would
- * make a sentence the provider is free to reword decide whether months of
- * history are attributed.
- */
-function isKeyGroupingRefusal(body: string): boolean {
-  try {
-    const parsed: unknown = JSON.parse(body);
-    const envelope =
-      parsed !== null && typeof parsed === "object" && "error" in parsed
-        ? (parsed as { error: unknown }).error
-        : parsed;
-    if (envelope === null || typeof envelope !== "object") return false;
-    const { param, code } = envelope as { param?: unknown; code?: unknown };
-    return param === "start_time" && code === "invalid_request_error";
-  } catch {
-    return false;
-  }
-}
-
 /** One group-by row inside a cost bucket. Unknown fields are tolerated so the
  *  raw payload keeps everything the provider sent. */
 const costResultSchema = z
@@ -381,67 +206,6 @@ const pageSchema = z.object({
   next_page: z.string().nullable().default(null),
 });
 
-/**
- * Dimension values are the identity of a row, so an absent one has to be a
- * STABLE token rather than an omitted key: dropping a dimension from one pull
- * and including it as null on the next would mint two keys for one row and
- * double-count it.
- */
-function dimension(value: string | null): string {
-  return value ?? "";
-}
-
-/**
- * The dimension values as one `:`-delimited string, each value encoded first.
- *
- * `line_item` is free text the provider writes and can contain the delimiter.
- * Joined raw, two distinct rows can produce the identical string and collapse
- * onto one `source_event_id`, which is the OCSF sink's dedup key. Encoding
- * first makes the separator unambiguous. The restatement key is unaffected —
- * it hashes the map through `JSON.stringify`, which escapes rather than
- * concatenates — this is about the readable identity that rides beside it.
- */
-function dimensionPath(dimensions: Record<string, string>): string {
-  return Object.values(dimensions).map(encodeURIComponent).join(":");
-}
-
-/** ISO instant for a bucket's epoch-seconds start. */
-function bucketStartIso(startTime: number): string {
-  return new Date(startTime * 1000).toISOString();
-}
-
-/**
- * The request URL for one page. Everything here except `page` is what
- * `queryIdentity` binds the cursor to — change one, change both.
- *
- * `end_time` is deliberately absent. It is optional, and a window whose end
- * moves with the clock would invalidate every page token the moment the run
- * asked for the next page.
- */
-function reportUrl({
-  startingAt,
-  page,
-  hasKeyGrouping,
-}: {
-  startingAt: string;
-  page: string | null;
-  hasKeyGrouping: boolean;
-}): URL {
-  const url = new URL(`${API_BASE}/costs`);
-  const startMs = Date.parse(startingAt);
-  if (Number.isNaN(startMs)) {
-    throw new Error(`openai admin puller cannot read a window start of "${startingAt}"`);
-  }
-  url.searchParams.set("start_time", String(Math.floor(startMs / 1000)));
-  url.searchParams.set("bucket_width", COST_REPORT_BUCKET_WIDTH);
-  url.searchParams.set("limit", String(PAGE_LIMIT));
-  for (const dim of hasKeyGrouping ? COST_GROUP_BY : COST_GROUP_BY_WITHOUT_KEY) {
-    url.searchParams.append("group_by[]", dim);
-  }
-  if (page) url.searchParams.set("page", page);
-  return url;
-}
-
 export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
   readonly id: string = OPENAI_ADMIN_ADAPTER_ID;
 
@@ -457,11 +221,11 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
 
   async runOnce(options: PullRunOptions, config: OpenAiAdminPullConfig): Promise<PullResult> {
     const events: NormalizedPullEvent[] = [];
-    const cursor = parseCursor({ cursor: options.cursor, config });
+    const cursor = OpenAiAdminPuller.parseCursor({ cursor: options.cursor, config });
     // The window start does not move within a run; only the page token, the
     // watermark and the key-grouping fallback do.
     const startingAt = cursor.windowStart;
-    const query = queryIdentity(config);
+    const query = OpenAiAdminPuller.queryIdentity(config);
     let page = cursor.page;
     let watermark = cursor.watermark;
     let hasKeyGrouping = cursor.hasKeyGrouping;
@@ -480,7 +244,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
         // so a deadline costs latency rather than a window.
         return {
           events,
-          cursor: encodeCursor({
+          cursor: OpenAiAdminPuller.encodeCursor({
             startingAt: resumeStart(),
             page,
             query,
@@ -505,13 +269,13 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       }
       events.push(...read.events);
       hasKeyGrouping = read.hasKeyGrouping;
-      watermark = laterOf(watermark, read.watermark);
+      watermark = OpenAiAdminPuller.laterOf(watermark, read.watermark);
 
       if (read.nextPage === null) {
         return {
           events,
-          cursor: encodeCursor(
-            drainCursor({
+          cursor: OpenAiAdminPuller.encodeCursor(
+            OpenAiAdminPuller.drainCursor({
               watermark,
               storedStart: cursor.storedStart,
               hasKeyGrouping,
@@ -530,7 +294,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     );
     return {
       events,
-      cursor: encodeCursor({
+      cursor: OpenAiAdminPuller.encodeCursor({
         startingAt: resumeStart(),
         page,
         query,
@@ -611,7 +375,8 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     // means that observation never has to hold: a page returned in another
     // order cannot rewind the source.
     const newest = parsed.data.reduce<string | null>(
-      (acc, bucket) => laterOf(acc, bucketStartIso(bucket.start_time)),
+      (acc, bucket) =>
+        OpenAiAdminPuller.laterOf(acc, OpenAiAdminPuller.bucketStartIso(bucket.start_time)),
       null,
     );
     return {
@@ -685,7 +450,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       throw new Error("openai admin puller requires an admin API key in credentials.token");
     }
 
-    const url = reportUrl({ startingAt, page, hasKeyGrouping });
+    const url = OpenAiAdminPuller.reportUrl({ startingAt, page, hasKeyGrouping });
     const signal = options.signal
       ? AbortSignal.any([options.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
       : AbortSignal.timeout(REQUEST_TIMEOUT_MS);
@@ -700,8 +465,8 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       followRedirects: false,
     });
     if (!response.ok) {
-      const detail = await safeResponseText(response);
-      if (response.status === 400 && isKeyGroupingRefusal(detail)) {
+      const detail = await AdminUsageReport.safeResponseText(response);
+      if (response.status === 400 && OpenAiAdminPuller.isKeyGroupingRefusal(detail)) {
         return { ok: false };
       }
       // The body can echo the request but never the credential — the key rides
@@ -726,7 +491,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     bucket: z.infer<typeof bucketSchema>;
     hasKeyGrouping: boolean;
   }): NormalizedPullEvent[] {
-    const startingAt = bucketStartIso(bucket.start_time);
+    const startingAt = OpenAiAdminPuller.bucketStartIso(bucket.start_time);
     return bucket.results.flatMap((result) => {
       const parsed = costResultSchema.safeParse(result);
       if (!parsed.success) {
@@ -757,14 +522,14 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     const dimensions: Record<string, string> = {
       report: "cost",
       bucketWidth: COST_REPORT_BUCKET_WIDTH,
-      projectId: dimension(result.project_id),
-      lineItem: dimension(result.line_item),
-      userId: dimension(result.user_id),
+      projectId: AdminUsageReport.dimension(result.project_id),
+      lineItem: AdminUsageReport.dimension(result.line_item),
+      userId: AdminUsageReport.dimension(result.user_id),
       // Present only when the window was read with the key dimension. Below
       // the provider's floor the coordinate is absent rather than empty: a
       // stable "" would be a claim about a key, and the map for a given bucket
       // is read one way or the other, never both.
-      ...(hasKeyGrouping ? { apiKeyId: dimension(result.api_key_id) } : {}),
+      ...(hasKeyGrouping ? { apiKeyId: AdminUsageReport.dimension(result.api_key_id) } : {}),
     };
 
     if (result.amount.currency.toLowerCase() !== "usd") {
@@ -785,12 +550,12 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     const amountUsd = result.amount.value;
 
     return {
-      source_event_id: `cost:${startingAt}:${dimensionPath(dimensions)}`,
+      source_event_id: `cost:${startingAt}:${AdminUsageReport.dimensionPath(dimensions)}`,
       event_timestamp: startingAt,
       // The provider names the person on every row, so no directory is asked.
-      actor: dimension(result.user_email),
+      actor: AdminUsageReport.dimension(result.user_email),
       action: "cost_report",
-      target: dimension(result.line_item),
+      target: AdminUsageReport.dimension(result.line_item),
       cost_usd: amountUsd,
       tokens_input: 0,
       tokens_output: 0,
@@ -800,8 +565,8 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
         // spreads `extra` into the audit row's metadata extension, which is
         // where the shipped Genie attribution puts the same thing — so this
         // needs no change to the published event contract.
-        actorUserId: dimension(result.user_id),
-        apiKeyId: dimension(result.api_key_id),
+        actorUserId: AdminUsageReport.dimension(result.user_id),
+        apiKeyId: AdminUsageReport.dimension(result.api_key_id),
         [PULLED_USAGE_HINT_KEY]: {
           costBasis: "provider_reported",
           // The provider's figure, but not the invoice: nothing establishes
@@ -810,67 +575,267 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
           costStatus: "estimate",
           costUsd: amountUsd,
           dimensions,
-          model: dimension(result.line_item),
+          model: AdminUsageReport.dimension(result.line_item),
         },
       },
     };
   }
-}
 
-function encodeCursor({
-  startingAt,
-  page,
-  query,
-  watermark,
-  hasKeyGrouping,
-  keyGroupingUpgrade,
-}: Omit<z.infer<typeof cursorSchema>, "query"> & { query: string }): string {
-  return JSON.stringify({
+  /**
+   * The configuration a cursor is bound to: everything that rides beside `page`
+   * in the request, plus the configured `startingAt`.
+   *
+   * `startingAt` is in here for the repair lever. It decides how far back a
+   * stale-cursor rewind reaches, so widening it on a source that has already run
+   * must mint a new identity — otherwise the cursor matches forever and the
+   * deeper history is unreachable without deleting the cursor by hand. That
+   * lever is the operator's answer to a correction that arrived later than
+   * `RESTATEMENT_LOOKBACK_DAYS`.
+   *
+   * The floor fallback is deliberately NOT part of this. It is decided per
+   * request from the provider's own refusal and carried on the cursor, so
+   * binding it here would mint a new identity mid-window and discard a live
+   * token over something the config never said.
+   */
+  private static queryIdentity(config: OpenAiAdminPullConfig): string {
+    return `cost:${COST_REPORT_BUCKET_WIDTH}:${COST_GROUP_BY.join(",")}:${config.startingAt ?? ""}`;
+  }
+
+  private static parseCursor({
+    cursor,
+    config,
+  }: {
+    cursor: string | null;
+    config: OpenAiAdminPullConfig;
+  }): ParsedCursor {
+    if (cursor) {
+      try {
+        const parsed = cursorSchema.parse(JSON.parse(cursor));
+        if (parsed.query === OpenAiAdminPuller.queryIdentity(config)) {
+          return {
+            // Mid-window (a page token in hand) the start must stay exactly what
+            // the token was minted against. Only a cursor with no token in hand
+            // gets the trailing re-read applied to it — UNLESS a key-grouping
+            // upgrade is pending, in which case the lookback is skipped so the
+            // first keyed window cannot overlap with user-only data.
+            windowStart:
+              parsed.page === null && !parsed.keyGroupingUpgrade
+                ? OpenAiAdminPuller.windowStartFor({ stored: parsed.startingAt, config })
+                : parsed.startingAt,
+            storedStart: parsed.startingAt,
+            page: parsed.page,
+            watermark: parsed.watermark,
+            hasKeyGrouping: parsed.hasKeyGrouping,
+          };
+        }
+        return OpenAiAdminPuller.staleCursorRestart({ parsed, config });
+      } catch {
+        logger.warn(
+          { adapter: OPENAI_ADMIN_ADAPTER_ID },
+          "unreadable openai admin cursor; restarting from the configured start",
+        );
+      }
+    }
+    const fresh = config.startingAt ?? OpenAiAdminPuller.defaultStartingAt();
+    return {
+      windowStart: fresh,
+      storedStart: fresh,
+      page: null,
+      watermark: null,
+      hasKeyGrouping: true,
+    };
+  }
+
+  /**
+   * Where a run resumes after its cursor failed the query-identity check.
+   *
+   * Cost identity is independent of config — the dimensions come off the
+   * provider's rows and the bucket width is pinned — so a re-read emits the same
+   * `source_event_id`s and restatement replaces the old rows in place rather
+   * than landing beside them. That makes rewinding safe, which is what turns
+   * "widen the backfill start" into a working repair.
+   */
+  private static staleCursorRestart({
+    parsed,
+    config,
+  }: {
+    parsed: z.infer<typeof cursorSchema>;
+    config: OpenAiAdminPullConfig;
+  }): ParsedCursor {
+    logger.warn(
+      { adapter: OPENAI_ADMIN_ADAPTER_ID },
+      "openai admin cursor was minted under a different query or repair window; discarding it and re-reading from the start",
+    );
+    const configuredStart = config.startingAt ?? OpenAiAdminPuller.defaultStartingAt();
+    // The EARLIER of the stored watermark and the configured start: a rewind
+    // must never move the watermark FORWARD. A source that fell behind holds a
+    // watermark older than the default window, and snapping it forward would
+    // silently skip everything in between.
+    const storedMs = Date.parse(parsed.startingAt);
+    const rewound =
+      Number.isNaN(storedMs) || Date.parse(configuredStart) <= storedMs
+        ? configuredStart
+        : parsed.startingAt;
+    return {
+      windowStart: rewound,
+      storedStart: rewound,
+      page: null,
+      watermark: null,
+      hasKeyGrouping: true,
+    };
+  }
+
+  /**
+   * The window a drained cursor's next run reads from: the watermark, moved back
+   * by the restatement look-back, but never before the configured start and
+   * never forward of the watermark itself.
+   */
+  private static windowStartFor({
+    stored,
+    config,
+  }: {
+    stored: string;
+    config: OpenAiAdminPullConfig;
+  }): string {
+    const storedMs = Date.parse(stored);
+    if (Number.isNaN(storedMs)) return config.startingAt ?? OpenAiAdminPuller.defaultStartingAt();
+
+    const floorMs = Date.parse(config.startingAt ?? OpenAiAdminPuller.defaultStartingAt());
+    const lookedBack = storedMs - RESTATEMENT_LOOKBACK_DAYS * MS_PER_DAY;
+    const notBeforeConfigured = Number.isNaN(floorMs) ? lookedBack : Math.max(lookedBack, floorMs);
+    return new Date(Math.min(notBeforeConfigured, storedMs)).toISOString();
+  }
+
+  /**
+   * A first run with no configured start.
+   *
+   * Daily buckets with a processing lag, so three days back guarantees at least
+   * one settled bucket. Snapped to midnight UTC to align with bucket boundaries.
+   */
+  private static defaultStartingAt(): string {
+    const d = new Date(Date.now() - 3 * MS_PER_DAY);
+    d.setUTCHours(0, 0, 0, 0);
+    return d.toISOString();
+  }
+
+  /**
+   * Whether a 400 is the provider refusing to group by API key this far back.
+   *
+   * Gated on `param` AND `code` together, and never on the message. Both halves
+   * are load-bearing: the endpoint's other rejections carry `param: "start_time"`
+   * with `code: "invalid_type"` (an unparseable date), or `code:
+   * "invalid_request_error"` with `param: null` (a missing date, an over-ceiling
+   * limit). Only this refusal carries both. Reading the English instead would
+   * make a sentence the provider is free to reword decide whether months of
+   * history are attributed.
+   */
+  private static isKeyGroupingRefusal(body: string): boolean {
+    try {
+      const parsed: unknown = JSON.parse(body);
+      const envelope =
+        parsed !== null && typeof parsed === "object" && "error" in parsed
+          ? (parsed as { error: unknown }).error
+          : parsed;
+      if (envelope === null || typeof envelope !== "object") return false;
+      const { param, code } = envelope as { param?: unknown; code?: unknown };
+      return param === "start_time" && code === "invalid_request_error";
+    } catch {
+      return false;
+    }
+  }
+
+  /** ISO instant for a bucket's epoch-seconds start. */
+  private static bucketStartIso(startTime: number): string {
+    return new Date(startTime * 1000).toISOString();
+  }
+
+  /**
+   * The request URL for one page. Everything here except `page` is what
+   * `queryIdentity` binds the cursor to — change one, change both.
+   *
+   * `end_time` is deliberately absent. It is optional, and a window whose end
+   * moves with the clock would invalidate every page token the moment the run
+   * asked for the next page.
+   */
+  private static reportUrl({
+    startingAt,
+    page,
+    hasKeyGrouping,
+  }: {
+    startingAt: string;
+    page: string | null;
+    hasKeyGrouping: boolean;
+  }): URL {
+    const url = new URL(`${API_BASE}/costs`);
+    const startMs = Date.parse(startingAt);
+    if (Number.isNaN(startMs)) {
+      throw new Error(`openai admin puller cannot read a window start of "${startingAt}"`);
+    }
+    url.searchParams.set("start_time", String(Math.floor(startMs / 1000)));
+    url.searchParams.set("bucket_width", COST_REPORT_BUCKET_WIDTH);
+    url.searchParams.set("limit", String(PAGE_LIMIT));
+    for (const dim of hasKeyGrouping ? COST_GROUP_BY : COST_GROUP_BY_WITHOUT_KEY) {
+      url.searchParams.append("group_by[]", dim);
+    }
+    if (page) url.searchParams.set("page", page);
+    return url;
+  }
+
+  private static encodeCursor({
     startingAt,
     page,
     query,
     watermark,
     hasKeyGrouping,
     keyGroupingUpgrade,
-  });
-}
+  }: Omit<z.infer<typeof cursorSchema>, "query"> & { query: string }): string {
+    return JSON.stringify({
+      startingAt,
+      page,
+      query,
+      watermark,
+      hasKeyGrouping,
+      keyGroupingUpgrade,
+    });
+  }
 
-/** Cursor emitted when a window drains (no more pages). */
-function drainCursor({
-  watermark,
-  storedStart,
-  hasKeyGrouping,
-  query,
-}: {
-  watermark: string | null;
-  storedStart: string;
-  hasKeyGrouping: boolean;
-  query: string;
-}): Parameters<typeof encodeCursor>[0] {
-  // The stored start never moves backwards: a retracted window whose newest
-  // bucket predates the stored start must not rewind the source.
-  const start = laterOf(watermark, storedStart) ?? storedStart;
-  return {
-    // When upgrading from user-only to keyed grouping, advance one bucket past
-    // the watermark: that day was already emitted with user-only dimensions,
-    // and re-reading it with keyed dimensions would produce a different
-    // source_event_id, doubling that day.
-    startingAt: !hasKeyGrouping ? new Date(Date.parse(start) + MS_PER_DAY).toISOString() : start,
-    page: null,
+  /** Cursor emitted when a window drains (no more pages). */
+  private static drainCursor({
+    watermark,
+    storedStart,
+    hasKeyGrouping,
     query,
-    watermark: null,
-    hasKeyGrouping: true,
-    keyGroupingUpgrade: !hasKeyGrouping,
-  };
-}
+  }: {
+    watermark: string | null;
+    storedStart: string;
+    hasKeyGrouping: boolean;
+    query: string;
+  }): Parameters<typeof OpenAiAdminPuller.encodeCursor>[0] {
+    // The stored start never moves backwards: a retracted window whose newest
+    // bucket predates the stored start must not rewind the source.
+    const start = OpenAiAdminPuller.laterOf(watermark, storedStart) ?? storedStart;
+    return {
+      // When upgrading from user-only to keyed grouping, advance one bucket past
+      // the watermark: that day was already emitted with user-only dimensions,
+      // and re-reading it with keyed dimensions would produce a different
+      // source_event_id, doubling that day.
+      startingAt: !hasKeyGrouping ? new Date(Date.parse(start) + MS_PER_DAY).toISOString() : start,
+      page: null,
+      query,
+      watermark: null,
+      hasKeyGrouping: true,
+      keyGroupingUpgrade: !hasKeyGrouping,
+    };
+  }
 
-/** The later of two ISO instants, tolerating nulls and unparseable input. */
-function laterOf(a: string | null, b: string | null): string | null {
-  if (a === null) return b;
-  if (b === null) return a;
-  const aMs = Date.parse(a);
-  const bMs = Date.parse(b);
-  if (Number.isNaN(aMs)) return b;
-  if (Number.isNaN(bMs)) return a;
-  return bMs > aMs ? b : a;
+  /** The later of two ISO instants, tolerating nulls and unparseable input. */
+  private static laterOf(a: string | null, b: string | null): string | null {
+    if (a === null) return b;
+    if (b === null) return a;
+    const aMs = Date.parse(a);
+    const bMs = Date.parse(b);
+    if (Number.isNaN(aMs)) return b;
+    if (Number.isNaN(bMs)) return a;
+    return bMs > aMs ? b : a;
+  }
 }
