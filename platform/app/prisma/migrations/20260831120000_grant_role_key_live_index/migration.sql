@@ -56,5 +56,14 @@ CREATE INDEX IF NOT EXISTS "Grant_organizationId_roleKey_live_idx"
 
 -- Down (manual rollback; uncomment and run). The index carries no row data of
 -- its own, so dropping it loses nothing - the API-key permission check goes
--- back to reading every live grant the organization owns on every call:
+-- back to reading every live grant the organization owns on every call.
+--
+-- Note the lock is the other way round from the build above: a plain DROP
+-- INDEX takes ACCESS EXCLUSIVE and blocks reads as well as writes, where the
+-- build blocked only writes. On this index that is immaterial - dropping it
+-- took 0.458 ms on the same reproduction, because the work is unlinking a
+-- catalog entry rather than scanning a heap - but if it ever needs to happen
+-- on a running system, DROP INDEX CONCURRENTLY is the form that does not
+-- block, and it works here because a manual rollback is not inside Prisma's
+-- transaction:
 -- DROP INDEX IF EXISTS "Grant_organizationId_roleKey_live_idx";
