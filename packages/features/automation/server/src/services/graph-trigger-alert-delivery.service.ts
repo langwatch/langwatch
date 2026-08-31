@@ -4,9 +4,33 @@ import {
   type SlackActionParams,
   slackDeliveryMethodOf,
 } from "@langwatch/automation-contract";
+import { createHash } from "node:crypto";
+import { isNoDataPredicate } from "@langwatch/automation-contract";
 import type { GraphAlertDispatchResult } from "../ports/automation-graph.port";
 import { TriggerEvaluatorService } from "./trigger-evaluator.service";
 import type { GraphEvaluationPlan, GraphSeriesEvaluation } from "./trigger-evaluator.service";
+
+/**
+ * Identity for one firing, derived from the trigger, the graph and the fire it
+ * follows — so a re-evaluation of the same unbroken incident derives the same
+ * digest and does not alert twice.
+ */
+function graphAlertFireDigest(input: {
+  triggerId: string;
+  customGraphId: string;
+  previousFireId: string | null;
+}): string {
+  return createHash("sha256")
+    .update(`${input.triggerId}:${input.customGraphId}:${input.previousFireId ?? "genesis"}`)
+    .digest("hex")
+    .slice(0, 16);
+}
+
+/** Why an evaluation was skipped, when the predicate is one that cannot fire
+ *  on an empty result. */
+function tryNoDataDetail(operator: string, threshold: number): string | undefined {
+  return isNoDataPredicate({ operator, threshold }) ? "no-data predicate" : undefined;
+}
 
 export class GraphTriggerAlertDeliveryService {
   private constructor() {}
@@ -82,7 +106,7 @@ export class GraphTriggerAlertDeliveryService {
         recipients: plan.params.members ?? [],
         slackWebhook: plan.params.slackWebhook ?? null,
         botDestination,
-        fireDigest: TriggerEvaluatorService.graphAlertFireDigest({
+        fireDigest: graphAlertFireDigest({
           triggerId: plan.request.triggerId,
           customGraphId: plan.customGraphId,
           previousFireId,
@@ -185,7 +209,7 @@ export class GraphTriggerAlertDeliveryService {
       ...plan.request,
       status: "fired",
       value,
-      detail: TriggerEvaluatorService.tryNoDataDetail(plan.operator, plan.threshold),
+      detail: tryNoDataDetail(plan.operator, plan.threshold),
       didSend: true,
       renderErrors: result.renderErrors,
       missingVariables: result.missingVariables,

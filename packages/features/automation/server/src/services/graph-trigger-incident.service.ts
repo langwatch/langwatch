@@ -2,7 +2,6 @@ import {
   evaluateCustomGraphThreshold,
   type GraphTriggerEvaluationResult,
 } from "@langwatch/automation-contract";
-import { TriggerEvaluatorService } from "./trigger-evaluator.service";
 import type { GraphEvaluationPlan, GraphSeriesEvaluation } from "./trigger-evaluator.service";
 import { GraphTriggerAlertDeliveryService } from "./graph-trigger-alert-delivery.service";
 
@@ -55,9 +54,8 @@ export class GraphTriggerIncidentService {
     value: number,
     open: { id: string; triggerId: string; projectId: string; customGraphId: string },
   ): Promise<GraphTriggerEvaluationResult> {
-    await TriggerEvaluatorService.resolveGraphIncident({
-      deps: plan.request.deps,
-      openTriggerSent: open,
+    await plan.request.deps.triggerSent.markResolvedById({
+      id: open.id,
       projectId: plan.request.projectId,
       now: plan.now,
     });

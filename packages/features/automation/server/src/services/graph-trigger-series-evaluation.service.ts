@@ -6,9 +6,35 @@ import {
 } from "./trigger-evaluator.service";
 import type {
   GraphEvaluationPlan,
+  GraphSeries,
   GraphSeriesEvaluation,
   TimeseriesResult,
 } from "./trigger-evaluator.service";
+
+/** ClickHouse's "too many rows or bytes", however the client spelled it. */
+function isTimeseriesResultTooLarge(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  if (code === 396 || code === "396") {
+    return true;
+  }
+
+  return (error instanceof Error ? error.message : String(error)).includes(
+    "TOO_MANY_ROWS_OR_BYTES",
+  );
+}
+
+/** The key analytics returns a series under, which the reader must rebuild to
+ *  find it in the result. */
+function graphSeriesName(series: GraphSeries, index: number): string {
+  const aggregation = series.aggregation === "terms" ? "cardinality" : series.aggregation;
+  if (series.pipeline) {
+    return `${index}/${series.metric}/${aggregation}/${series.pipeline.field}/${series.pipeline.aggregation}`;
+  }
+  if (series.key) {
+    return `${index}/${series.metric}/${aggregation}/${series.key}`;
+  }
+  return `${index}/${series.metric}/${aggregation}`;
+}
 
 export class GraphTriggerSeriesEvaluationService {
   private constructor() {}
@@ -36,7 +62,7 @@ export class GraphTriggerSeriesEvaluationService {
         maxResultRows: GRAPH_TRIGGER_MAX_RESULT_ROWS,
       })) as TimeseriesResult;
     } catch (error) {
-      if (!TriggerEvaluatorService.isTimeseriesResultTooLarge(error)) {
+      if (!isTimeseriesResultTooLarge(error)) {
         throw error;
       }
 
@@ -60,7 +86,7 @@ export class GraphTriggerSeriesEvaluationService {
   }
 
   private values(plan: GraphEvaluationPlan, result: TimeseriesResult): GraphSeriesEvaluation {
-    const key = TriggerEvaluatorService.buildGraphSeriesName(plan.timeseriesInput.series[0]!, 0);
+    const key = graphSeriesName(plan.timeseriesInput.series[0]!, 0);
     const currentPoints = extractSeriesPoints(result.currentPeriod, key, plan.graph.groupBy);
     const previousPoints = extractSeriesPoints(result.previousPeriod, key, plan.graph.groupBy);
 

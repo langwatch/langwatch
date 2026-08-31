@@ -4,9 +4,6 @@ import type {
   GraphTriggerEvaluationResult,
   Trigger,
 } from "@langwatch/automation-contract";
-import { isNoDataPredicate } from "@langwatch/automation-contract";
-import { createHash } from "node:crypto";
-import type { OpenGraphTriggerSent } from "../repositories/graph-trigger-sent.repository";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { TimeseriesBucket } from "@langwatch/analytics-contract";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -151,44 +148,19 @@ export type GraphSeriesEvaluation = {
 export const GRAPH_TRIGGER_MAX_RESULT_ROWS = 10_000;
 
 /** Pure graph-evaluation helpers shared by the focused evaluator services. */
+/**
+ * What the graph-trigger collaborators share.
+ *
+ * Everything else this class held moved to the one service that called it —
+ * the series name and the too-large classification to series evaluation, the
+ * fire digest and the no-data detail to alert delivery, and the incident
+ * resolve was a pass-through its caller could make itself. This is the only
+ * member with more than one caller.
+ */
 export class TriggerEvaluatorService {
   private constructor() {}
 
-  static buildGraphSeriesName(series: GraphSeries, index: number): string {
-    const aggregation = series.aggregation === "terms" ? "cardinality" : series.aggregation;
-    if (series.pipeline) {
-      return `${index}/${series.metric}/${aggregation}/${series.pipeline.field}/${series.pipeline.aggregation}`;
-    }
-
-    if (series.key) {
-      return `${index}/${series.metric}/${aggregation}/${series.key}`;
-    }
-
-    return `${index}/${series.metric}/${aggregation}`;
-  }
-
-  static isTimeseriesResultTooLarge(error: unknown): boolean {
-    const code = (error as { code?: unknown } | null)?.code;
-    if (code === 396 || code === "396") {
-      return true;
-    }
-
-    const message = error instanceof Error ? error.message : String(error);
-
-    return message.includes("TOO_MANY_ROWS_OR_BYTES");
-  }
-
-  static graphAlertFireDigest(input: {
-    triggerId: string;
-    customGraphId: string;
-    previousFireId: string | null;
-  }): string {
-    return createHash("sha256")
-      .update(`${input.triggerId}:${input.customGraphId}:${input.previousFireId ?? "genesis"}`)
-      .digest("hex")
-      .slice(0, 16);
-  }
-
+  /** A result that stops the evaluation before it reads any data. */
   static skippedGraphEvaluation(input: {
     triggerId: string;
     projectId: string;
@@ -196,22 +168,5 @@ export class TriggerEvaluatorService {
     detail: string;
   }): GraphTriggerEvaluationResult {
     return { ...input, status: "skipped" };
-  }
-
-  static async resolveGraphIncident(input: {
-    deps: GraphTriggerEvaluationDeps;
-    openTriggerSent: OpenGraphTriggerSent;
-    projectId: string;
-    now: Date;
-  }): Promise<void> {
-    await input.deps.triggerSent.markResolvedById({
-      id: input.openTriggerSent.id,
-      projectId: input.projectId,
-      now: input.now,
-    });
-  }
-
-  static tryNoDataDetail(operator: string, threshold: number): string | undefined {
-    return isNoDataPredicate({ operator, threshold }) ? "no-data predicate" : undefined;
   }
 }
