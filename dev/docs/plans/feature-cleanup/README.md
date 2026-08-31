@@ -351,3 +351,36 @@ legitimate and should not be "fixed": `testing.ts` files are a package's test
 surface, and the langy `eventing.*-index.adapter.ts` files look like barrels
 but are the targets of declared `exports` subpaths, imported by seventeen
 files. Deleting those would have broken all of them.
+
+### The sweep was under-counting
+
+The first scan only matched signatures on one line, so its 23 was a floor.
+Re-run multi-line aware, the count of methods putting a **tenant id beside
+another same-typed argument** was 48. It is 31 now — trace (5), scenario (4),
+api-key (3), gateway (3), then singles. Some of the remainder are private
+key-builders (`key(projectId, sessionId)`) where the risk is confined to one
+file; the rest are worth doing.
+
+**The worst one was in the gateway's virtual keys**, and it is the argument
+for the whole exercise:
+
+    rotateSecret(id, organizationId, newHashedSecret, newDisplayPrefix,
+                 previousHashedSecret, previousSecretValidUntil, tx?)
+
+Five strings in a row, where positions three and five are the incoming
+secret and the one being retired. Transpose them and it compiles: the key
+keeps working on its old secret, the newly issued one is filed as retired,
+and the rotation reports success having rotated nothing. Its one caller —
+platform/app's legacy VirtualKeyService — passed exactly those seven
+arguments positionally.
+
+Two of the same port's members, `updateConfig` and `setRoutingPolicy`, were
+abstract, implemented in Prisma, and called from nowhere in the repository.
+Gone.
+
+**Also worth recording, because it recurs:** in gateway, secret, presence and
+the virtual-key port, the named-object form was already in use *in the same
+file* — `create(input, transaction?)`, `findPageInOrganization(input)`,
+`tryGetWithHealth(input)`. The positional pairs were not a house style, they
+were the members that never got converted. That makes the remaining 31 a
+finishing job rather than a decision.
