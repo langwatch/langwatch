@@ -31,17 +31,25 @@
 -- Reads keep working; writes wait. That matters more here than on an ordinary
 -- table, because "Grant" is the live authorization projection and a revoke is
 -- a write - so the length of the build is the length of the worst-case delay
--- on a revoke landing. Measured on a 600,000-row reproduction of the shape
--- this index serves: 575 ms to build, 4 MB of index. The partial predicate is
--- doing most of that work, since it is a two-column btree over rows that are
--- almost all live. A sub-second pause during a deploy is the same order as
--- every other migration in this directory, and the two comparable index
--- migrations (20260804120000_dataset_record_project_dataset_index at ~2.8s,
--- 20260814120002_llm_prompt_config_org_scope_index) accepted the same trade
--- for the same reason: CONCURRENTLY cannot run inside the transaction Prisma
--- wraps a migration in. Making the concurrent prebuild mandatory instead
--- would fail this migration on every fresh install, which is a worse outcome
--- than a sub-second wait.
+-- on a revoke landing.
+--
+-- Measured on a local Postgres 16 container on developer hardware, over a
+-- 600,000-row reproduction: 400-575 ms to build, 4 MB of index. Two
+-- distributions were tried, because a btree deduplicates repeated keys and a
+-- lopsided seed would flatter the result - one organization holding every row
+-- built in 524 ms, a 7,000-organization spread in 399 ms. The shape barely
+-- moves it, so the range above is the honest one.
+--
+-- Read that as an order of magnitude, not as a production figure: a smaller
+-- or already-saturated instance should expect single-digit seconds, the same
+-- extrapolation 20260804120000_dataset_record_project_dataset_index made from
+-- its own reproduction. Plan the deploy window for seconds.
+--
+-- That trade is the one this directory already takes - see that migration and
+-- 20260814120002_llm_prompt_config_org_scope_index - and for the same reason:
+-- CONCURRENTLY cannot run inside the transaction Prisma wraps a migration in.
+-- Making the concurrent prebuild mandatory instead would fail this migration
+-- on every fresh install, which is worse than a wait of that length.
 CREATE INDEX IF NOT EXISTS "Grant_organizationId_roleKey_live_idx"
   ON "Grant" ("organizationId", "roleKey")
   WHERE "revokedAt" IS NULL;
