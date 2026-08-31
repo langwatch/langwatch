@@ -97,13 +97,45 @@ Turn the connection off for a deployment without a code change:
 LANGWATCH_AGENT_CONNECT=0
 ```
 
-`enabled=False` on the decorator does the same in code, and the SDK defaults it to false when `CI` is set, because a CI job is not a service anyone runs suites against. Pass `enabled=True` when a CI job is deliberately the target.
+`enabled` on the connect function does the same in code. It takes any boolean, so one expression decides which deployments connect:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import os
+
+    import langwatch
+
+    @langwatch.connect_agent(
+        name="support-agent",
+        enabled=os.environ.get("APP_ENV") != "production" and not os.environ.get("CI"),
+    )
+    async def support_agent(messages: list[dict]) -> str:
+        return await run_my_agent(messages)
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    import { connectAgent } from "langwatch/agent";
+
+    connectAgent(
+      {
+        name: "support-agent",
+        enabled: process.env.APP_ENV !== "production" && !process.env.CI,
+      },
+      async ({ messages }) => await runMyAgent(messages),
+    );
+    ```
+  </Tab>
+</Tabs>
+
+The `CI` half of each expression keeps the default the SDK applies on its own. Without an `enabled` argument the SDK connects, except when `CI` is set, because a CI job is not a service anyone runs suites against. An `enabled` argument replaces that rule instead of adding to it, so an expression that ignores `CI` connects CI jobs. Leave the `CI` half out when a CI job is deliberately the target.
 
 ## Next steps
 
 <CardGroup cols={2}>
   <Card title="Connect your agent" icon="plug" href="/agent-testing/connect-your-agent">
-    Decorate the function that runs your agent
+    Call your agent from a connect function beside your service startup
   </Card>
   <Card title="Run parameters" icon="sliders" href="/agent-testing/run-parameters">
     Values a run supplies, declared by the scenario or by the agent

@@ -232,8 +232,11 @@ jobs:
       - name: Check for stale generated files
         run: |
           STALE=0
+          # Every page the skills manifest drives, read from the generator, so
+          # a new entry in the manifest is covered without editing this list.
+          SKILL_PAGES=$(node docs/scripts/generate-skills-pages.mjs --list-pages)
           if ! git diff --exit-code \
-            docs/skills/directory.mdx docs/skills/pms-and-domain-experts.mdx \
+            $SKILL_PAGES \
             docs/llms.txt docs/llms-full.txt \
             docs/api-reference/openapiLangWatch.json docs/docs.json; then
             STALE=1

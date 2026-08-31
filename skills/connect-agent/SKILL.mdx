@@ -1,7 +1,7 @@
 ---
 name: connect-agent
 user-prompt: "Connect my agent to LangWatch simulations"
-description: Connect the codebase's AI agent to LangWatch agent simulations, so test suites run against the real agent process. Decorates the function that runs the agent with the LangWatch SDK, which opens an outbound connection and registers the agent with its environment and its run parameters, confirms the agent is Online, and runs the first test suite. Falls back to an HTTP registration when the agent cannot import the SDK. Use when the user wants platform scenarios to test their real agent.
+description: Connect the codebase's AI agent to LangWatch agent simulations, so test suites run against the real agent process. Adds a small connect function beside the service startup that calls the agent already in the codebase, which opens an outbound connection and registers the agent with its environment and its run parameters, confirms the agent is Online, and runs the first test suite. Falls back to an HTTP registration when the agent cannot import the SDK. Use when the user wants platform scenarios to test their real agent.
 license: MIT
 compatibility: Works with Claude Code and similar coding agents. The `langwatch` CLI is the only interface for platform operations.
 ---
@@ -14,7 +14,7 @@ import PlanLimits from "../_shared/plan-limits.mdx";
 
 Connect the agent in this codebase to LangWatch, so test suites run from the platform against the real agent process. The SDK opens an outbound connection to LangWatch from the process that already runs the agent, registers the agent with its environment and its run parameters, and receives one call per conversation turn. The simulation exercises the real code, dependencies, secrets and traces.
 
-Three steps: install the SDK, decorate the function, start the process. Work through them in order, confirm the agent reads Online, run one test suite, then report what changed and the result.
+Three steps: install the SDK, add the connect function where the service starts, start the service the way the user always starts it. Work through them in order, confirm the agent reads Online, run one test suite, then report what changed and the result.
 
 Use the HTTP fallback at the bottom of this skill ONLY when the agent cannot import the SDK: the agent is written in a language with no LangWatch SDK, or you have no access to its code.
 
@@ -26,7 +26,7 @@ Use the HTTP fallback at the bottom of this skill ONLY when the agent cannot imp
 
 ## Step 2: Install the SDK
 
-Read the codebase first. Find the function that takes a conversation and returns the agent's reply, and the file it lives in. That function is what you decorate; do not write a second one beside it.
+Read the codebase first. Find two things: the entry point that runs the agent, which is what the connect function calls, and the file that starts the service, which is where the connect function goes.
 
 ```bash
 pip install langwatch          # Python
@@ -35,46 +35,66 @@ npm install langwatch zod      # TypeScript, Node only
 
 The process needs `LANGWATCH_API_KEY` in its environment. It is the same project key the CLI uses. Without a key the SDK logs one line and opens no connection.
 
-## Step 3: Decorate the function
+## Step 3: Add the connect function where the service starts
+
+Write a small function beside the code that starts the service. It is the adapter between the messages that come from a scenario test and the agent in the codebase.
+
+Put it in the file that starts the service, or in a module that file imports at startup. The connection opens with the process, so the code has to run when the process runs.
 
 **Python**
 
 ```python
+# main.py, beside the server startup
 import langwatch
 
+from my_app.agent import SupportAgent
+
 @langwatch.connect_agent(name="support-agent")
-async def support_agent(messages: list[dict], thread_id: str) -> str:
-    return await run_my_agent(messages)
+async def support_agent(
+    messages: list[dict],
+    thread_id: str,
+    *,
+    model: str = "gpt-5-mini",
+) -> str:
+    result = await SupportAgent(model=model).run(messages, conversation_id=thread_id)
+    return result.output_text
 ```
 
 **TypeScript**
 
 ```typescript
+// server.ts, beside the server startup
 import { z } from "zod";
 import { connectAgent } from "langwatch/agent";
 
-export const supportAgent = connectAgent(
+import { runSupportAgent } from "./agent";
+
+connectAgent(
   {
     name: "support-agent",
     parameters: z.object({
       model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),
-      plan: z.string().default("free").describe("Customer plan"),
-      maxTools: z.number().int().default(5),
     }),
   },
-  async ({ messages, params }) => {
-    // params is typed: { model: "gpt-5" | "gpt-5-mini"; plan: string; maxTools: number }
-    return await runMyAgent(messages, { model: params.model });
+  async ({ messages, threadId, params }) => {
+    const result = await runSupportAgent({
+      messages,
+      conversationId: threadId,
+      model: params.model,
+    });
+    return result.text;
   },
 );
 ```
 
-Rules for the decorated function:
+Rules for the connect function:
 
 - `name` is required. Use the name the team calls the agent, in lower case with dashes.
+- Call the agent the product already runs. Do not reimplement it in the connect function, and do not call a simplified copy of it, or the suite tests code no customer reaches.
+- Change nothing about how the service starts. The connect function runs on the startup path, and the start command stays the same.
 - **Turn fields** are what the platform sends on every call: `messages` (the whole conversation, OpenAI-style), `new_messages` (`newMessages`, the delta since the last turn), `thread_id` (`threadId`), `session`, `trace_id` (`traceId`). In Python, declare only the ones you use and the SDK passes exactly those. In TypeScript, they arrive as one object, so destructure what you need.
 - Return a string, one message, a list of messages, or `langwatch.AgentReply(output, session=...)` (`{ output, session }` in TypeScript).
-- Do not remove or weaken the function's own behavior. The decorator wraps it; the direct callers keep working.
+- Do not change the agent's own code to fit the connect function. Map the turn onto the agent's existing call in the connect function instead.
 - Do NOT add a `traceparent` middleware. The SDK adopts the turn's trace context before it calls the function, so the agent's spans land in the turn's trace and the judge reads them.
 
 ### Run parameters
@@ -95,7 +115,7 @@ async def support_agent(
     ...
 ```
 
-TypeScript declares them with a zod schema in `parameters`, the way Step 3 shows. The schema types `params` in the handler, and the SDK validates the values a run supplies against it. Add `zod` to the project (`npm install zod`) if it is not there yet. Read the schema this way:
+TypeScript declares them with a zod schema in `parameters`, the way Step 3 shows. Read the values out of `params` in the connect function and pass them into the agent's own call. The schema types `params` in the handler, and the SDK validates the values a run supplies against it. Add `zod` to the project (`npm install zod`) if it is not there yet. Read the schema this way:
 
 - `z.enum([...])` becomes a closed option list in the run dialog. A value outside the list is refused.
 - `.default(value)` sets the default.
@@ -132,16 +152,21 @@ The SDK reads the environment from the `environment` argument, then `LANGWATCH_A
 
 Leave `environment` out when the service already sets `LANGWATCH_AGENT_ENVIRONMENT`, `APP_ENV`, `ENVIRONMENT` or `NODE_ENV`. The SDK reads them on its own.
 
-## Step 4: Start the process and confirm the agent is Online
+## Step 4: Start the service and confirm the agent is Online
 
-Start the service the way the user starts it. A web server keeps the connection alive by itself. For a script whose only job is the agent, block it:
+Start the service the way the user starts it. Do not add a start command, and do not write a separate runner script: the connect function is already on the startup path, and a web server holds the connection open by itself.
+
+The exception is an agent that is a library with no process of its own. Put the connect function in a small script and keep the script alive:
 
 ```python
 langwatch.agent.serve()   # Python, at the bottom of the script
 ```
 
 ```typescript
-// TypeScript: the socket keeps the event loop alive, `node agent.ts` serves until Ctrl-C
+// TypeScript: keep the script alive yourself. The WebSocket holds the event loop
+// while connected, but the HTTP fallback and the reconnect wait do not.
+setInterval(() => {}, 1 << 30);
+// Run it with the project's TypeScript runner, for example `tsx agent.ts`
 ```
 
 Then confirm from the CLI, in another terminal:
@@ -295,13 +320,14 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 | The run is refused with `agent_offline` | No instance was connected when the run started. | Start the agent process and run again. |
 | The run is refused with `agent_owner_only` | The agent registered under `development` with a personal key, so only its owner can run it. | Run it as the owner, or register it under a shared environment name such as `dev-shared`. |
 | The run is refused with `scenario_parameter_option_invalid` | A value is outside the closed option list the agent declares. | Use one of the listed options, or widen the `Literal` (Python) or `z.enum` (TypeScript) list in the code. |
-| A turn fails with `agent_call_timeout` | The function took longer than the agent's timeout. | Raise `timeout` on the decorator (up to 300 seconds), or make the agent answer faster. |
+| A turn fails with `agent_call_timeout` | The call took longer than the agent's timeout. | Raise `timeout` on the connect function (up to 300 seconds), or make the agent answer faster. |
 | Trace-dependent criteria come back inconclusive | The agent reports its traces to a different LangWatch project, or it reports none at all. | Point the agent's tracing at the same project's API key. Set it up with the `tracing` skill. |
 
 ## Common Mistakes
 
-- Do NOT write a second wrapper function for LangWatch to call. Decorate the function the product already runs, so the simulation exercises the real code path.
-- Do NOT add a `traceparent` middleware for a decorated agent. The SDK adopts the trace context itself; the middleware belongs to the HTTP fallback only.
+- Do NOT reimplement the agent inside the connect function, and do NOT point it at a simplified copy. It calls the agent the product already runs, so the simulation exercises the real code path.
+- Do NOT add a runner script or a second start command when the service already has one. The connect function goes on the existing startup path.
+- Do NOT add a `traceparent` middleware for a connected agent. The SDK adopts the trace context itself; the middleware belongs to the HTTP fallback only.
 - Do NOT hardcode an environment string, and do NOT write a fallback such as `process.env.APP_ENV ?? "development"`. It overrides `LANGWATCH_AGENT_ENVIRONMENT` and registers a production process under `development`. Let the SDK resolve the environment.
 - Do NOT declare a run parameter for a value the tests never vary. Every declared parameter appears in the run dialog.
 - Do NOT use a turn field name (`messages`, `new_messages`, `thread_id`, `session`, `trace_id`) as a run parameter name.
