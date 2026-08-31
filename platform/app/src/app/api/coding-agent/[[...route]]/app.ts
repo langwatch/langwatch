@@ -7,7 +7,10 @@ import { getApp } from "~/server/app-layer/app";
 import { MAX_SESSION_EVENTS_PAGE_SIZE } from "~/server/app-layer/coding-agent/coding-agent-session.service";
 import type { SessionEventsCursor } from "~/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository";
 import { GithubPullRequestNotMappedError } from "~/server/app-layer/github/errors";
-import { resolveCallerProjectScope } from "~/server/organizations/resolveCallerProjectScope";
+import {
+  type CallerApiKeyCeiling,
+  resolveCallerProjectScope,
+} from "~/server/organizations/resolveCallerProjectScope";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 
@@ -348,10 +351,23 @@ secured.access(requires("traces:view")).get(
     // The same permission cut the in-app surfaces resolve, names included: a
     // caller reading this rollup is building something that has to say WHO the
     // usage belongs to, and the agent-reported id it used to get instead
-    // resolved to nobody.
+    // resolved to nobody. A user-bound API key also brings its own binding
+    // ceiling: a deliberately narrowed key reads with its own scope, never
+    // its holder's full one. A legacy project key carries no ceiling by
+    // design, so none is applied for it.
+    const apiKeyId = c.get("apiKeyId");
     const scope = await resolveCallerProjectScope({
       userId: callerUserId,
       organizationId,
+      ...(apiKeyId
+        ? {
+            apiKeyCeiling: {
+              apiKeyId,
+              check: (check: Parameters<CallerApiKeyCeiling["check"]>[0]) =>
+                getApp().permissions.hasApiKeyPermission(check),
+            },
+          }
+        : {}),
     });
 
     const usage =

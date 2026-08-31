@@ -74,9 +74,11 @@ const callerScopedRead = {
     policy: handlerManagedAuth({
       reason:
         "authenticated by the organization-key middleware; the handler then " +
-        "resolves the caller's own per-project permission cut " +
-        "(resolveCallerProjectScope), so rows appear only for projects the " +
-        "calling user may view and cost only where they may price",
+        "resolves the caller's per-project permission cut " +
+        "(resolveCallerProjectScope) intersected with the key's own binding " +
+        "ceiling (hasApiKeyPermission), so rows appear only for projects " +
+        "BOTH the key and its holder may view, and cost only where both may " +
+        "price",
       permissions: ["traces:view", "cost:view"],
       credential: "apiKey",
     }),
@@ -101,12 +103,16 @@ const pullRequestUsageHandler = async (
     apiKeyUserId: (c.get("apiKeyUserId") as string | null) ?? null,
   });
 
-  // The same permission cut the in-app surfaces resolve, names included: a
-  // caller reading this rollup is building something that has to say WHO the
-  // usage belongs to.
+  // The same permission cut the in-app surfaces resolve, names included —
+  // intersected with the KEY's own binding ceiling: a deliberately narrowed
+  // key must read with its own scope, never its holder's full one.
   const scope = await resolveCallerProjectScope({
     userId: callerUserId,
     organizationId: organization.id,
+    apiKeyCeiling: {
+      apiKeyId: c.get("apiKeyId") as string,
+      check: (check) => getApp().permissions.hasApiKeyPermission(check),
+    },
   });
 
   const usage =

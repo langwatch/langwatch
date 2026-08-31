@@ -104,6 +104,6 @@ export const pullRequestUsageQuerySchema = z.object({
     .min(1)
     .default(() => getGithubHost())
     .describe(
-      "The GitHub host, for GitHub Enterprise Server instances. Defaults to github.com.",
+      "The GitHub host. Defaults to this instance's configured GitHub host, which is github.com unless an operator named a GitHub Enterprise Server.",
     ),
 });

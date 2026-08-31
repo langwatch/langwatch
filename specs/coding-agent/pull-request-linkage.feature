@@ -942,6 +942,25 @@ Rule: The v1 usage read needs only an organization credential that names its use
     Then the answer is the caller's organization-wide rollup
     And the read is recorded against the caller, the organization and the pull request
 
+  # A key can carry bindings NARROWER than its holder's own — that ceiling is
+  # the whole point of a restricted key — so the rollup intersects the
+  # holder's cut with the key's, the same key-plus-holder decision every
+  # other REST door asks.
+  @integration
+  Scenario: A narrowed key reads with its own scope, not its holder's
+    Given a holder who may view traces in two projects
+    And their organization key is bound to only one of them
+    When the v1 pull request usage is read with that key
+    Then only the bound project's rows appear
+    And the other project is absent from the whole answer
+
+  @integration
+  Scenario: A key whose binding lacks the cost grant reads tokens with no cost
+    Given an organization key bound to one project with a role that cannot price
+    When the v1 pull request usage is read with that key
+    Then the bound project's rows carry token counts
+    And every cost in the answer is absent
+
   # An organization service key authenticates fine but answers for nobody:
   # the rollup is the CALLER's permission cut, and a key with no user has no
   # caller to cut by. Refused with its own stable code, not a generic 401.
