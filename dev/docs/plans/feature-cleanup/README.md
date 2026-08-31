@@ -581,3 +581,34 @@ case never reached the query.
 
 **The rest is a decision, not a cleanup.** Sixty-odd files is a body of work
 whose owner should choose whether it is fixed, quarantined, or already known.
+
+### The same remedy does NOT work for `server/api`'s RBAC tests
+
+`server/api/__tests__/rbac*.test.ts` fail with the same "App not initialized",
+and `wireDefaultTestApp()` takes 118 failures down to 4 — which is exactly why
+it is worth spelling out that **it must not be used there.**
+
+The four that remain are the POSITIVE cases ("still grants a genuine member"),
+and their failing is the tell. These tests pass their own prisma fake to
+`hasProjectPermission`; with a default App wired, the decision routes through
+`getApp().permissions` and never reads the fake, so everything denies. The
+negative cases then pass for the wrong reason. Sabotage says so plainly:
+with the wiring in place, deleting the org-membership predicate from the
+direct-binding query fails NOTHING. Loud failure traded for silent green that
+guards nothing.
+
+`appPermissionsMock()` is the obvious next idea and is also wrong here: it
+backs the App's permissions with the very resolvers under test, so the call
+recurses and the suite hangs. It exists for tests of OTHER things that need a
+permission decision, and its consumers pair it with
+`vi.mock("~/server/api/rbac", ...)`, which is not available to a test of that
+module.
+
+What these need is an App whose `permissions.isOnEngine` answers false, so the
+legacy binding resolution runs against the fake each case supplies. Left
+alone rather than guessed at.
+
+The difference from `server/rbac/**`, which the same one-liner did fix: those
+call `checkRoleBindingPermission` directly, `isOnEngine` answers false under
+the default App, and the fake IS used — proven by the predicate sabotage
+failing there.
