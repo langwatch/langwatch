@@ -170,17 +170,23 @@ export function ensureClaudeSkillInstructions(workingDirectory: string): void {
  *   cold-start flows where the agent must discover keys from .env files.
  * @param omitEnvKeys - Additional variables to keep in the test process but
  *   remove from Claude Code, such as a provider key used only by the judge.
+ * @param extraEnv - Variables to add to the spawned Claude Code process,
+ *   such as LANGWATCH_CLI_CONFIG, which points the CLI at its own config
+ *   file so the `langwatch login` of the developer machine never reaches
+ *   a scenario that must start with no credential at all.
  */
 export function createClaudeCodeAgent({
 	workingDirectory,
 	skillPath,
 	cleanEnv,
 	omitEnvKeys = [],
+	extraEnv = {},
 }: {
 	workingDirectory: string;
 	skillPath?: string;
 	cleanEnv?: boolean;
 	omitEnvKeys?: string[];
+	extraEnv?: Record<string, string>;
 }): AgentAdapter {
 	setupLocalCli(workingDirectory);
 	if (skillPath) {
@@ -301,7 +307,12 @@ export function createClaudeCodeAgent({
 
 				const child = spawn(claudeBin, args, {
 					cwd: workingDirectory,
-					env: { ...envVars, FORCE_COLOR: "0", PATH: pathPrefix },
+					env: {
+						...envVars,
+						...extraEnv,
+						FORCE_COLOR: "0",
+						PATH: pathPrefix,
+					},
 					stdio: ["ignore", "pipe", "pipe"],
 				});
 
@@ -357,6 +368,39 @@ type ModelMessage = {
 	role: "user" | "assistant" | "tool";
 	content: string | Record<string, unknown>[];
 };
+
+/**
+ * The most characters one tool call, or one tool result, may add to the
+ * conversation.
+ *
+ * The judge and the user simulator read the whole conversation on every
+ * step. A skill that exports traces, or writes an HTML report, puts
+ * hundreds of kilobytes into a single tool call, and a long run then goes
+ * past the context window of the judge model. The test then fails for a
+ * reason that has nothing to do with the skill. The cap is far above what
+ * these tests read: command names, URLs and ids, which stand at the start
+ * of a command or of its output.
+ */
+const MAX_TOOL_TEXT_CHARS = 8000;
+
+function truncateToolText(text: string): string {
+	if (text.length <= MAX_TOOL_TEXT_CHARS) return text;
+	const dropped = text.length - MAX_TOOL_TEXT_CHARS;
+	return `${text.slice(0, MAX_TOOL_TEXT_CHARS)}\n… [${dropped} more characters]`;
+}
+
+/** The same cap over the string fields of a tool call, structure kept. */
+function truncateToolInput(input: unknown): unknown {
+	if (input == null || typeof input !== "object" || Array.isArray(input)) {
+		return input;
+	}
+	return Object.fromEntries(
+		Object.entries(input as Record<string, unknown>).map(([key, value]) => [
+			key,
+			typeof value === "string" ? truncateToolText(value) : value,
+		]),
+	);
+}
 
 function toolResultText(content: unknown): string {
 	if (typeof content === "string") return content;
@@ -415,7 +459,7 @@ function assistantMessageFromBlocks({
 				type: "tool-call",
 				toolCallId: block.id,
 				toolName: block.name,
-				input: block.input ?? {},
+				input: truncateToolInput(block.input ?? {}),
 			});
 		} else if (!KNOWN_BLOCK_TYPES.has(block?.type)) {
 			texts.push(unsupportedBlockText(block));
@@ -451,7 +495,7 @@ function userMessagesFromBlocks({
 			toolName: toolNamesByCallId.get(block.tool_use_id) ?? "tool",
 			output: {
 				type: block.is_error ? "error-text" : "text",
-				value: toolResultText(block.content),
+				value: truncateToolText(toolResultText(block.content)),
 			},
 		}));
 	if (toolResults.length > 0) {

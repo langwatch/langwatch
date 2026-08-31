@@ -147,6 +147,66 @@ describe("Claude Code transcript conversion", () => {
 			]);
 		});
 	});
+	describe("when a tool call carries far more text than a judge can read", () => {
+		const huge = "x".repeat(30_000);
+		const messages = claudeCodeTranscriptToModelMessages([
+			{
+				role: "assistant",
+				content: [
+					{
+						type: "tool_use",
+						id: "toolu_big",
+						name: "Bash",
+						input: { command: `cat > report.html <<EOF\n${huge}` },
+					},
+				],
+			},
+			{
+				role: "user",
+				content: [
+					{
+						type: "tool_result",
+						tool_use_id: "toolu_big",
+						content: [{ type: "text", text: huge }],
+					},
+				],
+			},
+		]);
+
+		it("caps the call input and says how much it dropped", () => {
+			const call = (messages[0].content as any[])[1];
+			expect(call.type).toBe("tool-call");
+			expect(call.input.command.length).toBeLessThan(9000);
+			expect(call.input.command).toContain("cat > report.html");
+			expect(call.input.command).toMatch(/more characters/);
+		});
+
+		it("caps the result the same way", () => {
+			const result = (messages[1].content as any[])[0];
+			expect(result.type).toBe("tool-result");
+			expect(result.output.value.length).toBeLessThan(9000);
+			expect(result.output.value).toMatch(/more characters/);
+		});
+		
+		it("leaves a small tool call alone", () => {
+			const small = claudeCodeTranscriptToModelMessages([
+				{
+					role: "assistant",
+					content: [
+						{
+							type: "tool_use",
+							id: "toolu_small",
+							name: "Bash",
+							input: { command: "langwatch virtual-keys list" },
+						},
+					],
+				},
+			]);
+			expect(bashCommands({ messages: small } as any)).toEqual([
+				"langwatch virtual-keys list",
+			]);
+		});
+	});
 });
 
 describe("Claude Code skill discovery", () => {
