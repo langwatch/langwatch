@@ -214,8 +214,14 @@ describe("handleGetPrompt()", () => {
 
       const result = await handleGetPrompt({ idOrHandle: "my-prompt" });
 
-      // Fails first against current code: "production" is never rendered at all.
-      expect(result).toMatch(/production/i);
+      // The tag is listed against the history version that carries it, and
+      // is absent from the returned version's Deployments section.
+      const [beforeHistory, historySection] = result.split("## Version History");
+      expect(historySection).toBeDefined();
+      expect(historySection).toMatch(/production/i);
+      const deploymentsSection =
+        beforeHistory?.split("## Deployments")[1] ?? "";
+      expect(deploymentsSection).not.toMatch(/production/i);
       expect(result).not.toMatch(/production["']?\s+is\s+(?:not\s+)?undeployed/i);
       expect(result).not.toMatch(/production["']?[^.\n]*not\s+deployed\s+anywhere/i);
     });
@@ -374,7 +380,7 @@ function expectNoLineMixesVersionAndTag(result: string, tags: string[]) {
   for (const line of result.split("\n")) {
     const hasTag = tags.some((t) => line.includes(t));
     if (hasTag) {
-      expect(line).not.toMatch(/\bv?\d+\b.*\b(version)\b|\bversion\b.*\bv?\d+\b/i);
+      expect(line).not.toMatch(/\bv\d+\b|\bversion\b\W*\d+/i);
     }
   }
 }
@@ -687,6 +693,59 @@ describe("handleUpdatePrompt()", () => {
 
       expect(result).toMatch(/fail/i);
       expect(result).not.toContain("ver_other08");
+    });
+  });
+
+  describe("when the update succeeds but the confirmation read fails", () => {
+    /** @scenario "Reporting success without details when the confirmation read fails" */
+    it("still reports success with a note that details are unavailable, instead of rejecting", async () => {
+      const { LangWatchApiError } = await import("../langwatch-api.js");
+      mockUpdatePrompt.mockResolvedValue({
+        id: "prompt_1",
+        handle: "my-prompt",
+        latestVersionNumber: 11,
+      } as any);
+      mockedGetPrompt.mockRejectedValue(
+        new LangWatchApiError("boom", 500, "{}")
+      );
+
+      const result = await handleUpdatePrompt({
+        idOrHandle: "my-prompt",
+        commitMessage: "Safe change",
+      });
+
+      expect(result).toContain("Prompt updated successfully!");
+      expect(result).toContain("prompt_1");
+      expect(result).toContain("my-prompt");
+      expect(result).toMatch(/confirmation read failed/i);
+      expect(result).toMatch(/version and deployment details are unavailable/i);
+      expect(result).not.toContain("**Version**:");
+      expect(result).not.toContain("**Deployed to**:");
+    });
+  });
+
+  describe("when tag assignment fails and the confirmation read also fails", () => {
+    /** @scenario "Preserving the tag-assignment failure when the confirmation read fails" */
+    it("reports the tag failure without claiming whether a version was created", async () => {
+      const { LangWatchApiError } = await import("../langwatch-api.js");
+      mockUpdatePrompt.mockRejectedValue(
+        new LangWatchApiError("Tag assignment rejected", 422, "{}")
+      );
+      mockedGetPrompt.mockRejectedValue(
+        new LangWatchApiError("boom", 500, "{}")
+      );
+
+      const result = await handleUpdatePrompt({
+        idOrHandle: "my-prompt",
+        commitMessage: "Risky change",
+        tags: ["production"],
+      });
+
+      expect(result).toMatch(/fail/i);
+      expect(result).toContain("production");
+      expect(result).toMatch(/confirmation read failed/i);
+      expect(result).not.toMatch(/version was created(?!\s+could not be confirmed)/i);
+      expect(result).toMatch(/could not be confirmed/i);
     });
   });
 });

@@ -52,7 +52,8 @@ Feature: MCP Prompt Tools
   Scenario: Never implying a tag is undeployed everywhere when it is only absent from this version
     Given a prompt version with no tags, while an older version of the same prompt is tagged "production"
     When the agent calls platform_get_prompt
-    Then the response states "production" is not assigned to the returned version
+    Then the response lists "production" against the older history version that carries it, via its tags suffix in the version history
+    And the returned version's deployments section does not list "production"
     And the response does not say "production" is undeployed
 
   @unit

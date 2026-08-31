@@ -23,25 +23,29 @@ export async function handleUpdatePrompt(params: {
 }): Promise<string> {
   const { idOrHandle, ...data } = params;
 
+  let updated;
   try {
-    await apiUpdatePrompt(idOrHandle, data);
+    updated = await apiUpdatePrompt(idOrHandle, data);
   } catch (err) {
     // The platform commits the version before assigning tags, so a
     // rejection while tags were requested may still have created a version.
     // Re-fetch to find out rather than reporting a bare failure.
     if (params.tags && params.tags.length > 0) {
-      return renderTagFailure(idOrHandle, params);
+      return renderTagFailure({ idOrHandle, params });
     }
     throw err;
   }
 
-  return renderUpdateSuccess(idOrHandle, params);
+  return renderUpdateSuccess({ idOrHandle, params, updated });
 }
 
-function findVersionByCommitMessage(
-  versions: PromptVersion[],
-  commitMessage: string
-): PromptVersion | undefined {
+function findVersionByCommitMessage({
+  versions,
+  commitMessage,
+}: {
+  versions: PromptVersion[];
+  commitMessage: string;
+}): PromptVersion | undefined {
   return versions.find((v) => v.commitMessage === commitMessage);
 }
 
@@ -50,16 +54,39 @@ function deploymentTagsOf(version: PromptVersion | undefined): string[] {
   return (version?.tags ?? []).filter((tag) => tag !== "latest");
 }
 
-async function renderUpdateSuccess(
-  idOrHandle: string,
-  params: { commitMessage: string; tags?: string[] }
-): Promise<string> {
-  const prompt = await apiGetPrompt(idOrHandle, {
-    version: undefined,
-    tag: undefined,
-  });
+async function renderUpdateSuccess({
+  idOrHandle,
+  params,
+  updated,
+}: {
+  idOrHandle: string;
+  params: { commitMessage: string; tags?: string[] };
+  updated?: { id?: string; handle?: string };
+}): Promise<string> {
+  let prompt;
+  try {
+    prompt = await apiGetPrompt(idOrHandle, {
+      version: undefined,
+      tag: undefined,
+    });
+  } catch {
+    // The update itself succeeded; a failed confirmation read must not
+    // surface as a tool failure — that invites a dangerous retry.
+    const lines: string[] = [];
+    lines.push("Prompt updated successfully!\n");
+    if (updated?.id) lines.push(`**ID**: ${updated.id}`);
+    if (updated?.handle) lines.push(`**Handle**: ${updated.handle}`);
+    lines.push(`**Commit**: ${params.commitMessage}`);
+    lines.push(
+      `**Note**: the update succeeded, but version and deployment details are unavailable (confirmation read failed). Run platform_get_prompt to inspect the current state. Do not retry the update.`
+    );
+    return lines.join("\n");
+  }
   const versions = prompt.versions ?? [];
-  const newVersion = findVersionByCommitMessage(versions, params.commitMessage);
+  const newVersion = findVersionByCommitMessage({
+    versions,
+    commitMessage: params.commitMessage,
+  });
 
   const lines: string[] = [];
   lines.push("Prompt updated successfully!\n");
@@ -108,17 +135,30 @@ async function renderUpdateSuccess(
   return lines.join("\n");
 }
 
-async function renderTagFailure(
-  idOrHandle: string,
-  params: { commitMessage: string; tags?: string[] }
-): Promise<string> {
-  const prompt = await apiGetPrompt(idOrHandle, {
-    version: undefined,
-    tag: undefined,
-  });
-  const versions = prompt.versions ?? [];
-  const matched = findVersionByCommitMessage(versions, params.commitMessage);
+async function renderTagFailure({
+  idOrHandle,
+  params,
+}: {
+  idOrHandle: string;
+  params: { commitMessage: string; tags?: string[] };
+}): Promise<string> {
   const failedTags = params.tags?.join(", ") ?? "";
+  let prompt;
+  try {
+    prompt = await apiGetPrompt(idOrHandle, {
+      version: undefined,
+      tag: undefined,
+    });
+  } catch {
+    // The confirmation read failed too — report the tag-assignment failure
+    // without claiming whether a version was created.
+    return `Prompt update failed: could not assign tag(s) ${failedTags} to "${idOrHandle}". Whether a new version was created could not be confirmed (confirmation read failed) — run platform_get_prompt before retrying.`;
+  }
+  const versions = prompt.versions ?? [];
+  const matched = findVersionByCommitMessage({
+    versions,
+    commitMessage: params.commitMessage,
+  });
 
   if (matched) {
     const lines: string[] = [];
