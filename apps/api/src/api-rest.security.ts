@@ -229,12 +229,20 @@ export class ApiRestSecurity {
     return async (context, next) => {
       const credentials = extractApiKeyRequestCredentials(context.req.raw);
       if (!credentials) {
-        return this.refuse(context, new ApiRestAuthenticationError("missing_credentials"), envelope);
+        return this.refuse(
+          context,
+          new ApiRestAuthenticationError("missing_credentials"),
+          envelope,
+        );
       }
 
       const resolved = await this.apiKeys.tryResolveToken(credentials);
       if (!resolved) {
-        return this.refuse(context, new ApiRestAuthenticationError("invalid_credentials"), envelope);
+        return this.refuse(
+          context,
+          new ApiRestAuthenticationError("invalid_credentials"),
+          envelope,
+        );
       }
 
       installProjectVariables(context, resolved);
@@ -312,7 +320,11 @@ export class ApiRestSecurity {
       let resolution;
       try {
         resolution = await this.apiKeys.resolveOrganizationToken({ token: credentials.token });
-      } catch {
+      } catch (error) {
+        this.logger.error(
+          { error, method: context.req.method, path: context.req.path },
+          "Organization credential resolution failed",
+        );
         return this.refuse(
           context,
           new ApiOrganizationAuthenticationError("internal_error"),
@@ -336,12 +348,25 @@ export class ApiRestSecurity {
       try {
         await this.organizations.getSettings({ organizationId: resolved.organizationId });
       } catch (error) {
+        // A deleted organization is an expected refusal and stays quiet; any
+        // other failure is the lookup itself breaking, and the 500 the caller
+        // receives carries none of the cause, so it is logged here or lost.
+        const organizationMissing = error instanceof OrganizationNotFoundError;
+        if (!organizationMissing) {
+          this.logger.error(
+            {
+              error,
+              method: context.req.method,
+              path: context.req.path,
+              organizationId: resolved.organizationId,
+            },
+            "Organization lookup failed while authenticating an organization credential",
+          );
+        }
         return this.refuse(
           context,
           new ApiOrganizationAuthenticationError(
-            error instanceof OrganizationNotFoundError
-              ? "organization_not_found"
-              : "internal_error",
+            organizationMissing ? "organization_not_found" : "internal_error",
           ),
           envelope,
         );

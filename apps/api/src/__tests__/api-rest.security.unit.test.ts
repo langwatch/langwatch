@@ -1,6 +1,7 @@
 import { requires } from "@langwatch/api";
 import { ApiKeyService, type ResolvedApiKeyToken } from "@langwatch/api-key-contract";
 import { AuthzService, type AuthzPermission } from "@langwatch/authz-contract";
+import type { Logger } from "@langwatch/observability";
 import { OrganizationNotFoundError, OrganizationService } from "@langwatch/organization-contract";
 import { Hono } from "hono";
 import type { Context } from "hono";
@@ -281,13 +282,66 @@ describe("ApiRestSecurity", () => {
       });
       const organizations = organizationService();
       organizations.getSettings.mockRejectedValue(new OrganizationNotFoundError());
-      const app = organizationApp({ apiKeys, organizations });
+      const logger = testLogger();
+      const app = organizationApp({ apiKeys, organizations, logger });
 
       const response = await app.request("/api/org-probe", {
         headers: { authorization: "Bearer pat-lw-orphaned" },
       });
 
       expect(response.status).toBe(401);
+      expect(logger.error).not.toHaveBeenCalled();
+    });
+
+    it("logs the cause when credential resolution itself fails", async () => {
+      const apiKeys = apiKeyService();
+      const failure = new Error("credential store unreachable");
+      apiKeys.resolveOrganizationToken.mockRejectedValue(failure);
+      const logger = testLogger();
+      const app = organizationApp({ apiKeys, logger });
+
+      const response = await app.request("/api/org-probe", {
+        headers: { authorization: "Bearer pat-lw-token" },
+      });
+
+      expect(response.status).toBe(500);
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ error: failure, method: "GET", path: "/api/org-probe" }),
+        expect.any(String),
+      );
+    });
+
+    it("logs the cause when the organization lookup fails for a reason other than absence", async () => {
+      const apiKeys = apiKeyService();
+      apiKeys.resolveOrganizationToken.mockResolvedValue({
+        ok: true,
+        resolved: {
+          type: "apiKey-org",
+          apiKeyId: "key-1",
+          userId: "user-1",
+          organizationId: "org-1",
+        },
+      });
+      const organizations = organizationService();
+      const failure = new Error("organization store unreachable");
+      organizations.getSettings.mockRejectedValue(failure);
+      const logger = testLogger();
+      const app = organizationApp({ apiKeys, organizations, logger });
+
+      const response = await app.request("/api/org-probe", {
+        headers: { authorization: "Bearer pat-lw-token" },
+      });
+
+      expect(response.status).toBe(500);
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: failure,
+          method: "GET",
+          path: "/api/org-probe",
+          organizationId: "org-1",
+        }),
+        expect.any(String),
+      );
     });
 
     it("authorizes the declared permission at the organization's own scope", async () => {
@@ -356,12 +410,14 @@ function organizationApp(fakes: {
   apiKeys: ReturnType<typeof apiKeyService>;
   authz?: ReturnType<typeof authzService>;
   organizations?: ReturnType<typeof organizationService>;
+  logger?: ReturnType<typeof testLogger>;
 }) {
   const security = ApiRestSecurity.create({
     apiKeys: fakes.apiKeys.service,
     authz: (fakes.authz ?? authzService()).service,
     organizations: (fakes.organizations ?? organizationService()).service,
     observability: ApiRestObservabilityComposition.create(),
+    ...(fakes.logger ? { logger: fakes.logger } : {}),
   });
   const secured = security.createOrgApp({ basePath: "/api/org-probe" });
   secured.access(requires("organization:view")).get("/", (context) => {
@@ -372,6 +428,10 @@ function organizationApp(fakes: {
 
 class TestAudit extends ApiAuditPort {
   readonly record = vi.fn(async () => undefined);
+}
+
+function testLogger() {
+  return { error: vi.fn<Logger["error"]>() };
 }
 
 function apiKeyService() {
