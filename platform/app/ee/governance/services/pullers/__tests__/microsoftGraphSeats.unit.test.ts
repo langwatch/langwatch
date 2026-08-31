@@ -56,7 +56,7 @@ function factsFor(one: SubscribedSku) {
   const [event] = microsoftSeatEvents({ skus: [one], day: DAY });
   return {
     event,
-    extra: (event?.extra ?? {}) as Record<string, string>,
+    extra: (event?.extra ?? {}) as Record<string, unknown>,
   };
 }
 
@@ -149,8 +149,8 @@ describe("the events one licence read produces", () => {
 
       // Bought minus assigned is the money conversation. Neither number
       // alone can say that two paid seats are sitting empty.
-      expect(extra.seatsBought).toBe("10");
-      expect(extra.seatsAssigned).toBe("8");
+      expect(extra.seatsBought).toBe(10);
+      expect(extra.seatsAssigned).toBe(8);
     });
 
     /** @scenario "Each licence pool is recorded with bought and assigned counts" */
@@ -235,9 +235,9 @@ describe("the events one licence read produces", () => {
       // A company pool reports zero assigned forever, so counting its units
       // as seats is the loudest possible false finding: "25 unused licences"
       // for a pool that has no seats to leave unused.
-      expect(extra.perPerson).toBe("false");
+      expect(extra.perPerson).toBe(false);
       expect(event).toBeDefined();
-      expect(extra.seatsBought).toBe("25");
+      expect(extra.seatsBought).toBe(25);
     });
   });
 
@@ -255,17 +255,17 @@ describe("the events one licence read produces", () => {
       // The 10,000 is a ceiling on how far the licence may spread, not a
       // quantity anyone bought. Counted as purchased it buries the handful
       // of paid seats that really are going unused.
-      expect(extra.free).toBe("true");
-      expect(extra.seatStem).toBe("true");
-      expect(extra.perPerson).toBe("true");
+      expect(extra.free).toBe(true);
+      expect(extra.seatStem).toBe(true);
+      expect(extra.perPerson).toBe(true);
     });
 
     /** @scenario "A free or trial pool is not counted as paid seats" */
     it("does not mark a paid pool free just because it is a seat", () => {
       const { extra } = factsFor(sku());
 
-      expect(extra.free).toBe("false");
-      expect(extra.seatStem).toBe("true");
+      expect(extra.free).toBe(false);
+      expect(extra.seatStem).toBe(true);
     });
   });
 
@@ -274,7 +274,7 @@ describe("the events one licence read produces", () => {
     it("records it, marked as not live", () => {
       const { event, extra } = factsFor(sku({ capabilityStatus: "Suspended" }));
 
-      expect(extra.live).toBe("false");
+      expect(extra.live).toBe(false);
       expect(event).toBeDefined();
     });
   });
@@ -287,7 +287,7 @@ describe("the events one licence read produces", () => {
       // The provider's own portal still honours these seats. A customer a
       // week late on a renewal has not stopped paying for people to sit in
       // them, and dropping the pool erases real spend exactly then.
-      expect(extra.live).toBe("true");
+      expect(extra.live).toBe(true);
     });
   });
 
@@ -300,7 +300,7 @@ describe("the events one licence read produces", () => {
 
       // Suspension is per unit, not only per pool: the frozen slice is not
       // being paid for this month.
-      expect(extra.seatsBought).toBe("10");
+      expect(extra.seatsBought).toBe(10);
     });
 
     /** @scenario "Suspended units inside a live pool are not counted as bought" */
@@ -312,7 +312,7 @@ describe("the events one licence read produces", () => {
         }),
       );
 
-      expect(extra.seatsBought).toBe("10");
+      expect(extra.seatsBought).toBe(10);
     });
   });
 });
