@@ -21,6 +21,14 @@ class FakeBudgetRepository extends GatewayBudgetRepository {
     super();
   }
 
+  findAttributedUserTemplates(): Promise<never[]> {
+    return Promise.resolve([]);
+  }
+
+  findBucketBoundaries(): Promise<never[]> {
+    return Promise.resolve([]);
+  }
+
   check(input: GatewayBudgetCheckReadInput): Promise<GatewayBudgetCheckResult> {
     this.input = input;
     return Promise.resolve(this.result);

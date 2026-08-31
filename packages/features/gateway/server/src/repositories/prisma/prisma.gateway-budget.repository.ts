@@ -62,6 +62,8 @@ import { usdToNanoUsd } from "../../adapters/gateway-wire-money.adapter";
 import { keysetAfter } from "../../adapters/gateway-wire-pagination.adapter";
 import {
   GatewayBudgetRepository,
+  type AttributedUserBudgetTemplate,
+  type BucketBoundaryRow,
   type GatewayBudgetCheckReadInput,
   type GatewayBudgetReadInput,
   type GatewayKeyReachCandidate,
@@ -459,6 +461,51 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
    * Per-bucket period boundaries for every per-person template in the set,
    * batch-loaded so the spend read stays one round-trip per template.
    */
+  async findAttributedUserTemplates({
+    organizationId,
+    virtualKeyId,
+  }: {
+    organizationId: string;
+    virtualKeyId?: string;
+  }): Promise<AttributedUserBudgetTemplate[]> {
+    return this.prisma.gatewayBudget.findMany({
+      where: {
+        organizationId,
+        scopeType: "ATTRIBUTED_USER",
+        archivedAt: null,
+        ...(virtualKeyId ? { scopeId: virtualKeyId } : {}),
+      },
+      select: {
+        id: true,
+        scopeType: true,
+        scopeId: true,
+        providerKey: true,
+        window: true,
+        onBreach: true,
+        limitUsd: true,
+        currentPeriodStartedAt: true,
+        resetsAt: true,
+        lastResetAt: true,
+        cycleAnchorAt: true,
+      },
+    });
+  }
+
+  async findBucketBoundaries({
+    organizationId,
+    budgetIds,
+  }: {
+    organizationId: string;
+    budgetIds: string[];
+  }): Promise<BucketBoundaryRow[]> {
+    if (budgetIds.length === 0) return [];
+
+    return this.prisma.gatewayBudgetBucketBoundary.findMany({
+      where: { organizationId, budgetId: { in: budgetIds } },
+      select: { budgetId: true, bucketScopeId: true, periodStartedAt: true },
+    });
+  }
+
   private async bucketBoundaries(
     budgets: GatewayBudget[],
     organizationId: string,

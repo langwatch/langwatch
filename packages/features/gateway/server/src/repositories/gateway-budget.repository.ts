@@ -12,6 +12,8 @@ import type {
   ResetGatewayBudgetInput,
   UpdateGatewayBudgetInput,
   GatewayBudgetWithSeats,
+  GatewayBudgetWindow,
+  GatewayBudgetScopeType,
 } from "@langwatch/gateway-contract";
 import type { ProjectIdentity, TraceDestinationProject } from "@langwatch/project-contract";
 import type {
@@ -93,6 +95,33 @@ export type GatewayVirtualKeyProjectScope = {
   projectId: string;
 };
 
+/**
+ * One attributed-user budget template, with exactly the fields the end-user
+ * cap reader needs — spelled portably so the port carries no generated row
+ * type across the repository boundary.
+ */
+export type AttributedUserBudgetTemplate = {
+  id: string;
+  scopeType: GatewayBudgetScopeType;
+  scopeId: string;
+  providerKey: string | null;
+  window: GatewayBudgetWindow;
+  onBreach: string;
+  /** Decimal-like: the money adapters read it through `toString()`. */
+  limitUsd: { toString(): string };
+  currentPeriodStartedAt: Date;
+  resetsAt: Date;
+  lastResetAt: Date | null;
+  cycleAnchorAt: Date | null;
+};
+
+/** When one budget's bucket last rolled over. */
+export type BucketBoundaryRow = {
+  budgetId: string;
+  bucketScopeId: string;
+  periodStartedAt: Date | null;
+};
+
 export abstract class GatewayBudgetRepository {
   abstract check(input: GatewayBudgetCheckReadInput): Promise<BudgetCheckResult>;
   abstract list(
@@ -129,6 +158,22 @@ export abstract class GatewayBudgetRepository {
     projects: ProjectIdentity[],
     virtualKeyProjectScopes: GatewayVirtualKeyProjectScope[],
   ): Promise<Map<string, GatewayBudgetScopeTarget>>;
+  /**
+   * The attributed-user budget templates an end user's caps are read from,
+   * and the bucket boundaries that say when each one's period started.
+   *
+   * Two reads rather than one join: the boundaries are keyed by budget AND
+   * bucket scope, and only the caller knows which bucket an end user falls in.
+   */
+  abstract findAttributedUserTemplates(input: {
+    organizationId: string;
+    virtualKeyId?: string;
+  }): Promise<AttributedUserBudgetTemplate[]>;
+  abstract findBucketBoundaries(input: {
+    organizationId: string;
+    budgetIds: string[];
+  }): Promise<BucketBoundaryRow[]>;
+
   abstract listVirtualKeyProjectScopes(input: {
     organizationId: string | null;
     virtualKeyIds: string[];

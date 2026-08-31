@@ -1,7 +1,8 @@
 export { GatewayService } from "./services/gateway.service";
 export { PrismaGatewayAdapter } from "./adapters/gateway.adapter";
 export { GatewaySpendEventsService } from "./services/gateway-spend-events.service";
-export { applicableEndUserCaps } from "./services/gateway-end-user-caps.service";
+export { GatewayEndUserCapsAdapter } from "./adapters/gateway-end-user-caps.adapter";
+export { GatewayEndUserCapsService } from "./services/gateway-end-user-caps.service";
 export * from "./services/gateway-usage.service";
 export { GatewayBudgetSpendPort } from "./ports/gateway-budget-spend.port";
 export * from "./ports/gateway-budget-spend.port";

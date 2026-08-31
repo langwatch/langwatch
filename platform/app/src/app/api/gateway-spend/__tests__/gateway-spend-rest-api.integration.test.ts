@@ -96,7 +96,7 @@ import {
   WebhookEndpointsNotEntitledError,
 } from "~/runtime/app/features/webhooks";
 import {
-  applicableEndUserCaps,
+  GatewayEndUserCapsAdapter,
   FixedGatewaySettlementPolicy,
   settlementGraceMs,
 } from "@langwatch/gateway-server";
@@ -123,9 +123,7 @@ function gatewaySpendRestPorts(): GatewaySpendRestPorts {
     ),
     resolveSpendScope,
     endUserCaps: ({ budgetRepository, organizationId, endUserId, tenantIds, virtualKeyId }) =>
-      applicableEndUserCaps({
-        prisma,
-        budgetRepository,
+      GatewayEndUserCapsAdapter.create({ database: prisma, spend: budgetRepository }).forEndUser({
         organizationId,
         endUserId,
         tenantIds,

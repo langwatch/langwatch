@@ -8,7 +8,7 @@ import { app as webhooksApp } from "~/server/enterprise/scim/webhooks";
 import { Hono, type MiddlewareHandler } from "hono";
 import { appRestSecurity } from "~/server/api/security";
 import {
-  applicableEndUserCaps,
+  GatewayEndUserCapsAdapter,
   FixedGatewaySettlementPolicy,
   settlementGraceMs,
 } from "@langwatch/gateway-server";
@@ -125,9 +125,7 @@ function gatewaySpendRestPorts(app: App): GatewaySpendRestPorts {
     ),
     resolveSpendScope,
     endUserCaps: ({ budgetRepository, organizationId, endUserId, tenantIds, virtualKeyId }) =>
-      applicableEndUserCaps({
-        prisma,
-        budgetRepository,
+      GatewayEndUserCapsAdapter.create({ database: prisma, spend: budgetRepository }).forEndUser({
         organizationId,
         endUserId,
         tenantIds,
