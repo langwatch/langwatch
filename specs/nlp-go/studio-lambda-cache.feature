@@ -79,6 +79,20 @@ Feature: getProjectLambdaArn — per-project ARN cache + single-flight
     And the v1 cache entry is no longer used for future calls under v2
 
   @integration @unit
+  Scenario: A config-only rollout (timeout change, no new image) invalidates the cache and reconciles
+    Given getProjectLambdaArn("projectA") resolved under image_uri "ecr/foo:v1" with a 120s timeout
+    When NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS is raised and image_uri is left unchanged
+    And getProjectLambdaArn("projectA") is called
+    Then the cached entry's configFingerprint no longer matches the desired configuration
+    And a fresh Lambda resolution flow runs so reconcileProjectLambdaConfig applies the new timeout
+    And the stale ceiling is not served for the remainder of the cache TTL
+
+  Scenario: An unchanged desired configuration keeps serving from cache, no spurious invalidation
+    Given getProjectLambdaArn("projectA") resolved and cached
+    When getProjectLambdaArn("projectA") is called again with an identical desired configuration
+    Then the configFingerprint matches and the cached ARN is returned
+    And no additional AWS calls are made
+
   Scenario: Different projects do not share cache slots
     When getProjectLambdaArn("projectA") and getProjectLambdaArn("projectB") both resolve
     Then the cache holds two independent entries
