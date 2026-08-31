@@ -410,8 +410,8 @@ Feature: Python SDK connect_agent decorator
     And an unset, empty or invalid value keeps the default of 0.25 seconds
 
   @unit
-  Scenario: The spans of a call are exported as soon as the call answers
-    Given a tracer provider with a batch exporter
+  Scenario: The spans of a call reach the platform before its result
+    Given an agent whose spans a batch exporter holds
     When a call answers
-    Then the client flushes the provider before the next call
-    And a flush that fails is logged and does not fail the call
+    Then the result reaches the platform only after those spans are exported
+    And an export that fails or times out is logged and the call still answers

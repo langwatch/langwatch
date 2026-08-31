@@ -348,9 +348,15 @@ describe("the agent client, given a fake platform", () => {
   });
 
   describe("when the platform sends a call", () => {
-    /** @scenario "The spans of a call are exported as soon as the call answers" */
-    it("flushes the tracer provider once the result is sent", async () => {
-      const forceFlush = vi.fn(async () => undefined);
+    /** @scenario "The spans of a call reach the platform before its result" */
+    it("exports the spans before it sends the result", async () => {
+      // The export only settles once released, so a result frame arriving
+      // while it is still pending is what a wrong order would look like.
+      let releaseFlush: () => void = () => undefined;
+      const flushing = new Promise<void>((resolve) => {
+        releaseFlush = resolve;
+      });
+      const forceFlush = vi.fn(() => flushing);
       const providerSpy = vi
         .spyOn(trace, "getTracerProvider")
         .mockReturnValue({ getDelegate: () => ({ forceFlush }) } as never);
@@ -358,8 +364,37 @@ describe("the agent client, given a fake platform", () => {
         const { connection } = await connectSupport(async () => "hello");
 
         connection.send(callFrame({}));
-        await connection.nextFrame("result");
+        await connection.nextFrame("ack");
         await vi.waitFor(() => expect(forceFlush).toHaveBeenCalledTimes(1));
+        expect(connection.frames.some((frame) => frame.type === "result")).toBe(
+          false,
+        );
+
+        releaseFlush();
+        expect(await connection.nextFrame("result")).toMatchObject({
+          output: "hello",
+        });
+      } finally {
+        providerSpy.mockRestore();
+      }
+    });
+
+    /** @scenario "The spans of a call reach the platform before its result" */
+    it("logs a failed export and still answers the call", async () => {
+      const forceFlush = vi.fn(async () => {
+        throw new Error("exporter is down");
+      });
+      const providerSpy = vi
+        .spyOn(trace, "getTracerProvider")
+        .mockReturnValue({ getDelegate: () => ({ forceFlush }) } as never);
+      try {
+        const { connection } = await connectSupport(async () => "hello");
+
+        connection.send(callFrame({}));
+
+        expect(await connection.nextFrame("result")).toMatchObject({
+          output: "hello",
+        });
       } finally {
         providerSpy.mockRestore();
       }

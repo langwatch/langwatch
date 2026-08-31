@@ -477,8 +477,8 @@ async def test_traceparent_is_adopted_before_the_call(style):
     assert f"{span.parent.span_id:016x}" == REMOTE_SPAN_ID
 
 
-# @scenario "The spans of a call are exported as soon as the call answers"
-async def test_call_flushes_the_spans_after_the_result(monkeypatch):
+# @scenario "The spans of a call reach the platform before its result"
+async def test_call_exports_the_spans_before_it_sends_the_result(monkeypatch):
     import threading
 
     flushed = threading.Event()
@@ -505,11 +505,45 @@ async def test_call_flushes_the_spans_after_the_result(monkeypatch):
             await connection.call(agent_id=ids["flushing"])
             await connection.expect("ack")
             await connection.expect("result")
-            assert await asyncio.to_thread(flushed.wait, 5)
+            # The result is already in hand, so the export it waited for has
+            # to be over. Reading the flag without waiting is what proves the
+            # order: a flush started next to the result would still be unset.
+            assert flushed.is_set()
         finally:
             await asyncio.to_thread(client.stop)
 
     assert timeouts == [client_module.SPAN_FLUSH_TIMEOUT_MILLIS]
+
+
+# @scenario "The spans of a call reach the platform before its result"
+async def test_a_flush_that_times_out_is_logged_and_the_call_still_answers(
+    monkeypatch, caplog
+):
+    class Provider:
+        def force_flush(self, timeout_millis: int | None = None) -> bool:
+            return False
+
+    monkeypatch.setattr(
+        client_module.trace_api, "get_tracer_provider", lambda: Provider()
+    )
+
+    def agent(messages):
+        return "ok"
+
+    with caplog.at_level(logging.DEBUG, logger=client_module.logger.name):
+        async with FakePlatform() as platform:
+            client, connection, _, ids = await connect(
+                platform, ConnectedAgent(agent, name="slow-flush")
+            )
+            try:
+                await connection.call(agent_id=ids["slow-flush"])
+                await connection.expect("ack")
+                result = await connection.expect("result")
+                assert result["output"] == "ok"
+            finally:
+                await asyncio.to_thread(client.stop)
+
+    assert any("timed out" in record.message for record in caplog.records)
 
 
 # @scenario "A refused registration warns once, names the fix and disables the client"
@@ -843,6 +877,8 @@ async def test_happy_eyeballs_delay_reads_the_environment_and_keeps_the_default_
     monkeypatch.setenv(client_module.HAPPY_EYEBALLS_DELAY_VARIABLE, "0")
     assert client_module.resolve_happy_eyeballs_delay() == 0.0
 
-    for bad in ("", "  ", "soon", "-1", "nan"):
+    # "inf" and "nan" both read as floats, and an infinite delay would stop
+    # the handshake from ever trying the next address.
+    for bad in ("", "  ", "soon", "-1", "nan", "inf", "-inf", "Infinity"):
         monkeypatch.setenv(client_module.HAPPY_EYEBALLS_DELAY_VARIABLE, bad)
         assert client_module.resolve_happy_eyeballs_delay() == 0.25

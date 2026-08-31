@@ -603,6 +603,7 @@ export class AgentClient {
     try {
       const result = await context.with(parent, () => runtime.run(call));
       if (entry.cancelled) return;
+      await this.flushSpans();
       this.send({
         type: "result",
         protocol: PROTOCOL_VERSION,
@@ -615,10 +616,10 @@ export class AgentClient {
       const code = error instanceof AgentParameterError ? error.code : "agent_call_failed";
       const message = describeError(error);
       this.logger.warn(`agent "${runtime.name}" call ${frame.callId} failed: ${message}`);
+      await this.flushSpans();
       this.sendError({ callId: frame.callId, code, message });
     } finally {
       this.releaseCall({ callId: frame.callId, entry });
-      void this.flushSpans();
     }
   }
 
@@ -627,6 +628,10 @@ export class AgentClient {
    * schedule. The judge reads the agent's spans right after the last turn,
    * and a batch exporter would otherwise hold them for seconds, which is what
    * made the judge report the spans missing.
+   *
+   * The call awaits this before it sends its result or its error: the frame is
+   * what tells the platform the turn is over, so a frame that goes out first
+   * lets the judge read the call while its spans are still in the exporter.
    */
   private async flushSpans(): Promise<void> {
     const provider = trace.getTracerProvider() as { getDelegate?: () => unknown };

@@ -391,8 +391,8 @@ Feature: connectAgent turns a function into a simulation target
 
   Rule: The spans of a call reach the platform before the judge reads them
 
-    Scenario: The spans of a call are exported as soon as the call answers
-      Given a tracer provider that exports in batches
+    Scenario: The spans of a call reach the platform before its result
+      Given an agent whose spans a batch exporter holds
       When a call answers
-      Then the client flushes the provider once the result is sent
-      And a flush that fails is logged and does not fail the call
+      Then the result reaches the platform only after those spans are exported
+      And an export that fails is logged and the call still answers

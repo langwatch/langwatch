@@ -18,6 +18,7 @@ import asyncio
 import atexit
 import json
 import logging
+import math
 import os
 import random
 import signal
@@ -105,14 +106,24 @@ def resolve_happy_eyeballs_delay() -> float:
         value = float(raw)
     except ValueError:
         return HAPPY_EYEBALLS_DELAY_SECONDS
-    if value < 0 or value != value:
+    # `float()` reads "nan", "inf" and "-inf". An infinite delay stops the
+    # handshake from ever trying the next resolved address, so only a finite,
+    # non-negative number is a delay.
+    if not math.isfinite(value) or value < 0:
         return HAPPY_EYEBALLS_DELAY_SECONDS
     return value
 
 
 def _flush_quietly(force_flush: Callable[..., Any]) -> None:
     try:
-        force_flush(SPAN_FLUSH_TIMEOUT_MILLIS)
+        # The OpenTelemetry providers answer False when the flush ran out of
+        # time. The spans are then still in the exporter, and the judge can
+        # read the call without them, so the line has to say so.
+        if force_flush(SPAN_FLUSH_TIMEOUT_MILLIS) is False:
+            logger.debug(
+                "connect_agent: the span flush after a call timed out after %s ms",
+                SPAN_FLUSH_TIMEOUT_MILLIS,
+            )
     except Exception as error:
         logger.debug("connect_agent: the span flush after a call failed: %s", error)
 
@@ -954,20 +965,26 @@ class AgentClient:
             self._in_flight.pop(call_id, None)
             self._in_flight_agent.pop(call_id, None)
         if result is not None:
+            await self._flush_spans()
             await self._deliver(result)
-        self._flush_spans()
 
-    def _flush_spans(self) -> None:
-        """Export the spans of the call now, off the connection loop.
+    async def _flush_spans(self) -> None:
+        """Export the spans of the call now, before the result goes out.
 
         The judge reads the agent's spans right after the last turn, and a
         batch exporter would otherwise hold them for its whole schedule delay,
-        which is what made the judge report the spans missing.
+        which is what made the judge report the spans missing. The result is
+        what tells the platform the turn is over, so the flush has to finish
+        first: a result that arrives before its spans is the same missing
+        evidence. The export itself runs in a worker thread, so waiting for it
+        never blocks the connection loop.
         """
         force_flush = getattr(trace_api.get_tracer_provider(), "force_flush", None)
         if not callable(force_flush):
             return
-        asyncio.get_running_loop().run_in_executor(None, _flush_quietly, force_flush)
+        await asyncio.get_running_loop().run_in_executor(
+            None, _flush_quietly, force_flush
+        )
 
     async def _deliver(self, frame: ResultFrame) -> None:
         if not await self._send(frame):
