@@ -17,30 +17,44 @@
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { checkLangyMessageRateLimit, startConversationTurn, auditLog } = vi.hoisted(
-  () => ({
+const { checkLangyMessageRateLimit, checkLangyWarmRateLimit, startConversationTurn, auditLog } =
+  vi.hoisted(() => ({
     checkLangyMessageRateLimit: vi.fn(),
+    // The router also mounts the warm path; the real limiter reaches Redis, so
+    // the whole middleware boundary stays stubbed rather than half-mocked.
+    checkLangyWarmRateLimit: vi.fn(),
     startConversationTurn: vi.fn(),
     auditLog: vi.fn(),
-  }),
-);
+  }));
 
 vi.mock("~/server/middleware/rate-limit-langy", () => ({
   checkLangyMessageRateLimit,
+  checkLangyWarmRateLimit,
   LANGY_MESSAGES_PER_MINUTE: 30,
+  LANGY_WARMS_PER_MINUTE: 60,
 }));
 
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsService } = await import("~/test-utils/appPermissionsMock");
+  const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
+  const { LangyApp } = await import("@langwatch/langy-server");
+  // The resolver-backed double, not the real engine over an empty database:
+  // this suite states its permission through `resolveProjectPermission` below,
+  // and only that double routes the declared-authz seam back to it.
+  const { permissions } = appPermissionsMock().getApp();
+  // The REAL application, over a stubbed service. The idempotency refusal
+  // below is `LangyApp.startTurn`'s own — the wire schema takes both keys as
+  // optional — so a hand-stubbed `langy` would leave it unreachable and the
+  // rejection this file exists to pin would never be thrown at all.
+  const langy = LangyApp.create({
+    langy: { startConversationTurn } as never,
+    // No Redis: the live edge is not what this suite is about.
+    redis: null,
+    broadcast: {} as never,
+  });
   return {
     // Consumers that degrade without Redis read through this one.
     tryGetApp: () => null,
-    getApp: () => ({
-      permissions: appPermissionsService(),
-      langy: { startConversationTurn },
-      // No Redis: the live edge is not what this suite is about.
-      redis: null,
-    }),
+    getApp: () => ({ permissions, langy, redis: null }),
   };
 });
 
@@ -239,8 +253,7 @@ describe("langy turn-start rejections", () => {
       expect(wire.data.error).not.toBeNull();
       expect(wire.data.error).toMatchObject({ code: "validation_error" });
       expect(
-        (wire.data.error as { meta: { fieldErrors: Record<string, unknown> } }).meta
-          .fieldErrors,
+        (wire.data.error as { meta: { fieldErrors: Record<string, unknown> } }).meta.fieldErrors,
       ).toHaveProperty("modelOverride");
       expect(startConversationTurn).not.toHaveBeenCalled();
     });
@@ -265,8 +278,7 @@ describe("langy turn-start rejections", () => {
       expect(wire.data.error).not.toBeNull();
       expect(wire.data.error).toMatchObject({ code: "validation_error" });
       expect(
-        (wire.data.error as { meta: { fieldErrors: Record<string, unknown> } }).meta
-          .fieldErrors,
+        (wire.data.error as { meta: { fieldErrors: Record<string, unknown> } }).meta.fieldErrors,
       ).toHaveProperty("modelOverride");
       expect(startConversationTurn).not.toHaveBeenCalled();
     });

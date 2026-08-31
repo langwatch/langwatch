@@ -8,7 +8,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
 
-vi.mock("@langwatch/observability", () => ({
+// Partial: the module under test also imports `createWarnThrottle`, whose real
+// in-memory implementation is what `resetSlowQueryThrottle` drives. Only the
+// logger is stubbed, so the throttle assertions exercise the real thing.
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/observability")>()),
   createLogger: () => ({
     info: vi.fn(),
     warn,

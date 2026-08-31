@@ -9,7 +9,11 @@ vi.mock("~/server/db", () => ({ prisma: {} }));
 // The gate itself is unit-tested in `@langwatch/enterprise-sso-server`.
 // This file tests ONLY the hook's orchestration: which paths get refused in
 // which gate state, per ADR-027 Decision 4 / Constants table.
-vi.mock("~/runtime/app/features/sso", () => ({
+// Partial: `createAuth` also reads `ssoConfiguration` and the two provider
+// builders out of this module. Only the two gate answers this suite steers are
+// replaced; the rest stay the real thing.
+vi.mock("~/runtime/app/features/sso", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/runtime/app/features/sso")>()),
   platformSSOAllowed: vi.fn(),
   resolveAuthProvider: vi.fn(),
 }));
@@ -34,11 +38,27 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => loggerMock,
 }));
 
+import type { AuthService } from "@langwatch/auth-contract";
+import type { PrismaClient } from "@langwatch/prisma-client";
+import type { UserService } from "@langwatch/user-contract";
+import type { SignUpVerificationService } from "~/server/app-layer/identity/signup-verification.service";
 import { platformSSOAllowed, resolveAuthProvider } from "~/runtime/app/features/sso";
 import { env } from "~/env.mjs";
-import { auth } from "../index";
+import { createAuth } from "../index";
 
 const envMock = env as unknown as { NEXTAUTH_PROVIDER: string };
+
+// `auth` is minted per process now rather than at module scope; the hook under
+// test is the same one `createAuthOptions` puts on every instance.
+const auth = createAuth({
+  auth: { revokeAllBrowserSessions: vi.fn() } as unknown as AuthService,
+  database: {} as PrismaClient,
+  mailer: { defaultFrom: () => "test@example.com", send: vi.fn() },
+  passkeyHandleSecret: "test-secret",
+  redis: null,
+  signUpVerification: {} as SignUpVerificationService,
+  users: {} as UserService,
+});
 
 // Named `runBeforeHook` rather than `before`: a bare `before` reads as a
 // test lifecycle hook, both to a human and to a linter looking for

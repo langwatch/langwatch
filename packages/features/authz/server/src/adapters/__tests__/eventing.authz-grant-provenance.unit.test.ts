@@ -7,42 +7,40 @@
  * who caused it, and for those same two surfaces that is nobody: a system
  * principal from the closed registry, not a person.
  *
- * These drive the real chain — GrantsService, over the ledger-backed
- * repository, over the writer — and assert on the command the writer
- * actually emits, because a value that stops one layer short of the fact is
- * indistinguishable from one that never travelled at all.
+ * These drive the real chain — AuthzGrantsService, over the eventing-backed
+ * grant repository, over the ledger writer — and assert on the command the
+ * writer actually emits, because a value that stops one layer short of the
+ * fact is indistinguishable from one that never travelled at all. That is why
+ * this file is not folded into `authz-grants.service.unit.test.ts`: that suite
+ * stubs both the repository and the ledger, so it pins provenance as far as
+ * the port call and no further.
  *
  * @see specs/rbac/authz-grants.feature
  */
 import { SYSTEM_ACTORS } from "@langwatch/actor";
-import {
-  type AuthzCollectorService,
-  GrantsService,
-} from "@langwatch/authz-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-vi.mock("../epoch", () => ({
-  bumpAuthzEpoch: vi.fn().mockResolvedValue(undefined),
-}));
-
-import type { PrismaClient } from "~/generated/prisma/client";
-import { LedgerAuthzGrantsRepository } from "../repositories/authz-grants.ledger.repository";
-import { harness, ORG_ID } from "./ledger-write-fork.harness";
+import { StubAuthzEpoch } from "../../ports/__tests__/support/authz-epoch.stub";
+import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub";
+import { EventingAuthzGrantRepository } from "../../repositories/eventing/eventing.authz-grant.repository";
+import { AuthzGrantsService } from "../../services/authz-grants.service";
+import { ORG_ID, harness } from "./support/eventing.authz-ledger-fork.harness";
 
 const ADMIN = { userId: "user_admin" };
 const BINDING_ID = "rb_provenance";
 
 function service() {
   const { writer, db, sent } = harness({ onLedger: true });
-  const repository = new LedgerAuthzGrantsRepository(
-    db as unknown as PrismaClient,
+  const repository = EventingAuthzGrantRepository.create({
+    database: db as never,
     writer,
-  );
-  const grants = new GrantsService(repository, {
+    selectHead: async () => true,
+  });
+  const grants = AuthzGrantsService.create({
+    repository,
+    ledger: writer,
+    epoch: new StubAuthzEpoch(),
     newBindingId: () => BINDING_ID,
-    bumpEpoch: vi.fn().mockResolvedValue(undefined),
-    // Offboarding's proof only; no test here reaches it.
-    collectorFor: () => ({}) as AuthzCollectorService,
+    bindings: new StubAuthzBindingRepository(),
   });
   return { grants, db, sent };
 }
@@ -121,9 +119,7 @@ describe("given a grant attached through the grants service", () => {
         source: "join-request",
       });
 
-      expect(attachedActors(sent)).toEqual([
-        { type: "system", id: SYSTEM_ACTORS.joinRequests },
-      ]);
+      expect(attachedActors(sent)).toEqual([{ type: "system", id: SYSTEM_ACTORS.joinRequests }]);
       expect(attachedSources(sent)).toEqual(["join-request"]);
     });
   });
@@ -140,9 +136,7 @@ describe("given a grant attached through the grants service", () => {
         where: { type: "organization", id: ORG_ID },
       });
 
-      expect(attachedActors(sent)).toEqual([
-        { type: "user", id: "user_admin" },
-      ]);
+      expect(attachedActors(sent)).toEqual([{ type: "user", id: "user_admin" }]);
     });
   });
 });
@@ -156,21 +150,27 @@ describe("given a grant revoked through the grants service", () => {
      *  @scenario "A revocation names the surface that made it without a source of its own" */
     it("carries the surface as the emitted revocation's actor", async () => {
       const { grants, db, sent } = service();
-      db.roleBinding.findUnique.mockResolvedValue({
-        id: BINDING_ID,
-        organizationId: ORG_ID,
-      });
       db.roleBinding.findFirst.mockResolvedValue({ id: BINDING_ID });
+      // The fork harness carries the writes this file is about; the ownership
+      // guard ahead of a revoke is the one read it does not already answer.
+      Object.assign(db.roleBinding, {
+        findUnique: vi.fn().mockResolvedValue({ id: BINDING_ID, organizationId: ORG_ID }),
+      });
 
       await grants.revoke({
-        actor: { type: "system", name: "scim" },
+        // `attach` and `offboard` widen their actor to `{ userId } | Actor`;
+        // `revoke` alone still takes the contract's bare `{ userId }`, even
+        // though `writeActor` renders a system principal here exactly as it
+        // does there — which is what this assertion pins. The cast is the
+        // asymmetry made visible rather than a claim about the runtime; it
+        // held silently while this file lived outside a typechecked test
+        // project.
+        actor: { type: "system", name: "scim" } as unknown as { userId: string },
         bindingId: BINDING_ID,
         organizationId: ORG_ID,
       });
 
-      expect(revokedActors(sent)).toEqual([
-        { type: "system", id: SYSTEM_ACTORS.scim },
-      ]);
+      expect(revokedActors(sent)).toEqual([{ type: "system", id: SYSTEM_ACTORS.scim }]);
     });
   });
 });
