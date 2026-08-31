@@ -3,7 +3,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 
 import { blankTemplate } from "@langwatch/workflow-web";
 import { createInnerTRPCContext } from "../../trpc";
-import { workflowRouter } from "../workflows";
+import { appRouter } from "../../root";
 
 // Regression: commit-message autogen sent function tools + reasoning_effort
 // to /v1/chat/completions, which the gpt-5 family rejects ("use /v1/responses
@@ -43,8 +43,8 @@ vi.mock("../../rbac", async (importOriginal) => {
   };
 });
 
-describe("workflowRouter.generateCommitMessage()", () => {
-  let caller: ReturnType<typeof workflowRouter.createCaller>;
+describe("workflow.generateCommitMessage()", () => {
+  let caller: ReturnType<typeof appRouter.createCaller>["workflow"];
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -58,7 +58,7 @@ describe("workflowRouter.generateCommitMessage()", () => {
     });
     ctx.prisma = {} as unknown as PrismaClient;
 
-    caller = workflowRouter.createCaller(ctx);
+    caller = appRouter.createCaller(ctx).workflow;
     mockGetVercelAIModel.mockResolvedValue({ modelId: "openai/gpt-5-mini" });
   });
 

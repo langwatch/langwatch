@@ -1,10 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import type { TRPCContext } from "~/server/api/trpc.context";
 import type { Session } from "~/server/auth";
-import {
-  copyWorkflowWithDatasets,
-  saveOrCommitWorkflowVersion,
-} from "~/server/api/routers/workflows";
 
 /**
  * Replicating the workflow behind a workflow evaluator, which stays
@@ -45,8 +41,7 @@ export async function replicateEvaluatorWorkflow(
     });
   }
 
-  const { workflowId: newWorkflowId, dsl } = await copyWorkflowWithDatasets({
-    ctx,
+  const { workflowId: newWorkflowId, dsl } = await ctx.app.workflows.copyStudioWorkflow({
     workflow: {
       id: workflow.id,
       name: workflow.name,
@@ -62,12 +57,16 @@ export async function replicateEvaluatorWorkflow(
   });
 
   try {
-    await saveOrCommitWorkflowVersion({
-      ctx,
-      input: { projectId: targetProjectId, workflowId: newWorkflowId, dsl },
-      autoSaved: false,
-      commitMessage: "Copied from " + workflow.name,
-    });
+    await ctx.app.workflows.saveStudioVersion(
+      {
+        projectId: targetProjectId,
+        workflowId: newWorkflowId,
+        dsl,
+        autoSaved: false,
+        commitMessage: "Copied from " + workflow.name,
+      },
+      ctx.actor(),
+    );
   } catch (saveError) {
     // deleteMany (not delete) so the multitenancy guard accepts the projectId
     // scope — a bare { id } delete is rejected and the rollback silently no-ops.

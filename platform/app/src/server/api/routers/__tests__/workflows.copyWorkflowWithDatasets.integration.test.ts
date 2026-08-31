@@ -1,11 +1,10 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { Session } from "~/server/auth";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { getTestUser } from "~/utils/testUtils";
-import { copyWorkflowWithDatasets } from "../workflows";
 
-describe("copyWorkflowWithDatasets", () => {
+describe("WorkflowApp.copyStudioWorkflow", () => {
   const sourceProjectId = "test-project-id";
   const targetProjectId = "test-project-id-copy-wf-target";
   const sourceWorkflowId = `test_wf_src_${nanoid(8)}`;
@@ -95,11 +94,6 @@ describe("copyWorkflowWithDatasets", () => {
     }
   });
 
-  const getCtx = () => ({
-    prisma,
-    session: { user: { id: userId } } as Session,
-  });
-
   describe("when source workflow is an evaluator", () => {
     it("preserves isEvaluator on the copied workflow", async () => {
       const source = await prisma.workflow.findUnique({
@@ -107,8 +101,7 @@ describe("copyWorkflowWithDatasets", () => {
         include: { latestVersion: true },
       });
 
-      const { workflowId } = await copyWorkflowWithDatasets({
-        ctx: getCtx(),
+      const { workflowId } = await getApp().workflows.copyStudioWorkflow({
         workflow: {
           id: source!.id,
           name: source!.name,
@@ -179,8 +172,7 @@ describe("copyWorkflowWithDatasets", () => {
         include: { latestVersion: true },
       });
 
-      const { workflowId } = await copyWorkflowWithDatasets({
-        ctx: getCtx(),
+      const { workflowId } = await getApp().workflows.copyStudioWorkflow({
         workflow: {
           id: source!.id,
           name: source!.name,

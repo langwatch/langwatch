@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
-import { workflowRouter } from "../workflows";
+import { appRouter } from "../../root";
 
 const { hasProjectPermission } = vi.hoisted(() => ({
   hasProjectPermission: vi.fn(),
@@ -25,8 +25,7 @@ vi.mock("../../rbac", async (importOriginal) => {
 
 // The router's imperative check goes through the app-layer facade.
 vi.mock("~/server/app-layer/permissions/imperative", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/server/app-layer/permissions/imperative")>();
+  const actual = await importOriginal<typeof import("~/server/app-layer/permissions/imperative")>();
   return { ...actual, probeProjectPermission: hasProjectPermission };
 });
 
@@ -40,7 +39,7 @@ const createCaller = () => {
   ctx.prisma = {
     workflow: { findMany },
   } as unknown as PrismaClient;
-  return workflowRouter.createCaller(ctx);
+  return appRouter.createCaller(ctx).workflow;
 };
 
 beforeEach(() => {
@@ -68,10 +67,7 @@ beforeEach(() => {
           },
         },
       },
-      copiedWorkflows: [
-        { projectId: "project_private" },
-        { projectId: "project_visible" },
-      ],
+      copiedWorkflows: [{ projectId: "project_private" }, { projectId: "project_visible" }],
     },
   ]);
 });

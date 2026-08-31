@@ -30,6 +30,10 @@ import type { EvaluationTrpcContext } from "@langwatch/evaluation-server";
 import type { ExperimentTrpcContext } from "@langwatch/experiment-server";
 import type { GroupTrpcContext, JoinRequestTrpcContext } from "@langwatch/organization-server";
 import type { IdentityTrpcContext } from "@langwatch/user-server";
+import type {
+  WorkflowOptimizationTrpcContext,
+  WorkflowTrpcContext,
+} from "@langwatch/workflow-server";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -51,7 +55,9 @@ type TestContext = AnnotationTrpcContext &
   GroupTrpcContext &
   IdentityTrpcContext &
   JoinRequestTrpcContext &
-  PublicEnvTrpcContext;
+  PublicEnvTrpcContext &
+  WorkflowOptimizationTrpcContext &
+  WorkflowTrpcContext;
 
 /** A pass-through stand-in for one of the process's policy middlewares. */
 const passThrough =
@@ -87,6 +93,8 @@ function refusingPorts(): AppTrpcFeaturePorts<
   string,
   Record<string, unknown>,
   Record<string, unknown>,
+  Record<string, unknown>,
+  Record<string, unknown>,
   Record<string, unknown>
 > {
   const refuse = (what: string) => (): never => {
@@ -116,6 +124,10 @@ function refusingPorts(): AppTrpcFeaturePorts<
     identity: refuseEvery("identity"),
     joinRequests: refuseEvery("joinRequests"),
     prisma: refuseEvery("prisma"),
+    workflows: {
+      lifecycle: refuseEvery("workflows.lifecycle"),
+      optimization: refuseEvery("workflows.optimization"),
+    },
   };
 }
 
@@ -152,7 +164,9 @@ describe("the app tRPC feature list", () => {
         "group",
         "identity",
         "joinRequests",
+        "optimization",
         "publicEnv",
+        "workflow",
       ]);
     });
 
@@ -179,6 +193,17 @@ describe("the app tRPC feature list", () => {
         "update",
       ]);
       expect(procedureNamesOf(features.identity)).toEqual(["completeVerification"]);
+      // Two namespaces for one feature, and the studio's own is not a subset of
+      // the lifecycle's: naming both is what would catch either being dropped.
+      expect(procedureNamesOf(features.optimization)).toEqual([
+        "chat",
+        "disableAsComponent",
+        "disableAsEvaluator",
+        "getComponents",
+        "getPublishedWorkflow",
+        "toggleSaveAsComponent",
+        "toggleSaveAsEvaluator",
+      ]);
     });
 
     it("mounts publicEnv as a bare procedure, because that is the name the client calls", () => {

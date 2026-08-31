@@ -45,7 +45,10 @@ import {
   declaredNoPermission,
   declaredServiceAuthorization,
 } from "~/server/app-layer/authz/trpc-middleware";
-import { fireScenarioCreatedNurturing } from "~/server/app-layer/billing/nurturing/featureAdoption";
+import {
+  fireScenarioCreatedNurturing,
+  fireWorkflowCreatedNurturing,
+} from "~/server/app-layer/billing/nurturing/featureAdoption";
 import { afterPromptCreated } from "~/server/app-layer/billing/nurturing/promptCreation";
 import { prisma } from "~/server/db";
 import { trackServerEvent } from "~/server/posthog";
@@ -206,20 +209,21 @@ import { setupSkillsRouter } from "./routers/setupSkills";
 import { teamRouter } from "~/runtime/app/internal-api/team.router";
 import { topicsRouter } from "~/runtime/app/internal-api/topic.router";
 import { userRouter } from "./routers/user";
-import {
-  copyWorkflowWithDatasets,
-  optimizationRouter,
-  saveOrCommitWorkflowVersion,
-  workflowRouter,
-} from "./routers/workflows";
 import type { resolveAnnotationSuggestionTarget } from "@langwatch/annotation-contract";
 import {
   createOrUpdateQueueItems,
   PostgresAnnotationQueueAdapter,
 } from "@langwatch/annotation-server";
 import { AuthApp } from "@langwatch/auth-server";
-import type { StudioWorkflow } from "@langwatch/workflow-contract";
+import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
+import { pMapLimited } from "@langwatch/eventing";
+import { featureByKey } from "@langwatch/model-provider-contract";
+import { WorkflowVersionRequiredError, type StudioWorkflow } from "@langwatch/workflow-contract";
+import { TRPCError } from "@trpc/server";
+import { generateText } from "ai";
+import { createPatch } from "diff";
 import { nanoid } from "nanoid";
+import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { resolveAuthProvider } from "~/runtime/app/features/sso";
 import { getAzureSafetyEnvFromProject } from "~/server/app-layer/evaluations/azure-safety-env.server";
 import { evaluatorUnavailability } from "~/server/evaluations/installedEvaluators";
@@ -961,12 +965,81 @@ async function verifiedEmailFor(
   return row?.emailVerified ? (row.email ?? null) : null;
 }
 
+/** The feature transports are typed against their own context; this is ours. */
+const appContext = (ctx: unknown) => ctx as TRPCContext;
+
 /**
- * The request context the workflow helpers resolve their work from. They read
- * the session and the process's own workflow and model-provider services, so
- * they are handed the whole context rather than pieces of it.
+ * Copies a workflow into another project, answering the code the experiment
+ * surface has always answered when the source has no version to copy.
+ *
+ * The refusal is the feature's — a workflow with no committed version cannot
+ * be replicated — and translating it into a transport code is the process's,
+ * because the experiment transport maps workflow errors no further.
  */
-type WorkflowHelperContext = Parameters<typeof saveOrCommitWorkflowVersion>[0]["ctx"];
+async function copyStudioWorkflow(
+  ctx: TRPCContext,
+  input: Parameters<TRPCContext["app"]["workflows"]["copyStudioWorkflow"]>[0],
+): Promise<{ workflowId: string; dsl: StudioWorkflow }> {
+  try {
+    return await ctx.app.workflows.copyStudioWorkflow(input);
+  } catch (error) {
+    if (error instanceof WorkflowVersionRequiredError) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Workflow version not found" });
+    }
+    throw error;
+  }
+}
+
+/** Where one copy lives, for the "org / team / project" path shown beside it. */
+const workflowCopyPathSelect = {
+  id: true,
+  name: true,
+  projectId: true,
+  project: {
+    select: {
+      id: true,
+      name: true,
+      team: {
+        select: {
+          id: true,
+          name: true,
+          organization: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+    },
+  },
+} as const;
+
+/** The copy-lineage selection `workflow.getAll` redacts against permissions. */
+const workflowCopyLineageSelect = {
+  id: true,
+  projectId: true,
+  name: true,
+  icon: true,
+  description: true,
+  createdAt: true,
+  updatedAt: true,
+  latestVersionId: true,
+  currentVersionId: true,
+  publishedId: true,
+  publishedById: true,
+  archivedAt: true,
+  isEvaluator: true,
+  isComponent: true,
+  copiedFromWorkflowId: true,
+  copiedFrom: {
+    select: workflowCopyPathSelect,
+  },
+  copiedWorkflows: {
+    where: { archivedAt: null },
+    select: { projectId: true },
+  },
+} as const;
 
 /**
  * Every packaged tRPC surface, installed in ONE call against this process's
@@ -1101,35 +1174,8 @@ const appTrpcFeatures = createAppTrpcFeatures({
       probeProjectPermission: (ctx, projectId, permission) =>
         probeProjectPermission(ctx as unknown as TRPCContext, projectId, permission),
       saveWorkflowVersion: (ctx, input) =>
-        saveOrCommitWorkflowVersion({
-          ctx: ctx as unknown as WorkflowHelperContext,
-          input: {
-            projectId: input.projectId,
-            workflowId: input.workflowId,
-            dsl: input.dsl,
-          },
-          autoSaved: input.autoSaved,
-          commitMessage: input.commitMessage,
-          ...(input.setAsLatestVersion === undefined
-            ? {}
-            : { setAsLatestVersion: input.setAsLatestVersion }),
-        }),
-      copyWorkflowWithDatasets: (ctx, input) =>
-        copyWorkflowWithDatasets({
-          ctx: ctx as unknown as Parameters<typeof copyWorkflowWithDatasets>[0]["ctx"],
-          workflow: {
-            ...input.workflow,
-            latestVersion: input.workflow.latestVersion
-              ? { dsl: input.workflow.latestVersion.dsl as StudioWorkflow }
-              : null,
-          },
-          targetProjectId: input.targetProjectId,
-          sourceProjectId: input.sourceProjectId,
-          ...(input.copyDatasets === undefined ? {} : { copyDatasets: input.copyDatasets }),
-          ...(input.copiedFromWorkflowId === undefined
-            ? {}
-            : { copiedFromWorkflowId: input.copiedFromWorkflowId }),
-        }),
+        appContext(ctx).app.workflows.saveStudioVersion(input, ctx.actor()),
+      copyWorkflowWithDatasets: (ctx, input) => copyStudioWorkflow(appContext(ctx), input),
       createWorkflow: async (ctx, input) =>
         await (ctx as unknown as TRPCContext).prisma.workflow.create({
           data: {
@@ -1226,6 +1272,370 @@ const appTrpcFeatures = createAppTrpcFeatures({
     },
 
     prisma,
+
+    workflows: {
+      lifecycle: {
+        hasProjectPermission: (ctx, input) =>
+          probeProjectPermission(appContext(ctx), input.projectId, input.permission),
+
+        // Each related project needs its own RBAC check; cap concurrency so a
+        // workflow with many copies can't exhaust the DB connection pool.
+        hasProjectPermissions: async (ctx, input) => {
+          const permitted = new Map<string, boolean>();
+          await pMapLimited({
+            items: [...input.projectIds],
+            concurrency: 5,
+            fn: async (projectId) => {
+              permitted.set(
+                projectId,
+                await probeProjectPermission(appContext(ctx), projectId, input.permission),
+              );
+            },
+          });
+          return permitted;
+        },
+
+        prepareDsl: (ctx, input) => appContext(ctx).app.workflows.prepareStudioDsl(input),
+
+        saveWorkflowVersion: (ctx, input) =>
+          appContext(ctx).app.workflows.saveStudioVersion(input, ctx.actor()),
+
+        listWorkflowsWithCopyLineage: async (ctx, input) =>
+          await appContext(ctx).prisma.workflow.findMany({
+            where: { projectId: input.projectId, archivedAt: null },
+            orderBy: { updatedAt: "desc" },
+            select: workflowCopyLineageSelect,
+          }),
+
+        tryFindWorkflow: async (ctx, input) =>
+          // Prisma requires projectId in the where clause for a project-level model.
+          await appContext(ctx).prisma.workflow.findFirst({
+            where: {
+              id: input.workflowId,
+              projectId: input.projectId,
+              archivedAt: null,
+            },
+          }),
+
+        // Copies are queried through the relation so the findMany's projectId
+        // requirement does not force a single project on a cross-project read.
+        tryFindCopiesWithPath: async (ctx, input) => {
+          const workflowWithCopies = await appContext(ctx).prisma.workflow.findUnique({
+            where: {
+              id: input.workflowId,
+              projectId: input.projectId,
+            },
+            select: {
+              id: true,
+              copiedWorkflows: {
+                where: {
+                  archivedAt: null,
+                },
+                select: workflowCopyPathSelect,
+              },
+            },
+          });
+
+          return workflowWithCopies ? workflowWithCopies.copiedWorkflows : null;
+        },
+
+        tryFindWorkflowWithSource: async (ctx, input) =>
+          await appContext(ctx).prisma.workflow.findUnique({
+            where: {
+              id: input.workflowId,
+              projectId: input.projectId,
+              archivedAt: null,
+            },
+            include: {
+              latestVersion: true,
+              copiedFrom: {
+                include: {
+                  latestVersion: true,
+                },
+              },
+            },
+          }),
+
+        tryFindWorkflowWithCopies: async (ctx, input) =>
+          await appContext(ctx).prisma.workflow.findUnique({
+            where: {
+              id: input.workflowId,
+              projectId: input.projectId,
+              archivedAt: null,
+            },
+            include: {
+              latestVersion: true,
+              copiedWorkflows: {
+                where: {
+                  archivedAt: null,
+                },
+                include: {
+                  latestVersion: true,
+                },
+              },
+            },
+          }),
+
+        tryFindLatestVersionNumber: async (ctx, input) => {
+          const workflow = await appContext(ctx).prisma.workflow.findUnique({
+            where: {
+              id: input.workflowId,
+              projectId: input.projectId,
+            },
+            include: {
+              latestVersion: true,
+            },
+          });
+
+          return workflow ? { version: workflow.latestVersion?.version ?? null } : null;
+        },
+
+        listAgentsForWorkflow: async (ctx, input) =>
+          await appContext(ctx).prisma.agent.findMany({
+            where: {
+              workflowId: input.workflowId,
+              projectId: input.projectId,
+              archivedAt: null,
+            },
+            select: { id: true, name: true },
+          }),
+
+        listMonitorsForEvaluators: async (ctx, input) =>
+          await appContext(ctx).prisma.monitor.findMany({
+            where: {
+              evaluatorId: { in: [...input.evaluatorIds] },
+              projectId: input.projectId,
+            },
+            select: { id: true, name: true, evaluatorId: true },
+          }),
+
+        cascadeArchiveWorkflow: async (ctx, input) => {
+          const now = input.unarchive ? null : new Date();
+
+          return appContext(ctx).prisma.$transaction(async (tx) => {
+            // 1. Find all evaluators linked to this workflow
+            const evaluators = await tx.evaluator.findMany({
+              where: {
+                workflowId: input.workflowId,
+                projectId: input.projectId,
+                archivedAt: null,
+              },
+              select: { id: true },
+            });
+            const evaluatorIds = evaluators.map((e) => e.id);
+
+            // 2. Delete monitors linked to those evaluators (hard delete)
+            const deletedMonitors =
+              evaluatorIds.length > 0
+                ? await tx.monitor.deleteMany({
+                    where: {
+                      evaluatorId: { in: evaluatorIds },
+                      projectId: input.projectId,
+                    },
+                  })
+                : { count: 0 };
+
+            // 3. Archive evaluators linked to this workflow
+            const archivedEvaluators = await tx.evaluator.updateMany({
+              where: {
+                workflowId: input.workflowId,
+                projectId: input.projectId,
+              },
+              data: { archivedAt: now },
+            });
+
+            // 4. Archive agents linked to this workflow
+            const archivedAgents = await tx.agent.updateMany({
+              where: {
+                workflowId: input.workflowId,
+                projectId: input.projectId,
+              },
+              data: { archivedAt: now },
+            });
+
+            // 5. Archive the workflow itself
+            const workflow = await tx.workflow.update({
+              where: { id: input.workflowId, projectId: input.projectId },
+              data: { archivedAt: now },
+            });
+
+            return {
+              workflow,
+              archivedEvaluatorsCount: archivedEvaluators.count,
+              archivedAgentsCount: archivedAgents.count,
+              deletedMonitorsCount: deletedMonitors.count,
+            };
+          });
+        },
+
+        generateCommitMessage: async (ctx, input) => {
+          const diff = createPatch(
+            "workflow.json",
+            input.previousDsl,
+            input.nextDsl,
+            "Previous Version",
+            "New Version",
+          );
+
+          // ModelNotConfiguredError passes through untouched (its own
+          // toast surface); every other provider/SDK failure surfaces as
+          // AiCallFailedError so the frontend can render the "double-check
+          // your model configuration" hint toast instead of a raw 500.
+          const commitFeature = featureByKey("workflows.commit_message");
+          if (!commitFeature) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "workflows.commit_message feature is not registered",
+            });
+          }
+          const commitMessage = await wrapAiCall(commitFeature, async () =>
+            generateText({
+              model: await getVercelAIModel({
+                projectId: input.projectId,
+                featureKey: "workflows.commit_message",
+                modelProviders: appContext(ctx).app.modelProviders.providerService,
+                managedProviders: appContext(ctx).app.managedProviders,
+              }),
+              providerOptions: {
+                openai: {
+                  reasoningEffort: "low",
+                } satisfies OpenAIResponsesProviderOptions,
+              },
+              messages: [
+                {
+                  role: "system",
+                  content: `
+You are a diff generator for the LLM Workflow builder from LangWatch Optimization Studio.
+Generate very short, concise commit messages for the changes in the diff. From 1 to 5 words max, all lowercase.
+If changing the model, just say the short new model name, like "gpt-4o", nothing else.
+For other changes:
+- Ignore renames and position changes unless it's the only thing that changed.
+- Explain not only the keys that changed, but the content inside them, for example do not say just "updated prompt", \
+but the actual change that was made inside the fields with as few words as possible, like "avoid word <example>".
+- By the way, always refer to the prompt as "prompt", not "instructions".
+- When changing the evaluator, it's not just the name the changes, it means the workflow is actually now using a different evaluator.
+- Do not use the word "edge", the user doesn't know the internal structure of the DSL, understand what is going on instead.
+            `,
+                },
+                {
+                  role: "user",
+                  content: `
+Original File:
+\`\`\`json
+${input.previousDsl}
+\`\`\`
+
+Diff:
+\`\`\`diff
+${diff}
+\`\`\`
+            `,
+                },
+              ],
+            }),
+          );
+
+          // A commit message is one short string: a plain-text completion, not a
+          // function-tool round-trip. Function tools combined with reasoning_effort
+          // are rejected on /v1/chat/completions for the gpt-5 family (the provider
+          // asks for /v1/responses), and these model calls go through the
+          // OpenAI-compatible chat-completions proxy. Generating text directly
+          // sidesteps that incompatibility and behaves the same across providers.
+
+          // TODO: save call costs to user account
+
+          return commitMessage.text.trim();
+        },
+
+        workflowCreated: (_ctx, input) => fireWorkflowCreatedNurturing(input),
+        captureException: (error) => captureException(toError(error)),
+      },
+
+      // Written out rather than inferred: the studio reads a stored version and
+      // a published component with the shape the rows have, and the transport
+      // is generic over both so the client sees exactly that. A context-
+      // sensitive implementation here would leave those two type parameters
+      // with nothing to infer from, and the studio's pages would be handed
+      // `unknown` instead of a workflow.
+      optimization: {
+        // The studio's chat panel runs the workflow over the same public run
+        // endpoint an external caller uses, authenticated as the project.
+        runPublishedWorkflow: async (
+          ctx: TRPCContext,
+          input: { workflowId: string; projectId: string; body: unknown },
+        ) => {
+          const project = await ctx.prisma.project.findFirst({
+            where: { id: input.projectId },
+          });
+
+          const apiKey = project?.apiKey;
+
+          const response = await fetch(
+            `${process.env.BASE_HOST}/api/workflows/${input.workflowId}/run`,
+            {
+              method: "POST",
+              body: JSON.stringify(input.body),
+              headers: {
+                "Content-Type": "application/json",
+                ...(apiKey && { "x-auth-token": apiKey }),
+              },
+            },
+          );
+
+          return await response.json();
+        },
+        tryGetWorkflow: async (
+          ctx: TRPCContext,
+          input: { workflowId: string; projectId: string },
+        ) =>
+          await ctx.prisma.workflow.findFirst({
+            where: { id: input.workflowId, projectId: input.projectId },
+          }),
+        tryGetWorkflowVersion: async (
+          ctx: TRPCContext,
+          input: { versionId: string; projectId: string },
+        ) =>
+          await ctx.prisma.workflowVersion.findFirst({
+            where: { id: input.versionId, projectId: input.projectId },
+          }),
+        setWorkflowFlags: async (
+          ctx: TRPCContext,
+          input: {
+            workflowId: string;
+            projectId: string;
+            isComponent?: boolean;
+            isEvaluator?: boolean;
+          },
+        ) => {
+          await ctx.prisma.workflow.update({
+            where: { id: input.workflowId, projectId: input.projectId },
+            data: {
+              ...(input.isComponent === undefined ? {} : { isComponent: input.isComponent }),
+              ...(input.isEvaluator === undefined ? {} : { isEvaluator: input.isEvaluator }),
+            },
+          });
+        },
+        listPublishedComponents: async (ctx: TRPCContext, input: { projectId: string }) => {
+          const workflows = await ctx.prisma.workflow.findMany({
+            where: {
+              projectId: input.projectId,
+              OR: [{ isComponent: true }, { isEvaluator: true }],
+            },
+            include: { versions: true },
+          });
+
+          // Each component carries only the version it publishes; the studio picks
+          // a component by its published shape, never by a draft.
+          workflows.forEach((workflow) => {
+            workflow.versions = workflow.versions.filter(
+              (version) => version.id === workflow.publishedId,
+            );
+          });
+
+          return workflows;
+        },
+      },
+    },
   },
 });
 
@@ -1271,8 +1681,6 @@ const coreRouters = {
   emailSuppression: emailSuppressionRouter,
   dataPrivacy: dataPrivacyRouter,
   translate: translateRouter,
-  workflow: workflowRouter,
-  optimization: optimizationRouter,
   integrationsChecks: integrationsChecksRouter,
   onboarding: onboardingRouter,
   scenarios: scenarioRouter,

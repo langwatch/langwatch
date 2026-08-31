@@ -1,20 +1,18 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { Session } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { getApp } from "~/server/app-layer/app";
 import { cleanupTestRows, requireAssigned } from "~/test-utils/cleanupTestRows";
 import { getTestUser } from "~/utils/testUtils";
-import { saveOrCommitWorkflowVersion } from "../workflows";
 
 /**
- * Integration test for saveOrCommitWorkflowVersion.
+ * Integration test for WorkflowApp.saveStudioVersion.
  *
  * Verifies that localPromptConfig is merged into parameters before
  * persisting — the root cause of #3437 where workflow evaluators
  * used a stale prompt when triggered from trace monitors.
  */
-describe("saveOrCommitWorkflowVersion", () => {
+describe("WorkflowApp.saveStudioVersion", () => {
   const workflowId = `test_workflow_${nanoid(8)}`;
   let projectId: string;
   let userId: string;
@@ -56,12 +54,6 @@ describe("saveOrCommitWorkflowVersion", () => {
     ]);
   });
 
-  const getCtx = () => ({
-    prisma,
-    session: { user: { id: userId } } as Session,
-    app: { workflows: getApp().workflows, modelProviders: getApp().modelProviders },
-  });
-
   describe("when a signature node has localPromptConfig", () => {
     it("merges localPromptConfig into parameters in the persisted DSL", async () => {
       const dsl = buildDsl({
@@ -89,12 +81,16 @@ describe("saveOrCommitWorkflowVersion", () => {
         },
       });
 
-      const version = await saveOrCommitWorkflowVersion({
-        ctx: getCtx(),
-        input: { projectId, workflowId, dsl },
-        autoSaved: false,
-        commitMessage: "test localPromptConfig merge",
-      });
+      const version = await getApp().workflows.saveStudioVersion(
+        {
+          projectId,
+          workflowId,
+          dsl,
+          autoSaved: false,
+          commitMessage: "test localPromptConfig merge",
+        },
+        { id: userId },
+      );
 
       const savedDsl = version.dsl as any;
       const signatureNode = savedDsl.nodes.find((n: any) => n.type === "signature");
@@ -131,12 +127,16 @@ describe("saveOrCommitWorkflowVersion", () => {
         messages: [{ role: "user", content: "Evaluate: {{output}}" }],
       });
 
-      const version = await saveOrCommitWorkflowVersion({
-        ctx: getCtx(),
-        input: { projectId, workflowId, dsl },
-        autoSaved: false,
-        commitMessage: "test no localPromptConfig",
-      });
+      const version = await getApp().workflows.saveStudioVersion(
+        {
+          projectId,
+          workflowId,
+          dsl,
+          autoSaved: false,
+          commitMessage: "test no localPromptConfig",
+        },
+        { id: userId },
+      );
 
       const savedDsl = version.dsl as any;
       const signatureNode = savedDsl.nodes.find((n: any) => n.type === "signature");

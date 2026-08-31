@@ -33,6 +33,11 @@ import { SuiteApp } from "@langwatch/suite-server";
 import { TraceApp } from "@langwatch/trace-server";
 import { UserApp } from "@langwatch/user-server";
 import { WorkflowApp } from "@langwatch/workflow-server";
+import {
+  AppWorkflowAgentMappingPort,
+  AppWorkflowRowPort,
+  AppWorkflowStudioDslPort,
+} from "~/runtime/app/features/workflow";
 import { assertWebhookEndpointsEntitled } from "~/runtime/app/features/webhooks";
 import type { AppCommands } from "~/server/event-sourcing/registration/pipelineRegistry";
 import { withIdempotency } from "~/server/api/idempotency";
@@ -368,6 +373,13 @@ export class App {
     this.workflows = WorkflowApp.create({
       workflows: deps.workflows,
       evaluators: deps.evaluators,
+      datasets: deps.dataset,
+      // Preparing a Studio graph and refreshing the agent mappings it implies
+      // both reach rows and cascades this deployment owns, so they arrive as
+      // this process's ports rather than as anything the feature can resolve.
+      studioDsl: AppWorkflowStudioDslPort.create({ modelProviders: deps.modelProviders }),
+      agentMappings: AppWorkflowAgentMappingPort.create({ database: prisma }),
+      workflowRows: AppWorkflowRowPort.create({ database: prisma }),
     });
     this.monitors = MonitorApp.create({
       monitors: deps.monitors,

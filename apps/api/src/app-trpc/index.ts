@@ -61,10 +61,6 @@ export {
   type ExportProgressEvent,
   type ExportTrpcContext,
 } from "../features/export/export-trpc.mount";
-export {
-  createWorkflowOptimizationTrpcRouter,
-  createWorkflowTrpcRouter,
-} from "../features/workflow/workflow-trpc.mount";
 export { createHomeTrpcRouter } from "../features/project/project-trpc.mount";
 export {
   createLimitsTrpcRouter,

@@ -69,8 +69,8 @@ const appRouter = createTRPCRouter({ ...appTrpcFeatures, /* unmigrated */ });
 
 The policy chain (tracer → logger → handled-error → scope-lineage guard →
 declared check → fail-closed backstop → audit) exists once in the process and
-reaches every feature through the mount. Twelve restated copies of that chain
-could drift; one cannot.
+reaches every feature through the mount. A restated copy of that chain per
+feature could drift; one cannot.
 
 ## Worker — `WorkerFeatureInstallerPort`
 

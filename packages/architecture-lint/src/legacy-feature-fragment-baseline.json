@@ -662,7 +662,6 @@
     {"feature":"workflow","file":"platform/app/src/pages/[project]/studio/[workflow].tsx","kind":"page-shell"},
     {"feature":"workflow","file":"platform/app/src/pages/[project]/workflows.tsx","kind":"page-shell"},
     {"feature":"workflow","file":"platform/app/src/runtime/app/features/workflow.ts","kind":"composition"},
-    {"feature":"workflow","file":"platform/app/src/server/api/routers/workflows.ts","kind":"transport"},
     {"feature":"workflow","file":"platform/app/src/server/routes/workflows.ts","kind":"transport"},
     {"feature":"workflow","file":"platform/app/src/server/workflows/auto-compute-agent-mappings.ts","kind":"legacy-implementation"},
     {"feature":"workflow","file":"platform/app/src/server/workflows/materializeNodeLlmConfigs.ts","kind":"legacy-implementation"},

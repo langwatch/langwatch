@@ -21,6 +21,7 @@
  * That is what lets one operation serve a browser session, an API key and a
  * background job without knowing which it is serving.
  */
+import type { DatasetService } from "@langwatch/dataset-contract";
 import type { Evaluator, EvaluatorService } from "@langwatch/evaluator-contract";
 import type {
   ArchiveWorkflowCommand,
@@ -28,6 +29,7 @@ import type {
   CreateWorkflowCommand,
   PublishWorkflowCommand,
   StudioClientEvent,
+  StudioWorkflow,
   Workflow,
   WorkflowService,
   WorkflowVersion,
@@ -36,6 +38,16 @@ import type {
   WorkflowWithVersion,
 } from "@langwatch/workflow-contract";
 import { nanoid } from "nanoid";
+import type {
+  WorkflowAgentMappingPort,
+  WorkflowRowPort,
+  WorkflowStudioDslPort,
+} from "../ports/workflow.port";
+import {
+  WorkflowStudioCopyService,
+  type CopyStudioWorkflowInput,
+} from "../services/workflow-studio-copy.service";
+import { WorkflowStudioVersionService } from "../services/workflow-studio-version.service";
 
 /** Who a write is attributed to. */
 export interface WorkflowCaller {
@@ -46,6 +58,14 @@ export interface WorkflowCaller {
 export interface WorkflowAppDependencies {
   workflows: WorkflowService;
   evaluators: EvaluatorService;
+  /** The dataset copies a Studio graph carries with it into another project. */
+  datasets: DatasetService;
+  /** How a Studio graph is prepared before any version of it is written. */
+  studioDsl: WorkflowStudioDslPort;
+  /** The agent mappings a saved Studio graph refreshes, best effort. */
+  agentMappings: WorkflowAgentMappingPort;
+  /** The bare row a Studio copy lands in, before its first version exists. */
+  workflowRows: WorkflowRowPort;
 }
 
 export class WorkflowApp {
@@ -53,7 +73,20 @@ export class WorkflowApp {
     return new WorkflowApp(dependencies);
   }
 
-  private constructor(private readonly dependencies: WorkflowAppDependencies) {}
+  private constructor(private readonly dependencies: WorkflowAppDependencies) {
+    this.studioVersions = WorkflowStudioVersionService.create({
+      workflows: dependencies.workflows,
+      studioDsl: dependencies.studioDsl,
+      agentMappings: dependencies.agentMappings,
+    });
+    this.studioCopies = WorkflowStudioCopyService.create({
+      datasets: dependencies.datasets,
+      rows: dependencies.workflowRows,
+    });
+  }
+
+  private readonly studioVersions: WorkflowStudioVersionService;
+  private readonly studioCopies: WorkflowStudioCopyService;
 
   // -- the workflow itself ---------------------------------------------------
 
@@ -128,10 +161,7 @@ export class WorkflowApp {
   }
 
   /** Publishes one version, attributed to the caller who asked for it. */
-  publish(
-    input: Omit<PublishWorkflowCommand, "actorId">,
-    by: WorkflowCaller,
-  ): Promise<Workflow> {
+  publish(input: Omit<PublishWorkflowCommand, "actorId">, by: WorkflowCaller): Promise<Workflow> {
     return this.dependencies.workflows.publish({ ...input, actorId: by.id });
   }
 
@@ -145,15 +175,54 @@ export class WorkflowApp {
     return this.dependencies.workflows.archive(input);
   }
 
+  // -- the Studio's own save and copy ----------------------------------------
+
+  /**
+   * Prepares a Studio graph the way saving one does, without writing anything.
+   *
+   * The studio asks for this before it dispatches a run, so what executes is
+   * the same graph a save would have persisted.
+   */
+  prepareStudioDsl(input: { projectId: string; dsl: StudioWorkflow }): Promise<StudioWorkflow> {
+    return this.studioVersions.prepareDsl(input);
+  }
+
+  /**
+   * Writes a Studio graph as a version, attributed to the caller who asked for
+   * it, and refreshes the agent mappings the new graph implies.
+   */
+  saveStudioVersion(
+    input: {
+      projectId: string;
+      workflowId: string;
+      dsl: StudioWorkflow;
+      autoSaved: boolean;
+      commitMessage: string;
+      setAsLatestVersion?: boolean;
+    },
+    by: WorkflowCaller,
+  ): Promise<WorkflowVersion> {
+    return this.studioVersions.saveOrCommit({ ...input, authorId: by.id });
+  }
+
+  /**
+   * Copies a workflow into another project and answers the new row's id with
+   * the graph rewritten to belong to it. The caller commits its first version.
+   */
+  copyStudioWorkflow(
+    input: CopyStudioWorkflowInput,
+  ): Promise<{ workflowId: string; dsl: StudioWorkflow }> {
+    return this.studioCopies.copyWithDatasets(input);
+  }
+
   /**
    * The service itself, for the process functions that still take it directly.
    *
-   * Two of them do, and neither is a workflow door: the trace evaluation runner
+   * One does, and it is not a workflow door: the trace evaluation runner
    * (`server/evaluations/runEvaluation.ts`) takes a `WorkflowService` as one of
-   * six collaborators, and the studio's save-or-commit helper writes a version
-   * with the author it resolved from the request. Both live beside the
-   * transports in the application being retired; until they move, this getter is
-   * the seam that remains — the same one `EvaluatorApp.evaluatorService` keeps.
+   * six collaborators. It lives beside the transports in the application being
+   * retired; until it moves, this getter is the seam that remains — the same one
+   * `EvaluatorApp.evaluatorService` keeps.
    */
   get workflowService(): WorkflowService {
     return this.dependencies.workflows;
