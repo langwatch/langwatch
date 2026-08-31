@@ -1905,6 +1905,20 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "00000000-0000-0000-0000-000000000000",
       hint: "Add this to also record what the environment costs each day. The same app registration needs the Cost Management Reader role on the subscription. Leave it empty to record conversations only.",
     },
+    {
+      key: "readSeats",
+      label: "Also record licence counts",
+      placeholder: "",
+      hint: "Records how many Copilot Studio licences the tenant has bought and how many are assigned, once a day. This needs a separate admin consent the other fields do not: the app registration must be granted the Organization.Read.All application permission on the tenant. Without it the read is refused and no counts are recorded. Only pool totals are read — never a list of users.",
+      control: "select",
+      // Off first, because a controlled <select> holding "" displays its first
+      // entry: a form nobody has touched must show the same answer the builder
+      // will produce for it.
+      options: () => [
+        { value: "no", label: "No — conversations and cost only" },
+        { value: "yes", label: "Yes — also record licence counts" },
+      ],
+    },
   ],
   openai_compliance: [
     {
@@ -2411,14 +2425,19 @@ function normalizeStartingAt(raw: string): string | null | undefined {
 }
 
 /**
- * The Databricks Genie adapter config, or null when a required field is empty.
+ * A yes/no select's value as the boolean an adapter schema expects.
  *
- * Genie needs a real builder rather than the bare `{ adapter }` the other
- * reference pullers get, for two reasons the form cannot express on its own:
- * the token has to land under `credentials` so the server encrypts it, and
- * `spaceIds` is a comma-separated string in the form but an array in the
- * adapter's schema.
+ * Only an explicit yes is on. An unset field, a source created before the
+ * field existed, and anything unrecognised all mean off, because the two
+ * mistakes are not symmetric: a value misread as on turns on a read the
+ * customer never asked for, while one misread as off leaves a setting looking
+ * ignored. "true" is accepted because `seedComposerParserConfig` turns a
+ * stored boolean back into form state with `String(stored)`.
  */
+function parserFlagIsOn(value: string | undefined): boolean {
+  return value === "yes" || value === "true";
+}
+
 /**
  * The pullConfig for a Copilot Studio source reading Dataverse.
  *
@@ -2463,10 +2482,22 @@ export function buildCopilotStudioDataversePullConfig(
     // about — and the schema would refuse it as not a uuid, failing the save
     // for a field the customer deliberately left blank.
     ...(azureSubscriptionId ? { azureSubscriptionId } : {}),
+    // A real boolean, because the adapter's schema is `z.boolean()` and would
+    // refuse the form's string on every run.
+    readSeats: parserFlagIsOn(p.readSeats),
     credentials: { tenantId, clientId, clientSecret },
   };
 }
 
+/**
+ * The Databricks Genie adapter config, or null when a required field is empty.
+ *
+ * Genie needs a real builder rather than the bare `{ adapter }` the other
+ * reference pullers get, for two reasons the form cannot express on its own:
+ * the token has to land under `credentials` so the server encrypts it, and
+ * `spaceIds` is a comma-separated string in the form but an array in the
+ * adapter's schema.
+ */
 function buildDatabricksGeniePullConfig(
   c: ComposerState,
 ): Record<string, unknown> | null {
@@ -2826,10 +2857,17 @@ const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
     // keeps the single rule "a field a builder decides about is owned by the
     // builder" true for this field too, so the day the builder starts
     // normalising it there is no raw copy left to win the merge.
+    //
+    // `readSeats` is owned for a stronger reason than either: the builder
+    // converts it from the form's string to a boolean, so the raw "yes"
+    // winning the merge would reach the adapter as a string where its schema
+    // demands a boolean — a source that saved cleanly and fails to parse on
+    // every run.
     copilot_studio_dataverse: [
       "environmentUrl",
       "botIds",
       "azureSubscriptionId",
+      "readSeats",
     ],
   };
 
