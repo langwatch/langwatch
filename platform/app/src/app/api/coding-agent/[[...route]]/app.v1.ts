@@ -115,7 +115,7 @@ const pullRequestUsageHandler = async (
     organizationId: organization.id,
     apiKeyCeiling: {
       apiKeyId: c.get("apiKeyId") as string,
-      check: (check) => getApp().permissions.hasApiKeyPermission(check),
+      cuts: (query) => getApp().permissions.apiKeyProjectCuts(query),
     },
   });
 

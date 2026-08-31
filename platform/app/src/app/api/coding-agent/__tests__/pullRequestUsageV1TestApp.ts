@@ -72,10 +72,21 @@ function staticBranchSessions(
 export function installPullRequestUsageTestApp(
   fixture: PullRequestUsageV1Fixture,
 ): void {
-  const staticSessions = staticBranchSessions([
-    fixture.projectAId,
-    fixture.projectBId,
-  ]);
+  installPullRequestUsageTestAppForTenants({
+    organizationId: fixture.organization.id,
+    tenantIds: [fixture.projectAId, fixture.projectBId],
+  });
+}
+
+/** The same App, for suites whose project set is not the two-project fixture. */
+export function installPullRequestUsageTestAppForTenants({
+  organizationId,
+  tenantIds,
+}: {
+  organizationId: string;
+  tenantIds: string[];
+}): void {
+  const staticSessions = staticBranchSessions(tenantIds);
   const nullSessionEvents = new NullCodingAgentSessionEventsRepository();
   const sessions = new CodingAgentSessionService({
     sessions: staticSessions,
@@ -90,7 +101,7 @@ export function installPullRequestUsageTestApp(
       sessionsList: new CodingAgentSessionsListService({
         sessions,
         pullRequests: new NullGithubPullRequestLookup(),
-        resolveOrganizationId: async () => fixture.organization.id,
+        resolveOrganizationId: async () => organizationId,
       }),
       pullRequestUsage: new PullRequestUsageService({
         pullRequests: new PrismaGithubPullRequestsRepository(prisma),
@@ -101,7 +112,7 @@ export function installPullRequestUsageTestApp(
           new NullGithubInstallationsRepository(),
           new GithubAppTokenService("", "", null),
         ),
-        resolveOrganizationId: async () => fixture.organization.id,
+        resolveOrganizationId: async () => organizationId,
         isSourceNonBillable: async () => false,
       }),
     },

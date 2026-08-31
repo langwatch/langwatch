@@ -59,20 +59,26 @@ export interface CallerProjectScope {
  * A key can carry bindings NARROWER than its holder's own — that ceiling is
  * the whole point of a restricted key — so a scope resolved from the holder
  * alone would let a deliberately narrowed key read with the holder's full
- * reach. `check` is `PermissionsService.hasApiKeyPermission`
- * (`effective = key bindings ∩ owning user's bindings`; for a service key,
- * which owns no user, the key's bindings alone), injected as a function so
- * this module does not depend on the app layer.
+ * reach. `cuts` is `PermissionsService.apiKeyProjectCuts`
+ * (`effective = key bindings ∩ owning user's bindings` per project; for a
+ * service key, which owns no user, the key's bindings alone), injected as a
+ * function so this module does not depend on the app layer.
+ *
+ * A BATCH by contract: it is called once with every project and both
+ * permissions, and the implementation collects the key's grant snapshot once
+ * and decides in memory. Deciding per project opened a database pass per
+ * project per permission, and a large organization's fan-out exhausted the
+ * connection pool (P2024) and turned the rollup into a 500.
  */
 export interface CallerApiKeyCeiling {
   apiKeyId: string;
-  check: (check: {
+  cuts: (query: {
     apiKeyId: string;
     userId: string | null;
     organizationId: string;
-    scope: { type: "project"; id: string; teamId: string };
-    permission: "traces:view" | "cost:view";
-  }) => Promise<boolean>;
+    projects: ReadonlyArray<{ projectId: string; teamId: string }>;
+    permissions: readonly ("traces:view" | "cost:view")[];
+  }) => Promise<ReadonlyMap<string, ReadonlyMap<string, boolean>>>;
 }
 
 export async function resolveCallerProjectScope({
@@ -124,22 +130,21 @@ export async function resolveCallerProjectScope({
   // The credential's own ceiling, applied after the holder's cut: both halves
   // must allow a project before it appears, and both before it is priced. For
   // a service key the holder's cut passes everything through, so the ceiling
-  // — the key's own bindings — is the whole of the answer.
-  const permitted = await withinApiKeyCeiling({
+  // — the key's own bindings — is the whole of the answer. ONE batched ask
+  // for every project and both permissions: the ceiling collects the key's
+  // grant snapshot once and decides in memory, never a pass per project.
+  const ceiling = await apiKeyCeilingCuts({
     apiKeyCeiling,
     userId,
     organizationId,
     projects: userPermitted,
-    permission: "traces:view",
   });
-  const userPriceable = permitted.filter((project) => priceable(project.id));
-  const priceableWithinCeiling = await withinApiKeyCeiling({
-    apiKeyCeiling,
-    userId,
-    organizationId,
-    projects: userPriceable,
-    permission: "cost:view",
-  });
+  const permitted = userPermitted.filter((project) =>
+    ceiling.viewable(project.id),
+  );
+  const priceableWithinCeiling = permitted.filter(
+    (project) => priceable(project.id) && ceiling.priceable(project.id),
+  );
 
   const ownerNames = await personalTeamOwnerNames({
     prisma,
@@ -238,42 +243,55 @@ function projectDisplayRecord({
 }
 
 /**
- * The projects a credential's own bindings reach, out of an already
- * user-permitted list.
+ * The credential's own per-project cut, as predicates by project id.
  *
- * One decision per project through the injected `check`, in parallel: the
- * decision is `key ∩ user` at the project's scope, exactly what every other
- * REST door asks (`enforceApiKeyCeiling`, `requireProjectPermission`), so a
- * key narrowed to one project answers here the way it answers everywhere
- * else. No ceiling means a session-authenticated caller, and the list passes
- * through untouched.
+ * One batched decision for every project and both permissions through the
+ * injected `cuts`: the decision per (project, permission) is `key ∩ user` at
+ * the project's scope, exactly what every other REST door asks
+ * (`enforceApiKeyCeiling`, `requireProjectPermission`), so a key narrowed to
+ * one project answers here the way it answers everywhere else — but the
+ * grant snapshots behind those decisions are collected once, not once per
+ * project. No ceiling means a session-authenticated caller, and everything
+ * passes through.
+ *
+ * Absent answers deny: a project the batch did not answer for is refused
+ * rather than assumed, so a short answer can only narrow the scope.
  */
-async function withinApiKeyCeiling<P extends { id: string; teamId: string }>({
+async function apiKeyCeilingCuts({
   apiKeyCeiling,
   userId,
   organizationId,
   projects,
-  permission,
 }: {
   apiKeyCeiling: CallerApiKeyCeiling | undefined;
   userId: string | null;
   organizationId: string;
-  projects: P[];
-  permission: "traces:view" | "cost:view";
-}): Promise<P[]> {
-  if (!apiKeyCeiling || projects.length === 0) return projects;
-  const allowed = await Promise.all(
-    projects.map((project) =>
-      apiKeyCeiling.check({
-        apiKeyId: apiKeyCeiling.apiKeyId,
-        userId,
-        organizationId,
-        scope: { type: "project", id: project.id, teamId: project.teamId },
-        permission,
-      }),
-    ),
-  );
-  return projects.filter((_, index) => allowed[index] === true);
+  projects: Array<{ id: string; teamId: string }>;
+}): Promise<{
+  viewable: (projectId: string) => boolean;
+  priceable: (projectId: string) => boolean;
+}> {
+  if (!apiKeyCeiling || projects.length === 0) {
+    const everything = () => true;
+    return { viewable: everything, priceable: everything };
+  }
+  const decisions = await apiKeyCeiling.cuts({
+    apiKeyId: apiKeyCeiling.apiKeyId,
+    userId,
+    organizationId,
+    projects: projects.map((project) => ({
+      projectId: project.id,
+      teamId: project.teamId,
+    })),
+    permissions: ["traces:view", "cost:view"],
+  });
+  const allowedBy =
+    (permission: "traces:view" | "cost:view") => (projectId: string) =>
+      decisions.get(permission)?.get(projectId) === true;
+  return {
+    viewable: allowedBy("traces:view"),
+    priceable: allowedBy("cost:view"),
+  };
 }
 
 /**

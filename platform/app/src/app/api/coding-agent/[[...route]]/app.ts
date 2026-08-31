@@ -363,8 +363,8 @@ secured.access(requires("traces:view")).get(
         ? {
             apiKeyCeiling: {
               apiKeyId,
-              check: (check: Parameters<CallerApiKeyCeiling["check"]>[0]) =>
-                getApp().permissions.hasApiKeyPermission(check),
+              cuts: (query: Parameters<CallerApiKeyCeiling["cuts"]>[0]) =>
+                getApp().permissions.apiKeyProjectCuts(query),
             },
           }
         : {}),

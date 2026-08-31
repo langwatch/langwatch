@@ -989,6 +989,20 @@ Rule: The v1 usage read needs only an organization credential
     Then only the bound project's rows appear
     And the other project is absent from the whole answer
 
+  # One collected grant snapshot decides every project. Deciding per project
+  # opened a database pass of several queries per project per permission, and
+  # a large organization's concurrent fan-out exhausted the connection pool —
+  # the rollup answered a ten-second 500 before it had even looked the pull
+  # request up.
+  @integration
+  Scenario: A large organization's rollup is decided from one grant snapshot
+    Given an organization on the authorization engine with dozens of projects
+    And an organization service key bound organization-wide
+    When the v1 pull request usage is read with that key
+    Then the answer covers every project of the organization
+    And the ceiling reads the same number of rows for dozens of projects as for a few
+    And the key's grants are collected once, not once per project
+
   # A legacy project key carries no organization and no user, so it cannot
   # authenticate at the organization door at all. The refusal names the
   # credential class to swap, because the caller is holding a working key of
