@@ -279,7 +279,7 @@ describe("userMigrationPassCohort on cloud", () => {
   });
 
   describe("when many organizations are enrolled and the user belongs to a few", () => {
-    /** @scenario "The membership probe does not scale with enrollment" — langwatch/langwatch#7709 */
+    // Regression for langwatch/langwatch#7709 — the cohort probe must not inline the enrolled set.
     it("answers from the user's memberships without shipping the enrolled set to the database", async () => {
       const backfill = IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME;
       const enrolled = Array.from({ length: 500 }, (_, i) => ({
