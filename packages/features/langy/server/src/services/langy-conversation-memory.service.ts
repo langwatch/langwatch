@@ -91,23 +91,21 @@ function cleanId(value: string): string | null {
 }
 
 /**
- * Fold a conversation's durable messages into the resources it touched.
+ * The resources this conversation touched, most recent first.
  *
  * Chronological in, MOST RECENT FIRST out. The turn ordinal counts agent
- * messages, which is what an agent turn durably is — a user asking and the agent
- * answering — so "turn 3" means the same thing to the model as it does to the
- * transcript.
+ * messages, which is what an agent turn durably is — a user asking and the
+ * agent answering — so "turn 3" means the same thing to the model as it does
+ * to the transcript.
  *
  * The rules, all of them about not offering a referent that isn't one:
- *   - a failed call contributes nothing (AGENTS.md rule 17: a create that names
- *     nothing created nothing);
+ *   - a failed call contributes nothing (AGENTS.md rule 17: a create that
+ *     names nothing created nothing);
  *   - a digest with no ids contributes nothing — `text`, `reduced` and
- *     `query-ref` results name no resource, so there is nothing to refer BACK to;
+ *     `query-ref` results name no resource, so there is nothing to refer BACK
+ *     to;
  *   - the same resource touched twice is remembered ONCE, at its latest turn,
  *     because "run it" means the thing as it now stands.
- */
-/**
- * The resources this conversation touched, most recent first.
  *
  * ── WHERE THE FACTS COME FROM ──────────────────────────────────────────────
  *
