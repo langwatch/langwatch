@@ -1446,3 +1446,62 @@ sabotage is.
   tests now cover it, and they matter more than they look — ClickHouse returns
   JSONEachRow numerics as strings, so the mapping is what keeps the pagination
   cursor a number rather than text that orders "1000" before "9".
+
+## Round: the files with no class at all
+
+The folds so far moved loose functions onto a class that already existed. This
+round is the other case, and the one the original complaint was actually
+about: files that were nothing but functions.
+
+| file | functions | now |
+| --- | --- | --- |
+| copilot-studio-trace-mapper | 34 | `CopilotStudioTraceMapper` |
+| trace-full-record.mapper | 29 | `TraceFullRecordMapper` |
+| genie-trace-mapper | 14 | `GenieTraceMapper` |
+| eventing.langy-type-guards | 14 | `LangyEventGuards` |
+| trace-full-protection.mapper | 11 | `TraceFullProtectionMapper` |
+| clickhouse.metric-data-point.mapper | 9 | `MetricDataPointMapper` |
+| gateway-window.adapter | 9 | `GatewayWindow` |
+| langy.turn-errors.adapter | 9 | `LangyTurnErrors` |
+| prisma.authz-grant.mapper | 8 | `AuthzGrantMapper` |
+| prisma.gateway-budget-scope-target.repository | 8 | `PrismaGatewayBudgetScopeTargetRepository` |
+
+Three of the four trace/conversation mappers exported something with no caller
+anywhere: `groupTranscriptRows`, `turnsOf` and `toolCallsOf` from the Copilot
+one, `flattenThoughts` from the Genie one, and `daysInUtcMonth` /
+`monthlyCycleStart` from the window adapter. A module that exports everything
+tells you nothing about what is anybody else's business, which is most of the
+argument for the class.
+
+### Two invariants that were encoded but not tested
+
+Both found the same way: fold, sabotage a member, watch nothing fail.
+
+- **The Copilot batch comparator.** Reversing it failed nothing, despite a test
+  named "orders piece 2 before piece 10". Activities are re-sorted by timestamp
+  after rows merge, so with distinct stamps the batch order leaves no trace.
+  What it decides is the same-millisecond tie. Now pinned.
+- **`firstAcceptanceWinsVersion`.** metric_data_points is a ReplacingMergeTree,
+  which keeps the LARGEST version, while the rule is that the FIRST acceptance
+  wins. The inversion is what reconciles those, and removing it changes nothing
+  visible — rows still write and still dedup, and quietly keep the wrong one.
+  Five tests now pin it, and writing them corrected my own wrong assumption
+  that `seriesRow` carries the version. Only `rawRow` and `usageEstimateRow` do.
+
+### Left alone deliberately
+
+- `stored-span-row.codec.ts`: its four exports reach platform/app's span
+  storage and integration paths I cannot run. The conversion is mechanical; the
+  verification is not.
+- The fourteen langy event guards, which have no caller at all. Their
+  re-export is gone, because the rule against re-exporting is unambiguous.
+  Whether the event union should be discriminated through guards or through
+  bare `event.type` is a design call, not a cleanup one.
+
+### Two process mistakes, both mine
+
+`oxfmt` on a package directory reformatted 45 files that were not oxfmt-clean
+to begin with — the same trap as the earlier billing round. Format the files
+you touched, never the tree. And a consumer survey that greps four of nine
+names finds four of nine consumers; the typecheck caught the rest, but the
+survey should have.
