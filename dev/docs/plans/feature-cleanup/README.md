@@ -427,3 +427,39 @@ the guard would pass. Comments are stripped before assertion now, verified in
 all three directions.
 
 Neither rule had actually been violated while its guard was down.
+
+## Round: hunting for more dead guards, and the model resolver (2026-08-31)
+
+Finding two dead source-reading guards in one day made the obvious question
+worth answering: are there others? Two sweeps say no.
+
+The first resolved every `__dirname`-relative source read in every test file —
+20 of them — against the filesystem. All resolve. The second ran **all 125
+feature packages**: 18,410 tests, one package with failures, and both of those
+are integration tests that want Redis rather than dead suites. So the two
+found earlier were the only ones, and the class is now understood well enough
+to recognise on sight.
+
+Worth keeping in mind about that class: the symptom is one red *file*, not N
+unguarded rules, which is why both survived several layout commits. And once
+revived, their substring assertions were satisfied by the comments in the
+files they read — the prose explains the very patterns being asserted.
+
+### ModelProviderResolutionService
+
+Untested, and it decides the model every AI surface runs on. Fifteen cases
+now hold the precedence (project over team over organization, feature
+override over role default, newest on a tie, another project's configuration
+never consulted).
+
+The case worth having is not a preference. A Codex model bills the user's
+ChatGPT plan through a backend licensed for coding harnesses and light
+assists, so it may run Langy and the FAST assists and nothing else. The
+resolver steps over one configured anywhere else — and the refusal is a
+different error from "nothing is configured", because one sends the customer
+to change the model and the other to set one at all. Both pinned, plus the
+same model resolving fine where the licence does cover it.
+
+`findAlternate` on that class remains uncovered: one caller, and it is the
+"offer a different tier" path behind a picker rather than the resolve every
+request takes.
