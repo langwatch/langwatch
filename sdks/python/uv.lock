@@ -3301,7 +3301,7 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "1.2.0"
+version = "1.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "attrs" },
@@ -3325,6 +3325,7 @@ dependencies = [
     { name = "tenacity" },
     { name = "termcolor" },
     { name = "tqdm" },
+    { name = "websockets" },
 ]
 
 [package.optional-dependencies]
@@ -3424,6 +3425,7 @@ requires-dist = [
     { name = "tenacity", specifier = ">=8.0.0" },
     { name = "termcolor", specifier = ">=3.0.1" },
     { name = "tqdm", specifier = ">=4.62.0" },
+    { name = "websockets", specifier = ">=12" },
 ]
 provides-extras = ["langchain", "dspy", "litellm", "dev", "tests"]
 
@@ -4801,7 +4803,7 @@ wheels = [
 
 [[package]]
 name = "openinference-instrumentation-litellm"
-version = "0.1.36"
+version = "0.1.37"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "openinference-instrumentation" },
@@ -4812,9 +4814,9 @@ dependencies = [
     { name = "setuptools" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/19/ae/22ff6e790f4d057e1b418e1897a822bc306e3f14361f8115b14de8e12865/openinference_instrumentation_litellm-0.1.36.tar.gz", hash = "sha256:dae5eae8ad2fa4570cbfdd3d1c11e0cd9d7c8b1a2f94358f36433ed317d8d1ef", size = 110534, upload-time = "2026-08-07T14:29:19.604Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/07/a3/57994351f806dc864e509762d4b3e3e4a5c4a3c9165c38a1e9c5367a8f61/openinference_instrumentation_litellm-0.1.37.tar.gz", hash = "sha256:1431f13e35ef9a979f818377c5dd3b1c0efcca97bd27bcba652b61d4d6877e6d", size = 110987, upload-time = "2026-08-12T19:46:14.596Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/39/30/29d91efe822af98154d9cad934581b9c93a3a46b0b329519d9d14a63a02f/openinference_instrumentation_litellm-0.1.36-py3-none-any.whl", hash = "sha256:c0382fd2163ddda5f6ef5b073e392fd561d4d70c9161ca3aeab58e00d1659650", size = 24341, upload-time = "2026-08-07T14:29:18.252Z" },
+    { url = "https://files.pythonhosted.org/packages/56/8a/918354cfba58b69fd8e9d8d6185db81fdf942ab20f949890b7aef17b6271/openinference_instrumentation_litellm-0.1.37-py3-none-any.whl", hash = "sha256:070500c69cc82b1c7b08782c07c4280a2ef291513ffe6361bb500d314fc35063", size = 24521, upload-time = "2026-08-12T19:46:13.465Z" },
 ]
 
 [[package]]
