@@ -49,9 +49,6 @@ export const spendRowToEnvelope = (row: WebhookSpendEventRow) =>
 export const webhookRetryDelayMs = (input: { attempt: number }): number =>
   WebhookDeliveryService.retryDelayMs(input);
 
-export const isEndpointStreamKey = (processKey: string): boolean =>
-  WebhookDeliveryService.isEndpointStreamKey(processKey);
-
 export const deliverPayloadToRow = (payload: DeliverPayload) =>
   WebhookDeliveryService.payloadToRow(payload);
 
