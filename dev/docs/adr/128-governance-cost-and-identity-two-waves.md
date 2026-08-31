@@ -25,8 +25,8 @@ project as the *home* of every pulled row and separates "home" from
 "spender" into different fields.
 
 > **One line:** every AI dollar — **gateway traffic**, **provider bills**,
-> **seat licences** — lands as an **append-only event** with a **raw actor
-> id** and a **currency code**, folds into **one daily rollup**, and is shown
+> **seat counts** — lands as an **append-only event** with a **raw actor
+> id** and a **currency code** (seat money derived at read from count × price list, §6), folds into **one daily rollup**, and is shown
 > where **the bill is the total** and our own metering only **splits** it;
 > **who** spent it is resolved **at read time** from three **dated identity
 > tables** this document defines — in **two waves**: money first, people
@@ -238,7 +238,7 @@ amortized *billed* money, and ours is a list-rate estimate.
 
 The screen never talks to providers and never merges numbers itself:
 
-```
+```text
 event_log ── gateway-spend events ──┬─(existing projections)──► gateway_spend / budget ledger  (sibling tables)
           └─ pulled-usage events  ──┴─(rollup fold projection)──► governance_cost_rollup_1d ──► thin cost service ──► screen
                                                                                   ▲
@@ -367,7 +367,7 @@ screen heals, because the stored event only ever claimed a count, which
 stays true. Roster history is frozen: January's count lives in January's
 events after people leave in March.
 
-If a roster-reported licence type has **no matching price row**, the
+If a roster-reported license type has **no matching price row**, the
 screen shows "N seats — price missing", never a silent zero: the count
 must not drop out of the sum through an inner join. (The failure
 red-team caught this as an unstated behaviour.)
@@ -783,6 +783,10 @@ model IdentityMatch {
   createdAt          DateTime  @default(now())
   // at most one OPEN link per discovered person — enforced with a partial unique index
   // (raw SQL in the migration: UNIQUE (discoveredPersonId) WHERE validTo IS NULL)
+  // Overlap guard: closed rows with overlapping date ranges are prevented by an
+  // exclusion constraint (raw SQL in the migration: EXCLUDE USING gist
+  // (discoveredPersonId WITH =, tsrange(validFrom, validTo) WITH &&) WHERE (validTo IS NOT NULL)).
+  // Without it, a read-time join on validFrom <= spendDate < validTo could match multiple rows.
 }
 
 model SeatPrice {
@@ -794,6 +798,10 @@ model SeatPrice {
   currencyCode   String
   validFrom      DateTime            // dated — price changes are new rows (§6)
   validTo        DateTime?
+  // Overlap guard: two price rows for the same (organizationId, provider, licenseType)
+  // with overlapping validity would make the seat-money multiplication ambiguous.
+  // Enforced by an exclusion constraint (raw SQL in the migration: EXCLUDE USING gist
+  // ((organizationId, provider, licenseType) WITH =, tsrange(validFrom, COALESCE(validTo, 'infinity')) WITH &&)).
 }
 ```
 
