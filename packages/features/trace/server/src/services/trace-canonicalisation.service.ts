@@ -50,8 +50,8 @@ import {
   claudeCacheWritesLongLived,
   isConversationalQuerySource,
 } from "./claude-code-call-policy.rules";
-import { deriveClaudeRequestBody } from "./claude-code-request.rules";
-import { deriveClaudeResponseBody } from "./claude-code-response.rules";
+import { ClaudeCodeRequest } from "./claude-code-request.rules";
+import { ClaudeCodeResponse } from "./claude-code-response.rules";
 
 export class TraceCanonicalisationService extends TraceCanonicalisationServiceContract {
   private readonly extractors: CanonicalAttributesPort[] = [
@@ -195,7 +195,7 @@ export class TraceCanonicalisationService extends TraceCanonicalisationServiceCo
     input: DeriveClaudeRequestContentInput,
   ): DeriveClaudeRequestContentResult {
     const { body } = deriveClaudeRequestContentInputSchema.parse(input);
-    const derived = deriveClaudeRequestBody(body);
+    const derived = ClaudeCodeRequest.deriveClaudeRequestBody(body);
     const toolResults = [...derived.toolResults].map(([useId, text]) => ({
       useId,
       text,
@@ -212,7 +212,9 @@ export class TraceCanonicalisationService extends TraceCanonicalisationServiceCo
   ): DeriveClaudeResponseContentResult {
     const { body } = deriveClaudeResponseContentInputSchema.parse(input);
 
-    return deriveClaudeResponseContentResultSchema.parse(deriveClaudeResponseBody(body));
+    return deriveClaudeResponseContentResultSchema.parse(
+      ClaudeCodeResponse.deriveClaudeResponseBody(body),
+    );
   }
 
   classifyClaudeCall(input: ClassifyClaudeCallInput): ClassifyClaudeCallResult {

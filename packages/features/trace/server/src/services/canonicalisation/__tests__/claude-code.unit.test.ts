@@ -2,13 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { ClaudeCodeCanonicaliser } from "../claude-code.canonicaliser";
 import { isConversationalQuerySource } from "../../claude-code-call-policy.rules";
-import { buildInputMessagesFromRequestBody } from "../../claude-code-request.rules";
+import { ClaudeCodeRequest } from "../../claude-code-request.rules";
+import { ClaudeCodeResponse } from "../../claude-code-response.rules";
 import {
-  extractAssistantOutputFromResponseBody,
-  extractAssistantTextFromResponseBody,
-  extractSessionTitleFromResponseBody,
-} from "../../claude-code-response.rules";
-import { createExtractorContext, createLogExtractorContext } from "../../../stores/__tests__/canonicalisation/adapters/test-helpers";
+  createExtractorContext,
+  createLogExtractorContext,
+} from "../../../stores/__tests__/canonicalisation/adapters/test-helpers";
 
 const SCOPE = "com.anthropic.claude_code.events";
 
@@ -179,7 +178,7 @@ describe("extractAssistantTextFromResponseBody (exported helper)", () => {
         },
       ],
     });
-    expect(extractAssistantTextFromResponseBody(body)).toBe(
+    expect(ClaudeCodeResponse.extractAssistantTextFromResponseBody(body)).toBe(
       "0 files (directory exists but is empty).\n\nUNLOCK-KNOBS-TEST-PROOF-7777",
     );
   });
@@ -197,7 +196,7 @@ describe("extractAssistantTextFromResponseBody (exported helper)", () => {
         },
       ],
     });
-    expect(extractAssistantTextFromResponseBody(body)).toBe("Let me run that.");
+    expect(ClaudeCodeResponse.extractAssistantTextFromResponseBody(body)).toBe("Let me run that.");
   });
 
   it("joins multiple text blocks with a blank line", () => {
@@ -207,23 +206,25 @@ describe("extractAssistantTextFromResponseBody (exported helper)", () => {
         { type: "text", text: "Second paragraph." },
       ],
     });
-    expect(extractAssistantTextFromResponseBody(body)).toBe(
+    expect(ClaudeCodeResponse.extractAssistantTextFromResponseBody(body)).toBe(
       "First paragraph.\n\nSecond paragraph.",
     );
   });
 
   it("returns null for non-string / empty / malformed / non-array content", () => {
-    expect(extractAssistantTextFromResponseBody(void 0)).toBeNull();
-    expect(extractAssistantTextFromResponseBody(null)).toBeNull();
-    expect(extractAssistantTextFromResponseBody(42)).toBeNull();
-    expect(extractAssistantTextFromResponseBody("")).toBeNull();
-    expect(extractAssistantTextFromResponseBody("{not valid json")).toBeNull();
-    expect(extractAssistantTextFromResponseBody(JSON.stringify({}))).toBeNull();
+    expect(ClaudeCodeResponse.extractAssistantTextFromResponseBody(void 0)).toBeNull();
+    expect(ClaudeCodeResponse.extractAssistantTextFromResponseBody(null)).toBeNull();
+    expect(ClaudeCodeResponse.extractAssistantTextFromResponseBody(42)).toBeNull();
+    expect(ClaudeCodeResponse.extractAssistantTextFromResponseBody("")).toBeNull();
+    expect(ClaudeCodeResponse.extractAssistantTextFromResponseBody("{not valid json")).toBeNull();
+    expect(ClaudeCodeResponse.extractAssistantTextFromResponseBody(JSON.stringify({}))).toBeNull();
     expect(
-      extractAssistantTextFromResponseBody(JSON.stringify({ content: "string-not-array" })),
+      ClaudeCodeResponse.extractAssistantTextFromResponseBody(
+        JSON.stringify({ content: "string-not-array" }),
+      ),
     ).toBeNull();
     expect(
-      extractAssistantTextFromResponseBody(
+      ClaudeCodeResponse.extractAssistantTextFromResponseBody(
         JSON.stringify({
           content: [{ type: "tool_use", id: "t", name: "Bash", input: {} }],
         }),
@@ -242,7 +243,7 @@ describe("buildInputMessagesFromRequestBody (exported helper)", () => {
         { role: "assistant", content: [{ type: "text", text: "Hello" }] },
       ],
     });
-    expect(buildInputMessagesFromRequestBody(body)).toEqual([
+    expect(ClaudeCodeRequest.buildInputMessagesFromRequestBody(body)).toEqual([
       { role: "system", content: "You are a coding assistant." },
       { role: "user", content: "Hi" },
       { role: "assistant", content: "Hello" },
@@ -267,7 +268,7 @@ describe("buildInputMessagesFromRequestBody (exported helper)", () => {
         },
       ],
     });
-    expect(buildInputMessagesFromRequestBody(body)).toEqual([
+    expect(ClaudeCodeRequest.buildInputMessagesFromRequestBody(body)).toEqual([
       { role: "user", content: "look at this\n\nresult\n\n[tool_use: Read]" },
     ]);
   });
@@ -280,21 +281,23 @@ describe("buildInputMessagesFromRequestBody (exported helper)", () => {
       ],
       messages: [{ role: "user", content: "go" }],
     });
-    expect(buildInputMessagesFromRequestBody(body)).toEqual([
+    expect(ClaudeCodeRequest.buildInputMessagesFromRequestBody(body)).toEqual([
       { role: "system", content: "line one\n\nline two" },
       { role: "user", content: "go" },
     ]);
   });
 
   it("returns null for truncated / malformed / message-less bodies", () => {
-    expect(buildInputMessagesFromRequestBody(void 0)).toBeNull();
-    expect(buildInputMessagesFromRequestBody("")).toBeNull();
+    expect(ClaudeCodeRequest.buildInputMessagesFromRequestBody(void 0)).toBeNull();
+    expect(ClaudeCodeRequest.buildInputMessagesFromRequestBody("")).toBeNull();
     // claude truncates large request bodies inline -> invalid JSON tail.
-    expect(buildInputMessagesFromRequestBody('{"model":"x","messages":[{"role":"u')).toBeNull();
-    expect(buildInputMessagesFromRequestBody(JSON.stringify({}))).toBeNull();
+    expect(
+      ClaudeCodeRequest.buildInputMessagesFromRequestBody('{"model":"x","messages":[{"role":"u'),
+    ).toBeNull();
+    expect(ClaudeCodeRequest.buildInputMessagesFromRequestBody(JSON.stringify({}))).toBeNull();
     // messages present but every turn flattens to empty -> null.
     expect(
-      buildInputMessagesFromRequestBody(
+      ClaudeCodeRequest.buildInputMessagesFromRequestBody(
         JSON.stringify({ messages: [{ role: "user", content: [] }] }),
       ),
     ).toBeNull();
@@ -314,7 +317,7 @@ describe("extractAssistantOutputFromResponseBody", () => {
         },
       ],
     });
-    const out = extractAssistantOutputFromResponseBody(body) ?? "";
+    const out = ClaudeCodeResponse.extractAssistantOutputFromResponseBody(body) ?? "";
     expect(out).toContain("Let me check.");
     expect(out).toContain("[tool_use: Bash]");
     expect(out).toContain("ls /tmp");
@@ -324,14 +327,14 @@ describe("extractAssistantOutputFromResponseBody", () => {
     const body = JSON.stringify({
       content: [{ type: "text", text: "PONG-Z" }],
     });
-    expect(extractAssistantOutputFromResponseBody(body)).toBe("PONG-Z");
-    expect(extractAssistantTextFromResponseBody(body)).toBe("PONG-Z");
+    expect(ClaudeCodeResponse.extractAssistantOutputFromResponseBody(body)).toBe("PONG-Z");
+    expect(ClaudeCodeResponse.extractAssistantTextFromResponseBody(body)).toBe("PONG-Z");
   });
 
   it("returns null for an empty or unparseable body", () => {
-    expect(extractAssistantOutputFromResponseBody("")).toBeNull();
-    expect(extractAssistantOutputFromResponseBody("{not json")).toBeNull();
-    expect(extractAssistantOutputFromResponseBody(null)).toBeNull();
+    expect(ClaudeCodeResponse.extractAssistantOutputFromResponseBody("")).toBeNull();
+    expect(ClaudeCodeResponse.extractAssistantOutputFromResponseBody("{not json")).toBeNull();
+    expect(ClaudeCodeResponse.extractAssistantOutputFromResponseBody(null)).toBeNull();
   });
 });
 
@@ -342,7 +345,7 @@ describe("extractSessionTitleFromResponseBody", () => {
     /** @scenario The title lifts from a generate_session_title response body, capped */
     it("reads the title out of the JSON text block", () => {
       expect(
-        extractSessionTitleFromResponseBody(
+        ClaudeCodeResponse.extractSessionTitleFromResponseBody(
           titleBody('{"title": "Fix the flaky session fold test"}'),
         ),
       ).toBe("Fix the flaky session fold test");
@@ -350,7 +353,7 @@ describe("extractSessionTitleFromResponseBody", () => {
 
     /** @scenario The title lifts from a generate_session_title response body, capped */
     it("caps a title long enough to be something other than a title", () => {
-      const title = extractSessionTitleFromResponseBody(
+      const title = ClaudeCodeResponse.extractSessionTitleFromResponseBody(
         titleBody(JSON.stringify({ title: "b".repeat(4_000) })),
       );
       expect(title).toHaveLength(512);
@@ -361,25 +364,33 @@ describe("extractSessionTitleFromResponseBody", () => {
     /** @scenario An unparseable title body sets no title */
     it("answers null for every deviation instead of guessing", () => {
       // Unparseable body, and the truncation claude applies past its inline cap.
-      expect(extractSessionTitleFromResponseBody("{not json")).toBeNull();
+      expect(ClaudeCodeResponse.extractSessionTitleFromResponseBody("{not json")).toBeNull();
       expect(
-        extractSessionTitleFromResponseBody(
+        ClaudeCodeResponse.extractSessionTitleFromResponseBody(
           '{"content":[{"type":"text","text":"{\\"title\\": \\"Fix the fl',
         ),
       ).toBeNull();
       // Parseable body whose text is prose, not the title JSON.
-      expect(extractSessionTitleFromResponseBody(titleBody("Done, pushed."))).toBeNull();
+      expect(
+        ClaudeCodeResponse.extractSessionTitleFromResponseBody(titleBody("Done, pushed.")),
+      ).toBeNull();
       // Right shape, wrong type or empty.
-      expect(extractSessionTitleFromResponseBody(titleBody('{"title": 7}'))).toBeNull();
-      expect(extractSessionTitleFromResponseBody(titleBody('{"title": "   "}'))).toBeNull();
-      expect(extractSessionTitleFromResponseBody(titleBody('["a title"]'))).toBeNull();
+      expect(
+        ClaudeCodeResponse.extractSessionTitleFromResponseBody(titleBody('{"title": 7}')),
+      ).toBeNull();
+      expect(
+        ClaudeCodeResponse.extractSessionTitleFromResponseBody(titleBody('{"title": "   "}')),
+      ).toBeNull();
+      expect(
+        ClaudeCodeResponse.extractSessionTitleFromResponseBody(titleBody('["a title"]')),
+      ).toBeNull();
       // No text block at all.
       expect(
-        extractSessionTitleFromResponseBody(
+        ClaudeCodeResponse.extractSessionTitleFromResponseBody(
           JSON.stringify({ content: [{ type: "tool_use", name: "Bash" }] }),
         ),
       ).toBeNull();
-      expect(extractSessionTitleFromResponseBody("")).toBeNull();
+      expect(ClaudeCodeResponse.extractSessionTitleFromResponseBody("")).toBeNull();
     });
   });
 });
@@ -524,7 +535,7 @@ describe("buildInputMessagesFromRequestBody tool definitions", () => {
       ],
       messages: [{ role: "user", content: "go" }],
     });
-    const out = buildInputMessagesFromRequestBody(body)!;
+    const out = ClaudeCodeRequest.buildInputMessagesFromRequestBody(body)!;
     expect(out[0]).toEqual({
       role: "system",
       content: "You are a coding assistant.",
@@ -553,7 +564,7 @@ describe("salvageTruncatedRequestBody (claude's 60KB inline cap)", () => {
     const cut =
       intact.slice(0, intact.indexOf("long tail")) +
       "long ta\n\n[TRUNCATED - Content exceeds 60KB limit]";
-    const out = buildInputMessagesFromRequestBody(cut)!;
+    const out = ClaudeCodeRequest.buildInputMessagesFromRequestBody(cut)!;
     expect(out[0]).toEqual({ role: "user", content: "first turn" });
     expect(out[1]).toEqual({ role: "assistant", content: "first reply" });
     const note = out[out.length - 1]!;
@@ -566,7 +577,7 @@ describe("salvageTruncatedRequestBody (claude's 60KB inline cap)", () => {
     const raw =
       '{"model":"claude-opus-5","messages":[{"role":"user","content":"hi"}],' +
       '"system":[{"type":"text","text":"You are Claude Code, working in the acme repo. Follow CLAU';
-    const out = buildInputMessagesFromRequestBody(raw)!;
+    const out = ClaudeCodeRequest.buildInputMessagesFromRequestBody(raw)!;
     const system = out.find(
       (m) => m.role === "system" && m.content.includes("You are Claude Code"),
     )!;
@@ -577,7 +588,7 @@ describe("salvageTruncatedRequestBody (claude's 60KB inline cap)", () => {
 
   it("recovers a partial STRING system value cut mid-escape", () => {
     const raw = '{"messages":[{"role":"user","content":"q"}],"system":"Line one\\nLine two\\';
-    const out = buildInputMessagesFromRequestBody(raw)!;
+    const out = ClaudeCodeRequest.buildInputMessagesFromRequestBody(raw)!;
     const system = out.find((m) => m.role === "system")!;
     expect(system.content).toContain("Line one\nLine two");
     expect(system.content).toContain("[system prompt truncated");
@@ -587,14 +598,16 @@ describe("salvageTruncatedRequestBody (claude's 60KB inline cap)", () => {
     const raw =
       '{"messages":[{"role":"user","content":"q"}],' +
       '"tools":[{"name":"Bash","description":"Run commands"},{"name":"Cut","descrip';
-    const out = buildInputMessagesFromRequestBody(raw)!;
+    const out = ClaudeCodeRequest.buildInputMessagesFromRequestBody(raw)!;
     const tools = out.find((m) => m.content.includes("[tools available"))!;
     expect(tools.content).toContain("Bash: Run commands");
     expect(tools.content).not.toContain("Cut");
   });
 
   it("still returns null when nothing complete precedes the cut", () => {
-    expect(buildInputMessagesFromRequestBody('{"model":"x","messages":[{"role":"u')).toBeNull();
+    expect(
+      ClaudeCodeRequest.buildInputMessagesFromRequestBody('{"model":"x","messages":[{"role":"u'),
+    ).toBeNull();
   });
 });
 

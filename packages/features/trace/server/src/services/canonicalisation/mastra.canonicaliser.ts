@@ -9,16 +9,7 @@ import {
   normalizeToMessages,
   stripSystemMessages,
 } from "../canonical-message.rules";
-import {
-  deriveDisplayName,
-  extractBodyFromModelStepInput,
-  extractEvalOutput,
-  extractModelFromMetadata,
-  extractSystemPromptFromBody,
-  extractTextFromOutput,
-  hasResponseFormat,
-  mastraSpanTypeToCanonical,
-} from "../mastra-value.rules";
+import { MastraValues } from "../mastra-value.rules";
 import type {
   CanonicalAttributesPort,
   ExtractorContext,
@@ -34,11 +25,12 @@ export class MastraCanonicaliser implements CanonicalAttributesPort {
 
     const mastraType = ctx.bag.attrs.get(ATTR_KEYS.MASTRA_SPAN_TYPE);
     const rawModelStepInput = ctx.bag.attrs.get(ATTR_KEYS.MASTRA_MODEL_STEP_INPUT);
-    const modelStepBody = extractBodyFromModelStepInput(rawModelStepInput);
+    const modelStepBody = MastraValues.extractBodyFromModelStepInput(rawModelStepInput);
 
     // Detect eval model_step: orphan (no parent) OR has response_format (structured output eval)
     const isEvalModelStep =
-      mastraType === "model_step" && (!ctx.span.parentSpanId || hasResponseFormat(modelStepBody));
+      mastraType === "model_step" &&
+      (!ctx.span.parentSpanId || MastraValues.hasResponseFormat(modelStepBody));
 
     this.mapSpanType(ctx, mastraType, isEvalModelStep);
     const modelName = this.extractModelInfo(ctx, modelStepBody);
@@ -67,7 +59,10 @@ export class MastraCanonicaliser implements CanonicalAttributesPort {
     if (ctx.bag.attrs.has(ATTR_KEYS.SPAN_TYPE)) {
       return;
     }
-    ctx.setAttr(ATTR_KEYS.SPAN_TYPE, mastraSpanTypeToCanonical(mastraType, isEvalModelStep));
+    ctx.setAttr(
+      ATTR_KEYS.SPAN_TYPE,
+      MastraValues.mastraSpanTypeToCanonical(mastraType, isEvalModelStep),
+    );
     ctx.recordRule(`${this.id}:mastra.span.type->langwatch.span.type`);
   }
 
@@ -118,7 +113,7 @@ export class MastraCanonicaliser implements CanonicalAttributesPort {
 
     // Fallback: try mastra.metadata.modelMetadata for model name
     if (!modelName) {
-      modelName = extractModelFromMetadata(attrs);
+      modelName = MastraValues.extractModelFromMetadata(attrs);
       if (
         modelName &&
         !attrs.has(ATTR_KEYS.GEN_AI_REQUEST_MODEL) &&
@@ -159,7 +154,7 @@ export class MastraCanonicaliser implements CanonicalAttributesPort {
       if (!attrs.has(ATTR_KEYS.LANGWATCH_OUTPUT)) {
         const rawOutput = attrs.get(ATTR_KEYS.MASTRA_AGENT_RUN_OUTPUT);
         if (rawOutput !== void 0) {
-          const text = extractTextFromOutput(rawOutput);
+          const text = MastraValues.extractTextFromOutput(rawOutput);
           if (text) {
             ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, text);
             ctx.recordRule(`${this.id}:mastra.agent_run.output->langwatch.output`);
@@ -174,13 +169,13 @@ export class MastraCanonicaliser implements CanonicalAttributesPort {
       if (rawOutput !== void 0) {
         if (isEvalModelStep) {
           // For orphan eval spans: prefer structured object, fall back to text
-          const evalOutput = extractEvalOutput(rawOutput);
+          const evalOutput = MastraValues.extractEvalOutput(rawOutput);
           if (evalOutput != null) {
             ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, evalOutput);
             ctx.recordRule(`${this.id}:orphan.model_step.output->langwatch.output`);
           }
         } else {
-          const text = extractTextFromOutput(rawOutput);
+          const text = MastraValues.extractTextFromOutput(rawOutput);
           if (text) {
             ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, text);
             if (
@@ -198,7 +193,7 @@ export class MastraCanonicaliser implements CanonicalAttributesPort {
 
     // For orphan eval spans: extract system prompt as input
     if (isEvalModelStep && !attrs.has(ATTR_KEYS.LANGWATCH_INPUT)) {
-      const systemPrompt = extractSystemPromptFromBody(modelStepBody);
+      const systemPrompt = MastraValues.extractSystemPromptFromBody(modelStepBody);
       if (systemPrompt) {
         ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, systemPrompt);
         ctx.recordRule(`${this.id}:orphan.system_prompt->langwatch.input`);
@@ -214,7 +209,7 @@ export class MastraCanonicaliser implements CanonicalAttributesPort {
     isEvalModelStep: boolean,
     modelStepBody: Record<string, unknown> | null,
   ): void {
-    const displayName = deriveDisplayName({
+    const displayName = MastraValues.deriveDisplayName({
       mastraType,
       modelName,
       isOrphan: isEvalModelStep,

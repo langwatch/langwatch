@@ -173,8 +173,7 @@ export {
 } from "./services/trace-ingestion.service";
 export {
   DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
-  capOversizedAttributes,
-  hasOversizedAttribute,
+  TraceAttributeCap,
 } from "./services/trace-attribute-cap.rules";
 export { capPayloadString } from "./services/trace-payload-cap.rules";
 export {

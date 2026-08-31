@@ -9,7 +9,7 @@ import {
   claudeCacheWritesLongLived,
   isConversationalQuerySource,
 } from "../claude-code-call-policy.rules";
-import { extractCacheCreationTtlSplit } from "../claude-code-response.rules";
+import { ClaudeCodeResponse } from "../claude-code-response.rules";
 
 export const CLAUDE_CODE_SCOPE_NAMES: ReadonlySet<string> = new Set([
   "com.anthropic.claude_code.events",
@@ -126,7 +126,7 @@ export class ClaudeCodeCanonicaliser implements CanonicalAttributesPort {
    * ride logs exclusively, so summing them can never double-count a span).
    */
   private liftApiResponseBodyUsage(ctx: LogExtractorContext): void {
-    const usage = extractCacheCreationTtlSplit(ctx.bag.attrs.get("body"));
+    const usage = ClaudeCodeResponse.extractCacheCreationTtlSplit(ctx.bag.attrs.get("body"));
     if (usage === null) {
       return;
     }
