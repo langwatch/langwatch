@@ -55,7 +55,7 @@
     "task:migrate-object-storage": "NODE_OPTIONS=--max-old-space-size=4096 pnpm run task migrateObjectStorage",
     "prisma:generate:typescript": "pnpm prisma generate",
     "prisma:generate:migration": "pnpm prisma migrate dev --create-only",
-    "prisma:migrate": "sh -c 'if [ \"$SKIP_PRISMA_MIGRATE\" != \"true\" ]; then pnpm prisma migrate deploy; else echo \"Skipping Prisma migrations\"; fi'",
+    "prisma:migrate": "sh -c 'if [ \"$SKIP_PRISMA_MIGRATE\" != \"true\" ]; then node scripts/prisma-premigrate.mjs && pnpm prisma migrate deploy; else echo \"Skipping Prisma migrations\"; fi'",
     "prisma:seed": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.portless prisma/seed.ts",
     "seed:sample-traces": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.portless scripts/seed-sample-traces.ts",
     "seed:realistic-platform": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.portless scripts/seed-realistic-platform-data.ts",
