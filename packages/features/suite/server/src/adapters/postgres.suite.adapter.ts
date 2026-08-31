@@ -1,9 +1,11 @@
 import type { AgentService } from "@langwatch/agent-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { ScenarioService } from "@langwatch/scenario-contract";
 import type { SuiteService as SuiteServiceContract } from "@langwatch/suite-contract";
-import { PrismaSuiteRepository } from "../repositories/prisma/prisma.suite.repository";
+import {
+  PrismaSuiteRepository,
+  type SuiteDatabase,
+} from "../repositories/prisma/prisma.suite.repository";
 import { ClickHouseSuiteRunRepository } from "../repositories/clickhouse/clickhouse.suite-run.repository";
 import type { SuiteExecutionPort } from "../ports/suite-execution.port";
 import type { SuiteClickHouseClient } from "../ports/suite-clickhouse.port";
@@ -13,7 +15,7 @@ import { SuiteService } from "../services/suite.service";
 import type { SuiteEventingCapabilities, SuiteRuntimeAdapter } from "./suite-runtime.adapter";
 
 export type PostgresSuiteAdapterOptions = {
-  database: PrismaClient;
+  database: SuiteDatabase;
   scenarios: ScenarioService;
   agents: AgentService;
   prompts: PromptService;

@@ -1,18 +1,20 @@
 import type { LangWatchQLService } from "@langwatch/analytics-contract";
 import type { DashboardService as DashboardServiceContract } from "@langwatch/dashboard-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
   DashboardIdGenerator,
   DashboardGraphVisibilityPolicyPort,
   SavedWorkbenchChartPolicy,
 } from "../ports/dashboard.port";
-import { PrismaDashboardRepository } from "../repositories/prisma/prisma.dashboard.repository";
+import {
+  PrismaDashboardRepository,
+  type DashboardDatabase,
+} from "../repositories/prisma/prisma.dashboard.repository";
 import { DashboardService } from "../services/dashboard.service";
 
 export class PostgresDashboardAdapter {
   private constructor(
     private readonly options: {
-      database: PrismaClient;
+      database: DashboardDatabase;
       ids: DashboardIdGenerator;
       savedWorkbenchChartPolicy: SavedWorkbenchChartPolicy;
       graphVisibility: DashboardGraphVisibilityPolicyPort;
@@ -21,7 +23,7 @@ export class PostgresDashboardAdapter {
   ) {}
 
   static create(options: {
-    database: PrismaClient;
+    database: DashboardDatabase;
     ids: DashboardIdGenerator;
     savedWorkbenchChartPolicy: SavedWorkbenchChartPolicy;
     graphVisibility: DashboardGraphVisibilityPolicyPort;

@@ -9,14 +9,18 @@ import {
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { DataPrivacyPolicyRepository } from "../../ports/data-privacy.repository";
 
-type Database = PrismaClient;
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type DataPrivacyDatabase = Pick<PrismaClient, "dataPrivacyPolicy">;
 
 export class PrismaDataPrivacyPolicyRepository extends DataPrivacyPolicyRepository {
-  private constructor(private readonly database: Database) {
+  private constructor(private readonly database: DataPrivacyDatabase) {
     super();
   }
 
-  static create(database: Database): PrismaDataPrivacyPolicyRepository {
+  static create(database: DataPrivacyDatabase): PrismaDataPrivacyPolicyRepository {
     return new PrismaDataPrivacyPolicyRepository(database);
   }
 
@@ -48,9 +52,7 @@ export class PrismaDataPrivacyPolicyRepository extends DataPrivacyPolicyReposito
     );
   }
 
-  async findAllInOrganization(input: {
-    organizationId: string;
-  }): Promise<DataPrivacyPolicy[]> {
+  async findAllInOrganization(input: { organizationId: string }): Promise<DataPrivacyPolicy[]> {
     const rows = await this.database.dataPrivacyPolicy.findMany({
       where: { organizationId: input.organizationId },
     });

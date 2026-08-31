@@ -36,12 +36,18 @@ const toDashboard = (row: PrismaDashboard): DashboardRecord =>
     updatedAt: row.updatedAt,
   });
 
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type DashboardDatabase = Pick<PrismaClient, "customGraph" | "dashboard" | "$transaction">;
+
 export class PrismaDashboardRepository extends DashboardRepository {
-  constructor(private readonly prisma: PrismaClient) {
+  constructor(private readonly prisma: DashboardDatabase) {
     super();
   }
 
-  static create(prisma: PrismaClient): PrismaDashboardRepository {
+  static create(prisma: DashboardDatabase): PrismaDashboardRepository {
     return new PrismaDashboardRepository(prisma);
   }
 

@@ -25,12 +25,21 @@ function nextAvailableSlug(baseSlug: string, existingSlugs: string[]): string {
   }
 }
 
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type SuiteDatabase = Pick<
+  PrismaClient,
+  "scenario" | "simulationSuite" | "$transaction" | "$executeRaw"
+>;
+
 export class PrismaSuiteRepository extends SuiteRepository {
-  static create(database: PrismaClient): PrismaSuiteRepository {
+  static create(database: SuiteDatabase): PrismaSuiteRepository {
     return new PrismaSuiteRepository(database);
   }
 
-  private constructor(private readonly database: PrismaClient) {
+  private constructor(private readonly database: SuiteDatabase) {
     super();
   }
 

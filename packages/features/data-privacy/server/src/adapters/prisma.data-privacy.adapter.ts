@@ -1,13 +1,15 @@
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { DataPrivacyService as DataPrivacyServiceContract } from "@langwatch/data-privacy-contract";
-import { PrismaDataPrivacyPolicyRepository } from "../repositories/prisma/prisma.data-privacy.repository";
+import {
+  PrismaDataPrivacyPolicyRepository,
+  type DataPrivacyDatabase,
+} from "../repositories/prisma/prisma.data-privacy.repository";
 import { DataPrivacyService } from "../services/data-privacy.service";
 
 export class PrismaDataPrivacyAdapter {
   static create(options: {
-    prisma: PrismaClient;
+    prisma: DataPrivacyDatabase;
     projects: ProjectService;
     organizations: OrganizationService;
     ttlMs?: number;
