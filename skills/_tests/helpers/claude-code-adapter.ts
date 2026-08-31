@@ -370,26 +370,34 @@ type ModelMessage = {
 };
 
 /**
- * The most characters one tool call, or one tool result, may add to the
- * conversation.
+ * How much of one tool result may reach the conversation.
  *
  * The judge and the user simulator read the whole conversation on every
- * step. A skill that exports traces, or writes an HTML report, puts
- * hundreds of kilobytes into a single tool call, and a long run then goes
- * past the context window of the judge model. The test then fails for a
- * reason that has nothing to do with the skill. The cap is far above what
- * these tests read: command names, URLs and ids, which stand at the start
- * of a command or of its output.
+ * step. A skill that exports traces puts hundreds of kilobytes into a
+ * single result, and a long run then goes past the context window of the
+ * judge model. The test then fails for a reason that has nothing to do
+ * with the skill. A result is the evidence the agent gathered, and what
+ * these tests read of it is short: command names, URLs and ids, which
+ * stand at the start of the output.
  */
-const MAX_TOOL_TEXT_CHARS = 8000;
+const MAX_TOOL_RESULT_CHARS = 8000;
 
-function truncateToolText(text: string): string {
-	if (text.length <= MAX_TOOL_TEXT_CHARS) return text;
-	const dropped = text.length - MAX_TOOL_TEXT_CHARS;
-	return `${text.slice(0, MAX_TOOL_TEXT_CHARS)}\n… [${dropped} more characters]`;
+/**
+ * How much of one tool call may reach the conversation.
+ *
+ * A call carries what the agent wrote: the dataset, the report, the test
+ * file. That is the work under judgement, so it keeps far more room than
+ * a result, and there are few such calls in a run.
+ */
+const MAX_TOOL_INPUT_CHARS = 30000;
+
+function truncateText(text: string, limit: number): string {
+	if (text.length <= limit) return text;
+	const dropped = text.length - limit;
+	return `${text.slice(0, limit)}\n… [${dropped} more characters]`;
 }
 
-/** The same cap over the string fields of a tool call, structure kept. */
+/** The call cap over the string fields of a tool call, structure kept. */
 function truncateToolInput(input: unknown): unknown {
 	if (input == null || typeof input !== "object" || Array.isArray(input)) {
 		return input;
@@ -397,7 +405,9 @@ function truncateToolInput(input: unknown): unknown {
 	return Object.fromEntries(
 		Object.entries(input as Record<string, unknown>).map(([key, value]) => [
 			key,
-			typeof value === "string" ? truncateToolText(value) : value,
+			typeof value === "string"
+				? truncateText(value, MAX_TOOL_INPUT_CHARS)
+				: value,
 		]),
 	);
 }
@@ -495,7 +505,10 @@ function userMessagesFromBlocks({
 			toolName: toolNamesByCallId.get(block.tool_use_id) ?? "tool",
 			output: {
 				type: block.is_error ? "error-text" : "text",
-				value: truncateToolText(toolResultText(block.content)),
+				value: truncateText(
+					toolResultText(block.content),
+					MAX_TOOL_RESULT_CHARS,
+				),
 			},
 		}));
 	if (toolResults.length > 0) {

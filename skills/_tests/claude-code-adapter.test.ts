@@ -148,7 +148,7 @@ describe("Claude Code transcript conversion", () => {
 		});
 	});
 	describe("when a tool call carries far more text than a judge can read", () => {
-		const huge = "x".repeat(30_000);
+		const huge = "x".repeat(60_000);
 		const messages = claudeCodeTranscriptToModelMessages([
 			{
 				role: "assistant",
@@ -176,7 +176,7 @@ describe("Claude Code transcript conversion", () => {
 		it("caps the call input and says how much it dropped", () => {
 			const call = (messages[0].content as any[])[1];
 			expect(call.type).toBe("tool-call");
-			expect(call.input.command.length).toBeLessThan(9000);
+			expect(call.input.command.length).toBeLessThan(31_000);
 			expect(call.input.command).toContain("cat > report.html");
 			expect(call.input.command).toMatch(/more characters/);
 		});
