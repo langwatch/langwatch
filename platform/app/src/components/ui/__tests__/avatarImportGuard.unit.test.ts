@@ -12,7 +12,9 @@
  * specifier a file writes, and a file that writes `@chakra-ui/react` for the
  * avatar has already made the mistake, whatever the graph beneath it looks
  * like. Type-only names count too — `AvatarRootProps` is re-exported from the
- * wrapper, so there is never a reason to reach past it.
+ * wrapper, so there is never a reason to reach past it. So do re-exports and
+ * namespace imports, which hand the library's avatar on under a local name
+ * and would otherwise walk straight past a check that only reads `import`.
  *
  * @see specs/components/avatar-initials.feature
  */
@@ -30,8 +32,17 @@ const IGNORED_DIRECTORIES = new Set(["node_modules", "dist", "generated"]);
 /** The wrapper itself, which is where the library's avatar is allowed. */
 const ALLOWED = new Set([path.join("src", "components", "ui", "avatar.tsx")]);
 
-const CHAKRA_IMPORT =
-  /import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+["']@chakra-ui\/react["']/gs;
+/** `import { A, B } from "…"` and `export { A } from "…"` alike. */
+const NAMED_FROM_CHAKRA =
+  /(?:import|export)\s+(?:type\s+)?\{([^}]*)\}\s+from\s+["']@chakra-ui\/react["']/gs;
+/**
+ * `import * as Chakra from "…"`, which reaches every export including the
+ * avatar, and `export * from "…"`, which re-publishes them under another
+ * module's name. Neither can be checked name by name, so the whole form is
+ * refused outside the wrapper.
+ */
+const WHOLESALE_FROM_CHAKRA =
+  /(?:import\s+\*\s+as\s+\w+|export\s+\*(?:\s+as\s+\w+)?)\s+from\s+["']@chakra-ui\/react["']/g;
 const AVATAR_NAME = /^(?:type\s+)?Avatar\w*$/;
 
 function* sourceFiles(directory: string): Generator<string> {
@@ -54,7 +65,12 @@ function avatarImportersOfTheLibrary(): string[] {
       const relative = path.relative(APP_ROOT, file);
       if (ALLOWED.has(relative)) continue;
       const source = fs.readFileSync(file, "utf8");
-      for (const match of source.matchAll(CHAKRA_IMPORT)) {
+      if (WHOLESALE_FROM_CHAKRA.test(source)) {
+        WHOLESALE_FROM_CHAKRA.lastIndex = 0;
+        offenders.push(relative);
+        continue;
+      }
+      for (const match of source.matchAll(NAMED_FROM_CHAKRA)) {
         const names = (match[1] ?? "").split(",").map(
           (name) =>
             name

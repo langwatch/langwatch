@@ -174,3 +174,25 @@ describe("given a flag whose rules name only organizations and projects", () => 
     });
   });
 });
+
+describe("given a flag whose rules put an everyone rule above a New users rule", () => {
+  describe("when the flag is read", () => {
+    /** @scenario "no creation date is fetched for an age rule that cannot be reached" */
+    it("never reads the organization table, the everyone rule having settled it", async () => {
+      const store = new FeatureFlagStorePostgres();
+      await store.setRules(
+        FLAG,
+        [
+          { match: {}, enabled: true },
+          { match: { organizationCreatedAfter: "2026-06-01" }, enabled: false },
+        ],
+        "operator-1",
+      );
+
+      expect(
+        await store.get(FLAG, { organizationId: NEW_ORGANIZATION }),
+      ).toBe(true);
+      expect(findOrganization).not.toHaveBeenCalled();
+    });
+  });
+});

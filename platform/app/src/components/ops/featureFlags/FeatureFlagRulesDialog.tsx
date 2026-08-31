@@ -13,12 +13,14 @@ import {
   closestCenter,
   DndContext,
   type DragEndEvent,
+  KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
 import {
   SortableContext,
+  sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
@@ -116,10 +118,15 @@ export function FeatureFlagRulesDialog({
       }),
   });
 
-  // A pointer sensor with a small distance threshold, so the grip still
-  // accepts an ordinary click without the row starting to drag under it.
+  // A small distance threshold on the pointer, so the grip still accepts an
+  // ordinary click without the row starting to drag under it. The keyboard
+  // sensor is not optional here: rule order decides which rule wins, so an
+  // operator who cannot drag would be unable to say what the flag does.
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
   // Re-seed the draft only when the dialog transitions from closed to

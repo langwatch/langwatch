@@ -290,6 +290,13 @@ Feature: Internal feature flag system for system-level kill switches
            afterwards, because a creation date never changes
 
     @unit
+    Scenario: no creation date is fetched for an age rule that cannot be reached
+      Given a flag whose rules put an everyone rule above a New users rule
+      When the flag is read
+      Then no organization record is read, because the everyone rule settles
+           the flag before the age rule is ever consulted
+
+    @unit
     Scenario: an operator cannot save an age rule without a readable date
       Given an operator writes a New users rule from the Ops UI
       When the date is blank or is not a date
@@ -383,11 +390,40 @@ Feature: Internal feature flag system for system-level kill switches
       Then the new rule is placed at the end of the list
 
     @integration
+    Scenario: an operator reorders rules from the keyboard
+      Given a flag with more than one targeting rule
+      When the operator moves a rule using only the keyboard
+      Then the order changes, because rule order is what decides the flag and
+           an operator who cannot drag would have no say in it
+
+    @integration
     Scenario: an operator reorders rules by dragging them
       Given a flag with more than one targeting rule
       Then every rule carries a drag handle
       And moving a rule changes the order the rules are saved in, which is the
           order they are evaluated in
+
+  Rule: The note under a flag says who its rules have switched it on for
+
+    # The note is read while the flag's own toggle is off, so it is the only
+    # place the page says the flag is live somewhere. It walks the rules the
+    # way the resolver does, because a note that disagrees with the resolver
+    # is worse than no note.
+
+    @unit
+    Scenario: a catch-all note admits the targets a rule above it excludes
+      Given a rule turns a flag off for one organization
+      And a later rule turns it on for everyone
+      When the note is written
+      Then it says the flag is on for everyone except that organization
+
+    @unit
+    Scenario: a new-users rule an earlier rule already answered for is not claimed
+      Given a rule turns a flag off for organizations created since January
+      And a later rule turns it on for organizations created since June
+      When the note is written
+      Then it does not offer June, because every organization created since
+           June was created since January and the earlier rule answers first
 
   Rule: The rules dialog offers New users as a scope of its own
 
@@ -404,6 +440,13 @@ Feature: Internal feature flag system for system-level kill switches
       Given a flag whose stored rule names an organization creation date
       When the operator opens the targeting rules
       Then the rule shows the New users scope with that date filled in
+
+    @unit
+    Scenario: a condition the dialog has no field for survives an edit
+      Given a stored rule that names both an organization and a creation date
+      When the operator saves the dialog without touching that rule
+      Then the saved rule still carries both conditions, because dropping one
+           would widen the rollout to that organization's whole history
 
   Rule: Self-hosted parity
 

@@ -1,4 +1,7 @@
-import type { FeatureFlagRules } from "~/server/featureFlag";
+import type {
+  FeatureFlagRuleMatch,
+  FeatureFlagRules,
+} from "~/server/featureFlag";
 
 /**
  * The editing model behind the targeting-rules dialog.
@@ -30,6 +33,15 @@ export interface UIRule {
   /** An organization or project id, or a date for `NEW_USERS`. */
   target: string;
   enabled: boolean;
+  /**
+   * Conditions the stored rule carries that this one-field editor has no
+   * control for. A `match` is a conjunction, so a rule naming both an
+   * organization and an age would come back from the dialog as the
+   * organization alone — silently widening the rollout to that organization's
+   * whole history. Carrying them through means the dialog can only change
+   * what it can show.
+   */
+  otherConditions: FeatureFlagRuleMatch;
 }
 
 let nextRuleId = 0;
@@ -45,6 +57,7 @@ export function newRule(): UIRule {
     scopeKind: "ORGANIZATION",
     target: "",
     enabled: true,
+    otherConditions: {},
   };
 }
 
@@ -59,6 +72,7 @@ export function rulesToUI(rules: FeatureFlagRules): UIRule[] {
         ...base,
         scopeKind: "ORGANIZATION" as const,
         target: rule.match.organizationId,
+        otherConditions: without(rule.match, "organizationId"),
       };
     }
     if (rule.match.projectId) {
@@ -66,6 +80,7 @@ export function rulesToUI(rules: FeatureFlagRules): UIRule[] {
         ...base,
         scopeKind: "PROJECT" as const,
         target: rule.match.projectId,
+        otherConditions: without(rule.match, "projectId"),
       };
     }
     if (rule.match.organizationCreatedAfter) {
@@ -73,29 +88,51 @@ export function rulesToUI(rules: FeatureFlagRules): UIRule[] {
         ...base,
         scopeKind: "NEW_USERS" as const,
         target: toDateInputValue(rule.match.organizationCreatedAfter),
+        otherConditions: without(rule.match, "organizationCreatedAfter"),
       };
     }
-    return { ...base, scopeKind: "EVERYONE" as const, target: "" };
+    return {
+      ...base,
+      scopeKind: "EVERYONE" as const,
+      target: "",
+      otherConditions: {},
+    };
   });
 }
 
 export function uiToRules(rules: UIRule[]): FeatureFlagRules {
   return rules.map((rule) => {
     const target = rule.target.trim();
+    // Conditions the editor cannot show ride along, except under "Everyone":
+    // choosing it is the operator saying the rule matches every context, and
+    // a leftover condition would quietly make that untrue.
+    const rest = rule.scopeKind === "EVERYONE" ? {} : rule.otherConditions;
     if (rule.scopeKind === "ORGANIZATION") {
-      return { match: { organizationId: target }, enabled: rule.enabled };
+      return {
+        match: { ...rest, organizationId: target },
+        enabled: rule.enabled,
+      };
     }
     if (rule.scopeKind === "PROJECT") {
-      return { match: { projectId: target }, enabled: rule.enabled };
+      return { match: { ...rest, projectId: target }, enabled: rule.enabled };
     }
     if (rule.scopeKind === "NEW_USERS") {
       return {
-        match: { organizationCreatedAfter: target },
+        match: { ...rest, organizationCreatedAfter: target },
         enabled: rule.enabled,
       };
     }
     return { match: {}, enabled: rule.enabled };
   });
+}
+
+/** The rule's other conditions: its match without the one the scope owns. */
+function without(
+  match: FeatureFlagRuleMatch,
+  key: keyof FeatureFlagRuleMatch,
+): FeatureFlagRuleMatch {
+  const { [key]: _owned, ...rest } = match;
+  return rest;
 }
 
 /**

@@ -13,8 +13,10 @@ import { getColorForString } from "../utils/rotatingColors";
  * project is not a person, has no first and last name, and never has a photo
  * to fall back from.
  *
- * The background still hashes the same single character it always did, so no
- * existing project's color moves.
+ * The background hashes that same character. For an emoji-prefixed name that
+ * is a different key than the half surrogate the old code hashed, so those
+ * projects do change color — freezing it would mean keeping a hash of half a
+ * character to preserve the palette entry of a bubble nobody could read.
  *
  * @see specs/navigation/project-avatar-initial.feature
  */

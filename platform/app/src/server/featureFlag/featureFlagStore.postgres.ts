@@ -170,7 +170,12 @@ export class FeatureFlagStorePostgres {
     });
   }
 
-  /** Expired entries first; failing that, the oldest insertion. */
+  /**
+   * A Map iterates in insertion order, so the fallback here drops the oldest
+   * entry rather than the least recently used one. That is the intended
+   * trade: tracking recency would mean writing to the map on every read, and
+   * the entry being protected is a date that is only worth a query anyway.
+   */
   private evictOrganizationCreatedAt(now: number): void {
     for (const [id, entry] of this.organizationCreatedAt) {
       if (entry.expiresAt <= now) this.organizationCreatedAt.delete(id);

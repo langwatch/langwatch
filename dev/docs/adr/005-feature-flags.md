@@ -31,7 +31,8 @@ every signup is not a rollout. A rule may therefore name a date instead:
 ```
 
 It matches every organization created **on or after** that instant, and nobody
-else, so existing customers keep exactly the value they had. `/ops/feature-flags`
+else: organizations created before it are left on whatever the rest of the
+rules and the flag's own value already said. `/ops/feature-flags`
 writes it as the **New users** scope in the targeting-rules dialog, where the
 field beside the picker becomes a date.
 

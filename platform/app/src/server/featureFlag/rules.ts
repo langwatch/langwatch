@@ -109,15 +109,23 @@ export interface RuleEvaluationContext {
 }
 
 /**
- * True when any rule targets organization age, which is the store's signal
- * that it must resolve `organizationCreatedAt` before evaluating. Checked
- * per read so a flag with no age rule — every kill switch on the per-event
- * hot path — never pays for an organization lookup.
+ * True when a rule that can actually decide the outcome targets organization
+ * age, which is the store's signal that it must resolve
+ * `organizationCreatedAt` before evaluating. Checked per read so a flag with
+ * no age rule — every kill switch on the per-event hot path — never pays for
+ * an organization lookup.
+ *
+ * The walk stops at the first rule with no conditions, which matches every
+ * context and settles the flag there. An age rule below one cannot affect the
+ * answer, and reading a date for it would put a database query on the path of
+ * every previously unseen organization to no end.
  */
 export function rulesTargetOrganizationAge(rules: FeatureFlagRules): boolean {
-  return rules.some(
-    (rule) => rule.match.organizationCreatedAfter !== undefined,
-  );
+  for (const rule of rules) {
+    if (rule.match.organizationCreatedAfter !== undefined) return true;
+    if (Object.keys(rule.match).length === 0) return false;
+  }
+  return false;
 }
 
 /**

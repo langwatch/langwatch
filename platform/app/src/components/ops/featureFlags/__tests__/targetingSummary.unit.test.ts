@@ -116,3 +116,85 @@ describe("given a new-users rule", () => {
     });
   });
 });
+
+describe("given a rule excludes a target before a catch-all enables everyone", () => {
+  describe("when the note is written", () => {
+    /** @scenario "a catch-all note admits the targets a rule above it excludes" */
+    it("names the exception rather than claiming the whole fleet", () => {
+      expect(
+        labelFor([
+          { match: { organizationId: "organization_a" }, enabled: false },
+          { match: {}, enabled: true },
+        ]),
+      ).toBe("Enabled for everyone via rule, except 1 organization");
+    });
+
+    it("counts projects among the exceptions too", () => {
+      expect(
+        labelFor([
+          { match: { organizationId: "organization_a" }, enabled: false },
+          { match: { projectId: "project_a" }, enabled: false },
+          { match: { projectId: "project_b" }, enabled: false },
+          { match: {}, enabled: true },
+        ]),
+      ).toBe(
+        "Enabled for everyone via rule, except 1 organization, 2 projects",
+      );
+    });
+  });
+
+  describe("when the earlier rules enable rather than exclude", () => {
+    it("says everyone flatly, because nothing is left out", () => {
+      expect(
+        labelFor([
+          { match: { organizationId: "organization_a" }, enabled: true },
+          { match: {}, enabled: true },
+        ]),
+      ).toBe("Enabled for everyone via rule");
+    });
+  });
+});
+
+describe("given an age rule sits below a disabled age rule with an earlier date", () => {
+  describe("when the note is written", () => {
+    /** @scenario "a new-users rule an earlier rule already answered for is not claimed" */
+    it("offers neither date, because the first rule answers for both", () => {
+      // Every organization created since June was created since January, so
+      // the January rule matches first and turns the flag off for all of them.
+      expect(
+        labelFor([
+          { match: { organizationCreatedAfter: "2026-01-01" }, enabled: false },
+          { match: { organizationCreatedAfter: "2026-06-01" }, enabled: true },
+        ]),
+      ).toBeNull();
+    });
+  });
+
+  describe("when the disabled rule names a later date", () => {
+    it("still offers the earlier one, whose population it does not cover", () => {
+      expect(
+        labelFor([
+          { match: { organizationCreatedAfter: "2026-06-01" }, enabled: false },
+          { match: { organizationCreatedAfter: "2026-01-01" }, enabled: true },
+        ]),
+      ).toContain("Jan 1, 2026");
+    });
+  });
+
+  describe("when the disabled rule also names an organization", () => {
+    it("does not shadow, because it speaks for that organization alone", () => {
+      expect(
+        labelFor([
+          {
+            match: {
+              organizationId: "organization_a",
+              organizationCreatedAfter: "2026-01-01",
+            },
+            enabled: false,
+          },
+          { match: { organizationCreatedAfter: "2026-06-01" }, enabled: true },
+        ]),
+      ).toContain("Jun 1, 2026");
+    });
+  });
+});

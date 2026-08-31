@@ -10,7 +10,7 @@
  * that the "Add rule" button never calls fixes nothing.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FeatureFlagRules } from "~/server/featureFlag";
@@ -162,5 +162,78 @@ describe("given an operator picks the New users scope for a rule", () => {
     // The organization id must not survive the scope change: as a date it
     // parses to nothing, and the rule would match nobody while reading live.
     expect(field).toHaveValue("");
+  });
+});
+
+/**
+ * jsdom lays nothing out, so every rect is zero and dnd-kit cannot tell which
+ * row a keypress moves toward. Stacking siblings 60px apart is the smallest
+ * geometry that makes "the row below" a real answer.
+ */
+function stubVerticalLayout(): () => void {
+  const original = Element.prototype.getBoundingClientRect;
+  Element.prototype.getBoundingClientRect = function (this: Element): DOMRect {
+    const siblings = this.parentElement?.children;
+    const index = siblings
+      ? Array.prototype.indexOf.call(siblings, this)
+      : 0;
+    const top = index * 60;
+    return {
+      x: 0,
+      y: top,
+      top,
+      bottom: top + 50,
+      left: 0,
+      right: 400,
+      width: 400,
+      height: 50,
+      toJSON: () => ({}),
+    } as DOMRect;
+  };
+  return () => {
+    Element.prototype.getBoundingClientRect = original;
+  };
+}
+
+/**
+ * One keystroke, delivered where dnd-kit's keyboard sensor listens for it,
+ * then a frame to let it measure. Its droppable rects are read on an
+ * animation frame, so keys dispatched back to back arrive before there is
+ * any geometry to move through.
+ */
+async function press(element: HTMLElement, code: string): Promise<void> {
+  await act(async () => {
+    fireEvent.keyDown(element, { code, key: code === "Space" ? " " : code });
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+  });
+}
+
+describe("given a flag with more than one targeting rule", () => {
+  describe("when the operator moves a rule using only the keyboard", () => {
+    /** @scenario "an operator reorders rules from the keyboard" */
+    it("changes the order, so rule priority is not a pointer-only decision", async () => {
+      const restoreLayout = stubVerticalLayout();
+      try {
+        renderDialog([
+          { match: { organizationId: "organization_a" }, enabled: true },
+          { match: { projectId: "project_b" }, enabled: true },
+        ]);
+
+        const [firstGrip] = screen.getAllByRole("button", {
+          name: "Reorder rule",
+        });
+        if (!firstGrip) throw new Error("no reorder handle to press");
+        // Keys are dispatched at the handle rather than typed at whatever
+        // holds focus: the dialog's focus trap moves focus around between
+        // tests, and what is under test is the sensor, not the trap.
+        await press(firstGrip, "Space");
+        await press(firstGrip, "ArrowDown");
+        await press(firstGrip, "Space");
+
+        expect(ruleFieldLabels()).toEqual(["Project id", "Organization id"]);
+      } finally {
+        restoreLayout();
+      }
+    });
   });
 });

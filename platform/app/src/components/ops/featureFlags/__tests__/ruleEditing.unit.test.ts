@@ -195,3 +195,43 @@ describe("findUnfillableRule", () => {
     });
   });
 });
+
+describe("given a stored rule names both an organization and a creation date", () => {
+  describe("when the dialog saves it back untouched", () => {
+    /** @scenario "a condition the dialog has no field for survives an edit" */
+    it("keeps both conditions", () => {
+      const stored = [
+        {
+          match: {
+            organizationId: "organization_a",
+            organizationCreatedAfter: "2026-06-01",
+          },
+          enabled: true,
+        },
+      ];
+
+      expect(uiToRules(rulesToUI(stored))).toEqual(stored);
+    });
+  });
+
+  describe("when the operator changes its scope to everyone", () => {
+    it("drops both, because everyone means every context", () => {
+      const stored = [
+        {
+          match: {
+            organizationId: "organization_a",
+            organizationCreatedAfter: "2026-06-01",
+          },
+          enabled: true,
+        },
+      ];
+      const edited = rulesToUI(stored).map((rule) => ({
+        ...rule,
+        scopeKind: "EVERYONE" as const,
+        target: "",
+      }));
+
+      expect(uiToRules(edited)).toEqual([{ match: {}, enabled: true }]);
+    });
+  });
+});

@@ -26,11 +26,14 @@ import { firstGrapheme } from "~/utils/firstGrapheme";
 /**
  * The one or two characters an avatar shows for `name`.
  *
- * Mirrors Chakra's own rule — first character of the first word, plus the
+ * Follows Chakra's own rule — first character of the first word, plus the
  * first character of the last word when there is more than one — but counts
- * in grapheme clusters rather than UTF-16 code units. Empty for a blank name,
- * which is what makes the avatar fall through to its generic icon rather than
- * render an empty bubble.
+ * in grapheme clusters rather than UTF-16 code units. Words are separated by
+ * whitespace rather than by the literal space Chakra splits on, so a name
+ * holding a tab or a newline yields two initials instead of treating the
+ * whole thing as one word. Empty for a blank name, which is what makes the
+ * avatar fall through to its generic icon rather than render an empty
+ * bubble.
  */
 export function initialsFromName(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
