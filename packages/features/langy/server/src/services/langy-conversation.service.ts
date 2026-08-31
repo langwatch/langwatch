@@ -32,10 +32,7 @@ import {
   langyJsonValueSchema,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import {
-  langyAgentErrorFromErrorFrame,
-  serializeLangyTurnError,
-} from "../adapters/langy.turn-errors.adapter";
+import { LangyTurnErrors } from "../adapters/langy.turn-errors.adapter";
 import { mintRunToken } from "../ports/langy-frame-auth.port";
 import type { LangyConversationProcessingEvent } from "../adapters/eventing.langy.adapter";
 import { LANGY_ID_RESOURCES } from "../ports/langy-ids.port";
@@ -968,8 +965,8 @@ export class LangyConversationService {
         projectId,
         conversationId,
         turnId,
-        error: serializeLangyTurnError(
-          langyAgentErrorFromErrorFrame({
+        error: LangyTurnErrors.serialize(
+          LangyTurnErrors.fromErrorFrame({
             code: errorCode ?? "agent error",
             ...(errorCause !== undefined ? { cause: errorCause } : {}),
           }),

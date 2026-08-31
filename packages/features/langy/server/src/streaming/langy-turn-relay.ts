@@ -34,10 +34,7 @@ import {
   LangyCliEnvelopeService,
   type LangyToolFrame,
 } from "../services/langy-cli-envelope.service";
-import {
-  langyAgentErrorFromErrorFrame,
-  serializeLangyTurnError,
-} from "../adapters/langy.turn-errors.adapter";
+import { LangyTurnErrors } from "../adapters/langy.turn-errors.adapter";
 import { verifyFrame } from "../ports/langy-frame-auth.port";
 import {
   type LangyFrameEnvelope,
@@ -703,13 +700,13 @@ export class LangyTurnRelay {
         // no_provider_configured riding as a reason — persists into LastError),
         // falling back to the vetted `code` (never the prose), the same mapping
         // ingestAgentTurnResult applies to the fold.
-        const classified = langyAgentErrorFromErrorFrame({
+        const classified = LangyTurnErrors.fromErrorFrame({
           code: frame.code ?? frame.error,
           ...(frame.herr !== undefined ? { cause: frame.herr } : {}),
         });
         await this.deps.buffer.markError({
           ...at,
-          error: serializeLangyTurnError(classified),
+          error: LangyTurnErrors.serialize(classified),
         });
         await this.deps.conversations.ingestAgentTurnResult({
           projectId,

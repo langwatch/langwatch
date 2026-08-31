@@ -1,16 +1,10 @@
 import { createLogger } from "@langwatch/observability";
 import { LangyDispatchRejectedError } from "@langwatch/langy-contract";
-import { serializeLangyTurnError } from "./langy.turn-errors.adapter";
-import type {
-  LangyEffectPorts,
-  LangyTitleGenerator,
-} from "../ports/langy-effect.port";
+import { LangyTurnErrors } from "./langy.turn-errors.adapter";
+import type { LangyEffectPorts, LangyTitleGenerator } from "../ports/langy-effect.port";
 import { LangyTurnDispatchRetry } from "../processes/langy-turn-dispatch-retry.error";
 import type { LangyWorkerPort } from "../ports/langy-turn-runtime.port";
-import type {
-  LangyTurnHandoff,
-  LangyTurnHandoffStore,
-} from "../streaming/langy-turn-handoff";
+import type { LangyTurnHandoff, LangyTurnHandoffStore } from "../streaming/langy-turn-handoff";
 import type { LangyFailTurnCommandPort } from "../subscribers/langy-conversation.subscriber";
 
 const logger = createLogger("langwatch:langy:process-effects");
@@ -42,7 +36,7 @@ export interface CreateLangyEffectPortsOptions {
   markError: (params: {
     conversationId: string;
     turnId: string;
-    error: ReturnType<typeof serializeLangyTurnError>;
+    error: ReturnType<typeof LangyTurnErrors.serialize>;
   }) => Promise<void>;
   titleGenerator: LangyTitleGenerator;
   saveTitle: (params: {
@@ -126,9 +120,7 @@ export class LangyEffectPortsAdapter {
               // fresh session it spawns must still get the conversation so far.
               ...(candidate.historySeed ? { historySeed: candidate.historySeed } : {}),
               credentials: candidate.credentials,
-              ...(candidate.modelOverride
-                ? { modelOverride: candidate.modelOverride }
-                : {}),
+              ...(candidate.modelOverride ? { modelOverride: candidate.modelOverride } : {}),
               ...(candidate.resumeToken ? { resumeToken: candidate.resumeToken } : {}),
             });
 
@@ -139,10 +131,7 @@ export class LangyEffectPortsAdapter {
           // Postgres, persist it into the retryable handoff, then redrive once.
           // Subsequent outbox/liveness deliveries reuse the same key rather than
           // minting on every retry.
-          if (
-            outcome === "credentialsRequired" &&
-            !dispatchHandoff.credentials.langwatchApiKey
-          ) {
+          if (outcome === "credentialsRequired" && !dispatchHandoff.credentials.langwatchApiKey) {
             const minted = await deps.mintSessionKey({
               userId: dispatchHandoff.actorUserId,
               projectId,
@@ -185,7 +174,7 @@ export class LangyEffectPortsAdapter {
               { projectId, conversationId, turnId },
               "langy dispatch permanently rejected; terminalizing the turn",
             );
-            const error = serializeLangyTurnError(new LangyDispatchRejectedError());
+            const error = LangyTurnErrors.serialize(new LangyDispatchRejectedError());
             await deps.markError({ conversationId, turnId, error }).catch(() => undefined);
             await deps.failTurn.failTurn({
               projectId,

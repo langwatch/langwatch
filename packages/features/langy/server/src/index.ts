@@ -50,10 +50,9 @@ export { LangyCliEnvelopeService } from "./services/langy-cli-envelope.service";
 export type { LangyToolFrame } from "./services/langy-cli-envelope.service";
 export { LangyFinalPartsService } from "./services/langy-final-parts.service";
 export {
-  langyAgentErrorFromErrorFrame,
-  serializeLangyTurnError,
-  LangyWorkerStoppedError,
   AGENT_CHAT_TIMEOUT_MS,
+  LangyTurnErrors,
+  LangyWorkerStoppedError,
 } from "./adapters/langy.turn-errors.adapter";
 export type { LangyConversationProcessingEvent } from "./adapters/eventing.langy.adapter";
 export {

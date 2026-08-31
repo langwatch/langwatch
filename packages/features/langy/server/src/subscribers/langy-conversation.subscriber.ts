@@ -13,10 +13,7 @@ import {
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import type { LangyConversationProcessingEvent } from "../adapters/eventing.langy.adapter";
-import {
-  LangyWorkerStoppedError,
-  serializeLangyTurnError,
-} from "../adapters/langy.turn-errors.adapter";
+import { LangyTurnErrors, LangyWorkerStoppedError } from "../adapters/langy.turn-errors.adapter";
 
 const livenessLogger = createLogger("langwatch:langy:agent-turn-liveness-subscriber");
 const broadcastLogger = createLogger("langwatch:langy:conversation-update-broadcast-subscriber");
@@ -212,7 +209,7 @@ export function createAgentTurnLivenessSubscriber(
           },
           "failing a stalled langy turn",
         );
-        const error = serializeLangyTurnError(new LangyWorkerStoppedError());
+        const error = LangyTurnErrors.serialize(new LangyWorkerStoppedError());
         await deps.buffer.markError({ conversationId, turnId, error }).catch(() => undefined);
         await deps.failTurn.failTurn({ projectId, conversationId, turnId, error });
         return;

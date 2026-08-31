@@ -4,18 +4,15 @@ import { LangyModelNotConfiguredError } from "@langwatch/langy-contract";
 
 import {
   AGENT_CHAT_TIMEOUT_MS,
-  classifyLangyTurnError,
   LangyAgentAtCapacityError,
   LangyAgentErroredError,
   LangyAgentSessionLostError,
   LangyAgentUnavailableError,
   LangyGithubNotConnectedError,
   LangyGithubRepoNotAccessibleError,
+  LangyTurnErrors,
   LangyWorkerRestartingError,
   LangyWorkerStoppedError,
-  langyAgentErrorFromErrorFrame,
-  langyAgentErrorFromFrame,
-  serializeLangyTurnError,
 } from "@langwatch/langy-server/execution/langy-turn.errors";
 
 /**
@@ -24,16 +21,14 @@ import {
  * exception may fall through to `unknown`.
  */
 
-describe("langyAgentErrorFromFrame", () => {
+describe("LangyTurnErrors.fromFrame", () => {
   describe("given the manager's typed error frames", () => {
     it("maps at-capacity onto the at-capacity domain error", () => {
-      expect(langyAgentErrorFromFrame("at-capacity")).toBeInstanceOf(
-        LangyAgentAtCapacityError,
-      );
+      expect(LangyTurnErrors.fromFrame("at-capacity")).toBeInstanceOf(LangyAgentAtCapacityError);
     });
 
     it("maps session-not-found onto the session-lost domain error", () => {
-      expect(langyAgentErrorFromFrame("session-not-found")).toBeInstanceOf(
+      expect(LangyTurnErrors.fromFrame("session-not-found")).toBeInstanceOf(
         LangyAgentSessionLostError,
       );
     });
@@ -41,7 +36,7 @@ describe("langyAgentErrorFromFrame", () => {
     it("accepts the snake_case session_not_found the mono-binary emits", () => {
       // app.go's PostMessage session-vanished branch emits `session_not_found`;
       // the classifier historically matched only the hyphenated form.
-      expect(langyAgentErrorFromFrame("session_not_found")).toBeInstanceOf(
+      expect(LangyTurnErrors.fromFrame("session_not_found")).toBeInstanceOf(
         LangyAgentSessionLostError,
       );
     });
@@ -50,9 +45,7 @@ describe("langyAgentErrorFromFrame", () => {
       // The worker died mid-turn. `worker_stopped` is the deliberate signal;
       // `post_error` is the older code for the same thing.
       for (const code of ["worker_stopped", "post_error"]) {
-        expect(langyAgentErrorFromFrame(code), code).toBeInstanceOf(
-          LangyWorkerStoppedError,
-        );
+        expect(LangyTurnErrors.fromFrame(code), code).toBeInstanceOf(LangyWorkerStoppedError);
       }
     });
 
@@ -61,7 +54,7 @@ describe("langyAgentErrorFromFrame", () => {
       // reached for gh/git-remote with no installation token. This is the wire
       // half of the connect-card flow — the explainer suppresses the red card
       // and the panel draws the install card instead.
-      expect(langyAgentErrorFromFrame("langy_github_not_connected")).toBeInstanceOf(
+      expect(LangyTurnErrors.fromFrame("langy_github_not_connected")).toBeInstanceOf(
         LangyGithubNotConnectedError,
       );
     });
@@ -70,7 +63,7 @@ describe("langyAgentErrorFromFrame", () => {
       // Credentialed variant: the app installation doesn't cover the repo the
       // agent reached for (the clone 404'd). Terminal card pointing the user
       // at granting the app access.
-      expect(langyAgentErrorFromFrame("langy_github_repo_not_accessible")).toBeInstanceOf(
+      expect(LangyTurnErrors.fromFrame("langy_github_repo_not_accessible")).toBeInstanceOf(
         LangyGithubRepoNotAccessibleError,
       );
     });
@@ -94,16 +87,13 @@ describe("langyAgentErrorFromFrame", () => {
           ],
         });
 
-        const error = langyAgentErrorFromErrorFrame({
+        const error = LangyTurnErrors.fromErrorFrame({
           code: "agent_error",
           cause,
         });
 
         expect(error).toBeInstanceOf(LangyModelNotConfiguredError);
-        const serialized = JSON.parse(serializeLangyTurnError(error)) as Record<
-          string,
-          unknown
-        >;
+        const serialized = JSON.parse(LangyTurnErrors.serialize(error)) as Record<string, unknown>;
         expect(serialized.kind).toBe("langy_model_not_configured");
         // The chain persists losslessly: herr ⇄ HandledError, one model.
         expect(serialized.reasons).toEqual([
@@ -130,16 +120,13 @@ describe("langyAgentErrorFromFrame", () => {
           reasons: [{ type: "rate_limited", message: "rate limited", meta: {} }],
         });
 
-        const error = langyAgentErrorFromErrorFrame({
+        const error = LangyTurnErrors.fromErrorFrame({
           code: "agent_error",
           cause,
         });
 
         expect(error).toBeInstanceOf(LangyAgentErroredError);
-        const serialized = JSON.parse(serializeLangyTurnError(error)) as Record<
-          string,
-          unknown
-        >;
+        const serialized = JSON.parse(LangyTurnErrors.serialize(error)) as Record<string, unknown>;
         expect(serialized.reasons).toEqual([
           {
             code: "rate_limited",
@@ -152,7 +139,7 @@ describe("langyAgentErrorFromFrame", () => {
       });
 
       it("falls back to the bare-code mapping without a cause", () => {
-        expect(langyAgentErrorFromErrorFrame({ code: "worker_stopped" })).toBeInstanceOf(
+        expect(LangyTurnErrors.fromErrorFrame({ code: "worker_stopped" })).toBeInstanceOf(
           LangyWorkerStoppedError,
         );
       });
@@ -161,29 +148,27 @@ describe("langyAgentErrorFromFrame", () => {
     it("maps agent_error onto its own agent-errored final state", () => {
       // The agent reported its own failure (e.g. the provider rejected its LLM
       // call). The worker did not stop — the copy must not claim it did.
-      expect(langyAgentErrorFromFrame("agent_error")).toBeInstanceOf(
-        LangyAgentErroredError,
-      );
+      expect(LangyTurnErrors.fromFrame("agent_error")).toBeInstanceOf(LangyAgentErroredError);
     });
   });
 
   describe("given an arbitrary agent-side error string", () => {
     it("keeps it as an opaque Error so it is never pattern-matched into a kind", () => {
-      const error = langyAgentErrorFromFrame(
+      const error = LangyTurnErrors.fromFrame(
         "worker spawn failed: /home/langy-7: permission denied",
       );
 
       expect(error).not.toBeInstanceOf(LangyAgentAtCapacityError);
       expect(error.message).toBe("worker spawn failed: /home/langy-7: permission denied");
-      expect(classifyLangyTurnError(error).kind).toBe("unknown");
+      expect(LangyTurnErrors.classify(error).kind).toBe("unknown");
     });
   });
 });
 
-describe("classifyLangyTurnError", () => {
+describe("LangyTurnErrors.classify", () => {
   describe("given the manager responded non-2xx", () => {
     it("classifies unavailable and exposes only the status", () => {
-      const shape = classifyLangyTurnError(
+      const shape = LangyTurnErrors.classify(
         new LangyAgentUnavailableError("manager responded 503", {
           status: 503,
         }),
@@ -203,7 +188,7 @@ describe("classifyLangyTurnError", () => {
         { code: "ECONNREFUSED" },
       );
 
-      const shape = classifyLangyTurnError(failure);
+      const shape = LangyTurnErrors.classify(failure);
 
       expect(shape.kind).toBe("langy_agent_unavailable");
       expect(shape.meta).toEqual({});
@@ -216,7 +201,7 @@ describe("classifyLangyTurnError", () => {
         name: "TimeoutError",
       });
 
-      const shape = classifyLangyTurnError(timeout);
+      const shape = LangyTurnErrors.classify(timeout);
 
       expect(shape.kind).toBe("langy_turn_timeout");
       expect(shape.httpStatus).toBe(504);
@@ -226,7 +211,7 @@ describe("classifyLangyTurnError", () => {
 
   describe("given the worker drained mid-turn", () => {
     it("classifies a worker restart", () => {
-      const shape = classifyLangyTurnError(new LangyWorkerRestartingError());
+      const shape = LangyTurnErrors.classify(new LangyWorkerRestartingError());
 
       expect(shape.kind).toBe("langy_worker_restarting");
     });
@@ -234,7 +219,7 @@ describe("classifyLangyTurnError", () => {
 
   describe("given a genuinely unexpected exception", () => {
     it("falls back to unknown with no meta", () => {
-      const shape = classifyLangyTurnError(
+      const shape = LangyTurnErrors.classify(
         new Error("Cannot read properties of undefined (reading 'foo')"),
       );
 
@@ -245,10 +230,10 @@ describe("classifyLangyTurnError", () => {
   });
 });
 
-describe("serializeLangyTurnError", () => {
+describe("LangyTurnErrors.serialize", () => {
   describe("given any classified failure", () => {
     it("never leaks the raw message onto the wire", () => {
-      const serialized = serializeLangyTurnError(
+      const serialized = LangyTurnErrors.serialize(
         new LangyAgentUnavailableError("manager responded 401", {
           status: 401,
         }),
@@ -264,7 +249,7 @@ describe("serializeLangyTurnError", () => {
     it("never leaks an unexpected exception's message or stack", () => {
       const boom = new Error("secret-internal-detail at /srv/app/foo.ts:12");
 
-      const serialized = serializeLangyTurnError(boom);
+      const serialized = LangyTurnErrors.serialize(boom);
 
       expect(serialized).not.toContain("secret-internal-detail");
       expect(serialized).not.toContain("/srv/app");

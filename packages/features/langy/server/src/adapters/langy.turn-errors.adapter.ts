@@ -96,14 +96,10 @@ export class LangyGithubNotConnectedError extends HandledError {
   declare readonly code: "langy_github_not_connected";
 
   constructor() {
-    super(
-      "langy_github_not_connected",
-      "agent required GitHub but the account is not connected",
-      {
-        httpStatus: 409,
-        ...remediation("langy_github_not_connected"),
-      },
-    );
+    super("langy_github_not_connected", "agent required GitHub but the account is not connected", {
+      httpStatus: 409,
+      ...remediation("langy_github_not_connected"),
+    });
     this.name = "LangyGithubNotConnectedError";
   }
 }
@@ -242,15 +238,11 @@ export class LangyWorkerRestartingError extends HandledError {
   declare readonly code: "langy_worker_restarting";
 
   constructor() {
-    super(
-      "langy_worker_restarting",
-      "Worker restarting — turn terminated before completion",
-      {
-        httpStatus: 503,
-        fault: "platform",
-        ...remediation("langy_worker_restarting"),
-      },
-    );
+    super("langy_worker_restarting", "Worker restarting — turn terminated before completion", {
+      httpStatus: 503,
+      fault: "platform",
+      ...remediation("langy_worker_restarting"),
+    });
     this.name = "LangyWorkerRestartingError";
   }
 }
@@ -263,88 +255,6 @@ export class LangyWorkerRestartingError extends HandledError {
  * so the classifier files it under `unknown` (calm copy + trace id) while the
  * raw text still reaches the log via `error.message`.
  */
-/** Walk a HandledError chain (the error + its reasons, depth-first) for a kind. */
-function domainErrorChainHas(error: Error, code: string): boolean {
-  if (!HandledError.isHandled(error)) return false;
-  if (error.code === code) return true;
-  return error.reasons.some((r) => domainErrorChainHas(r, code));
-}
-
-/**
- * Classify the manager's terminal error frame, preferring the typed cause
- * chain when present (the wire's herr envelope, already deserialized into a
- * HandledError by the relay-frame schema — this code never sees the wire
- * dialect): a KNOWN cause anywhere in the chain gets its own kind (so a
- * gateway `no_provider_configured` renders the model-setup card, not a
- * generic failure), and the generic `agent_error` keeps the received chain as
- * reasons so the full context persists into `LastError`. Falls back to the
- * bare-code mapping for frames without a cause.
- */
-export function langyAgentErrorFromErrorFrame({
-  code,
-  cause,
-}: {
-  code?: string;
-  cause?: HandledError;
-}): Error {
-  if (cause) {
-    const reasons = [...cause.reasons];
-    // The organization has no model provider configured — an unmet setup
-    // step, not a fault. Same state the turn-START guard names, so the same
-    // kind (and the same "configure a model" card).
-    if (domainErrorChainHas(cause, "no_provider_configured")) {
-      return new LangyModelNotConfiguredError({ reasons });
-    }
-    if (cause.code === "agent_error") {
-      return new LangyAgentErroredError({ reasons });
-    }
-  }
-  return langyAgentErrorFromFrame(code ?? cause?.code ?? "agent error");
-}
-
-export function langyAgentErrorFromFrame(frame: string): Error {
-  const normalized = frame.trim().toLowerCase();
-  switch (normalized) {
-    case "at-capacity":
-      return new LangyAgentAtCapacityError();
-    // Both spellings of the session-vanished code: the classifier historically
-    // matched the hyphenated form, but the mono-binary emits the snake_case
-    // `session_not_found` on its error frame (see app.go). Accept either.
-    case "session-not-found":
-    case "session_not_found":
-      return new LangyAgentSessionLostError();
-    // The worker stopped mid-turn. `worker_stopped` is the deliberate signal;
-    // `post_error` (the worker would not accept the prompt) is the older code
-    // for the same thing — the opencode process died or is broken.
-    case "worker_stopped":
-    case "post_error":
-      return new LangyWorkerStoppedError();
-    // The agent reported its own failure (e.g. the provider rejected its LLM
-    // call). The worker is fine; the reply failed. Its own kind, so the copy
-    // never claims a crash that didn't happen.
-    case "agent_error":
-      return new LangyAgentErroredError();
-    // The manager's GitHub gate (services/langyagent/app/githubgate.go) stopped
-    // the turn: the agent reached for GitHub without the access this turn
-    // carried. Not connected ⇒ the install card (render: suppress); repo not
-    // accessible ⇒ the "grant the app access" card. These are the ONLY
-    // producers of the two codes the client's connect-card flow is keyed to.
-    case "langy_github_not_connected":
-      return new LangyGithubNotConnectedError();
-    case "langy_github_repo_not_accessible":
-      return new LangyGithubRepoNotAccessibleError();
-  }
-  // The manager also surfaces its typed `herr` CODES on this frame, e.g.
-  // `worker_spawn_failed (map[message:...])`. Match on the code prefix, not the
-  // whole string: the parenthesised detail is the manager's internal envelope and
-  // is neither stable nor safe to show. Anything still unmatched stays a bare
-  // Error — it becomes `unknown`, and its raw text reaches the log only.
-  if (normalized.startsWith("worker_spawn_failed")) {
-    return new LangyWorkerSpawnFailedError();
-  }
-  return new Error(frame);
-}
-
 /** Node/undici connect-level failures: the manager isn't answering the socket. */
 const UNREACHABLE_CODES = new Set([
   "ECONNREFUSED",
@@ -359,81 +269,169 @@ const UNREACHABLE_CODES = new Set([
   "UND_ERR_CONNECT_TIMEOUT",
 ]);
 
-/** Walk the `cause` chain (undici wraps the real reason under `TypeError: fetch failed`). */
-function causeChain(error: unknown): unknown[] {
-  const chain: unknown[] = [];
-  let current: unknown = error;
-  for (let depth = 0; current && depth < 5; depth++) {
-    chain.push(current);
-    current = (current as { cause?: unknown }).cause;
-  }
-  return chain;
-}
-
-function isTimeout(error: unknown): boolean {
-  return causeChain(error).some((link) => {
-    const name = (link as { name?: unknown }).name;
-    return name === "TimeoutError" || name === "AbortError";
-  });
-}
-
-function isUnreachable(error: unknown): boolean {
-  return causeChain(error).some((link) => {
-    const code = (link as { code?: unknown }).code;
-    return typeof code === "string" && UNREACHABLE_CODES.has(code);
-  });
-}
-
 /**
- * The unhandled shape: nothing but an id to correlate on.
+ * What a failed Langy turn is, and what the client is told about it.
  *
- * The id must IDENTIFY THE INCIDENT. It used to be the ACTIVE TRACE id, which in
- * the worker is the long-lived process/turn-processor span — so every failure,
- * in every conversation, showed the user the SAME id. An id that does not
- * identify the thing it is attached to is worse than no id: it sends whoever
- * receives it looking for the wrong incident. The SPAN id is per-failure, so we
- * lead with it and keep the trace id only as a correlation hint.
+ * The ten HandledError classes above are the named failures. This is the
+ * machinery that decides WHICH of them an arbitrary thrown value is, by
+ * walking the cause chain and the agent's own error frames, and falls back to
+ * an unhandled shape when it can name nothing — that fallback is deliberate,
+ * not a gap: a failure we cannot name must degrade to a generic error with a
+ * trace id rather than be dressed up as one we understand.
  */
-function unhandledShape(): SerializedHandledError {
-  const spanContext = trace.getActiveSpan()?.spanContext();
-  return {
-    code: "unknown",
-    // Deprecated back-compat alias of `code` — see SerializedHandledError.kind.
-    kind: "unknown",
-    meta: {},
-    traceId: spanContext?.traceId,
-    spanId: spanContext?.spanId,
-    httpStatus: 500,
-    // An unclassified failure is potentially ours — log it like an incident.
-    fault: "platform",
-    retryable: false,
-    reasons: [],
-  };
-}
-
-/**
- * Map a caught turn failure onto the domain-error shape the browser renders.
- * Handled errors keep their `kind`; a genuinely unexpected exception — and only
- * that — falls through to `unknown`.
- */
-export function classifyLangyTurnError(error: unknown): SerializedHandledError {
-  if (HandledError.isHandled(error)) return error.serialize();
-  // fetch/AbortSignal failures arrive as DOMException/TypeError, never as ours.
-  if (isTimeout(error)) {
-    return new LangyTurnTimeoutError(AGENT_CHAT_TIMEOUT_MS).serialize();
+export class LangyTurnErrors {
+  /** Walk a HandledError chain (the error + its reasons, depth-first) for a kind. */
+  private static domainErrorChainHas(error: Error, code: string): boolean {
+    if (!HandledError.isHandled(error)) return false;
+    if (error.code === code) return true;
+    return error.reasons.some((r) => LangyTurnErrors.domainErrorChainHas(r, code));
   }
-  if (isUnreachable(error)) {
-    return new LangyAgentUnavailableError("agent unreachable").serialize();
-  }
-  return unhandledShape();
-}
 
-/**
- * Serialize a turn failure into the JSON the token buffer's `error` entry
- * carries, which `attachTurnStream` re-emits as a structured error PART. The
- * copy the user sees is derived from `kind` in the browser — the raw message
- * never crosses the wire.
- */
-export function serializeLangyTurnError(error: unknown): string {
-  return JSON.stringify(classifyLangyTurnError(error));
+  /** Walk the `cause` chain (undici wraps the real reason under `TypeError: fetch failed`). */
+  private static causeChain(error: unknown): unknown[] {
+    const chain: unknown[] = [];
+    let current: unknown = error;
+    for (let depth = 0; current && depth < 5; depth++) {
+      chain.push(current);
+      current = (current as { cause?: unknown }).cause;
+    }
+    return chain;
+  }
+
+  private static isTimeout(error: unknown): boolean {
+    return LangyTurnErrors.causeChain(error).some((link) => {
+      const name = (link as { name?: unknown }).name;
+      return name === "TimeoutError" || name === "AbortError";
+    });
+  }
+
+  private static isUnreachable(error: unknown): boolean {
+    return LangyTurnErrors.causeChain(error).some((link) => {
+      const code = (link as { code?: unknown }).code;
+      return typeof code === "string" && UNREACHABLE_CODES.has(code);
+    });
+  }
+
+  /**
+   * The unhandled shape: nothing but an id to correlate on.
+   *
+   * The id must IDENTIFY THE INCIDENT. It used to be the ACTIVE TRACE id, which in
+   * the worker is the long-lived process/turn-processor span — so every failure,
+   * in every conversation, showed the user the SAME id. An id that does not
+   * identify the thing it is attached to is worse than no id: it sends whoever
+   * receives it looking for the wrong incident. The SPAN id is per-failure, so we
+   * lead with it and keep the trace id only as a correlation hint.
+   */
+  private static unhandledShape(): SerializedHandledError {
+    const spanContext = trace.getActiveSpan()?.spanContext();
+    return {
+      code: "unknown",
+      // Deprecated back-compat alias of `code` — see SerializedHandledError.kind.
+      kind: "unknown",
+      meta: {},
+      traceId: spanContext?.traceId,
+      spanId: spanContext?.spanId,
+      httpStatus: 500,
+      // An unclassified failure is potentially ours — log it like an incident.
+      fault: "platform",
+      retryable: false,
+      reasons: [],
+    };
+  }
+
+  /**
+   * Classify the manager's terminal error frame, preferring the typed cause
+   * chain when present (the wire's herr envelope, already deserialized into a
+   * HandledError by the relay-frame schema — this code never sees the wire
+   * dialect): a KNOWN cause anywhere in the chain gets its own kind (so a
+   * gateway `no_provider_configured` renders the model-setup card, not a
+   * generic failure), and the generic `agent_error` keeps the received chain as
+   * reasons so the full context persists into `LastError`. Falls back to the
+   * bare-code mapping for frames without a cause.
+   */
+  static fromErrorFrame({ code, cause }: { code?: string; cause?: HandledError }): Error {
+    if (cause) {
+      const reasons = [...cause.reasons];
+      // The organization has no model provider configured — an unmet setup
+      // step, not a fault. Same state the turn-START guard names, so the same
+      // kind (and the same "configure a model" card).
+      if (LangyTurnErrors.domainErrorChainHas(cause, "no_provider_configured")) {
+        return new LangyModelNotConfiguredError({ reasons });
+      }
+      if (cause.code === "agent_error") {
+        return new LangyAgentErroredError({ reasons });
+      }
+    }
+    return LangyTurnErrors.fromFrame(code ?? cause?.code ?? "agent error");
+  }
+
+  static fromFrame(frame: string): Error {
+    const normalized = frame.trim().toLowerCase();
+    switch (normalized) {
+      case "at-capacity":
+        return new LangyAgentAtCapacityError();
+      // Both spellings of the session-vanished code: the classifier historically
+      // matched the hyphenated form, but the mono-binary emits the snake_case
+      // `session_not_found` on its error frame (see app.go). Accept either.
+      case "session-not-found":
+      case "session_not_found":
+        return new LangyAgentSessionLostError();
+      // The worker stopped mid-turn. `worker_stopped` is the deliberate signal;
+      // `post_error` (the worker would not accept the prompt) is the older code
+      // for the same thing — the opencode process died or is broken.
+      case "worker_stopped":
+      case "post_error":
+        return new LangyWorkerStoppedError();
+      // The agent reported its own failure (e.g. the provider rejected its LLM
+      // call). The worker is fine; the reply failed. Its own kind, so the copy
+      // never claims a crash that didn't happen.
+      case "agent_error":
+        return new LangyAgentErroredError();
+      // The manager's GitHub gate (services/langyagent/app/githubgate.go) stopped
+      // the turn: the agent reached for GitHub without the access this turn
+      // carried. Not connected ⇒ the install card (render: suppress); repo not
+      // accessible ⇒ the "grant the app access" card. These are the ONLY
+      // producers of the two codes the client's connect-card flow is keyed to.
+      case "langy_github_not_connected":
+        return new LangyGithubNotConnectedError();
+      case "langy_github_repo_not_accessible":
+        return new LangyGithubRepoNotAccessibleError();
+    }
+    // The manager also surfaces its typed `herr` CODES on this frame, e.g.
+    // `worker_spawn_failed (map[message:...])`. Match on the code prefix, not the
+    // whole string: the parenthesised detail is the manager's internal envelope and
+    // is neither stable nor safe to show. Anything still unmatched stays a bare
+    // Error — it becomes `unknown`, and its raw text reaches the log only.
+    if (normalized.startsWith("worker_spawn_failed")) {
+      return new LangyWorkerSpawnFailedError();
+    }
+    return new Error(frame);
+  }
+
+  /**
+   * Map a caught turn failure onto the domain-error shape the browser renders.
+   * Handled errors keep their `kind`; a genuinely unexpected exception — and only
+   * that — falls through to `unknown`.
+   */
+  static classify(error: unknown): SerializedHandledError {
+    if (HandledError.isHandled(error)) return error.serialize();
+    // fetch/AbortSignal failures arrive as DOMException/TypeError, never as ours.
+    if (LangyTurnErrors.isTimeout(error)) {
+      return new LangyTurnTimeoutError(AGENT_CHAT_TIMEOUT_MS).serialize();
+    }
+    if (LangyTurnErrors.isUnreachable(error)) {
+      return new LangyAgentUnavailableError("agent unreachable").serialize();
+    }
+    return LangyTurnErrors.unhandledShape();
+  }
+
+  /**
+   * Serialize a turn failure into the JSON the token buffer's `error` entry
+   * carries, which `attachTurnStream` re-emits as a structured error PART. The
+   * copy the user sees is derived from `kind` in the browser — the raw message
+   * never crosses the wire.
+   */
+  static serialize(error: unknown): string {
+    return JSON.stringify(LangyTurnErrors.classify(error));
+  }
 }
