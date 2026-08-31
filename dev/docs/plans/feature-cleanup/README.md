@@ -913,3 +913,99 @@ one. The test records what the code does rather than claiming more.
 
 architecture-lint violations 845 -> 832 for the session, with
 `comment-block-size` at 0 and `service-quality` at 4.
+
+## Names that lie, and a guard that read its own documentation (2026-08-31)
+
+### `fallible-result-naming`: 34 -> 27
+
+`try` in this repo means one specific thing — this call can answer "nothing",
+and the caller must handle that. Five methods disagreed, in both directions.
+
+Two claimed it and could not keep it. `TraceSpanDedupPort.tryConfirmProcessed`
+and `tryReleaseOnFailure` return `void`; their `try` meant "best effort,
+swallows its own failures", a different property the type cannot show. They
+are `confirmProcessed` and `releaseOnFailure` now.
+`tryAcquireProcessingLock` keeps its prefix, because it really does return
+null when the store is unreachable and the caller then ingests the span
+anyway rather than dropping a customer's data over a cache.
+
+Three had it and did not claim it: `IdentityEmailService.resolveEmail` and
+`verifiedEmailsOf` return null to mean "read the legacy `User.email` column
+instead", and `TraceAnalyticsRepository.findByTraceIdWithApplied` returns null
+when there is no stored projection row yet.
+
+**Seven were left alone deliberately**, and this is the useful part of the
+sweep — not every violation is a naming slip:
+
+| what | why not renamed |
+| --- | --- |
+| `TraceSummaryStore.get`, `TraceDerivedStore.get` | `FoldProjectionStore` from `@langwatch/eventing` declares `get`; the executor calls it generically |
+| `TraceLegacyReadPort.getById` and two siblings | the port mirrors the app's `TraceService` on purpose, so the transports can be package-owned before the service moves |
+| `TraceSummaryRepository.findByTraceId` | shares its name with `EvaluationRepository.findByTraceId`, which is not flagged — a textual rename hits both |
+
+### The browser-capability guard was reading comments
+
+`ui-backend-access` and friends are regex searches over the raw file text, so
+a module that NAMES a capability in order to explain why it avoids it was
+reported as using it. Both files it flagged were prose:
+
+- `apps/ui/src/behavior/public-config.ts` — its header explains that the
+  browser has no `process.env`. Saying so was the violation.
+- `.../surfaces/api-snippet/get-prompt-snippets.ts` — a JSDoc `@param`
+  reading "Optional label/tag to fetch (e.g. production)" matched
+  `/\bfetch\s*\(/`.
+
+`withoutComments` now blanks comments with spaces before the scan, using the
+TypeScript scanner rather than a regex so a `//` inside a string is not
+mistaken for one, and keeping every offset aligned with the file on disk. A
+guard that punishes the comment documenting the guard teaches people to
+delete the comment.
+
+### One conversion, written six times
+
+`nanoUsdToDecimalString` appeared six times and `usdToNanoUsd` three, in two
+variants that disagree: four use `BigInt(Math.round(nano))`, the two webhook
+copies use `BigInt(Math.abs(value))`, which throws a `RangeError` on a
+fractional input. **Not currently reachable** — `gateway_spend.CostNanoUSD` is
+`Int64` and selected raw — so it is a difference between copies, not a bug.
+
+Four of the six were inside two packages and are now one each, under
+`adapters/nano-usd.adapter.ts`. The remaining two, in `gateway-server` and
+`enterprise/composition/api`, share no dependency that could reasonably hold
+money formatting. **Consolidating those needs a new workspace package**, which
+is a dependency-graph and lockfile change and should be its own decision.
+
+Removing the pair also took the databricks puller from 753 lines to 704 —
+that file is 14 module-level functions with a stateless five-method
+pass-through class at the bottom, which is the R2/R3 shape in its purest
+form, and is the obvious next target.
+
+### Still nothing tested the sign
+
+Sabotage again found the gap: dropping the minus in either conversion changed
+no test. A credit on a vendor bill is negative, so that turns a refund into a
+charge of the same size. Sixteen tests now cover the boundaries — the ninth
+decimal place, rounding half-up at it, exponent notation, the refusal of an
+unparseable amount, and both sign paths.
+
+## Where this session ended
+
+architecture-lint violations **845 -> 822**, with `comment-block-size` at 0,
+`service-quality` at 3, and `service-quality-baseline` at 4.
+
+The three service-quality files left are large facades whose overruns need a
+real redesign rather than an extraction: `authz.service.ts` (808/775),
+`langy-conversation.service.ts` (1275/1250), `organization.service.ts`
+(1415/1388).
+
+Two categories were examined and deliberately not started, because each is a
+migration rather than a cleanup:
+
+- **`private-runtime-export` (16)** — all sixteen are one file,
+  `packages/features/trace/server/src/index.ts`, exporting its repositories,
+  stores and projections. 76 references across `platform/app` consume them.
+  This is the core-application extraction, not a tidy-up.
+- **`api-transport-import-boundary` / `prisma-containment` in `apps/api`** —
+  `custom-evaluators.ts` needs `PrismaClient` only as a type, but narrowing it
+  would narrow the tRPC output type the client receives. The file's own
+  docblock already names the fix: the Workflow vertical should own the query.
