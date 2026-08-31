@@ -1505,3 +1505,53 @@ to begin with — the same trap as the earlier billing round. Format the files
 you touched, never the tree. And a consumer survey that greps four of nine
 names finds four of nine consumers; the typecheck caught the rest, but the
 survey should have.
+
+## Round: the query translator, the projections, and two more untested bounds
+
+Folded the trace query translator into its three layers —
+`TraceQueryValues` (bind a value, mint a placeholder, refuse a bad one),
+`TraceQueryTranslators` (one field becomes one predicate) and
+`TraceQueryClickHouse` (walk the filter tree) — plus the trace-derived and
+coding-agent projections and the two metric rules modules. 35 + 19 + 17
+functions, of which only nine were ever anybody else's business.
+
+### apps/ exists
+
+Every consumer survey in this cleanup had been `packages` + `platform/app`.
+It should have been `packages` + `platform/app` + `apps`. Three files there
+were stale — two tRPC mounts supplying the trace query port and the automation
+filter check, and one still importing `USD_DISPLAY_STRING_FORMAT` from
+`gateway-server` after the money round moved it to the contract.
+
+All four `apps/*` packages now typecheck at 0, which retroactively clears the
+earlier rounds too. Worth remembering: `apps/**` runs no CI (see the
+`ci-typechecked-10-of-156-packages` note), so nothing else would have said so.
+
+### Two more bounds that were encoded but not tested
+
+- **`validateAttributeKey`'s character check.** Removable with the whole
+  1447-test suite green. It is NOT the injection defence — the key is bound as
+  a `{name:String}` parameter — but it is the readable refusal on top, and its
+  message has to name the allowed characters because it is the only thing
+  telling the person what to type instead. The test asserts the message, not
+  just that something threw.
+- **`checkedInteger`'s range check.** Same: `if (false)` and the metric suite
+  stayed green. A point declares its integers as UInt64/Int64/UInt32, nothing
+  downstream re-checks, and the column takes what it is given — so an
+  out-of-range value is stored as a measurement nobody made.
+
+### Three rewrite hazards, all caught by the typecheck
+
+Worth writing down because they recur:
+
+1. **Prose.** A `\s*\(` lookahead matched "Cross-table categorical
+   (evaluation_runs...)" in a docblock and turned it into a method call. Use
+   `\(` with no whitespace.
+2. **Declarations.** The same pattern rewrites a method DECLARATION as readily
+   as a call — a port's type-literal signatures, and a class's own
+   `static validatePointShape` in a file that was both fold target and
+   consumer.
+3. **Collisions.** `hasPersistableSignal` is defined three times over three
+   different state types; only one was being folded. Same shape as
+   `collectDroppedCategories` and the generic `wrap`. A name grep finds
+   definitions, not consumers — check what each file actually IMPORTS.
