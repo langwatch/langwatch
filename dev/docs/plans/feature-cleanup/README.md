@@ -1009,3 +1009,94 @@ migration rather than a cleanup:
   `custom-evaluators.ts` needs `PrismaClient` only as a type, but narrowing it
   would narrow the tRPC output type the client receives. The file's own
   docblock already names the fix: the Workflow vertical should own the query.
+
+## Services that were modules of functions (2026-08-31)
+
+The shape the original complaint named — "tons of tiny files with loads of
+functions in them that don't really do very much, it could really just be one
+very simple class" — turns out to be one recurring pattern, and it is now
+measurable. A sweep for `services/*.service.ts` carrying four or more
+module-level functions found nine. Seven are done.
+
+| service | was | what it was |
+| --- | --- | --- |
+| `puller-databricks-warehouse-cost` | 10 fns + stateless facade | five methods that only renamed the function they called |
+| `persist-cap` | 14 fns + **two** facades | six statics AND three instance methods forwarding to the same functions |
+| `scenario-target-prefetch` | 7 fns | `tryFetch` threading seven of its own fields into them as arguments |
+| `langy-conversation-memory` | 9 fns, **no class at all** | named `.service.ts`, held none |
+| `saved-workbench-chart` | 5 fns | a presenter and four parsers |
+| `gateway-usage` | 6 fns | six summary helpers |
+| `webhook-delivery` | 25 fns + facade | **not done** — see below |
+
+### What the pattern costs, concretely
+
+`ScenarioTargetPrefetchService.tryFetch` is the clearest example. It is a
+four-branch dispatch on the target type, and every branch was handing the
+fetchers the service's own fields, because the fetchers lived outside the
+class and could not reach them. The workflow branch passed nine arguments.
+Each branch is now one line.
+
+`AutomationPersistCapService` had the duplication in the other direction:
+two public APIs for one behaviour, and neither was the implementation. Two of
+its six statics had no call site anywhere.
+
+### The tool, and where it stops working
+
+`fold_into_class.py` (in the job scratch, not committed) does the mechanical
+move: it takes a function with its docblock, re-signs it as a method, indents
+it, drops it into the class and rewrites the call sites. Three failure modes
+found the hard way, each now asserted:
+
+- **A bare reference is not a call.** `.map(cleanId)` and
+  `toPayload: confirmedDeliverPayload` pass the function as a value, so a
+  regex looking for `name(` misses them and the name silently goes out of
+  scope.
+- **Docblock styles vary.** A one-line `/** ... */`, a block ending `*/` on
+  its own line, and a block ending `... one. */` on the last text line each
+  need different detection. Getting it wrong orphans the docblock and leaves
+  it floating above the next declaration — which is exactly the defect
+  141a2c210e left in `langy-conversation-memory.service.ts` and this session
+  fixed.
+- **Brace matching over raw text is unsafe** in a file with template
+  literals. It put nine members outside the class in `webhook-delivery`.
+
+### webhook-delivery is left, deliberately
+
+25 functions, 1207 lines, and it is the production delivery path. It defeats
+the text tooling on both counts above, and it carries a hazard neither the
+compiler nor a type check would catch:
+
+```ts
+const WEBHOOK_DELIVERY_OUTBOX = { retryDelayMs: webhookRetryDelayMs, ... };
+```
+
+That const is evaluated at module load, **before** the class below it is
+initialised. Folding `webhookRetryDelayMs` into the class and naming the
+static there directly is a temporal-dead-zone `ReferenceError` at import
+time, with a clean typecheck. It has to become an arrow, or the const has to
+move below the class.
+
+Doing this one properly wants an AST-based move rather than text heuristics.
+The attempt was reverted; the file is untouched and its 83 tests pass.
+
+### Coverage found by sabotage, again
+
+Four more untested paths, all in code being restructured:
+
+| what nothing guarded | tests added |
+| --- | --- |
+| `ScenarioTargetPrefetchService` — the whole service | 10 |
+| `LangyConversationMemoryService` — the whole service | 14 |
+| the automation cap's ten-minute plan cache | 2 |
+| the nano-USD sign, both directions | (in the money commit) |
+
+The langy one is the one to read: it decides what the model sees. Its rules —
+an errored call is not a referent, a digest with no ids is not a referent,
+the same resource touched twice is the thing as it now stands, and the block
+must declare itself DATA with its ids unverified — were all unguarded.
+Breaking any of the five now fails between one and three tests.
+
+## Where this session ended, updated
+
+architecture-lint violations **845 -> 822**. `comment-block-size` 0,
+`service-quality` 3, `service-quality-baseline` 4.
