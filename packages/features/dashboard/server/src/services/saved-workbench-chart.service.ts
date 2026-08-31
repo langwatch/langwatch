@@ -57,7 +57,7 @@ export class SavedWorkbenchChartService {
       projectId: projectIdSchema.parse(input.projectId),
     });
 
-    return rows.map((row) => presentSavedWorkbenchChart(row));
+    return rows.map((row) => this.present(row));
   }
 
   async getById(input: { projectId: string; chartId: string }): Promise<SavedWorkbenchChart> {
@@ -68,7 +68,7 @@ export class SavedWorkbenchChartService {
       throw new SavedWorkbenchChartNotFoundError();
     }
 
-    return presentSavedWorkbenchChart(chart);
+    return this.present(chart);
   }
 
   async create(input: {
@@ -80,9 +80,9 @@ export class SavedWorkbenchChartService {
   }): Promise<SavedWorkbenchChart> {
     const projectId = projectIdSchema.parse(input.projectId);
 
-    const name = parseSavedWorkbenchChartName(input.name);
+    const name = this.parseName(input.name);
 
-    const definition = parseSavedWorkbenchChartDefinition(input.definition);
+    const definition = this.parseDefinition(input.definition);
 
     await this.policy.validate({
       projectId,
@@ -91,13 +91,13 @@ export class SavedWorkbenchChartService {
     });
 
     const chart = await this.repository.createSavedWorkbenchChart({
-      id: input.id === undefined ? this.ids.generate() : parseSavedWorkbenchChartId(input.id),
+      id: input.id === undefined ? this.ids.generate() : this.parseId(input.id),
       projectId,
       name,
       definition,
     });
 
-    return presentSavedWorkbenchChart(chart);
+    return this.present(chart);
   }
 
   async update(input: {
@@ -110,7 +110,7 @@ export class SavedWorkbenchChartService {
 
     await this.getById(parsed);
 
-    const name = input.name === undefined ? undefined : parseSavedWorkbenchChartName(input.name);
+    const name = input.name === undefined ? undefined : this.parseName(input.name);
 
     const definitionUpdate = input.definitionUpdate;
     if (definitionUpdate !== undefined && definitionUpdate.protections === undefined) {
@@ -120,7 +120,7 @@ export class SavedWorkbenchChartService {
     const definition =
       definitionUpdate === undefined
         ? undefined
-        : parseSavedWorkbenchChartDefinition(definitionUpdate.definition);
+        : this.parseDefinition(definitionUpdate.definition);
 
     if (definition !== undefined && definitionUpdate !== undefined) {
       await this.policy.validate({
@@ -139,7 +139,7 @@ export class SavedWorkbenchChartService {
       throw new SavedWorkbenchChartNotFoundError();
     }
 
-    return presentSavedWorkbenchChart(chart);
+    return this.present(chart);
   }
 
   async delete(input: { projectId: string; chartId: string }): Promise<void> {
@@ -162,7 +162,7 @@ export class SavedWorkbenchChartService {
   }): Promise<SavedWorkbenchChart> {
     const ref = zSavedChartRef(input);
 
-    const placement = parseSavedWorkbenchChartPlacement({
+    const placement = this.parsePlacement({
       dashboardId: input.dashboardId,
       ...(input.gridColumn === undefined ? {} : { gridColumn: input.gridColumn }),
       ...(input.gridRow === undefined ? {} : { gridRow: input.gridRow }),
@@ -197,7 +197,7 @@ export class SavedWorkbenchChartService {
       throw new SavedWorkbenchChartNotFoundError();
     }
 
-    return presentSavedWorkbenchChart(chart);
+    return this.present(chart);
   }
 
   async unplace(input: { projectId: string; chartId: string }): Promise<SavedWorkbenchChart> {
@@ -206,7 +206,7 @@ export class SavedWorkbenchChartService {
       throw new SavedWorkbenchChartNotFoundError();
     }
 
-    return presentSavedWorkbenchChart(chart);
+    return this.present(chart);
   }
 
   async run(input: {
@@ -225,44 +225,44 @@ export class SavedWorkbenchChartService {
       parameters: chart.definition.parameters,
     });
   }
+
+  private present<T extends { id: string; definition: unknown }>(
+    row: T,
+  ): T & { definition: SavedWorkbenchChartDefinition } {
+    const parsed = savedWorkbenchChartDefinitionSchema.safeParse(row.definition);
+    if (!parsed.success) {
+      throw new SavedWorkbenchChartDefinitionInvalidError(row.id);
+    }
+
+    return { ...row, definition: parsed.data };
+  }
+
+  private parseName(input: unknown): string {
+    const parsed = savedWorkbenchChartNameSchema.safeParse(input);
+    if (!parsed.success) throw new SavedWorkbenchChartValidationError(parsed.error);
+    return parsed.data;
+  }
+
+  private parseId(input: unknown): string {
+    const parsed = savedWorkbenchChartIdSchema.safeParse(input);
+    if (!parsed.success) throw new SavedWorkbenchChartValidationError(parsed.error);
+    return parsed.data;
+  }
+
+  private parseDefinition(input: unknown): SavedWorkbenchChartDefinition {
+    const parsed = savedWorkbenchChartDefinitionSchema.safeParse(input);
+    if (!parsed.success) throw new SavedWorkbenchChartValidationError(parsed.error);
+    return parsed.data;
+  }
+
+  private parsePlacement(input: unknown) {
+    const parsed = savedWorkbenchChartPlacementSchema.safeParse(input);
+    if (!parsed.success) throw new SavedWorkbenchChartValidationError(parsed.error);
+    return parsed.data;
+  }
 }
 
 const zSavedChartRef = (input: { projectId: string; chartId: string }) => ({
   projectId: projectIdSchema.parse(input.projectId),
   chartId: input.chartId,
 });
-
-function presentSavedWorkbenchChart<T extends { id: string; definition: unknown }>(
-  row: T,
-): T & { definition: SavedWorkbenchChartDefinition } {
-  const parsed = savedWorkbenchChartDefinitionSchema.safeParse(row.definition);
-  if (!parsed.success) {
-    throw new SavedWorkbenchChartDefinitionInvalidError(row.id);
-  }
-
-  return { ...row, definition: parsed.data };
-}
-
-function parseSavedWorkbenchChartName(input: unknown): string {
-  const parsed = savedWorkbenchChartNameSchema.safeParse(input);
-  if (!parsed.success) throw new SavedWorkbenchChartValidationError(parsed.error);
-  return parsed.data;
-}
-
-function parseSavedWorkbenchChartId(input: unknown): string {
-  const parsed = savedWorkbenchChartIdSchema.safeParse(input);
-  if (!parsed.success) throw new SavedWorkbenchChartValidationError(parsed.error);
-  return parsed.data;
-}
-
-function parseSavedWorkbenchChartDefinition(input: unknown): SavedWorkbenchChartDefinition {
-  const parsed = savedWorkbenchChartDefinitionSchema.safeParse(input);
-  if (!parsed.success) throw new SavedWorkbenchChartValidationError(parsed.error);
-  return parsed.data;
-}
-
-function parseSavedWorkbenchChartPlacement(input: unknown) {
-  const parsed = savedWorkbenchChartPlacementSchema.safeParse(input);
-  if (!parsed.success) throw new SavedWorkbenchChartValidationError(parsed.error);
-  return parsed.data;
-}

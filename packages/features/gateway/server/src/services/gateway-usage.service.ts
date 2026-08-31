@@ -169,18 +169,18 @@ export class GatewayUsageService {
     window: UsageWindow;
   }): Promise<UsageSummary> {
     if (!this.spendRepo || args.virtualKeyIds.length === 0) {
-      return emptySummary();
+      return this.emptySummary();
     }
 
     const tenantIds = await this.orgProjectIds(args.organizationId);
-    if (tenantIds.length === 0) return emptySummary();
+    if (tenantIds.length === 0) return this.emptySummary();
 
     const buckets = await this.spendRepo.usageBuckets({
       tenantIds,
       window: args.window,
       virtualKeyIds: args.virtualKeyIds,
     });
-    if (buckets.length === 0) return emptySummary();
+    if (buckets.length === 0) return this.emptySummary();
 
     const byVk = new Map<string, { totalUsd: Prisma.Decimal; requests: number }>();
     const byModel = new Map<string, { totalUsd: Prisma.Decimal; requests: number }>();
@@ -193,9 +193,9 @@ export class GatewayUsageService {
       totalUsd = totalUsd.plus(bucket.totalUsd);
       totalRequests += bucket.requests;
       blockedRequests += bucket.blockedRequests;
-      bumpBucket(byVk, bucket.virtualKeyId, bucket.totalUsd, bucket.requests);
-      bumpBucket(byModel, bucket.model, bucket.totalUsd, bucket.requests);
-      bumpBucket(byDay, bucket.day, bucket.totalUsd, bucket.requests);
+      this.bumpBucket(byVk, bucket.virtualKeyId, bucket.totalUsd, bucket.requests);
+      this.bumpBucket(byModel, bucket.model, bucket.totalUsd, bucket.requests);
+      this.bumpBucket(byDay, bucket.day, bucket.totalUsd, bucket.requests);
     }
 
     const vkMeta = await this.loadVirtualKeyMeta(args.organizationId, [...byVk.keys()]);
@@ -204,20 +204,22 @@ export class GatewayUsageService {
       totalUsd: totalUsd.toFixed(6),
       totalRequests,
       blockedRequests,
-      avgUsdPerRequest: averagePerRequest(totalUsd, totalRequests),
-      byVirtualKey: topEntries(byVk).map(([virtualKeyId, { totalUsd: bucketUsd, requests }]) => ({
-        virtualKeyId,
-        name: vkMeta.get(virtualKeyId)?.name ?? virtualKeyId,
-        displayPrefix: vkMeta.get(virtualKeyId)?.displayPrefix ?? "",
-        totalUsd: bucketUsd.toFixed(6),
-        requests,
-      })),
-      byModel: topEntries(byModel).map(([model, { totalUsd: bucketUsd, requests }]) => ({
+      avgUsdPerRequest: this.averagePerRequest(totalUsd, totalRequests),
+      byVirtualKey: this.topEntries(byVk).map(
+        ([virtualKeyId, { totalUsd: bucketUsd, requests }]) => ({
+          virtualKeyId,
+          name: vkMeta.get(virtualKeyId)?.name ?? virtualKeyId,
+          displayPrefix: vkMeta.get(virtualKeyId)?.displayPrefix ?? "",
+          totalUsd: bucketUsd.toFixed(6),
+          requests,
+        }),
+      ),
+      byModel: this.topEntries(byModel).map(([model, { totalUsd: bucketUsd, requests }]) => ({
         model,
         totalUsd: bucketUsd.toFixed(6),
         requests,
       })),
-      byDay: sortedDays(byDay),
+      byDay: this.sortedDays(byDay),
     };
   }
 
@@ -239,10 +241,10 @@ export class GatewayUsageService {
      */
     model?: string;
   }): Promise<VirtualKeyUsageSummary> {
-    if (!this.spendRepo) return emptyVkSummary();
+    if (!this.spendRepo) return this.emptyVirtualKeySummary();
 
     const tenantIds = await this.orgProjectIds(args.organizationId);
-    if (tenantIds.length === 0) return emptyVkSummary();
+    if (tenantIds.length === 0) return this.emptyVirtualKeySummary();
 
     // Slices aggregate in ClickHouse; only the 20-row recent list pulls
     // raw traces, and that pull carries its own LIMIT.
@@ -271,21 +273,21 @@ export class GatewayUsageService {
       totalUsd = totalUsd.plus(bucket.totalUsd);
       totalRequests += bucket.requests;
       blockedRequests += bucket.blockedRequests;
-      bumpBucket(byModel, bucket.model, bucket.totalUsd, bucket.requests);
-      bumpBucket(byDay, bucket.day, bucket.totalUsd, bucket.requests);
+      this.bumpBucket(byModel, bucket.model, bucket.totalUsd, bucket.requests);
+      this.bumpBucket(byDay, bucket.day, bucket.totalUsd, bucket.requests);
     }
 
     return {
       totalUsd: totalUsd.toFixed(6),
       totalRequests,
       blockedRequests,
-      avgUsdPerRequest: averagePerRequest(totalUsd, totalRequests),
-      byModel: topEntries(byModel).map(([model, { totalUsd: bucketUsd, requests }]) => ({
+      avgUsdPerRequest: this.averagePerRequest(totalUsd, totalRequests),
+      byModel: this.topEntries(byModel).map(([model, { totalUsd: bucketUsd, requests }]) => ({
         model,
         totalUsd: bucketUsd.toFixed(6),
         requests,
       })),
-      byDay: sortedDays(byDay),
+      byDay: this.sortedDays(byDay),
       recentDebits: recentTraces.map((trace) => ({
         id: trace.traceId,
         occurredAt: trace.occurredAt.toISOString(),
@@ -316,68 +318,68 @@ export class GatewayUsageService {
   private orgProjectIds(organizationId: string): Promise<string[]> {
     return this.projects.listIdsByOrganization({ organizationId });
   }
-}
 
-function averagePerRequest(totalUsd: Prisma.Decimal, requests: number): string {
-  return requests > 0 ? totalUsd.div(requests).toFixed(6) : "0.000000";
-}
-
-function topEntries(
-  map: Map<string, { totalUsd: Prisma.Decimal; requests: number }>,
-  limit = 10,
-): Array<[string, { totalUsd: Prisma.Decimal; requests: number }]> {
-  return [...map.entries()]
-    .sort((a, b) => b[1].totalUsd.comparedTo(a[1].totalUsd) || a[0].localeCompare(b[0]))
-    .slice(0, limit);
-}
-
-function sortedDays(
-  map: Map<string, { totalUsd: Prisma.Decimal; requests: number }>,
-): Array<{ day: string; totalUsd: string; requests: number }> {
-  return [...map.entries()]
-    .sort((a, b) => (a[0] < b[0] ? -1 : 1))
-    .map(([day, { totalUsd, requests }]) => ({
-      day,
-      totalUsd: totalUsd.toFixed(6),
-      requests,
-    }));
-}
-
-function bumpBucket(
-  map: Map<string, { totalUsd: Prisma.Decimal; requests: number }>,
-  key: string,
-  amount: Prisma.Decimal | string,
-  requests: number,
-) {
-  const existing = map.get(key);
-  if (existing) {
-    existing.totalUsd = existing.totalUsd.plus(amount);
-    existing.requests += requests;
-  } else {
-    map.set(key, { totalUsd: new Prisma.Decimal(amount), requests });
+  private averagePerRequest(totalUsd: Prisma.Decimal, requests: number): string {
+    return requests > 0 ? totalUsd.div(requests).toFixed(6) : "0.000000";
   }
-}
 
-function emptySummary(): UsageSummary {
-  return {
-    totalUsd: "0.000000",
-    totalRequests: 0,
-    blockedRequests: 0,
-    avgUsdPerRequest: "0.000000",
-    byVirtualKey: [],
-    byModel: [],
-    byDay: [],
-  };
-}
+  private topEntries(
+    map: Map<string, { totalUsd: Prisma.Decimal; requests: number }>,
+    limit = 10,
+  ): Array<[string, { totalUsd: Prisma.Decimal; requests: number }]> {
+    return [...map.entries()]
+      .sort((a, b) => b[1].totalUsd.comparedTo(a[1].totalUsd) || a[0].localeCompare(b[0]))
+      .slice(0, limit);
+  }
 
-function emptyVkSummary(): VirtualKeyUsageSummary {
-  return {
-    totalUsd: "0.000000",
-    totalRequests: 0,
-    blockedRequests: 0,
-    avgUsdPerRequest: "0.000000",
-    byModel: [],
-    byDay: [],
-    recentDebits: [],
-  };
+  private sortedDays(
+    map: Map<string, { totalUsd: Prisma.Decimal; requests: number }>,
+  ): Array<{ day: string; totalUsd: string; requests: number }> {
+    return [...map.entries()]
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .map(([day, { totalUsd, requests }]) => ({
+        day,
+        totalUsd: totalUsd.toFixed(6),
+        requests,
+      }));
+  }
+
+  private bumpBucket(
+    map: Map<string, { totalUsd: Prisma.Decimal; requests: number }>,
+    key: string,
+    amount: Prisma.Decimal | string,
+    requests: number,
+  ) {
+    const existing = map.get(key);
+    if (existing) {
+      existing.totalUsd = existing.totalUsd.plus(amount);
+      existing.requests += requests;
+    } else {
+      map.set(key, { totalUsd: new Prisma.Decimal(amount), requests });
+    }
+  }
+
+  private emptySummary(): UsageSummary {
+    return {
+      totalUsd: "0.000000",
+      totalRequests: 0,
+      blockedRequests: 0,
+      avgUsdPerRequest: "0.000000",
+      byVirtualKey: [],
+      byModel: [],
+      byDay: [],
+    };
+  }
+
+  private emptyVirtualKeySummary(): VirtualKeyUsageSummary {
+    return {
+      totalUsd: "0.000000",
+      totalRequests: 0,
+      blockedRequests: 0,
+      avgUsdPerRequest: "0.000000",
+      byModel: [],
+      byDay: [],
+      recentDebits: [],
+    };
+  }
 }
