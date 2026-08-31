@@ -37,7 +37,13 @@ export class ScimGroupMembershipService {
     return new ScimGroupMembershipService(repository);
   }
 
-  async uniqueSlug(organizationId: string, name: string): Promise<string> {
+  async uniqueSlug({
+    organizationId,
+    name,
+  }: {
+    organizationId: string;
+    name: string;
+  }): Promise<string> {
     const base = slugify(name) || "group";
     let slug = base;
     let sequence = 1;

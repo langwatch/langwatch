@@ -103,9 +103,7 @@ export abstract class ModelProviderCredentialPolicy {
 export abstract class CodexTokenRefresher {
   abstract refresh(input: {
     tokens: CodexTokenKeys;
-  }): Promise<
-    { status: "refreshed"; tokens: CodexTokenKeys } | { status: "session_expired" }
-  >;
+  }): Promise<{ status: "refreshed"; tokens: CodexTokenKeys } | { status: "session_expired" }>;
 }
 
 export abstract class ModelProviderConnectionRateLimiter {
@@ -113,9 +111,7 @@ export abstract class ModelProviderConnectionRateLimiter {
 }
 
 export abstract class ModelDefaultRepository {
-  abstract listForProject(
-    projectScopes: ModelDefaultScope[],
-  ): Promise<ModelDefaultConfig[]>;
+  abstract listForProject(projectScopes: ModelDefaultScope[]): Promise<ModelDefaultConfig[]>;
   abstract tryGetById(id: string): Promise<ModelDefaultConfig | null>;
   abstract tryFindByScope(scope: ModelDefaultScope): Promise<ModelDefaultConfig | null>;
   abstract save(input: ModelDefaultConfigSaveInput): Promise<ModelDefaultConfig>;
@@ -168,9 +164,7 @@ export abstract class ModelProviderCatalog {
 
     return {
       models: getProviderModelOptions(provider, "chat").map((model) => model.value),
-      embeddingsModels: getProviderModelOptions(provider, "embedding").map(
-        (model) => model.value,
-      ),
+      embeddingsModels: getProviderModelOptions(provider, "embedding").map((model) => model.value),
       disabledByDefault: definition?.type === "safety",
     };
   }
@@ -228,8 +222,7 @@ export abstract class ModelProviderCatalog {
       const allowed = isModelRole(key)
         ? isModelAllowedAsRoleDefault(value, key)
         : Boolean(
-            featureByKey(key) &&
-            isModelAllowedForFeature({ modelId: value, featureKey: key }),
+            featureByKey(key) && isModelAllowedForFeature({ modelId: value, featureKey: key }),
           );
       if (!allowed) {
         throw new ModelDefaultValidationError(
@@ -252,7 +245,7 @@ export abstract class ModelProviderCatalog {
     const deprecation = providerDeprecation(provider);
     return deprecation ? { replacement: deprecation.replacedBy } : null;
   }
-  isManagedProvider(_organizationId: string, _provider: string): boolean {
+  isManagedProvider(_input: { organizationId: string; provider: string }): boolean {
     return false;
   }
   prepareExecution(input: {

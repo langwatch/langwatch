@@ -24,14 +24,23 @@ export class MemoryPresenceRepository extends PresenceRepository {
     });
   }
 
-  async remove(projectId: string, sessionId: string): Promise<boolean> {
+  async remove({
+    projectId,
+    sessionId,
+  }: {
+    projectId: string;
+    sessionId: string;
+  }): Promise<boolean> {
     return this.entries.delete(this.key(projectId, sessionId));
   }
 
-  async tryFindSession(
-    projectId: string,
-    sessionId: string,
-  ): Promise<PresenceSession | null> {
+  async tryFindSession({
+    projectId,
+    sessionId,
+  }: {
+    projectId: string;
+    sessionId: string;
+  }): Promise<PresenceSession | null> {
     const key = this.key(projectId, sessionId);
     const entry = this.entries.get(key);
     if (!entry) return null;

@@ -9,11 +9,7 @@ import {
   type ScenarioService,
   withoutParameterNames,
 } from "@langwatch/scenario-contract";
-import {
-  tryExtractSuiteId,
-  type Suite,
-  type SuiteService,
-} from "@langwatch/suite-contract";
+import { tryExtractSuiteId, type Suite, type SuiteService } from "@langwatch/suite-contract";
 
 import type { ScenarioConfig } from "@langwatch/scenario-contract";
 
@@ -119,7 +115,13 @@ export class ScenarioExecutionLookupService {
     return { success: true, data: { apiKey: project.apiKey } };
   }
 
-  async tryFetchSuite(setId: string, projectId: string): Promise<Suite | null> {
+  async tryFetchSuite({
+    setId,
+    projectId,
+  }: {
+    setId: string;
+    projectId: string;
+  }): Promise<Suite | null> {
     const suiteId = tryExtractSuiteId(setId);
     if (!suiteId) {
       return null;
@@ -127,7 +129,13 @@ export class ScenarioExecutionLookupService {
     return this.options.suites.tryGet({ id: suiteId, projectId });
   }
 
-  async resolveModel(featureKey: string, projectId: string): Promise<string> {
+  async resolveModel({
+    featureKey,
+    projectId,
+  }: {
+    featureKey: string;
+    projectId: string;
+  }): Promise<string> {
     const resolved = await this.options.modelProviders.tryGetResolvedDefault({
       projectId,
       featureKey,

@@ -316,7 +316,10 @@ describe("PresenceTrpcApi", () => {
       await expect(caller.leave({ projectId: "project-1", sessionId: "tab-1" })).resolves.toEqual({
         ok: true,
       });
-      expect(repository.remove).toHaveBeenCalledWith("project-1", "tab-1");
+      expect(repository.remove).toHaveBeenCalledWith({
+        projectId: "project-1",
+        sessionId: "tab-1",
+      });
     });
 
     it("asks the policy for the project alone, so a cursor tick is broadcast", async () => {

@@ -104,9 +104,7 @@ export class ScenarioExecutionPrefetcherService {
     private readonly completion: ScenarioPrefetchCompletionService,
   ) {}
 
-  prefetch(
-    input: ScenarioExecutionPrefetchInput,
-  ): Promise<ScenarioExecutionPrefetchResult> {
+  prefetch(input: ScenarioExecutionPrefetchInput): Promise<ScenarioExecutionPrefetchResult> {
     return this.prepare(input).result;
   }
 
@@ -147,9 +145,7 @@ export class ScenarioExecutionPrefetcherService {
     };
   }
 
-  private decryptRunSecrets(
-    ciphertext: RunSecretCiphertext | undefined,
-  ): DecryptedRunSecrets {
+  private decryptRunSecrets(ciphertext: RunSecretCiphertext | undefined): DecryptedRunSecrets {
     if (!ciphertext || Object.keys(ciphertext).length === 0) {
       return { success: true, values: {} };
     }
@@ -188,7 +184,7 @@ export class ScenarioExecutionPrefetcherService {
         target,
         runSecretValues,
       }),
-      suite: this.lookups.tryFetchSuite(context.setId, context.projectId),
+      suite: this.lookups.tryFetchSuite({ setId: context.setId, projectId: context.projectId }),
     };
   }
 }

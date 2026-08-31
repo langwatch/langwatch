@@ -27,9 +27,7 @@ export type ScenarioPrefetchLookups = {
 type ScenarioResult = NonNullable<
   Awaited<ReturnType<ScenarioExecutionLookupService["tryFetchScenario"]>>
 >;
-type SuiteOverrides = Awaited<
-  ReturnType<ScenarioExecutionLookupService["tryFetchSuite"]>
->;
+type SuiteOverrides = Awaited<ReturnType<ScenarioExecutionLookupService["tryFetchSuite"]>>;
 
 type ValidatedLookups =
   | {
@@ -233,8 +231,7 @@ export class ScenarioPrefetchCompletionService {
       return;
     }
     adapter.scenarioMappings = suite?.targets?.find(
-      (candidate) =>
-        candidate.type === "prompt" && candidate.referenceId === target.referenceId,
+      (candidate) => candidate.type === "prompt" && candidate.referenceId === target.referenceId,
     )?.scenarioMappings;
   }
 
@@ -247,28 +244,29 @@ export class ScenarioPrefetchCompletionService {
         lookups.adapter.type === "prompt"
           ? lookups.adapter.model
             ? lookups.adapter.model
-            : await this.options.lookups.resolveModel(
-                "scenarios.agent_under_test",
-                context.projectId,
-              )
+            : await this.options.lookups.resolveModel({
+                featureKey: "scenarios.agent_under_test",
+                projectId: context.projectId,
+              })
           : void 0;
       const simulator =
         lookups.suite?.simulatorModel ??
         lookups.scenario.simulatorModel ??
-        (await this.options.lookups.resolveModel(
-          "scenarios.user_simulator",
-          context.projectId,
-        ));
+        (await this.options.lookups.resolveModel({
+          featureKey: "scenarios.user_simulator",
+          projectId: context.projectId,
+        }));
       const judge =
         lookups.suite?.judgeModel ??
         lookups.scenario.judgeModel ??
-        (await this.options.lookups.resolveModel("scenarios.judge", context.projectId));
+        (await this.options.lookups.resolveModel({
+          featureKey: "scenarios.judge",
+          projectId: context.projectId,
+        }));
       return { success: true, adapter, simulator, judge };
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "No default model configured for this project";
+        error instanceof Error ? error.message : "No default model configured for this project";
       return { success: false, result: { success: false, error: message } };
     }
   }

@@ -236,7 +236,7 @@ export class ModelProviderService extends ModelProviderServiceContract {
   }
 
   isManagedProvider(input: { organizationId: string; provider: string }): boolean {
-    return this.options.catalog.isManagedProvider(input.organizationId, input.provider);
+    return this.options.catalog.isManagedProvider(input);
   }
 
   getDefaultSnapshot(input: ModelDefaultSnapshotInput): Promise<ModelDefaultSnapshot> {

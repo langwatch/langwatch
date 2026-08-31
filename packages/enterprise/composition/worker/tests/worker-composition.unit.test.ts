@@ -26,7 +26,12 @@ describe("EnterpriseWorkerComposition", () => {
     });
 
     expect(composition.catalogue.get("licensing")).toBeDefined();
-    expect(composition.managedProviders.isManagedProvider("org-1", "bedrock")).toBe(true);
+    expect(
+      composition.managedProviders.isManagedProvider({
+        organizationId: "org-1",
+        provider: "bedrock",
+      }),
+    ).toBe(true);
   });
 
   it("passes worker-owned project persistence through to managed provider execution", async () => {

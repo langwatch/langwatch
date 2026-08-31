@@ -12,10 +12,7 @@ import {
   type PresenceUpdateInput,
 } from "@langwatch/presence-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import type {
-  PresenceBroadcastPort,
-  PresenceDiagnosticsPort,
-} from "../ports/presence.port";
+import type { PresenceBroadcastPort, PresenceDiagnosticsPort } from "../ports/presence.port";
 import type { PresenceRepository } from "../repositories/presence.repository";
 
 export const PRESENCE_TTL_SECONDS = 30;
@@ -61,10 +58,10 @@ export class PresenceService extends PresenceServiceContract {
 
   async update(input: PresenceUpdateInput): Promise<PresenceSession> {
     const parsed = presenceUpdateInputSchema.parse(input);
-    const existing = await this.repository.tryFindSession(
-      parsed.projectId,
-      parsed.sessionId,
-    );
+    const existing = await this.repository.tryFindSession({
+      projectId: parsed.projectId,
+      sessionId: parsed.sessionId,
+    });
     const session: PresenceSession = { ...parsed, updatedAt: this.now() };
     await this.repository.upsert(session, this.ttlSeconds);
     if (!existing) {
@@ -77,7 +74,10 @@ export class PresenceService extends PresenceServiceContract {
 
   async leave(input: PresenceLeaveInput): Promise<void> {
     const parsed = presenceLeaveInputSchema.parse(input);
-    const removed = await this.repository.remove(parsed.projectId, parsed.sessionId);
+    const removed = await this.repository.remove({
+      projectId: parsed.projectId,
+      sessionId: parsed.sessionId,
+    });
     if (!removed) return;
     await this.publishUpdate(parsed.projectId, {
       kind: "leave",

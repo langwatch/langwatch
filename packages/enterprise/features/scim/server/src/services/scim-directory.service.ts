@@ -133,7 +133,10 @@ export class ScimDirectoryService {
       });
     }
 
-    const slug = await this.membership.uniqueSlug(organizationId, request.displayName);
+    const slug = await this.membership.uniqueSlug({
+      organizationId,
+      name: request.displayName,
+    });
     const group = await this.prisma.createGroup({
       organizationId,
       name: request.displayName,

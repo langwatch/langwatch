@@ -117,8 +117,8 @@ class AppModelProviderCatalog extends ModelProviderCatalog {
     return this.systemProviderEnvironment[input.key] ?? null;
   }
 
-  isManagedProvider(organizationId: string, provider: string): boolean {
-    return this.managedProviders.isManagedProvider(organizationId, provider);
+  isManagedProvider(input: { organizationId: string; provider: string }): boolean {
+    return this.managedProviders.isManagedProvider(input);
   }
 
   prepareExecution(input: {

@@ -1,7 +1,4 @@
-import {
-  presenceSessionSchema,
-  type PresenceSession,
-} from "@langwatch/presence-contract";
+import { presenceSessionSchema, type PresenceSession } from "@langwatch/presence-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type Redis from "ioredis";
 import type { Cluster } from "ioredis";
@@ -27,14 +24,23 @@ export class RedisPresenceRepository extends PresenceRepository {
     );
   }
 
-  async remove(projectId: string, sessionId: string): Promise<boolean> {
+  async remove({
+    projectId,
+    sessionId,
+  }: {
+    projectId: string;
+    sessionId: string;
+  }): Promise<boolean> {
     return (await this.redis.del(this.sessionKey(projectId, sessionId))) > 0;
   }
 
-  async tryFindSession(
-    projectId: string,
-    sessionId: string,
-  ): Promise<PresenceSession | null> {
+  async tryFindSession({
+    projectId,
+    sessionId,
+  }: {
+    projectId: string;
+    sessionId: string;
+  }): Promise<PresenceSession | null> {
     const raw = await this.redis.get(this.sessionKey(projectId, sessionId));
     return raw ? this.parse(raw) : null;
   }
@@ -81,10 +87,7 @@ export class RedisPresenceRepository extends PresenceRepository {
   }
 }
 
-async function scanNode(
-  node: { scan: Redis["scan"] },
-  pattern: string,
-): Promise<string[]> {
+async function scanNode(node: { scan: Redis["scan"] }, pattern: string): Promise<string[]> {
   const keys: string[] = [];
   let cursor = "0";
   do {

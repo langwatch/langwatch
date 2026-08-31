@@ -25,7 +25,13 @@ export class ManagedProviderService extends ManagedProviderServiceContract {
     return new ManagedProviderService(options.configuration, options.projects, options.credentials);
   }
 
-  isManagedProvider(organizationId: string, provider: string): boolean {
+  isManagedProvider({
+    organizationId,
+    provider,
+  }: {
+    organizationId: string;
+    provider: string;
+  }): boolean {
     return provider === "bedrock" && this.configuration.tryForOrganization(organizationId) !== null;
   }
 

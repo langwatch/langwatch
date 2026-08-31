@@ -27,7 +27,7 @@ export type BuildManagedProviderParametersInput = {
 };
 
 export abstract class ManagedProviderService {
-  abstract isManagedProvider(organizationId: string, provider: string): boolean;
+  abstract isManagedProvider(input: { organizationId: string; provider: string }): boolean;
 
   abstract buildLitellmParameters(
     input: BuildManagedProviderParametersInput,
