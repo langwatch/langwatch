@@ -26,8 +26,10 @@ import type { ApiKeyTrpcContext } from "@langwatch/api-key-server";
 import type { FrontDoorTrpcContext, PublicEnvTrpcContext } from "@langwatch/auth-server";
 import { declareAuthzMiddleware } from "@langwatch/authz-contract";
 import type { DashboardTrpcContext, GraphTrpcContext } from "@langwatch/dashboard-server";
+import type { DataPrivacyTrpcContext } from "@langwatch/data-privacy-server";
 import type { EvaluationTrpcContext } from "@langwatch/evaluation-server";
 import type { ExperimentTrpcContext } from "@langwatch/experiment-server";
+import type { BugReportTrpcContext } from "@langwatch/ops-server";
 import type { GroupTrpcContext, JoinRequestTrpcContext } from "@langwatch/organization-server";
 import type { IntegrationsChecksTrpcContext } from "@langwatch/project-server";
 import type { IdentityTrpcContext, UserTrpcContext } from "@langwatch/user-server";
@@ -48,7 +50,9 @@ import { createAppTrpcFeatures, type AppTrpcFeaturePorts } from "../app-trpc.fea
 type TestContext = AnnotationTrpcContext &
   AnnotationScoreTrpcContext &
   ApiKeyTrpcContext &
+  BugReportTrpcContext &
   DashboardTrpcContext &
+  DataPrivacyTrpcContext &
   EvaluationTrpcContext &
   ExperimentTrpcContext &
   FrontDoorTrpcContext &
@@ -94,7 +98,11 @@ const middlewares: AppTrpcPolicyMiddlewares = {
 function refusingPorts(): AppTrpcFeaturePorts<
   AnnotationTrpcPorts,
   Record<string, unknown>,
+  Record<string, unknown>,
+  Record<string, unknown>,
   string,
+  Record<string, unknown>,
+  Record<string, unknown>,
   Record<string, unknown>,
   Record<string, unknown>,
   Record<string, unknown>,
@@ -108,10 +116,31 @@ function refusingPorts(): AppTrpcFeaturePorts<
   const refuseEvery = (what: string) =>
     new Proxy({}, { get: (_target, member) => refuse(`${what}.${String(member)}`) }) as never;
 
+  /** A refusing check that still carries a declaration, as the real ones do. */
+  const refusingCheck = (what: string) =>
+    declareAuthzMiddleware(
+      {
+        kind: "service-authorized",
+        reason: `${what} is enforced by the process's resolver`,
+        permissions: [],
+        enforces: { projectId: what },
+      },
+      refuse(what) as unknown as (params: never) => Promise<unknown>,
+    );
+
   return {
     annotation: refuseEvery("annotation"),
     apiKeyAudit: refuse("apiKeyAudit"),
+    bugReports: refuseEvery("bugReports"),
     auth: refuseEvery("auth"),
+    dataPrivacy: refuseEvery("dataPrivacy"),
+    // Read while the two writes are BUILT — the policy chain lifts each
+    // declaration off the middleware it is handed — so these are declared
+    // checks rather than refusals.
+    dataPrivacyScopeChecks: {
+      write: refusingCheck("dataPrivacyScopeChecks.write"),
+      removal: refusingCheck("dataPrivacyScopeChecks.removal"),
+    },
     evaluations: {
       ...(refuseEvery("evaluations") as object),
       mappingsSchema: z.object({ mapping: z.record(z.string(), z.unknown()) }),
@@ -162,7 +191,9 @@ describe("the app tRPC feature list", () => {
         "annotation",
         "annotationScore",
         "apiKey",
+        "bugReports",
         "dashboards",
+        "dataPrivacy",
         "evaluations",
         "experiments",
         "frontDoor",
@@ -199,6 +230,18 @@ describe("the app tRPC feature list", () => {
         "orgTeams",
         "revoke",
         "update",
+      ]);
+      // The support inbox: two reads, and the pair is the whole surface. The
+      // public REST intake that FILES a report is a different door and is not
+      // in this list.
+      expect(procedureNamesOf(features.bugReports)).toEqual(["getAll", "getById"]);
+      // The privacy settings screen: one read and the two writes it drives.
+      // Every answer comes back through a port, so what this pins is that the
+      // three names the settings page calls are the packaged ones.
+      expect(procedureNamesOf(features.dataPrivacy)).toEqual([
+        "getSnapshot",
+        "removeForScope",
+        "setForScope",
       ]);
       expect(procedureNamesOf(features.identity)).toEqual(["completeVerification"]);
       // The project's setup rollup. Its evidence comes from nine other

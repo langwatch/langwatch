@@ -56,6 +56,7 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
     "@langwatch/dashboard-server": "workspace:*",
+    "@langwatch/data-privacy-server": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/dataset-server": "workspace:*",
     "@langwatch/enterprise-api": "workspace:*",

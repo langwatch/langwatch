@@ -22,6 +22,7 @@ import type {
 import type { TrpcApiMount, TrpcApiPublicMount } from "@langwatch/api/trpc";
 import type { ApiKeyTrpcContext } from "@langwatch/api-key-server";
 import type { AuthApp, FrontDoorTrpcContext, PublicEnvTrpcContext } from "@langwatch/auth-server";
+import type { DataPrivacyTrpcContext, DataPrivacyTrpcPorts } from "@langwatch/data-privacy-server";
 import type {
   DashboardTrpcContext,
   GraphTrpcContext,
@@ -29,6 +30,7 @@ import type {
 } from "@langwatch/dashboard-server";
 import type { EvaluationTrpcContext } from "@langwatch/evaluation-server";
 import type { ExperimentTrpcContext, ExperimentTrpcPorts } from "@langwatch/experiment-server";
+import type { BugReportTrpcContext, BugReportTrpcPorts } from "@langwatch/ops-server";
 import type {
   GroupTrpcContext,
   GroupTrpcPorts,
@@ -71,10 +73,15 @@ import {
   createGraphTrpcRouter,
 } from "../features/dashboard/dashboard-trpc.mount";
 import {
+  createDataPrivacyTrpcRouter,
+  type DataPrivacyTrpcChecks,
+} from "../features/data-privacy/data-privacy-trpc.mount";
+import {
   createEvaluationTrpcRouter,
   type EvaluationMountPorts,
 } from "../features/evaluation/evaluation-trpc.mount";
 import { createExperimentTrpcRouter } from "../features/experiment/experiment-trpc.mount";
+import { createBugReportTrpcRouter } from "../features/ops/ops-trpc.mount";
 import {
   createGroupTrpcRouter,
   createJoinRequestTrpcRouter,
@@ -98,10 +105,14 @@ import {
  */
 export interface AppTrpcFeaturePorts<
   TAnnotationPorts extends AnnotationTrpcPorts,
+  TBugReport,
+  TBugReportPage,
   TCheckStatus,
   TFilterField extends string,
   TMappingsIn,
   TMappingsOut,
+  TPrivacyRule,
+  TPrivacySnapshot,
   TWorkbenchState,
   TWorkflowVersion,
   TPublishedComponent,
@@ -119,12 +130,40 @@ export interface AppTrpcFeaturePorts<
    */
   apiKeyAudit: ApiKeyAuditSink["recordAudit"];
   /**
+   * The support inbox and the audit trail every read of it is written to. The
+   * reports themselves are a global table with no tenant column, filed against
+   * the product by `langwatch report` and the MCP tool, so the process reads
+   * them the way it reads any other back-office resource.
+   */
+  bugReports: BugReportTrpcPorts<TBugReportPage, TBugReport>;
+  /**
    * The composed auth application BOTH signed-out doors answer from — the
    * front door and `publicEnv` beside it. One instance rather than two,
    * because the sign-in mode it resolves is the one ADR-027 source of truth
    * for the whole deployment and the two doors must never disagree.
    */
   auth: AuthApp;
+  /**
+   * The privacy settings surface's three answers: the snapshot the screen
+   * renders, and the two writes.
+   *
+   * All three are the application's rather than the feature's, and for the
+   * same reason. The snapshot is assembled from the organization, department,
+   * team and group storage the data-privacy package may not reach and filtered
+   * by the caller's permission at each tier; both writes first anchor the
+   * target scope to the project's organization and then probe the permission
+   * that tier demands. What the package owns is the wire: the tiers, the
+   * durable configuration parser, and the two failures a caller can act on.
+   */
+  dataPrivacy: DataPrivacyTrpcPorts<TPrivacySnapshot, TPrivacyRule>;
+  /**
+   * The declarations those two writes are checked under, already built.
+   *
+   * They are middlewares rather than descriptions because each one CLAIMS
+   * which assertion enforces the project id, and the declaration sweep counts
+   * a claim as coverage. A claim has to be written where the enforcement is.
+   */
+  dataPrivacyScopeChecks: DataPrivacyTrpcChecks;
   /**
    * The trace-mapping registry, the project's Azure Safety credentials, this
    * install's evaluator inventory and environment, the trace evaluation
@@ -204,7 +243,9 @@ export function createAppTrpcFeatures<
   TContext extends AnnotationTrpcContext &
     AnnotationScoreTrpcContext &
     ApiKeyTrpcContext &
+    BugReportTrpcContext &
     DashboardTrpcContext &
+    DataPrivacyTrpcContext &
     EvaluationTrpcContext &
     ExperimentTrpcContext &
     FrontDoorTrpcContext &
@@ -220,10 +261,14 @@ export function createAppTrpcFeatures<
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
   TAnnotationPorts extends AnnotationTrpcPorts,
+  TBugReport,
+  TBugReportPage,
   TCheckStatus,
   TFilterField extends string,
   TMappingsIn,
   TMappingsOut,
+  TPrivacyRule,
+  TPrivacySnapshot,
   TWorkbenchState,
   TWorkflowVersion,
   TPublishedComponent,
@@ -231,10 +276,14 @@ export function createAppTrpcFeatures<
   mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPublicMount<TContext, TOptions, TRoot>;
   ports: AppTrpcFeaturePorts<
     TAnnotationPorts,
+    TBugReport,
+    TBugReportPage,
     TCheckStatus,
     TFilterField,
     TMappingsIn,
     TMappingsOut,
+    TPrivacyRule,
+    TPrivacySnapshot,
     TWorkbenchState,
     TWorkflowVersion,
     TPublishedComponent
@@ -246,7 +295,13 @@ export function createAppTrpcFeatures<
     annotation: createAnnotationTrpcRouter({ ...mount, ports: ports.annotation }),
     annotationScore: createAnnotationScoreTrpcRouter(mount),
     apiKey: createApiKeyTrpcRouter({ ...mount, recordAudit: ports.apiKeyAudit }),
+    bugReports: createBugReportTrpcRouter({ ...mount, ports: ports.bugReports }),
     dashboards: createDashboardTrpcRouter(mount),
+    dataPrivacy: createDataPrivacyTrpcRouter({
+      ...mount,
+      ports: ports.dataPrivacy,
+      checks: ports.dataPrivacyScopeChecks,
+    }),
     evaluations: createEvaluationTrpcRouter({
       ...mount,
       prisma: ports.prisma,

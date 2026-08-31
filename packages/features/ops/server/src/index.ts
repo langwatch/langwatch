@@ -14,6 +14,12 @@ export {
   type OpsReplayRunner,
 } from "./app/ops.app";
 export {
+  BugReportTrpcApi,
+  BUG_REPORTS_NO_PERMISSION,
+  type BugReportTrpcContext,
+  type BugReportTrpcPorts,
+} from "./transport/api-trpc/bug-report.api";
+export {
   OpsTrpcApi,
   type OpsScope,
   type OpsTrpcContext,

@@ -72,6 +72,12 @@ import {
   EnterpriseTrpcComposition,
   INSTANCE_LICENSE_NO_PERMISSION,
 } from "@langwatch/enterprise-api";
+import {
+  InvalidDataPrivacyConfigError,
+  ScopeTargetNotFoundError,
+  type DataPrivacyConfig,
+  type DataPrivacyScope,
+} from "@langwatch/data-privacy-contract";
 import { evaluatorsSchema } from "@langwatch/evaluator-contract";
 import { z } from "zod";
 import {
@@ -114,6 +120,7 @@ import {
 // it stays behind when the plan gate leaves.
 import { isCustomRole } from "./enterprise";
 import {
+  authorizeInResolver,
   batchScopePermissions,
   checkOpsPermission,
   checkOrganizationPermission,
@@ -121,7 +128,11 @@ import {
   type PermissionMiddlewareParams,
 } from "./rbac";
 import { declareAuthzMiddleware, type AuthzPermission } from "@langwatch/authz-contract";
-import { RoleBindingScopeType, type PrismaClient } from "~/generated/prisma/client";
+import {
+  RoleBindingScopeType,
+  type DataPrivacyPolicy as DataPrivacyPolicyRow,
+  type PrismaClient,
+} from "~/generated/prisma/client";
 import { fireTeamMemberInvitedNurturing } from "~/server/app-layer/billing/nurturing/featureAdoption";
 import { fireInviteAcceptedNurturingCalls } from "~/server/app-layer/billing/nurturing/inviteAcceptance";
 import { deploymentOffersPasskeys } from "~/server/app-layer/identity/signin-method-policy";
@@ -182,6 +193,23 @@ import {
 } from "~/runtime/app/features/automation-adapters/providers/registry";
 import { decryptSlackBotToken } from "~/runtime/app/features/automation-adapters/providers/slack/server";
 import { Auth0ApiError, changeAuth0Password } from "~/server/auth0/passwordService";
+import {
+  getAllBugReports,
+  getBugReportById,
+} from "~/server/app-layer/bug-reports/bug-report.service";
+import {
+  assertCanWriteDataPrivacyScope,
+  assertScopeBelongsToProjectOrganization,
+} from "~/server/data-privacy/dataPrivacyPolicy.authz";
+import {
+  getDataPrivacySnapshot,
+  type DataPrivacySnapshot,
+} from "~/server/data-privacy/dataPrivacyPolicy.read";
+import {
+  getDataPrivacyPolicyService,
+  InvalidDataPrivacyConfigError as AppInvalidDataPrivacyConfigError,
+  ScopeTargetNotFoundError as AppScopeTargetNotFoundError,
+} from "~/server/data-privacy/dataPrivacyPolicy.service";
 import { RecentItemsService } from "~/server/home/recent-items.service";
 import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
 import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRequestEmail";
@@ -193,9 +221,7 @@ import { rateLimit } from "~/server/rateLimit";
 import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
 import { getClientIp } from "~/utils/getClientIp";
 import { batchRecordRouter } from "~/runtime/app/internal-api/batch-record.router";
-import { bugReportsRouter } from "./routers/bugReports";
 import { costsRouter } from "./routers/costs";
-import { dataPrivacyRouter } from "./routers/dataPrivacy";
 import { dataRetentionRouter } from "~/runtime/app/internal-api/data-retention.router";
 import { datasetRouter } from "~/runtime/app/internal-api/dataset.router";
 import { datasetRecordRouter } from "~/runtime/app/internal-api/dataset-record.router";
@@ -1164,7 +1190,122 @@ const appTrpcFeatures = createAppTrpcFeatures({
       void auditLog(entry);
     },
 
+    /**
+     * The support inbox, read straight out of the process's own store.
+     *
+     * A bug report is a global row — no organization, no team, no project — so
+     * nothing here narrows by tenant and nothing could. The audit sink is the
+     * same one every other back-office read is written to, and unlike the
+     * API-key one above it is awaited: the row is the record of who opened
+     * somebody's transcript, and it is written before they see it.
+     */
+    bugReports: {
+      getAll: getAllBugReports,
+      getById: getBugReportById,
+      recordAudit: auditLog,
+    },
+
     auth: authApp,
+
+    /**
+     * The privacy settings surface, whose three answers all need reach the
+     * data-privacy package does not have.
+     *
+     * The snapshot walks the organization, department, team and group tables
+     * and filters what it found by the caller's permission at each tier. Both
+     * writes anchor the target scope to the project's organization first — so
+     * a project id cannot be used to reach another tenant's rule — and then
+     * authorize at the target's own tier, which is why a project member cannot
+     * push a rule up to the organization.
+     *
+     * Parameters are annotated rather than inferred from the port: an
+     * unannotated arrow is context-sensitive, so the snapshot and the written
+     * rule would be resolved after the call's type arguments were fixed and
+     * the client would be handed `{}` instead of either shape.
+     */
+    dataPrivacy: {
+      getSnapshot: (
+        ctx: TRPCContext,
+        input: Readonly<{ projectId: string }>,
+      ): Promise<DataPrivacySnapshot> =>
+        getDataPrivacySnapshot(
+          { prisma: ctx.prisma, session: ctx.session },
+          { projectId: input.projectId },
+        ),
+
+      setForScope: async (
+        ctx: TRPCContext,
+        input: Readonly<{
+          projectId: string;
+          scope: DataPrivacyScope;
+          personalOnly: boolean;
+          config: DataPrivacyConfig;
+        }>,
+      ): Promise<DataPrivacyPolicyRow> => {
+        const authCtx = { prisma: ctx.prisma, session: ctx.session };
+        await assertScopeBelongsToProjectOrganization(authCtx, input.projectId, input.scope);
+        await assertCanWriteDataPrivacyScope(authCtx, input.scope);
+        try {
+          return await getDataPrivacyPolicyService().setForScope({
+            scope: input.scope,
+            personalOnly: input.personalOnly,
+            config: input.config,
+          });
+        } catch (error) {
+          // The application's policy service is a second implementation over
+          // the same table as the packaged one (see the feature's ADR-001), so
+          // it raises its own copies of these two. Rethrown as the contract's,
+          // because the surface that decides they mean `NOT_FOUND` and
+          // `BAD_REQUEST` is the feature's transport and it recognises the
+          // feature's classes.
+          if (error instanceof AppScopeTargetNotFoundError) {
+            throw new ScopeTargetNotFoundError(error.message);
+          }
+          if (error instanceof AppInvalidDataPrivacyConfigError) {
+            throw new InvalidDataPrivacyConfigError(error.message);
+          }
+          throw error;
+        }
+      },
+
+      removeForScope: async (
+        ctx: TRPCContext,
+        input: Readonly<{
+          projectId: string;
+          scope: DataPrivacyScope;
+          personalOnly: boolean;
+        }>,
+      ): Promise<void> => {
+        const authCtx = { prisma: ctx.prisma, session: ctx.session };
+        await assertScopeBelongsToProjectOrganization(authCtx, input.projectId, input.scope);
+        await assertCanWriteDataPrivacyScope(authCtx, input.scope);
+        await getDataPrivacyPolicyService().removeForScope({
+          scope: input.scope,
+          personalOnly: input.personalOnly,
+        });
+      },
+    },
+
+    /**
+     * What each rule write claims about the project id it accepts, written
+     * where the enforcement is.
+     *
+     * Neither is a permission the runtime can resolve from the input: the id
+     * that decides the answer is the TARGET scope's, and which tier that is
+     * only becomes known once the scope has been anchored to this project's
+     * organization. So the check is declared here as resolver-authorized and
+     * the sentence names the two assertions the port above actually runs.
+     */
+    dataPrivacyScopeChecks: {
+      write: authorizeInResolver({
+        projectId:
+          "assertScopeBelongsToProjectOrganization anchors the scope to this project's organization; assertCanWriteDataPrivacyScope authorizes the write",
+      }),
+      removal: authorizeInResolver({
+        projectId:
+          "assertScopeBelongsToProjectOrganization anchors the scope to this project's organization; assertCanWriteDataPrivacyScope authorizes the removal",
+      }),
+    },
 
     evaluations: {
       mappingsSchema: mappingStateSchema,
@@ -1873,7 +2014,6 @@ const coreRouters = {
     appTrpcFeatures.user,
     enterpriseGovernanceRouters.personalDashboard,
   ),
-  bugReports: bugReportsRouter,
   ssoConnections: enterpriseRouters.ssoConnections,
   setupSkills: setupSkillsRouter,
   share: shareRouter,
@@ -1881,7 +2021,6 @@ const coreRouters = {
   pinnedTrace: pinnedTraceRouter,
   dataRetention: dataRetentionRouter,
   emailSuppression: emailSuppressionRouter,
-  dataPrivacy: dataPrivacyRouter,
   translate: translateRouter,
   onboarding: onboardingRouter,
   scenarios: scenarioRouter,
