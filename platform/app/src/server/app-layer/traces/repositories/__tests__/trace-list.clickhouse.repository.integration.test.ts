@@ -39,16 +39,44 @@ function traceIdFor(i: number): string {
   return `tr-${String(i).padStart(4, "0")}`;
 }
 
-/** system.query_log only exists on a server started with log_queries enabled. */
+/**
+ * Whether this server actually RECORDS queries, which is what the read-cost
+ * assertions need.
+ *
+ * Table existence alone does not answer that: `log_queries = 0` stops the
+ * recording but leaves `system.query_log` in place, so a guard that only
+ * checks the table passes and then the assertions fail on an empty result.
+ * Run a query under a known id and look for its own row instead.
+ */
 async function hasQueryLog(client: ClickHouseClient): Promise<boolean> {
-  const rows = (await (
+  const tables = (await (
     await client.query({
       query: `SELECT count() AS n FROM system.tables
               WHERE database = 'system' AND name = 'query_log'`,
       format: "JSONEachRow",
     })
   ).json()) as Array<{ n: string }>;
-  return Number(rows[0]?.n ?? 0) > 0;
+  if (Number(tables[0]?.n ?? 0) === 0) return false;
+
+  const probeId = `query-log-probe-${nanoid()}`;
+  await (
+    await client.query({
+      query: "SELECT 1 AS probe",
+      query_id: probeId,
+      format: "JSONEachRow",
+    })
+  ).json();
+  await client.exec({ query: "SYSTEM FLUSH LOGS" });
+
+  const logged = (await (
+    await client.query({
+      query: `SELECT count() AS n FROM system.query_log
+              WHERE query_id = {probeId:String} AND type = 'QueryFinish'`,
+      query_params: { probeId },
+      format: "JSONEachRow",
+    })
+  ).json()) as Array<{ n: string }>;
+  return Number(logged[0]?.n ?? 0) > 0;
 }
 
 function makeTraceSummaryRow(
@@ -741,6 +769,13 @@ describe("TraceListClickHouseRepository.findAll across unmerged same-version row
     const dupAt = new Date(base + 500);
 
     beforeAll(async () => {
+      // The fixture IS the unmerged state, so a background merge landing
+      // between the inserts and the read would collapse the two rows and the
+      // assertion below would stop testing anything — passing or failing on
+      // whichever version happened to survive. Hold merges off the table for
+      // the duration.
+      await ch.exec({ query: "SYSTEM STOP MERGES trace_summaries" });
+
       // Separate inserts on purpose: two rows with the same sorting key in one
       // block are collapsed at part formation, which is not the case here.
       for (const traceName of ["keep", "drop"]) {
@@ -762,11 +797,25 @@ describe("TraceListClickHouseRepository.findAll across unmerged same-version row
     });
 
     afterAll(async () => {
+      await ch.exec({ query: "SYSTEM START MERGES trace_summaries" });
       await ch.exec({
         query:
           "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
         query_params: { tenantId: dupTenant },
       });
+    });
+
+    it("keeps both rows unmerged, so the assertion below is not vacuous", async () => {
+      const rows = (await (
+        await ch.query({
+          query: `SELECT TraceName FROM trace_summaries
+                  WHERE TenantId = {tenantId:String} ORDER BY TraceName`,
+          query_params: { tenantId: dupTenant },
+          format: "JSONEachRow",
+        })
+      ).json()) as Array<{ TraceName: string }>;
+
+      expect(rows.map((r) => r.TraceName)).toEqual(["drop", "keep"]);
     });
 
     it("returns only the version the filter matches, and agrees with its own total", async () => {
