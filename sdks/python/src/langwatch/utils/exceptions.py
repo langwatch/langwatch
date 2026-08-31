@@ -35,14 +35,18 @@ def extract_api_error_reasons(body: Any) -> List[str]:
     each with ``meta.field`` and ``meta.message``. Those two are what the
     caller needs to fix the request, and neither ever quotes what was sent.
     An envelope without ``reasons`` answers an empty list.
+
+    Three envelope spellings carry the same list: ``reasons`` at the top, the
+    whole object nested under ``error``, and the list under ``meta`` beside the
+    ``fields`` it names, which is what the REST routes send.
     """
     if not isinstance(body, Mapping):
         return []
-    inner = body.get("error")
-    if isinstance(inner, Mapping) and "reasons" not in body:
-        body = inner
-    reasons = body.get("reasons")
-    if not isinstance(reasons, list):
+    reasons = _reasons_list(body)
+    if reasons is None:
+        inner = body.get("error")
+        reasons = _reasons_list(inner) if isinstance(inner, Mapping) else None
+    if reasons is None:
         return []
     lines: List[str] = []
     for reason in reasons:
@@ -58,6 +62,17 @@ def extract_api_error_reasons(body: Any) -> List[str]:
         elif isinstance(message, str):
             lines.append(message)
     return lines
+
+
+def _reasons_list(body: Mapping) -> Optional[list]:
+    """The ``reasons`` list of one envelope, at the top or under ``meta``."""
+    reasons = body.get("reasons")
+    if isinstance(reasons, list):
+        return reasons
+    meta = body.get("meta")
+    if isinstance(meta, Mapping) and isinstance(meta.get("reasons"), list):
+        return cast(list, meta["reasons"])
+    return None
 
 
 def extract_api_error_detail(body: Any) -> str:
