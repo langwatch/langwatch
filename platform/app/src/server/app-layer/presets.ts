@@ -839,7 +839,8 @@ function composeGatewayApp(input: {
   const { prisma, projects, evaluators, monitors, stores } = input;
   const virtualKeys = stores.virtualKeys;
   const usage = GatewayUsageService.create({
-    prisma,
+    projects,
+    virtualKeys,
     chRepo: stores.budgets,
     spendRepo: stores.virtualKeySpend,
   });

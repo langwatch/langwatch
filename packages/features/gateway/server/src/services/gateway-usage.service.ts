@@ -22,10 +22,32 @@
  * project is how the Usage page rendered "No usage in this window" while
  * the keys table showed spend for the same keys.
  */
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { Prisma } from "@langwatch/prisma-client/generated";
 
 import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
 import type { GatewayVirtualKeySpendPort } from "../ports/gateway-virtual-key-spend.port";
+
+/**
+ * The one project read these surfaces make: which tenants an organization's
+ * gateway traces can land in. Narrower than ProjectService on purpose — a
+ * ProjectService satisfies it, and so does anything else that can answer the
+ * question, which is what a test needs.
+ */
+export type GatewayUsageProjectsPort = {
+  listIdsByOrganization(input: { organizationId: string }): Promise<string[]>;
+};
+
+/**
+ * The one key read these surfaces make: a label for each key the ledger
+ * reported spend against. Narrow for the same reason as the project port —
+ * the repository satisfies it, and so can two lines in a test.
+ */
+export type GatewayUsageVirtualKeysPort = {
+  findMetaByIds(input: {
+    organizationId: string;
+    ids: string[];
+  }): Promise<Array<{ id: string; name: string; displayPrefix: string }>>;
+};
 
 export type UsageWindow = { fromDate: Date; toDate: Date };
 
@@ -79,7 +101,8 @@ const RECENT_DEBITS_LIMIT = 20;
 
 export class GatewayUsageService {
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly projects: GatewayUsageProjectsPort,
+    private readonly virtualKeys: GatewayUsageVirtualKeysPort,
     private readonly chRepo?: GatewayBudgetSpendPort,
     private readonly spendRepo?: GatewayVirtualKeySpendPort,
   ) {}
@@ -91,11 +114,12 @@ export class GatewayUsageService {
    * compile instead of silently reporting $0.00.
    */
   static create(args: {
-    prisma: PrismaClient;
+    projects: GatewayUsageProjectsPort;
+    virtualKeys: GatewayUsageVirtualKeysPort;
     chRepo: GatewayBudgetSpendPort | undefined;
     spendRepo: GatewayVirtualKeySpendPort | undefined;
   }): GatewayUsageService {
-    return new GatewayUsageService(args.prisma, args.chRepo, args.spendRepo);
+    return new GatewayUsageService(args.projects, args.virtualKeys, args.chRepo, args.spendRepo);
   }
 
   /**
@@ -174,7 +198,7 @@ export class GatewayUsageService {
       bumpBucket(byDay, bucket.day, bucket.totalUsd, bucket.requests);
     }
 
-    const vkMeta = await this.loadVirtualKeyMeta([...byVk.keys()]);
+    const vkMeta = await this.loadVirtualKeyMeta(args.organizationId, [...byVk.keys()]);
 
     return {
       totalUsd: totalUsd.toFixed(6),
@@ -281,23 +305,16 @@ export class GatewayUsageService {
   }
 
   private async loadVirtualKeyMeta(
+    organizationId: string,
     virtualKeyIds: string[],
   ): Promise<Map<string, { name: string; displayPrefix: string }>> {
-    if (virtualKeyIds.length === 0) return new Map();
-    const keys = await this.prisma.virtualKey.findMany({
-      where: { id: { in: virtualKeyIds } },
-      select: { id: true, name: true, displayPrefix: true },
-    });
+    const keys = await this.virtualKeys.findMetaByIds({ organizationId, ids: virtualKeyIds });
     return new Map(keys.map((k) => [k.id, { name: k.name, displayPrefix: k.displayPrefix }]));
   }
 
   /** Every project of the org: the tenant set gateway traces can land in. */
-  private async orgProjectIds(organizationId: string): Promise<string[]> {
-    const projects = await this.prisma.project.findMany({
-      where: { team: { organizationId } },
-      select: { id: true },
-    });
-    return projects.map((p) => p.id);
+  private orgProjectIds(organizationId: string): Promise<string[]> {
+    return this.projects.listIdsByOrganization({ organizationId });
   }
 }
 

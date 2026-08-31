@@ -102,7 +102,24 @@ function usageService(): GatewayUsageService {
   const ch = getTestClickHouseClient();
   if (!ch) throw new Error("test ClickHouse client not available");
   return GatewayUsageService.create({
-    prisma,
+    // Two reads against the real database this test seeds, which is what the
+    // service's narrow ports ask for — no PrismaClient goes into the service.
+    projects: {
+      listIdsByOrganization: async ({ organizationId }) =>
+        (
+          await prisma.project.findMany({
+            where: { team: { organizationId } },
+            select: { id: true },
+          })
+        ).map((project) => project.id),
+    },
+    virtualKeys: {
+      findMetaByIds: async ({ organizationId, ids }) =>
+        prisma.virtualKey.findMany({
+          where: { organizationId, id: { in: ids } },
+          select: { id: true, name: true, displayPrefix: true },
+        }),
+    },
     chRepo: undefined,
     spendRepo: GatewayVirtualKeySpendAdapter.create(async () => ch),
   });

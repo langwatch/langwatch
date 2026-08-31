@@ -191,7 +191,8 @@ function gatewayPlatformRestPorts(): GatewayPlatformRestPorts {
     },
     spendByVirtualKey: ({ organizationId, virtualKeyIds, window }) =>
       GatewayUsageService.create({
-        prisma,
+        projects: current.projects,
+        virtualKeys: current.gateway.virtualKeys,
         chRepo: undefined,
         spendRepo: current.gateway.virtualKeySpend,
       }).spendByVirtualKey({

@@ -61,6 +61,21 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
     });
   }
 
+  async findMetaByIds({
+    organizationId,
+    ids,
+  }: {
+    organizationId: string;
+    ids: string[];
+  }): Promise<Array<{ id: string; name: string; displayPrefix: string }>> {
+    if (ids.length === 0) return [];
+
+    return this.client().virtualKey.findMany({
+      where: { organizationId, id: { in: ids } },
+      select: { id: true, name: true, displayPrefix: true },
+    });
+  }
+
   async tryFindByIdGlobal(
     id: string,
     tx?: GatewayPersistenceTransaction,

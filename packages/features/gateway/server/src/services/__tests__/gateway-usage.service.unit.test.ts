@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { Prisma } from "@langwatch/prisma-client/generated";
 
-import { GatewayUsageService } from "../gateway-usage.service";
+import {
+  GatewayUsageService,
+  type GatewayUsageProjectsPort,
+  type GatewayUsageVirtualKeysPort,
+} from "../gateway-usage.service";
 import type {
   GatewayTraceRow,
   GatewayUsageBucket,
@@ -13,17 +17,28 @@ type TraceStub = Pick<GatewayTraceRow, "virtualKeyId" | "costUsd" | "occurredAt"
   blockedByGuardrail?: boolean;
 };
 
-function mockPrisma(
-  virtualKeys: Array<{ id: string; name: string; displayPrefix: string }>,
-): PrismaClient {
+/** The org's projects: the tenant set gateway traces can land in. */
+function mockProjects(): GatewayUsageProjectsPort {
+  return { listIdsByOrganization: async () => ["proj_01"] };
+}
+
+/** Names and prefixes for the keys the ledger reported spend against. */
+/**
+ * Labels only for keys of the organization asked about — the real repository
+ * filters on both, so a fake that ignored the organization would let a
+ * mis-scoped read look correct here.
+ */
+function mockVirtualKeys(
+  virtualKeys: Array<{ id: string; name: string; displayPrefix: string; organizationId?: string }>,
+  belongingTo = "org_01",
+): GatewayUsageVirtualKeysPort {
   return {
-    virtualKey: {
-      findMany: async () => virtualKeys,
-    },
-    project: {
-      findMany: async () => [{ id: "proj_01" }],
-    },
-  } as unknown as PrismaClient;
+    findMetaByIds: async ({ organizationId, ids }) =>
+      virtualKeys.filter(
+        (key) =>
+          ids.includes(key.id) && (key.organizationId ?? belongingTo) === organizationId,
+      ),
+  };
 }
 
 function mockSpendRepo(traces: TraceStub[]): GatewayVirtualKeySpendPort {
@@ -85,7 +100,8 @@ function service(
   traces: TraceStub[],
 ): GatewayUsageService {
   return GatewayUsageService.create({
-    prisma: mockPrisma(virtualKeys),
+    projects: mockProjects(),
+    virtualKeys: mockVirtualKeys(virtualKeys),
     chRepo: undefined,
     spendRepo: mockSpendRepo(traces),
   });
