@@ -48,45 +48,9 @@ import {
   type ProjectStoredObjectsPort,
 } from "../ports/project.port";
 import type { ProjectRepository } from "../repositories/project.repository";
+import { ProjectSlugService } from "./project-slug.service";
 
 export const CODING_AGENT_ACTIVITY_TOUCH_MS = 60 * 60 * 1000;
-
-function slugify(value: string): string {
-  return value
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replaceAll(/[:?&_]/g, "-")
-    .replace(/[^a-zA-Z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .toLowerCase();
-}
-
-function mintProjectSlug(name: string, projectId: string): string {
-  const slug = `${slugify(name)}-${projectId.substring(0, 6)}`;
-  const reserved = new Set([
-    "admin",
-    "api",
-    "assets",
-    "auth",
-    "authorize",
-    "cli",
-    "gateway",
-    "governance",
-    "invite",
-    "mcp",
-    "me",
-    "onboarding",
-    "ops",
-    "settings",
-    "share",
-    "unsubscribe",
-  ]);
-  if (reserved.has(slug)) {
-    throw new Error(`Minted project slug "${slug}" equals a reserved top-level route`);
-  }
-
-  return slug;
-}
 
 export class ProjectService extends ProjectServiceContract {
   private constructor(
@@ -311,7 +275,7 @@ export class ProjectService extends ProjectServiceContract {
 
     const generatedId = this.credentials.generateProjectId();
     const projectId = `project_${generatedId}`;
-    const slug = mintProjectSlug(input.name, generatedId);
+    const slug = ProjectSlugService.mint(input.name, generatedId);
     const existing = await this.repository.tryFindBySlugInTeam({ slug, teamId });
     if (existing) {
       throw new ProjectSlugConflictError(
