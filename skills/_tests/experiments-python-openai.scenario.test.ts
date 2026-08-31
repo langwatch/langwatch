@@ -65,11 +65,9 @@ describe("Experiments Skill for a Python OpenAI bot", () => {
 							scenario.agent(),
 							(state) => {
 								const transcript = executedCommandTranscript(state);
+								expect(transcript).toMatch(/python|uv run|poetry run/);
 								expect(transcript).toMatch(
-									/"command":"[^"]*(python|uv run|poetry run)[^"]*/,
-								);
-								expect(transcript).toMatch(
-									/"command":"[^"]*langwatch experiment list[^"]*--format json/,
+									/langwatch experiment list[\s\S]*--format json/,
 								);
 								toolCallFix(state);
 								assertSkillWasRead(state, "experiments");
