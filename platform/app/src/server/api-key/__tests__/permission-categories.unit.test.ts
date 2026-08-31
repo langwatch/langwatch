@@ -106,6 +106,7 @@ describe("PERMISSION_CATEGORIES", () => {
       { category: "Organization", accessLevels: "read, write" },
       { category: "Gateway", accessLevels: "read, write" },
       { category: "Governance", accessLevels: "read, write" },
+      { category: "Feature Flags", accessLevels: "write" },
     ]);
   });
 

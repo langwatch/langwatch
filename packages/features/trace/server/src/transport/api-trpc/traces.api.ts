@@ -179,14 +179,18 @@ export class TracesTrpcApi {
   ) {
     const { protected: procedure, policy } = procedures;
 
-    // Chained rather than intersected. `.input()` twice leaves BOTH parsers on
-    // the procedure, each still an object the router sweep can read its scope
-    // fields out of; one `z.intersection` would leave a single schema with no
-    // readable shape, and the sweep reports an input it cannot inspect rather
-    // than trusting it. The keys added here are exactly the ones the process's
-    // filter schema does not already carry — `projectId` and `query` were
-    // re-declared identically by the router this replaced, which added nothing
-    // and would now collide on merge.
+    // Each of these is intersected onto the process's filter parser, not
+    // chained after it with a second `.input()`. Chaining is the composition
+    // that reads better, but tRPC types the second `.input()` as a conditional
+    // on the input already accumulated, and the base parser arrives here as a
+    // type parameter: a conditional whose check type is an unresolved
+    // parameter never takes the merging branch, so the chained form does not
+    // compile at all. The declaration sweep reads through the intersection to
+    // both members, so `projectId` stays visible to it either way. The keys
+    // added here are exactly the ones the process's filter schema does not
+    // already carry — `projectId` and `query` were re-declared identically by
+    // the router this replaced, which added nothing and would now collide on
+    // merge.
     const sampleExtrasSchema = z.object({ sortBy: z.string().optional() });
 
     const sampleTracesExtrasSchema = z.object({

@@ -260,6 +260,20 @@ export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
     readPermissions: viewsOf(...GOVERNANCE_RESOURCES),
     writePermissions: allActionsOf(...GOVERNANCE_RESOURCES),
   },
+  {
+    // Write only, because the resource has one action and it is a write:
+    // `featureFlags:manageExperiments` sets a project's or organization's
+    // experiment enrolment policy, and the registry declares no
+    // `featureFlags:view` for a read level to grant. Its own category rather
+    // than a line in Governance: the governance resources are org-exclusive
+    // at enforcement time, and this one is grantable at the project tier too.
+    // Distinct from "Experiments", which is the evaluation product.
+    key: "featureFlags",
+    label: "Feature Flags",
+    accessLevels: ["write"],
+    readPermissions: [],
+    writePermissions: allActionsOf("featureFlags"),
+  },
 ] as const;
 
 /**

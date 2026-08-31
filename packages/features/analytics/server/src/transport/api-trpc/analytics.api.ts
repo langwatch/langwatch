@@ -108,13 +108,11 @@ export class AnalyticsTrpcApi {
     /**
      * The narrowing this read adds on top of the host's shared filters.
      *
-     * Chained onto `sharedFiltersSchema` with a SECOND `.input()` rather than
-     * intersected into one parser: tRPC keeps every input parser, runs each
-     * against the raw request and spreads the results, so the handler sees the
-     * same object either way — but a `ZodIntersection` exposes no `.shape`, so
-     * the declaration sweep cannot read `projectId` out of it and reports the
-     * procedure as opaque input with no scope id to check. Two readable object
-     * parsers keep the authorization declaration verifiable.
+     * Intersected onto `sharedFiltersSchema` rather than chained after it with
+     * a SECOND `.input()`, for the reason given at `dataForFilter` below. The
+     * declaration sweep reads through the intersection to both members, so
+     * `projectId` stays visible to it and the authorization declaration stays
+     * verifiable.
      */
     const filterSelectionSchema = z.object({
       field: ports.filterFieldSchema,
@@ -131,7 +129,9 @@ export class AnalyticsTrpcApi {
       // One `.input()` over an intersection, not two chained calls: tRPC's
       // second `.input()` merges through a conditional on the input already
       // accumulated, and the process supplies `sharedFiltersSchema` as a type
-      // parameter — an unresolved parameter never takes the merging branch.
+      // parameter — an unresolved parameter never takes the merging branch, so
+      // the chained form lands on tRPC's own `TypeError<…>` and does not
+      // compile.
       dataForFilter: policy("analytics:view")(
         procedure.input(z.intersection(ports.sharedFiltersSchema, filterSelectionSchema)),
       ).query(async ({ ctx, input }) => {

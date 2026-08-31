@@ -102,6 +102,7 @@ Feature: API Key Scope and Fine-Grained Permissions
       | Organization           | read, write   |
       | Gateway                | read, write   |
       | Governance             | read, write   |
+      | Feature Flags          | write         |
 
   @unit
   Scenario: Project write carries creation and deletion, because manage implies them

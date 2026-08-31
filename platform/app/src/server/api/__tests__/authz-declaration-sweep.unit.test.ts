@@ -36,23 +36,6 @@ import { appRouter } from "../root";
 
 const SCOPE_FIELDS = Object.values(SCOPE_TIER_FIELDS) as ScopeTierField[];
 
-/**
- * Procedures whose declared permission resolves no scope from their input,
- * and procedures whose input schema cannot be read at all. Same rule as
- * above: shrink only.
- */
-const UNRESOLVABLE_SCOPES: readonly string[] = [
-  "dataset.upsert declares a permission its input carries no scope id for",
-  "datasetRecord.create declares a permission its input carries no scope id for",
-];
-
-// `dataset.upsert` left this list when its input stopped being a
-// `z.intersection`: an intersection exposes no `.shape`, so `scopeFieldsOf`
-// cannot see the scope ids and the procedure reads as opaque. Two chained
-// `.input()` calls parse the same thing and stay readable. `datasetRecord.create`
-// is the last one composed that way, and the same fix applies to it.
-const OPAQUE_INPUTS: readonly string[] = ["datasetRecord.create"];
-
 type Procedure = {
   path: string;
   declaration: AuthzDeclaration | null;
@@ -134,11 +117,40 @@ type ScopeFieldSets = {
  *
  * A union requires a field only when every member does — a member that omits
  * it can be sent without one — but accepts a field that ANY member carries,
- * since the runtime resolves a tier from whichever arrived.
+ * since the runtime resolves a tier from whichever arrived. An intersection is
+ * the mirror image: both members parse the SAME request, so a field either one
+ * requires is required, and a field either one carries is accepted.
  */
 function scopeFieldsOf(parser: unknown): ScopeFieldSets | null {
   const schema = unwrap(parser);
   const typeName = zodKindOf(schema);
+
+  // Read THROUGH an intersection rather than reporting it opaque. A transport
+  // handed its base parser as a port has no alternative to one: chaining is
+  // the readable composition, but `procedure.input(a).input(b)` types its
+  // second call as a conditional on the input already accumulated, and a
+  // conditional whose check type is an unresolved type parameter never takes
+  // the merging branch — it lands on tRPC's own `TypeError<…>`. So the four
+  // reads whose filter schema arrives as a port (`analytics.dataForFilter`,
+  // `traces.getSampleTraces`, `traces.getSampleTracesDataset`,
+  // `traces.getAllForDownload`) each take one `.input()` over a
+  // `z.intersection`, and treating that as unreadable left their `projectId`
+  // unchecked behind an allowlist. Both members are still real parsers at
+  // runtime, which is the only thing this sweep needs: a member that cannot be
+  // read still returns null, so nothing passes by silence.
+  if (typeName === "intersection") {
+    const left = scopeFieldsOf(schema._def.left);
+    const right = scopeFieldsOf(schema._def.right);
+    if (!left || !right) return null;
+    return {
+      required: SCOPE_FIELDS.filter(
+        (field) => left.required.includes(field) || right.required.includes(field),
+      ),
+      accepted: SCOPE_FIELDS.filter(
+        (field) => left.accepted.includes(field) || right.accepted.includes(field),
+      ),
+    };
+  }
 
   if (typeName === "union" || typeName === "discriminatedUnion") {
     const options: unknown[] =
@@ -354,7 +366,11 @@ describe("tRPC authz declaration sweep", () => {
         )
         .sort();
 
-      expect(unresolvable).toEqual(UNRESOLVABLE_SCOPES);
+      // No allowlist. A declared permission the runtime cannot resolve a
+      // scope from is a check that never runs, and the fix is a scope id on
+      // the input or a declaration that names how the resolver enforces it —
+      // never an exception list.
+      expect(unresolvable).toEqual([]);
     });
 
     /** @scenario "A procedure whose input cannot be inspected fails the sweep" */
@@ -364,7 +380,11 @@ describe("tRPC authz declaration sweep", () => {
         .map((procedure) => procedure.path)
         .sort();
 
-      expect(opaque).toEqual(OPAQUE_INPUTS);
+      // No allowlist. Every input parser the router carries is an object, a
+      // union of objects, or an intersection of them — all three readable. An
+      // input this sweep cannot inspect is one whose scope ids nothing here
+      // proves are checked, so it fails rather than being listed.
+      expect(opaque).toEqual([]);
     });
   });
 
@@ -460,6 +480,35 @@ describe("tRPC authz declaration sweep", () => {
         kind: "service-authorized",
         enforces: { organizationId: "claimed for this sentinel" },
       });
+    });
+  });
+
+  describe("given an input composed as an intersection", () => {
+    /** @scenario "An input composed as an intersection is inspected, not skipped" */
+    it("reads the scope ids out of both members", () => {
+      const intersection = z.intersection(
+        z.object({ projectId: z.string() }),
+        z.object({ organizationId: z.string().optional(), sortBy: z.string().optional() }),
+      );
+
+      expect(scopeFieldsOf(intersection)?.required).toEqual(["projectId"]);
+      expect(scopeFieldsOf(intersection)?.accepted).toEqual(["projectId", "organizationId"]);
+    });
+
+    /** The fail-closed half: reading through an intersection must not become a
+     *  way to smuggle an unreadable parser past the sweep. One member with no
+     *  readable shape makes the whole input opaque, exactly as that member
+     *  would be on its own.
+     *  @scenario "An input composed as an intersection is inspected, not skipped" */
+    it("stays opaque when either member cannot be read", () => {
+      const unreadable = z.record(z.string(), z.unknown());
+
+      expect(scopeFieldsOf(z.intersection(z.object({ projectId: z.string() }), unreadable))).toBe(
+        null,
+      );
+      expect(scopeFieldsOf(z.intersection(unreadable, z.object({ projectId: z.string() })))).toBe(
+        null,
+      );
     });
   });
 
