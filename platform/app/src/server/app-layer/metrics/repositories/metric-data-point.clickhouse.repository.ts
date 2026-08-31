@@ -88,6 +88,43 @@ const SUCCESSOR_PARAM_BUDGET_CHARS = 3500;
 const PREDECESSOR_LOOKBACK_MS = 60 * 60 * 1000;
 
 /**
+ * The seeks whose predecessor the near pass failed to find.
+ *
+ * A bucket whose near pass returned nothing in [start - lookbackMs, start) has
+ * no stored point in that window at all — the branch returns the newest there
+ * is — so whatever precedes it is older than the window, and only then is the
+ * wide seek worth its partitions.
+ *
+ * A row from a neighbouring affected bucket answers this just as well: if
+ * anything at all sits in the window, then the newest thing in it does too,
+ * and that is precisely what the near seek returned. So the check is against
+ * every point the pass collected, indexed by series to keep it off the
+ * seeks × points path.
+ */
+function seeksWithoutPredecessor({
+  seeks,
+  points,
+  lookbackMs,
+}: {
+  seeks: readonly { seriesId: string; start: number }[];
+  points: Iterable<MetricRollupSourcePoint>;
+  lookbackMs: number;
+}): { seriesId: string; start: number }[] {
+  const seenBySeries = new Map<string, number[]>();
+  for (const point of points) {
+    const times = seenBySeries.get(point.seriesId);
+    if (times) times.push(point.timeUnixMs);
+    else seenBySeries.set(point.seriesId, [point.timeUnixMs]);
+  }
+  return seeks.filter(
+    ({ seriesId, start }) =>
+      !(seenBySeries.get(seriesId) ?? []).some(
+        (timeUnixMs) => timeUnixMs < start && timeUnixMs >= start - lookbackMs,
+      ),
+  );
+}
+
+/**
  * The successor read's whole statement, emitted once at module load rather than
  * rebuilt per chunk, because nothing in it varies with the chunk any more.
  *
@@ -838,30 +875,14 @@ export class MetricDataPointClickHouseRepository
       withBucketRows: true,
     });
 
-    // A bucket whose near pass returned nothing in [start - nearMs, start) has
-    // no stored point in that window at all — the branch returns the newest
-    // there is — so whatever precedes it is older than the window, and only
-    // then is the wide seek worth its partitions.
-    //
-    // A row from a neighbouring affected bucket answers this just as well: if
-    // anything at all sits in the window, then the newest thing in it does
-    // too, and that is precisely what the near seek returned.
-    const seenBySeries = new Map<string, number[]>();
-    for (const point of unique.values()) {
-      const times = seenBySeries.get(point.seriesId);
-      if (times) times.push(point.timeUnixMs);
-      else seenBySeries.set(point.seriesId, [point.timeUnixMs]);
-    }
     const unresolved =
       nearMs >= retentionMs
         ? []
-        : seeks.filter(
-            ({ seriesId, start }) =>
-              !(seenBySeries.get(seriesId) ?? []).some(
-                (timeUnixMs) =>
-                  timeUnixMs < start && timeUnixMs >= start - nearMs,
-              ),
-          );
+        : seeksWithoutPredecessor({
+            seeks,
+            points: unique.values(),
+            lookbackMs: nearMs,
+          });
     if (unresolved.length > 0) {
       await this.readAffectedBuckets({
         client,
