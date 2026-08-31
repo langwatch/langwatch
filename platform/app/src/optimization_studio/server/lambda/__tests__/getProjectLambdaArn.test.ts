@@ -326,9 +326,12 @@ describe("getProjectLambdaArn", () => {
             call[0] instanceof UpdateFunctionConfigurationCommand,
         );
         expect(updates).toHaveLength(1);
+        const updateInput = (
+          updates[0]?.[0] as UpdateFunctionConfigurationCommand | undefined
+        )?.input;
         expect(
-          updates[0][0].input.Environment.Variables
-            .NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS,
+          updateInput?.Environment?.Variables
+            ?.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS,
         ).toBe("300");
       } finally {
         if (originalTimeoutEnv === undefined) {
