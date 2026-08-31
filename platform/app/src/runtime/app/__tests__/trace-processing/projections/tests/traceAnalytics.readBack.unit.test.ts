@@ -190,17 +190,17 @@ describe("TraceAnalyticsStore read-back version gate", () => {
   } as unknown as ProjectionStoreContext;
 
   function storeOver(row: TraceAnalyticsRow) {
-    const findByTraceIdWithApplied = vi
+    const tryFindByTraceIdWithApplied = vi
       .fn()
       .mockResolvedValue({ row, appliedEventIds: ["evt-1", "evt-2"] });
     const repository = {
-      findByTraceIdWithApplied,
+      tryFindByTraceIdWithApplied,
     } as unknown as TraceAnalyticsRepository;
     const store = TraceAnalyticsStore.create({
       storage: AppTraceProjectionStorageAdapter.createAnalytics(repository),
       defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
     });
-    return { store, findByTraceIdWithApplied };
+    return { store, tryFindByTraceIdWithApplied };
   }
 
   describe("given a row stamped with the current projection version", () => {
@@ -345,7 +345,7 @@ describe("TraceAnalyticsStore read-back version gate", () => {
       // rebuilt". Reporting a version rejection as `absent` spent the
       // window-fallback signal on a schema condition.
       const repository = {
-        findByTraceIdWithApplied: vi.fn().mockResolvedValue(null),
+        tryFindByTraceIdWithApplied: vi.fn().mockResolvedValue(null),
       } as unknown as TraceAnalyticsRepository;
       const store = TraceAnalyticsStore.create({
         storage: AppTraceProjectionStorageAdapter.createAnalytics(repository),
@@ -480,7 +480,7 @@ describe("TraceAnalyticsStore dimension-only signal", () => {
       upsert: async (row: TraceAnalyticsRow) => {
         rows.push(row);
       },
-      findByTraceIdWithApplied: async () => {
+      tryFindByTraceIdWithApplied: async () => {
         const row = rows[rows.length - 1];
         return row ? { row, appliedEventIds: [] } : null;
       },

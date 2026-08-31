@@ -53,7 +53,7 @@ export interface TraceAnalyticsRepository {
    * rule out a row outside its window retries without one — the fold path gets
    * that retry from the executor's declared-read-window contract.
    */
-  findByTraceIdWithApplied(params: {
+  tryFindByTraceIdWithApplied(params: {
     tenantId: string;
     traceId: string;
     window?: { fromMs: number; toMs: number };
@@ -76,7 +76,7 @@ export class NullTraceAnalyticsRepository implements TraceAnalyticsRepository {
     }>,
   ): Promise<void> {}
 
-  async findByTraceIdWithApplied(): Promise<{
+  async tryFindByTraceIdWithApplied(): Promise<{
     row: TraceAnalyticsRow;
     appliedEventIds: string[];
   } | null> {

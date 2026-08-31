@@ -309,7 +309,7 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
    * bound is threaded through as plain fromMs/toMs and rendered by the query
    * builder into the OUTER scope alone.
    */
-  async findByTraceIdWithApplied({
+  async tryFindByTraceIdWithApplied({
     tenantId,
     traceId,
     window,
@@ -320,7 +320,7 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
   }): Promise<{ row: TraceAnalyticsRow; appliedEventIds: string[] } | null> {
     EventUtils.validateTenantId(
       { tenantId },
-      "TraceAnalyticsClickHouseRepository.findByTraceIdWithApplied",
+      "TraceAnalyticsClickHouseRepository.tryFindByTraceIdWithApplied",
     );
 
     try {
@@ -353,7 +353,7 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
   }
 
   /**
-   * One ClickHouse attempt for {@link findByTraceIdWithApplied}.
+   * One ClickHouse attempt for {@link tryFindByTraceIdWithApplied}.
    *
    * Dedups with the IN-tuple pattern (max(UpdatedAt) per key), never FINAL: the
    * ReplacingMergeTree only physically collapses rows sharing the full sort key

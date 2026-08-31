@@ -100,7 +100,7 @@ class AppTraceAnalyticsProjectionAdapter extends TraceAnalyticsProjectionPort {
     traceId: string;
     window?: { fromMs: number; toMs: number };
   }) {
-    return await this.repository.findByTraceIdWithApplied(input);
+    return await this.repository.tryFindByTraceIdWithApplied(input);
   }
 }
 
