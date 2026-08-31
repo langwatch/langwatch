@@ -3184,6 +3184,14 @@ model Grant {
   // the partiality and rebuild it over every share-link row, which is the one
   // thing the WHERE clause exists to avoid.
   //
+  // "Grant_organizationId_roleKey_live_idx" is partial for the same reason
+  // (`WHERE "revokedAt" IS NULL`), defined in migration
+  // 20260831120000_grant_org_role_key_live_index. It serves the API-key
+  // permission check, whose predicate is (organizationId, roleKey) over live
+  // rows only; no index declarable here contains "roleKey", and declaring this
+  // one as an `@@index` would drop the WHERE clause and rebuild it over every
+  // revoked and share-link row.
+  //
   // "Grant_resource_terms_check" is an all-or-nothing CHECK over the tier's
   // four identity columns (token, permission, resourceKind, projectId), tied
   // to scopeType = 'RESOURCE'. Added over two columns in
