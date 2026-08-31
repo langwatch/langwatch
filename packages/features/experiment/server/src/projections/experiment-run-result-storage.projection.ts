@@ -7,7 +7,7 @@ import {
   targetResultEventSchema,
 } from "../adapters/eventing.experiment-run-events.adapter";
 import { normalizeDurationMs } from "../processes/experiment-run-duration.process";
-import { IdUtils } from "../processes/experiment-run-id.process";
+import { ExperimentRunIds } from "../processes/experiment-run-id.process";
 
 /**
  * Record type matching the experiment_run_items ClickHouse table schema.
@@ -74,9 +74,7 @@ export class ExperimentRunResultStorageMapProjection
   protected readonly events = resultEvents;
 
   override options = {
-    groupKeyFn: (event: {
-      data: { experimentId: string; runId: string; index: number };
-    }) =>
+    groupKeyFn: (event: { data: { experimentId: string; runId: string; index: number } }) =>
       `experiment:${event.data.experimentId}:result:${event.data.runId}:item:${event.data.index}`,
   };
 
@@ -85,10 +83,8 @@ export class ExperimentRunResultStorageMapProjection
     this.store = deps.store;
   }
 
-  mapExperimentRunTargetResult(
-    event: TargetResultEvent,
-  ): ClickHouseExperimentRunResultRecord {
-    const id = IdUtils.generateDeterministicResultId({
+  mapExperimentRunTargetResult(event: TargetResultEvent): ClickHouseExperimentRunResultRecord {
+    const id = ExperimentRunIds.generateDeterministicResultId({
       tenantId: event.tenantId,
       runId: event.data.runId,
       index: event.data.index,
@@ -110,9 +106,7 @@ export class ExperimentRunResultStorageMapProjection
       TargetCost: event.data.cost ?? null,
       TargetDurationMs: normalizeDurationMs(event.data.duration),
       TargetError: event.data.error ?? null,
-      TargetDomainError: event.data.domainError
-        ? JSON.stringify(event.data.domainError)
-        : null,
+      TargetDomainError: event.data.domainError ? JSON.stringify(event.data.domainError) : null,
       TraceId: event.data.traceId ?? null,
       EvaluatorId: null,
       EvaluatorName: null,
@@ -132,7 +126,7 @@ export class ExperimentRunResultStorageMapProjection
   mapExperimentRunEvaluatorResult(
     event: EvaluatorResultEvent,
   ): ClickHouseExperimentRunResultRecord {
-    const id = IdUtils.generateDeterministicResultId({
+    const id = ExperimentRunIds.generateDeterministicResultId({
       tenantId: event.tenantId,
       runId: event.data.runId,
       index: event.data.index,

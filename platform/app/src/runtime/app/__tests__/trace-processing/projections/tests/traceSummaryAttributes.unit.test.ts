@@ -85,7 +85,10 @@ describe("applySpanToSummary attribute forwarding", () => {
         },
       });
 
-      let state = applySpanToSummary({ state: createInitState(), span: span1 });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: span1,
+      });
       state = applySpanToSummary({ state, span: span2 });
 
       expect(state.attributes["gen_ai.agent.name"]).toBe("first-agent");
@@ -100,7 +103,10 @@ describe("applySpanToSummary attribute forwarding", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(JSON.parse(state.attributes["langwatch.prompt_ids"]!)).toEqual([
         "team/sample-prompt:3",
@@ -114,7 +120,10 @@ describe("applySpanToSummary attribute forwarding", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(state.attributes["langwatch.prompt.id"]).toBeUndefined();
     });
@@ -136,7 +145,10 @@ describe("applySpanToSummary attribute forwarding", () => {
         },
       });
 
-      let state = applySpanToSummary({ state: createInitState(), span: span1 });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: span1,
+      });
       state = applySpanToSummary({ state, span: span2 });
 
       expect(JSON.parse(state.attributes["langwatch.prompt_ids"]!)).toEqual([
@@ -162,7 +174,10 @@ describe("applySpanToSummary attribute forwarding", () => {
         },
       });
 
-      let state = applySpanToSummary({ state: createInitState(), span: span1 });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: span1,
+      });
       state = applySpanToSummary({ state, span: span2 });
 
       expect(JSON.parse(state.attributes["langwatch.prompt_ids"]!)).toEqual([
@@ -179,7 +194,10 @@ describe("applySpanToSummary attribute forwarding", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(state.attributes["langwatch.prompt_ids"]).toBeUndefined();
     });
@@ -198,7 +216,10 @@ describe("applySpanToSummary attribute forwarding", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(state.attributes["langwatch.virtual_key_id"]).toBe("vk_live_abc123");
     });
@@ -210,7 +231,10 @@ describe("applySpanToSummary attribute forwarding", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(state.attributes["langwatch.gateway_request_id"]).toBe("req_01HZX0ABCDEF");
     });
@@ -223,7 +247,10 @@ describe("applySpanToSummary attribute forwarding", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       // Shape the subscriber's early-return check expects.
       expect(state.attributes["langwatch.virtual_key_id"]).toBeTruthy();
@@ -242,7 +269,10 @@ describe("applySpanToSummary attribute forwarding", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(state.attributes["langwatch.requested_model"]).toBe("complex");
     });

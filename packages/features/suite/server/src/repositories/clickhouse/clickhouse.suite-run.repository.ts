@@ -49,7 +49,7 @@ export class ClickHouseSuiteRunRepository
     try {
       const client = await this.options.resolveClient(String(context.tenantId));
       const result = await client.query({
-        query: projectionQuery(),
+        query: ClickHouseSuiteRunRepository.projectionQuery(),
         query_params: { tenantId: context.tenantId, batchRunId: aggregateId },
         format: "JSONEachRow",
       });
@@ -61,7 +61,7 @@ export class ClickHouseSuiteRunRepository
         aggregateId,
         tenantId: createTenantId(String(context.tenantId)),
         version: String(row.Version),
-        data: mapRowToState(row),
+        data: ClickHouseSuiteRunRepository.mapRowToState(row),
       };
     } catch (error) {
       throw this.storeError({
@@ -99,7 +99,13 @@ export class ClickHouseSuiteRunRepository
       const client = await this.options.resolveClient(String(context.tenantId));
       await client.insert({
         table: TABLE_NAME,
-        values: [mapProjectionToRow(projection, context, this.options.defaultRetentionDays)],
+        values: [
+          ClickHouseSuiteRunRepository.mapProjectionToRow(
+            projection,
+            context,
+            this.options.defaultRetentionDays,
+          ),
+        ],
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
       });
@@ -140,7 +146,11 @@ export class ClickHouseSuiteRunRepository
       await client.insert({
         table: TABLE_NAME,
         values: projections.map((projection) =>
-          mapProjectionToRow(projection, context, this.options.defaultRetentionDays),
+          ClickHouseSuiteRunRepository.mapProjectionToRow(
+            projection,
+            context,
+            this.options.defaultRetentionDays,
+          ),
         ),
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
@@ -189,13 +199,13 @@ export class ClickHouseSuiteRunRepository
       format: "JSONEachRow",
     });
     const rows = await result.json<Record<string, unknown>>();
-    return rows[0] ? mapRowToState(rows[0]) : null;
+    return rows[0] ? ClickHouseSuiteRunRepository.mapRowToState(rows[0]) : null;
   }
 
   async getBatchHistory(input: SuiteBatchHistoryInput): Promise<SuiteRunStateData[]> {
     const client = await this.options.resolveClient(input.projectId);
     const limit = Math.min(input.limit ?? 50, 100);
-    const scenarioSetIds = expandSetIdFilter(input.scenarioSetId);
+    const scenarioSetIds = ClickHouseSuiteRunRepository.expandSetIdFilter(input.scenarioSetId);
     const result = await client.query({
       query: `
         SELECT
@@ -227,7 +237,7 @@ export class ClickHouseSuiteRunRepository
       format: "JSONEachRow",
     });
     const rows = await result.json<Record<string, unknown>>();
-    return rows.map(mapRowToState);
+    return rows.map((row) => ClickHouseSuiteRunRepository.mapRowToState(row));
   }
   private storeError(input: {
     operation: string;
@@ -248,105 +258,108 @@ export class ClickHouseSuiteRunRepository
       input.error,
     );
   }
-}
 
-function expandSetIdFilter(scenarioSetId: string): string[] {
-  return scenarioSetId === "default" || scenarioSetId === "" ? ["default", ""] : [scenarioSetId];
-}
-
-function mapRowToState(row: Record<string, unknown>): SuiteRunStateData {
-  return suiteRunStateDataSchema.parse({
-    SuiteRunId: String(row.SuiteRunId),
-    BatchRunId: String(row.BatchRunId),
-    ScenarioSetId: String(row.ScenarioSetId),
-    SuiteId: String(row.SuiteId),
-    Status: String(row.Status),
-    Total: Number(row.Total),
-    StartedCount: Number(row.StartedCount),
-    CompletedCount: Number(row.CompletedCount),
-    FailedCount: Number(row.FailedCount),
-    Progress: Number(row.Progress),
-    PassRateBps: row.PassRateBps == null ? null : Number(row.PassRateBps),
-    PassedCount: Number(row.PassedCount ?? 0),
-    GradedCount: Number(row.GradedCount ?? 0),
-    CreatedAt: Number(row.CreatedAt),
-    UpdatedAt: Number(row.UpdatedAt),
-    LastEventOccurredAt: Number(row.LastEventOccurredAt ?? 0),
-    StartedAt: row.StartedAt == null ? null : Number(row.StartedAt),
-    FinishedAt: row.FinishedAt == null ? null : Number(row.FinishedAt),
-  });
-}
-
-function projectionQuery(): string {
-  return `
-    SELECT
-      t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
-      t.Version AS Version, t.SuiteRunId AS SuiteRunId,
-      t.BatchRunId AS BatchRunId, t.ScenarioSetId AS ScenarioSetId,
-      t.SuiteId AS SuiteId, t.Status AS Status, t.Total AS Total,
-      t.StartedCount AS StartedCount, t.CompletedCount AS CompletedCount,
-      t.FailedCount AS FailedCount, t.Progress AS Progress,
-      t.PassRateBps AS PassRateBps, t.PassedCount AS PassedCount,
-      t.GradedCount AS GradedCount,
-      toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
-      toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
-      toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt,
-      toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
-      toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt
-    FROM suite_runs AS t
-    WHERE t.TenantId = {tenantId:String}
-      AND t.BatchRunId = {batchRunId:String}
-      AND (t.TenantId, t.BatchRunId, t.UpdatedAt) IN (
-        SELECT TenantId, BatchRunId, max(UpdatedAt)
-        FROM suite_runs
-        WHERE TenantId = {tenantId:String}
-          AND BatchRunId = {batchRunId:String}
-        GROUP BY TenantId, BatchRunId
-      )
-    LIMIT 1
-  `;
-}
-
-function mapProjectionToRow(
-  projection: Projection<SuiteRunStateData>,
-  context: ProjectionStoreWriteContext,
-  defaultRetentionDays: number,
-): Record<string, unknown> {
-  const data = projection.data;
-  return {
-    ProjectionId: projection.id,
-    TenantId: context.tenantId,
-    SuiteRunId: data.SuiteRunId || projection.id,
-    BatchRunId: data.BatchRunId,
-    ScenarioSetId: data.ScenarioSetId,
-    SuiteId: data.SuiteId,
-    Version: projection.version,
-    Status: data.Status,
-    Total: data.Total,
-    StartedCount: data.StartedCount,
-    CompletedCount: data.CompletedCount,
-    FailedCount: data.FailedCount,
-    Progress: data.Progress,
-    PassRateBps: data.PassRateBps,
-    PassedCount: data.PassedCount,
-    GradedCount: data.GradedCount,
-    CreatedAt: new Date(data.CreatedAt),
-    UpdatedAt: new Date(data.UpdatedAt),
-    StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
-    FinishedAt: data.FinishedAt == null ? null : new Date(data.FinishedAt),
-    LastEventOccurredAt: new Date(data.LastEventOccurredAt || 0),
-    _retention_days: retentionDaysFromContext(context, defaultRetentionDays),
-  };
-}
-
-function retentionDaysFromContext(
-  context: ProjectionStoreWriteContext,
-  defaultRetentionDays: number,
-): number {
-  const policy = context.metadata?.retentionPolicy;
-  if (typeof policy === "object" && policy !== null && "scenarios" in policy) {
-    const scenarios = policy.scenarios;
-    if (typeof scenarios === "number") return scenarios;
+  private static expandSetIdFilter(scenarioSetId: string): string[] {
+    return scenarioSetId === "default" || scenarioSetId === "" ? ["default", ""] : [scenarioSetId];
   }
-  return defaultRetentionDays;
+
+  private static mapRowToState(row: Record<string, unknown>): SuiteRunStateData {
+    return suiteRunStateDataSchema.parse({
+      SuiteRunId: String(row.SuiteRunId),
+      BatchRunId: String(row.BatchRunId),
+      ScenarioSetId: String(row.ScenarioSetId),
+      SuiteId: String(row.SuiteId),
+      Status: String(row.Status),
+      Total: Number(row.Total),
+      StartedCount: Number(row.StartedCount),
+      CompletedCount: Number(row.CompletedCount),
+      FailedCount: Number(row.FailedCount),
+      Progress: Number(row.Progress),
+      PassRateBps: row.PassRateBps == null ? null : Number(row.PassRateBps),
+      PassedCount: Number(row.PassedCount ?? 0),
+      GradedCount: Number(row.GradedCount ?? 0),
+      CreatedAt: Number(row.CreatedAt),
+      UpdatedAt: Number(row.UpdatedAt),
+      LastEventOccurredAt: Number(row.LastEventOccurredAt ?? 0),
+      StartedAt: row.StartedAt == null ? null : Number(row.StartedAt),
+      FinishedAt: row.FinishedAt == null ? null : Number(row.FinishedAt),
+    });
+  }
+
+  private static projectionQuery(): string {
+    return `
+      SELECT
+        t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
+        t.Version AS Version, t.SuiteRunId AS SuiteRunId,
+        t.BatchRunId AS BatchRunId, t.ScenarioSetId AS ScenarioSetId,
+        t.SuiteId AS SuiteId, t.Status AS Status, t.Total AS Total,
+        t.StartedCount AS StartedCount, t.CompletedCount AS CompletedCount,
+        t.FailedCount AS FailedCount, t.Progress AS Progress,
+        t.PassRateBps AS PassRateBps, t.PassedCount AS PassedCount,
+        t.GradedCount AS GradedCount,
+        toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
+        toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
+        toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt,
+        toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
+        toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt
+      FROM suite_runs AS t
+      WHERE t.TenantId = {tenantId:String}
+        AND t.BatchRunId = {batchRunId:String}
+        AND (t.TenantId, t.BatchRunId, t.UpdatedAt) IN (
+          SELECT TenantId, BatchRunId, max(UpdatedAt)
+          FROM suite_runs
+          WHERE TenantId = {tenantId:String}
+            AND BatchRunId = {batchRunId:String}
+          GROUP BY TenantId, BatchRunId
+        )
+      LIMIT 1
+    `;
+  }
+
+  private static mapProjectionToRow(
+    projection: Projection<SuiteRunStateData>,
+    context: ProjectionStoreWriteContext,
+    defaultRetentionDays: number,
+  ): Record<string, unknown> {
+    const data = projection.data;
+    return {
+      ProjectionId: projection.id,
+      TenantId: context.tenantId,
+      SuiteRunId: data.SuiteRunId || projection.id,
+      BatchRunId: data.BatchRunId,
+      ScenarioSetId: data.ScenarioSetId,
+      SuiteId: data.SuiteId,
+      Version: projection.version,
+      Status: data.Status,
+      Total: data.Total,
+      StartedCount: data.StartedCount,
+      CompletedCount: data.CompletedCount,
+      FailedCount: data.FailedCount,
+      Progress: data.Progress,
+      PassRateBps: data.PassRateBps,
+      PassedCount: data.PassedCount,
+      GradedCount: data.GradedCount,
+      CreatedAt: new Date(data.CreatedAt),
+      UpdatedAt: new Date(data.UpdatedAt),
+      StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
+      FinishedAt: data.FinishedAt == null ? null : new Date(data.FinishedAt),
+      LastEventOccurredAt: new Date(data.LastEventOccurredAt || 0),
+      _retention_days: ClickHouseSuiteRunRepository.retentionDaysFromContext(
+        context,
+        defaultRetentionDays,
+      ),
+    };
+  }
+
+  private static retentionDaysFromContext(
+    context: ProjectionStoreWriteContext,
+    defaultRetentionDays: number,
+  ): number {
+    const policy = context.metadata?.retentionPolicy;
+    if (typeof policy === "object" && policy !== null && "scenarios" in policy) {
+      const scenarios = policy.scenarios;
+      if (typeof scenarios === "number") return scenarios;
+    }
+    return defaultRetentionDays;
+  }
 }

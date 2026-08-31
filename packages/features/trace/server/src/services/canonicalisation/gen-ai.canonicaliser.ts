@@ -4,13 +4,13 @@ import type {
   LogExtractorContext,
 } from "../../ports/canonical-attributes.port";
 import { canonicaliseGenAILog } from "../gen-ai-log.rules";
-import { canonicaliseGenAISpan } from "../gen-ai-span.rules";
+import { GenAiSpan } from "../gen-ai-span.rules";
 
 export class GenAICanonicaliser implements CanonicalAttributesPort {
   readonly id = "genai";
 
   apply(ctx: ExtractorContext): void {
-    canonicaliseGenAISpan(ctx);
+    GenAiSpan.canonicalise(ctx);
   }
 
   applyLog(ctx: LogExtractorContext): void {

@@ -42,7 +42,10 @@ describe("applySpanToSummary token estimation integration", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(result.totalPromptTokenCount).toBe(25);
       expect(result.totalCompletionTokenCount).toBe(12);
@@ -64,7 +67,10 @@ describe("applySpanToSummary token estimation integration", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(result.tokensEstimated).toBe(true);
     });
@@ -81,7 +87,10 @@ describe("applySpanToSummary token estimation integration", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(result.totalPromptTokenCount).toBe(42);
       expect(result.totalCompletionTokenCount).toBe(17);
@@ -103,7 +112,10 @@ describe("applySpanToSummary token estimation integration", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       // Without token attributes, the fold projection correctly reports null.
       // The fix ensures RecordSpanCommand pushes these attributes before
@@ -123,7 +135,10 @@ describe("applySpanToSummary token estimation integration", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(result.totalPromptTokenCount).toBeNull();
       expect(result.totalCompletionTokenCount).toBeNull();

@@ -26,71 +26,6 @@ import { META_FIELD_DEFS } from "./trace-query-meta-fields.clickhouse.adapter";
 
 const FACET_BY_KEY = new Map(FACET_REGISTRY.map((d) => [d.key, d]));
 
-function expressionFacet(key: string): ExpressionCategoricalDef | RangeFacetDef {
-  const def = FACET_BY_KEY.get(key);
-  if (!def) throw new Error(`facet '${key}' is missing from FACET_REGISTRY`);
-  if (!("expression" in def)) {
-    throw new Error(`facet '${key}' has no expression to derive a handler from`);
-  }
-  return def;
-}
-
-/** Auto-derived `trace_summaries` categorical: direct equality + summary read. */
-function categoricalFacet(key: string): FieldDef {
-  const def = expressionFacet(key);
-  if (def.kind !== "categorical") {
-    throw new Error(`facet '${key}' is not a categorical facet`);
-  }
-  if (!def.read) throw new Error(`facet '${key}' has no in-memory read`);
-  return TraceQueryTranslators.categorical(def.expression, def.read, def.key);
-}
-
-/** Auto-derived `trace_summaries` range: numeric comparison + summary read. */
-function rangeFacet(key: string): FieldDef {
-  const def = expressionFacet(key);
-  if (def.kind !== "range") {
-    throw new Error(`facet '${key}' is not a range facet`);
-  }
-  if (!def.read) throw new Error(`facet '${key}' has no in-memory read`);
-  return TraceQueryTranslators.range(def.expression, def.read, def.key);
-}
-
-/**
- * Cross-table categorical (evaluation_runs / stored_spans): subquery SQL from
- * the registry expression, paired with a per-collection in-memory read (the
- * read iterates `trace.evaluations` / `trace.spans` and fails closed when the
- * collection isn't loaded).
- */
-function crossCategoricalFacet(key: string, needs: FieldNeeds, read: CategoricalRead): FieldDef {
-  const def = expressionFacet(key);
-  if (def.kind !== "categorical") {
-    throw new Error(`facet '${key}' is not a categorical facet`);
-  }
-  return TraceQueryTranslators.crossTableCategorical(
-    def.table,
-    TABLE_TIME_COLUMNS[def.table],
-    def.expression,
-    read,
-    needs,
-    def.key,
-  );
-}
-
-function crossRangeFacet(key: string, needs: FieldNeeds, read: RangeRead): FieldDef {
-  const def = expressionFacet(key);
-  if (def.kind !== "range") {
-    throw new Error(`facet '${key}' is not a range facet`);
-  }
-  return TraceQueryTranslators.crossTableRange(
-    def.table,
-    TABLE_TIME_COLUMNS[def.table],
-    def.expression,
-    read,
-    needs,
-    def.key,
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Cross-table in-memory reads (item 4: iterate the referenced collection)
 // ---------------------------------------------------------------------------
@@ -136,6 +71,82 @@ const spanStatusRead: CategoricalRead = (t) =>
   t.spans == null
     ? UNSUPPORTED
     : t.spans.map((s) => (s.statusCode === 2 ? "error" : s.statusCode === 1 ? "ok" : "unset"));
+
+/**
+ * How one field's definition is built.
+ *
+ * A field needs two answers that must agree: the SQL predicate a filter
+ * compiles to, and the in-memory evaluation used where there is no query to
+ * run. These five builders pair them, so a field cannot be given one without
+ * the other — which is the failure mode this shape exists to prevent, since a
+ * field that filters in SQL but not in memory silently disagrees with itself.
+ */
+export class TraceQueryFields {
+  static expressionFacet(key: string): ExpressionCategoricalDef | RangeFacetDef {
+    const def = FACET_BY_KEY.get(key);
+    if (!def) throw new Error(`facet '${key}' is missing from FACET_REGISTRY`);
+    if (!("expression" in def)) {
+      throw new Error(`facet '${key}' has no expression to derive a handler from`);
+    }
+    return def;
+  }
+
+  /** Auto-derived `trace_summaries` categorical: direct equality + summary read. */
+  static categoricalFacet(key: string): FieldDef {
+    const def = TraceQueryFields.expressionFacet(key);
+    if (def.kind !== "categorical") {
+      throw new Error(`facet '${key}' is not a categorical facet`);
+    }
+    if (!def.read) throw new Error(`facet '${key}' has no in-memory read`);
+    return TraceQueryTranslators.categorical(def.expression, def.read, def.key);
+  }
+
+  /** Auto-derived `trace_summaries` range: numeric comparison + summary read. */
+  static rangeFacet(key: string): FieldDef {
+    const def = TraceQueryFields.expressionFacet(key);
+    if (def.kind !== "range") {
+      throw new Error(`facet '${key}' is not a range facet`);
+    }
+    if (!def.read) throw new Error(`facet '${key}' has no in-memory read`);
+    return TraceQueryTranslators.range(def.expression, def.read, def.key);
+  }
+
+  /**
+   * Cross-table categorical (evaluation_runs / stored_spans): subquery SQL from
+   * the registry expression, paired with a per-collection in-memory read (the
+   * read iterates `trace.evaluations` / `trace.spans` and fails closed when the
+   * collection isn't loaded).
+   */
+  static crossCategoricalFacet(key: string, needs: FieldNeeds, read: CategoricalRead): FieldDef {
+    const def = TraceQueryFields.expressionFacet(key);
+    if (def.kind !== "categorical") {
+      throw new Error(`facet '${key}' is not a categorical facet`);
+    }
+    return TraceQueryTranslators.crossTableCategorical(
+      def.table,
+      TABLE_TIME_COLUMNS[def.table],
+      def.expression,
+      read,
+      needs,
+      def.key,
+    );
+  }
+
+  static crossRangeFacet(key: string, needs: FieldNeeds, read: RangeRead): FieldDef {
+    const def = TraceQueryFields.expressionFacet(key);
+    if (def.kind !== "range") {
+      throw new Error(`facet '${key}' is not a range facet`);
+    }
+    return TraceQueryTranslators.crossTableRange(
+      def.table,
+      TABLE_TIME_COLUMNS[def.table],
+      def.expression,
+      read,
+      needs,
+      def.key,
+    );
+  }
+}
 
 // ---------------------------------------------------------------------------
 // FIELD_DEFS — the exhaustive registry of filter fields.
@@ -204,45 +215,61 @@ export type KnownField =
   | "evaluatorPassed";
 
 export const FIELD_DEFS = {
-  status: categoricalFacet("status"),
-  origin: categoricalFacet("origin"),
-  service: categoricalFacet("service"),
+  status: TraceQueryFields.categoricalFacet("status"),
+  origin: TraceQueryFields.categoricalFacet("origin"),
+  service: TraceQueryFields.categoricalFacet("service"),
   model: MODEL_DEF,
-  user: categoricalFacet("user"),
-  conversation: categoricalFacet("conversation"),
-  customer: categoricalFacet("customer"),
+  user: TraceQueryFields.categoricalFacet("user"),
+  conversation: TraceQueryFields.categoricalFacet("conversation"),
+  customer: TraceQueryFields.categoricalFacet("customer"),
   scenarioRun: META_FIELD_DEFS.scenarioRun,
-  topic: categoricalFacet("topic"),
-  subtopic: categoricalFacet("subtopic"),
-  traceName: categoricalFacet("traceName"),
-  rootSpanType: categoricalFacet("rootSpanType"),
-  guardrail: categoricalFacet("guardrail"),
-  annotation: categoricalFacet("annotation"),
-  containsAi: categoricalFacet("containsAi"),
-  errorMessage: categoricalFacet("errorMessage"),
-  tokensEstimated: categoricalFacet("tokensEstimated"),
-  selectedPrompt: categoricalFacet("selectedPrompt"),
-  lastUsedPrompt: categoricalFacet("lastUsedPrompt"),
-  promptVersion: rangeFacet("promptVersion"),
+  topic: TraceQueryFields.categoricalFacet("topic"),
+  subtopic: TraceQueryFields.categoricalFacet("subtopic"),
+  traceName: TraceQueryFields.categoricalFacet("traceName"),
+  rootSpanType: TraceQueryFields.categoricalFacet("rootSpanType"),
+  guardrail: TraceQueryFields.categoricalFacet("guardrail"),
+  annotation: TraceQueryFields.categoricalFacet("annotation"),
+  containsAi: TraceQueryFields.categoricalFacet("containsAi"),
+  errorMessage: TraceQueryFields.categoricalFacet("errorMessage"),
+  tokensEstimated: TraceQueryFields.categoricalFacet("tokensEstimated"),
+  selectedPrompt: TraceQueryFields.categoricalFacet("selectedPrompt"),
+  lastUsedPrompt: TraceQueryFields.categoricalFacet("lastUsedPrompt"),
+  promptVersion: TraceQueryFields.rangeFacet("promptVersion"),
   label: LABEL_DEF,
-  cost: rangeFacet("cost"),
-  duration: rangeFacet("duration"),
-  tokens: rangeFacet("tokens"),
-  ttft: rangeFacet("ttft"),
-  ttlt: rangeFacet("ttlt"),
-  promptTokens: rangeFacet("promptTokens"),
-  completionTokens: rangeFacet("completionTokens"),
-  tokensPerSecond: rangeFacet("tokensPerSecond"),
-  spans: rangeFacet("spans"),
-  size: rangeFacet("size"),
+  cost: TraceQueryFields.rangeFacet("cost"),
+  duration: TraceQueryFields.rangeFacet("duration"),
+  tokens: TraceQueryFields.rangeFacet("tokens"),
+  ttft: TraceQueryFields.rangeFacet("ttft"),
+  ttlt: TraceQueryFields.rangeFacet("ttlt"),
+  promptTokens: TraceQueryFields.rangeFacet("promptTokens"),
+  completionTokens: TraceQueryFields.rangeFacet("completionTokens"),
+  tokensPerSecond: TraceQueryFields.rangeFacet("tokensPerSecond"),
+  spans: TraceQueryFields.rangeFacet("spans"),
+  size: TraceQueryFields.rangeFacet("size"),
   evaluator: EVALUATOR_DEF,
-  evaluatorStatus: crossCategoricalFacet("evaluatorStatus", "evaluations", evaluatorStatusRead),
-  evaluatorVerdict: crossCategoricalFacet("evaluatorVerdict", "evaluations", evaluatorVerdictRead),
-  evaluatorScore: crossRangeFacet("evaluatorScore", "evaluations", evaluatorScoreRead),
-  evaluatorLabel: crossCategoricalFacet("evaluatorLabel", "evaluations", evaluatorLabelRead),
-  spanType: crossCategoricalFacet("spanType", "spans", spanTypeRead),
-  spanName: crossCategoricalFacet("spanName", "spans", spanNameRead),
-  spanStatus: crossCategoricalFacet("spanStatus", "spans", spanStatusRead),
+  evaluatorStatus: TraceQueryFields.crossCategoricalFacet(
+    "evaluatorStatus",
+    "evaluations",
+    evaluatorStatusRead,
+  ),
+  evaluatorVerdict: TraceQueryFields.crossCategoricalFacet(
+    "evaluatorVerdict",
+    "evaluations",
+    evaluatorVerdictRead,
+  ),
+  evaluatorScore: TraceQueryFields.crossRangeFacet(
+    "evaluatorScore",
+    "evaluations",
+    evaluatorScoreRead,
+  ),
+  evaluatorLabel: TraceQueryFields.crossCategoricalFacet(
+    "evaluatorLabel",
+    "evaluations",
+    evaluatorLabelRead,
+  ),
+  spanType: TraceQueryFields.crossCategoricalFacet("spanType", "spans", spanTypeRead),
+  spanName: TraceQueryFields.crossCategoricalFacet("spanName", "spans", spanNameRead),
+  spanStatus: TraceQueryFields.crossCategoricalFacet("spanStatus", "spans", spanStatusRead),
   has: META_FIELD_DEFS.has,
   none: META_FIELD_DEFS.none,
   eval: META_FIELD_DEFS.eval,
@@ -259,7 +286,11 @@ export const FIELD_DEFS = {
   // Back-compat alias for the renamed `evaluatorVerdict` field. Any saved
   // query/lens using the old key keeps working; the SQL + predicate are the
   // same as `evaluatorVerdict`.
-  evaluatorPassed: crossCategoricalFacet("evaluatorVerdict", "evaluations", evaluatorVerdictRead),
+  evaluatorPassed: TraceQueryFields.crossCategoricalFacet(
+    "evaluatorVerdict",
+    "evaluations",
+    evaluatorVerdictRead,
+  ),
 } satisfies Record<KnownField, FieldDef>;
 
 /**

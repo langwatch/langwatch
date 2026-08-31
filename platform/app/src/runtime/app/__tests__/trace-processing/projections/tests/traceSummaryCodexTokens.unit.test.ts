@@ -89,7 +89,10 @@ describe("applySpanToSummary codex redundant-usage handling", () => {
           },
         });
 
-        const result = applySpanToSummary({ state: createInitState(), span });
+        const result = applySpanToSummary({
+          state: createInitState(),
+          span,
+        });
 
         expect(result.attributes["gen_ai.request.reasoning_effort"]).toBe("high");
       });
@@ -105,7 +108,10 @@ describe("applySpanToSummary codex redundant-usage handling", () => {
           },
         });
 
-        const result = applySpanToSummary({ state: createInitState(), span });
+        const result = applySpanToSummary({
+          state: createInitState(),
+          span,
+        });
 
         expect(result.attributes["gen_ai.request.reasoning_effort"]).toBeUndefined();
       });

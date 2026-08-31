@@ -325,7 +325,10 @@ describe("applySpanToSummary token timing from OTel instrumentation events (@reg
         ],
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(result.timeToFirstTokenMs).toBe(250);
     });
@@ -341,7 +344,10 @@ describe("applySpanToSummary token timing from OTel instrumentation events (@reg
         ],
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(result.timeToLastTokenMs).toBe(2800);
     });
@@ -362,7 +368,10 @@ describe("applySpanToSummary token timing from OTel instrumentation events (@reg
         ],
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(result.timeToFirstTokenMs).toBe(200);
     });
@@ -380,7 +389,10 @@ describe("applySpanToSummary token timing from OTel instrumentation events (@reg
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(result.timeToFirstTokenMs).toBe(2046);
     });
@@ -396,7 +408,10 @@ describe("applySpanToSummary token timing from OTel instrumentation events (@reg
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(result.timeToFirstTokenMs).toBe(3125);
     });
@@ -412,7 +427,10 @@ describe("applySpanToSummary token timing from OTel instrumentation events (@reg
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(result.timeToFirstTokenMs).toBe(300);
     });
@@ -430,7 +448,10 @@ describe("applySpanToSummary token timing from OTel instrumentation events (@reg
         ],
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(result.timeToFirstTokenMs).toBe(100);
       expect(result.timeToLastTokenMs).toBe(1900);
@@ -457,7 +478,10 @@ describe("applySpanToSummary token timing from OTel instrumentation events (@reg
         ],
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(result.timeToFirstTokenMs).toBe(150);
       expect(result.timeToLastTokenMs).toBe(1700);
@@ -476,7 +500,10 @@ describe("applySpanToSummary token timing from OTel instrumentation events (@reg
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(result.timeToFirstTokenMs).toBe(1716);
     });
@@ -492,7 +519,10 @@ describe("applySpanToSummary token timing from OTel instrumentation events (@reg
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(result.timeToFirstTokenMs).toBe(250);
     });
@@ -533,7 +563,10 @@ describe("applySpanToSummary cache + reasoning token roll-up", () => {
         state: createInitState(),
         span: first,
       });
-      const result = applySpanToSummary({ state: afterFirst, span: second });
+      const result = applySpanToSummary({
+        state: afterFirst,
+        span: second,
+      });
 
       // The last span carries no cache write, so reading the raw merged
       // attribute would drop it entirely — the sum is what keeps it visible.
@@ -551,7 +584,10 @@ describe("applySpanToSummary cache + reasoning token roll-up", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(result.attributes["langwatch.reserved.reasoning_tokens"]).toBeUndefined();
     });
@@ -566,7 +602,10 @@ describe("applySpanToSummary cache + reasoning token roll-up", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(result.attributes["langwatch.reserved.reasoning_tokens"]).toBe("512");
     });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { IdUtils } from "../experiment-run-id.process";
+import { ExperimentRunIds } from "../experiment-run-id.process";
 
-describe("IdUtils", () => {
+describe("ExperimentRunIds", () => {
   describe("generateDeterministicResultId", () => {
     const baseParams = {
       tenantId: "tenant-1",
@@ -13,38 +13,38 @@ describe("IdUtils", () => {
     };
 
     it("generates deterministic IDs (same input = same output)", () => {
-      const id1 = IdUtils.generateDeterministicResultId(baseParams);
-      const id2 = IdUtils.generateDeterministicResultId(baseParams);
+      const id1 = ExperimentRunIds.generateDeterministicResultId(baseParams);
+      const id2 = ExperimentRunIds.generateDeterministicResultId(baseParams);
 
       expect(id1).toBe(id2);
     });
 
     it("generates different IDs for different inputs", () => {
-      const baseId = IdUtils.generateDeterministicResultId(baseParams);
+      const baseId = ExperimentRunIds.generateDeterministicResultId(baseParams);
 
       // Different tenant
-      const differentTenant = IdUtils.generateDeterministicResultId({
+      const differentTenant = ExperimentRunIds.generateDeterministicResultId({
         ...baseParams,
         tenantId: "tenant-2",
       });
       expect(differentTenant).not.toBe(baseId);
 
       // Different run
-      const differentRun = IdUtils.generateDeterministicResultId({
+      const differentRun = ExperimentRunIds.generateDeterministicResultId({
         ...baseParams,
         runId: "run-456",
       });
       expect(differentRun).not.toBe(baseId);
 
       // Different index
-      const differentIndex = IdUtils.generateDeterministicResultId({
+      const differentIndex = ExperimentRunIds.generateDeterministicResultId({
         ...baseParams,
         index: 1,
       });
       expect(differentIndex).not.toBe(baseId);
 
       // Different target
-      const differentTarget = IdUtils.generateDeterministicResultId({
+      const differentTarget = ExperimentRunIds.generateDeterministicResultId({
         ...baseParams,
         targetId: "target-2",
       });
@@ -52,9 +52,9 @@ describe("IdUtils", () => {
     });
 
     it("generates different IDs for target vs evaluator results", () => {
-      const targetId = IdUtils.generateDeterministicResultId(baseParams);
+      const targetId = ExperimentRunIds.generateDeterministicResultId(baseParams);
 
-      const evaluatorId = IdUtils.generateDeterministicResultId({
+      const evaluatorId = ExperimentRunIds.generateDeterministicResultId({
         ...baseParams,
         resultType: "evaluator",
         evaluatorId: "eval-1",
@@ -64,13 +64,13 @@ describe("IdUtils", () => {
     });
 
     it("generates different IDs for different evaluators", () => {
-      const eval1Id = IdUtils.generateDeterministicResultId({
+      const eval1Id = ExperimentRunIds.generateDeterministicResultId({
         ...baseParams,
         resultType: "evaluator",
         evaluatorId: "eval-1",
       });
 
-      const eval2Id = IdUtils.generateDeterministicResultId({
+      const eval2Id = ExperimentRunIds.generateDeterministicResultId({
         ...baseParams,
         resultType: "evaluator",
         evaluatorId: "eval-2",
@@ -80,7 +80,7 @@ describe("IdUtils", () => {
     });
 
     it("returns a string ID", () => {
-      const id = IdUtils.generateDeterministicResultId(baseParams);
+      const id = ExperimentRunIds.generateDeterministicResultId(baseParams);
 
       expect(typeof id).toBe("string");
       expect(id.length).toBeGreaterThan(0);
@@ -88,7 +88,7 @@ describe("IdUtils", () => {
 
     it("throws when evaluator result has no evaluatorId", () => {
       expect(() =>
-        IdUtils.generateDeterministicResultId({
+        ExperimentRunIds.generateDeterministicResultId({
           ...baseParams,
           resultType: "evaluator",
           evaluatorId: null,
@@ -98,7 +98,7 @@ describe("IdUtils", () => {
 
     it("throws when target result has an evaluatorId", () => {
       expect(() =>
-        IdUtils.generateDeterministicResultId({
+        ExperimentRunIds.generateDeterministicResultId({
           ...baseParams,
           resultType: "target",
           evaluatorId: "eval-1",

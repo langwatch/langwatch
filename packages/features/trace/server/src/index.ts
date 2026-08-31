@@ -63,7 +63,7 @@ export {
   trackedEventSyncDedupId,
 } from "./subscribers/tracked-event-sync.subscriber";
 export { parseJsonStringValues } from "./services/otlp-trace-request.rules";
-export { IdUtils } from "./services/span-record-identity.rules";
+export { SpanRecordIdentity } from "./services/span-record-identity.rules";
 export { TraceListClickHouseRepository } from "./repositories/clickhouse/trace-list.repository";
 export { TraceSummaryClickHouseRepository } from "./repositories/clickhouse/trace-summary.repository";
 export { TraceAnalyticsClickHouseRepository } from "./repositories/clickhouse/trace-analytics.repository";
@@ -143,9 +143,7 @@ export type {
 } from "./ports/query-field-values.port";
 export { SpanStorageMapProjection } from "./projections/span-storage.projection";
 export {
-  applySpanToSummary,
   MAX_PROCESSED_SPANS,
-  mergeModelsMostRecentFirst,
   TraceSummaryFoldProjection,
 } from "./projections/trace-summary.projection";
 export {

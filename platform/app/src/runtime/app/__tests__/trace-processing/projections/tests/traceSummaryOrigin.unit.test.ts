@@ -48,7 +48,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(state.attributes["langwatch.origin"]).toBe("coding_agent");
     });
@@ -60,7 +63,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         resourceAttributes: { "langwatch.origin": "coding_agent" },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(state.attributes["langwatch.origin"]).toBe("simulation");
     });

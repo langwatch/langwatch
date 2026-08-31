@@ -34,10 +34,10 @@ import { trimAttributesForAnalytics } from "../services/analytics-attribute-trim
 import { anchorStorageTime, firstUsableAnchor } from "../services/trace-storage-anchor.rules";
 import {
   MAX_PROCESSED_SPANS,
-  mergeModelsMostRecentFirst,
   RESERVED_CACHE_CREATION_TOKENS,
   RESERVED_CACHE_READ_TOKENS,
   RESERVED_REASONING_TOKENS,
+  TraceSummaryFoldProjection,
 } from "./trace-summary.projection";
 
 /**
@@ -903,7 +903,7 @@ export class TraceAnalyticsFoldProjection
     let totalCompletionTokenCount = state.totalCompletionTokenCount;
     const model = contribution.liftedAttributes["langwatch.model"];
     if (typeof model === "string" && model.length > 0) {
-      models = mergeModelsMostRecentFirst(models, [model]);
+      models = TraceSummaryFoldProjection.mergeModelsMostRecentFirst(models, [model]);
     }
     const cost = Number(contribution.liftedAttributes["langwatch.cost.usd"]);
     if (Number.isFinite(cost) && cost > 0) {
@@ -1267,7 +1267,7 @@ export class TraceAnalyticsFoldProjection
     TraceAnalyticsFoldProjection.accumulateReservedTokenSums(attributes, span, runtime);
 
     const newModels = runtime.spanCost.extractModelsFromSpan(span);
-    const models = mergeModelsMostRecentFirst(state.models, newModels);
+    const models = TraceSummaryFoldProjection.mergeModelsMostRecentFirst(state.models, newModels);
 
     // Mirror the trace-summary fold's trace-level model metadata stamp so the
     // slim table's Attributes stay consistent with trace_summaries.

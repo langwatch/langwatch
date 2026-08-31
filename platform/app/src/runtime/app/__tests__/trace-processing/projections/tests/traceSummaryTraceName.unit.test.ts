@@ -69,7 +69,10 @@ describe("applySpanToSummary() trace name extraction", () => {
         name: "OrderProcessingAgent",
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(state.traceName).toBe("OrderProcessingAgent");
     });
@@ -83,7 +86,10 @@ describe("applySpanToSummary() trace name extraction", () => {
         name: "",
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span,
+      });
 
       expect(state.traceName).toBe("");
     });
@@ -283,7 +289,10 @@ describe("applySpanToSummary() trace name extraction", () => {
         name: "OrderAgent",
         startTimeUnixMs: 1000,
       });
-      let state = applySpanToSummary({ state: createInitState(), span: root });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: root,
+      });
       expect(state.traceName).toBe("OrderAgent");
 
       state = projection.apply(

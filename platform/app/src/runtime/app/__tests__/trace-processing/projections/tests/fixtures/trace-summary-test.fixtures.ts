@@ -11,7 +11,6 @@ import {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
-import { applySpanToSummary as applySpanToSummaryWithServices } from "@langwatch/trace-server";
 import { AppTraceProjectionsAdapter } from "~/runtime/app/trace-projections.adapter";
 
 const traceCanonicalisation = TraceCanonicalisationService.create();
@@ -27,7 +26,7 @@ export function applySpanToSummary(input: {
   state: TraceSummaryData;
   span: NormalizedSpan;
 }): TraceSummaryData {
-  return applySpanToSummaryWithServices({
+  return TraceSummaryFoldProjection.applySpanToSummary({
     ...input,
     runtime: traceProjectionRuntime,
   });

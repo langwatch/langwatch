@@ -96,158 +96,6 @@ export const RESERVED_CONTEXT_SIZE_TOKENS = "langwatch.reserved.context_size_tok
 export const RESERVED_CONTEXT_SIZE_AT_MS = "langwatch.reserved.context_size_at_ms";
 
 /**
- * Merge the models seen on one span (or log turn) into the running list,
- * most-recently-used FIRST. `models[0]` is therefore always the last model
- * the trace actually used — the conversational/primary model — rather than
- * an alphabetical pick (which surfaced the title-generation haiku call over
- * the opus turn it belonged to) or the first-touched model. Every consumer
- * that reads `models[0]` as "the model" gets the right one, and the surplus
- * spills into the "+N" badge in encounter-recency order.
- */
-export function mergeModelsMostRecentFirst(existing: string[], incoming: string[]): string[] {
-  const fresh = [...new Set(incoming)].filter((m) => m.length > 0);
-  if (fresh.length === 0) return existing;
-  const rest = existing.filter((m) => !fresh.includes(m));
-  return [...fresh, ...rest];
-}
-
-/** Add a positive per-span delta onto a reserved running-sum attribute. */
-function addReservedTokenSum(attributes: Record<string, string>, key: string, delta: number): void {
-  if (delta <= 0) return;
-  const prior = Number(attributes[key] ?? "0");
-  attributes[key] = String((Number.isFinite(prior) ? prior : 0) + delta);
-}
-
-/**
- * How full the context window already was when this trace started working:
- * the cached-plus-freshly-written input of its EARLIEST model call. Unlike
- * every other token number on a trace this is deliberately NOT a sum, and the
- * difference matters: a coding-agent turn re-sends its whole conversation on
- * every call, so summed cache reads run to millions while the thing a reader
- * actually wants ("how much was I already carrying") is a single call's worth.
- *
- * Earliest by span start time rather than fold order: spans arrive in whatever
- * order their exporter batched them.
- */
-function recordContextSize({
-  attributes,
-  span,
-  cacheTokens,
-}: {
-  attributes: Record<string, string>;
-  span: NormalizedSpan;
-  cacheTokens: { cacheReadTokens: number; cacheCreationTokens: number };
-}): void {
-  const contextTokens = cacheTokens.cacheReadTokens + cacheTokens.cacheCreationTokens;
-  if (contextTokens <= 0) return;
-  const priorAtMs = Number(attributes[RESERVED_CONTEXT_SIZE_AT_MS]);
-  if (Number.isFinite(priorAtMs) && priorAtMs <= span.startTimeUnixMs) return;
-  attributes[RESERVED_CONTEXT_SIZE_TOKENS] = String(contextTokens);
-  attributes[RESERVED_CONTEXT_SIZE_AT_MS] = String(span.startTimeUnixMs);
-}
-
-/** @internal Exported for unit testing */
-export function applySpanToSummary({
-  state,
-  span,
-  runtime,
-}: {
-  state: TraceSummaryData;
-  span: NormalizedSpan;
-  runtime: TraceProjectionRuntimeService;
-}): TraceSummaryData {
-  if (SYNTHETIC_TRACE_SPAN_NAMES.has(span.name)) {
-    // Synthetic spans (e.g. `langwatch.track_event`) must not contribute to
-    // timing/cost/I-O -- they don't represent real execution. Their payload
-    // (the `/api/track_event` endpoint stuffs the user-tracked event into
-    // `span.events`) is still persisted to stored_spans like any other span,
-    // so the trace-level events list is derived from there at read time.
-    return state;
-  }
-
-  const timing = runtime.spanTiming.accumulateTiming({ state, span });
-  const tokens = runtime.spanCost.accumulateTokens({
-    state,
-    span,
-    totalDurationMs: timing.totalDurationMs,
-  });
-  const status = runtime.spanStatus.accumulateStatus({ state, span });
-  const io = runtime.traceIo.accumulateIO({ state, span });
-  const attributes = runtime.traceAttributes.accumulateAttributes({
-    state,
-    span,
-    outputSource: io.outputSource,
-    inputIsFallback: io.inputIsFallback,
-    outputIsFallback: io.outputIsFallback,
-    inputMediaRefs: io.inputMediaRefs,
-    outputMediaRefs: io.outputMediaRefs,
-  });
-
-  // Roll the per-span cache / reasoning token counts into trace-level sums.
-  // The merged attribute map only carries identity/metadata keys, so the
-  // raw gen_ai.usage.cache_* numbers never reach the drawer — fold the sums
-  // in under reserved keys the popover reads directly.
-  const cacheTokens = runtime.spanCost.isTokenAccumulationSkipped(span)
-    ? { cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 }
-    : runtime.spanCost.extractCacheTokens(span);
-  addReservedTokenSum(attributes, RESERVED_CACHE_READ_TOKENS, cacheTokens.cacheReadTokens);
-  addReservedTokenSum(attributes, RESERVED_CACHE_CREATION_TOKENS, cacheTokens.cacheCreationTokens);
-  addReservedTokenSum(attributes, RESERVED_REASONING_TOKENS, cacheTokens.reasoningTokens);
-  recordContextSize({ attributes, span, cacheTokens });
-
-  const newModels = runtime.spanCost.extractModelsFromSpan(span);
-  const models = mergeModelsMostRecentFirst(state.models, newModels);
-
-  // Surface the span-derived models as trace-level metadata (primary +
-  // set) so `trace.metadata.model` is populated for API consumers and
-  // metadata filters, not just the Models column.
-  runtime.traceAttributes.stampModelMetadata({ attributes, models });
-
-  // Precedence rules for traceName / rootSpanType / rootSpanStartTimeMs
-  // live in TraceNameResolutionService — see that file for the full set.
-  const {
-    traceName,
-    rootSpanType,
-    rootSpanStartTimeMs,
-    traceNameFromFallback,
-    rootMetadataFromFallback,
-  } = runtime.traceName.resolveFromSpan({ state, span });
-
-  const spanType = String(span.spanAttributes[ATTR_KEYS.SPAN_TYPE] ?? "");
-  const containsAi = state.containsAi || AI_SPAN_TYPES.has(spanType);
-
-  const promptRollup = runtime.tracePrompt.accumulate({
-    state,
-    span,
-  });
-
-  return {
-    ...state,
-    traceId: state.traceId || span.traceId,
-    spanCount: state.spanCount + 1,
-    computedIOSchemaVersion: COMPUTED_IO_SCHEMA_VERSION,
-    occurredAt: timing.occurredAt,
-    totalDurationMs: timing.totalDurationMs,
-    models,
-    traceName,
-    traceNameFromFallback,
-    rootMetadataFromFallback,
-    rootSpanStartTimeMs,
-    ...tokens,
-    ...status,
-    computedInput: io.computedInput,
-    computedOutput: io.computedOutput,
-    outputFromRootSpan: io.outputFromRootSpan,
-    outputSpanEndTimeMs: io.outputSpanEndTimeMs,
-    blockedByGuardrail: io.blockedByGuardrail,
-    rootSpanType,
-    containsAi,
-    ...promptRollup,
-    attributes,
-  };
-}
-
-/**
  * A single log record's normalized contribution to the trace summary fold.
  * Both log-path events fold identically once normalized to this shape:
  * `log_record_received` builds it from the raw record (IO extraction +
@@ -261,145 +109,6 @@ interface LogContribution {
   timeUnixMs: number;
   liftedAttributes: Record<string, unknown>;
   nonBillable: boolean;
-}
-
-/**
- * Fold one log contribution into the summary: bump the reserved log
- * count, apply the input/output override semantics, merge the lifted
- * canonical langwatch.* attributes, and mirror them onto the top-level
- * TraceSummary columns the v2 drawer + /traces list read directly
- * (Models / TotalCost / TotalPromptTokenCount /
- * TotalCompletionTokenCount). Without this mirror a Path B log-only
- * trace ends up with the right strings on state.attributes but
- * trace.totalCost still NULL, so the drawer chip and the cost column
- * on /traces both render empty even though the data is sitting in CH.
- *
- * Each api_request event is its OWN turn. Cost + tokens are additive
- * across turns; models are a deduped set. Reading from
- * contribution.liftedAttributes (this event's contribution) rather
- * than mergedAttributes (the cumulative latest snapshot) is critical
- * for cost so we don't double-count across replays.
- */
-function applyLogContribution({
-  state,
-  contribution,
-  runtime,
-}: {
-  state: TraceSummaryData;
-  contribution: LogContribution;
-  runtime: TraceProjectionRuntimeService;
-}): TraceSummaryData {
-  const mergedAttributes = { ...state.attributes };
-  const logCount = parseInt(mergedAttributes["langwatch.reserved.log_record_count"] ?? "0", 10);
-  mergedAttributes["langwatch.reserved.log_record_count"] = String(logCount + 1);
-
-  let computedInput = state.computedInput;
-  let computedOutput = state.computedOutput;
-  let outputSpanEndTimeMs = state.outputSpanEndTimeMs;
-  const currentOutputSource =
-    state.attributes["langwatch.reserved.output_source"] ?? OUTPUT_SOURCE.INFERRED;
-  const currentInputIsFallback =
-    state.attributes["langwatch.reserved.input_is_fallback"] === "true";
-  const currentOutputIsFallback =
-    state.attributes["langwatch.reserved.output_is_fallback"] === "true";
-
-  if (contribution.input !== null && (computedInput === null || currentInputIsFallback)) {
-    computedInput = contribution.input;
-    delete mergedAttributes["langwatch.reserved.input_is_fallback"];
-  }
-
-  if (contribution.output !== null) {
-    const shouldReplace =
-      currentOutputIsFallback ||
-      TraceIOAccumulationService.shouldOverrideOutput({
-        isRoot: false,
-        outputFromRoot: state.outputFromRootSpan,
-        isExplicit: false,
-        currentIsExplicit: currentOutputSource === OUTPUT_SOURCE.EXPLICIT,
-        endTime: contribution.timeUnixMs,
-        currentEndTime: outputSpanEndTimeMs,
-      });
-    if (shouldReplace) {
-      computedOutput = contribution.output;
-      outputSpanEndTimeMs = contribution.timeUnixMs;
-      mergedAttributes["langwatch.reserved.output_source"] = OUTPUT_SOURCE.INFERRED;
-      delete mergedAttributes["langwatch.reserved.output_is_fallback"];
-    }
-  }
-
-  // The per-TTL cache-creation lift is a PER-CALL value that must accumulate,
-  // not overwrite: sum it into the reserved running totals and keep the
-  // per-call keys out of the generic last-write-wins merge below.
-  const cacheCreation5m = Number(
-    contribution.liftedAttributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_5M_INPUT_TOKENS],
-  );
-  if (Number.isFinite(cacheCreation5m)) {
-    addReservedTokenSum(mergedAttributes, RESERVED_CACHE_CREATION_5M_TOKENS, cacheCreation5m);
-  }
-  const cacheCreation1h = Number(
-    contribution.liftedAttributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS],
-  );
-  if (Number.isFinite(cacheCreation1h)) {
-    addReservedTokenSum(mergedAttributes, RESERVED_CACHE_CREATION_1H_TOKENS, cacheCreation1h);
-  }
-
-  // The lifts are merged into mergedAttributes here so the reserved +
-  // log_count keys set above remain intact.
-  for (const [key, value] of Object.entries(contribution.liftedAttributes)) {
-    if (
-      key === ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_5M_INPUT_TOKENS ||
-      key === ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS
-    ) {
-      continue;
-    }
-    mergedAttributes[key] = String(value);
-  }
-
-  let models = state.models;
-  let totalCost = state.totalCost;
-  let nonBilledCost = state.nonBilledCost;
-  let totalPromptTokenCount = state.totalPromptTokenCount;
-  let totalCompletionTokenCount = state.totalCompletionTokenCount;
-  const model = contribution.liftedAttributes["langwatch.model"];
-  if (typeof model === "string" && model.length > 0) {
-    models = mergeModelsMostRecentFirst(models, [model]);
-  }
-  const cost = Number(contribution.liftedAttributes["langwatch.cost.usd"]);
-  if (Number.isFinite(cost) && cost > 0) {
-    totalCost = (totalCost ?? 0) + cost;
-    if (contribution.nonBillable) {
-      nonBilledCost = (nonBilledCost ?? 0) + cost;
-    }
-  }
-  const inputTokens = Number(contribution.liftedAttributes["langwatch.input_tokens"]);
-  if (Number.isFinite(inputTokens) && inputTokens > 0) {
-    totalPromptTokenCount = (totalPromptTokenCount ?? 0) + inputTokens;
-  }
-  const outputTokens = Number(contribution.liftedAttributes["langwatch.output_tokens"]);
-  if (Number.isFinite(outputTokens) && outputTokens > 0) {
-    totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + outputTokens;
-  }
-
-  // Same trace-level model metadata stamp the span path applies, so
-  // log-only (Path B) traces also surface `metadata.model`.
-  runtime.traceAttributes.stampModelMetadata({
-    attributes: mergedAttributes,
-    models,
-  });
-
-  return {
-    ...state,
-    traceId: state.traceId || contribution.traceId,
-    computedInput,
-    computedOutput,
-    outputSpanEndTimeMs,
-    attributes: mergedAttributes,
-    models,
-    totalCost,
-    nonBilledCost,
-    totalPromptTokenCount,
-    totalCompletionTokenCount,
-  };
 }
 
 // ─── Fold projection class ──────────────────────────────────────────
@@ -636,7 +345,7 @@ export class TraceSummaryFoldProjection
     this.runtime.spanNormalization.enrichRagContextIds(normalizedSpan);
 
     return {
-      ...applySpanToSummary({
+      ...TraceSummaryFoldProjection.applySpanToSummary({
         state,
         span: normalizedSpan,
         runtime: this.runtime,
@@ -675,7 +384,7 @@ export class TraceSummaryFoldProjection
       attributes: event.data.attributes,
     }).attributes;
 
-    return applyLogContribution({
+    return TraceSummaryFoldProjection.applyLogContribution({
       state,
       runtime: this.runtime,
       contribution: {
@@ -693,7 +402,7 @@ export class TraceSummaryFoldProjection
   }
 
   handleTraceLogContributed(event: LogContributedEvent, state: TraceSummaryData): TraceSummaryData {
-    return applyLogContribution({
+    return TraceSummaryFoldProjection.applyLogContribution({
       state,
       runtime: this.runtime,
       contribution: {
@@ -799,6 +508,321 @@ export class TraceSummaryFoldProjection
       // came before is no longer a "fallback" guess that should be
       // displaced by a later real-root span.
       traceNameFromFallback: false,
+    };
+  }
+
+  /** Add a positive per-span delta onto a reserved running-sum attribute. */
+  private static addReservedTokenSum(
+    attributes: Record<string, string>,
+    key: string,
+    delta: number,
+  ): void {
+    if (delta <= 0) return;
+    const prior = Number(attributes[key] ?? "0");
+    attributes[key] = String((Number.isFinite(prior) ? prior : 0) + delta);
+  }
+
+  /**
+   * How full the context window already was when this trace started working:
+   * the cached-plus-freshly-written input of its EARLIEST model call. Unlike
+   * every other token number on a trace this is deliberately NOT a sum, and the
+   * difference matters: a coding-agent turn re-sends its whole conversation on
+   * every call, so summed cache reads run to millions while the thing a reader
+   * actually wants ("how much was I already carrying") is a single call's worth.
+   *
+   * Earliest by span start time rather than fold order: spans arrive in whatever
+   * order their exporter batched them.
+   */
+  private static recordContextSize({
+    attributes,
+    span,
+    cacheTokens,
+  }: {
+    attributes: Record<string, string>;
+    span: NormalizedSpan;
+    cacheTokens: { cacheReadTokens: number; cacheCreationTokens: number };
+  }): void {
+    const contextTokens = cacheTokens.cacheReadTokens + cacheTokens.cacheCreationTokens;
+    if (contextTokens <= 0) return;
+    const priorAtMs = Number(attributes[RESERVED_CONTEXT_SIZE_AT_MS]);
+    if (Number.isFinite(priorAtMs) && priorAtMs <= span.startTimeUnixMs) return;
+    attributes[RESERVED_CONTEXT_SIZE_TOKENS] = String(contextTokens);
+    attributes[RESERVED_CONTEXT_SIZE_AT_MS] = String(span.startTimeUnixMs);
+  }
+
+  /**
+   * Fold one log contribution into the summary: bump the reserved log
+   * count, apply the input/output override semantics, merge the lifted
+   * canonical langwatch.* attributes, and mirror them onto the top-level
+   * TraceSummary columns the v2 drawer + /traces list read directly
+   * (Models / TotalCost / TotalPromptTokenCount /
+   * TotalCompletionTokenCount). Without this mirror a Path B log-only
+   * trace ends up with the right strings on state.attributes but
+   * trace.totalCost still NULL, so the drawer chip and the cost column
+   * on /traces both render empty even though the data is sitting in CH.
+   *
+   * Each api_request event is its OWN turn. Cost + tokens are additive
+   * across turns; models are a deduped set. Reading from
+   * contribution.liftedAttributes (this event's contribution) rather
+   * than mergedAttributes (the cumulative latest snapshot) is critical
+   * for cost so we don't double-count across replays.
+   */
+  private static applyLogContribution({
+    state,
+    contribution,
+    runtime,
+  }: {
+    state: TraceSummaryData;
+    contribution: LogContribution;
+    runtime: TraceProjectionRuntimeService;
+  }): TraceSummaryData {
+    const mergedAttributes = { ...state.attributes };
+    const logCount = parseInt(mergedAttributes["langwatch.reserved.log_record_count"] ?? "0", 10);
+    mergedAttributes["langwatch.reserved.log_record_count"] = String(logCount + 1);
+
+    let computedInput = state.computedInput;
+    let computedOutput = state.computedOutput;
+    let outputSpanEndTimeMs = state.outputSpanEndTimeMs;
+    const currentOutputSource =
+      state.attributes["langwatch.reserved.output_source"] ?? OUTPUT_SOURCE.INFERRED;
+    const currentInputIsFallback =
+      state.attributes["langwatch.reserved.input_is_fallback"] === "true";
+    const currentOutputIsFallback =
+      state.attributes["langwatch.reserved.output_is_fallback"] === "true";
+
+    if (contribution.input !== null && (computedInput === null || currentInputIsFallback)) {
+      computedInput = contribution.input;
+      delete mergedAttributes["langwatch.reserved.input_is_fallback"];
+    }
+
+    if (contribution.output !== null) {
+      const shouldReplace =
+        currentOutputIsFallback ||
+        TraceIOAccumulationService.shouldOverrideOutput({
+          isRoot: false,
+          outputFromRoot: state.outputFromRootSpan,
+          isExplicit: false,
+          currentIsExplicit: currentOutputSource === OUTPUT_SOURCE.EXPLICIT,
+          endTime: contribution.timeUnixMs,
+          currentEndTime: outputSpanEndTimeMs,
+        });
+      if (shouldReplace) {
+        computedOutput = contribution.output;
+        outputSpanEndTimeMs = contribution.timeUnixMs;
+        mergedAttributes["langwatch.reserved.output_source"] = OUTPUT_SOURCE.INFERRED;
+        delete mergedAttributes["langwatch.reserved.output_is_fallback"];
+      }
+    }
+
+    // The per-TTL cache-creation lift is a PER-CALL value that must accumulate,
+    // not overwrite: sum it into the reserved running totals and keep the
+    // per-call keys out of the generic last-write-wins merge below.
+    const cacheCreation5m = Number(
+      contribution.liftedAttributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_5M_INPUT_TOKENS],
+    );
+    if (Number.isFinite(cacheCreation5m)) {
+      TraceSummaryFoldProjection.addReservedTokenSum(
+        mergedAttributes,
+        RESERVED_CACHE_CREATION_5M_TOKENS,
+        cacheCreation5m,
+      );
+    }
+    const cacheCreation1h = Number(
+      contribution.liftedAttributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS],
+    );
+    if (Number.isFinite(cacheCreation1h)) {
+      TraceSummaryFoldProjection.addReservedTokenSum(
+        mergedAttributes,
+        RESERVED_CACHE_CREATION_1H_TOKENS,
+        cacheCreation1h,
+      );
+    }
+
+    // The lifts are merged into mergedAttributes here so the reserved +
+    // log_count keys set above remain intact.
+    for (const [key, value] of Object.entries(contribution.liftedAttributes)) {
+      if (
+        key === ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_5M_INPUT_TOKENS ||
+        key === ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS
+      ) {
+        continue;
+      }
+      mergedAttributes[key] = String(value);
+    }
+
+    let models = state.models;
+    let totalCost = state.totalCost;
+    let nonBilledCost = state.nonBilledCost;
+    let totalPromptTokenCount = state.totalPromptTokenCount;
+    let totalCompletionTokenCount = state.totalCompletionTokenCount;
+    const model = contribution.liftedAttributes["langwatch.model"];
+    if (typeof model === "string" && model.length > 0) {
+      models = TraceSummaryFoldProjection.mergeModelsMostRecentFirst(models, [model]);
+    }
+    const cost = Number(contribution.liftedAttributes["langwatch.cost.usd"]);
+    if (Number.isFinite(cost) && cost > 0) {
+      totalCost = (totalCost ?? 0) + cost;
+      if (contribution.nonBillable) {
+        nonBilledCost = (nonBilledCost ?? 0) + cost;
+      }
+    }
+    const inputTokens = Number(contribution.liftedAttributes["langwatch.input_tokens"]);
+    if (Number.isFinite(inputTokens) && inputTokens > 0) {
+      totalPromptTokenCount = (totalPromptTokenCount ?? 0) + inputTokens;
+    }
+    const outputTokens = Number(contribution.liftedAttributes["langwatch.output_tokens"]);
+    if (Number.isFinite(outputTokens) && outputTokens > 0) {
+      totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + outputTokens;
+    }
+
+    // Same trace-level model metadata stamp the span path applies, so
+    // log-only (Path B) traces also surface `metadata.model`.
+    runtime.traceAttributes.stampModelMetadata({
+      attributes: mergedAttributes,
+      models,
+    });
+
+    return {
+      ...state,
+      traceId: state.traceId || contribution.traceId,
+      computedInput,
+      computedOutput,
+      outputSpanEndTimeMs,
+      attributes: mergedAttributes,
+      models,
+      totalCost,
+      nonBilledCost,
+      totalPromptTokenCount,
+      totalCompletionTokenCount,
+    };
+  }
+
+  /**
+   * Merge the models seen on one span (or log turn) into the running list,
+   * most-recently-used FIRST. `models[0]` is therefore always the last model
+   * the trace actually used — the conversational/primary model — rather than
+   * an alphabetical pick (which surfaced the title-generation haiku call over
+   * the opus turn it belonged to) or the first-touched model. Every consumer
+   * that reads `models[0]` as "the model" gets the right one, and the surplus
+   * spills into the "+N" badge in encounter-recency order.
+   */
+  static mergeModelsMostRecentFirst(existing: string[], incoming: string[]): string[] {
+    const fresh = [...new Set(incoming)].filter((m) => m.length > 0);
+    if (fresh.length === 0) return existing;
+    const rest = existing.filter((m) => !fresh.includes(m));
+    return [...fresh, ...rest];
+  }
+
+  /** @internal Exported for unit testing */
+  static applySpanToSummary({
+    state,
+    span,
+    runtime,
+  }: {
+    state: TraceSummaryData;
+    span: NormalizedSpan;
+    runtime: TraceProjectionRuntimeService;
+  }): TraceSummaryData {
+    if (SYNTHETIC_TRACE_SPAN_NAMES.has(span.name)) {
+      // Synthetic spans (e.g. `langwatch.track_event`) must not contribute to
+      // timing/cost/I-O -- they don't represent real execution. Their payload
+      // (the `/api/track_event` endpoint stuffs the user-tracked event into
+      // `span.events`) is still persisted to stored_spans like any other span,
+      // so the trace-level events list is derived from there at read time.
+      return state;
+    }
+
+    const timing = runtime.spanTiming.accumulateTiming({ state, span });
+    const tokens = runtime.spanCost.accumulateTokens({
+      state,
+      span,
+      totalDurationMs: timing.totalDurationMs,
+    });
+    const status = runtime.spanStatus.accumulateStatus({ state, span });
+    const io = runtime.traceIo.accumulateIO({ state, span });
+    const attributes = runtime.traceAttributes.accumulateAttributes({
+      state,
+      span,
+      outputSource: io.outputSource,
+      inputIsFallback: io.inputIsFallback,
+      outputIsFallback: io.outputIsFallback,
+      inputMediaRefs: io.inputMediaRefs,
+      outputMediaRefs: io.outputMediaRefs,
+    });
+
+    // Roll the per-span cache / reasoning token counts into trace-level sums.
+    // The merged attribute map only carries identity/metadata keys, so the
+    // raw gen_ai.usage.cache_* numbers never reach the drawer — fold the sums
+    // in under reserved keys the popover reads directly.
+    const cacheTokens = runtime.spanCost.isTokenAccumulationSkipped(span)
+      ? { cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 }
+      : runtime.spanCost.extractCacheTokens(span);
+    TraceSummaryFoldProjection.addReservedTokenSum(
+      attributes,
+      RESERVED_CACHE_READ_TOKENS,
+      cacheTokens.cacheReadTokens,
+    );
+    TraceSummaryFoldProjection.addReservedTokenSum(
+      attributes,
+      RESERVED_CACHE_CREATION_TOKENS,
+      cacheTokens.cacheCreationTokens,
+    );
+    TraceSummaryFoldProjection.addReservedTokenSum(
+      attributes,
+      RESERVED_REASONING_TOKENS,
+      cacheTokens.reasoningTokens,
+    );
+    TraceSummaryFoldProjection.recordContextSize({ attributes, span, cacheTokens });
+
+    const newModels = runtime.spanCost.extractModelsFromSpan(span);
+    const models = TraceSummaryFoldProjection.mergeModelsMostRecentFirst(state.models, newModels);
+
+    // Surface the span-derived models as trace-level metadata (primary +
+    // set) so `trace.metadata.model` is populated for API consumers and
+    // metadata filters, not just the Models column.
+    runtime.traceAttributes.stampModelMetadata({ attributes, models });
+
+    // Precedence rules for traceName / rootSpanType / rootSpanStartTimeMs
+    // live in TraceNameResolutionService — see that file for the full set.
+    const {
+      traceName,
+      rootSpanType,
+      rootSpanStartTimeMs,
+      traceNameFromFallback,
+      rootMetadataFromFallback,
+    } = runtime.traceName.resolveFromSpan({ state, span });
+
+    const spanType = String(span.spanAttributes[ATTR_KEYS.SPAN_TYPE] ?? "");
+    const containsAi = state.containsAi || AI_SPAN_TYPES.has(spanType);
+
+    const promptRollup = runtime.tracePrompt.accumulate({
+      state,
+      span,
+    });
+
+    return {
+      ...state,
+      traceId: state.traceId || span.traceId,
+      spanCount: state.spanCount + 1,
+      computedIOSchemaVersion: COMPUTED_IO_SCHEMA_VERSION,
+      occurredAt: timing.occurredAt,
+      totalDurationMs: timing.totalDurationMs,
+      models,
+      traceName,
+      traceNameFromFallback,
+      rootMetadataFromFallback,
+      rootSpanStartTimeMs,
+      ...tokens,
+      ...status,
+      computedInput: io.computedInput,
+      computedOutput: io.computedOutput,
+      outputFromRootSpan: io.outputFromRootSpan,
+      outputSpanEndTimeMs: io.outputSpanEndTimeMs,
+      blockedByGuardrail: io.blockedByGuardrail,
+      rootSpanType,
+      containsAi,
+      ...promptRollup,
+      attributes,
     };
   }
 }

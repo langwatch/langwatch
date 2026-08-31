@@ -12,7 +12,7 @@ import type {
   NormalizedSpan,
 } from "@langwatch/trace-contract";
 import { TraceRequestUtils } from "./otlp-trace-request.rules";
-import { IdUtils } from "./span-record-identity.rules";
+import { SpanRecordIdentity } from "./span-record-identity.rules";
 
 export class SpanNormalizationPipelineService {
   private readonly logger = createLogger(
@@ -96,7 +96,7 @@ export class SpanNormalizationPipelineService {
     );
 
     return {
-      id: IdUtils.generateDeterministicSpanRecordIdFromData(
+      id: SpanRecordIdentity.generateDeterministicSpanRecordIdFromData(
         tenantId,
         traceId,
         spanId,

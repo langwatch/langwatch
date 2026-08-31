@@ -186,7 +186,10 @@ describe("applySpanToSummary I/O logic", () => {
         return null;
       });
 
-      let state = applySpanToSummary({ state: createInitState(), span: span1 });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: span1,
+      });
       expect(state.computedOutput).toBe("first output");
       expect(state.outputSpanEndTimeMs).toBe(1500);
 
@@ -350,7 +353,10 @@ describe("applySpanToSummary I/O logic", () => {
         return null;
       });
 
-      let state = applySpanToSummary({ state: createInitState(), span: span1 });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: span1,
+      });
       expect(state.computedOutput).toBe("step 1 output");
 
       // Second explicit output at later endTime 2000
