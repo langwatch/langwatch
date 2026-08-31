@@ -38,16 +38,27 @@ function hasOrganizationLogin(): boolean {
   if (!fs.existsSync(cliPath)) return false;
   const env = { ...process.env };
   delete env.LANGWATCH_API_KEY;
-  const probe = spawnSync(process.execPath, [cliPath, "api-keys", "list"], {
-    env,
-    encoding: "utf-8",
-    stdio: ["ignore", "ignore", "ignore"],
-  });
-  return probe.status === 0;
+  // A directory of its own: the CLI reads the .env of its working directory,
+  // and skills/.env carries the project key this probe must not see.
+  const probeDir = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-org-probe-"));
+  try {
+    const probe = spawnSync(process.execPath, [cliPath, "api-keys", "list"], {
+      cwd: probeDir,
+      env,
+      encoding: "utf-8",
+      stdio: ["ignore", "ignore", "ignore"],
+      // A binary that hangs must not hold the whole file: the probe only
+      // reads one short list, so 15 seconds is already generous.
+      timeout: 15_000,
+    });
+    return probe.status === 0;
+  } finally {
+    fs.rmSync(probeDir, { recursive: true, force: true });
+  }
 }
 
 describe("LangWatch CLI Projects & API Keys — Agent Usability", () => {
-  it.skipIf(isCI)(
+  it.skipIf(isCI || !hasOrganizationLogin())(
     "agent uses CLI to list and create projects",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -56,26 +67,26 @@ describe("LangWatch CLI Projects & API Keys — Agent Usability", () => {
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
-        [
-          `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY ?? ""}`,
-          process.env.LANGWATCH_ENDPOINT
-            ? `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}`
-            : "",
-        ]
-          .filter(Boolean)
-          .join("\n") + "\n",
+        process.env.LANGWATCH_ENDPOINT
+          ? `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}\n`
+          : "",
       );
       setupLocalCli(tempFolder);
 
+      // No project key here on purpose: `projects` reaches the organization,
+      // refuses a project key, and reads the credential of `langwatch login`.
       fs.writeFileSync(
         path.join(tempFolder, "CLAUDE.md"),
         `# IMPORTANT: Use the langwatch CLI via Bash, NOT MCP tools
 DO NOT use any MCP tools (mcp__claude_ai_LangWatch__*). Use ONLY the Bash tool to run the \`langwatch\` CLI.
 
+\`projects\` manages the projects of the whole organization, so it uses the
+credential of \`langwatch login\`. Do not set LANGWATCH_API_KEY: a project key
+is refused on these commands.
+
 First, set up the environment:
 \`\`\`bash
 export PATH="./bin:$PATH"
-export $(grep LANGWATCH_API_KEY .env)
 ${process.env.LANGWATCH_ENDPOINT ? `export $(grep LANGWATCH_ENDPOINT .env)` : ""}
 \`\`\`
 
@@ -91,7 +102,10 @@ Then run CLI commands directly:
         description:
           "Developer wants to list and create projects using the LangWatch CLI (not MCP).",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createClaudeCodeAgent({
+            workingDirectory: tempFolder,
+            omitEnvKeys: ["LANGWATCH_API_KEY"],
+          }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -104,7 +118,7 @@ Then run CLI commands directly:
         ],
         script: [
           scenario.user(
-            'Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export PATH="./bin:$PATH" && export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch projects list`\n3. `langwatch projects create --name "CLI Test Project" --language python --framework langchain --new-team-name "CLI Team"`\n\nDo NOT use MCP tools. Use ONLY the Bash tool.',
+            'Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export PATH="./bin:$PATH"`\n2. `langwatch projects list`\n3. `langwatch projects create --name "CLI Test Project" --language python --framework langchain --new-team-name "CLI Team"`\n\nDo NOT use MCP tools. Use ONLY the Bash tool. Do NOT set LANGWATCH_API_KEY.',
           ),
           scenario.agent(),
           (state) => {
