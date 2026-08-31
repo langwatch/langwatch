@@ -571,7 +571,7 @@ const organizationRouter = createOrganizationTrpcRouter({
       matchInviteToAcceptor({
         inviteEmail,
         sessionEmail,
-        matchable: await identityEmail().verifiedEmailsOf({ userId }),
+        matchable: await identityEmail().tryVerifiedEmailsOf({ userId }),
       }),
     maskInvitedAddress,
     applyInvite: (ctx, { userId, invite, viaIdentifierId }) =>

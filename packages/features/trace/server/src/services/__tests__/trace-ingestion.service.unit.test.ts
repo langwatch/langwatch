@@ -41,11 +41,11 @@ class TestTraceSpanDedup extends TraceSpanDedupPort {
     return this.acquire();
   }
 
-  tryConfirmProcessed(): Promise<void> {
+  confirmProcessed(): Promise<void> {
     return this.confirm();
   }
 
-  tryReleaseOnFailure(): Promise<void> {
+  releaseOnFailure(): Promise<void> {
     return this.release();
   }
 }

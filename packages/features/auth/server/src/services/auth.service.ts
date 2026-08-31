@@ -80,7 +80,7 @@ export class AuthService extends AuthCapability {
         id: verified.user.id,
         name: verified.user.name ?? null,
         email:
-          (await this.options.identityEmails.resolveEmail({ userId: verified.user.id })) ??
+          (await this.options.identityEmails.tryResolveEmail({ userId: verified.user.id })) ??
           user?.email ??
           verified.user.email ??
           null,
@@ -110,7 +110,7 @@ export class AuthService extends AuthCapability {
         id: impersonation.data.id,
         name: impersonation.data.name ?? null,
         email:
-          (await this.options.identityEmails.resolveEmail({ userId: impersonation.data.id })) ??
+          (await this.options.identityEmails.tryResolveEmail({ userId: impersonation.data.id })) ??
           impersonatedUser?.email ??
           impersonation.data.email ??
           null,

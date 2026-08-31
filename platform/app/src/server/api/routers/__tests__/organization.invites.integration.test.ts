@@ -40,16 +40,16 @@ vi.mock("../../../mailer/inviteEmail", () => ({
 // boundary here - these tests exercise the invitation mechanics against
 // Postgres, not the identity projection (which has its own suites).
 // `null` = the pre-identifier legacy comparison.
-const { verifiedEmailsOfMock } = vi.hoisted(() => ({
-  verifiedEmailsOfMock: vi.fn().mockResolvedValue(null),
+const { tryVerifiedEmailsOfMock } = vi.hoisted(() => ({
+  tryVerifiedEmailsOfMock: vi.fn().mockResolvedValue(null),
 }));
 vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => {
   const original = await importOriginal<typeof import("~/server/app-layer/identity/runtime")>();
   return {
     ...original,
     identityEmail: () => ({
-      resolveEmail: () => Promise.resolve(null),
-      verifiedEmailsOf: verifiedEmailsOfMock,
+      tryResolveEmail: () => Promise.resolve(null),
+      tryVerifiedEmailsOf: tryVerifiedEmailsOfMock,
     }),
   };
 });
@@ -232,8 +232,8 @@ describe("Organization Invites Integration", () => {
     // Clean up invites after each test
     await cleanupTestRows(prisma, [["organizationInvite", { organizationId }]]);
     mockSendInviteEmail.mockClear();
-    verifiedEmailsOfMock.mockReset();
-    verifiedEmailsOfMock.mockResolvedValue(null);
+    tryVerifiedEmailsOfMock.mockReset();
+    tryVerifiedEmailsOfMock.mockResolvedValue(null);
     mockGetActivePlan.mockReset();
     mockGetActivePlan.mockResolvedValue(makeTestPlan());
 
@@ -315,7 +315,7 @@ describe("Organization Invites Integration", () => {
         const workEmail = `invitee-${testNamespace}-work@acme.com`;
         const invite = await createPendingInvite(workEmail);
         const { user, caller } = await createInvitee(`invitee-${testNamespace}-personal@home.net`);
-        verifiedEmailsOfMock.mockResolvedValue([
+        tryVerifiedEmailsOfMock.mockResolvedValue([
           {
             identifierId: "idf_int_g",
             value: normalizeIdentifierValue(workEmail),
@@ -353,7 +353,7 @@ describe("Organization Invites Integration", () => {
         const { user, caller } = await createInvitee(
           `invitee-${testNamespace}-googleborn@gmail.com`,
         );
-        verifiedEmailsOfMock.mockResolvedValue([
+        tryVerifiedEmailsOfMock.mockResolvedValue([
           {
             identifierId: "idf_int_cross",
             value: normalizeIdentifierValue(workEmail),
@@ -388,7 +388,7 @@ describe("Organization Invites Integration", () => {
         const email = `invitee-${testNamespace}-glinked@acme.com`;
         const invite = await createPendingInvite(email);
         const { user, caller } = await createInvitee(email);
-        verifiedEmailsOfMock.mockResolvedValue([
+        tryVerifiedEmailsOfMock.mockResolvedValue([
           {
             identifierId: "idf_int_gl",
             value: normalizeIdentifierValue(email),

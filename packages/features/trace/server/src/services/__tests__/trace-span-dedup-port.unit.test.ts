@@ -22,10 +22,10 @@ describe("TraceSpanDedupPort", () => {
           seen.push(span);
           return true;
         },
-        async tryConfirmProcessed(span: SpanDedupRef) {
+        async confirmProcessed(span: SpanDedupRef) {
           seen.push(span);
         },
-        async tryReleaseOnFailure(span: SpanDedupRef) {
+        async releaseOnFailure(span: SpanDedupRef) {
           seen.push(span);
         },
       };

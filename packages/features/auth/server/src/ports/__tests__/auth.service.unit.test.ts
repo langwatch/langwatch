@@ -103,7 +103,7 @@ class IdentityEmails extends IdentityEmailService {
     super();
   }
 
-  async resolveEmail({ userId }: { userId: string }): Promise<string | null> {
+  async tryResolveEmail({ userId }: { userId: string }): Promise<string | null> {
     return this.emails.get(userId) ?? null;
   }
 }

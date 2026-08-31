@@ -27,7 +27,7 @@ describe("the identity email read fork", () => {
     it("answers from the identifiers", async () => {
       const { service } = harness();
 
-      expect(await service.resolveEmail({ userId: USER })).toBe(
+      expect(await service.tryResolveEmail({ userId: USER })).toBe(
         "chosen@acme.com",
       );
     });
@@ -39,7 +39,7 @@ describe("the identity email read fork", () => {
       const { service, heads } = harness({ onIdentity: false });
       const findHeads = vi.spyOn(heads, "findHeads");
 
-      expect(await service.resolveEmail({ userId: USER })).toBeNull();
+      expect(await service.tryResolveEmail({ userId: USER })).toBeNull();
       expect(findHeads).not.toHaveBeenCalled();
     });
   });
@@ -52,7 +52,7 @@ describe("the identity email read fork", () => {
         new Error("postgres unavailable"),
       );
 
-      expect(await service.resolveEmail({ userId: USER })).toBeNull();
+      expect(await service.tryResolveEmail({ userId: USER })).toBeNull();
     });
   });
 
@@ -63,7 +63,7 @@ describe("the identity email read fork", () => {
         throw new Error("migration state unavailable");
       });
 
-      expect(await service.resolveEmail({ userId: USER })).toBeNull();
+      expect(await service.tryResolveEmail({ userId: USER })).toBeNull();
     });
   });
 });
@@ -94,7 +94,7 @@ describe("the verified emails a user can accept an invitation through", () => {
         },
       });
 
-      expect(await service.verifiedEmailsOf({ userId: USER })).toEqual([
+      expect(await service.tryVerifiedEmailsOf({ userId: USER })).toEqual([
         {
           identifierId: "idf_google",
           value: "sam@home.net",
@@ -113,7 +113,7 @@ describe("the verified emails a user can accept an invitation through", () => {
     it("answers null so the caller keeps the legacy comparison", async () => {
       const { service } = harness({ onIdentity: false });
 
-      expect(await service.verifiedEmailsOf({ userId: USER })).toBeNull();
+      expect(await service.tryVerifiedEmailsOf({ userId: USER })).toBeNull();
     });
   });
 
@@ -124,7 +124,7 @@ describe("the verified emails a user can accept an invitation through", () => {
         new Error("postgres unavailable"),
       );
 
-      expect(await service.verifiedEmailsOf({ userId: USER })).toBeNull();
+      expect(await service.tryVerifiedEmailsOf({ userId: USER })).toBeNull();
     });
   });
 });

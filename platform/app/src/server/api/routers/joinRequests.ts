@@ -60,7 +60,7 @@ function joinRequests(ctx: Pick<TRPCContext, "app">) {
  * The caller's own verified address, and the reason every requester-side
  * procedure starts here.
  *
- * `verifiedEmailsOf` answers `null` for a user who is not on identifiers yet,
+ * `tryVerifiedEmailsOf` answers `null` for a user who is not on identifiers yet,
  * which is the legacy fallback the rest of the identity surface uses: the
  * `User.email` column, but only where better-auth has marked it verified. An
  * unverified address answers null, and every caller treats that as the
@@ -70,7 +70,7 @@ async function verifiedEmailFor(
   ctx: Pick<TRPCContext, "prisma">,
   { userId }: { userId: string },
 ): Promise<string | null> {
-  const verified = await identityEmail().verifiedEmailsOf({ userId });
+  const verified = await identityEmail().tryVerifiedEmailsOf({ userId });
   if (verified !== null) return verified[0]?.value ?? null;
 
   const row = await ctx.prisma.user.findUnique({

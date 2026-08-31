@@ -39,13 +39,21 @@ export type SpanDedupRef = {
   spanId: string;
 };
 
-/** Redis-backed deduplication is app infrastructure, not Trace domain state. */
+/**
+ * Redis-backed deduplication is app infrastructure, not Trace domain state.
+ *
+ * Only the claim can answer "I don't know": it returns null when the store is
+ * unreachable, and the caller ingests the span anyway rather than dropping a
+ * customer's data because a cache was down. The other two report nothing and
+ * throw nothing — dedup is an optimisation, so a failure to tidy up after
+ * one span must not fail the span.
+ */
 export abstract class TraceSpanDedupPort {
   abstract tryAcquireProcessingLock(span: SpanDedupRef): Promise<boolean | null>;
 
-  abstract tryConfirmProcessed(span: SpanDedupRef): Promise<void>;
+  abstract confirmProcessed(span: SpanDedupRef): Promise<void>;
 
-  abstract tryReleaseOnFailure(span: SpanDedupRef): Promise<void>;
+  abstract releaseOnFailure(span: SpanDedupRef): Promise<void>;
 }
 
 /** The Trace pipeline's one named command handoff. */
@@ -232,7 +240,7 @@ export class TraceIngestionService {
       const prepared = this.payloads ? await this.payloads.prepare(commandData) : commandData;
 
       await this.commands.recordSpan(prepared);
-      await this.dedup.tryConfirmProcessed({
+      await this.dedup.confirmProcessed({
         tenantId: input.tenantId,
         traceId: input.span.traceId,
         spanId: input.span.spanId,
@@ -241,7 +249,7 @@ export class TraceIngestionService {
       return { status: "collected" };
     } catch (error) {
       if (lockAcquired) {
-        await this.dedup.tryReleaseOnFailure({
+        await this.dedup.releaseOnFailure({
           tenantId: input.tenantId,
           traceId: input.span.traceId,
           spanId: input.span.spanId,

@@ -1,5 +1,3 @@
-// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
-
 import { createLogger } from "@langwatch/observability";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
@@ -28,8 +26,8 @@ function buildKey(tenantId: string, traceId: string, spanId: string): string {
 
 export interface SpanDedupService {
   tryAcquireProcessingLock(span: SpanDedupRef): Promise<boolean | null>;
-  tryConfirmProcessed(span: SpanDedupRef): Promise<void>;
-  tryReleaseOnFailure(span: SpanDedupRef): Promise<void>;
+  confirmProcessed(span: SpanDedupRef): Promise<void>;
+  releaseOnFailure(span: SpanDedupRef): Promise<void>;
 }
 
 /**
@@ -70,7 +68,7 @@ export class RedisSpanDedupeService implements SpanDedupService {
   /**
    * Extend the key TTL after successful processing.
    */
-  async tryConfirmProcessed({ tenantId, traceId, spanId }: SpanDedupRef): Promise<void> {
+  async confirmProcessed({ tenantId, traceId, spanId }: SpanDedupRef): Promise<void> {
     try {
       await this.redis.expire(buildKey(tenantId, traceId, spanId), CONFIRMED_TTL_SECONDS);
     } catch (error) {
@@ -81,7 +79,7 @@ export class RedisSpanDedupeService implements SpanDedupService {
   /**
    * Delete the key so retries can proceed immediately after a failure.
    */
-  async tryReleaseOnFailure({ tenantId, traceId, spanId }: SpanDedupRef): Promise<void> {
+  async releaseOnFailure({ tenantId, traceId, spanId }: SpanDedupRef): Promise<void> {
     try {
       await this.redis.del(buildKey(tenantId, traceId, spanId));
     } catch (error) {
@@ -98,8 +96,8 @@ export class NullSpanDedupeService implements SpanDedupService {
   async tryAcquireProcessingLock(_span: SpanDedupRef): Promise<null> {
     return null;
   }
-  async tryConfirmProcessed(_span: SpanDedupRef): Promise<void> {}
-  async tryReleaseOnFailure(_span: SpanDedupRef): Promise<void> {}
+  async confirmProcessed(_span: SpanDedupRef): Promise<void> {}
+  async releaseOnFailure(_span: SpanDedupRef): Promise<void> {}
 }
 
 export function createSpanDedupeService(redis: IORedis | Cluster | null): SpanDedupService {

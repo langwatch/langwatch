@@ -42,7 +42,7 @@ export class IdentityEmailService extends IdentityEmailCapability {
    * The user's email according to their identifiers — PRIMARY, else the
    * most recently VERIFIED — or null to keep the legacy column's answer.
    */
-  async resolveEmail({ userId }: { userId: string }): Promise<string | null> {
+  async tryResolveEmail({ userId }: { userId: string }): Promise<string | null> {
     try {
       if (!(await this.isOnIdentity({ userId }))) return null;
       const heads = await this.heads.findHeads({ userId });
@@ -64,11 +64,11 @@ export class IdentityEmailService extends IdentityEmailCapability {
    *
    * `null` means "answer from the legacy columns instead" — the user is not
    * on identifiers, or the projection could not be read. The same
-   * never-fail-a-request rule as `resolveEmail`, for the same reason: this
+   * never-fail-a-request rule as `tryResolveEmail`, for the same reason: this
    * runs on the invite-acceptance path a brand-new member's first session
    * walks through.
    */
-  async verifiedEmailsOf({ userId }: { userId: string }): Promise<MatchableEmail[] | null> {
+  async tryVerifiedEmailsOf({ userId }: { userId: string }): Promise<MatchableEmail[] | null> {
     try {
       if (!(await this.isOnIdentity({ userId }))) return null;
       const heads = await this.heads.findHeads({ userId });

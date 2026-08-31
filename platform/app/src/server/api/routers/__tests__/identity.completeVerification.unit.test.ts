@@ -52,7 +52,7 @@ vi.mock(
       beforeAccountDelete: async () => undefined,
       beforeUserDelete: async () => undefined,
     }),
-    identityEmail: () => ({ resolveEmail: async () => null }),
+    identityEmail: () => ({ tryResolveEmail: async () => null }),
     identityService: () => ({}),
     identityGuards: () => ({}),
     identityProjectionStore: () => ({}),

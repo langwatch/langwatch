@@ -392,8 +392,8 @@ describe.skipIf(!shouldRun)(
         codingAgentSpanFilterEnabled: false,
         dedup: {
           tryAcquireProcessingLock: async () => true,
-          tryConfirmProcessed: async () => undefined,
-          tryReleaseOnFailure: async () => undefined,
+          confirmProcessed: async () => undefined,
+          releaseOnFailure: async () => undefined,
         },
         recordSpan: (data) => tracePipeline.commands.recordSpan.send(data),
       });

@@ -631,7 +631,7 @@ secured
       // group-queue outage). There is no fallback stack, so a 200 here
       // would tell the SDK the trace landed and it would never retry —
       // permanent trace loss. Return 500 so clients retry; the dedup gate
-      // releases failed spans via tryReleaseOnFailure, so a retry is safe.
+      // releases failed spans via releaseOnFailure, so a retry is safe.
       // Partial success stays 2xx for SDK back-compat.
       if (freshSpans.length > 0 && dispatchFailures === freshSpans.length) {
         return c.json(

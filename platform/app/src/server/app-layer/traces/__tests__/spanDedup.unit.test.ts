@@ -57,11 +57,11 @@ describe("RedisSpanDedupeService", () => {
     });
   });
 
-  describe("tryConfirmProcessed", () => {
+  describe("confirmProcessed", () => {
     it("calls EXPIRE with confirmed TTL", async () => {
       mockExpire.mockResolvedValue(1);
 
-      await service.tryConfirmProcessed({ tenantId, traceId, spanId });
+      await service.confirmProcessed({ tenantId, traceId, spanId });
 
       expect(mockExpire).toHaveBeenCalledWith(expectedKey, 3600);
     });
@@ -71,17 +71,17 @@ describe("RedisSpanDedupeService", () => {
         mockExpire.mockRejectedValue(new Error("Redis connection lost"));
 
         await expect(
-          service.tryConfirmProcessed({ tenantId, traceId, spanId }),
+          service.confirmProcessed({ tenantId, traceId, spanId }),
         ).resolves.toBeUndefined();
       });
     });
   });
 
-  describe("tryReleaseOnFailure", () => {
+  describe("releaseOnFailure", () => {
     it("calls DEL on the key", async () => {
       mockDel.mockResolvedValue(1);
 
-      await service.tryReleaseOnFailure({ tenantId, traceId, spanId });
+      await service.releaseOnFailure({ tenantId, traceId, spanId });
 
       expect(mockDel).toHaveBeenCalledWith(expectedKey);
     });
@@ -91,7 +91,7 @@ describe("RedisSpanDedupeService", () => {
         mockDel.mockRejectedValue(new Error("Redis connection lost"));
 
         await expect(
-          service.tryReleaseOnFailure({ tenantId, traceId, spanId }),
+          service.releaseOnFailure({ tenantId, traceId, spanId }),
         ).resolves.toBeUndefined();
       });
     });
@@ -106,11 +106,11 @@ describe("NullSpanDedupeService", () => {
     expect(result).toBeNull();
   });
 
-  it("tryConfirmProcessed resolves", async () => {
-    await expect(service.tryConfirmProcessed({ tenantId: "t", traceId: "tr", spanId: "sp" })).resolves.toBeUndefined();
+  it("confirmProcessed resolves", async () => {
+    await expect(service.confirmProcessed({ tenantId: "t", traceId: "tr", spanId: "sp" })).resolves.toBeUndefined();
   });
 
-  it("tryReleaseOnFailure resolves", async () => {
-    await expect(service.tryReleaseOnFailure({ tenantId: "t", traceId: "tr", spanId: "sp" })).resolves.toBeUndefined();
+  it("releaseOnFailure resolves", async () => {
+    await expect(service.releaseOnFailure({ tenantId: "t", traceId: "tr", spanId: "sp" })).resolves.toBeUndefined();
   });
 });
