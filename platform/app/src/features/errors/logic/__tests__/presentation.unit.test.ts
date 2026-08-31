@@ -647,6 +647,12 @@ describe("explainHandledError", () => {
         // recipients to test-fire to."), and it names WHICH piece is missing.
         // Authored by the automation service, never relayed.
         test_fire_unavailable: new Set(["reason"]),
+        // The filter parser's own line about the author's query ("Invalid
+        // filter syntax", "Too many filter conditions"). It names WHERE the
+        // query went wrong, which the generic sentence cannot. Ours, and
+        // clamped by `safeProse` like every other server-authored sentence
+        // in the registry.
+        automation_trace_filter_invalid: new Set(["reason"]),
       };
 
       /**
