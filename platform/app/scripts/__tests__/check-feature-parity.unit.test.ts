@@ -276,13 +276,36 @@ describe("collectMalformedJsdocAnnotations", () => {
       "utf8",
     );
 
-    expect(collectMalformedJsdocAnnotations([tests])).toEqual([
+    expect(collectMalformedJsdocAnnotations({ testRoots: [tests] })).toEqual([
       expect.objectContaining({
         title: "A scenario in a JSDoc body",
         ref: expect.objectContaining({
           file: expect.stringContaining("parity.test.ts"),
+          line: 3,
         }),
-        reason: expect.stringContaining("multi-line JSDoc"),
+        reason: expect.stringContaining("put it on its own annotation line"),
+      }),
+    ]);
+  });
+
+  it("reports an unquoted scenario tag embedded in a multi-line JSDoc block", () => {
+    const tests = join(root, "tests");
+    mkdirSync(tests);
+    writeFileSync(
+      join(tests, "parity.test.ts"),
+      [
+        "/**",
+        " * @scenario A bare scenario title",
+        " */",
+        'it("covers the case", () => {});',
+      ].join("\n"),
+      "utf8",
+    );
+
+    expect(collectMalformedJsdocAnnotations({ testRoots: [tests] })).toEqual([
+      expect.objectContaining({
+        title: "A bare scenario title",
+        ref: expect.objectContaining({ line: 2 }),
       }),
     ]);
   });
@@ -296,7 +319,7 @@ describe("collectMalformedJsdocAnnotations", () => {
       "utf8",
     );
 
-    expect(collectMalformedJsdocAnnotations([tests])).toEqual([]);
+    expect(collectMalformedJsdocAnnotations({ testRoots: [tests] })).toEqual([]);
   });
 });
 

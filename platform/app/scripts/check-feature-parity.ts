@@ -868,9 +868,11 @@ function isFollowedByTestCall(src: string, start: number): boolean {
   return false;
 }
 
-export function collectMalformedJsdocAnnotations(
-  testRoots: string[],
-): MalformedAnnotation[] {
+export function collectMalformedJsdocAnnotations({
+  testRoots,
+}: {
+  testRoots: string[];
+}): MalformedAnnotation[] {
   const malformed: MalformedAnnotation[] = [];
   const files: string[] = [];
   for (const r of testRoots) {
@@ -1628,9 +1630,9 @@ function analyzeParity(): ParityAnalysis {
   const unknownAnnotations: UnknownAnnotation[] = bindings
     .filter((b) => !allKnownTitles.has(b.title))
     .map((b) => ({ title: b.title, ref: b.ref }));
-  const malformedAnnotations = collectMalformedJsdocAnnotations([
-    ...DEFAULT_TEST_ROOTS,
-  ]);
+  const malformedAnnotations = collectMalformedJsdocAnnotations({
+    testRoots: [...DEFAULT_TEST_ROOTS],
+  });
 
   const legacySet = new Set(LEGACY_UNBOUND);
   const enforced: Report[] = [];
