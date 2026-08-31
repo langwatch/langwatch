@@ -274,13 +274,15 @@ export class ApiKeyGrantPolicyService {
       onDuplicate: "skip",
     });
     if (input.replace) {
+      // A duplicate is an existing binding the caller asked for again, so it is
+      // just as much a keeper as a fresh one — an edit that resubmits the key's
+      // current scopes attaches nothing and would otherwise revoke the lot.
+      const keep = [...attached.attached, ...attached.duplicates];
       await this.options.grants.revokeBindingsWhere({
         organizationId: input.organizationId,
         where: {
           apiKeyId: input.apiKeyId,
-          ...(attached.attached.length
-            ? { id: { notIn: [...attached.attached, ...attached.duplicates] } }
-            : {}),
+          ...(keep.length ? { id: { notIn: keep } } : {}),
         },
         actor: input.actor,
         reason: "api key grants replaced",

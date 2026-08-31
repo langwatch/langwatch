@@ -372,6 +372,13 @@ Feature: API Key Scope and Fine-Grained Permissions
     And the bindings are recreated with the CustomRole id
 
   @unit
+  Scenario: Editing a key without changing its scopes keeps them
+    Given an API key already bound to a project
+    When I save an edit that resubmits the same scope unchanged
+    Then the key keeps that binding
+    And the key still works afterwards
+
+  @unit
   Scenario: Restricted key with camelCase permissions saves without error
     When I create a restricted key with permissions including "auditLog:view"
     Then the CustomRole is created successfully
