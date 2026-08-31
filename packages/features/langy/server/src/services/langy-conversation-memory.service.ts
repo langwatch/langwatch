@@ -1,70 +1,34 @@
 /**
  * THE CONVERSATION'S OWN MEMORY, carried on the turn.
  *
- * ── WHY THIS FILE EXISTS ───────────────────────────────────────────────────
- *
  * A real transcript. Langy created a scenario and reported its id. The user
  * said "run it". Langy answered "Assuming you want to search traces from the
  * last 24h", ran a 40-trace search, and volunteered a cost analysis. The user
  * had to say "no, run the scenario you just made".
  *
- * The agent's rules were not the problem — AGENTS.md rule 11 says, in as many
- * words, that if turn 1 created a scenario and turn 2 says "run it" then it must
- * run THAT scenario with the id from turn 1. It could not, because the id was
- * not there to use.
+ * The rules were not the problem — AGENTS.md rule 11 says in as many words
+ * that if turn 1 created a scenario and turn 2 says "run it", it must run THAT
+ * scenario with the id from turn 1. It could not, because the id was not there
+ * to use: the agent's memory of a conversation lives only in the opencode
+ * session inside its live worker process, which is reaped after idle, killed
+ * when the credential signature changes, and gone whenever the fleet rolls.
+ * Only a graceful shutdown checkpoints anything. Meanwhile the control plane
+ * sends a turn the last user sentence and a system block — never the
+ * transcript. So "run it" arrives with no "it" in context, and the agent's
+ * standing instruction to pick a reasonable default fills the hole.
  *
- * The agent's memory of a conversation lives in exactly one place: the opencode
- * session inside its live worker process (`app/workerpool/pool.go` — one
- * `OpenSession` per spawn). That process is reaped after `LANGY_WORKER_IDLE_MS`
- * of quiet (10 min by default), killed outright when the turn's credential
- * signature changes, and gone whenever the fleet rolls. Only a GRACEFUL pool
- * shutdown checkpoints anything (the ADR-048 handoff token); an idle reap and a
- * kill checkpoint nothing at all. Meanwhile the control plane sends a turn the
- * last user sentence and a system block — never the transcript. So after any of
- * those events "run it" arrives with no "it" anywhere in the agent's context,
- * and the agent's standing instruction to pick a reasonable default and act
- * fills the hole with the most generic thing it knows how to do.
- *
- * That is a plumbing failure, not a wording failure, and no amount of prompt
- * editing fixes it. This module is the plumbing, in two layers read off the
- * same durable message projection and carried on the turn as the HISTORY SEED
- * (folded into the first message a fresh worker session receives; see
- * `renderLangyConversationTranscript` for why not the system block):
+ * That is plumbing, not wording, and no amount of prompt editing fixes it.
+ * This module is the plumbing, in two layers read off the same durable message
+ * projection and carried as the HISTORY SEED:
  *
  *   - the TRANSCRIPT (`renderLangyConversationTranscript`): what was already
- *     said, so a fresh worker (model switch, idle reap, deploy, a resume days
- *     later) continues the conversation instead of meeting a stranger;
- *   - the RESOURCE MEMORY (`extractLangyConversationMemory`): the resources
- *     this conversation created, ran or listed, most recent first, so a bare
- *     "run it" resolves to a concrete id.
+ *     said, so a fresh worker continues rather than meeting a stranger;
+ *   - the RESOURCE MEMORY (`extractLangyConversationMemory`): what this
+ *     conversation created, ran or listed, so a bare "run it" resolves to a
+ *     concrete id.
  *
- * ── WHERE THE FACTS COME FROM ──────────────────────────────────────────────
- *
- * Not from a new store. Every finalized assistant message already carries its
- * turn's tool calls as parts (`buildFinalAssistantParts`), and every `langwatch
- * <resource> <verb>` call carries a `CliResultDigest` — the resource, the verb,
- * the ids it surfaced, the name, the counts. That digest exists so a capability
- * card can hydrate fresh data by reference instead of shipping rows; it is
- * exactly the compact record a referent needs, and it is already durable.
- *
- * ── SECURITY ───────────────────────────────────────────────────────────────
- *
- * 1. PROMPT INJECTION. A resource `name` is whatever a user (or an upstream
- *    system, or the agent itself) called the thing, echoed back into a SYSTEM
- *    block. Same exploit as a composer chip's label, so the same defence and
- *    literally the same function: `sanitizeLangyPromptValue` (control characters
- *    incl. CR/LF and backticks stripped, length capped), plus a trailer that
- *    tells the model this block is data and never an instruction.
- *
- * 2. AUTHORISATION. Nothing here resolves an id, reads a resource, or widens
- *    what a turn may see. The entries are the ids the agent itself surfaced,
- *    earlier in THIS conversation, through its own per-session key — already
- *    scoped to this project, org and user (ADR-047). The caller reads them from
- *    the conversation the turn service has already proved is OWNED by this user
- *    (`LangyConversationService.ensureConversation` rejects anything else), and
- *    the projection read is filtered by projectId. An id that reaches the model
- *    is still inert text: the only way to the resource behind it is a tool call
- *    that authenticates, which is the same boundary every other read crosses.
+ * Each layer carries the rest of its own reasoning, above the function that
+ * does it.
  */
 
 import {
@@ -141,6 +105,39 @@ function cleanId(value: string): string | null {
  *     `query-ref` results name no resource, so there is nothing to refer BACK to;
  *   - the same resource touched twice is remembered ONCE, at its latest turn,
  *     because "run it" means the thing as it now stands.
+ */
+/**
+ * The resources this conversation touched, most recent first.
+ *
+ * ── WHERE THE FACTS COME FROM ──────────────────────────────────────────────
+ *
+ * Not a new store. Every finalized assistant message already carries its
+ * turn's tool calls as parts (`buildFinalAssistantParts`), and every
+ * `langwatch <resource> <verb>` call carries a `CliResultDigest` — the
+ * resource, the verb, the ids it surfaced, the name, the counts. That digest
+ * exists so a capability card can hydrate fresh data by reference instead of
+ * shipping rows; it is exactly the compact record a referent needs, and it is
+ * already durable.
+ *
+ * ── AUTHORISATION ──────────────────────────────────────────────────────────
+ *
+ * Nothing here resolves an id, reads a resource, or widens what a turn may
+ * see. The entries are ids the agent itself surfaced earlier in THIS
+ * conversation through its own per-session key — already scoped to this
+ * project, org and user (ADR-047). The caller reads them from a conversation
+ * the turn service has already proved is OWNED by this user
+ * (`LangyConversationService.ensureConversation` rejects anything else), and
+ * the projection read is filtered by projectId. An id that reaches the model
+ * is still inert text: the only way to the resource behind it is a tool call
+ * that authenticates, the same boundary every other read crosses.
+ *
+ * ── PROMPT INJECTION ───────────────────────────────────────────────────────
+ *
+ * A resource `name` is whatever a user, an upstream system, or the agent
+ * itself called the thing, echoed back into a SYSTEM block. Same exploit as a
+ * composer chip's label, so the same defence and literally the same function:
+ * `sanitizeLangyPromptValue`, plus a trailer telling the model this block is
+ * data and never an instruction.
  */
 export function extractLangyConversationMemory({
   messages,

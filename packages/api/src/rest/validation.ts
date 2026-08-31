@@ -1,65 +1,20 @@
 /**
  * The REST boundary's request validator.
  *
- * ── WHY THIS EXISTS ────────────────────────────────────────────────────────
- *
  * The Standard Schema validator does not throw when a request fails its
- * schema; without a hook it returns the validation result directly. Two things
- * follow, and both are bad:
+ * schema; without a hook it returns the result directly, and two things
+ * follow. The route's `onError` never runs, so the failure answers in a shape
+ * no consumer knows how to read — the CLI's reader finds no
+ * `error`/`code`/`kind`, falls through to the status, and reports
+ * `request_failed`, or `network_error` when the status is lost on the way. An
+ * agent told "network_error" retries the identical broken request forever. And
+ * the whole ZodError goes on the wire: one wrong enum value produces a
+ * paragraph listing every permitted value, which is then truncated on its way
+ * to the model, losing the only part worth having.
  *
- *   1. The route's `onError` never runs, so `handleError` never sees it. Every
- *      other failure at this boundary is a `HandledError` with a code, a status
- *      and a remediation channel (ADR-045); a schema failure was the one hole,
- *      answering in a shape no consumer knows how to read. The CLI's reader
- *      finds no `error`/`code`/`kind` in that body, falls through to the
- *      status-derived reading, and reports `request_failed` — or, when the
- *      status is lost on the way, `network_error`. An agent told "network_error"
- *      retries the identical broken request forever.
- *
- *   2. The whole ZodError goes on the wire. A single wrong enum value produces
- *      a paragraph listing every permitted value inline, which then gets
- *      truncated on its way to the model — losing the only part worth having.
- *
- * This wrapper installs the validation hook and throws a typed error on
- * failure, so the ordinary boundary machinery takes it from there.
- *
- * ── THE SHAPE ──────────────────────────────────────────────────────────────
- *
- * A short sentence, and the detail as structured `reasons` — one per zod issue,
- * modelled on Go's `cher.E`, which the platform's `HandledError` already
- * mirrors field-for-field:
- *
- *     HTTP 422
- *     { "error": "validation_error",
- *       "message": "The request body didn't match the expected shape.",
- *       "target": "json",
- *       "fields": ["series.0.metric"],
- *       "reasons": [
- *         { "code": "schema_failure",
- *           "meta": { "field": "series.0.metric",
- *                     "type": "invalid_enum_value",
- *                     "message": "Invalid enum value",
- *                     "expected": ["metadata.trace_id", "metadata.user_id"] } }
- *       ] }
- *
- * `meta.field` is the thing a caller can act on, and it survives truncation in
- * a way a prose paragraph does not.
- *
- * ── WHY 422, AND WHY THE OTHER ONE IS 400 ──────────────────────────────────
- *
- * The two failures are not the same failure and must not share a status:
- *
- *   - The request PARSED and the schema rejected it → 422 Unprocessable
- *     Content. The syntax was fine; the semantics were not. A caller can fix
- *     exactly the fields named in `reasons` and retry.
- *   - The request did not parse at all (malformed JSON, broken form body) →
- *     400 Bad Request. There are no fields to name because there is no
- *     document. Hono's own validator already raises this as an `HTTPException`
- *     before any schema runs; we only give it a code so it stops arriving
- *     anonymous.
- *
- * Both are the caller's fault (`fault: "customer"`) and neither is retryable
- * unchanged.
+ * This wrapper installs the hook and throws a typed error, so the ordinary
+ * boundary machinery (ADR-045) takes it from there. The two errors it can
+ * throw carry the rest of the reasoning, each above its own class.
  */
 
 import { HandledError, remediation } from "@langwatch/handled-error";
@@ -108,6 +63,33 @@ export interface FieldViolation {
  * A reason is a HandledError like any other, so `serialize()` renders it with
  * the same `code`/`meta`/nested-`reasons` shape as the error it hangs off —
  * there is no second serialisation path to keep in step.
+ */
+/**
+ * ── THE SHAPE ──────────────────────────────────────────────────────────────
+ *
+ * A short sentence, and the detail as structured `reasons` — one per zod
+ * issue, modelled on Go's `cher.E`, which HandledError already mirrors
+ * field-for-field:
+ *
+ *     HTTP 422
+ *     { "error": "validation_error",
+ *       "message": "The request body didn't match the expected shape.",
+ *       "target": "json",
+ *       "fields": ["series.0.metric"],
+ *       "reasons": [
+ *         { "code": "schema_failure",
+ *           "meta": { "field": "series.0.metric",
+ *                     "type": "invalid_enum_value",
+ *                     "message": "Invalid enum value",
+ *                     "expected": ["metadata.trace_id", "metadata.user_id"] } }
+ *       ] }
+ *
+ * `meta.field` is the thing a caller can act on, and it survives truncation in
+ * a way a prose paragraph does not.
+ *
+ * 422 and not 400: the request PARSED and the schema rejected it. The syntax
+ * was fine, the semantics were not, and a caller can fix exactly the fields
+ * named in `reasons` and retry.
  */
 class SchemaFailure extends HandledError {
   constructor(violation: FieldViolation) {
@@ -160,7 +142,16 @@ function violationOf(issue: ZodIssue): FieldViolation {
   };
 }
 
-/** The request never parsed, so no schema ever ran. */
+/**
+ * The request never parsed, so no schema ever ran.
+ *
+ * 400 and not 422: there are no fields to name because there is no document.
+ * Hono's own validator already raises this as an `HTTPException` before any
+ * schema runs; we only give it a code so it stops arriving anonymous.
+ *
+ * Both this and a schema failure are the caller's fault (`fault: "customer"`)
+ * and neither is retryable unchanged.
+ */
 class MalformedRequestError extends HandledError {
   constructor(args: { target: keyof ValidationTargets; detail: string }) {
     super("malformed_request", `The ${TARGET_NOUN[args.target]} could not be parsed.`, {
