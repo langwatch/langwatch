@@ -1,16 +1,25 @@
+import type { SavedViewJson, SavedViewRecord } from "../../ports/dashboard.port";
 import type { Prisma, PrismaClient, SavedView } from "@langwatch/prisma-client/generated";
 
 /**
  * Input types for saved view operations.
  */
+/**
+ * Only the delegate this repository touches, plus the transaction it reorders in.
+ *
+ * Composition can name this instead of the whole generated client, which keeps
+ * `@langwatch/prisma-client/generated` an import of this directory alone.
+ */
+export type SavedViewDatabase = Pick<PrismaClient, "savedView" | "$transaction">;
+
 export type CreateSavedViewInput = {
   id: string;
   projectId: string;
   userId?: string;
   name: string;
-  filters: Prisma.InputJsonValue;
+  filters: SavedViewJson;
   query?: string;
-  period?: Prisma.InputJsonValue;
+  period?: SavedViewJson;
   order: number;
   /**
    * Storage shape discriminator. Omit to keep the SavedView default
@@ -21,10 +30,20 @@ export type CreateSavedViewInput = {
   kind?: string;
 };
 
+/** The fields a saved view may be edited through, in portable terms. */
+export type SavedViewUpdate = {
+  name?: string;
+  filters?: SavedViewJson;
+  query?: string | null;
+  period?: SavedViewJson | null;
+  order?: number;
+  kind?: string;
+};
+
 export type UpdateSavedViewInput = {
   id: string;
   projectId: string;
-  data: Prisma.SavedViewUpdateInput;
+  data: SavedViewUpdate;
 };
 
 /**
@@ -34,7 +53,7 @@ export type UpdateSavedViewInput = {
  * CRITICAL: Every query includes projectId for multitenancy protection.
  */
 export class SavedViewRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: SavedViewDatabase) {}
 
   /**
    * Finds all saved views visible to a user: project-level views (userId IS NULL)
@@ -44,7 +63,7 @@ export class SavedViewRepository {
     projectId: string;
     userId?: string;
     kind?: string;
-  }): Promise<SavedView[]> {
+  }): Promise<SavedViewRecord[]> {
     return await this.prisma.savedView.findMany({
       where: {
         projectId: input.projectId,
@@ -59,7 +78,7 @@ export class SavedViewRepository {
    * Finds a saved view by id within a project, or nothing when the project
    * holds no such view.
    */
-  async tryFindById(input: { id: string; projectId: string }): Promise<SavedView | null> {
+  async tryFindById(input: { id: string; projectId: string }): Promise<SavedViewRecord | null> {
     return await this.prisma.savedView.findFirst({
       where: {
         id: input.id,
@@ -72,7 +91,7 @@ export class SavedViewRepository {
    * Finds the last saved view by order for a project, or nothing when the
    * project has none yet.
    */
-  async tryFindLast(input: { projectId: string; kind?: string }): Promise<SavedView | null> {
+  async tryFindLast(input: { projectId: string; kind?: string }): Promise<SavedViewRecord | null> {
     return await this.prisma.savedView.findFirst({
       where: {
         projectId: input.projectId,
@@ -98,16 +117,16 @@ export class SavedViewRepository {
   /**
    * Creates a new saved view.
    */
-  async create(input: CreateSavedViewInput): Promise<SavedView> {
+  async create(input: CreateSavedViewInput): Promise<SavedViewRecord> {
     return await this.prisma.savedView.create({
       data: {
         id: input.id,
         projectId: input.projectId,
         userId: input.userId,
         name: input.name,
-        filters: input.filters,
+        filters: input.filters as Prisma.InputJsonValue,
         query: input.query,
-        period: input.period ?? undefined,
+        period: (input.period ?? undefined) as Prisma.InputJsonValue | undefined,
         order: input.order,
         ...(input.kind ? { kind: input.kind } : {}),
       },
@@ -125,9 +144,9 @@ export class SavedViewRepository {
         projectId: v.projectId,
         userId: v.userId,
         name: v.name,
-        filters: v.filters,
+        filters: v.filters as Prisma.InputJsonValue,
         query: v.query,
-        period: v.period ?? undefined,
+        period: (v.period ?? undefined) as Prisma.InputJsonValue | undefined,
         order: v.order,
         ...(v.kind ? { kind: v.kind } : {}),
       })),
@@ -138,20 +157,20 @@ export class SavedViewRepository {
   /**
    * Updates an existing saved view.
    */
-  async update(input: UpdateSavedViewInput): Promise<SavedView> {
+  async update(input: UpdateSavedViewInput): Promise<SavedViewRecord> {
     return await this.prisma.savedView.update({
       where: {
         id: input.id,
         projectId: input.projectId,
       },
-      data: input.data,
+      data: input.data as Prisma.SavedViewUpdateInput,
     });
   }
 
   /**
    * Deletes a saved view.
    */
-  async delete(input: { id: string; projectId: string }): Promise<SavedView> {
+  async delete(input: { id: string; projectId: string }): Promise<SavedViewRecord> {
     return await this.prisma.savedView.delete({
       where: {
         id: input.id,

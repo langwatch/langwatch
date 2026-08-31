@@ -33,6 +33,38 @@ export type SavedWorkbenchChartRecord = {
   updatedAt: Date;
 };
 
+/**
+ * A JSON value as a saved view stores it.
+ *
+ * Named here rather than taken from Prisma so the service and its callers can
+ * describe a view's filters without importing the generated client — which is
+ * what `prisma-containment` asks for, and what keeps the storage engine a
+ * detail of the repository.
+ */
+export type SavedViewJson =
+  | string
+  | number
+  | boolean
+  | null
+  | SavedViewJson[]
+  // Members are optional to match how a JSON object arrives from storage.
+  | { [key: string]: SavedViewJson | undefined };
+
+/** A saved view as the repository hands it back. */
+export type SavedViewRecord = {
+  id: string;
+  projectId: string;
+  userId: string | null;
+  name: string;
+  filters: SavedViewJson;
+  query: string | null;
+  period: SavedViewJson | null;
+  order: number;
+  kind: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 /** The one private persistence capability owned by Dashboard. */
 export abstract class DashboardRepository {
   abstract findAllDashboards(input: {

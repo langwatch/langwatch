@@ -1,6 +1,6 @@
 import { nanoid } from "nanoid";
 import { SavedViewNotFoundError, SavedViewReorderError } from "@langwatch/dashboard-contract";
-import type { Prisma, SavedView } from "@langwatch/prisma-client/generated";
+import type { SavedViewJson, SavedViewRecord } from "../ports/dashboard.port";
 import { SavedViewRepository } from "../repositories/prisma/prisma.saved-view.repository";
 
 /**
@@ -45,7 +45,7 @@ export class SavedViewService {
      * defaults code-side.
      */
     kind?: string;
-  }): Promise<SavedView[]> {
+  }): Promise<SavedViewRecord[]> {
     // Only seed origin-bucket defaults for the legacy kind. The new
     // traces v2 lens system seeds its built-in lenses client-side from
     // code, so triggering server-side seed on first access here would
@@ -77,9 +77,9 @@ export class SavedViewService {
       /** Optional client-provided id — see router-level comment. */
       id?: string;
       name: string;
-      filters: Prisma.InputJsonValue;
+      filters: SavedViewJson;
       query?: string;
-      period?: Prisma.InputJsonValue;
+      period?: SavedViewJson;
       userId?: string;
       /**
        * Storage shape. Omit for the "v1-traces-filter" default; the
@@ -88,7 +88,7 @@ export class SavedViewService {
        */
       kind?: string;
     };
-  }): Promise<SavedView> {
+  }): Promise<SavedViewRecord> {
     // `order` is scoped to the kind so the two storage shapes maintain
     // independent ordering — otherwise a brand new v2 lens would land at
     // the end of the legacy ordering and look misplaced when the legacy
@@ -126,7 +126,7 @@ export class SavedViewService {
     projectId: string;
     viewId: string;
     userId: string;
-  }): Promise<SavedView> {
+  }): Promise<SavedViewRecord> {
     const view = await this.repository.tryFindById({
       id: viewId,
       projectId,
@@ -162,7 +162,7 @@ export class SavedViewService {
     viewId: string;
     name: string;
     userId: string;
-  }): Promise<SavedView> {
+  }): Promise<SavedViewRecord> {
     const view = await this.repository.tryFindById({
       id: viewId,
       projectId,
@@ -221,7 +221,7 @@ export class SavedViewService {
         id: nanoid(),
         projectId,
         name: seed.name,
-        filters: seed.filters as Prisma.InputJsonValue,
+        filters: seed.filters as SavedViewJson,
         order: i,
       })),
     });
@@ -245,7 +245,7 @@ export class SavedViewService {
         id: nanoid(),
         projectId,
         name: seed.name,
-        filters: seed.filters as Prisma.InputJsonValue,
+        filters: seed.filters as SavedViewJson,
         order: highestOrder + 1 + i,
       })),
     });
