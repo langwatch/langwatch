@@ -1,86 +1,32 @@
 /**
  * `Idempotency-Key` for the REST creates.
  *
- * ── WHY THIS EXISTS ────────────────────────────────────────────────────────
- *
  * A create is the one shape of request where a retry is dangerous. When a
  * caller's connection drops after the write but before the response, it cannot
- * tell a lost request from a lost reply, and the only safe-looking move,
- * retrying, mints a second virtual key, budget, cache rule or webhook
+ * tell a lost request from a lost reply, and the only safe-looking move —
+ * retrying — mints a second virtual key, budget, cache rule or webhook
  * endpoint. Sending a key with the first attempt is how the caller says "these
- * two requests are the same request", and this module is what makes the second
- * one return the first one's answer.
- *
- * ── NOT MIDDLEWARE ─────────────────────────────────────────────────────────
+ * two requests are the same request", and this module makes the second one
+ * return the first one's answer.
  *
  * Deliberately a function the handler calls rather than middleware wrapping
  * it. Middleware would run before the route's validator and would therefore
  * have to consume and re-expose the raw body to fingerprint it. Called from
  * inside the handler, the fingerprint is taken over the already-validated
- * body: a request that never passed validation never reaches here, so no key
- * is ever burned on a request the platform refused outright.
+ * body, so no key is ever burned on a request the platform refused outright.
  *
- * ── ONLY SUCCESSES ARE STORED ──────────────────────────────────────────────
+ * A pending row is inserted before the handler runs and filled in only if the
+ * handler returns 2xx; a throw deletes it and propagates untouched. That is
+ * narrower than Stripe, which stores 4xx replies too, and the reason is that
+ * Stripe cannot re-run your handler and we can. The hazard idempotency exists
+ * to prevent is double creation, which only happens on success: a create that
+ * failed left nothing behind. Storing failures would pin a transient error, a
+ * rate limit or a moment of database unavailability to the key for 24 hours,
+ * so the caller's retry gets the stale failure rather than the success it
+ * would now get.
  *
- * A pending row is inserted before the handler runs and is filled in only if
- * the handler returns 2xx. If the handler throws, the pending row is deleted
- * and the error propagates untouched.
- *
- * That is narrower than Stripe, which stores 4xx replies too, and the reason
- * is that Stripe cannot re-run your handler and we can. The hazard idempotency
- * exists to prevent is double creation, which only ever happens on success: a
- * create that failed left nothing behind, so re-running it is safe, and a
- * deterministic 4xx simply recurs on the retry with the same answer. Storing
- * failures would instead pin a transient error, a rate limit or a moment of
- * database unavailability to the key for 24 hours, so the caller's retry gets
- * the stale failure back rather than the success it would now get.
- *
- * ── A CLAIM IS HELD BY A LIVE REQUEST ──────────────────────────────────────
- *
- * The unique index on (scopeId, key) is what serialises two concurrent
- * retries: the second insert loses, finds a pending row, and is told to retry
- * shortly rather than being allowed to create alongside the first.
- *
- * That leaves the question of when a pending row may be superseded, because a
- * process that died between the insert and the update would otherwise hold the
- * key locked for its full 24 hour lifetime and the caller could never complete
- * the create it was trying to make. A row is superseded only once its claim
- * stops reporting itself alive: the request holding a claim rewrites
- * `heartbeatAt` every {@link HEARTBEAT_INTERVAL_MS} for as long as its handler
- * runs, and another request may take the claim over once that column has been
- * quiet for {@link TAKEOVER_AFTER_MS}.
- *
- * Liveness rather than age, because age says nothing about whether the
- * original is still running. A request merely slow past whatever horizon was
- * chosen, waiting on a row lock or a saturated connection pool, is still going
- * to write its resource, so superseding it mints the second resource the key
- * was sent to prevent, and does it exactly when the system is least able to
- * absorb it. A slow request keeps beating and keeps its claim; a dead one
- * stops beating and its key frees up in seconds rather than in minutes.
- *
- * ── FENCING ────────────────────────────────────────────────────────────────
- *
- * A takeover rewrites the row's `claimId` rather than deleting the row, so the
- * request that took over owns the claim and the one it replaced stays
- * recognisable. Every write the replaced request goes on to make names the
- * claim it still thinks it holds, so a process that resumes after being
- * declared dead cannot overwrite the receipt of the request that replaced it.
- * The attempt is logged, and that log is the signal that one key may have
- * produced two resources.
- *
- * ── THE STORED BODY IS ENCRYPTED ───────────────────────────────────────────
- *
- * Two of the four creates answer with a secret that is kept nowhere else in
- * readable form: the virtual key's secret and the webhook endpoint's signing
- * secret are both shown once and stored only as a hash. Replaying those
- * responses is the whole point of a key on those routes, and it means the
- * secret transits the receipt. So the body is held as AES-256-GCM ciphertext
- * under `CREDENTIALS_SECRET`, the same treatment the automations webhook gives
- * its custom headers, and expiry bounds how long it exists at all.
- *
- * The body is stored as the exact bytes the first response carried, which is
- * also what makes a replay byte-identical: it is a string round trip, so
- * nothing in storage is in a position to reorder or renormalise it.
+ * How a claim is held, when it may be taken over, and why the stored body is
+ * encrypted are each explained beside the code that does them.
  */
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
@@ -116,6 +62,31 @@ export const RECEIPT_TTL_MS = 24 * 60 * 60 * 1000;
 export const HEARTBEAT_INTERVAL_MS = 5_000;
 
 /**
+ * ── A CLAIM IS HELD BY A LIVE REQUEST ──────────────────────────────────────
+ *
+ * The unique index on (scopeId, key) serialises two concurrent retries: the
+ * second insert loses, finds a pending row, and is told to retry shortly
+ * rather than being allowed to create alongside the first.
+ *
+ * A row is superseded only once its claim stops reporting itself alive —
+ * liveness rather than age, because age says nothing about whether the
+ * original is still running. A request merely slow past whatever horizon was
+ * chosen, waiting on a row lock or a saturated pool, is still going to write
+ * its resource, so superseding it mints the second resource the key was sent
+ * to prevent, and does it exactly when the system is least able to absorb it.
+ * A slow request keeps beating and keeps its claim; a dead one stops beating
+ * and its key frees in seconds rather than minutes.
+ *
+ * ── FENCING ────────────────────────────────────────────────────────────────
+ *
+ * A takeover rewrites the row's `claimId` rather than deleting the row, so the
+ * request that took over owns the claim and the one it replaced stays
+ * recognisable. Every write the replaced request goes on to make names the
+ * claim it still thinks it holds, so a process that resumes after being
+ * declared dead cannot overwrite the receipt of the request that replaced it.
+ * The attempt is logged, and that log is the signal that one key may have
+ * produced two resources.
+ *
  * How long a claim may go quiet before another request may take it over.
  *
  * Four missed beats rather than one, so an interval a garbage collection pause
@@ -440,6 +411,7 @@ async function finalizeClaim({
 }): Promise<void> {
   const { count } = await prisma.idempotencyReceipt.updateMany({
     where: { id: receiptId, claimId },
+    // Ciphertext; see `readStoredBody` for why.
     data: { responseStatus: status, responseBody: encrypt(serializedBody) },
   });
 
@@ -680,9 +652,23 @@ async function readExistingReceipt({
 /**
  * The stored response bytes, or null when this row cannot be read back.
  *
- * The realistic cause is `CREDENTIALS_SECRET` having been rotated inside the
- * receipt's 24 hours, which leaves rows that are authentic but no longer
- * decryptable. Dropping them matches how the model provider repository treats
+ * ── WHY THE STORED BODY IS ENCRYPTED ───────────────────────────────────────
+ *
+ * Two of the four creates answer with a secret kept nowhere else in readable
+ * form: the virtual key's secret and the webhook endpoint's signing secret are
+ * both shown once and stored only as a hash. Replaying those responses is the
+ * whole point of a key on those routes, which means the secret transits the
+ * receipt. So the body is held as AES-256-GCM ciphertext under
+ * `CREDENTIALS_SECRET` — the same treatment the automations webhook gives its
+ * custom headers — and expiry bounds how long it exists at all.
+ *
+ * It is stored as the exact bytes the first response carried, which is also
+ * what makes a replay byte-identical: a string round trip, so nothing in
+ * storage is in a position to reorder or renormalise it.
+ *
+ * The realistic cause of an unreadable row is `CREDENTIALS_SECRET` having been
+ * rotated inside the receipt's 24 hours, which leaves rows that are authentic
+ * but no longer decryptable. Dropping them matches how the model provider repository treats
  * customKeys it can no longer read: an unreadable secret is treated as absent
  * rather than as a failure the caller has to understand.
  */

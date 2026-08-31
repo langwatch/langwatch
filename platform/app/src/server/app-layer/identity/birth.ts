@@ -19,10 +19,7 @@ import {
   type IdentityNewborn,
 } from "@langwatch/identity-server/better-auth";
 import { createLogger } from "@langwatch/observability";
-import {
-  type IdentityEvent,
-  identityEventsFor,
-} from "@langwatch/identity-eventing";
+import { type IdentityEvent, identityEventsFor } from "@langwatch/identity-eventing";
 import type { IdentityLedgerWriter } from "./ledger";
 import type { PrismaIdentityNewbornRepository } from "./repositories/identity-newborn.prisma.repository";
 
@@ -58,43 +55,6 @@ export interface IdentityBirthServiceDeps {
  * The guards still run, unchanged, and they are what makes a retry cost
  * nothing: a fact the heads already carry is not stated again.
  *
- * ## The legs, and why each is where it is
- *
- *   0. the pinned id must be FREE, and the CLAIM. An entrance that dies
- *      between the staging and the row commit leaves facts under a tenant
- *      with no user row and no projection — nothing serves them, and nothing
- *      could FIND them either, since the event store enumerates no
- *      aggregates. The claim is the handle the reconciliation sweep needs.
- *   1. the idempotent command, STAGED. Engine down means the sign-up fails
- *      loudly here, before any row exists on either branch.
- *   2. ONE Postgres transaction: the user row and the `finalized`
- *      migration-state row.
- *   3. the bounded wait on the fold — so the `Identifier` row is there when
- *      sign-up returns.
- *
- * Nothing after leg two can fail the sign-up. Once the transaction commits
- * the user is real and `finalized`, and a throw from the observation that
- * follows would leave a user who can never sign in and whom no pass owns:
- * the runner skips terminal tenants and the sweep hunts tenants with no user
- * row. The wait is an observation, so it is treated as one.
- *
- * ## Ids, and why they are pinned
- *
- * A retry is a fresh request: better-auth mints a new random user id, and
- * with it a new tenant, a new command and a new identifier. So every id here
- * is derived instead. The user id comes from the normalized address; the
- * command id is the one the BACKFILL would use for this user's `User.email`,
- * which means the entrance and any later adoption pass state the same
- * command and the event store dedupes rather than duplicating.
- *
- * The pinned id is a convergence key for a RETRY of this birth, never a claim
- * on a user who already exists. Normalization strips plus-tags, so
- * `sam+anything@acme.com` derives the id `sam@acme.com` was born under — and
- * adopting whatever row sits there would hand the second signer a session as
- * the first. An occupied id is therefore refused outright, before any fact is
- * stated, which is also the honest answer: that address already has an
- * account.
- *
  * ## The AccountCredential row
  *
  * ADR-116 §3 lists it among the transaction's row writes. better-auth makes
@@ -106,15 +66,35 @@ export interface IdentityBirthServiceDeps {
  * that follows, on the identity branch, routed there by the request marker
  * this entrance sets. Both rows still exist when sign-up returns, which is
  * what the spec pins.
+ *
+ * The sequence itself is documented on `bear`, and the id derivation on
+ * `claimAddress`.
  */
 export class IdentityBirthService implements IdentityBirthPort {
   constructor(private readonly deps: IdentityBirthServiceDeps) {}
 
-  async bear({
-    row,
-    email,
-    createdAtMs,
-  }: IdentityNewborn): Promise<Record<string, unknown>> {
+  /**
+   * ## The legs, and why each is where it is
+   *
+   *   0. the pinned id must be FREE, and the CLAIM. An entrance that dies
+   *      between the staging and the row commit leaves facts under a tenant
+   *      with no user row and no projection — nothing serves them, and nothing
+   *      could FIND them either, since the event store enumerates no
+   *      aggregates. The claim is the handle the reconciliation sweep needs.
+   *   1. the idempotent command, STAGED. Engine down means the sign-up fails
+   *      loudly here, before any row exists on either branch.
+   *   2. ONE Postgres transaction: the user row and the `finalized`
+   *      migration-state row.
+   *   3. the bounded wait on the fold — so the `Identifier` row is there when
+   *      sign-up returns.
+   *
+   * Nothing after leg two can fail the sign-up. Once the transaction commits
+   * the user is real and `finalized`, and a throw from the observation that
+   * follows would leave a user who can never sign in and whom no pass owns:
+   * the runner skips terminal tenants and the sweep hunts tenants with no user
+   * row. The wait is an observation, so it is treated as one.
+   */
+  async bear({ row, email, createdAtMs }: IdentityNewborn): Promise<Record<string, unknown>> {
     const normalizedValue = normalizeIdentifierValue(email);
     const userId = deriveNewbornUserId({ normalizedValue });
     const command = this.attachCommand({ userId, email, createdAtMs });
@@ -165,6 +145,22 @@ export class IdentityBirthService implements IdentityBirthPort {
   /**
    * The address lock, taken before the facts reach the engine (ADR-116 §6).
    *
+   * ## Ids, and why they are pinned
+   *
+   * A retry is a fresh request: better-auth mints a new random user id, and
+   * with it a new tenant, a new command and a new identifier. So every id here
+   * is derived instead. The user id comes from the normalized address; the
+   * command id is the one the BACKFILL would use for this user's `User.email`,
+   * which means the entrance and any later adoption pass state the same
+   * command and the event store dedupes rather than duplicating.
+   *
+   * The pinned id is a convergence key for a RETRY of this birth, never a
+   * claim on a user who already exists. Normalization strips plus-tags, so
+   * `sam+anything@acme.com` derives the id `sam@acme.com` was born under — and
+   * adopting whatever row sits there would hand the second signer a session as
+   * the first. An occupied id is refused outright, before any fact is stated,
+   * which is also the honest answer: that address already has an account.
+   *
    * The entrance and the verification ceremony contend on ONE constraint,
    * which is what makes the pinned-id check above a fast path rather than the
    * decision: two sign-ups for one normalized address can both read a free id
@@ -183,9 +179,7 @@ export class IdentityBirthService implements IdentityBirthPort {
     facts: IdentityFactInput[];
     command: AttachIdentifierCommandData;
   }): Promise<void> {
-    const attached = facts.find(
-      (fact) => fact.type === IDENTIFIER_ATTACHED_EVENT_TYPE,
-    );
+    const attached = facts.find((fact) => fact.type === IDENTIFIER_ATTACHED_EVENT_TYPE);
     if (attached === undefined) return;
     const holder = await this.deps.reservations.claim({
       normalizedValue,
