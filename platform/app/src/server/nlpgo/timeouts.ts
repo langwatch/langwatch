@@ -195,6 +195,18 @@ export function resolveMaxFetchTimeoutMs(): number {
 }
 
 /**
+ * Cache for {@link createNlpFetchDispatcher}, keyed by the effective
+ * `timeoutMs`. An `Agent` owns its own connection pool, so building a fresh
+ * one per call — the original behaviour here — opened a new pool on every
+ * scenario fetch that was never reused and never destroyed: a socket/FD
+ * leak under load that also defeated keep-alive to nlpgo. `timeoutMs` comes
+ * from env-derived config (`resolveFloorFetchTimeoutMs`,
+ * `resolveMaxFetchTimeoutMs`), so the key cardinality is small and fixed
+ * for the process's life — no eviction policy is needed.
+ */
+const dispatchersByTimeoutMs = new Map<number, Dispatcher>();
+
+/**
  * Undici's own per-request timeouts — `headersTimeout`/`bodyTimeout`, default
  * 300_000ms each — live on the DISPATCHER (the `Agent`), not on the request.
  * An `AbortController` deadline passed as `signal` cannot raise them: past
@@ -207,13 +219,38 @@ export function resolveMaxFetchTimeoutMs(): number {
  * Callers of the bare global `fetch` (not the named `undici` export) must
  * pass this as `dispatcher` explicitly; the global's own `RequestInit` type
  * (from the `dom` lib) has no `dispatcher` field, hence {@link FetchInitWithDispatcher}.
+ *
+ * Memoized by `timeoutMs` — see {@link dispatchersByTimeoutMs}. Call
+ * {@link closeNlpFetchDispatchers} on shutdown to release the pooled
+ * connections this holds open.
  */
 export function createNlpFetchDispatcher({
   timeoutMs,
 }: {
   timeoutMs: number;
 }): Dispatcher {
-  return new Agent({ headersTimeout: timeoutMs, bodyTimeout: timeoutMs });
+  const cached = dispatchersByTimeoutMs.get(timeoutMs);
+  if (cached) {
+    return cached;
+  }
+  const dispatcher = new Agent({
+    headersTimeout: timeoutMs,
+    bodyTimeout: timeoutMs,
+  });
+  dispatchersByTimeoutMs.set(timeoutMs, dispatcher);
+  return dispatcher;
+}
+
+/**
+ * Closes every dispatcher {@link createNlpFetchDispatcher} has cached and
+ * clears the cache, so a later call builds a fresh `Agent` instead of
+ * reusing a closed one. Wired into process shutdown from
+ * `~/server/workers/startWorkers.ts`.
+ */
+export async function closeNlpFetchDispatchers(): Promise<void> {
+  const dispatchers = [...dispatchersByTimeoutMs.values()];
+  dispatchersByTimeoutMs.clear();
+  await Promise.all(dispatchers.map((dispatcher) => dispatcher.close()));
 }
 
 /**

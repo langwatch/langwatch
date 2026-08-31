@@ -4,6 +4,7 @@
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { closeNlpFetchDispatchers } from "../../../../nlpgo/timeouts";
 import type { WorkflowAgentData } from "../../types";
 
 vi.mock("@langwatch/observability/tracing", () => ({
@@ -122,9 +123,15 @@ describe("SerializedWorkflowAgentAdapter", () => {
     scenarioConfig: {} as AgentInput["scenarioConfig"],
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     agentOptions.length = 0;
+    // createNlpFetchDispatcher now memoizes by timeoutMs at module scope
+    // (nlpgo/timeouts.ts). Without clearing the cache here, a dispatcher
+    // built by an earlier test for the same timeoutMs is returned again
+    // without touching the mocked undici.Agent constructor, so agentOptions
+    // stays empty and this test's assertions see stale/undefined values.
+    await closeNlpFetchDispatchers();
     // Pin the timeout explicitly so the test doesn't rely on ambient env.
     // Stubbed, not assigned: a raw assignment here outlives the file and
     // reaches whatever else shares this vitest worker.
