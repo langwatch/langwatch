@@ -272,6 +272,23 @@ export const buildCommentBody = ({
   return parts.join("\n");
 };
 
+/** The v1 family answers `{"code": "...", "error": "Bad Request", ...}` —
+ * the specific code beside a generic status text — while the legacy flat
+ * shape carried the code AS the `error` string, and the canonical envelope
+ * nests it under `error.code`. Read all three, most specific first, so the
+ * script survives either side of the API family migration. */
+const errorCodeOf = (body: unknown): string => {
+  if (typeof body !== "object" || body === null) return "";
+  const record = body as { code?: unknown; error?: unknown };
+  if (typeof record.code === "string") return record.code;
+  const error = record.error;
+  if (typeof error === "string") return error;
+  if (typeof error === "object" && error !== null && "code" in error) {
+    return String((error as { code: unknown }).code);
+  }
+  return "";
+};
+
 /** The rollup's whole-response shape is the API's; only what the comment
  * renders is typed above, and unknown fields pass through untouched. */
 export const interpretUsageResponse = ({
@@ -284,10 +301,7 @@ export const interpretUsageResponse = ({
   if (status === 200) {
     return { kind: "usage", usage: body as PullRequestUsage };
   }
-  const code =
-    typeof body === "object" && body !== null && "error" in body
-      ? String((body as { error: unknown }).error)
-      : "";
+  const code = errorCodeOf(body);
   if (status === 404 && code === PR_NOT_MAPPED_CODE) {
     return { kind: "none" };
   }
@@ -300,26 +314,21 @@ export const interpretUsageResponse = ({
 const fetchUsage = async ({
   endpoint,
   apiKey,
-  projectId,
   repository,
   prNumber,
 }: {
   endpoint: string;
   apiKey: string;
-  projectId: string;
   repository: string;
   prNumber: number;
 }): Promise<FetchOutcome> => {
   const url =
-    `${endpoint}/api/coding-agent/pull-request-usage` +
+    `${endpoint}/api/v1/coding-agent/pull-request-usage` +
     `?repository=${encodeURIComponent(repository)}&pullRequest=${prNumber}`;
   let response: Response;
   try {
     response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "X-Project-Id": projectId,
-      },
+      headers: { Authorization: `Bearer ${apiKey}` },
     });
   } catch (error) {
     return { kind: "error", message: `LangWatch unreachable: ${String(error)}` };
@@ -422,7 +431,6 @@ const run = async (): Promise<void> => {
   const outcome = await fetchUsage({
     endpoint,
     apiKey: requireEnv("LANGWATCH_API_KEY"),
-    projectId: requireEnv("LANGWATCH_PROJECT_ID"),
     repository,
     prNumber,
   });

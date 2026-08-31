@@ -206,12 +206,34 @@ describe("given a usage rollup whose model rows cover far fewer tokens than the 
 describe("given the LangWatch API's answer", () => {
   describe("when the pull request is not mapped", () => {
     /** @scenario "An unmapped pull request reads as no usage" */
-    it("treats the refusal as no usage recorded rather than an error", () => {
-      const outcome = interpretUsageResponse({
+    it("treats the refusal as no usage recorded, in every error envelope shape", () => {
+      // The v1 family's live shape: specific code beside generic status text.
+      const v1Flat = interpretUsageResponse({
+        status: 404,
+        body: {
+          code: "github_pr_not_mapped",
+          message: "github_pr_not_mapped",
+          error: "Not Found",
+          kind: "github_pr_not_mapped",
+        },
+      });
+      assert.equal(v1Flat.kind, "none");
+      const canonical = interpretUsageResponse({
+        status: 404,
+        body: {
+          error: {
+            type: "not_found",
+            code: "github_pr_not_mapped",
+            message: "pull request not found",
+          },
+        },
+      });
+      assert.equal(canonical.kind, "none");
+      const legacyFlat = interpretUsageResponse({
         status: 404,
         body: { error: "github_pr_not_mapped", message: "pull request not found" },
       });
-      assert.equal(outcome.kind, "none");
+      assert.equal(legacyFlat.kind, "none");
     });
   });
 

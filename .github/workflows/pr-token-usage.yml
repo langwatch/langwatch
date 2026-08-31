@@ -60,7 +60,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LANGWATCH_API_KEY: ${{ secrets.LANGWATCH_PR_USAGE_API_KEY }}
-          LANGWATCH_PROJECT_ID: ${{ vars.LANGWATCH_PR_USAGE_PROJECT_ID }}
           PR_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pull_request }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
