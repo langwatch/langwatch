@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 
 import { guardAgainstGlobalFetch } from "../globalFetchGuard";
 
@@ -12,15 +12,15 @@ const realFetch = globalThis.fetch;
 // cleanup must leave it alone: the unit config runs with `isolate: false`, so
 // a cleanup that dropped every global stub would take this one with it.
 //
-// It is installed and removed by hand for that same reason, since
-// `vi.stubGlobal` and `vi.unstubAllGlobals` work on one shared registry.
+// `vi.stubGlobal` is what such a suite would use, and it is what puts the
+// probe in the registry that `vi.unstubAllGlobals` empties. Installing it any
+// other way would hide it from that call, and the test below could no longer
+// tell a targeted cleanup from a wholesale one.
 const probe = Symbol("langwatch-guard-probe");
-Object.defineProperty(globalThis, "langwatchGuardProbe", {
-  value: probe,
-  configurable: true,
-  writable: true,
-});
+vi.stubGlobal("langwatchGuardProbe", probe);
 
+// Removed by hand rather than with `vi.unstubAllGlobals`, which would empty
+// the same shared registry this file asks the guard not to touch.
 afterAll(() => {
   delete (globalThis as { langwatchGuardProbe?: symbol }).langwatchGuardProbe;
 });
