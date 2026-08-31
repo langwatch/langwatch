@@ -1197,3 +1197,161 @@ describe("given the pull goes wrong", () => {
     expect(query).not.toContain("createdon gt");
   });
 });
+
+/**
+ * The Azure bill arriving in more than one piece.
+ *
+ * The mapper's own tests already prove it reports the next-page link. Nothing
+ * proved the loop that follows the link, and "reads several pages whole" is a
+ * promise about the loop, not about the link: a caller that reported the link
+ * and stopped would pass every mapper test and still hand back a bill missing
+ * most of its days.
+ *
+ * The page walk is reached directly. Driving it through a whole run would need
+ * a subscription, a cursor and a write path, none of which this is about, and
+ * all of which would hide the property being asserted behind their own
+ * failures.
+ */
+describe("given an Azure bill that does not fit in one reply", () => {
+  interface PageWalk {
+    fetchAzureCostPages(params: {
+      subscriptionId: string;
+      token: string;
+      window: { fromDay: string; toDay: string };
+      options: { signal?: AbortSignal; deadlineMs?: number };
+    }): Promise<Array<{ day: string; costMinor: string }> | null>;
+  }
+
+  async function readTheBill(
+    options: { signal?: AbortSignal; deadlineMs?: number } = {},
+  ) {
+    const adapter = await newAdapter();
+    return await (adapter as unknown as PageWalk).fetchAzureCostPages({
+      subscriptionId: "sub-1",
+      token: "token-xyz",
+      window: { fromDay: "2026-08-01", toDay: "2026-08-02" },
+      options,
+    });
+  }
+
+  function costPage({
+    day,
+    cost,
+    nextLink = null,
+  }: {
+    day: number;
+    cost: number;
+    nextLink?: string | null;
+  }) {
+    return {
+      properties: {
+        columns: [
+          { name: "UsageDate" },
+          { name: "Cost" },
+          { name: "MeterCategory" },
+          { name: "Currency" },
+        ],
+        rows: [[day, cost, "Power Platform", "EUR"]],
+        nextLink,
+      },
+    };
+  }
+
+  function costCalls() {
+    return capturedCalls.filter((call) =>
+      call.url.includes("management.azure.com"),
+    );
+  }
+
+  describe("when the next page is Azure Resource Manager's own", () => {
+    /** @scenario "A cost reply spread over several pages is read whole" */
+    it("follows it and returns the days from both pages", async () => {
+      responseQueue.push({
+        status: 200,
+        body: costPage({
+          day: 20260801,
+          cost: 1.5,
+          nextLink: "https://management.azure.com/next-page",
+        }),
+      });
+      responseQueue.push({
+        status: 200,
+        body: costPage({ day: 20260802, cost: 2.5 }),
+      });
+
+      const days = await readTheBill();
+
+      expect(days?.map((day) => day.day)).toEqual(["2026-08-01", "2026-08-02"]);
+      expect(costCalls()[1]?.url).toBe(
+        "https://management.azure.com/next-page",
+      );
+    });
+  });
+
+  describe("when the next page points somewhere that is not Azure", () => {
+    /** @scenario "A cost reply spread over several pages is read whole" */
+    it("holds the window rather than report half a bill", async () => {
+      responseQueue.push({
+        status: 200,
+        body: costPage({
+          day: 20260801,
+          cost: 1.5,
+          nextLink: "https://not-azure.example.com/next",
+        }),
+      });
+
+      expect(await readTheBill()).toBeNull();
+      // The refused link carries the token if followed.
+      expect(costCalls()).toHaveLength(1);
+      expect(errors.join(" ")).toContain("not-azure.example.com");
+    });
+  });
+
+  describe("when there are more pages than one run will read", () => {
+    /** @scenario "A cost reply spread over several pages is read whole" */
+    it("holds the window instead of recording the pages it did read", async () => {
+      for (let page = 0; page < 60; page++) {
+        responseQueue.push({
+          status: 200,
+          body: costPage({
+            day: 20260801,
+            cost: 1,
+            nextLink: `https://management.azure.com/page-${page}`,
+          }),
+        });
+      }
+
+      expect(await readTheBill()).toBeNull();
+      expect(costCalls()).toHaveLength(50);
+    });
+  });
+
+  describe("when the run is over before the first page is asked for", () => {
+    /** @scenario "A cost reply spread over several pages is read whole" */
+    it("asks for nothing and holds the window", async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      expect(await readTheBill({ signal: controller.signal })).toBeNull();
+      expect(costCalls()).toHaveLength(0);
+    });
+  });
+
+  describe("when Azure asks the read to slow down mid-bill", () => {
+    /** @scenario "Being asked to slow down leaves the window unpriced rather than priced at nothing" */
+    it("holds the whole window, including the page it already read", async () => {
+      responseQueue.push({
+        status: 200,
+        body: costPage({
+          day: 20260801,
+          cost: 1.5,
+          nextLink: "https://management.azure.com/next-page",
+        }),
+      });
+      responseQueue.push({ status: 429, body: {} });
+
+      expect(await readTheBill()).toBeNull();
+      expect(warnings.join(" ")).toContain("HTTP 429");
+    });
+  });
+});
