@@ -774,7 +774,7 @@ describe("TraceListClickHouseRepository.findAll across unmerged same-version row
       // assertion below would stop testing anything — passing or failing on
       // whichever version happened to survive. Hold merges off the table for
       // the duration.
-      await ch.exec({ query: "SYSTEM STOP MERGES trace_summaries" });
+      await ch.command({ query: "SYSTEM STOP MERGES trace_summaries" });
 
       // Separate inserts on purpose: two rows with the same sorting key in one
       // block are collapsed at part formation, which is not the case here.
@@ -797,7 +797,7 @@ describe("TraceListClickHouseRepository.findAll across unmerged same-version row
     });
 
     afterAll(async () => {
-      await ch.exec({ query: "SYSTEM START MERGES trace_summaries" });
+      await ch.command({ query: "SYSTEM START MERGES trace_summaries" });
       await ch.exec({
         query:
           "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
