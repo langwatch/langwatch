@@ -5893,6 +5893,9 @@ importers:
 
   packages/group-queue:
     dependencies:
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../config
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability

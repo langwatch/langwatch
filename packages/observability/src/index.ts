@@ -27,7 +27,9 @@ export {
   type LoggerConfiguration,
   type LoggerFactory,
   type LoggerFormat,
+  loggerConfigurationFrom,
   type Logger,
+  type ProcessLoggerInputs,
   type ResolvedLoggerConfiguration,
 } from "./logger";
 export {

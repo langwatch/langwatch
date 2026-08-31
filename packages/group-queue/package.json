@@ -26,6 +26,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/config": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
     "@opentelemetry/api": "^1.9.1",

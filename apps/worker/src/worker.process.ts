@@ -1,4 +1,4 @@
-import { configureLogger, type LoggerConfiguration } from "@langwatch/observability";
+import { configureLogger, loggerConfigurationFrom } from "@langwatch/observability";
 import {
   createProcessObservability,
   type ProcessObservability,
@@ -50,7 +50,7 @@ export class WorkerProcess {
   static async boot(options: WorkerBootOptions): Promise<WorkerProcess> {
     const config = resolveWorkerConfig(options.source);
     const resources = new ResourceScope();
-    const loggerConfiguration = toLoggerConfiguration(config);
+    const loggerConfiguration = loggerConfigurationFrom(config);
     configureLogger(loggerConfiguration);
     const observability = createProcessObservability({
       ...options.observability,
@@ -174,15 +174,3 @@ function toObservabilitySetup(config: WorkerConfig): ProcessObservabilityOptions
   };
 }
 
-function toLoggerConfiguration(config: WorkerConfig): LoggerConfiguration {
-  return {
-    environment: config.nodeEnvironment,
-    format: config.logger.format,
-    level: config.logger.level,
-    consoleLevel: config.logger.consoleLevel,
-    otelExportEnabled: config.logger.otelExportEnabled,
-    serviceName: config.serviceName,
-    serviceVersion: config.serviceVersion,
-    deploymentEnvironment: config.environment,
-  };
-}

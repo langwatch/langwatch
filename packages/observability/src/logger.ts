@@ -14,8 +14,10 @@ import {
 export type {
   LoggerConfiguration,
   LoggerFormat,
+  ProcessLoggerInputs,
   ResolvedLoggerConfiguration,
 } from "./logger-config";
+export { loggerConfigurationFrom } from "./logger-config";
 
 type LogContextProvider = () => Record<string, string | null>;
 

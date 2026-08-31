@@ -4,7 +4,10 @@ import {
   RuntimeConfig,
   type ConfigValue,
 } from "@langwatch/config";
-import type { GroupQueuePolicy } from "@langwatch/group-queue";
+import {
+  resolveGroupQueuePolicyFromEnv,
+  type GroupQueuePolicy,
+} from "@langwatch/group-queue";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
 import { z } from "zod";
 
@@ -191,7 +194,7 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
     }),
     infrastructure: {
       redis: new RedisConfigService().resolve(value.infrastructure.redis),
-      groupQueue: resolveGroupQueuePolicy(value.infrastructure.groupQueue),
+      groupQueue: resolveGroupQueuePolicyFromEnv(value.infrastructure.groupQueue),
       storage: {
         backend: value.infrastructure.storage.backend ?? "s3",
         localFilesystemRoot:
@@ -219,28 +222,6 @@ function normalizeWorkerConfigSource(
     HTTP_PROXY: source.HTTP_PROXY ?? source.http_proxy,
     NO_PROXY: source.NO_PROXY ?? source.no_proxy,
   };
-}
-
-function resolveGroupQueuePolicy(
-  input: WorkerConfigProjection["infrastructure"]["groupQueue"],
-): GroupQueuePolicy {
-  return {
-    globalConcurrency: positiveSafeIntegerOrUndefined(input.globalConcurrency),
-    tenantConcurrencyCap: nonNegativeSafeIntegerOrUndefined(input.tenantConcurrencyCap),
-    globalConcurrencyBudget: nonNegativeSafeIntegerOrUndefined(input.globalConcurrencyBudget),
-    compression: input.zstdWritesEnabled === "true" ? "zstd" : "gzip",
-    payloadCodec: input.msgpackWritesEnabled === "true" ? "msgpack" : "json",
-  };
-}
-
-function positiveSafeIntegerOrUndefined(raw: string | undefined): number | undefined {
-  const parsed = Number(raw);
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
-}
-
-function nonNegativeSafeIntegerOrUndefined(raw: string | undefined): number | undefined {
-  const parsed = Number(raw);
-  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
 function resolveS3Region(

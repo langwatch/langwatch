@@ -472,3 +472,26 @@ function parseTelemetryResourceAttributes(raw: string | undefined): Record<strin
 
   return attributes;
 }
+
+/**
+ * Parse an env-string into a positive safe integer, or `undefined` when it
+ * isn't one. The result never carries junk: a non-numeric value, `NaN`,
+ * `Infinity`, a decimal, zero, or a negative all collapse to `undefined`
+ * rather than a value the downstream config would treat as valid.
+ */
+export function positiveSafeIntegerOrUndefined(raw: string | undefined): number | undefined {
+  const parsed = Number(raw);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+/**
+ * Like {@link positiveSafeIntegerOrUndefined} but accepts `0`. Used for
+ * budgets and caps where zero means "unbounded" or "off" and negatives are
+ * still nonsense.
+ */
+export function nonNegativeSafeIntegerOrUndefined(
+  raw: string | undefined,
+): number | undefined {
+  const parsed = Number(raw);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : undefined;
+}

@@ -5,9 +5,15 @@ import {
   portSchema,
   type ConfigValue,
 } from "@langwatch/config";
-import type { LoggerConfiguration } from "@langwatch/observability";
+import {
+  loggerConfigurationFrom,
+  type LoggerConfiguration,
+} from "@langwatch/observability";
 import type { ProcessObservabilityOptions } from "@langwatch/observability/node";
-import type { GroupQueuePolicy } from "@langwatch/group-queue";
+import {
+  resolveGroupQueuePolicyFromEnv,
+  type GroupQueuePolicy,
+} from "@langwatch/group-queue";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
 import { z } from "zod";
 
@@ -130,23 +136,21 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
     },
     infrastructure: {
       redis: new RedisConfigService().resolve(value.infrastructure.redis),
-      groupQueue: resolveGroupQueuePolicy(value.infrastructure.groupQueue),
+      groupQueue: resolveGroupQueuePolicyFromEnv(value.infrastructure.groupQueue),
     },
   };
 }
 
-/** The logger receives semantic process values, never a raw environment source. */
+/**
+ * The logger receives semantic process values, never a raw environment source.
+ *
+ * Delegates to `loggerConfigurationFrom` in `@langwatch/observability`: every
+ * process (api, worker, and any future one) folds its parsed config through
+ * the same one-place mapping, so a new logger field lands in one map instead
+ * of drifting across N copies.
+ */
 export function apiLoggerConfiguration(config: ApiConfig): LoggerConfiguration {
-  return {
-    environment: config.nodeEnvironment,
-    format: config.logger.format,
-    level: config.logger.level,
-    consoleLevel: config.logger.consoleLevel,
-    otelExportEnabled: config.logger.otelExportEnabled,
-    serviceName: config.serviceName,
-    serviceVersion: config.serviceVersion,
-    deploymentEnvironment: config.environment,
-  };
+  return loggerConfigurationFrom(config);
 }
 
 /** Builds SDK setup from parsed semantic configuration before boot side effects. */
@@ -183,24 +187,3 @@ function firstDefined(
   return undefined;
 }
 
-function resolveGroupQueuePolicy(
-  input: ApiConfigProjection["infrastructure"]["groupQueue"],
-): GroupQueuePolicy {
-  return {
-    globalConcurrency: positiveSafeIntegerOrUndefined(input.globalConcurrency),
-    tenantConcurrencyCap: nonNegativeSafeIntegerOrUndefined(input.tenantConcurrencyCap),
-    globalConcurrencyBudget: nonNegativeSafeIntegerOrUndefined(input.globalConcurrencyBudget),
-    compression: input.zstdWritesEnabled === "true" ? "zstd" : "gzip",
-    payloadCodec: input.msgpackWritesEnabled === "true" ? "msgpack" : "json",
-  };
-}
-
-function positiveSafeIntegerOrUndefined(raw: string | undefined): number | undefined {
-  const parsed = Number(raw);
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
-}
-
-function nonNegativeSafeIntegerOrUndefined(raw: string | undefined): number | undefined {
-  const parsed = Number(raw);
-  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : undefined;
-}

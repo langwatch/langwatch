@@ -8,9 +8,13 @@ const mocks = vi.hoisted(() => ({
   createObservability: vi.fn(),
 }));
 
-vi.mock("@langwatch/observability", () => ({
-  configureLogger: mocks.configureLogger,
-}));
+vi.mock("@langwatch/observability", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/observability")>();
+  return {
+    ...actual,
+    configureLogger: mocks.configureLogger,
+  };
+});
 
 vi.mock("@langwatch/observability/node", () => ({
   createProcessObservability: mocks.createObservability,

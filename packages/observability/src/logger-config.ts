@@ -84,3 +84,43 @@ export function resolveLoggerConfiguration(
       DEFAULT_LOGGER_CONFIGURATION.otelTransportServiceVersion,
   };
 }
+
+/**
+ * The process-config shape both API and worker (and any future process) hand
+ * this package to produce their `LoggerConfiguration`. Kept structural on
+ * purpose: every process defines its own `Config` type, and this port takes
+ * the slice of it a logger reads — never the whole thing.
+ */
+export interface ProcessLoggerInputs {
+  nodeEnvironment?: string;
+  environment?: string;
+  serviceName?: string;
+  serviceVersion?: string;
+  logger: {
+    format?: LoggerFormat;
+    level?: string;
+    consoleLevel?: string;
+    otelExportEnabled?: boolean;
+  };
+}
+
+/**
+ * Map a process configuration into the `LoggerConfiguration` the package
+ * builds a logger from. One place: every process (api, worker, and any future
+ * one) hands its parsed config here, so a new logger field lands in exactly
+ * one map instead of drifting across N copies.
+ */
+export function loggerConfigurationFrom(
+  inputs: ProcessLoggerInputs,
+): LoggerConfiguration {
+  return {
+    environment: inputs.nodeEnvironment,
+    format: inputs.logger.format,
+    level: inputs.logger.level,
+    consoleLevel: inputs.logger.consoleLevel,
+    otelExportEnabled: inputs.logger.otelExportEnabled,
+    serviceName: inputs.serviceName,
+    serviceVersion: inputs.serviceVersion,
+    deploymentEnvironment: inputs.environment,
+  };
+}
