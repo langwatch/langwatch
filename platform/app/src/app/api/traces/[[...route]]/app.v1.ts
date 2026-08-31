@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
+import { getAllForProjectInput } from "~/server/api/ports/traces.schemas";
 import { TracesV2TrpcApi } from "@langwatch/trace-server";
 import { createTraceViewReadPorts } from "~/runtime/app/features/trace";
 import {

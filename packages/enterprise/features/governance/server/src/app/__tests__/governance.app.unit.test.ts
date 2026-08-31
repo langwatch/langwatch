@@ -23,6 +23,7 @@ import type { ProjectService } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
   GovernanceApp,
+  type GovernanceActorDirectory,
   type GovernancePersonalVirtualKeyPorts,
   type GovernanceProjectCaller,
 } from "../governance.app";
@@ -70,6 +71,7 @@ function buildApp(overrides: Partial<TestGovernanceService> = {}) {
       hasActivePersonalKeyLabelled:
         unreachable<GovernancePersonalVirtualKeyPorts["hasActivePersonalKeyLabelled"]>(),
     },
+    actors: { tryFindUser: unreachable<GovernanceActorDirectory["tryFindUser"]>() },
   });
 
   return { app, getOrganizationId };

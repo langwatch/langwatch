@@ -4,7 +4,7 @@ import { useSSESubscription } from "~/hooks/useSSESubscription";
 import {
   type ExperimentUpdateSignal,
   experimentUpdateSignalSchema,
-} from "~/server/api/routers/experiments.schemas";
+} from "@langwatch/experiment-contract";
 import { api } from "~/utils/api";
 import type { EvaluationsV3Actions } from "../types";
 import { useEvaluationsV3Store } from "./useEvaluationsV3Store";

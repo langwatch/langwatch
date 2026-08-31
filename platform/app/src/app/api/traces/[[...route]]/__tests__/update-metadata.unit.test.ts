@@ -55,7 +55,7 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-vi.mock("~/server/api/routers/traces.schemas", () => {
+vi.mock("~/server/api/ports/traces.schemas", () => {
   const { z } = require("zod");
   return {
     getAllForProjectInput: z.object({

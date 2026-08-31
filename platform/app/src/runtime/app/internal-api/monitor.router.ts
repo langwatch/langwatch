@@ -1,7 +1,7 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { EvaluatorReplicationApi } from "@langwatch/evaluator-server";
 import { MonitorTrpcApi } from "@langwatch/monitor-server";
-import { currentVsPreviousDates } from "~/server/api/routers/analytics/common";
+import { currentVsPreviousDates } from "~/server/api/currentVsPreviousDates";
 import type { TRPCContext } from "~/server/api/trpc.context";
 import { appTrpcRoot } from "~/server/api/trpc.root";
 import {

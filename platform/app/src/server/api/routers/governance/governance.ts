@@ -1,22 +1,25 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * Two cross-cutting governance procedures that still live on the app router
- * because their data-gathering reaches directly into `ctx.prisma` and
- * composes several cross-feature services (feature flags, organizations,
- * users, usage stats). The other four surfaces — `setupState`, `ocsfExport`,
- * `recordWorkspaceView`, `quarantineFillStats` — moved to the governance
- * package's `GovernanceTrpcApi` and are mounted alongside these on the
- * `governance.*` namespace.
+ * `governance.resolveHome`: which `/` destination the authenticated user lands
+ * on. It stays on the app router, and this is why.
  *
- * These two will follow once their gathering is behind a `PersonaHomeApp` /
- * `ActorResolutionApp` seam the composition can supply. Doing that now would
- * mean an in-flight design decision about how governance reads enterprise
- * plan status, so the split lands first and the extraction follows.
+ * The decision is not here — it is `PersonaHomeResolverService.resolveSafe`,
+ * a pure function in the governance contract, which the package owns. What is
+ * left is the gathering, and the gathering spans six owners: the governance
+ * setup state, the organization's projects, the plan, the permission engine,
+ * the feature flags, the member's own pinned path and the organization's
+ * declared intent. No package owns that composition; the router root does.
+ * Moving it into the governance package would mean handing the package a port
+ * for each signal, which is this code with an interface stapled to it.
+ *
+ * Its five siblings are packaged. `setupState`, `ocsfExport`,
+ * `recordWorkspaceView`, `quarantineFillStats` and `resolveActorPersonalProject`
+ * live on the governance package's `GovernanceTrpcApi` and are mounted
+ * alongside this one on the `governance.*` namespace.
  *
  * Specs:
  *   - specs/ai-gateway/governance/persona-home-resolver.feature
- *   - specs/ai-gateway/governance/admin-trace-access.feature
  */
 
 import {
@@ -134,57 +137,5 @@ export const governanceRouter = createTRPCRouter({
         hasGovernanceUi,
         firstProjectSlug,
       });
-    }),
-
-  /**
-   * Resolves a CH-side `actor` token (typically the email stamped on spans
-   * as `langwatch.user_id`, occasionally the User.id directly) to that
-   * user's Personal Workspace inside the given org. Drives the bird's-eye
-   * `/governance/users/[id]` "View their workspace →" link.
-   *
-   * Returns null when the actor doesn't resolve to a User in this org, or
-   * when the resolved User has no Personal Workspace yet — no enumeration
-   * leak, both branches collapse to null.
-   */
-  resolveActorPersonalProject: protectedProcedure
-    .input(
-      z.object({
-        organizationId: z.string(),
-        /** Email or User.id stamped on spans as the actor identity. */
-        actor: z.string().min(1).max(512),
-      }),
-    )
-    .permission("governance:view")
-    .query(async ({ ctx, input }) => {
-      const user = await ctx.prisma.user.findFirst({
-        where: {
-          OR: [{ email: input.actor }, { id: input.actor }],
-        },
-        select: { id: true, name: true, email: true },
-      });
-      if (!user) return null;
-
-      const membership = await ctx.prisma.organizationUser.findFirst({
-        where: {
-          userId: user.id,
-          organizationId: input.organizationId,
-        },
-        select: { userId: true },
-      });
-      if (!membership) return null;
-
-      const workspace = await ctx.app.users.tryFindPersonalWorkspace({
-        userId: user.id,
-        organizationId: input.organizationId,
-      });
-      if (!workspace) return null;
-
-      return {
-        userId: user.id,
-        displayName: user.name ?? user.email ?? user.id,
-        teamId: workspace.team.id,
-        projectId: workspace.project.id,
-        projectSlug: workspace.project.slug,
-      };
     }),
 });

@@ -63,7 +63,7 @@ vi.mock("~/server/app-layer/app", () => ({
   })),
 }));
 
-vi.mock("~/server/api/routers/traces.schemas", () => ({
+vi.mock("~/server/api/ports/traces.schemas", () => ({
   getAllForProjectInput: z.object({
     projectId: z.string(),
     startDate: z.number(),

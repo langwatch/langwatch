@@ -1,3 +1,15 @@
+/**
+ * The trace-read input parsers the process hands the trace package's tRPC
+ * transport as its `filterInputSchema` / `listInputSchema` ports, and that the
+ * two legacy trace REST routes parse their own query strings with.
+ *
+ * They live here rather than in the trace package because they are built on
+ * `sharedFiltersInputSchema` — the application's own analytics filter
+ * vocabulary, which the trace feature does not own. A tRPC procedure's input
+ * parser is fixed when the router is BUILT, so the transport takes the parser
+ * as a port and the process supplies this one.
+ */
+
 import { z } from "zod";
 import { sharedFiltersInputSchema } from "../../analytics/types";
 

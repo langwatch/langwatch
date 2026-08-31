@@ -94,7 +94,7 @@ import { checkPreconditionSchema } from "~/server/evaluations/types";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import { redactPatchForViewer } from "~/server/traces/edit-overlay/redactTraceEditOverlayPatch";
 import { restoreWithheldEdits } from "~/server/traces/edit-overlay/restoreWithheldTraceEdits";
-import { getAllForProjectInput, tracesFilterInput } from "./routers/traces.schemas";
+import { getAllForProjectInput, tracesFilterInput } from "./ports/traces.schemas";
 import type { TRPCContext } from "./trpc.context";
 import { getUserProtectionsForProject } from "./utils";
 import { virtualKeyBudgetInputSchema } from "~/server/gateway/virtualKey.service";
@@ -195,8 +195,8 @@ import {
   validateSavedWorkbenchChartDefinition,
 } from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
 import { availableFilters } from "~/server/filters/registry";
-import { resolveLangWatchQLCaller } from "./routers/analytics/lwqlCaller";
-import { enforceWorkbenchEnabled } from "./routers/analytics/workbenchAccessMiddleware";
+import { resolveLangWatchQLCaller } from "./ports/lwqlCaller";
+import { enforceWorkbenchEnabled } from "./ports/workbenchAccessMiddleware";
 import type { SlackActionParams, Trigger } from "@langwatch/automation-contract";
 import { PostgresSavedViewAdapter } from "@langwatch/dashboard-server";
 import { createSharedTraceTrpcPorts, createTracesV2TrpcPorts } from "~/runtime/app/features/trace";

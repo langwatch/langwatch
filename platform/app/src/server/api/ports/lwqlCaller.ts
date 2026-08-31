@@ -12,7 +12,7 @@ import { NotFoundError } from "@langwatch/handled-error";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
 
-import { getUserProtectionsForProject } from "../../utils";
+import { getUserProtectionsForProject } from "../utils";
 
 /**
  * Resolves the project identity and the member's protections a LangWatchQL

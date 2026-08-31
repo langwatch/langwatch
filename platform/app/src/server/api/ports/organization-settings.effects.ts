@@ -1,3 +1,14 @@
+/**
+ * What the process does after an organization settings write says trace
+ * sharing was switched off.
+ *
+ * It is here rather than on the organization service because the revocation
+ * crosses two other features — every project in the organization, and every
+ * share link on it — and the organization feature owns neither. The management
+ * REST family is the caller; the failure is loud on purpose, because a share
+ * link that survives the switch is a live leak.
+ */
+
 import type { UpdateOrganizationSettingsResult } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { ShareService } from "@langwatch/share-contract";

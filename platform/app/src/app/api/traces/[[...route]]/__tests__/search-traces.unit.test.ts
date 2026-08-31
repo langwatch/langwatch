@@ -65,7 +65,7 @@ vi.mock("~/server/traces/projection", async (importOriginal) => {
   };
 });
 
-vi.mock("~/server/api/routers/traces.schemas", () => {
+vi.mock("~/server/api/ports/traces.schemas", () => {
   const { z } = require("zod");
   return {
     getAllForProjectInput: z.object({

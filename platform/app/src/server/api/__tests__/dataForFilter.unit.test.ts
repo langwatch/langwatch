@@ -2,11 +2,11 @@ import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getApp } from "~/server/app-layer/app";
 import { appPermissionsService } from "~/test-utils/appPermissionsMock";
-import { appRouter } from "../../../root";
-import { createInnerTRPCContext } from "../../../trpc";
+import { appRouter } from "../root";
+import { createInnerTRPCContext } from "../trpc";
 
-vi.mock("../../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../rbac")>();
+vi.mock("../rbac", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../rbac")>();
   return {
     ...actual,
     resolveProjectPermission: vi

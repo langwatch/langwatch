@@ -542,6 +542,16 @@ export class App {
             },
           })) !== null,
       },
+      // The actor token a span carries is usually the person's email and
+      // occasionally their User id; which columns those are is this process's
+      // fact, so the match on either lives here rather than in the feature.
+      actors: {
+        tryFindUser: ({ token }) =>
+          prisma.user.findFirst({
+            where: { OR: [{ email: token }, { id: token }] },
+            select: { id: true, name: true, email: true },
+          }),
+      },
     });
     this.sessionPolicy = PostgresSessionPolicyAdapter.create(prisma);
     this.billableEvents = deps.billableEvents;

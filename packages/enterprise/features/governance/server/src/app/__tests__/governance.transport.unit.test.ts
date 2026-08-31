@@ -35,7 +35,11 @@ import type { ProjectIdentity, ProjectService } from "@langwatch/project-contrac
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
-import { GovernanceApp, type GovernancePersonalVirtualKeyPorts } from "../governance.app";
+import {
+  GovernanceApp,
+  type GovernanceActorDirectory,
+  type GovernancePersonalVirtualKeyPorts,
+} from "../governance.app";
 import { createGovernanceRestApp } from "../../transport/api-rest/governance.api";
 import { TestGovernanceService } from "./support/test-governance-service";
 
@@ -178,6 +182,7 @@ function buildApi(
       hasActivePersonalKeyLabelled:
         unreachable<GovernancePersonalVirtualKeyPorts["hasActivePersonalKeyLabelled"]>(),
     },
+    actors: { tryFindUser: unreachable<GovernanceActorDirectory["tryFindUser"]>() },
   });
 
   const built = spine(options.grants ?? ["aiTools:view", "aiTools:manage"]);

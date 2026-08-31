@@ -76,7 +76,7 @@ vi.mock("~/server/app-layer/app", () => ({
 // Stub the schema used by the search route to avoid Zod import issues.
 // Top-level `z` is safe to close over in a vi.mock factory — vitest hoists
 // vi.mock calls but allows factories to reference imports of OTHER modules.
-vi.mock("~/server/api/routers/traces.schemas", () => ({
+vi.mock("~/server/api/ports/traces.schemas", () => ({
   getAllForProjectInput: z.object({
     projectId: z.string(),
     startDate: z.number(),

@@ -20,7 +20,7 @@ import { createOrganizationRestApp } from "@langwatch/organization-server";
 import { appFromContext } from "~/app/api/middleware/app-context";
 import { requireEnterprisePlanRest } from "~/app/api/middleware/enterprise-gate";
 import { managementAuditPort } from "~/server/api/management/audit";
-import { revokeTraceSharesAfterOrganizationSettingsUpdate } from "~/server/api/routers/organization-settings.effects";
+import { revokeTraceSharesAfterOrganizationSettingsUpdate } from "~/server/api/ports/organization-settings.effects";
 import { appRestSecurity } from "~/server/api/security";
 import { MemberSeatLimitReachedError } from "~/server/app-layer/organizations/errors";
 import { prisma } from "~/server/db";

@@ -17,7 +17,7 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { deleteEvaluationRunsByTenant } from "~/server/analytics/clickhouse/__tests__/test-utils/clickhouse-cleanup";
-import { currentVsPreviousDates } from "~/server/api/routers/analytics/common";
+import { currentVsPreviousDates } from "~/server/api/currentVsPreviousDates";
 import {
   cleanupTestData,
   startTestContainers,

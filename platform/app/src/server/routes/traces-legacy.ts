@@ -12,7 +12,7 @@ import type { Context } from "hono";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import type { Permission } from "~/server/api/rbac";
-import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
+import { getAllForProjectInput } from "~/server/api/ports/traces.schemas";
 import { createServiceApp } from "~/server/api/security";
 import { handlerManagedAuth } from "@langwatch/platform-api/app-rest";
 import { getProtectionsForProject } from "~/server/api/utils";

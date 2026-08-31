@@ -200,6 +200,34 @@ export interface GovernancePersonalVirtualKeyPorts {
   }): Promise<boolean>;
 }
 
+/**
+ * The user an actor token names.
+ *
+ * A port rather than a service call because the token is whatever the span
+ * carried as `langwatch.user_id` — an email address on most SDKs, occasionally
+ * the User id itself — and matching either against the process's user table is
+ * a single-row lookup the Governance service does not own.
+ */
+export interface GovernanceActorDirectory {
+  tryFindUser(input: { token: string }): Promise<GovernanceActorUser | null>;
+}
+
+/** The identity columns an actor drill-in reads. */
+export interface GovernanceActorUser {
+  id: string;
+  name: string | null;
+  email: string | null;
+}
+
+/** Where an actor's own workspace lives, for the admin's drill-in link. */
+export interface GovernanceActorWorkspace {
+  userId: string;
+  displayName: string;
+  teamId: string;
+  projectId: string;
+  projectSlug: string;
+}
+
 /** What the process composes this feature's application from. */
 export interface GovernanceAppDependencies {
   governance: GovernanceService;
@@ -221,6 +249,8 @@ export interface GovernanceAppDependencies {
    */
   permissions: Pick<AuthzService, "getDecision">;
   personalVirtualKeys: GovernancePersonalVirtualKeyPorts;
+  /** Resolves the actor token stamped on a span to the person who owns it. */
+  actors: GovernanceActorDirectory;
 }
 
 /** Who a call is attributed to, and (for a lazy backfill) what to name them. */
@@ -534,6 +564,46 @@ export class GovernanceApp {
       userId: by.id,
       organizationId: input.organizationId,
     });
+  }
+
+  /**
+   * The personal workspace behind a CH-side `actor` token, for the bird's-eye
+   * "View their workspace →" link on `/governance/users/[id]`.
+   *
+   * Three refusals collapse to one `null`: the token names nobody, the person
+   * it names is not in this organization, or they have no personal workspace
+   * yet. Keeping them indistinguishable is deliberate — a caller who may read
+   * the governance surface still learns nothing about who else exists on the
+   * instance from the shape of the answer.
+   */
+  async tryResolveActorWorkspace(input: {
+    organizationId: string;
+    actor: string;
+  }): Promise<GovernanceActorWorkspace | null> {
+    const user = await this.dependencies.actors.tryFindUser({ token: input.actor });
+    if (!user) return null;
+
+    const member = await this.isOrganizationMember({
+      organizationId: input.organizationId,
+      userId: user.id,
+    });
+    if (!member) return null;
+
+    const workspace = await this.dependencies.organizations.tryFindPersonalWorkspace({
+      userId: user.id,
+      organizationId: input.organizationId,
+    });
+    if (!workspace) return null;
+
+    return {
+      userId: user.id,
+      // The admin reading the link needs a person, and any of the three
+      // columns identifies one; the id is the last resort rather than a blank.
+      displayName: user.name ?? user.email ?? user.id,
+      teamId: workspace.team.id,
+      projectId: workspace.project.id,
+      projectSlug: workspace.project.slug,
+    };
   }
 
   // ── Routing policies ──────────────────────────────────────────────────────
