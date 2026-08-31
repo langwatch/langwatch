@@ -327,3 +327,12 @@ Feature: The agent cache
       Given the platform refuses a write because the value is not text
       When the agent reads the exception
       Then it names the field and what was expected of it
+
+    # The REST routes send the refusal under "error", with the reasons beside
+    # the fields they name in "meta". A reader that only looks at the top of
+    # the envelope finds no reason there and answers the bare code again.
+    @unit
+    Scenario: A refusal read from the REST envelope names the field too
+      Given the platform refuses a write and puts the reasons under error meta
+      When the agent reads the exception
+      Then it names the field and what was expected of it
