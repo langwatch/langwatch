@@ -286,8 +286,4 @@ export {
   mapChRowToNormalized,
   serializeAttributes,
 } from "./repositories/clickhouse/stored-span-row.codec";
-export {
-  enrichRagContextIds,
-  generateDocumentId,
-  SpanNormalizationPipelineService,
-} from "./services/span-normalization.service";
+export { SpanNormalizationPipelineService } from "./services/span-normalization.service";

@@ -129,28 +129,8 @@ export class SpanNormalizationPipelineService {
       resourceAttributes: TraceRequestUtils.normalizeOtlpAttributes(otlpResource?.attributes ?? []),
       spanAttributes: TraceRequestUtils.normalizeOtlpAttributes(otlpSpan.attributes),
 
-      events: otlpSpan.events
-        .filter((e) => Boolean(e))
-        .map((event) => {
-          const timeUnixNano = TraceRequestUtils.normalizeOtlpUnixNano(event.timeUnixNano);
-          const attributes = TraceRequestUtils.normalizeOtlpAttributes(event.attributes);
-
-          return {
-            name: event.name,
-            timeUnixMs: TraceRequestUtils.convertUnixNanoToUnixMs(timeUnixNano),
-            attributes: attributes,
-          };
-        }),
-
-      links: otlpSpan.links
-        .filter((l) => Boolean(l))
-        .map((link) => {
-          const traceId = TraceRequestUtils.normalizeOtlpId(link.traceId);
-          const spanId = TraceRequestUtils.normalizeOtlpId(link.spanId);
-          const attributes = TraceRequestUtils.normalizeOtlpAttributes(link.attributes);
-
-          return { traceId, spanId, attributes };
-        }),
+      events: this.decodeEvents(otlpSpan),
+      links: this.decodeLinks(otlpSpan),
 
       droppedAttributesCount: 0,
       droppedEventsCount: 0,
@@ -163,6 +143,28 @@ export class SpanNormalizationPipelineService {
       cost: null,
       nonBilledCost: null,
     };
+  }
+
+  private decodeEvents(otlpSpan: OtlpSpan): NormalizedEvent[] {
+    return otlpSpan.events
+      .filter((event) => Boolean(event))
+      .map((event) => ({
+        name: event.name,
+        timeUnixMs: TraceRequestUtils.convertUnixNanoToUnixMs(
+          TraceRequestUtils.normalizeOtlpUnixNano(event.timeUnixNano),
+        ),
+        attributes: TraceRequestUtils.normalizeOtlpAttributes(event.attributes),
+      }));
+  }
+
+  private decodeLinks(otlpSpan: OtlpSpan): NormalizedSpan["links"] {
+    return otlpSpan.links
+      .filter((link) => Boolean(link))
+      .map((link) => ({
+        traceId: TraceRequestUtils.normalizeOtlpId(link.traceId),
+        spanId: TraceRequestUtils.normalizeOtlpId(link.spanId),
+        attributes: TraceRequestUtils.normalizeOtlpAttributes(link.attributes),
+      }));
   }
 
   private canonicalizeSpanAttributes(normalizedSpan: NormalizedSpan): {
@@ -203,61 +205,63 @@ export class SpanNormalizationPipelineService {
       events: result.events,
     };
   }
-}
 
-/**
- * Extracts textual content from a RAG chunk content value.
- * Mirrors `extractChunkTextualContent` from collector/rag.ts.
- */
-function extractChunkTextualContent(object: unknown): string {
-  let content = object;
-  if (typeof content === "string") {
-    try {
-      content = JSON.parse(content);
-    } catch {
-      return (object as string).trim();
+  /**
+   * Gives every RAG context entry a `document_id`, deriving one from the
+   * chunk's own content where the SDK sent none. Mutates the span's
+   * attributes in place, and writes back under the canonical key.
+   */
+  enrichRagContextIds(span: NormalizedSpan): void {
+    const raw =
+      span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] ??
+      span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS_LEGACY];
+    if (!Array.isArray(raw)) return;
+
+    span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] = raw.map((context) => {
+      if (!context || typeof context !== "object" || Array.isArray(context)) return context;
+      const entry: Record<string, unknown> = context;
+      if ("document_id" in entry && entry.document_id) return entry;
+      return {
+        ...entry,
+        document_id: SpanNormalizationPipelineService.documentIdFor(
+          entry.content !== undefined ? entry.content : context,
+        ),
+      };
+    });
+  }
+
+  /**
+   * The id a RAG chunk gets when it arrived without one: a hash of its own
+   * text, so the same chunk seen twice is the same document both times.
+   */
+  static documentIdFor(content: unknown): string {
+    return crypto
+      .createHash("md5")
+      .update(SpanNormalizationPipelineService.chunkText(content))
+      .digest("hex");
+  }
+
+  /** Mirrors `extractChunkTextualContent` from collector/rag.ts. */
+  private static chunkText(object: unknown): string {
+    let content = object;
+    if (typeof content === "string") {
+      try {
+        content = JSON.parse(content);
+      } catch {
+        return (object as string).trim();
+      }
     }
+    if (Array.isArray(content)) {
+      return content
+        .map((item) => SpanNormalizationPipelineService.chunkText(item))
+        .filter((text) => text)
+        .join("\n")
+        .trim();
+    }
+    if (typeof content === "object" && content !== null) {
+      return JSON.stringify(content);
+    }
+    // Parsed to a primitive (number, boolean, etc.) — use the original string
+    return String(object).trim();
   }
-  if (Array.isArray(content)) {
-    return content
-      .map(extractChunkTextualContent)
-      .filter((x) => x)
-      .join("\n")
-      .trim();
-  }
-  if (typeof content === "object" && content !== null) {
-    return JSON.stringify(content);
-  }
-  // Parsed to a primitive (number, boolean, etc.) — use the original string
-  return String(object).trim();
-}
-
-/** @internal Exported for unit testing */
-export function generateDocumentId(content: unknown): string {
-  return crypto.createHash("md5").update(extractChunkTextualContent(content)).digest("hex");
-}
-
-/**
- * Enriches RAG context entries that lack a `document_id` by generating
- * an MD5 hash from their content. Mutates the span attributes in-place.
- */
-export function enrichRagContextIds(span: NormalizedSpan): void {
-  const raw =
-    span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] ??
-    span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS_LEGACY];
-  if (!Array.isArray(raw)) return;
-
-  const enriched = raw.map((ctx) => {
-    if (!ctx || typeof ctx !== "object" || Array.isArray(ctx)) return ctx;
-    const ctxObj: Record<string, unknown> = ctx;
-    // Skip items that already have a document_id
-    if ("document_id" in ctxObj && ctxObj.document_id) return ctxObj;
-    return {
-      ...ctxObj,
-      document_id: generateDocumentId(ctxObj.content !== undefined ? ctxObj.content : ctx),
-    };
-  });
-
-  // Write back to the canonical attribute key (as real array)
-  span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] = enriched;
 }
