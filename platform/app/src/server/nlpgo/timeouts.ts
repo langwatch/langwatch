@@ -19,7 +19,11 @@
  * headroom. One operator-set number, read on both sides of the socket.
  */
 
-import { Agent, type Dispatcher } from "undici";
+import {
+  Agent,
+  type Dispatcher,
+  type RequestInit as UndiciRequestInit,
+} from "undici";
 
 /**
  * The engine's own knob for the code block's execution ceiling — see
@@ -216,9 +220,13 @@ const dispatchersByTimeoutMs = new Map<number, Dispatcher>();
  * cut off at 300s in production — the abort signal was never the ceiling
  * that mattered.
  *
- * Callers of the bare global `fetch` (not the named `undici` export) must
- * pass this as `dispatcher` explicitly; the global's own `RequestInit` type
- * (from the `dom` lib) has no `dispatcher` field, hence {@link FetchInitWithDispatcher}.
+ * This dispatcher may only be given to the `fetch` exported by `undici`, never
+ * to the global one. Node's global `fetch` is bound to the undici bundled with
+ * the Node runtime — 7.29.0 on Node 24, against 8.x here — and builds a request
+ * handler of the older shape, which this package rejects up front with
+ * `InvalidArgumentError: invalid onRequestStart method`. Pairing the two failed
+ * every scenario agent call in about a second, before a byte left the process.
+ * {@link FetchInitWithDispatcher} is typed so that mistake cannot compile.
  *
  * Memoized by `timeoutMs` — see {@link dispatchersByTimeoutMs}. Call
  * {@link closeNlpFetchDispatchers} on shutdown to release the pooled
@@ -254,10 +262,16 @@ export async function closeNlpFetchDispatchers(): Promise<void> {
 }
 
 /**
- * Widens the DOM-lib `RequestInit` the global `fetch` is typed with to admit
- * the undici-only `dispatcher` option. See {@link createNlpFetchDispatcher}.
+ * The request init for a call that carries {@link createNlpFetchDispatcher}'s
+ * dispatcher.
+ *
+ * Deliberately undici's own `RequestInit` (which already declares
+ * `dispatcher`), not the DOM-lib one the global `fetch` takes. The two are not
+ * assignable to each other, so this type is what makes handing the dispatcher
+ * to the global `fetch` a compile error rather than a production outage — see
+ * {@link createNlpFetchDispatcher} for what that outage looked like.
  */
-export type FetchInitWithDispatcher = RequestInit & { dispatcher?: Dispatcher };
+export type FetchInitWithDispatcher = UndiciRequestInit;
 
 /**
  * Lambda's own hard invocation ceiling. The code-block timeout override must
