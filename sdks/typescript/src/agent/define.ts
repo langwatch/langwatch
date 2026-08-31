@@ -83,8 +83,10 @@ export interface ConnectAgentOptions<P extends ParameterInput = ParameterDefinit
   parameters?: P;
   /**
    * Whether this process connects. Takes any boolean, so one expression can
-   * gate the deployments that connect: `process.env.APP_ENV !== "production"`.
-   * Default true, except when CI is truthy. LANGWATCH_AGENT_CONNECT=0 always disables.
+   * gate the deployments that connect. Without it the default is true, except
+   * when CI is truthy; a value given here replaces that rule rather than adding
+   * to it, so keep the CI half: `process.env.APP_ENV !== "production" && !process.env.CI`.
+   * LANGWATCH_AGENT_CONNECT=0 always disables.
    */
   enabled?: boolean;
   /** Names this instance in the platform. Also LANGWATCH_AGENT_INSTANCE_LABEL. */

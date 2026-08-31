@@ -278,10 +278,11 @@ def connect_agent(
             `ENVIRONMENT` and `NODE_ENV`; defaults to `development`.
         parameters: Replaces the run parameters read from the signature.
         enabled: Whether this process connects. Takes any boolean, so one
-            expression can gate the deployments that connect, for example
-            `os.environ.get("APP_ENV") != "production"`. Defaults to true,
-            except when `CI` is truthy; `LANGWATCH_AGENT_CONNECT=0` always
-            disables.
+            expression can gate the deployments that connect. Without it the
+            default is true, except when `CI` is truthy; a value given here
+            replaces that rule rather than adding to it, so keep the `CI` half:
+            `os.environ.get("APP_ENV") != "production" and not os.environ.get("CI")`.
+            `LANGWATCH_AGENT_CONNECT=0` always disables.
         instance_label: Names this process; also `LANGWATCH_AGENT_INSTANCE_LABEL`.
         timeout: Seconds one call may take, default 120, at most 300.
         concurrency: Calls in flight per process, default 1 in development and 4 elsewhere.

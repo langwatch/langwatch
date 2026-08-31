@@ -36296,7 +36296,8 @@ langwatch.agent.serve()   # Python, at the bottom of the script
 ```
 
 ```typescript
-// TypeScript: the connection holds the event loop open, `node agent.ts` serves until Ctrl-C
+// TypeScript: the connection holds the event loop open, so the script serves until Ctrl-C
+// Run it with the project's TypeScript runner, for example `tsx agent.ts`
 ```
 
 Then confirm from the CLI, in another terminal:
@@ -36582,7 +36583,7 @@ Then start your service the way you always start it. The start command does not 
 
   In Python, call `langwatch.agent.serve()` at the end of the script. It blocks until Ctrl-C.
 
-  In TypeScript the connection holds the event loop open by itself, so `node agent.ts` serves until Ctrl-C.
+  In TypeScript the connection holds the event loop open by itself, so the script serves until Ctrl-C. Run it with whatever runner the project uses, for example `tsx agent.ts`.
 </Note>
 
 ## 3. Confirm it is online
@@ -36815,7 +36816,7 @@ One deployment with several pods is one row and several instances. The platform 
 |---|---|
 | `concurrency` | How many calls one instance takes at the same time. Default 1 in `development`, 4 elsewhere. When every instance is full, the platform waits and retries within the call's deadline. |
 | `instance_label` (`instanceLabel`) | A name for this instance in the instances table, for example the pod name. Also read from `LANGWATCH_AGENT_INSTANCE_LABEL`. |
-| `enabled` | Whether this process connects. It takes any boolean, so one expression decides which deployments connect: `enabled=os.environ.get("APP_ENV") != "production"` connects everywhere but production. Default true, and false when `CI` is set, because a CI job is not a service anyone runs suites against. Pass `enabled=True` to override that. |
+| `enabled` | Whether this process connects. It takes any boolean, so one expression decides which deployments connect: `enabled=os.environ.get("APP_ENV") != "production" and not os.environ.get("CI")` connects everywhere but production and CI. Without the argument the default is true, and false when `CI` is set. An `enabled` argument replaces that rule, so keep the `CI` half unless a CI job is deliberately the target. |
 | `LANGWATCH_AGENT_CONNECT=0` | Turns the connection off for a deployment without a code change. |
 
 The platform delivers each call at most once. The SDK confirms a call when the function starts, and the platform never sends a confirmed call to a second instance, so a turn with side effects runs one time.
@@ -36877,7 +36878,7 @@ The decorator never stops the application from starting. Every problem is one wa
     | `name` | required | The agent's name, and the first half of a `connected:<name>@<environment>` target. |
     | `environment` | resolved, see above | Which environment row this process registers under. |
     | `parameters` | read from the signature | An explicit parameter declaration that replaces what the signature declares. |
-    | `enabled` | `True`, `False` under `CI` | Whether this process connects at all. Takes any boolean, for example `os.environ.get("APP_ENV") != "production"`. |
+    | `enabled` | `True`, `False` under `CI` | Whether this process connects at all. Takes any boolean, and replaces the `CI` default rather than adding to it. |
     | `instance_label` | none | A name for this instance in the instances table. |
     | `timeout` | `120` seconds | How long one call may take. The ceiling is 300 seconds. |
     | `concurrency` | `1` in `development`, `4` elsewhere | Calls this instance takes at the same time. |
@@ -36897,7 +36898,7 @@ The decorator never stops the application from starting. Every problem is one wa
     | `name` | required | The agent's name, and the first half of a `connected:<name>@<environment>` target. |
     | `environment` | resolved, see above | Which environment row this process registers under. |
     | `parameters` | none | A zod schema, a definition map, or a JSON Schema object. |
-    | `enabled` | `true`, `false` under `CI` | Whether this process connects at all. Takes any boolean, for example `process.env.APP_ENV !== "production"`. |
+    | `enabled` | `true`, `false` under `CI` | Whether this process connects at all. Takes any boolean, and replaces the `CI` default rather than adding to it. |
     | `instanceLabel` | none | A name for this instance in the instances table. |
     | `timeoutMs` | `120000` | How long one call may take. The ceiling is 300000. |
     | `concurrency` | `1` in `development`, `4` elsewhere | Calls this instance takes at the same time. |
@@ -37077,9 +37078,11 @@ LANGWATCH_AGENT_CONNECT=0
   ### Python
 
     ```python
+    import os
+
     @langwatch.connect_agent(
         name="support-agent",
-        enabled=os.environ.get("APP_ENV") != "production",
+        enabled=os.environ.get("APP_ENV") != "production" and not os.environ.get("CI"),
     )
     ```
 
@@ -37089,7 +37092,7 @@ LANGWATCH_AGENT_CONNECT=0
     connectAgent(
       {
         name: "support-agent",
-        enabled: process.env.APP_ENV !== "production",
+        enabled: process.env.APP_ENV !== "production" && !process.env.CI,
       },
       handler,
     );
@@ -37097,7 +37100,7 @@ LANGWATCH_AGENT_CONNECT=0
 
 
 
-The SDK defaults `enabled` to false when `CI` is set, because a CI job is not a service anyone runs suites against. Pass it true when a CI job is deliberately the target.
+The `CI` half of each expression keeps the default the SDK applies on its own. Without an `enabled` argument the SDK connects, except when `CI` is set, because a CI job is not a service anyone runs suites against. An `enabled` argument replaces that rule instead of adding to it, so an expression that ignores `CI` connects CI jobs. Leave the `CI` half out when a CI job is deliberately the target.
 
 ## Next steps
 
@@ -54291,7 +54294,8 @@ langwatch.agent.serve()   # Python, at the bottom of the script
 ```
 
 ```typescript
-// TypeScript: the connection holds the event loop open, `node agent.ts` serves until Ctrl-C
+// TypeScript: the connection holds the event loop open, so the script serves until Ctrl-C
+// Run it with the project's TypeScript runner, for example `tsx agent.ts`
 ```
 
 Then confirm from the CLI, in another terminal:

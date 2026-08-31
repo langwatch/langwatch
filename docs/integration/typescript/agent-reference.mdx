@@ -131,7 +131,7 @@ Values arrive validated against the declaration. A value the declaration refuses
 
 ### Lifecycle
 
-The connection starts on the next tick after the first `connectAgent` call, once per process, and one connection carries every agent the process declares. It uses the global `WebSocket` when the runtime has one and the `ws` package otherwise. While connected, it keeps the event loop alive, so `node agent.ts` serves until Ctrl-C.
+The connection starts on the next tick after the first `connectAgent` call, once per process, and one connection carries every agent the process declares. It uses the global `WebSocket` when the runtime has one and the `ws` package otherwise. While connected, it keeps the event loop alive, so a script that only declares an agent serves until Ctrl-C.
 
 SIGINT, SIGTERM and normal exit send a deregistration, so the agent reads Offline at once. A dropped connection is retried with a growing wait, from 1 second to 30 seconds.
 
