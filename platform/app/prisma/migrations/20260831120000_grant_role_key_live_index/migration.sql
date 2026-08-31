@@ -25,8 +25,28 @@
 -- concurrent path must check
 --   SELECT indisvalid FROM pg_index WHERE indexrelid =
 --     '"Grant_organizationId_roleKey_live_idx"'::regclass;
--- and DROP INDEX before retrying. Left alone, the plain build below is safe:
--- it takes a lock that blocks writes to Grant, not reads, for the build.
+-- and DROP INDEX before retrying.
+--
+-- LOCKING NOTE: left alone, the plain build takes a SHARE lock on "Grant".
+-- Reads keep working; writes wait. That matters more here than on an ordinary
+-- table, because "Grant" is the live authorization projection and a revoke is
+-- a write - so the length of the build is the length of the worst-case delay
+-- on a revoke landing. Measured on a 600,000-row reproduction of the shape
+-- this index serves: 575 ms to build, 4 MB of index. The partial predicate is
+-- doing most of that work, since it is a two-column btree over rows that are
+-- almost all live. A sub-second pause during a deploy is the same order as
+-- every other migration in this directory, and the two comparable index
+-- migrations (20260804120000_dataset_record_project_dataset_index at ~2.8s,
+-- 20260814120002_llm_prompt_config_org_scope_index) accepted the same trade
+-- for the same reason: CONCURRENTLY cannot run inside the transaction Prisma
+-- wraps a migration in. Making the concurrent prebuild mandatory instead
+-- would fail this migration on every fresh install, which is a worse outcome
+-- than a sub-second wait.
 CREATE INDEX IF NOT EXISTS "Grant_organizationId_roleKey_live_idx"
   ON "Grant" ("organizationId", "roleKey")
   WHERE "revokedAt" IS NULL;
+
+-- Down (manual rollback; uncomment and run). The index carries no row data of
+-- its own, so dropping it loses nothing - the API-key permission check goes
+-- back to reading every live grant the organization owns on every call:
+-- DROP INDEX IF EXISTS "Grant_organizationId_roleKey_live_idx";
