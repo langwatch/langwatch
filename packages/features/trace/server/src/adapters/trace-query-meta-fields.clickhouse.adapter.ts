@@ -182,7 +182,8 @@ function translateExistence(tag: TagToken, negated: boolean, ctx: TranslationCon
 /**
  * Which auxiliary collection a `has:<value>` / `none:<value>` reads, or `null`
  * when it's answered from the trace summary alone. `has` is value-polymorphic
- * so it carries no static `FieldDef.needs`; `queryNeeds` consults this instead.
+ * so it carries no static `FieldDef.needs`;
+ * `TraceQueryEvaluationService.needs` consults this instead.
  */
 export function existenceNeeds(value: string): "evaluations" | "events" | null {
   if (value === "eval") return "evaluations";

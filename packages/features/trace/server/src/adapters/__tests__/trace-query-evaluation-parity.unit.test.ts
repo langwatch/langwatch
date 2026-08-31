@@ -7,7 +7,10 @@ import {
 } from "../trace-facet-registry.clickhouse.adapter";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { translateFilterToClickHouse } from "../trace-query.clickhouse.adapter";
-import { evaluateQueryInMemory, queryNeeds } from "../../services/trace-query-evaluation.service";
+import { TraceQueryEvaluationService } from "../../services/trace-query-evaluation.service";
+
+const evaluateQueryInMemory = TraceQueryEvaluationService.matches;
+const queryNeeds = TraceQueryEvaluationService.needs;
 import {
   type InMemoryTrace,
   type TraceQueryEvaluationRun,
@@ -355,6 +358,22 @@ const cases: Case[] = [
     name: "free text matches computed input (case-insensitive)",
     query: "HELLO",
     trace: makeTrace({ computedInput: "say hello world" }),
+    expected: true,
+  },
+  {
+    // The other direction: the query is lowered before it gets here, so only
+    // an upper-case COLUMN exercises the column's own lowering. ClickHouse
+    // matches this with ILIKE, and an in-memory half that did not would stop
+    // an automation firing on traces the trace list still shows.
+    name: "free text matches an upper-case computed input",
+    query: "hello",
+    trace: makeTrace({ computedInput: "Say HELLO World" }),
+    expected: true,
+  },
+  {
+    name: "free text matches an upper-case computed output",
+    query: "answer",
+    trace: makeTrace({ computedOutput: "The ANSWER Is 42" }),
     expected: true,
   },
   {

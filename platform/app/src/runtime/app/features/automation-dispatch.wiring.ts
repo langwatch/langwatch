@@ -17,7 +17,7 @@ import type {
   TraceCanonicalisationService,
   TraceService,
 } from "@langwatch/trace-contract";
-import { evaluateQueryInMemory } from "@langwatch/trace-server";
+import { TraceQueryEvaluationService } from "@langwatch/trace-server";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { AppAutomationPersistActionAdapter } from "./automation-adapters/automation-persist-action.adapter";
@@ -51,7 +51,7 @@ class AppSettlementFilterEvaluator extends AutomationSettlementFilterEvaluatorPo
     evaluations: EvaluationRunData[] | null;
     events: DerivedTraceEvent[] | null;
   }): boolean {
-    return evaluateQueryInMemory(input.query, {
+    return TraceQueryEvaluationService.matches(input.query, {
       summary: input.foldState,
       evaluations: input.evaluations,
       events: input.events,

@@ -108,7 +108,7 @@ export {
   type RangeFacetDef,
 } from "./adapters/trace-facet-registry.clickhouse.adapter";
 export { buildSpanAttributeKeysFacetQuery } from "./adapters/trace-facet-span-attribute-keys.clickhouse.adapter";
-export { evaluateQueryInMemory, queryNeeds } from "./services/trace-query-evaluation.service";
+export { TraceQueryEvaluationService } from "./services/trace-query-evaluation.service";
 export type { FieldDef } from "./adapters/trace-query-evaluation.adapter";
 export { TraceSummaryReaderPort } from "./ports/trace-summary-reader.port";
 export {

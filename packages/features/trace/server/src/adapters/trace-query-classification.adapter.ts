@@ -1,7 +1,7 @@
 import type { TraceQueryClassification } from "@langwatch/trace-contract";
 
 import { TraceQueryClassificationPort } from "../ports/trace-query-classification.port";
-import { queryNeeds } from "../services/trace-query-evaluation.service";
+import { TraceQueryEvaluationService } from "../services/trace-query-evaluation.service";
 
 export class TraceQueryClassificationAdapter extends TraceQueryClassificationPort {
   private constructor() {
@@ -13,7 +13,7 @@ export class TraceQueryClassificationAdapter extends TraceQueryClassificationPor
   }
 
   classify(query: string): TraceQueryClassification {
-    const needs = queryNeeds(query);
+    const needs = TraceQueryEvaluationService.needs(query);
 
     return {
       evaluations: needs.has("evaluations"),
