@@ -54,6 +54,8 @@ function harness(
     existingUser?: UserProfile | null;
     membership?: unknown;
     currentUser?: UserProfile | null;
+    /** The offboarding path under test. Defaults to the legacy one. */
+    provenOffboarding?: boolean;
   } = {},
 ) {
   const repo = options.repository ?? repository();
@@ -96,7 +98,7 @@ function harness(
     governance,
     entitlements: new EnterpriseEntitlements(),
     lifecycle: new QuietScimSyncLifecycle(),
-    provenOffboarding: false,
+    provenOffboarding: options.provenOffboarding ?? false,
   });
   if (options.membership !== void 0) {
     vi.mocked(repo.tryFindMembership).mockResolvedValue(options.membership as never);
@@ -340,6 +342,48 @@ describe("SCIM user parity", () => {
       organizationId: "org-1",
     });
     expect(users.deactivate).toHaveBeenCalledWith({ id: "user-1" });
+  });
+
+  describe("when proven offboarding is switched on", () => {
+    // Every other case here runs the legacy path, so until now the flag's
+    // enabled branch — the one a rollout turns on — had no cover at all.
+    it("removes access through the grants offboard rather than the legacy writer", async () => {
+      const { writer, repo, service } = harness({
+        membership: { userId: "user-1", organizationId: "org-1", role: "MEMBER" },
+        provenOffboarding: true,
+      });
+
+      await expect(
+        service.deleteUser({ id: "user-1", organizationId: "org-1" }),
+      ).resolves.toBeUndefined();
+
+      expect(writer.offboard).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: "user-1", organizationId: "org-1" }),
+      );
+      expect(writer.offboardMember).not.toHaveBeenCalled();
+      expect(repo.removeMembership).not.toHaveBeenCalled();
+    });
+
+    it("still deactivates the user, which both paths owe", async () => {
+      const { users, service } = harness({
+        membership: { userId: "user-1", organizationId: "org-1", role: "MEMBER" },
+        provenOffboarding: true,
+      });
+
+      await service.deleteUser({ id: "user-1", organizationId: "org-1" });
+
+      expect(users.deactivate).toHaveBeenCalledWith({ id: "user-1" });
+    });
+
+    it("refuses a user outside the organization before removing anything", async () => {
+      const { writer, users, service } = harness({ membership: null, provenOffboarding: true });
+
+      await expect(
+        service.deleteUser({ id: "user-1", organizationId: "org-1" }),
+      ).rejects.toMatchObject({ response: { status: "404" } });
+      expect(writer.offboard).not.toHaveBeenCalled();
+      expect(users.deactivate).not.toHaveBeenCalled();
+    });
   });
 
   it("rejects deleting a user outside the organization", async () => {
