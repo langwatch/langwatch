@@ -57,6 +57,14 @@ describe("workflow.generateCommitMessage()", () => {
       publiclyShared: false,
     });
     ctx.prisma = {} as unknown as PrismaClient;
+    // The mutation resolves its model through the App: the provider service
+    // and the managed-provider catalogue are handed to `getVercelAIModel`,
+    // which this file stubs. They only have to be reachable — what the
+    // resolution DOES with them is `getVercelAIModel`'s own subject.
+    Object.assign(ctx.app, {
+      modelProviders: { providerService: {} },
+      managedProviders: {},
+    });
 
     caller = appRouter.createCaller(ctx).workflow;
     mockGetVercelAIModel.mockResolvedValue({ modelId: "openai/gpt-5-mini" });

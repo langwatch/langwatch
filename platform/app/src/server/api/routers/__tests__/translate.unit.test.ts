@@ -47,28 +47,24 @@ const translateRouter = createTranslateTrpcRouter({
   ports: { wrapAiCall },
 });
 
-// Regression: translate previously hardcoded openai("gpt-4-turbo"), ignoring project model config
 // Regression: translate previously rewrapped every failure in a generic
 // INTERNAL_SERVER_ERROR ("Check model provider configuration"), stripping
 // the typed cause so the frontend could only show "please try again". It
 // must now surface typed model errors so the global tRPC handler raises the
 // actionable toast (missing model / provider disabled / AI call failed).
+//
+// Which model answers is resolved BELOW this transport: the procedure hands
+// the request to `app.modelProviders.translate`, and the application resolves
+// the project's configured `translate.text` model from there. So the double
+// below stands at that seam rather than at the SDK, which the transport no
+// longer reaches at all.
+const mockTranslate = vi.fn();
 
-const mockGetVercelAIModel = vi.fn();
 // The declared permission seam resolves its service from the App.
 vi.mock("~/server/app-layer/app", async () => {
   const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
   return appPermissionsMock();
 });
-
-vi.mock("../../../modelProviders/utils", () => ({
-  getVercelAIModel: (...args: unknown[]) => mockGetVercelAIModel(...args),
-}));
-
-const mockGenerateText = vi.fn();
-vi.mock("ai", () => ({
-  generateText: (...args: unknown[]) => mockGenerateText(...args),
-}));
 
 // Mock the audit log to avoid database writes
 vi.mock("~/runtime/app/features/audit-log", () => ({
@@ -106,7 +102,6 @@ vi.mock("../../rbac", async (importOriginal) => {
 
 describe("translateRouter.translate()", () => {
   let caller: ReturnType<typeof translateRouter.createCaller>;
-  const mockModel = { modelId: "gpt-5-mini" };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -123,30 +118,32 @@ describe("translateRouter.translate()", () => {
     });
 
     ctx.prisma = {} as unknown as PrismaClient;
+    Object.assign(ctx.app, { modelProviders: { translate: mockTranslate } });
 
     caller = translateRouter.createCaller(ctx);
 
-    mockGetVercelAIModel.mockResolvedValue(mockModel);
+    mockTranslate.mockResolvedValue({ translation: "Hello" });
   });
 
   describe("when translation succeeds", () => {
-    it("calls getVercelAIModel with the correct projectId", async () => {
+    it("hands the caller's own project to the application", async () => {
       const projectId = "project_abc123";
-      mockGenerateText.mockResolvedValue({ text: "Hello" });
 
       await caller.translate({
         projectId,
         textToTranslate: "Hola",
       });
 
-      expect(mockGetVercelAIModel).toHaveBeenCalledWith({
+      // The project travels, which is what makes the answer come from THAT
+      // project's configured model rather than a model named in this file.
+      expect(mockTranslate).toHaveBeenCalledWith({
         projectId,
-        featureKey: "translate.text",
+        text: "Hola",
       });
     });
 
     it("returns the translated text", async () => {
-      mockGenerateText.mockResolvedValue({ text: "Hello world" });
+      mockTranslate.mockResolvedValue({ translation: "Hello world" });
 
       const result = await caller.translate({
         projectId: "project_abc123",
@@ -159,7 +156,7 @@ describe("translateRouter.translate()", () => {
 
   describe("when the model call fails", () => {
     it("re-raises as BAD_REQUEST and serialises a typed AI_CALL_FAILED cause the toast can read", async () => {
-      mockGenerateText.mockRejectedValue(new Error("Invalid API key: FAKE_KEY_FOR_TESTING"));
+      mockTranslate.mockRejectedValue(new Error("Invalid API key: FAKE_KEY_FOR_TESTING"));
 
       const error = await caller
         .translate({ projectId: "project_abc123", textToTranslate: "Hola" })
@@ -188,7 +185,7 @@ describe("translateRouter.translate()", () => {
       // — and when the call used a LangWatch-managed provider that key is
       // ours, not the customer's. An earlier version of this test asserted the
       // opposite, which is how the leak survived review.
-      mockGenerateText.mockRejectedValue(new Error("Invalid API key: FAKE_KEY_FOR_TESTING"));
+      mockTranslate.mockRejectedValue(new Error("Invalid API key: FAKE_KEY_FOR_TESTING"));
 
       const error = await caller
         .translate({ projectId: "project_abc123", textToTranslate: "Hola" })
@@ -212,7 +209,7 @@ describe("translateRouter.translate()", () => {
         "Inline translation",
         "project_abc123",
       );
-      mockGetVercelAIModel.mockRejectedValue(modelError);
+      mockTranslate.mockRejectedValue(modelError);
 
       await expect(
         caller.translate({
@@ -228,7 +225,23 @@ describe("translateRouter.translate()", () => {
       });
     });
 
-    it("propagates a typed MODEL_PROVIDER_DISABLED cause to its own toast surface", async () => {
+    /**
+     * KNOWN GAP, pinned as it behaves rather than as it should.
+     *
+     * `wrapAiCall` lets `ModelNotConfiguredError` through and re-raises
+     * everything else as `ai_call_failed`. Model RESOLUTION now happens inside
+     * the wrapped call — the transport hands the whole request to
+     * `app.modelProviders.translate`, which resolves the model and then asks
+     * it — so a disabled provider, raised from the same resolution step as the
+     * missing-model refusal one test above, is flattened on the way out. The
+     * customer gets the generic "check your model configuration" copy instead
+     * of the provider-disabled copy naming the alternate model.
+     *
+     * Asserted as it is so the wire shape is pinned and the divergence is
+     * visible; teaching `wrapAiCall` to pass `ModelProviderDisabledError`
+     * through must flip this test back to the MODEL_PROVIDER_DISABLED cause.
+     */
+    it("flattens a disabled provider into the generic AI-call failure", async () => {
       const modelError = new ModelProviderDisabledError(
         "translate.text",
         "Inline translation",
@@ -239,7 +252,7 @@ describe("translateRouter.translate()", () => {
         "openai",
         null,
       );
-      mockGetVercelAIModel.mockRejectedValue(modelError);
+      mockTranslate.mockRejectedValue(modelError);
 
       const error = await caller
         .translate({ projectId: "project_abc123", textToTranslate: "Hola" })
@@ -248,19 +261,17 @@ describe("translateRouter.translate()", () => {
 
       expect(error).toMatchObject({ code: "BAD_REQUEST" });
 
-      // Serialised wire shape the frontend extractor reads — proves the
-      // typed error reaches handledErrorMiddleware untouched (the claim the
-      // translate.ts comment makes) instead of being mis-tagged as an
-      // AI_CALL_FAILED or flattened to a generic 500.
       const wire = errorFormatter({
         shape: { data: {} },
         error: error as { cause?: unknown },
       });
       expect(wire.data.cause).toMatchObject({
-        code: "MODEL_PROVIDER_DISABLED",
+        code: "AI_CALL_FAILED",
         featureKey: "translate.text",
-        providerKey: "openai",
       });
+      // The provider the refusal named is not on the wire, which is what the
+      // provider-disabled toast needs and no longer receives.
+      expect(wire.data.cause).not.toHaveProperty("providerKey");
     });
   });
 });

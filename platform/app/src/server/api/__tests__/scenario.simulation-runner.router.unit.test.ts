@@ -9,6 +9,7 @@
  * @see specs/scenarios/simulation-runner.feature - Error Handling - Early Validation
  */
 
+import { ScenarioApp, type ScenarioAppDependencies } from "@langwatch/scenario-server";
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -20,12 +21,24 @@ vi.mock("@langwatch/scenario-contract", async (importOriginal) => ({
   generateBatchRunId: vi.fn().mockReturnValue("batch_test_123"),
 }));
 
-// The run resolves the scenario's declared parameters before it queues
-// anything, which is the router's only database read. Stubbed here so this
-// suite stays a unit test of the router's own decisions.
-const mockGetRunConfigByIds = vi.fn<
-  (params: { ids: string[]; projectId: string }) => Promise<ScenarioRunConfig[]>
->(async ({ ids }) =>
+/**
+ * The scenario every test starts from: no declared parameters, version 1.
+ *
+ * The run resolves the scenario's declared parameters before it queues
+ * anything, which is the router's only database read. Stubbed here so this
+ * suite stays a unit test of the router's own decisions.
+ *
+ * Named and re-applied per test because two tests below override it in their
+ * own body, and `vi.clearAllMocks()` clears recorded calls without restoring
+ * an implementation — so without this the parameterised scenario leaked into
+ * every later test in the file.
+ */
+const defaultRunConfigs = async ({
+  ids,
+}: {
+  ids: string[];
+  projectId: string;
+}): Promise<ScenarioRunConfig[]> =>
   ids.map((id) => ({
     id,
     name: "Test Scenario",
@@ -33,8 +46,12 @@ const mockGetRunConfigByIds = vi.fn<
     criteria: ["Must respond politely"],
     parameters: null,
     version: 1,
-  })),
-);
+  }));
+
+const mockGetRunConfigByIds =
+  vi.fn<(params: { ids: string[]; projectId: string }) => Promise<ScenarioRunConfig[]>>(
+    defaultRunConfigs,
+  );
 const mockQueueRun = vi.fn().mockResolvedValue(undefined);
 vi.mock("~/server/app-layer/app", async () => {
   const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
@@ -44,17 +61,25 @@ vi.mock("~/server/app-layer/app", async () => {
     tryGetApp: authz.tryGetApp,
     getApp: vi.fn().mockReturnValue({
       ...authz.getApp(),
-      simulations: {
-        queueRun: (...args: unknown[]) => mockQueueRun(...args),
-      },
-      scenarios: {
-        getRunConfigs: (params: { ids: string[]; projectId: string }) =>
-          mockGetRunConfigByIds(params),
-        resolveRunParameters: (...args: unknown[]) => mockResolveRunParameters(...args),
-      },
-      scenarioExecution: {
-        prefetch: (...args: unknown[]) => mockPrefetchScenarioData(...args),
-      },
+      // The run surface is one application now — the transport reads
+      // `ctx.app.scenarios` for parameter resolution, prefetch AND queueing —
+      // so the real `ScenarioApp` stands here over the same three service
+      // doubles it used to be given side by side. It is what assembles the
+      // queued run's metadata envelope, which is what the assertions below
+      // are about, so faking it would leave that rule untested.
+      scenarios: ScenarioApp.create({
+        scenarios: {
+          getRunConfigs: (params: { ids: string[]; projectId: string }) =>
+            mockGetRunConfigByIds(params),
+          resolveRunParameters: (...args: unknown[]) => mockResolveRunParameters(...args),
+        },
+        simulations: {
+          queueRun: (...args: unknown[]) => mockQueueRun(...args),
+        },
+        scenarioExecution: {
+          prefetch: (...args: unknown[]) => mockPrefetchScenarioData(...args),
+        },
+      } as unknown as ScenarioAppDependencies),
     }),
   };
 });
@@ -65,21 +90,36 @@ vi.mock("@langwatch/ksuid", () => ({
   }),
 }));
 
-vi.mock("@langwatch/observability", () => ({
-  createLogger: vi.fn().mockReturnValue({
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-  }),
-}));
+// Partial: the packaged tRPC policy this router mounts under also reaches for
+// `createWarnThrottle`, and a whole-module replacement leaves that export
+// undefined, which fails the file at collection rather than in a test.
+vi.mock("@langwatch/observability", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    createLogger: vi.fn().mockReturnValue({
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+      trace: vi.fn(),
+    }),
+  };
+});
 
-// Mock RBAC to always allow - we're testing business logic, not permissions
-vi.mock("../rbac", () => ({
-  resolveProjectPermission: vi
-    .fn()
-    .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-}));
+// Mock RBAC to always allow - we're testing business logic, not permissions.
+// Partial for the same reason as the observability mock above: the policy
+// chain reaches other exports of this module, and replacing it wholesale
+// leaves them undefined.
+vi.mock("../rbac", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../rbac")>();
+  return {
+    ...actual,
+    resolveProjectPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+  };
+});
 
 // Mock audit log to avoid database calls
 vi.mock("~/runtime/app/features/audit-log", () => ({
@@ -120,6 +160,7 @@ describe("scenarios.run", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetRunConfigByIds.mockImplementation(defaultRunConfigs);
     mockQueueRun.mockResolvedValue(undefined);
     mockResolveRunParameters.mockImplementation(
       async (input: ResolveScenarioRunParametersInput) => {
@@ -595,7 +636,9 @@ describe("scenarios.run", () => {
       });
 
       it("rejects a note longer than the limit before anything is queued", async () => {
-        await expect(caller.scenarios.run({ ...defaultInput, note: "a".repeat(201) })).rejects.toMatchObject({
+        await expect(
+          caller.scenarios.run({ ...defaultInput, note: "a".repeat(201) }),
+        ).rejects.toMatchObject({
           code: "BAD_REQUEST",
         });
 
@@ -617,7 +660,7 @@ describe("scenarios.run", () => {
           langwatch: {
             targetReferenceId: "prompt_123",
             targetType: "prompt",
-            scenarioVersion: 5,
+            scenarioVersion: 1,
           },
         });
       });
@@ -627,6 +670,19 @@ describe("scenarios.run", () => {
       /** @scenario "A one-off run records which target it ran against" */
       /** @scenario "A one-off run of a single case records that case version" */
       it("records the target, its kind and the scenario version read at queue time", async () => {
+        // A version that is not the file's default, so the assertion proves
+        // the number was read off the scenario rather than defaulted.
+        mockGetRunConfigByIds.mockImplementation(async ({ ids }) =>
+          ids.map((id) => ({
+            id,
+            name: "Test Scenario",
+            situation: "User asks a question",
+            criteria: ["Must respond politely"],
+            parameters: null,
+            version: 5,
+          })),
+        );
+
         await caller.scenarios.run(defaultInput);
 
         expect(mockQueueRun).toHaveBeenCalledWith(

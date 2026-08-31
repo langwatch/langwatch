@@ -1,4 +1,8 @@
-import { createOrUpdateQueueItems, PostgresAnnotationAdapter } from "@langwatch/annotation-server";
+import {
+  AnnotationApp,
+  createOrUpdateQueueItems,
+  PostgresAnnotationAdapter,
+} from "@langwatch/annotation-server";
 import { UserNotInOrganizationError } from "@langwatch/organization-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -142,11 +146,17 @@ const createCaller = () => {
   });
   ctx.prisma = prisma;
   Object.assign(ctx.app, {
-    annotations: PostgresAnnotationAdapter.create({
-      database: prisma,
-      projects,
-      organizations,
-    }).build(),
+    // `app.annotations` is an `AnnotationApp` in the real composition — the
+    // transport reads `organizationOf` and the user-joining reads off it,
+    // none of which the service underneath answers.
+    annotations: AnnotationApp.create({
+      annotations: PostgresAnnotationAdapter.create({
+        database: prisma,
+        projects,
+        organizations,
+      }).build(),
+      users,
+    }),
     users,
   });
   return appRouter.createCaller(ctx).annotation;
@@ -157,8 +167,11 @@ const annotationService = () =>
 
 describe("annotation queue references", () => {
   it("keeps the legacy internal error when an update target is absent", async () => {
-    annotationUpdate.mockRejectedValueOnce(new Error("Record to update not found."));
-
+    // The absence is found by the read the transport does first — it needs the
+    // stored suggestion and anchor before it may write — and
+    // `AnnotationNotFoundError` is a plain `Error`, so it degrades to the
+    // unknown-failure path exactly as it always did. What changed is only
+    // WHERE it is found: the write is no longer attempted at all.
     await expect(
       createCaller().updateByTraceId({
         id: "missing-annotation",
@@ -174,7 +187,7 @@ describe("annotation queue references", () => {
         where: { id: "missing-annotation", projectId: "project_1" },
       }),
     );
-    expect(annotationUpdate).toHaveBeenCalledOnce();
+    expect(annotationUpdate).not.toHaveBeenCalled();
   });
 
   it("rejects queue members from another organization", async () => {
@@ -209,6 +222,9 @@ describe("annotation queue references", () => {
   it("rejects queue assignments from another project", async () => {
     annotationQueueCount.mockResolvedValue(0);
 
+    // Called directly rather than through tRPC, so what comes back is the
+    // domain refusal itself. Its 400 is what the boundary reads as
+    // BAD_REQUEST; the code names which refusal it is.
     await expect(
       createOrUpdateQueueItems({
         traceIds: ["trace_1"],
@@ -218,7 +234,7 @@ describe("annotation queue references", () => {
         annotations: annotationService(),
         findExistingTraceIds: async ({ traceIds }) => traceIds,
       }),
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    ).rejects.toMatchObject({ code: "annotation_annotator_invalid", httpStatus: 400 });
 
     expect(annotationQueueCount).toHaveBeenCalledWith({
       where: { id: { in: ["foreign-queue"] }, projectId: "project_1" },
@@ -240,7 +256,7 @@ describe("annotation queue references", () => {
         annotations: annotationService(),
         findExistingTraceIds: async ({ traceIds }) => traceIds,
       }),
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    ).rejects.toMatchObject({ code: "annotation_annotator_invalid", httpStatus: 400 });
 
     expect(organizations.getOrganizationMembers).toHaveBeenCalledWith({
       organizationId: "org_1",

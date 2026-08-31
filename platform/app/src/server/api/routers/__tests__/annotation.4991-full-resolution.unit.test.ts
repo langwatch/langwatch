@@ -10,7 +10,8 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PostgresAnnotationAdapter } from "@langwatch/annotation-server";
+import { AnnotationApp, PostgresAnnotationAdapter } from "@langwatch/annotation-server";
+import { TraceApp } from "@langwatch/trace-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
   createAnnotationTestOrganizations,
@@ -110,11 +111,6 @@ function makePrismaStub(): PrismaClient {
     annotationQueue: {
       findMany: vi.fn().mockResolvedValue([]),
     },
-    project: {
-      findUnique: vi.fn().mockResolvedValue({
-        team: { organizationId: "org_123" },
-      }),
-    },
   } as unknown as PrismaClient;
 }
 
@@ -137,13 +133,28 @@ beforeEach(() => {
   });
   ctx.prisma = makePrismaStub();
   Object.assign(ctx.app, {
-    annotations: PostgresAnnotationAdapter.create({
-      database: ctx.prisma,
-      projects: createAnnotationTestProjects(),
-      organizations: createAnnotationTestOrganizations(),
-    }).build(),
+    // `app.annotations` is an `AnnotationApp` in the real composition, not the
+    // service it wraps: the join between a comment and the person who left it
+    // is the application's, and the transport reads it there
+    // (`listWithFullUsers`, `listWithUserSummaries`, `organizationOf`).
+    annotations: AnnotationApp.create({
+      annotations: PostgresAnnotationAdapter.create({
+        database: ctx.prisma,
+        // The organization a project belongs to is the project service's
+        // answer, not a Prisma row this suite stubs.
+        projects: createAnnotationTestProjects("org_123"),
+        organizations: createAnnotationTestOrganizations(),
+      }).build(),
+      users,
+    }),
     users,
-    traces: { read: { getTracesWithSpans: mockGetTracesWithSpans } },
+    // The real `TraceApp` over a stubbed legacy reader, because `full: true`
+    // — the whole subject of #4991 — is the application's own decision now,
+    // not the caller's. A hand-written `readTracesWithSpans` double here
+    // would assert the flag this file exists to pin from the test's own side.
+    traces: TraceApp.create({
+      traces: { read: { getTracesWithSpans: mockGetTracesWithSpans } },
+    } as never),
   });
   caller = appRouter.createCaller(ctx).annotation;
 });

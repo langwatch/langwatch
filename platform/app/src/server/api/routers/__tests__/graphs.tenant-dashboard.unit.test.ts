@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardNotFoundError } from "@langwatch/dashboard-contract";
+import { DashboardApp, type DashboardAppDependencies } from "@langwatch/dashboard-server";
 import { createInnerTRPCContext } from "../../trpc";
 import { appRouter } from "../../root";
 
@@ -37,7 +38,13 @@ const createCaller = () => {
   });
   Object.defineProperty(ctx.app, "dashboard", {
     configurable: true,
-    value: { createGraph },
+    // The real `DashboardApp` over a stubbed service. The translation from the
+    // service's `DashboardNotFoundError` to the typed 404 the transport ships
+    // is the application's own rule, so a hand-written double standing in its
+    // place would decide the answer this test is asking about.
+    value: DashboardApp.create({
+      dashboard: { createGraph },
+    } as unknown as DashboardAppDependencies),
   });
   return appRouter.createCaller(ctx).graphs;
 };

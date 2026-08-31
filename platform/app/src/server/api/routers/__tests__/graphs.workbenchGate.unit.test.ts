@@ -1,23 +1,48 @@
 /**
- * Which kinds a card procedure may touch, and who decides.
+ * Which kinds a card procedure may touch.
  *
  * The read was gated on the workbench flag from the start; the three placement
  * *writes* were not, and the gap is the kind that never shows up as an error.
  * With the feature off a `workbench_sql` row left behind by a trial is invisible
  * on the grid — but an ungated `delete` by id would still remove it, and an
  * ungated layout write would silently rewrite the placement of a card the
- * surface never admitted existed. "The feature off sees exactly the old grid"
- * has to be true of every procedure, not just the one that lists rows.
+ * surface never admitted existed. "The grid sees exactly the builder rows" has
+ * to be true of every procedure, not just the one that lists rows.
  *
  * Asserted on the `kind` clause each procedure sends to Prisma, because that
  * clause *is* the gate: it is what decides whether a row is reachable at all,
  * and a procedure that dropped it would still return successfully.
+ *
+ * ## Where the clause is decided now
+ *
+ * The four procedures reach Prisma through the packaged chain — the `graphs.*`
+ * transport calls `DashboardApp`, which calls `DashboardService`, which calls
+ * `PrismaDashboardRepository` — so this file mounts that whole chain over a
+ * Prisma stub rather than putting one on `ctx.prisma`, which the transport no
+ * longer reads.
+ *
+ * The rollout flag no longer reaches this surface at all: the repository names
+ * the builder kind unconditionally, and `graphs.*` takes no flag port. What
+ * survives of the flag is `DashboardGraphVisibilityPolicyPort.placeableKinds`,
+ * which decides only how many cards a dashboard reports
+ * (`packages/features/dashboard/.../dashboard.service.unit.test.ts` and
+ * `runtime/app/features/__tests__/dashboard-graph-visibility-policy.adapter.unit.test.ts`
+ * own that). So the assertions here are unconditional, and a placed workbench
+ * card is moved and removed through `analytics.savedWorkbenchCharts.*`, which
+ * carries its own gate.
  */
 
+import { LangWatchQLService } from "@langwatch/analytics-contract";
+import {
+  DashboardApp,
+  DashboardGraphVisibilityPolicyPort,
+  DashboardIdGenerator,
+  PostgresDashboardAdapter,
+  SavedWorkbenchChartPolicy,
+} from "@langwatch/dashboard-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { PrismaClient } from "~/generated/prisma/client";
-import { BUILDER_CHART_KIND, WORKBENCH_SQL_CHART_KIND } from "~/server/analytics/chartKinds";
+import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 
 import { createInnerTRPCContext } from "../../trpc";
 import { appRouter } from "../../root";
@@ -46,35 +71,92 @@ vi.mock("../../rbac", async (importOriginal) => {
   };
 });
 
-// The gate itself, stubbed per test: this suite is about what each procedure
-// DOES with the answer, not about how the flag resolves (which `access.ts` and
-// its own tests own).
-const lwqlEnabledMock = vi.fn();
-vi.mock("~/server/analytics/lwql/access", () => ({
-  lwqlEnabled: (args: unknown) => lwqlEnabledMock(args),
-  LWQL_FLAG: "release_lwql_workbench",
-}));
-
-const findUnique = vi.fn();
+const findFirst = vi.fn();
 const deleteGraph = vi.fn();
 const update = vi.fn();
 const findMany = vi.fn();
 const transaction = vi.fn();
+
+/**
+ * The widest answer the visibility policy can give.
+ *
+ * Deliberately "both kinds", not "builder": if the flag could still widen this
+ * surface, these assertions would fail rather than pass by accident.
+ */
+class EveryKindPlaceable extends DashboardGraphVisibilityPolicyPort {
+  async placeableKinds(): Promise<readonly ("builder" | "workbench_sql")[]> {
+    return ["builder", "workbench_sql"];
+  }
+}
+
+class TestDashboardIds extends DashboardIdGenerator {
+  generate(): string {
+    return "dashboard-graph-test";
+  }
+}
+
+class AllowSavedWorkbenchCharts extends SavedWorkbenchChartPolicy {
+  validate(): void {}
+}
+
+/** No procedure under test runs a statement, so every member refuses. */
+class UnusedLangWatchQL extends LangWatchQLService {
+  readonly available = false;
+
+  async close(): Promise<void> {}
+
+  describeSchema(): never {
+    throw new Error("not used by this test");
+  }
+
+  validate(): never {
+    throw new Error("not used by this test");
+  }
+
+  execute(): never {
+    throw new Error("not used by this test");
+  }
+}
+
+const GRAPH_ROW = {
+  id: "graph_1",
+  projectId: "project_1",
+  name: "A chart",
+  graph: {},
+  filters: null,
+  dashboardId: "dashboard_1",
+  gridColumn: 0,
+  gridRow: 0,
+  colSpan: 1,
+  rowSpan: 1,
+  createdAt: new Date(1),
+  updatedAt: new Date(2),
+};
 
 const createCaller = () => {
   const ctx = createInnerTRPCContext({
     session: { user: { id: "user_1" }, expires: "1" },
     permissionChecked: true,
   });
-  ctx.prisma = {
-    customGraph: {
-      findUnique,
-      delete: deleteGraph,
-      update,
-      findMany,
-    },
-    $transaction: transaction,
-  } as unknown as PrismaClient;
+  Object.defineProperty(ctx.app, "dashboard", {
+    configurable: true,
+    value: DashboardApp.create({
+      dashboard: PostgresDashboardAdapter.create({
+        database: {
+          customGraph: { findFirst, delete: deleteGraph, update, findMany },
+          $transaction: transaction,
+        } as never,
+        ids: new TestDashboardIds(),
+        savedWorkbenchChartPolicy: new AllowSavedWorkbenchCharts(),
+        graphVisibility: new EveryKindPlaceable(),
+        langWatchQL: new UnusedLangWatchQL(),
+      }).build(),
+      automation: {
+        getByCustomGraphIds: async () => [],
+        tryGetByCustomGraphId: async () => null,
+      },
+    }),
+  });
   return appRouter.createCaller(ctx).graphs;
 };
 
@@ -91,65 +173,22 @@ const LAYOUT = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  findUnique.mockResolvedValue({ id: "graph_1", kind: BUILDER_CHART_KIND });
-  deleteGraph.mockResolvedValue({ id: "graph_1" });
-  update.mockResolvedValue({ id: "graph_1" });
+  findFirst.mockResolvedValue(GRAPH_ROW);
+  deleteGraph.mockResolvedValue(GRAPH_ROW);
+  update.mockResolvedValue(GRAPH_ROW);
   findMany.mockResolvedValue([]);
   transaction.mockResolvedValue([]);
 });
 
 describe("the dashboard card procedures", () => {
-  describe("given the workbench is on for the project", () => {
-    beforeEach(() => {
-      lwqlEnabledMock.mockResolvedValue(true);
-    });
-
-    it("lets delete reach a placed workbench row", async () => {
-      await createCaller().delete({ projectId: "project_1", id: "graph_1" });
-
-      expect(kindClauseOf(findUnique)).toEqual({
-        in: [BUILDER_CHART_KIND, WORKBENCH_SQL_CHART_KIND],
-      });
-      expect(kindClauseOf(deleteGraph)).toEqual({
-        in: [BUILDER_CHART_KIND, WORKBENCH_SQL_CHART_KIND],
-      });
-    });
-
-    it("lets a layout write move a placed workbench row", async () => {
-      await createCaller().updateLayout({
-        projectId: "project_1",
-        graphId: "graph_1",
-        ...LAYOUT,
-      });
-
-      expect(kindClauseOf(update)).toEqual({
-        in: [BUILDER_CHART_KIND, WORKBENCH_SQL_CHART_KIND],
-      });
-    });
-
-    it("lets a batch reflow move placed workbench rows", async () => {
-      await createCaller().batchUpdateLayouts({
-        projectId: "project_1",
-        layouts: [{ graphId: "graph_1", ...LAYOUT }],
-      });
-
-      expect(kindClauseOf(update)).toEqual({
-        in: [BUILDER_CHART_KIND, WORKBENCH_SQL_CHART_KIND],
-      });
-    });
-  });
-
-  describe("given the workbench is off for the project", () => {
-    beforeEach(() => {
-      lwqlEnabledMock.mockResolvedValue(false);
-    });
-
+  describe("given a project whose workbench rows may be placed on the grid", () => {
     it("scopes delete to builder rows, so a trial's row is not removable", async () => {
       await createCaller().delete({ projectId: "project_1", id: "graph_1" });
 
       // Not an `in` of one — the same clause the grid saw before the feature
-      // existed, which is what "exactly the old grid" means.
-      expect(kindClauseOf(findUnique)).toBe(BUILDER_CHART_KIND);
+      // existed, which is what "exactly the builder rows" means. Both halves:
+      // the read that admits the row exists, and the delete itself.
+      expect(kindClauseOf(findFirst)).toBe(BUILDER_CHART_KIND);
       expect(kindClauseOf(deleteGraph)).toBe(BUILDER_CHART_KIND);
     });
 
@@ -160,6 +199,7 @@ describe("the dashboard card procedures", () => {
         ...LAYOUT,
       });
 
+      expect(kindClauseOf(findFirst)).toBe(BUILDER_CHART_KIND);
       expect(kindClauseOf(update)).toBe(BUILDER_CHART_KIND);
     });
 
@@ -169,6 +209,7 @@ describe("the dashboard card procedures", () => {
         layouts: [{ graphId: "graph_1", ...LAYOUT }],
       });
 
+      expect(kindClauseOf(findFirst)).toBe(BUILDER_CHART_KIND);
       expect(kindClauseOf(update)).toBe(BUILDER_CHART_KIND);
     });
 
