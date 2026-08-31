@@ -318,11 +318,14 @@ export async function userMigrationPassCohort(): Promise<
     if (automatic.has(migrationName)) return true;
     const enrolled = enrolledByMigration.get(migrationName);
     if (!enrolled || enrolled.size === 0) return false;
-    const memberships = await prisma.organizationUser.findMany({
-      where: { userId: tenantId },
-      select: { organizationId: true },
+    // Read as a relation of the user, not as a top-level OrganizationUser
+    // query: that model is org-guarded (dbOrganizationIdProtection), and a
+    // userId-only predicate has no admitted shape there.
+    const user = await prisma.user.findUnique({
+      where: { id: tenantId },
+      select: { orgMemberships: { select: { organizationId: true } } },
     });
-    return memberships.some((membership) =>
+    return (user?.orgMemberships ?? []).some((membership) =>
       enrolled.has(membership.organizationId),
     );
   };
