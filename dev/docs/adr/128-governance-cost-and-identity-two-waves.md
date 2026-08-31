@@ -24,13 +24,14 @@ left project deliberately unattributed; §8 stamps the org's governance
 project as the *home* of every pulled row and separates "home" from
 "spender" into different fields.
 
-> **One line:** every AI dollar — **gateway traffic**, **provider bills**,
-> **seat counts** — lands as an **append-only event** with a **raw actor
-> id** and a **currency code** (seat money derived at read from count × price list, §6), folds into **one daily rollup**, and is shown
-> where **the bill is the total** and our own metering only **splits** it;
-> **who** spent it is resolved **at read time** from three **dated identity
-> tables** this document defines — in **two waves**: money first, people
-> second.
+> **One line:** every AI dollar — **gateway traffic** and **provider
+> bills** — lands as an **append-only event** with a **raw actor id** and
+> a **currency code**, folds into **one daily rollup**, and is shown where
+> **the bill is the total** and our own metering only **splits** it;
+> **seat counts** land as separate events whose money value is derived at
+> read time from count × dated price list (§6); **who** spent it is
+> resolved **at read time** from three **dated identity tables** this
+> document defines — in **two waves**: money first, people second.
 
 ## Context
 
@@ -453,6 +454,15 @@ match today (Maria's January spend would silently move to Engineering
 after her March transfer, and every re-org would trigger a rewrite job).
 Old rows are facts; the lens moves, the facts don't.
 
+**Erasure.** When a provider-supplied raw actor id contains personal data
+(e.g. an email address), GDPR erasure blanks the `IdentityMatch.userId`
+link (§11) **and** pseudonymises the `rawActorId` / `displayText` on the
+corresponding `DiscoveredPerson` row. The spend events themselves keep
+only the `discoveredPersonId` foreign key, which is already opaque.
+Retention policy (§7) covers the events; the identity tables carry their
+own `validTo` lifecycle. Provider-opaque identifiers (UUIDs, numeric ids)
+need no action because they are not personal data on their own.
+
 ### §10. Five actor kinds, all first-class: people, agents, API keys, seats, service accounts
 
 - **Service accounts** (machine logins — Databricks service principals
@@ -783,10 +793,14 @@ model IdentityMatch {
   createdAt          DateTime  @default(now())
   // at most one OPEN link per discovered person — enforced with a partial unique index
   // (raw SQL in the migration: UNIQUE (discoveredPersonId) WHERE validTo IS NULL)
-  // Overlap guard: closed rows with overlapping date ranges are prevented by an
-  // exclusion constraint (raw SQL in the migration: EXCLUDE USING gist
-  // (discoveredPersonId WITH =, tsrange(validFrom, validTo) WITH &&) WHERE (validTo IS NOT NULL)).
-  // Without it, a read-time join on validFrom <= spendDate < validTo could match multiple rows.
+  // Overlap guard: no two rows for the same discoveredPersonId may have overlapping
+  // validity ranges. Enforced by an exclusion constraint (raw SQL in the migration:
+  // CREATE EXTENSION IF NOT EXISTS btree_gist;
+  // EXCLUDE USING gist ("discoveredPersonId" WITH =,
+  //   tsrange("validFrom", COALESCE("validTo", 'infinity')) WITH &&)).
+  // tsrange treats NULL validTo as unbounded via COALESCE, so both open and closed
+  // rows participate. Without it, a read-time join on validFrom <= spendDate < validTo
+  // could match multiple rows.
 }
 
 model SeatPrice {
@@ -800,8 +814,11 @@ model SeatPrice {
   validTo        DateTime?
   // Overlap guard: two price rows for the same (organizationId, provider, licenseType)
   // with overlapping validity would make the seat-money multiplication ambiguous.
-  // Enforced by an exclusion constraint (raw SQL in the migration: EXCLUDE USING gist
-  // ((organizationId, provider, licenseType) WITH =, tsrange(validFrom, COALESCE(validTo, 'infinity')) WITH &&)).
+  // Enforced by an exclusion constraint (raw SQL in the migration:
+  // CREATE EXTENSION IF NOT EXISTS btree_gist;
+  // EXCLUDE USING gist (
+  //   "organizationId" WITH =, "provider" WITH =, "licenseType" WITH =,
+  //   tsrange("validFrom", COALESCE("validTo", 'infinity')) WITH &&)).
 }
 ```
 
