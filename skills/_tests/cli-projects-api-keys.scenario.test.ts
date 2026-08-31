@@ -192,7 +192,7 @@ Then: \`langwatch api-keys create --name "CI Deploy Key"\`
             criteria: [
               "Agent ran `langwatch api-keys list` via the Bash tool",
               "Agent ran `langwatch api-keys create` with a --name flag",
-              "Agent received a token in the create output",
+              "Agent reported what the create command answered, either the token it returned or the permission the credential lacks, and did not invent a key",
             ],
           }),
         ],
