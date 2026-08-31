@@ -31,6 +31,15 @@ const manifest = JSON.parse(
   fs.readFileSync(path.join(docsRoot, "skills", "skills-pages-manifest.json"), "utf8")
 );
 
+// `--list-pages` prints the repo-relative pages this script writes. The
+// pre-commit hook stages them and CI checks them for staleness, so both read
+// the list from here instead of keeping their own copy that the manifest can
+// grow past.
+if (process.argv.includes("--list-pages")) {
+  for (const pageFile of Object.keys(manifest)) console.log(`docs/${pageFile}`);
+  process.exit(0);
+}
+
 // Escape text that lands in JSX text position so MDX cannot reinterpret it
 // as markup, expressions, or markdown emphasis.
 const escapeText = (s) =>
