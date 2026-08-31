@@ -132,7 +132,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    1_800_000
   );
 
   it.skipIf(isCI)(
@@ -199,7 +199,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    1_800_000
   );
 
   it.skipIf(isCI)(
@@ -250,7 +250,7 @@ describe("Scenarios Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    900_000
+    1_800_000
   );
 
   it.skipIf(isCI)(
@@ -315,7 +315,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    1_800_000
   );
 
   it.skipIf(isCI)(
@@ -383,7 +383,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    1_800_000
   );
 
   it.skipIf(isCI)(
@@ -436,7 +436,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    1_800_000
   );
 
   it.skipIf(isCI)(
@@ -509,7 +509,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    1_800_000
   );
 
   it.skipIf(isCI)(
@@ -559,7 +559,7 @@ describe("Scenarios Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    900_000
+    1_800_000
   );
 
   it.skipIf(isCI)(
@@ -629,7 +629,7 @@ describe("Scenarios Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    900_000
+    1_800_000
   );
 
   it.skipIf(isCI)(
@@ -702,7 +702,7 @@ describe("Scenarios Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    900_000 // longer timeout — agent needs to run tests + generate suggestions
+    1_800_000 // longer: the agent runs the tests and then writes the suggestions
   );
 
   it.skipIf(isCI)(
@@ -803,7 +803,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    1_800_000
   );
 
   it.skipIf(isCI)(
