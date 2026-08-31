@@ -62,10 +62,12 @@ describe("AgentTypeSelectorDrawer", () => {
   };
 
   describe("Basic rendering", () => {
-    it("shows Choose Agent Type header", async () => {
+    it("shows the Choose Agent Connection Type header", async () => {
       renderDrawer();
       await waitFor(() => {
-        expect(screen.getByText("Choose Agent Type")).toBeInTheDocument();
+        expect(
+          screen.getByText("Choose Agent Connection Type"),
+        ).toBeInTheDocument();
       });
     });
 

@@ -103,7 +103,7 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
                 <LuArrowLeft size={20} />
               </Button>
             )}
-            <Heading>Choose Agent Type</Heading>
+            <Heading>Choose Agent Connection Type</Heading>
           </HStack>
         </Drawer.Header>
         <Drawer.Body
@@ -114,7 +114,7 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
         >
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
             <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
-              Select the type of agent you want to create.
+              Select how you want to integrate your agent for testing.
             </Text>
 
             {/* Agent type cards */}
@@ -183,7 +183,7 @@ function ConnectFromCodeCard({ onClick }: { onClick: () => void }) {
             </Text>
           </HStack>
           <Text fontSize="xs" color="fg.muted">
-            Call your agent from a connect function beside your service startup
+            Setup your agent to connect automatically when it starts up
           </Text>
         </VStack>
       </HStack>
