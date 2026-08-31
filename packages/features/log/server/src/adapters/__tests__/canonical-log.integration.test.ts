@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import {
-  logCommandGroupKey,
-  prepareCanonicalLogRecords as prepareRecords,
-} from "../canonical-log.adapter";
+import { CanonicalLogAdapter } from "../canonical-log.adapter";
 import type { LogPreparationInput } from "../../ports/log-preparation.port";
 import type { LogRedactionPort } from "../../ports/log-redaction.port";
 import type { AppendStore } from "@langwatch/eventing";
 import {
+  DEFAULT_LOG_COMMAND_SHARDS,
+  MAX_LOG_COMMAND_SHARDS,
+  MIN_LOG_COMMAND_SHARDS,
   canonicalLogRecordReceivedEventSchema,
   CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
   type CanonicalLogRecord,
@@ -21,7 +21,7 @@ function prepareCanonicalLogRecords(
   input: LogPreparationInput,
   redaction: LogRedactionPort = noRedaction,
 ) {
-  return prepareRecords(input, redaction);
+  return CanonicalLogAdapter.create({ redaction }).prepare(input);
 }
 
 function request(logRecords: unknown[], scopeName = "test.scope") {
@@ -250,9 +250,49 @@ describe("canonical log preparation", () => {
     expect(result.rejectedLogRecords).toBe(1);
   });
 
+  describe("the shard count read from the environment", () => {
+    it("uses the default when the variable is unset or empty", () => {
+      expect(CanonicalLogAdapter.resolveLogCommandShardCount(void 0)).toBe(
+        DEFAULT_LOG_COMMAND_SHARDS,
+      );
+      expect(CanonicalLogAdapter.resolveLogCommandShardCount("")).toBe(DEFAULT_LOG_COMMAND_SHARDS);
+    });
+
+    it("uses the default when the variable is not a number", () => {
+      // A typo in a deploy variable must not decide the lane count.
+      expect(CanonicalLogAdapter.resolveLogCommandShardCount("many")).toBe(
+        DEFAULT_LOG_COMMAND_SHARDS,
+      );
+    });
+
+    it("clamps to the bounds rather than trusting the value", () => {
+      // Zero would make the lane modulo divide by zero; an enormous count
+      // would fan one project's logs across lanes nothing consumes.
+      expect(CanonicalLogAdapter.resolveLogCommandShardCount("0")).toBe(MIN_LOG_COMMAND_SHARDS);
+      expect(CanonicalLogAdapter.resolveLogCommandShardCount("-4")).toBe(MIN_LOG_COMMAND_SHARDS);
+      expect(CanonicalLogAdapter.resolveLogCommandShardCount("100000")).toBe(
+        MAX_LOG_COMMAND_SHARDS,
+      );
+    });
+
+    it("truncates a fractional count to a whole lane", () => {
+      expect(CanonicalLogAdapter.resolveLogCommandShardCount("8.9")).toBe(8);
+    });
+  });
+
+  it("keeps a lane inside the bounds even when handed a bad count directly", () => {
+    // `logCommandGroupKey` clamps too, so a caller that skipped the resolver
+    // still cannot divide by zero.
+    expect(CanonicalLogAdapter.logCommandGroupKey("a".repeat(64), 0)).toBe("log:0");
+  });
+
   it("assigns stable bounded command lanes", () => {
-    expect(logCommandGroupKey("a".repeat(64), 16)).toBe(logCommandGroupKey("a".repeat(64), 16));
-    expect(Number(logCommandGroupKey("b".repeat(64), 16).split(":")[1])).toBeLessThan(16);
+    expect(CanonicalLogAdapter.logCommandGroupKey("a".repeat(64), 16)).toBe(
+      CanonicalLogAdapter.logCommandGroupKey("a".repeat(64), 16),
+    );
+    expect(
+      Number(CanonicalLogAdapter.logCommandGroupKey("b".repeat(64), 16).split(":")[1]),
+    ).toBeLessThan(16);
   });
 
   it("uses the canonical record id to shard map storage", () => {
@@ -320,6 +360,8 @@ describe("canonical log preparation", () => {
       shardCount: 16,
     });
 
-    expect(projection.options?.groupKeyFn?.(event)).toBe(logCommandGroupKey(record.recordId, 16));
+    expect(projection.options?.groupKeyFn?.(event)).toBe(
+      CanonicalLogAdapter.logCommandGroupKey(record.recordId, 16),
+    );
   });
 });

@@ -28,7 +28,7 @@ import {
 import { CanonicalLogStorageMapProjection } from "../projections/canonical-log-storage.projection";
 import type { CanonicalLogRecordRepository } from "../repositories/canonical-log-record.repository";
 import { CanonicalLogRecordStore } from "../stores/eventing/eventing.canonical-log-record.store";
-import { logCommandGroupKey } from "./canonical-log.adapter";
+import { CanonicalLogAdapter } from "./canonical-log.adapter";
 
 export interface LogProcessingPipelineDeps {
   canonicalLogAppendStore: AppendStore<CanonicalLogRecord>;
@@ -70,7 +70,8 @@ function createLogProcessingPipeline(deps: LogProcessingPipelineDeps): LogProces
 
   return builder
     .withCommand("recordLogRecord", RecordCanonicalLogCommand, {
-      getGroupKey: (payload) => logCommandGroupKey(payload.recordId, deps.logCommandShardCount),
+      getGroupKey: (payload) =>
+        CanonicalLogAdapter.logCommandGroupKey(payload.recordId, deps.logCommandShardCount),
       // ADR-066 pillar 2: a shard funnels many records into one group, so a
       // backed-up shard appends one tiny insert per record. Coalesce its queued
       // records into one multi-row insert instead. Safe to fold: the handler

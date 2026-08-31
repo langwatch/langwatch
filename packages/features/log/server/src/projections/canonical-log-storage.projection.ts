@@ -1,6 +1,6 @@
 import type { AppendStore } from "@langwatch/eventing";
 import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
-import { logCommandGroupKey } from "../adapters/canonical-log.adapter";
+import { CanonicalLogAdapter } from "../adapters/canonical-log.adapter";
 import { LOG_MAP_COALESCE_MAX_BATCH } from "@langwatch/log-contract";
 import {
   type CanonicalLogRecordReceivedEvent,
@@ -30,7 +30,7 @@ export class CanonicalLogStorageMapProjection
     this.store = deps.store;
     this.options = {
       groupKeyFn: (event: CanonicalLogRecordReceivedEvent) =>
-        logCommandGroupKey(event.data.recordId, deps.shardCount),
+        CanonicalLogAdapter.logCommandGroupKey(event.data.recordId, deps.shardCount),
       coalesceMaxBatch: LOG_MAP_COALESCE_MAX_BATCH,
     };
   }

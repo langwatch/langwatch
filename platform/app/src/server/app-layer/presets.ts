@@ -401,7 +401,7 @@ import { ManagedProvidersAppAdapter } from "./enterprise/managed-providers.adapt
 import { PrismaEvaluationCostRecorder } from "./evaluations/evaluation-cost.recorder";
 import { createDefaultModelEnvResolver } from "./evaluations/evaluation-execution.factories";
 import { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
-import { LogRuntimeAdapter, resolveLogCommandShardCount } from "@langwatch/log-server";
+import { CanonicalLogAdapter, LogRuntimeAdapter } from "@langwatch/log-server";
 import { MetricRuntimeAdapter, resolveMetricCommandShardCount } from "@langwatch/metric-server";
 import {
   NullTraceAnalyticsRepository,
@@ -1206,12 +1206,16 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
         resolveClient: logMetricClickHouseResolver.resolve,
         defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
         defaultReadLimit: TRACE_LOG_READ_CAP,
-        logCommandShardCount: resolveLogCommandShardCount(process.env.LOG_PROCESSING_SHARDS),
+        logCommandShardCount: CanonicalLogAdapter.resolveLogCommandShardCount(
+          process.env.LOG_PROCESSING_SHARDS,
+        ),
         redaction: tracePrivacy.redaction,
       })
     : LogRuntimeAdapter.createUnavailable({
         defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-        logCommandShardCount: resolveLogCommandShardCount(process.env.LOG_PROCESSING_SHARDS),
+        logCommandShardCount: CanonicalLogAdapter.resolveLogCommandShardCount(
+          process.env.LOG_PROCESSING_SHARDS,
+        ),
         redaction: tracePrivacy.redaction,
       });
   const metricRuntime = clickhouseEnabled
@@ -3113,7 +3117,7 @@ export function createTestApp(
   });
   const logRuntime = LogRuntimeAdapter.createUnavailable({
     defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-    logCommandShardCount: resolveLogCommandShardCount(void 0),
+    logCommandShardCount: CanonicalLogAdapter.resolveLogCommandShardCount(void 0),
     redaction: testTracePrivacy.redaction,
   });
   const metricRuntime = MetricRuntimeAdapter.createUnavailable({

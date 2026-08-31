@@ -13,9 +13,9 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  CanonicalLogAdapter,
   ClickHouseCanonicalLogRecordRepository,
   type LogRedactionPort,
-  prepareCanonicalLogRecords,
 } from "@langwatch/log-server/testing";
 import {
   startTestContainers,
@@ -150,7 +150,7 @@ async function insertSessionLog({
   body: string;
   timeMs: number;
 }) {
-  const result = await prepareCanonicalLogRecords({
+  const result = await CanonicalLogAdapter.create({ redaction: noRedaction }).prepare({
     tenantId,
     organizationId: `${tag}-org`,
     piiRedactionLevel: "DISABLED",
