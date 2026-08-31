@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardNotFoundError } from "@langwatch/dashboard-contract";
 import { createInnerTRPCContext } from "../../trpc";
-import { graphsRouter } from "../graphs";
+import { appRouter } from "../../root";
 
 // The declared permission seam resolves its service from the App.
 vi.mock("~/server/app-layer/app", async () => {
@@ -39,7 +39,7 @@ const createCaller = () => {
     configurable: true,
     value: { createGraph },
   });
-  return graphsRouter.createCaller(ctx);
+  return appRouter.createCaller(ctx).graphs;
 };
 
 beforeEach(() => {

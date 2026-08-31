@@ -19,7 +19,7 @@ import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
  * recorded it: a credential response never waits on the audit write, and the
  * minted token is never among the arguments.
  */
-type ApiKeyAuditSink = Readonly<{
+export type ApiKeyAuditSink = Readonly<{
   recordAudit(
     entry: Readonly<{
       userId: string;

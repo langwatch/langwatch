@@ -15,7 +15,7 @@ import { memoryAdapter } from "better-auth/adapters/memory";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as IdentityRuntime from "~/server/app-layer/identity/runtime";
 import { createInnerTRPCContext } from "../../trpc";
-import { identityRouter } from "../identity";
+import { appRouter } from "../../root";
 
 const { mockComplete } = vi.hoisted(() => ({
   mockComplete: vi.fn<(...args: unknown[]) => Promise<void>>(),
@@ -114,7 +114,7 @@ function callerFor(session: { user: { id: string; email: string } } | null) {
     permissionChecked: true,
     publiclyShared: false,
   });
-  return identityRouter.createCaller(ctx);
+  return appRouter.createCaller(ctx).identity;
 }
 
 describe("identity.completeVerification", () => {

@@ -20,7 +20,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { BUILDER_CHART_KIND, WORKBENCH_SQL_CHART_KIND } from "~/server/analytics/chartKinds";
 
 import { createInnerTRPCContext } from "../../trpc";
-import { graphsRouter } from "../graphs";
+import { appRouter } from "../../root";
 
 vi.mock("~/server/app-layer/app", async () => {
   const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
@@ -75,7 +75,7 @@ const createCaller = () => {
     },
     $transaction: transaction,
   } as unknown as PrismaClient;
-  return graphsRouter.createCaller(ctx);
+  return appRouter.createCaller(ctx).graphs;
 };
 
 /** The `kind` clause of the first Prisma call a spy recorded. */

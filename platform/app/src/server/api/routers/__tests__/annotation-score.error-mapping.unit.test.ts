@@ -1,7 +1,7 @@
 import { AnnotationScoreNotFoundError } from "@langwatch/annotation-contract";
 import { describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
-import { annotationScoreRouter } from "../annotationScore";
+import { appRouter } from "../../root";
 
 vi.mock("~/server/app-layer/app", async () => {
   const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
@@ -33,7 +33,7 @@ describe("annotation score error mapping", () => {
     });
 
     await expect(
-      annotationScoreRouter.createCaller(ctx).getById({
+      appRouter.createCaller(ctx).annotationScore.getById({
         projectId: "project-1",
         scoreId: "missing-score",
       }),

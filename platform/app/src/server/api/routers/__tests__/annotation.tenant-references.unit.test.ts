@@ -1,7 +1,4 @@
-import {
-  createOrUpdateQueueItems,
-  PostgresAnnotationAdapter,
-} from "@langwatch/annotation-server";
+import { createOrUpdateQueueItems, PostgresAnnotationAdapter } from "@langwatch/annotation-server";
 import { UserNotInOrganizationError } from "@langwatch/organization-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -11,7 +8,7 @@ import {
   createAnnotationTestUsers,
 } from "~/test-utils/annotation-test-services";
 import { createInnerTRPCContext } from "../../trpc";
-import { annotationRouter } from "../annotation";
+import { appRouter } from "../../root";
 
 // The declared permission seam resolves its service from the App.
 vi.mock("~/server/app-layer/app", async () => {
@@ -76,8 +73,7 @@ const queueItemUpdateMany = vi.fn(
       const queueMatches =
         where.annotationQueueId === void 0 ||
         where.annotationQueueId.in.includes(item.annotationQueueId ?? "");
-      const userMatches =
-        where.userId === void 0 || where.userId.in.includes(item.userId ?? "");
+      const userMatches = where.userId === void 0 || where.userId.in.includes(item.userId ?? "");
       if (
         item.projectId === where.projectId &&
         where.traceId.in.includes(item.traceId) &&
@@ -153,7 +149,7 @@ const createCaller = () => {
     }).build(),
     users,
   });
-  return annotationRouter.createCaller(ctx);
+  return appRouter.createCaller(ctx).annotation;
 };
 
 const annotationService = () =>

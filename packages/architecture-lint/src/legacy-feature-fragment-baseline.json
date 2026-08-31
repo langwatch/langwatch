@@ -443,7 +443,6 @@
     {"feature":"organization","file":"platform/app/src/pages/settings/teams.tsx","kind":"page-shell"},
     {"feature":"organization","file":"platform/app/src/pages/settings/teams/[team].tsx","kind":"page-shell"},
     {"feature":"organization","file":"platform/app/src/runtime/app/features/organization.ts","kind":"composition"},
-    {"feature":"organization","file":"platform/app/src/server/api/routers/group.ts","kind":"transport"},
     {"feature":"organization","file":"platform/app/src/server/app-layer/organizations/compute-effective-team-role-updates.ts","kind":"legacy-implementation"},
     {"feature":"organization","file":"platform/app/src/server/app-layer/organizations/errors.ts","kind":"legacy-implementation"},
     {"feature":"organization","file":"platform/app/src/server/app-layer/organizations/organization.service.ts","kind":"legacy-implementation"},

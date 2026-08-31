@@ -18,7 +18,7 @@ import {
   createAnnotationTestUsers,
 } from "~/test-utils/annotation-test-services";
 import { createInnerTRPCContext } from "../../trpc";
-import { annotationRouter } from "../annotation";
+import { appRouter } from "../../root";
 
 const { mockGetTracesWithSpans } = vi.hoisted(() => ({
   mockGetTracesWithSpans: vi.fn(),
@@ -118,7 +118,7 @@ function makePrismaStub(): PrismaClient {
   } as unknown as PrismaClient;
 }
 
-let caller: ReturnType<typeof annotationRouter.createCaller>;
+let caller: ReturnType<typeof appRouter.createCaller>["annotation"];
 let users = createAnnotationTestUsers();
 
 beforeEach(() => {
@@ -145,7 +145,7 @@ beforeEach(() => {
     users,
     traces: { read: { getTracesWithSpans: mockGetTracesWithSpans } },
   });
-  caller = annotationRouter.createCaller(ctx);
+  caller = appRouter.createCaller(ctx).annotation;
 });
 
 function expectFullResolution() {

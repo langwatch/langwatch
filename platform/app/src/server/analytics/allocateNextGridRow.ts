@@ -10,7 +10,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
  * space, and scoping this to one kind would place a new chart on top of
  * whichever kind it ignored.
  *
- * @see platform/app/src/server/api/routers/graphs.ts — the builder's writer
+ * @see packages/features/dashboard/server/src/transport/api-trpc/graph.api.ts — the builder's writer
  * @see ./saved-workbench-charts/savedWorkbenchChart.service.ts — the
  *   workbench's writer
  */

@@ -1,24 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("~/env.mjs", () => ({
-  env: {
-    BASE_HOST: "https://example.com",
-    NEXTAUTH_PROVIDER: "auth0",
-    DEMO_PROJECT_SLUG: undefined,
-    NODE_ENV: "test",
-    SENDGRID_API_KEY: undefined,
-    USE_AWS_SES: undefined,
-    AWS_REGION: undefined,
-    IS_SAAS: false,
-    SHOW_OPS_IN_MAIN_SIDEBAR: undefined,
-    POSTHOG_KEY: undefined,
-    POSTHOG_HOST: undefined,
-    LANGWATCH_NLP_SERVICE: undefined,
-    LANGWATCH_NLP_LAMBDA_CONFIG: undefined,
-    LANGEVALS_ENDPOINT: undefined,
-    STRIPE_LICENSE_PAYMENT_LINK_URL: undefined,
-  },
-}));
+// Only the three facts this surface reports are pinned; everything else keeps
+// the real value, because the whole router graph boots behind `appRouter`.
+vi.mock("~/env.mjs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/env.mjs")>();
+  return {
+    ...actual,
+    env: {
+      ...actual.env,
+      NEXTAUTH_PROVIDER: "auth0",
+      SHOW_OPS_IN_MAIN_SIDEBAR: undefined,
+    },
+  };
+});
 
 vi.mock("~/runtime/app/features/sso", () => ({
   resolveAuthProvider: vi.fn(),
@@ -33,10 +27,8 @@ vi.mock("~/runtime/app/features/sso", () => ({
 }));
 
 import { resolveAuthProvider } from "~/runtime/app/features/sso";
-import { createInnerTRPCContext, createTRPCRouter } from "../../trpc";
-import { publicEnvRouter } from "../publicEnv";
-
-const testRouter = createTRPCRouter({ publicEnv: publicEnvRouter });
+import { appRouter } from "../../root";
+import { createInnerTRPCContext } from "../../trpc";
 
 const callPublicEnv = () => {
   const ctx = createInnerTRPCContext({
@@ -45,10 +37,10 @@ const callPublicEnv = () => {
       typeof createInnerTRPCContext
     >[0]["app"],
   });
-  return testRouter.createCaller(ctx).publicEnv({});
+  return appRouter.createCaller(ctx).publicEnv({});
 };
 
-describe("publicEnvRouter", () => {
+describe("the publicEnv procedure", () => {
   describe("when the platform SSO gate allows", () => {
     it("reports the configured provider via resolveAuthProvider", async () => {
       vi.mocked(resolveAuthProvider).mockResolvedValue("auth0");

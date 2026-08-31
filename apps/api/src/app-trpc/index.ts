@@ -9,7 +9,6 @@
 // The policy chain now lives in `@langwatch/api/trpc` beside
 // `createTrpcApiService`, which is the only thing that composes it. Import it
 // from there rather than re-exporting it through this barrel.
-export { createApiKeyTrpcRouter } from "../features/api-key/api-key-trpc.mount";
 export {
   createAutomationTrpcRouter,
   createEmailSuppressionTrpcRouter,
@@ -19,10 +18,6 @@ export { createCodingAgentTrpcRouter } from "../features/coding-agent/coding-age
 export { createHttpProxyTrpcRouter } from "../features/agent/http-proxy-trpc.mount";
 export { createAuthzTrpcRouter } from "../features/authz/authz-trpc.mount";
 export { createTranslateTrpcRouter } from "../features/model-provider/translate-trpc.mount";
-export {
-  createEvaluationTrpcRouter,
-  type EvaluationMountPorts,
-} from "../features/evaluation/evaluation-trpc.mount";
 export { listCustomEvaluators } from "../features/evaluation/custom-evaluators";
 export {
   createPromptTagTrpcRouter,
@@ -45,32 +40,20 @@ export {
   createTracesV2TrpcRouter,
 } from "../features/trace/traces-v2-trpc.mount";
 export { declaredCheckFrom, type AppAuthzMiddlewareBuilders } from "./app-trpc.declared-check";
+export { createAppTrpcFeatures, type AppTrpcFeaturePorts } from "./app-trpc.features";
 export {
-  createFrontDoorTrpcRouter,
-  createPublicEnvTrpcProcedure,
-} from "../features/auth/auth-trpc.mount";
-export {
-  createGroupTrpcRouter,
-  createJoinRequestTrpcRouter,
   createOrganizationTrpcRouter,
   createPersonalWorkspaceFeaturesTrpcRouter,
 } from "../features/organization/organization-trpc.mount";
-export { createIdentityTrpcRouter, createUserTrpcRouter } from "../features/user/user-trpc.mount";
-export {
-  createAnnotationScoreTrpcRouter,
-  createAnnotationTrpcRouter,
-} from "../features/annotation/annotation-trpc.mount";
+export { createUserTrpcRouter } from "../features/user/user-trpc.mount";
 export {
   createAnalyticsTrpcRouter,
   createLangWatchQLTrpcRouter,
 } from "../features/analytics/analytics-trpc.mount";
 export {
-  createDashboardTrpcRouter,
-  createGraphTrpcRouter,
   createSavedViewTrpcRouter,
   createSavedWorkbenchChartTrpcRouter,
 } from "../features/dashboard/dashboard-trpc.mount";
-export { createExperimentTrpcRouter } from "../features/experiment/experiment-trpc.mount";
 export {
   createExportTrpcRouter,
   exportProgressEventSchema,

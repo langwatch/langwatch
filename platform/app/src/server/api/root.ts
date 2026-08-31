@@ -1,6 +1,7 @@
 import { governanceRouter } from "./routers/governance/governance";
 import { createTRPCRouter } from "~/server/api/trpc";
 import {
+  createAppTrpcFeatures,
   createAuthzTrpcRouter,
   createAutomationTrpcRouter,
   createCodingAgentTrpcRouter,
@@ -87,7 +88,10 @@ import { auditLog } from "~/runtime/app/features/audit-log";
 import {
   identityEmail,
   joinRequestsService,
+  signInRouter,
+  signUpVerification,
   ssoConnections,
+  verificationCeremony,
 } from "~/server/app-layer/identity/runtime";
 import { SsoConnectionBackofficeService } from "~/server/app-layer/identity/sso-connection-backoffice.service";
 import { systemMigrationsService } from "~/server/app-layer/system-migrations/runtime";
@@ -112,15 +116,18 @@ import {
   checkProjectPermission,
   type PermissionMiddlewareParams,
 } from "./rbac";
-import { declareAuthzMiddleware } from "@langwatch/authz-contract";
-import { RoleBindingScopeType } from "~/generated/prisma/client";
+import { declareAuthzMiddleware, type AuthzPermission } from "@langwatch/authz-contract";
+import { RoleBindingScopeType, type PrismaClient } from "~/generated/prisma/client";
 import { fireTeamMemberInvitedNurturing } from "~/server/app-layer/billing/nurturing/featureAdoption";
 import { fireInviteAcceptedNurturingCalls } from "~/server/app-layer/billing/nurturing/inviteAcceptance";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
 import { MemberSeatLimitReachedError } from "~/server/app-layer/organizations/errors";
 import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";
-import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
-import { buildInviteAcceptUrl } from "~/server/invites/invite-link";
+import {
+  probeOrganizationPermission,
+  probeProjectPermission,
+} from "~/server/app-layer/permissions/imperative";
+import { buildInviteAcceptUrl, buildMembersSettingsUrl } from "~/server/invites/invite-link";
 import { assertInviteSendAllowed } from "~/server/invites/invite-send-throttle";
 import {
   INVITE_ALREADY_ACCEPTED_MESSAGE,
@@ -152,10 +159,7 @@ import {
 import { toError } from "~/utils/posthogErrorCapture";
 import { agentsRouter } from "~/runtime/app/internal-api/agents.router";
 import { analyticsRouter } from "./routers/analytics";
-import { annotationRouter } from "./routers/annotation";
-import { annotationScoreRouter } from "./routers/annotationScore";
-import { apiKeyRouter } from "./routers/apiKey";
-import type { SlackActionParams } from "@langwatch/automation-contract";
+import type { SlackActionParams, Trigger } from "@langwatch/automation-contract";
 import { PostgresSavedViewAdapter } from "@langwatch/dashboard-server";
 import { createSharedTraceTrpcPorts, createTracesV2TrpcPorts } from "~/runtime/app/features/trace";
 import { canReadCapturedContent } from "@langwatch/trace-server";
@@ -179,22 +183,14 @@ import { batchRecordRouter } from "~/runtime/app/internal-api/batch-record.route
 import { bugReportsRouter } from "./routers/bugReports";
 import { costsRouter } from "./routers/costs";
 import { currencyRouter } from "./routers/currency";
-import { dashboardsRouter } from "./routers/dashboards";
 import { dataPrivacyRouter } from "./routers/dataPrivacy";
 import { dataRetentionRouter } from "~/runtime/app/internal-api/data-retention.router";
 import { datasetRouter } from "~/runtime/app/internal-api/dataset.router";
 import { datasetRecordRouter } from "~/runtime/app/internal-api/dataset-record.router";
-import { evaluationsRouter } from "./routers/evaluations";
 import { evaluatorsRouter } from "~/runtime/app/internal-api/evaluator.router";
-import { experimentsRouter } from "./routers/experiments";
 import { featureFlagRouter } from "~/runtime/app/internal-api/feature-flag.router";
-import { frontDoorRouter } from "./routers/frontDoor";
 import { githubRouter } from "~/runtime/app/internal-api/github.router";
-import { graphsRouter } from "./routers/graphs";
-import { groupRouter } from "./routers/group";
-import { identityRouter } from "./routers/identity";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
-import { joinRequestsRouter } from "./routers/joinRequests";
 import { langyRouter } from "~/runtime/app/internal-api/langy.router";
 import { langyEgressRouter } from "~/runtime/app/internal-api/langy.router";
 import { llmModelCostsRouter } from "~/runtime/app/internal-api/model-provider.router";
@@ -203,7 +199,6 @@ import { monitorsRouter } from "~/runtime/app/internal-api/monitor.router";
 import { onboardingRouter } from "./routers/onboarding/onboarding.router";
 import { presenceRouter } from "~/runtime/app/internal-api/presence.router";
 import { projectRouter } from "~/runtime/app/internal-api/project.router";
-import { publicEnvRouter } from "./routers/publicEnv";
 import { roleBindingRouter } from "~/runtime/app/internal-api/role-binding.router";
 import { roleRouter } from "~/runtime/app/internal-api/role.router";
 import { secretsRouter } from "~/runtime/app/internal-api/secrets.router";
@@ -211,7 +206,30 @@ import { setupSkillsRouter } from "./routers/setupSkills";
 import { teamRouter } from "~/runtime/app/internal-api/team.router";
 import { topicsRouter } from "~/runtime/app/internal-api/topic.router";
 import { userRouter } from "./routers/user";
-import { optimizationRouter, workflowRouter } from "./routers/workflows";
+import {
+  copyWorkflowWithDatasets,
+  optimizationRouter,
+  saveOrCommitWorkflowVersion,
+  workflowRouter,
+} from "./routers/workflows";
+import type { resolveAnnotationSuggestionTarget } from "@langwatch/annotation-contract";
+import {
+  createOrUpdateQueueItems,
+  PostgresAnnotationQueueAdapter,
+} from "@langwatch/annotation-server";
+import { AuthApp } from "@langwatch/auth-server";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
+import { nanoid } from "nanoid";
+import { resolveAuthProvider } from "~/runtime/app/features/sso";
+import { getAzureSafetyEnvFromProject } from "~/server/app-layer/evaluations/azure-safety-env.server";
+import { evaluatorUnavailability } from "~/server/evaluations/installedEvaluators";
+import { runEvaluationForTrace } from "~/server/evaluations/runEvaluation";
+import { workbenchStateSchema } from "~/server/experiments-v3/legacy-workbench.schema";
+import { filterFieldsEnum } from "~/server/filters/types";
+import { coerceMonitorMappings, mappingStateSchema } from "~/server/tracer/tracesMapping";
+import { ClickHouseTraceService } from "~/server/traces/clickhouse-trace.service";
+import { TraceEditOverlayService } from "~/server/traces/edit-overlay/traceEditOverlay.service";
+import { slugify } from "~/utils/slugify";
 
 /** This process's concrete policy chain, in the order the mounts apply it. */
 const appTrpcMiddlewares: AppTrpcPolicyMiddlewares = {
@@ -792,12 +810,432 @@ const enterpriseGovernanceRouters = EnterpriseGovernanceTrpcComposition.create({
   policy: appTrpcPolicy(appTrpcMiddlewares),
 });
 
+/** The slug `/annotations/<slug>` addresses, for a queue name. */
+const toAnnotationQueueSlug = (name: string): string =>
+  slugify(name.replace("_", "-"), { lower: true, strict: true });
+
+/** The trace content behind a set of queue items, resolved in full (#4991). */
+async function loadQueueItemTraces(
+  ctx: TRPCContext,
+  { projectId, traceIds }: { projectId: string; traceIds: readonly string[] },
+) {
+  const protections = await getUserProtectionsForProject(ctx, { projectId });
+  // Annotators label trace content — resolve full IO (#4991) so they see the
+  // whole value, not the 64 KB preview.
+  return ctx.app.traces.readTracesWithSpans({
+    projectId,
+    traceIds: [...traceIds],
+    protections,
+  });
+}
+
+/** Writes one suggestion into the trace's correction, or takes it back off when
+ *  the reviewer cleared the text. */
+async function writeAnnotationSuggestionToOverlay({
+  prisma: client,
+  projectId,
+  traceId,
+  target,
+  text,
+  userId,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+  traceId: string;
+  target: NonNullable<ReturnType<typeof resolveAnnotationSuggestionTarget>>;
+  text: string;
+  userId: string;
+}): Promise<void> {
+  const overlay = TraceEditOverlayService.create(client);
+  const withdrawn = text.length === 0;
+  if (target.kind === "span") {
+    const span = { projectId, traceId, spanId: target.spanId, userId };
+    await (withdrawn
+      ? overlay.removeSpanFieldEdit({ ...span, field: target.field })
+      : overlay.mergeSpanFieldEdit({ ...span, field: target.field, text }));
+    return;
+  }
+
+  const trace = { projectId, traceId, field: target.field, userId };
+  await (withdrawn
+    ? overlay.removeTraceIOEdit(trace)
+    : overlay.mergeTraceIOEdit({ ...trace, value: text }));
+}
+
+/** The sign-up ceremony, composed per request over this process's app. */
+const signUp = (ctx: TRPCContext) => signUpVerification(ctx.app.mailer, ctx.app.users.userService);
+
+/**
+ * The auth feature's application, composed once over this process.
+ *
+ * Both signed-out doors take it — the front door and `publicEnv` beside it —
+ * which is why it is built in one place rather than composed twice. Every
+ * capability it holds is the process's, and each takes the request rather than
+ * being captured from one, so a single instance serves every caller.
+ */
+const authApp = AuthApp.create({
+  clientIp: (ctx: TRPCContext) => getClientIp(ctx.req) ?? "unknown",
+  rateLimit,
+  route: (input) => signInRouter().route(input),
+  addressIsRegistered: (ctx: TRPCContext, input) => signUp(ctx).addressIsRegistered(input),
+  requestSignUpVerification: (ctx: TRPCContext, input) => signUp(ctx).requestVerification(input),
+  completeSignUpVerification: (ctx: TRPCContext, input) => signUp(ctx).completeVerification(input),
+
+  /**
+   * A revoked invitation reads exactly like a missing one, the same way
+   * `organization.acceptInvite` answers it: the journey ends quietly,
+   * revealing nothing about the organization or the inviter. Expired is
+   * different — it is recoverable (the inviter resends in one click), so it
+   * gets its own named refusal.
+   */
+  readInviteLanding: async (ctx: TRPCContext, { inviteCode }) => {
+    const invite = await ctx.prisma.organizationInvite.findUnique({
+      where: { inviteCode },
+      select: {
+        status: true,
+        expiration: true,
+        organization: { select: { name: true } },
+        requestedByUser: { select: { name: true } },
+      },
+    });
+
+    if (!invite || invite.status === "REVOKED") {
+      throw new InviteNotFoundError("Invitation not found");
+    }
+
+    const status = resolveInviteDisplayStatus(invite);
+    if (status === "EXPIRED") {
+      throw new InviteExpiredError();
+    }
+
+    return {
+      organizationName: invite.organization.name,
+      inviterName: invite.requestedByUser?.name ?? null,
+      alreadyAccepted: status === "ACCEPTED",
+    };
+  },
+
+  requestFreshInvite: async (ctx: TRPCContext, { inviteCode }) => {
+    await invitesFor(ctx).requestFreshInvite({
+      inviteCode,
+      membersSettingsUrl: buildMembersSettingsUrl(),
+    });
+  },
+
+  // ADR-027: the single source of truth for the sign-in mode. Never read
+  // `env.NEXTAUTH_PROVIDER` directly here — a deployment whose licence gate
+  // denies SSO must still be told to render the email form.
+  resolveAuthProvider,
+});
+
+/** The join-request service, composed per request over this process's app. */
+function joinRequestsFor(ctx: Pick<TRPCContext, "app">) {
+  return joinRequestsService({
+    authzGrants: ctx.app.authzGrants,
+    featureFlags: ctx.app.featureFlags,
+    mailer: ctx.app.mailer,
+  });
+}
+
+/**
+ * The caller's own verified address, and the reason every requester-side
+ * join-request procedure starts here.
+ *
+ * `tryVerifiedEmailsOf` answers `null` for a user who is not on identifiers yet,
+ * which is the legacy fallback the rest of the identity surface uses: the
+ * `User.email` column, but only where better-auth has marked it verified. An
+ * unverified address answers null, and every caller treats that as the
+ * universal nothing.
+ */
+async function verifiedEmailFor(
+  ctx: Pick<TRPCContext, "prisma">,
+  { userId }: { userId: string },
+): Promise<string | null> {
+  const verified = await identityEmail().tryVerifiedEmailsOf({ userId });
+  if (verified !== null) return verified[0]?.value ?? null;
+
+  const row = await ctx.prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, emailVerified: true },
+  });
+  return row?.emailVerified ? (row.email ?? null) : null;
+}
+
+/**
+ * The request context the workflow helpers resolve their work from. They read
+ * the session and the process's own workflow and model-provider services, so
+ * they are handed the whole context rather than pieces of it.
+ */
+type WorkflowHelperContext = Parameters<typeof saveOrCommitWorkflowVersion>[0]["ctx"];
+
+/**
+ * Every packaged tRPC surface, installed in ONE call against this process's
+ * mount. Adding a feature to `@langwatch/platform-api`'s list mounts it here;
+ * there is no second enumeration to keep in step, which is what stops a
+ * surface serving traffic while missing from the declaration sweep.
+ */
+const appTrpcFeatures = createAppTrpcFeatures({
+  mount: { ...appTrpcMount, publicProcedure: appTrpcRoot.procedure },
+  ports: {
+    annotation: {
+      // Queue rows are still application-owned storage, and the request's own
+      // client is what reaches them.
+      queues: (ctx: TRPCContext) =>
+        PostgresAnnotationQueueAdapter.create({ database: ctx.prisma }).build(),
+
+      // A suggested output rewrites the trace itself, so it is carried over
+      // only for a caller who may also update annotations. The declared check
+      // on the procedure covers the annotation; this covers the correction.
+      probeProjectPermission: (ctx: TRPCContext, projectId: string, permission: AuthzPermission) =>
+        probeProjectPermission(ctx, projectId, permission),
+
+      writeTraceSuggestion: (ctx: TRPCContext, { projectId, traceId, target, text, userId }) =>
+        writeAnnotationSuggestionToOverlay({
+          prisma: ctx.prisma,
+          projectId,
+          traceId,
+          target,
+          text,
+          userId,
+        }),
+
+      loadTraces: (ctx: TRPCContext, input) => loadQueueItemTraces(ctx, input),
+
+      // The trace-side write is an eventing command rather than an application
+      // operation: carrying a comment onto the trace is ingestion into the
+      // trace pipeline, not a rule the trace application owns.
+      recordAnnotationOnTrace: (ctx: TRPCContext, input) =>
+        ctx.app.commands.traces.addAnnotation(input),
+
+      removeAnnotationFromTrace: (ctx: TRPCContext, input) =>
+        ctx.app.commands.traces.removeAnnotation(input),
+
+      queueTracesForAnnotation: (ctx: TRPCContext, input) =>
+        createOrUpdateQueueItems({
+          traceIds: [...input.traceIds],
+          projectId: input.projectId,
+          annotators: [...input.annotators],
+          userId: input.userId,
+          annotations: ctx.app.annotations.annotationService,
+          // Which ids address a trace this project holds is trace storage's
+          // answer, so it is resolved here rather than inside the queueing.
+          findExistingTraceIds: (candidates) =>
+            ClickHouseTraceService.create({
+              prisma: ctx.prisma,
+              traceCanonicalisation: ctx.app.traces.canonicalisation,
+            }).findExistingTraceIds(candidates),
+        }),
+
+      toQueueSlug: toAnnotationQueueSlug,
+    },
+
+    /**
+     * Fire and forget, exactly as the API-key router has always recorded it: a
+     * credential response never waits on the audit write. The minted token is
+     * never among the arguments the package passes here.
+     */
+    apiKeyAudit: (entry) => {
+      void auditLog(entry);
+    },
+
+    auth: authApp,
+
+    evaluations: {
+      mappingsSchema: mappingStateSchema,
+
+      /**
+       * Azure Safety evaluators resolve their credentials solely from the
+       * project's `azure_safety` Model Provider. There is no `process.env`
+       * fallback, so an unconfigured provider deterministically resolves null
+       * and the package reports every Azure variable as missing.
+       *
+       * Spec: specs/evaluators/azure-safety-byok-gating.feature.
+       */
+      tryResolveAzureSafetyEnv: (ctx: TRPCContext, { projectId }) =>
+        getAzureSafetyEnvFromProject(ctx.app.modelProviders.providerService, projectId),
+
+      evaluatorUnavailability,
+      missingEnvironmentVariables: (envVars) => envVars.filter((envVar) => !process.env[envVar]),
+
+      runEvaluationForTrace: async (ctx: TRPCContext, input) => {
+        const protections = await getUserProtectionsForProject(ctx, {
+          projectId: input.projectId,
+        });
+
+        return runEvaluationForTrace({
+          projectId: input.projectId,
+          traceId: input.traceId,
+          evaluatorType: input.evaluatorType,
+          settings: input.settings,
+          mappings: input.mappings,
+          protections,
+          evaluations: ctx.app.evaluations,
+          modelProviders: ctx.app.modelProviders.providerService,
+          managedProviders: ctx.app.managedProviders,
+          workflows: ctx.app.workflows.workflowService,
+          evaluators: ctx.app.evaluators,
+          traceCanonicalisation: ctx.app.traces.canonicalisation,
+        });
+      },
+
+      trackEvaluationRan: ({ userId, projectId }) => {
+        trackServerEvent({ userId, event: "evaluation_ran", projectId });
+      },
+
+      sendKeepAliveProbe: async (ctx: TRPCContext, { projectId }) => {
+        await studioBackendPostEvent({
+          projectId,
+          nlpLambda: ctx.app.nlpLambda,
+          modelProviders: ctx.app.modelProviders.providerService,
+          message: { type: "is_alive", payload: {} },
+          onEvent: () => {
+            // Response received - lambda is warm
+          },
+        });
+      },
+    },
+
+    experiments: {
+      workbenchStateSchema,
+      slugify,
+      probeProjectPermission: (ctx, projectId, permission) =>
+        probeProjectPermission(ctx as unknown as TRPCContext, projectId, permission),
+      saveWorkflowVersion: (ctx, input) =>
+        saveOrCommitWorkflowVersion({
+          ctx: ctx as unknown as WorkflowHelperContext,
+          input: {
+            projectId: input.projectId,
+            workflowId: input.workflowId,
+            dsl: input.dsl,
+          },
+          autoSaved: input.autoSaved,
+          commitMessage: input.commitMessage,
+          ...(input.setAsLatestVersion === undefined
+            ? {}
+            : { setAsLatestVersion: input.setAsLatestVersion }),
+        }),
+      copyWorkflowWithDatasets: (ctx, input) =>
+        copyWorkflowWithDatasets({
+          ctx: ctx as unknown as Parameters<typeof copyWorkflowWithDatasets>[0]["ctx"],
+          workflow: {
+            ...input.workflow,
+            latestVersion: input.workflow.latestVersion
+              ? { dsl: input.workflow.latestVersion.dsl as StudioWorkflow }
+              : null,
+          },
+          targetProjectId: input.targetProjectId,
+          sourceProjectId: input.sourceProjectId,
+          ...(input.copyDatasets === undefined ? {} : { copyDatasets: input.copyDatasets }),
+          ...(input.copiedFromWorkflowId === undefined
+            ? {}
+            : { copiedFromWorkflowId: input.copiedFromWorkflowId }),
+        }),
+      createWorkflow: async (ctx, input) =>
+        await (ctx as unknown as TRPCContext).prisma.workflow.create({
+          data: {
+            id: `workflow_${nanoid()}`,
+            projectId: input.projectId,
+            name: input.name,
+            icon: input.icon ?? null,
+            description: input.description ?? null,
+          },
+        }),
+      tryFindWorkflow: async (ctx, input) =>
+        await (ctx as unknown as TRPCContext).prisma.workflow.findFirst({
+          where: { id: input.workflowId, projectId: input.projectId },
+        }),
+      coerceMonitorMappings,
+      upsertExperimentMonitor: async (ctx, { projectId, experimentId, monitor }) => {
+        const monitorData = {
+          name: monitor.name,
+          checkType: monitor.checkType,
+          slug: monitor.slug,
+          preconditions: monitor.preconditions as object,
+          parameters: monitor.parameters as Record<string, unknown>,
+          mappings: monitor.mappings as object,
+          sample: monitor.sample,
+          enabled: monitor.enabled,
+          executionMode: monitor.executionMode as "ON_MESSAGE",
+        };
+
+        return await (ctx as unknown as TRPCContext).prisma.monitor.upsert({
+          where: { experimentId, projectId },
+          update: monitorData,
+          create: {
+            ...monitorData,
+            id: `monitor_${nanoid()}`,
+            projectId,
+            experimentId,
+          },
+        });
+      },
+      resolveAuthorNames: async (ctx, authorIds) =>
+        await (ctx as unknown as TRPCContext).prisma.user.findMany({
+          where: { id: { in: [...authorIds] } },
+          select: { id: true, name: true },
+        }),
+    },
+
+    graphs: {
+      // The catalogue of filterable trace fields is the process's filter
+      // registry, so a stored graph naming a field that has since been removed
+      // is dropped on read rather than shipped to a page that cannot render it.
+      filterFieldSchema: filterFieldsEnum,
+      // The included trigger row carries provider secrets in actionParams (the
+      // encrypted Slack bot token per ADR-041, webhook header values per
+      // ADR-040 §3) — the same registry-driven redaction the automations
+      // router applies on its own read paths.
+      redactActionParams: (action: Trigger["action"], actionParams: Record<string, unknown>) =>
+        redactActionParamsFor(action, actionParams) as Record<string, unknown>,
+    },
+
+    group: {
+      // Groups arrive with SCIM, and the plan is read per organization out of
+      // this process's billing store.
+      assertScimAllowed: (ctx: TRPCContext, { organizationId }) =>
+        assertEnterprisePlan({
+          planProvider: ctx.app.planProvider,
+          organizationId,
+          user: ctx.session?.user,
+          errorMessage: ENTERPRISE_FEATURE_ERRORS.SCIM,
+        }),
+    },
+
+    // Spec: specs/identity/identifier-model.feature.
+    identity: {
+      completeEmailVerification: (input) => verificationCeremony().completeEmailVerification(input),
+    },
+
+    joinRequests: {
+      lookup: (ctx: TRPCContext, input) => joinRequestsFor(ctx).lookup(input),
+      pendingForUser: (ctx: TRPCContext, input) => joinRequestsFor(ctx).pendingForUser(input),
+      request: (ctx: TRPCContext, input) => joinRequestsFor(ctx).request(input),
+      withdraw: (ctx: TRPCContext, input) => joinRequestsFor(ctx).withdraw(input),
+      pendingForOrganization: (ctx: TRPCContext, input) =>
+        joinRequestsFor(ctx).pendingForOrganization(input),
+      approve: (ctx: TRPCContext, input) => joinRequestsFor(ctx).approve(input),
+      reject: (ctx: TRPCContext, input) => joinRequestsFor(ctx).reject(input),
+      readJoining: (ctx: TRPCContext, input) => joinRequestsFor(ctx).readJoining(input),
+      setJoining: (ctx: TRPCContext, input) => joinRequestsFor(ctx).setJoining(input),
+      tryResolveVerifiedEmail: verifiedEmailFor,
+      listUserNames: (ctx: TRPCContext, { userIds }) =>
+        ctx.prisma.user.findMany({
+          where: { id: { in: [...userIds] } },
+          select: { id: true, name: true },
+        }),
+    },
+
+    prisma,
+  },
+});
+
 const coreRouters = {
+  // Every packaged surface, mounted by iteration rather than one line each.
+  ...appTrpcFeatures,
   agents: agentsRouter,
   evaluators: evaluatorsRouter,
   httpProxy: httpProxyRouter,
   organization: organizationRouter,
-  joinRequests: joinRequestsRouter,
   project: projectRouter,
   team: teamRouter,
   traces: tracesRouter,
@@ -813,27 +1251,18 @@ const coreRouters = {
   topics: topicsRouter,
   dataset: datasetRouter,
   datasetRecord: datasetRecordRouter,
-  graphs: graphsRouter,
-  dashboards: dashboardsRouter,
   home: homeRouter,
-  evaluations: evaluationsRouter,
   export: exportRouter,
   batchRecord: batchRecordRouter,
   limits: limitsRouter,
   automation: automationRouter,
   authz: authzRouter,
-  identity: identityRouter,
-  frontDoor: frontDoorRouter,
-  experiments: experimentsRouter,
   featureFlag: featureFlagRouter,
-  annotation: annotationRouter,
   modelProvider: modelProviderRouter,
   llmModelCost: llmModelCostsRouter,
   user: userRouter,
   bugReports: bugReportsRouter,
   ssoConnections: enterpriseRouters.ssoConnections,
-  annotationScore: annotationScoreRouter,
-  publicEnv: publicEnvRouter,
   setupSkills: setupSkillsRouter,
   share: shareRouter,
   sharedTrace: sharedTraceRouter,
@@ -857,8 +1286,6 @@ const coreRouters = {
   licenseEnforcement: enterpriseRouters.licenseEnforcement,
   scimToken: enterpriseRouters.scimToken,
   roleBinding: roleBindingRouter,
-  apiKey: apiKeyRouter,
-  group: groupRouter,
   ops: opsRouter,
   storedObjects: storedObjectsRouter,
   virtualKeys: gatewayRouters.virtualKeys,
@@ -872,10 +1299,7 @@ const coreRouters = {
   departments: enterpriseGovernanceRouters.departments,
   ingestionTemplates: enterpriseGovernanceRouters.ingestionTemplates,
   ingestionKey: enterpriseGovernanceRouters.ingestionKey,
-  governance: appTrpcRoot.mergeRouters(
-    governanceRouter,
-    enterpriseGovernanceRouters.governance,
-  ),
+  governance: appTrpcRoot.mergeRouters(governanceRouter, enterpriseGovernanceRouters.governance),
   personalSessions: enterpriseGovernanceRouters.personalSessions,
   sessionPolicy: enterpriseGovernanceRouters.sessionPolicy,
   gatewayBudgets: gatewayRouters.gatewayBudgets,
