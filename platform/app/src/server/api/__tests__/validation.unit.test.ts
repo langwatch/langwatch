@@ -77,7 +77,7 @@ describe("the REST boundary's request validator", () => {
       const [reason] = body.reasons;
       expect(reason.code).toBe("schema_failure");
       expect(reason.meta.field).toBe("metric");
-      expect(reason.meta.type).toBe("invalid_enum_value");
+      expect(reason.meta.type).toBe("invalid_value");
     });
 
     /** @scenario "The expected values are structured data, not prose" */

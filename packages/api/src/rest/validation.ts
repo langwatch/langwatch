@@ -133,12 +133,12 @@ export class RequestValidationError extends HandledError {
 }
 
 /** A zod issue, read into the shape above. */
-function violationOf(issue: ZodIssue): FieldViolation {
+function violationOf(issue: ZodIssue, input: unknown): FieldViolation {
   return {
     field: fieldOf(issue),
     type: issue.code,
     message: issue.message,
-    ...expectationOf(issue),
+    ...expectationOf(issue, input),
   };
 }
 
@@ -180,9 +180,20 @@ function fieldOf(issue: ZodIssue): string {
  * a sentence is exactly what made that sentence long enough to be truncated.
  * As structured data they cost nothing to carry and can be listed by a UI.
  */
-function expectationOf(issue: ZodIssue): Record<string, unknown> {
+function expectationOf(issue: ZodIssue, input: unknown): Record<string, unknown> {
   if (issue.code === "invalid_value") {
-    return { expected: [...issue.values] };
+    // Zod stopped carrying the rejected value on the issue when it renamed
+    // invalid_enum_value, but the caller-facing contract did not: the MCP
+    // client renders `received` next to the permitted values. The raw
+    // candidate is in hand, so the value is read back off it — scalars only,
+    // because an enum's rejected value is one the caller typed, while an
+    // object landing here is a shape mistake whose dump belongs in no
+    // envelope.
+    const received = valueAt(input, issue.path);
+    return {
+      expected: [...issue.values],
+      ...(isWireScalar(received) ? { received } : {}),
+    };
   }
   if (issue.code === "invalid_type") {
     return { expected: issue.expected };
@@ -204,6 +215,25 @@ function expectationOf(issue: ZodIssue): Record<string, unknown> {
     };
   }
   return {};
+}
+
+/** The value at a zod issue path, or undefined when the path cannot be walked. */
+function valueAt(input: unknown, path: ReadonlyArray<PropertyKey>): unknown {
+  let current = input;
+  for (const key of path) {
+    if (current === null || typeof current !== "object") return undefined;
+    current = (current as Record<PropertyKey, unknown>)[key];
+  }
+  return current;
+}
+
+function isWireScalar(value: unknown): value is string | number | boolean | null {
+  return (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  );
 }
 
 /**
@@ -234,7 +264,7 @@ function build(
     if (!result.success) {
       throw new RequestValidationError({
         target,
-        violations: issuesOf(result.error).map(violationOf),
+        violations: issuesOf(result.error).map((issue) => violationOf(issue, result.data)),
       });
     }
     return undefined;
@@ -265,6 +295,8 @@ function build(
 
 interface ValidationResult {
   success: boolean;
+  /** The raw candidate the schema rejected; both container versions supply it. */
+  data?: unknown;
   /**
    * Two shapes, because hono-openapi changed containers at v1.
    *
