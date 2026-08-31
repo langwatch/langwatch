@@ -5,8 +5,8 @@ import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { SecretService } from "@langwatch/secret-contract";
+import { createApiKeysRestApp } from "@langwatch/api-key-server";
 import { Hono } from "hono";
-import { ApiKeyManagementRestFeature } from "../api-key-management-rest.feature";
 import {
   ApiAuditPort,
   ApiRequestPolicy,
@@ -24,13 +24,13 @@ import {
   type ApiRuntimeCompositionOptions,
 } from "../api.main";
 import { ApiSecretRestFeature } from "../api-secret-rest.feature";
-import type { ApiOrganizationRestSecurityPort, ApiRestSecurityPort } from "../api-rest.security";
+import { ApiRestSecurity, type ApiRestProjectPolicy } from "../api-rest.security";
+import type { AppRestManagementAuditPort, AppRestSecurity } from "@langwatch/api/rest";
 import {
   ApiAuthSessionCompositionPort,
   AuthSessionApiAuthenticationAdapter,
 } from "./api-auth.composition";
-import { ApiKeyRestSecurityAdapter } from "./api-key-rest-security.adapter";
-import { ApiKeyOrganizationRestSecurityAdapter } from "./api-key-organization-rest-security.adapter";
+import { ApiRestObservabilityComposition } from "./api-rest-observability.composition";
 
 /** The concrete composition port for the migrated API transports. */
 export class ApiProductionComposition extends ApiRuntimeCompositionPort {
@@ -52,23 +52,29 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       authorization: AuthzApiAuthorizationAdapter.create(options.authz),
       audit: options.audit,
     });
-    const restSecurity = ApiKeyRestSecurityAdapter.create({
-      apiKeys: options.apiKeys,
-      authz: options.authz,
-      audit: options.audit,
-    });
-    const organizationRestSecurity = ApiKeyOrganizationRestSecurityAdapter.create({
+    // One credential resolution for both doors: the framework-shaped
+    // `AppRestSecurity` every packaged REST family is built from, and the
+    // four-callable projection the additive public-REST builder takes. Both
+    // wrap the same `ApiRestSecurity`, so they cannot enforce differently.
+    const credentials = {
       apiKeys: options.apiKeys,
       authz: options.authz,
       organizations: options.organizations,
+      ...(options.audit ? { audit: options.audit } : {}),
+    };
+    const restSecurity = ApiRestSecurity.create({
+      ...credentials,
+      observability: ApiRestObservabilityComposition.create(),
     });
+    const projectRestPolicy = ApiRestSecurity.projectPolicy(credentials);
     return new ApiProductionComposition(
       options.agents,
       options.secrets,
       options.apiKeys,
+      options.authz,
       policy,
       restSecurity,
-      organizationRestSecurity,
+      projectRestPolicy,
       options.audit,
       options.readiness,
       options.metrics,
@@ -81,9 +87,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     private readonly agents: AgentService,
     private readonly secrets: SecretService,
     private readonly apiKeys: ApiKeyService,
+    private readonly authz: AuthzService,
     readonly policy: ApiRequestPolicy,
-    private readonly restSecurity: ApiRestSecurityPort,
-    private readonly organizationRestSecurity: ApiOrganizationRestSecurityPort,
+    private readonly restSecurity: AppRestSecurity,
+    private readonly projectRestPolicy: ApiRestProjectPolicy,
     private readonly audit: ApiAuditPort | undefined,
     private readonly readiness: ApiReadinessPort | undefined,
     private readonly metrics: ApiMetricsPort | undefined,
@@ -99,22 +106,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       agents: this.agents,
       secrets: this.secrets,
       requestPolicy: this.policy,
-      rest: new Hono()
-        .route(
-          "/",
-          ApiSecretRestFeature.create({
-            secrets: this.secrets,
-            security: this.restSecurity,
-          }),
-        )
-        .route(
-          "/",
-          ApiKeyManagementRestFeature.create({
-            apiKeys: this.apiKeys,
-            security: this.organizationRestSecurity,
-            audit: this.audit,
-          }),
-        ),
+      rest: this.composeRest(),
       observability: options.observability,
       graph: options.graph,
       featureDrain: this.featureDrain,
@@ -128,6 +120,58 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     });
 
     return Promise.resolve(ApiProductionProcess.create(process));
+  }
+
+  /**
+   * The public REST door: each family is the packaged builder over the one
+   * {@link ApiRestSecurity}. Secret rides the additive public-REST builder,
+   * so it takes the four-callable projection; API keys is a packaged
+   * framework family, so it takes the `AppRestSecurity` directly.
+   */
+  private composeRest(): Hono {
+    return new Hono()
+      .route(
+        "/",
+        ApiSecretRestFeature.create({ secrets: this.secrets, security: this.projectRestPolicy }),
+      )
+      .route(
+        "/",
+        createApiKeysRestApp({
+          security: this.restSecurity,
+          apiKeys: () => this.apiKeys,
+          permissions: () => this.authz,
+          audit: this.composeManagementAudit(),
+        }).hono,
+      );
+  }
+
+  /**
+   * Bridges the packaged families' management-audit port onto this process's
+   * audit sink. The port names the action, not the URL, so the action is what
+   * lands in `path` — it is the stable identifier of what was done.
+   */
+  private composeManagementAudit(): AppRestManagementAuditPort {
+    const audit = this.audit;
+    if (!audit) {
+      return () => {};
+    }
+    const logger = createLogger("langwatch:api:management-audit");
+    return (entry) => {
+      void audit
+        .record({
+          actorId: entry.userId,
+          path: entry.action,
+          input: {
+            organizationId: entry.organizationId,
+            action: entry.action,
+            ...(entry.args === undefined ? {} : { args: entry.args }),
+          },
+          error: null,
+        })
+        .catch((error) => {
+          logger.error({ error, action: entry.action }, "Management audit failed");
+        });
+    };
   }
 
   private composeQueue(options: ApiRuntimeCompositionOptions): ApiQueueInfrastructure | undefined {

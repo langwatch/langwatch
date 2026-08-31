@@ -1,16 +1,15 @@
 export { ApiApplication } from "./api.application";
 export { ApiSecretRestFeature } from "./api-secret-rest.feature";
-export { ApiKeyManagementRestFeature } from "./api-key-management-rest.feature";
 export {
-  ApiOrganizationRestSecurityPolicy,
-  ApiOrganizationRestSecurityPort,
-  ApiRestSecurityPolicy,
-  ApiRestSecurityPort,
-  type ApiOrganizationRestAuthenticatedRequest,
-  type ApiOrganizationRestSuccessfulResponse,
-  type ApiRestAuthenticatedRequest,
-  type ApiRestSuccessfulResponse,
+  ApiOrganizationAuthenticationError,
+  ApiOrganizationPermissionError,
+  ApiRestAuthenticationError,
+  ApiRestProjectPolicy,
+  ApiRestSecurity,
+  ApiRouteProjectNotFoundError,
+  type ApiRestSecurityObservability,
 } from "./api-rest.security";
+export { ApiRestObservabilityComposition } from "./app/api-rest-observability.composition";
 export { ApiProductionComposition, LoggedApiQueueAbsence } from "./app/api-production.composition";
 export {
   API_UNAVAILABLE_PRODUCT_ADAPTERS,
@@ -25,15 +24,6 @@ export {
   type ApiExecutableHost,
   type ApiStandaloneExecutableOptions,
 } from "./app/api-standalone.executable";
-export {
-  ApiKeyRestSecurityAdapter,
-  ApiRestAuthenticationError,
-} from "./app/api-key-rest-security.adapter";
-export {
-  ApiKeyOrganizationRestSecurityAdapter,
-  ApiOrganizationAuthenticationError,
-  ApiOrganizationPermissionError,
-} from "./app/api-key-organization-rest-security.adapter";
 export {
   ApiAuthSessionCompositionPort,
   ApiBrowserSessionTransportPort,

@@ -193,7 +193,7 @@ describe("ApiProductionComposition", () => {
     await vi.waitFor(() => {
       expect(audit.record).toHaveBeenCalledWith({
         actorId: "user-1",
-        path: "/api/api-keys/key-1",
+        path: "management.apiKey.read",
         input: {
           organizationId: "org-1",
           action: "management.apiKey.read",
