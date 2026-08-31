@@ -40,7 +40,7 @@ describe("PrismaGatewayVirtualKeyRepository", () => {
       it("scopes the read to it, so another tenant's key cannot be read", async () => {
         const { repository, calls } = repositoryWith();
 
-        await repository.tryFindById("key-1", "organization-1");
+        await repository.tryFindById({ id: "key-1", organizationId: "organization-1" });
 
         expect(calls[0]?.args.where).toEqual({ id: "key-1", organizationId: "organization-1" });
       });
@@ -93,14 +93,14 @@ describe("PrismaGatewayVirtualKeyRepository", () => {
         const { repository, calls } = repositoryWith();
         const validUntil = new Date("2026-09-01T00:00:00.000Z");
 
-        await repository.rotateSecret(
-          "key-1",
-          "organization-1",
-          "hash-new",
-          "lw_new",
-          "hash-old",
-          validUntil,
-        );
+        await repository.rotateSecret({
+          id: "key-1",
+          organizationId: "organization-1",
+          newHashedSecret: "hash-new",
+          newDisplayPrefix: "lw_new",
+          previousHashedSecret: "hash-old",
+          previousSecretValidUntil: validUntil,
+        });
 
         expect(calls[0]?.args.where).toEqual({ id: "key-1", organizationId: "organization-1" });
         expect(calls[0]?.args.data).toMatchObject({
@@ -114,14 +114,14 @@ describe("PrismaGatewayVirtualKeyRepository", () => {
       it("advances the revision, so a cached decision can tell it changed", async () => {
         const { repository, calls } = repositoryWith();
 
-        await repository.rotateSecret(
-          "key-1",
-          "organization-1",
-          "hash-new",
-          "lw_new",
-          "hash-old",
-          new Date(),
-        );
+        await repository.rotateSecret({
+          id: "key-1",
+          organizationId: "organization-1",
+          newHashedSecret: "hash-new",
+          newDisplayPrefix: "lw_new",
+          previousHashedSecret: "hash-old",
+          previousSecretValidUntil: new Date(),
+        });
 
         expect((calls[0]?.args.data as { revision: unknown }).revision).toEqual({
           increment: 1n,
@@ -135,7 +135,11 @@ describe("PrismaGatewayVirtualKeyRepository", () => {
       it("scopes it to the organization", async () => {
         const { repository, calls } = repositoryWith();
 
-        await repository.revoke("key-1", "organization-1", "user-1");
+        await repository.revoke({
+          id: "key-1",
+          organizationId: "organization-1",
+          revokedById: "user-1",
+        });
 
         expect(calls[0]?.args.where).toEqual({ id: "key-1", organizationId: "organization-1" });
       });
@@ -143,7 +147,11 @@ describe("PrismaGatewayVirtualKeyRepository", () => {
       it("stamps when it happened", async () => {
         const { repository, calls } = repositoryWith();
 
-        await repository.revoke("key-1", "organization-1", "user-1");
+        await repository.revoke({
+          id: "key-1",
+          organizationId: "organization-1",
+          revokedById: "user-1",
+        });
 
         expect((calls[0]?.args.data as { revokedAt: unknown }).revokedAt).toBeInstanceOf(Date);
       });

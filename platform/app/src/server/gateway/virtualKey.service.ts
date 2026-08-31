@@ -298,7 +298,7 @@ export class VirtualKeyService {
     id: string,
     organizationId: string,
   ): Promise<VirtualKeyWithScopes | null> {
-    const vk = await this.repository.tryFindById(id, organizationId);
+    const vk = await this.repository.tryFindById({ id, organizationId });
     if (!vk || isProductManaged(vk)) return null;
     return vk;
   }
@@ -611,12 +611,14 @@ export class VirtualKeyService {
 
     const rotated = await this.prisma.$transaction(async (tx) => {
       const vk = await this.repository.rotateSecret(
-        input.id,
-        input.organizationId,
-        newHashedSecret,
-        newDisplayPrefix,
-        existing.hashedSecret,
-        previousSecretValidUntil,
+        {
+          id: input.id,
+          organizationId: input.organizationId,
+          newHashedSecret,
+          newDisplayPrefix,
+          previousHashedSecret: existing.hashedSecret,
+          previousSecretValidUntil,
+        },
         tx,
       );
       await this.changeEvents.append(
@@ -658,9 +660,11 @@ export class VirtualKeyService {
     return this.prisma
       .$transaction(async (tx) => {
         const vk = await this.repository.revoke(
-          input.id,
-          input.organizationId,
-          input.actorUserId,
+          {
+            id: input.id,
+            organizationId: input.organizationId,
+            revokedById: input.actorUserId,
+          },
           tx,
         );
         // A dead key's cap is retired, not deleted: the ledger rows behind
@@ -844,7 +848,7 @@ export class VirtualKeyService {
     id: string,
     organizationId: string,
   ): Promise<VirtualKeyWithScopes> {
-    const existing = await this.repository.tryFindById(id, organizationId);
+    const existing = await this.repository.tryFindById({ id, organizationId });
     if (!existing || isProductManaged(existing)) {
       throw new TRPCError({
         code: "NOT_FOUND",

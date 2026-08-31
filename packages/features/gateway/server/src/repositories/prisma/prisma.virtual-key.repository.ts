@@ -45,8 +45,7 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
   }
 
   async tryFindById(
-    id: string,
-    organizationId: string,
+    { id, organizationId }: { id: string; organizationId: string },
     tx?: GatewayPersistenceTransaction,
   ): Promise<VirtualKeyWithScopes | null> {
     const client = this.client(tx);
@@ -245,26 +244,6 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
     });
   }
 
-  async updateConfig(
-    id: string,
-    organizationId: string,
-    config: Prisma.InputJsonValue,
-    tx?: GatewayPersistenceTransaction,
-  ): Promise<VirtualKeyWithScopes> {
-    const client = this.client(tx);
-    return client.virtualKey.update({
-      where: { id, organizationId },
-      data: { config, revision: { increment: 1n } },
-      include: {
-        scopes: true,
-        principalUser: { select: { id: true, name: true, email: true } },
-        routingPolicy: {
-          select: gatewayRoutingPolicySelect,
-        },
-      },
-    });
-  }
-
   /**
    * Replace the VK's scope set in-place. Used by the edit drawer when
    * an admin moves a VK between scopes. Two-step delete+createMany
@@ -287,33 +266,22 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
     });
   }
 
-  async setRoutingPolicy(
-    id: string,
-    organizationId: string,
-    routingPolicyId: string | null,
-    tx?: GatewayPersistenceTransaction,
-  ): Promise<VirtualKeyWithScopes> {
-    const client = this.client(tx);
-    return client.virtualKey.update({
-      where: { id, organizationId },
-      data: { routingPolicyId, revision: { increment: 1n } },
-      include: {
-        scopes: true,
-        principalUser: { select: { id: true, name: true, email: true } },
-        routingPolicy: {
-          select: gatewayRoutingPolicySelect,
-        },
-      },
-    });
-  }
-
   async rotateSecret(
-    id: string,
-    organizationId: string,
-    newHashedSecret: string,
-    newDisplayPrefix: string,
-    previousHashedSecret: string,
-    previousSecretValidUntil: Date,
+    {
+      id,
+      organizationId,
+      newHashedSecret,
+      newDisplayPrefix,
+      previousHashedSecret,
+      previousSecretValidUntil,
+    }: {
+      id: string;
+      organizationId: string;
+      newHashedSecret: string;
+      newDisplayPrefix: string;
+      previousHashedSecret: string;
+      previousSecretValidUntil: Date;
+    },
     tx?: GatewayPersistenceTransaction,
   ): Promise<VirtualKeyWithScopes> {
     const client = this.client(tx);
@@ -337,9 +305,11 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
   }
 
   async revoke(
-    id: string,
-    organizationId: string,
-    revokedById: string,
+    {
+      id,
+      organizationId,
+      revokedById,
+    }: { id: string; organizationId: string; revokedById: string },
     tx?: Prisma.TransactionClient,
   ): Promise<VirtualKeyWithScopes> {
     const client = this.client(tx);
@@ -396,11 +366,7 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
     });
   }
 
-  async recordUsage(
-    id: string,
-    at: Date,
-    tx?: GatewayPersistenceTransaction,
-  ): Promise<void> {
+  async recordUsage(id: string, at: Date, tx?: GatewayPersistenceTransaction): Promise<void> {
     const client = this.client(tx);
     await client.virtualKey.update({
       where: { id },
@@ -409,9 +375,7 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
   }
 }
 
-export function createGatewayVirtualKeysPort(
-  database: PrismaClient,
-): GatewayVirtualKeysPort {
+export function createGatewayVirtualKeysPort(database: PrismaClient): GatewayVirtualKeysPort {
   return new PrismaGatewayVirtualKeyRepository(database);
 }
 

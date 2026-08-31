@@ -77,8 +77,7 @@ export type SetGatewayVirtualKeyDisabledInput = {
 
 export abstract class GatewayVirtualKeysPort {
   abstract tryFindById(
-    id: string,
-    organizationId: string,
+    input: { id: string; organizationId: string },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayVirtualKeyRecord | null>;
   abstract tryFindByIdGlobal(
@@ -107,36 +106,29 @@ export abstract class GatewayVirtualKeysPort {
     input: CreateGatewayVirtualKeyInput,
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayVirtualKeyRecord>;
-  abstract updateConfig(
-    id: string,
-    organizationId: string,
-    config: unknown,
-    transaction?: GatewayPersistenceTransaction,
-  ): Promise<GatewayVirtualKeyRecord>;
   abstract replaceScopes(
     id: string,
     scopes: GatewayVirtualKeyScope[],
     transaction?: GatewayPersistenceTransaction,
   ): Promise<void>;
-  abstract setRoutingPolicy(
-    id: string,
-    organizationId: string,
-    routingPolicyId: string | null,
-    transaction?: GatewayPersistenceTransaction,
-  ): Promise<GatewayVirtualKeyRecord>;
+  /**
+   * Named rather than positional on purpose: `newHashedSecret` and
+   * `previousHashedSecret` are both strings, and transposing them at a call
+   * site compiles — leaving the retired secret as the live one.
+   */
   abstract rotateSecret(
-    id: string,
-    organizationId: string,
-    newHashedSecret: string,
-    newDisplayPrefix: string,
-    previousHashedSecret: string,
-    previousSecretValidUntil: Date,
+    input: {
+      id: string;
+      organizationId: string;
+      newHashedSecret: string;
+      newDisplayPrefix: string;
+      previousHashedSecret: string;
+      previousSecretValidUntil: Date;
+    },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayVirtualKeyRecord>;
   abstract revoke(
-    id: string,
-    organizationId: string,
-    revokedById: string,
+    input: { id: string; organizationId: string; revokedById: string },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayVirtualKeyRecord>;
   abstract setDisabled(
