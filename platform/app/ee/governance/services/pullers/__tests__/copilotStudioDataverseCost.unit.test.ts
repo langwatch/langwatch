@@ -150,6 +150,8 @@ async function runPull({
       adapter: "copilot_studio_dataverse" as const,
       environmentUrl: ENVIRONMENT_URL,
       botIds: [],
+      // Off throughout this file: the licence read has its own, next door.
+      readSeats: false,
       ...(azureSubscriptionId === undefined ? {} : { azureSubscriptionId }),
     },
   );
@@ -366,31 +368,6 @@ describe("the Azure cost read inside the Dataverse source", () => {
       expect(result.cursor).toBe(previous);
     });
 
-    /** @scenario "Conversations failing after cost was read discards both" */
-    it("does not let a cost advance stand in for transcript progress", async () => {
-      // The nastiest shape of all. The transcript walk raised an error WITHOUT
-      // throwing, so it made no progress — but the cost read succeeded and
-      // moved its own watermark. A cursor that changed for the cost's sake
-      // reads to the worker as "advanced past input it could not read", and it
-      // would log a warning and persist a run that read no conversations at
-      // all. Worst case, the error is `refusesNextLink` — a next-page link
-      // pointing away from the customer's environment — and that refusal is
-      // meant to fail the run loudly, not once a day quietly.
-      transcriptRows = [{ conversationtranscriptid: "not-a-uuid" }];
-      const previous = JSON.stringify({
-        createdon: "2026-08-20T10:00:00.000Z",
-        conversationtranscriptid: "22222222-2222-4222-8222-222222222222",
-      });
-
-      const result = await runPull({
-        azureSubscriptionId: SUBSCRIPTION_ID,
-        cursor: previous,
-      });
-
-      expect(result.errorCount).toBeGreaterThan(0);
-      expect(result.cursor).toBe(previous);
-    });
-
     /** @scenario "Being asked to slow down leaves the window unpriced rather than priced at nothing" */
     it("hands back the same string when only the cost read was held", async () => {
       // No transcript rows and no failure, so the walk genuinely makes no
@@ -445,27 +422,109 @@ describe("the Azure cost read inside the Dataverse source", () => {
   });
 
   describe("when reading the conversations fails after the cost was read", () => {
-    /** @scenario "Conversations failing after cost was read discards both" */
-    it("reports the failure and keeps its transcript position", async () => {
+    const TRANSCRIPT_POSITION = {
+      createdon: "2026-08-20T10:00:00.000Z",
+      conversationtranscriptid: "22222222-2222-4222-8222-222222222222",
+    };
+
+    /** @scenario "The bill is still recorded when the environment cannot be reached" */
+    it("delivers the bill, reports the failure, and holds the transcript position", async () => {
       transcriptStatus = 503;
 
       const result = await runPull({
         azureSubscriptionId: SUBSCRIPTION_ID,
-        cursor: JSON.stringify({
-          createdon: "2026-08-20T10:00:00.000Z",
-          conversationtranscriptid: "22222222-2222-4222-8222-222222222222",
-        }),
+        cursor: JSON.stringify(TRANSCRIPT_POSITION),
       });
 
-      // The run failed, so the worker discards its events and retries the
-      // same window. The transcript position must be exactly where it was, or
-      // the retry would skip the conversations this run never read.
+      // The bill was read before the environment was ever asked, and the
+      // conversation failure no longer abandons the run's result. The worker
+      // sees a moved cursor with errors on it, which is its partial-success
+      // shape: it writes the figures and warns.
+      expect(costEvents(result.events).length).toBeGreaterThan(0);
       expect(result.errorCount).toBeGreaterThan(0);
+
       const cursor = JSON.parse(String(result.cursor));
+      expect(cursor.costPricedThroughDay).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      // Exactly where it was, or the next run would skip the conversations
+      // this one never read.
       expect(cursor.conversationtranscriptid).toBe(
-        "22222222-2222-4222-8222-222222222222",
+        TRANSCRIPT_POSITION.conversationtranscriptid,
       );
-      expect(cursor.createdon).toBe("2026-08-20T10:00:00.000Z");
+      expect(cursor.createdon).toBe(TRANSCRIPT_POSITION.createdon);
+    });
+
+    /** @scenario "The bill is still recorded when the environment cannot be reached" */
+    it("does the same when the walk reported an error without throwing", async () => {
+      // The other shape of a broken conversation half, and the one that does
+      // not go through the catch: a row that parses as neither an event nor a
+      // position counts an error and returns normally. The cost advance has to
+      // survive it the same way, or the two paths would disagree about a run
+      // the worker cannot tell apart.
+      transcriptRows = [{ conversationtranscriptid: "not-a-uuid" }];
+
+      const result = await runPull({
+        azureSubscriptionId: SUBSCRIPTION_ID,
+        cursor: JSON.stringify(TRANSCRIPT_POSITION),
+      });
+
+      expect(result.errorCount).toBeGreaterThan(0);
+      expect(result.cursor).not.toBe(JSON.stringify(TRANSCRIPT_POSITION));
+      const cursor = JSON.parse(String(result.cursor));
+      expect(cursor.costPricedThroughDay).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(cursor.conversationtranscriptid).toBe(
+        TRANSCRIPT_POSITION.conversationtranscriptid,
+      );
+    });
+
+    /** @scenario "A conversation failure with no new bill still fails the run" */
+    it("fails the run outright once the bill is already priced through today", async () => {
+      // What keeps a dead environment visible. The mark only moves on the
+      // day roll, so every run after the first that day has nothing to show
+      // for itself and hands back the incoming string — which the worker
+      // reads as no progress and fails.
+      const previous = JSON.stringify({
+        ...TRANSCRIPT_POSITION,
+        costPricedThroughDay: new Date().toISOString().slice(0, 10),
+        costHeldSinceMs: null,
+      });
+      transcriptStatus = 503;
+
+      const result = await runPull({
+        azureSubscriptionId: SUBSCRIPTION_ID,
+        cursor: previous,
+      });
+
+      expect(result.errorCount).toBeGreaterThan(0);
+      expect(result.cursor).toBe(previous);
+    });
+
+    /** @scenario "The conversation window is retried without losing the priced bill" */
+    it("resumes the transcript window from where the failed run started", async () => {
+      const previous = JSON.stringify({
+        ...TRANSCRIPT_POSITION,
+        costPricedThroughDay: new Date().toISOString().slice(0, 10),
+        costHeldSinceMs: null,
+      });
+
+      const result = await runPull({
+        azureSubscriptionId: SUBSCRIPTION_ID,
+        cursor: previous,
+      });
+
+      const transcriptCall = capturedCalls.find((call) =>
+        call.url.includes("/conversationtranscripts"),
+      );
+      expect(decodeURIComponent(transcriptCall?.url ?? "")).toContain(
+        TRANSCRIPT_POSITION.createdon,
+      );
+      expect(result.errorCount).toBe(0);
+      // The mark stays on the day the failed run priced; the trailing window
+      // was still re-read and restated in place.
+      const cursor = JSON.parse(String(result.cursor));
+      expect(cursor.costPricedThroughDay).toBe(
+        new Date().toISOString().slice(0, 10),
+      );
+      expect(costEvents(result.events).length).toBeGreaterThan(0);
     });
   });
 });

@@ -397,15 +397,50 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
     # change the old value cannot survive stalls every already-configured
     # source at once.
 
+  # --- One source, several reads: they do not hold each other hostage ---
+  # The source reads conversations from the environment, the bill from Azure,
+  # and seat licences from the tenant — three reads under three separate
+  # sign-ins. A customer whose environment address is wrong is still being
+  # billed, so the reads that CAN succeed must land while the one that cannot
+  # keeps failing loudly. This replaces the earlier rule that a conversation
+  # failure discarded the cost read along with it.
+
   @unit
-  Scenario: Conversations failing after cost was read discards both
-    Given the cost read succeeded
-    When reading the conversations then fails
-    Then the run reports the failure and keeps its position
-    And the cost figures from this run are not written on their own
-    # The two are one run and one position. Writing the cost while the
-    # conversation walk is retried from an unchanged position would write the
-    # same cost again on the retry.
+  Scenario: The bill is still recorded when the environment cannot be reached
+    Given a source that reads conversations and the provider's bill
+    And the conversation read cannot sign in to the environment
+    When the source runs
+    Then the day's bill is delivered and its priced-through mark advances
+    And the run still reports the conversation failure
+    And the conversation position does not move
+    # The bill and the licences are read before the environment sign-in is
+    # attempted, and the conversation failure no longer abandons the run's
+    # result. The advanced cost mark is what lets the framework keep the
+    # delivered figures while still counting the failure.
+
+  @unit
+  Scenario: A conversation failure with no new bill still fails the run
+    Given the bill is already priced through today
+    And the seat licences are already reported through today
+    And the conversation read cannot sign in to the environment
+    When the source runs
+    Then the run fails and the same window is retried
+    # The cost and seat marks only move once a day. If their daily advance
+    # stood in for conversation progress on every run, a dead environment
+    # would look like steady progress. Failing the runs in between is what
+    # keeps the failure visible. The cost restatements those failed runs
+    # produced are discarded with them; the amendment lands at the next
+    # day-roll, at most a day late.
+
+  @unit
+  Scenario: The conversation window is retried without losing the priced bill
+    Given a run that priced the bill and then failed to read conversations
+    When the next run succeeds
+    Then the conversation window resumes from where the failed run started
+    And the bill's priced-through mark stays on that same day
+    # The trailing week is still re-read and restated in place on every run —
+    # that is how late-settling days get corrected. What holds still within a
+    # day is the mark, not the reading.
 
   # --- Retiring the source that never worked ---
 

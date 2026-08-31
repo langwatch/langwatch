@@ -18,11 +18,25 @@
  * into a base class four other adapters run on, for the sake of one, buys a
  * shared parent and pays for it in blast radius.
  *
- * What the customer has to set up, in full: one application registration, one
- * secret, one role grant in their Power Platform environment. No directory
- * permission of any kind — this never calls Microsoft Graph, which is only
- * true because author identities are stored as the raw account identifier and
- * resolved to names elsewhere.
+ * What the customer has to set up for the conversations alone: one application
+ * registration, one secret, one role grant in their Power Platform
+ * environment. No directory permission — nothing here resolves a person, which
+ * is only true because author identities are stored as the raw account
+ * identifier and named elsewhere.
+ *
+ * The source reads two further things beside the conversations, each under its
+ * own sign-in and each off until the customer asks for it: the environment's
+ * daily bill from Azure Cost Management, and the tenant's seat licences from
+ * Microsoft Graph. The Graph call is one read of `/subscribedSkus` — a count
+ * of pools bought and pools assigned, no user list and no directory read — and
+ * it happens only when `readSeats` is on, because it needs an admin consent
+ * the other two reads do not.
+ *
+ * The three reads do not hold each other hostage. Cost and licences are read
+ * first and degrade to "not this run" on any failure; the conversation half
+ * runs afterwards and is the only one that can report an error. That ordering
+ * is what lets a customer whose environment address is wrong still see what
+ * they are being billed.
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -42,6 +56,14 @@ import {
   isDataverseEnvironmentOrigin,
   isSameDataverseEnvironment,
 } from "./dataverseEnvironment";
+import {
+  MICROSOFT_GRAPH_SCOPE,
+  microsoftSeatEvents,
+  nextSeatsCursor,
+  readSubscribedSkuRows,
+  seatsReadIsDue,
+  seatsReportDay,
+} from "./microsoftGraphSeats";
 import type {
   NormalizedPullEvent,
   PullerAdapter,
@@ -126,6 +148,18 @@ export const copilotStudioDataversePullConfigSchema = z.object({
    * correct is the same shape that keeps anything else out of it.
    */
   azureSubscriptionId: z.string().uuid().optional(),
+  /**
+   * Whether to read the tenant's seat licences beside the conversations.
+   *
+   * Off unless asked for, the same rule the subscription id above is written
+   * under: `/subscribedSkus` needs its own admin consent on the tenant
+   * (`Organization.Read.All`), and a customer who only wants transcripts must
+   * not have a second permission grant forced on them to get them. Default-on
+   * would be worse than merely presumptuous — every source already configured
+   * without that consent would spend a refused Graph call on every run,
+   * forever, for a reading nobody asked for.
+   */
+  readSeats: z.boolean().default(false),
 });
 
 export type CopilotStudioDataverseConfig = z.infer<
@@ -228,16 +262,16 @@ const cursorSchema = z.object({
 type Cursor = z.infer<typeof cursorSchema>;
 
 /**
- * The whole stored position: where the transcript walk got to, and how far the
- * bill has been priced.
+ * The whole stored position: where the transcript walk got to, how far the
+ * bill has been priced, and which day's licences were last reported.
  *
  * The transcript fields keep their original names at the TOP LEVEL rather than
- * moving under a nest, and the cost fields are optional. Both halves of that
- * are backward compatibility: a position written before cost existed parses
- * here unchanged, and a position written by this build is still readable by a
- * build that only knows the transcript fields. Positions are read back on
- * every scheduled run, so a shape the old value cannot survive would stall
- * every already-configured source at once.
+ * moving under a nest, and everything the later reads added is optional. Both
+ * halves of that are backward compatibility: a position written before cost or
+ * seats existed parses here unchanged, and a position written by this build is
+ * still readable by a build that only knows the transcript fields. Positions
+ * are read back on every scheduled run, so a shape the old value cannot
+ * survive would stall every already-configured source at once.
  */
 const storedCursorSchema = z.object({
   createdon: z.string().datetime({ offset: true }).optional(),
@@ -249,17 +283,26 @@ const storedCursorSchema = z.object({
     .nullish(),
   /** When the current unpriced window started being held. */
   costHeldSinceMs: z.number().int().nonnegative().nullish(),
+  /** The last day the seat licences were reported for, `YYYY-MM-DD`. */
+  seatsReportedThroughDay: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullish(),
+  /** When the current unreported day started being held. */
+  seatsHeldSinceMs: z.number().int().nonnegative().nullish(),
 });
 
 interface StoredCursor {
   /** Null until a run has read at least one transcript row. */
   transcript: Cursor | null;
   cost: { pricedThroughDay: string | null; heldSinceMs: number | null };
+  seats: { reportedThroughDay: string | null; heldSinceMs: number | null };
 }
 
 const NO_CURSOR: StoredCursor = {
   transcript: null,
   cost: { pricedThroughDay: null, heldSinceMs: null },
+  seats: { reportedThroughDay: null, heldSinceMs: null },
 };
 
 function parseCursor(raw: string | null): StoredCursor {
@@ -279,6 +322,10 @@ function parseCursor(raw: string | null): StoredCursor {
         pricedThroughDay: parsed.data.costPricedThroughDay ?? null,
         heldSinceMs: parsed.data.costHeldSinceMs ?? null,
       },
+      seats: {
+        reportedThroughDay: parsed.data.seatsReportedThroughDay ?? null,
+        heldSinceMs: parsed.data.seatsHeldSinceMs ?? null,
+      },
     };
   } catch {
     // A cursor we cannot read is treated as no cursor: re-reading a window is
@@ -293,6 +340,8 @@ function encodeCursor(cursor: StoredCursor): string {
     ...(cursor.transcript ?? {}),
     costPricedThroughDay: cursor.cost.pricedThroughDay,
     costHeldSinceMs: cursor.cost.heldSinceMs,
+    seatsReportedThroughDay: cursor.seats.reportedThroughDay,
+    seatsHeldSinceMs: cursor.seats.heldSinceMs,
   });
 }
 
@@ -753,7 +802,27 @@ export class CopilotStudioDataversePuller
   ): Promise<PullResult> {
     const walk: TranscriptWalk = { events: [], errorCount: 0, last: null };
     const previous = parseCursor(options.cursor);
-    let cost = previous.cost;
+
+    // Both money reads happen BEFORE the environment is signed in to, and the
+    // order is the whole reason a wrong environment address no longer hides
+    // the bill. Neither throws and neither counts an error — put either of
+    // them after the sign-in and a customer with a broken environment would
+    // stop seeing figures that were sitting there to be read.
+    const costRead = await this.readAzureCost({
+      config,
+      options,
+      previous: previous.cost,
+    });
+    walk.events.push(...costRead.events);
+    const cost = costRead.cost;
+
+    const seatsRead = await this.readMicrosoftSeats({
+      config,
+      options,
+      previous: previous.seats,
+    });
+    walk.events.push(...seatsRead.events);
+    const seats = seatsRead.seats;
 
     try {
       const token = await resolveEnvironmentToken({
@@ -767,19 +836,6 @@ export class CopilotStudioDataversePuller
         signal: options.signal,
       });
 
-      // Before the transcript walk, and it never throws. The walk is what can
-      // fail and what the run is judged on; a cost read that threw here would
-      // be caught below, count an error against an unmoved cursor, and the
-      // worker would discard the whole run — the conversations included. So
-      // this returns "no cost this run" for every failure instead.
-      const read = await this.readAzureCost({
-        config,
-        options,
-        previous: previous.cost,
-      });
-      walk.events.push(...read.events);
-      cost = read.cost;
-
       await this.walkTranscriptPages({ walk, options, config, token, bots });
     } catch (error) {
       walk.errorCount += 1;
@@ -787,29 +843,24 @@ export class CopilotStudioDataversePuller
         { error: error instanceof Error ? error.message : String(error) },
         "copilot studio dataverse pull failed",
       );
-      // The cursor is deliberately not advanced: the next run retries the
-      // same window, and re-reading is safe because identifiers are derived
-      // from the conversation rather than minted per pull.
+      // Falls through to the cursor computation rather than returning here.
+      // The bill and the licences above already landed, and abandoning the
+      // result for a failure in an unrelated half would throw away figures the
+      // run genuinely obtained. The transcript position is untouched either
+      // way, so the next run retries the same window; re-reading is safe
+      // because identifiers are derived from the conversation rather than
+      // minted per pull.
       //
-      // The events already read are handed back, but the worker will not
-      // write them — an error count with an unchanged cursor is the "made no
-      // progress" half of the `PullResult` contract, and it fails the run.
-      // That is the intended answer: a walk that threw part-way through a page
-      // cannot say which rows it got, so keeping some of them would persist a
-      // window nobody can describe. They are returned anyway because the caller
-      // is what decides, and a run that reports zero events reads as a source
-      // with nothing in it rather than one that fell over.
-      return {
-        events: walk.events,
-        cursor: options.cursor,
-        errorCount: walk.errorCount,
-      };
+      // The rows this walk did read are kept, and the position it reached
+      // describes them exactly: pages arrive in `TRANSCRIPT_ORDER_BY` order and
+      // a page that throws is parsed as a whole or not at all, so `walk.last`
+      // is the last row of the last page that came back complete.
     }
 
     // Only advance past rows this run actually read: a walk that read nothing
     // keeps the position it started from, so the same window is retried. The
-    // cost half advances independently — it is a different window with a
-    // different watermark, and holding one for the other would make an
+    // cost and licence halves advance independently — each is its own window
+    // with its own watermark, and holding one for another would make an
     // environment with no new conversations never price its bill, or a bill
     // that cannot be read stall the transcripts.
     const advanced = walk.last?.createdon ? walk.last : previous.transcript;
@@ -821,18 +872,23 @@ export class CopilotStudioDataversePuller
     const costMoved =
       cost.pricedThroughDay !== previous.cost.pricedThroughDay ||
       cost.heldSinceMs !== previous.cost.heldSinceMs;
+    const seatsMoved =
+      seats.reportedThroughDay !== previous.seats.reportedThroughDay ||
+      seats.heldSinceMs !== previous.seats.heldSinceMs;
 
-    // On a run that reported errors, ONLY the transcript half may signal
-    // progress. The worker reads a changed cursor as "advanced past input it
-    // could not read" and downgrades the failure to a warning — and the cost
-    // watermark moves on the first run of every UTC day, so letting it count
-    // would quietly excuse a stuck transcript walk once a day, every day. The
-    // loudest case is `refusesNextLink`: a next-page link pointing away from
-    // the customer's environment is meant to fail the run, not be absorbed by
-    // an unrelated bill being read successfully. The cost advance is simply
-    // dropped and re-earned next run, which costs one request.
-    const moved =
-      walk.errorCount > 0 ? transcriptMoved : transcriptMoved || costMoved;
+    // Any of the three reads counts, on a clean run and on a failing one
+    // alike. A run whose conversations broke but whose bill was read is a
+    // partial success: the worker persists the advance, keeps the figures, and
+    // warns. What such a run does to the source's recorded health is the fold
+    // projection's decision to make, not this gate's — refusing the advance
+    // here bought that visibility by throwing away figures already in hand.
+    //
+    // What stops a dead environment reading as steady progress is that the
+    // cost and seat marks only move on the day roll. Every later run that day
+    // hands back the incoming cursor string verbatim, which the worker reads
+    // as no progress and fails. `refusesNextLink` still fails or warns exactly
+    // as it did, because there the transcript cursor is what moved.
+    const moved = transcriptMoved || costMoved || seatsMoved;
 
     return {
       events: walk.events,
@@ -843,7 +899,7 @@ export class CopilotStudioDataversePuller
       // — which it would read as an advance and persist. That is the whole
       // reason this is a string comparison and not a deep one.
       cursor: moved
-        ? encodeCursor({ transcript: advanced, cost })
+        ? encodeCursor({ transcript: advanced, cost, seats })
         : options.cursor,
       errorCount: walk.errorCount,
     };
@@ -1079,6 +1135,147 @@ export class CopilotStudioDataversePuller
     }
 
     return nextLink;
+  }
+
+  /**
+   * The tenant's seat licences, or nothing at all.
+   *
+   * The same contract as `readAzureCost` and for the same reason: it NEVER
+   * throws and NEVER counts an error. An error count against an unmoved cursor
+   * is what `assertRunMadeProgress` fails a run on, and it discards the run
+   * WHOLE — so a refused licence read would cost the customer the
+   * conversations this source exists to collect.
+   *
+   * A failure holds the day rather than recording zero. Being refused says
+   * nothing about how many seats a tenant holds, and a zero would be a
+   * confident wrong number that everything reading it downstream would honour
+   * over a real one.
+   */
+  private async readMicrosoftSeats(params: {
+    config: CopilotStudioDataverseConfig;
+    options: PullRunOptions;
+    previous: { reportedThroughDay: string | null; heldSinceMs: number | null };
+  }): Promise<{
+    events: NormalizedPullEvent[];
+    seats: { reportedThroughDay: string | null; heldSinceMs: number | null };
+  }> {
+    const { config, options, previous } = params;
+
+    // Neither of the two skips below is a hold. Nothing was attempted, so
+    // there is nothing to hold: the position is handed back untouched, which
+    // is also what keeps `seatsMoved` false on a run whose only progress was
+    // elsewhere.
+    if (!config.readSeats) return { events: [], seats: previous };
+
+    const nowMs = Date.now();
+    const due = seatsReadIsDue({
+      nowMs,
+      reportedThroughDay: previous.reportedThroughDay,
+    });
+    if (!due) return { events: [], seats: previous };
+
+    const held = () => ({
+      events: [],
+      seats: nextSeatsCursor({ nowMs, previous, outcome: "held" as const }),
+    });
+
+    try {
+      const token = await resolveEnvironmentToken({
+        credentials: options.credentials,
+        environmentUrl: config.environmentUrl,
+        scope: MICROSOFT_GRAPH_SCOPE,
+        signal: options.signal,
+      });
+
+      const read = await this.fetchSubscribedSkus({ token, options });
+      if (read === null) return held();
+
+      return {
+        events: microsoftSeatEvents({
+          skus: read.skus,
+          day: seatsReportDay({ nowMs }),
+        }),
+        seats: nextSeatsCursor({ nowMs, previous, outcome: "reported" }),
+      };
+    } catch (error) {
+      logger.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        "copilot studio dataverse: could not read the tenant's seat licences; holding the day and delivering the conversations",
+      );
+      return held();
+    }
+  }
+
+  /**
+   * The one read of the tenant's licence pools, or null when it could not be
+   * read.
+   *
+   * One request and no page loop. `/v1.0/subscribedSkus` answers with the
+   * whole list — it publishes no next link and documents `$top` as ignored —
+   * so unlike the cost read there is no half-read list to guard against.
+   *
+   * Null rather than an empty list, because the two mean opposite things: an
+   * empty list is "this tenant holds no licences", which is a real answer, and
+   * null is "we could not ask", which holds the day.
+   */
+  private async fetchSubscribedSkus(params: {
+    token: string;
+    options: PullRunOptions;
+  }): Promise<ReturnType<typeof readSubscribedSkuRows> | null> {
+    const { token, options } = params;
+
+    const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+    const response = await ssrfSafeFetch(
+      "https://graph.microsoft.com/v1.0/subscribedSkus",
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+        signal: options.signal
+          ? AbortSignal.any([options.signal, timeout])
+          : timeout,
+        // Carries a token minted from the customer's secret, so a redirect
+        // must not hand it to whoever answers.
+        followRedirects: false,
+      },
+    );
+
+    if (!response.ok) {
+      // A 403 is the ordinary shape of "the consent was never granted", and it
+      // is worth saying so by name: every other reading of a 403 sends an
+      // admin to check a role assignment that was never the problem.
+      logger.warn(
+        { status: response.status },
+        response.status === 403
+          ? "copilot studio dataverse: the tenant has not consented to the licence read (HTTP 403); holding the day"
+          : "copilot studio dataverse: Microsoft Graph refused the licence read; holding the day",
+      );
+      return null;
+    }
+
+    const read = readSubscribedSkuRows({ response: await response.json() });
+    if (read.malformed) {
+      // An HTTP 200 whose body is not the shape this reads. Held, not
+      // recorded: taken as an empty list it would publish a tenant that holds
+      // no licences at all and mark the day reported.
+      logger.warn(
+        "copilot studio dataverse: Microsoft Graph answered the licence read with an unrecognised body; holding the day",
+      );
+      return null;
+    }
+
+    if (read.unreadableRows > 0) {
+      // Counted here and nowhere else. It must never reach the run's own error
+      // count, which would cost the run its conversations.
+      logger.warn(
+        { unreadableRows: read.unreadableRows },
+        "copilot studio dataverse: some licence pools could not be read; the rest of the list is recorded",
+      );
+    }
+
+    return read;
   }
 
   /**
