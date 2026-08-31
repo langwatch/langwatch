@@ -9,7 +9,7 @@ import {
   AutomationEvaluationTriggerFilterService,
   AutomationTriggerMatchRecorderPort,
   RecordTriggerMatchCommand,
-  settleWindowBucket,
+  TriggerSettlement,
 } from "@langwatch/automation-server";
 import { createTenantId, type TriggerContext } from "@langwatch/eventing";
 import {
@@ -422,7 +422,7 @@ describe("evaluation alert trigger match subscriber", () => {
       );
       expect(new Set(idempotencyKeys).size).toBe(1);
       expect(idempotencyKeys[0]).toBe(
-        `trigger-1:trace-1:${settleWindowBucket({
+        `trigger-1:trace-1:${TriggerSettlement.settleWindowBucket({
           occurredAt: firstDeliveryAt,
           traceDebounceMs: 30_000,
         })}`,
