@@ -1,12 +1,14 @@
 import type { AnnotationService as AnnotationServiceContract } from "@langwatch/annotation-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
-import { PrismaAnnotationRepository } from "../repositories/prisma/prisma.annotation.repository";
+import {
+  PrismaAnnotationRepository,
+  type AnnotationDatabase,
+} from "../repositories/prisma/prisma.annotation.repository";
 import { AnnotationService } from "../services/annotation.service";
 
 export interface PostgresAnnotationAdapterOptions {
-  database: PrismaClient;
+  database: AnnotationDatabase;
   projects: ProjectService;
   organizations: OrganizationService;
 }

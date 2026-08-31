@@ -114,12 +114,22 @@ function isRecordNotFound(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025";
 }
 
+/**
+ * Only the delegates this repository touches, plus the transaction it writes
+ * scores in, so composition can name the
+ * slice it needs instead of the whole generated client.
+ */
+export type AnnotationDatabase = Pick<
+  PrismaClient,
+  "annotation" | "annotationQueue" | "annotationScore" | "annotationQueueItem" | "$transaction"
+>;
+
 export class PrismaAnnotationRepository extends AnnotationRepository {
-  private constructor(private readonly database: PrismaClient) {
+  private constructor(private readonly database: AnnotationDatabase) {
     super();
   }
 
-  static create(database: PrismaClient): PrismaAnnotationRepository {
+  static create(database: AnnotationDatabase): PrismaAnnotationRepository {
     return new PrismaAnnotationRepository(database);
   }
 
@@ -158,12 +168,8 @@ export class PrismaAnnotationRepository extends AnnotationRepository {
           comment: parsed.comment,
           isThumbsUp: parsed.isThumbsUp,
           ...(parsed.email === void 0 ? {} : { email: parsed.email }),
-          ...(parsed.scoreOptions === void 0
-            ? {}
-            : { scoreOptions: parsed.scoreOptions }),
-          ...(parsed.expectedOutput === void 0
-            ? {}
-            : { expectedOutput: parsed.expectedOutput }),
+          ...(parsed.scoreOptions === void 0 ? {} : { scoreOptions: parsed.scoreOptions }),
+          ...(parsed.expectedOutput === void 0 ? {} : { expectedOutput: parsed.expectedOutput }),
         },
         select: annotationSelect,
       });
@@ -214,9 +220,7 @@ export class PrismaAnnotationRepository extends AnnotationRepository {
     return rows.map(parseRow);
   }
 
-  async listForProjection(
-    input: ListProjectionAnnotationsInput,
-  ): Promise<ProjectionAnnotation[]> {
+  async listForProjection(input: ListProjectionAnnotationsInput): Promise<ProjectionAnnotation[]> {
     const parsed = listProjectionAnnotationsInputSchema.parse(input);
     const rows = await this.database.annotation.findMany({
       where: {
@@ -234,9 +238,7 @@ export class PrismaAnnotationRepository extends AnnotationRepository {
     );
   }
 
-  async listScoreNames(
-    input: ListAnnotationScoreNamesInput,
-  ): Promise<AnnotationScoreName[]> {
+  async listScoreNames(input: ListAnnotationScoreNamesInput): Promise<AnnotationScoreName[]> {
     const rows = await this.database.annotationScore.findMany({
       where: { projectId: input.projectId },
       select: { id: true, name: true },
@@ -382,10 +384,7 @@ export class PrismaAnnotationRepository extends AnnotationRepository {
     });
   }
 
-  async countAnnotationQueues(input: {
-    projectId: string;
-    queueIds: string[];
-  }): Promise<number> {
+  async countAnnotationQueues(input: { projectId: string; queueIds: string[] }): Promise<number> {
     if (input.queueIds.length === 0) return 0;
     return this.database.annotationQueue.count({
       where: { projectId: input.projectId, id: { in: input.queueIds } },

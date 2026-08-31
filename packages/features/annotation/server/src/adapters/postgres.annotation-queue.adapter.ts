@@ -1,5 +1,7 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createPrismaAnnotationQueueStore } from "../repositories/prisma/prisma.annotation-queue.repository";
+import {
+  createPrismaAnnotationQueueStore,
+  type AnnotationQueueDatabase,
+} from "../repositories/prisma/prisma.annotation-queue.repository";
 
 /**
  * The queue rows over Postgres, as the annotation transport's queue port.
@@ -9,9 +11,9 @@ import { createPrismaAnnotationQueueStore } from "../repositories/prisma/prisma.
  * on the caller's organization, so nothing here is process-wide.
  */
 export class PostgresAnnotationQueueAdapter {
-  private constructor(private readonly options: { database: PrismaClient }) {}
+  private constructor(private readonly options: { database: AnnotationQueueDatabase }) {}
 
-  static create(options: { database: PrismaClient }): PostgresAnnotationQueueAdapter {
+  static create(options: { database: AnnotationQueueDatabase }): PostgresAnnotationQueueAdapter {
     return new PostgresAnnotationQueueAdapter(options);
   }
 

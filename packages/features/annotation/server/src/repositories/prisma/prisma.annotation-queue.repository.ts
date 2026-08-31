@@ -143,7 +143,13 @@ const queueScoreInclude = (projectId: string) => ({
  * `satisfies` check at the end is what proves the port is answered in full
  * without erasing the concrete row types.
  */
-export function createPrismaAnnotationQueueStore(prisma: PrismaClient) {
+/**
+ * Only the delegates this repository touches, so composition can name the
+ * slice it needs instead of the whole generated client.
+ */
+export type AnnotationQueueDatabase = Pick<PrismaClient, "annotationQueue" | "annotationQueueItem">;
+
+export function createPrismaAnnotationQueueStore(prisma: AnnotationQueueDatabase) {
   const store = {
     async queueSlugExists({ projectId, slug }: { projectId: string; slug: string }) {
       const existing = await prisma.annotationQueue.findFirst({
