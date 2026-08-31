@@ -44,19 +44,11 @@ const stubs = vi.hoisted(() => {
 
 /** Answers the cohort's per-user membership probes from a plain map. */
 function stubMemberships(memberships: Record<string, string[]>): void {
-  stubs.organizationUserFindFirst.mockImplementation(
-    async ({
-      where,
-    }: {
-      where: { userId: string; organizationId: { in: string[] } };
-    }) => {
-      const organizations = memberships[where.userId] ?? [];
-      return organizations.some((organizationId) =>
-        where.organizationId.in.includes(organizationId),
-      )
-        ? { userId: where.userId }
-        : null;
-    },
+  stubs.organizationUserFindMany.mockImplementation(
+    async ({ where }: { where: { userId: string } }) =>
+      (memberships[where.userId] ?? []).map((organizationId) => ({
+        organizationId,
+      })),
   );
 }
 
@@ -274,17 +266,47 @@ describe("userMigrationPassCohort on cloud", () => {
       await expect(
         cohort({ tenantId: "user_solo", migrationName: backfill }),
       ).resolves.toBe(false);
-      // Membership is probed per user against the enrolled organizations
-      // only - never materialized fleet-wide.
-      expect(stubs.organizationUserFindFirst).toHaveBeenCalledWith(
+      // Membership is probed by the user's own memberships alone — the
+      // enrolled set stays in memory and never rides along as an IN list
+      // (whose planning cost scales with every enrolled organization).
+      expect(stubs.organizationUserFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({
-            userId: "user_sam",
-            organizationId: { in: ["org_acme"] },
-          }),
+          where: { userId: "user_sam" },
         }),
       );
-      expect(stubs.organizationUserFindMany).not.toHaveBeenCalled();
+      expect(stubs.organizationUserFindFirst).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when many organizations are enrolled and the user belongs to a few", () => {
+    /** @scenario "The membership probe does not scale with enrollment" — langwatch/langwatch#7709 */
+    it("answers from the user's memberships without shipping the enrolled set to the database", async () => {
+      const backfill = IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME;
+      const enrolled = Array.from({ length: 500 }, (_, i) => ({
+        organizationId: `org_${i}`,
+        migrationName: backfill,
+      }));
+      stubs.enrollmentFindMany.mockResolvedValueOnce(enrolled);
+      stubMemberships({
+        user_multi: ["org_unenrolled", "org_7"],
+        user_out: ["org_unenrolled"],
+      });
+
+      const cohort = await userMigrationPassCohort();
+
+      await expect(
+        cohort({ tenantId: "user_multi", migrationName: backfill }),
+      ).resolves.toBe(true);
+      await expect(
+        cohort({ tenantId: "user_out", migrationName: backfill }),
+      ).resolves.toBe(false);
+      // The regression #7709 guards against: one parameter per probe, no
+      // organizationId filter, regardless of how many organizations are
+      // enrolled.
+      for (const call of stubs.organizationUserFindMany.mock.calls) {
+        expect(call[0].where).toEqual({ userId: expect.any(String) });
+      }
+      expect(stubs.organizationUserFindFirst).not.toHaveBeenCalled();
     });
   });
 

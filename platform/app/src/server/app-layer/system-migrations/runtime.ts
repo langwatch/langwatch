@@ -283,9 +283,14 @@ export async function migrationPassCohort(): Promise<
  * ORGANIZATIONS, and a user is in the cohort when any organization they
  * belong to is enrolled for it. Self-hosted admits every user, as it admits
  * every organization. Enrollment is read once, fresh, at the start of each
- * pass; membership is answered per candidate user with two cheap indexed
- * reads rather than materializing every enrolled organization's member list
- * into memory (the runner visits each user once per pass). A user outside
+ * pass; membership is answered per candidate user by reading that user's own
+ * organization ids (a handful of rows behind one parameter) and intersecting
+ * them in memory with the enrolled set. It used to ride the enrolled set
+ * along as an IN list instead, which read the same rows but made Postgres
+ * PLAN a many-thousand-parameter statement per user per pass - a cost that
+ * scales with every enrolled organization and that execution-time stats
+ * never show (pg_stat_statements.track_planning is off by default). A user
+ * outside
  * every organization has nothing to enroll them on cloud and stays on the
  * legacy path until they join one; their sign-in is unaffected (the write
  * gate answers false; the D03 read fork falls back to legacy routing).
@@ -309,21 +314,17 @@ export async function userMigrationPassCohort(): Promise<
   const automatic = automaticallyEnrolledMigrationNames();
   const enrolledByMigration =
     await enrollmentRepository.findEnrolledOrganizationIdsByMigration();
-  const enrolledByMigrationList = new Map<string, string[]>();
-  for (const migration of registeredUserMigrations()) {
-    enrolledByMigrationList.set(migration.name, [
-      ...(enrolledByMigration.get(migration.name) ?? new Set<string>()),
-    ]);
-  }
   return async ({ tenantId, migrationName }) => {
     if (automatic.has(migrationName)) return true;
-    const organizationIds = enrolledByMigrationList.get(migrationName) ?? [];
-    if (organizationIds.length === 0) return false;
-    const enrolledMembership = await prisma.organizationUser.findFirst({
-      where: { userId: tenantId, organizationId: { in: organizationIds } },
-      select: { userId: true },
+    const enrolled = enrolledByMigration.get(migrationName);
+    if (!enrolled || enrolled.size === 0) return false;
+    const memberships = await prisma.organizationUser.findMany({
+      where: { userId: tenantId },
+      select: { organizationId: true },
     });
-    return enrolledMembership !== null;
+    return memberships.some((membership) =>
+      enrolled.has(membership.organizationId),
+    );
   };
 }
 
