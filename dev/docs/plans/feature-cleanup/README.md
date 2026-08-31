@@ -384,3 +384,46 @@ file* — `create(input, transaction?)`, `findPageInOrganization(input)`,
 `tryGetWithHealth(input)`. The positional pairs were not a house style, they
 were the members that never got converted. That makes the remaining 31 a
 finishing job rather than a decision.
+
+## Round: the sweep finished, and a second dead guard (2026-08-31)
+
+The tenant-adjacent positional pairs are done: **48 → 3**, and the three left
+are file-local (two key-builders and a handle helper called only from within
+its own class), where a swap cannot cross a boundary and the compiler could
+not have helped either way.
+
+Two more of the seam were worth naming. `TraceApp` accepted
+`{ projectId, evaluationId }` and `{ projectId, spanId, protections }` and
+took them apart to call the port positionally — the same unwrapping as
+`isManagedProvider` and `ModelProviderService`. Whenever the object exists on
+one side and the positional list on the other, the unwrapping IS the seam.
+
+The span dedup port produced the round's best simplification. Its three
+operations each took `(tenantId, traceId, spanId)`; they take a `SpanDedupRef`
+now, and because platform/app declared its own restatement of the same three
+methods plus an adapter that forwarded each one, giving both sides the same
+type deleted the adapter — 34 lines. What made that safe without a
+platform/app typecheck is a type test in the package: a plain object with the
+three methods is assignable to `TraceSpanDedupPort`. If a private member ever
+makes that false, the test says so where it can be read.
+
+### The second dead source-reading guard
+
+`trace-dedup-oom-safety.unit.test.ts` enforces the `LIMIT 1 BY` ban across
+five files — a rule with a real production cost. It had stopped loading,
+because two of those files moved into feature packages and its paths counted
+`../`. One missing file takes twenty-one rules out of CI and shows up as a
+single red test file.
+
+That is now two of these found in one day (the other was Langy's documented
+card examples). **Both were dead for the same reason and neither was noticed**,
+because the symptom is one red file rather than N unguarded rules.
+
+Reviving it exposed the sharper problem: every assertion is a substring check
+against source text *including comments*, and these files explain in prose the
+exact patterns being asserted. `toContain("max(UpdatedAt)")` was satisfied by
+a comment about why the dedup uses it — the SQL could drop the aggregate and
+the guard would pass. Comments are stripped before assertion now, verified in
+all three directions.
+
+Neither rule had actually been violated while its guard was down.
