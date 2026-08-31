@@ -325,14 +325,18 @@ export function microsoftSeatEvents({
       skuPartNumber: sku.skuPartNumber,
       appliesTo: sku.appliesTo,
       capabilityStatus: sku.capabilityStatus,
-      seatsBought: String(seatsBought(sku)),
-      seatsAssigned: String(sku.consumedUnits),
+      // Native numbers and booleans: the whole OCSF row is serialised as one
+      // JSON document, which keeps them, and every reader would otherwise
+      // have to re-parse "27" and string-compare "true" forever — an event
+      // shape, once written, is the one shape history has.
+      seatsBought: seatsBought(sku),
+      seatsAssigned: sku.consumedUnits,
       // Four independent facts, not one label: a pool can be free and
       // company-wide and suspended at once, and a label would have to pick.
-      perPerson: String(isPerPersonSku(sku)),
-      live: String(isLiveSku(sku)),
-      free: String(isFreeSku(sku.skuPartNumber)),
-      seatStem: String(isSeatSku(sku.skuPartNumber)),
+      perPerson: isPerPersonSku(sku),
+      live: isLiveSku(sku),
+      free: isFreeSku(sku.skuPartNumber),
+      seatStem: isSeatSku(sku.skuPartNumber),
     },
   }));
 }
