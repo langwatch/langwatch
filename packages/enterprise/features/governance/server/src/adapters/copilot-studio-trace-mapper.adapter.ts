@@ -36,18 +36,12 @@
 import type { exportTraceServiceRequestSchema } from "@langwatch/trace-contract";
 import type { z } from "zod";
 import {
-  assembleTraceRequest,
   type ConversationRoutingProfile,
   type ConversationSeeds,
-  deriveConversationIdentity,
-  hashId,
-  intAttr,
-  msToNano,
+  ConversationTraceAssembly,
   type OtlpJsonAttr,
   type OtlpJsonSpan,
-  originAttrs,
   type RoutingOrigin,
-  stringAttr,
 } from "./conversation-trace-assembly.adapter";
 import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "./dataverse-environment.adapter";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
@@ -749,23 +743,28 @@ export class CopilotStudioTraceMapper {
   }): OtlpJsonAttr[] {
     const { origin, group, endMs, skipped, threadId } = params;
     const attrs: OtlpJsonAttr[] = [
-      stringAttr({ key: "langwatch.thread.id", value: threadId }),
-      ...originAttrs(origin),
+      ConversationTraceAssembly.stringAttr({ key: "langwatch.thread.id", value: threadId }),
+      ...ConversationTraceAssembly.originAttrs(origin),
     ];
     if (group.bot.botName) {
       attrs.push(
-        stringAttr({
+        ConversationTraceAssembly.stringAttr({
           key: "copilot_studio.agent_name",
           value: group.bot.botName,
         }),
       );
     }
     if (CopilotStudioTraceMapper.agentChangedSince(group.bot, endMs)) {
-      attrs.push(stringAttr({ key: "copilot_studio.agent_changed_since", value: "true" }));
+      attrs.push(
+        ConversationTraceAssembly.stringAttr({
+          key: "copilot_studio.agent_changed_since",
+          value: "true",
+        }),
+      );
     }
     if (group.batches.length > 0) {
       attrs.push(
-        stringAttr({
+        ConversationTraceAssembly.stringAttr({
           key: "copilot_studio.transcript_batches",
           value: group.batches.join(","),
         }),
@@ -773,7 +772,7 @@ export class CopilotStudioTraceMapper {
     }
     if (group.isIncomplete) {
       attrs.push(
-        stringAttr({
+        ConversationTraceAssembly.stringAttr({
           key: "copilot_studio.conversation_incomplete",
           value: "true",
         }),
@@ -783,10 +782,17 @@ export class CopilotStudioTraceMapper {
       // The conversation happened while someone was building the agent rather
       // than using it. Recorded and labelled instead of filtered, because the
       // person testing their agent is exactly who wants to read the transcript.
-      attrs.push(stringAttr({ key: "copilot_studio.design_mode", value: "true" }));
+      attrs.push(
+        ConversationTraceAssembly.stringAttr({ key: "copilot_studio.design_mode", value: "true" }),
+      );
     }
     if (skipped > 0) {
-      attrs.push(intAttr({ key: "copilot_studio.activities_skipped", value: skipped }));
+      attrs.push(
+        ConversationTraceAssembly.intAttr({
+          key: "copilot_studio.activities_skipped",
+          value: skipped,
+        }),
+      );
     }
     return attrs;
   }
@@ -814,7 +820,7 @@ export class CopilotStudioTraceMapper {
       conversationEndMs,
     } = params;
     const attrs: OtlpJsonAttr[] = [
-      stringAttr({ key: "langwatch.span.type", value: "llm" }),
+      ConversationTraceAssembly.stringAttr({ key: "langwatch.span.type", value: "llm" }),
       ...CopilotStudioTraceMapper.conversationAttrs({
         origin,
         group,
@@ -822,14 +828,14 @@ export class CopilotStudioTraceMapper {
         skipped,
         threadId,
       }),
-      stringAttr({
+      ConversationTraceAssembly.stringAttr({
         key: "gen_ai.request.model",
         value: origin.profile.agentModel,
       }),
     ];
     if (turn.question !== null) {
       attrs.push(
-        stringAttr({
+        ConversationTraceAssembly.stringAttr({
           key: "langwatch.input",
           value: CopilotStudioTraceMapper.chatValue("user", turn.question),
         }),
@@ -837,7 +843,7 @@ export class CopilotStudioTraceMapper {
     }
     if (turn.answer !== null) {
       attrs.push(
-        stringAttr({
+        ConversationTraceAssembly.stringAttr({
           key: "langwatch.output",
           value: CopilotStudioTraceMapper.chatValue("assistant", turn.answer),
         }),
@@ -847,16 +853,21 @@ export class CopilotStudioTraceMapper {
       // The raw directory identifier, never resolved to a name at pull time.
       // Resolving it would mean asking for a directory permission this source
       // otherwise does not need.
-      attrs.push(stringAttr({ key: "langwatch.user.id", value: turn.authorAadObjectId }));
+      attrs.push(
+        ConversationTraceAssembly.stringAttr({
+          key: "langwatch.user.id",
+          value: turn.authorAadObjectId,
+        }),
+      );
     }
     return {
       traceId,
-      spanId: hashId(`${spanSeed}:${turn.seedActivityId}`, 16),
+      spanId: ConversationTraceAssembly.hashId(`${spanSeed}:${turn.seedActivityId}`, 16),
       parentSpanId,
       name: COPILOT_TURN_SPAN_NAME,
       kind: 1,
-      startTimeUnixNano: msToNano(turn.startMs),
-      endTimeUnixNano: msToNano(Math.max(turn.endMs, turn.startMs)),
+      startTimeUnixNano: ConversationTraceAssembly.msToNano(turn.startMs),
+      endTimeUnixNano: ConversationTraceAssembly.msToNano(Math.max(turn.endMs, turn.startMs)),
       attributes: attrs,
       status: { code: 1 },
     };
@@ -871,27 +882,34 @@ export class CopilotStudioTraceMapper {
   }): OtlpJsonSpan {
     const { origin, call, traceId, parentSpanId, spanSeed } = params;
     const attrs: OtlpJsonAttr[] = [
-      stringAttr({ key: "langwatch.span.type", value: "tool" }),
-      stringAttr({ key: "tool_name", value: call.name }),
-      ...originAttrs(origin),
+      ConversationTraceAssembly.stringAttr({ key: "langwatch.span.type", value: "tool" }),
+      ConversationTraceAssembly.stringAttr({ key: "tool_name", value: call.name }),
+      ...ConversationTraceAssembly.originAttrs(origin),
     ];
     if (call.arguments) {
-      attrs.push(stringAttr({ key: "full_command", value: call.arguments }));
+      attrs.push(
+        ConversationTraceAssembly.stringAttr({ key: "full_command", value: call.arguments }),
+      );
     }
     if (!call.isFinished) {
       // The tool started and never reported finishing. Common enough that the
       // validation script calls it normal, so it renders marked rather than
       // being held back or dropped.
-      attrs.push(stringAttr({ key: "copilot_studio.tool_call_unfinished", value: "true" }));
+      attrs.push(
+        ConversationTraceAssembly.stringAttr({
+          key: "copilot_studio.tool_call_unfinished",
+          value: "true",
+        }),
+      );
     }
     return {
       traceId,
-      spanId: hashId(`${spanSeed}:${call.seedActivityId}`, 16),
+      spanId: ConversationTraceAssembly.hashId(`${spanSeed}:${call.seedActivityId}`, 16),
       parentSpanId,
       name: COPILOT_TOOL_SPAN_NAME,
       kind: 1,
-      startTimeUnixNano: msToNano(call.startMs),
-      endTimeUnixNano: msToNano(Math.max(call.endMs, call.startMs)),
+      startTimeUnixNano: ConversationTraceAssembly.msToNano(call.startMs),
+      endTimeUnixNano: ConversationTraceAssembly.msToNano(Math.max(call.endMs, call.startMs)),
       attributes: attrs,
       status: { code: 1 },
     };
@@ -945,7 +963,7 @@ export class CopilotStudioTraceMapper {
     const lastAnswer = [...turns].reverse().find((turn) => turn.answer !== null)?.answer;
 
     const attributes: OtlpJsonAttr[] = [
-      stringAttr({ key: "langwatch.span.type", value: "chain" }),
+      ConversationTraceAssembly.stringAttr({ key: "langwatch.span.type", value: "chain" }),
       ...CopilotStudioTraceMapper.conversationAttrs({
         origin,
         group,
@@ -956,7 +974,7 @@ export class CopilotStudioTraceMapper {
     ];
     if (firstQuestion) {
       attributes.push(
-        stringAttr({
+        ConversationTraceAssembly.stringAttr({
           key: "langwatch.input",
           value: CopilotStudioTraceMapper.chatValue("user", firstQuestion),
         }),
@@ -964,7 +982,7 @@ export class CopilotStudioTraceMapper {
     }
     if (lastAnswer) {
       attributes.push(
-        stringAttr({
+        ConversationTraceAssembly.stringAttr({
           key: "langwatch.output",
           value: CopilotStudioTraceMapper.chatValue("assistant", lastAnswer),
         }),
@@ -976,8 +994,8 @@ export class CopilotStudioTraceMapper {
       spanId,
       name: COPILOT_CONVERSATION_SPAN_NAME,
       kind: 1,
-      startTimeUnixNano: msToNano(spanStartMs),
-      endTimeUnixNano: msToNano(spanEndMs),
+      startTimeUnixNano: ConversationTraceAssembly.msToNano(spanStartMs),
+      endTimeUnixNano: ConversationTraceAssembly.msToNano(spanEndMs),
       attributes,
       status: { code: 1 },
     };
@@ -1005,7 +1023,7 @@ export class CopilotStudioTraceMapper {
       thread: [group.key],
       span: [group.key],
     };
-    const identity = deriveConversationIdentity(origin, seeds);
+    const identity = ConversationTraceAssembly.deriveConversationIdentity(origin, seeds);
     const conversationEndMs = turns.reduce(
       (latest, turn) => Math.max(latest, turn.endMs),
       turns[0]!.startMs,
@@ -1069,7 +1087,7 @@ export class CopilotStudioTraceMapper {
     origin: RoutingOrigin;
     calls: ToolCall[];
     turns: Turn[];
-    identity: ReturnType<typeof deriveConversationIdentity>;
+    identity: ReturnType<typeof ConversationTraceAssembly.deriveConversationIdentity>;
   }): OtlpJsonSpan[] {
     const { origin, calls, turns, identity } = params;
     return calls.map((call) => {
@@ -1078,7 +1096,10 @@ export class CopilotStudioTraceMapper {
         origin,
         call,
         traceId: identity.traceId,
-        parentSpanId: hashId(`${identity.spanSeed}:${parent.seedActivityId}`, 16),
+        parentSpanId: ConversationTraceAssembly.hashId(
+          `${identity.spanSeed}:${parent.seedActivityId}`,
+          16,
+        ),
         spanSeed: identity.spanSeed,
       });
     });
@@ -1100,6 +1121,6 @@ export class CopilotStudioTraceMapper {
       (group) => CopilotStudioTraceMapper.conversationSpans({ origin, group }),
     );
 
-    return assembleTraceRequest(spans, origin.profile);
+    return ConversationTraceAssembly.assembleTraceRequest(spans, origin.profile);
   }
 }

@@ -15,7 +15,7 @@ import {
 } from "../adapters/trace-query-evaluation.adapter";
 import { MAX_NODE_COUNT, TraceQueryClickHouse } from "../adapters/trace-query.clickhouse.adapter";
 import { FIELD_DEF_BY_NAME } from "../adapters/trace-query-fields.clickhouse.adapter";
-import { existenceNeeds } from "../adapters/trace-query-meta-fields.clickhouse.adapter";
+import { TraceQueryMetaFields } from "../adapters/trace-query-meta-fields.clickhouse.adapter";
 import {
   EVENT_ATTRIBUTE_PREFIX,
   EVENT_ATTRIBUTE_PREFIX_LEGACY,
@@ -365,7 +365,7 @@ export class TraceQueryEvaluationService {
     // from the value rather than a static `FieldDef.needs`.
     if (fieldName === "has" || fieldName === "none") {
       try {
-        const need = existenceNeeds(TraceQueryValues.extractStringValue(tag));
+        const need = TraceQueryMetaFields.existenceNeeds(TraceQueryValues.extractStringValue(tag));
         if (need) needs.add(need);
       } catch {
         // Non-literal value — nothing to resolve.

@@ -39,20 +39,14 @@
 import type { exportTraceServiceRequestSchema } from "@langwatch/trace-contract";
 import type { z } from "zod";
 import {
-  assembleTraceRequest,
   type ConversationRoutingProfile,
   type ConversationSeeds,
-  deriveConversationIdentity,
-  hashId,
-  intAttr,
+  ConversationTraceAssembly,
   KNOWN_AGENT_IDENTITIES,
   type KnownAgentIdentity,
-  msToNano,
   type OtlpJsonAttr,
   type OtlpJsonSpan,
-  originAttrs,
   type RoutingOrigin,
-  stringAttr,
 } from "./conversation-trace-assembly.adapter";
 import { TERMINAL_MESSAGE_STATUSES } from "./databricks-genie-puller.adapter";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
@@ -279,7 +273,7 @@ export class GenieTraceMapper {
       thread: [conversationId],
       span: [conversationId, messageId, regenCount],
     };
-    const identity = deriveConversationIdentity(origin, seeds);
+    const identity = ConversationTraceAssembly.deriveConversationIdentity(origin, seeds);
     // Both timestamp sources can be garbage (mapToOcsfRow guards the same
     // field). NaN here would serialize as "NaN000000" and fail spanSchema,
     // dropping the whole conversation — degrade to pull time instead.
@@ -344,16 +338,16 @@ export class GenieTraceMapper {
     const reasoning = GenieTraceMapper.flattenThoughts(attachments);
     if (reasoning) assistantMessage.reasoning_content = reasoning;
     return [
-      stringAttr({ key: "langwatch.span.type", value: "llm" }),
-      stringAttr({ key: "langwatch.thread.id", value: frame.threadId }),
-      stringAttr({
+      ConversationTraceAssembly.stringAttr({ key: "langwatch.span.type", value: "llm" }),
+      ConversationTraceAssembly.stringAttr({ key: "langwatch.thread.id", value: frame.threadId }),
+      ConversationTraceAssembly.stringAttr({
         key: "langwatch.input",
         value: JSON.stringify({
           type: "chat_messages",
           value: [{ role: "user", content: question }],
         }),
       }),
-      stringAttr({
+      ConversationTraceAssembly.stringAttr({
         key: "langwatch.output",
         value: JSON.stringify({
           type: "chat_messages",
@@ -364,16 +358,19 @@ export class GenieTraceMapper {
       // Now that the value varies, `KNOWN_AGENT_IDENTITIES` is what keeps it
       // true — at compile time only. Every profile is a code literal the
       // compiler checks, so nothing re-checks this at runtime.
-      stringAttr({
+      ConversationTraceAssembly.stringAttr({
         key: "gen_ai.request.model",
         value: frame.origin.profile.agentModel,
       }),
-      stringAttr({ key: "databricks.genie.message_id", value: frame.messageId }),
-      stringAttr({
+      ConversationTraceAssembly.stringAttr({
+        key: "databricks.genie.message_id",
+        value: frame.messageId,
+      }),
+      ConversationTraceAssembly.stringAttr({
         key: "databricks.genie.conversation_id",
         value: frame.conversationId,
       }),
-      ...originAttrs(frame.origin),
+      ...ConversationTraceAssembly.originAttrs(frame.origin),
       ...GenieTraceMapper.optionalRootAttributes(event, frame),
     ];
   }
@@ -390,13 +387,21 @@ export class GenieTraceMapper {
       frame.payload.user_id != null
         ? String(frame.payload.user_id)
         : GenieTraceMapper.extraString(event, "actorUserId");
-    if (rawUserId) attributes.push(stringAttr({ key: "langwatch.user.id", value: rawUserId }));
+    if (rawUserId)
+      attributes.push(
+        ConversationTraceAssembly.stringAttr({ key: "langwatch.user.id", value: rawUserId }),
+      );
     if (frame.status) {
-      attributes.push(stringAttr({ key: "databricks.genie.status", value: frame.status }));
+      attributes.push(
+        ConversationTraceAssembly.stringAttr({
+          key: "databricks.genie.status",
+          value: frame.status,
+        }),
+      );
     }
     if (frame.regenCount > 0) {
       attributes.push(
-        intAttr({
+        ConversationTraceAssembly.intAttr({
           key: "databricks.genie.auto_regenerate_count",
           value: frame.regenCount,
         }),
@@ -404,7 +409,9 @@ export class GenieTraceMapper {
     }
     const spaceId = GenieTraceMapper.extraString(event, "spaceId");
     if (spaceId) {
-      attributes.push(stringAttr({ key: "databricks.genie.space_id", value: spaceId }));
+      attributes.push(
+        ConversationTraceAssembly.stringAttr({ key: "databricks.genie.space_id", value: spaceId }),
+      );
     }
     const statementIds = GenieTraceMapper.queryAttachmentsOf(attachments)
       .map((attachment) => attachment.query?.statement_id)
@@ -413,7 +420,7 @@ export class GenieTraceMapper {
       // ALL statement ids (Decision 12): the display-time join key to the
       // warehouse spend ledger — a multi-statement answer never undercounts.
       attributes.push(
-        stringAttr({
+        ConversationTraceAssembly.stringAttr({
           key: "databricks.genie.statement_ids",
           value: JSON.stringify(statementIds),
         }),
@@ -425,7 +432,7 @@ export class GenieTraceMapper {
     if (vizPointers.length > 0) {
       // A pointer, not chart data — stored, never rendered (Decision 12).
       attributes.push(
-        stringAttr({
+        ConversationTraceAssembly.stringAttr({
           key: "databricks.genie.viz_query_attachment_ids",
           value: JSON.stringify(vizPointers),
         }),
@@ -457,30 +464,38 @@ export class GenieTraceMapper {
     // A JSON blob under `langwatch.params` gets dot-flattened at the trace door
     // and lands at `params.langwatch.params.*`, where no reader looks.
     const stepAttrs = [
-      stringAttr({
+      ConversationTraceAssembly.stringAttr({
         key: "tool_name",
         value: attachment.query?.description || "SQL query",
       }),
-      stringAttr({ key: "full_command", value: attachment.query?.query ?? "" }),
+      ConversationTraceAssembly.stringAttr({
+        key: "full_command",
+        value: attachment.query?.query ?? "",
+      }),
     ];
     if (attachment.query?.statement_id) {
-      stepAttrs.push(stringAttr({ key: "statement_id", value: attachment.query.statement_id }));
+      stepAttrs.push(
+        ConversationTraceAssembly.stringAttr({
+          key: "statement_id",
+          value: attachment.query.statement_id,
+        }),
+      );
     }
     if (typeof rowCount === "number") {
-      stepAttrs.push(intAttr({ key: "row_count", value: rowCount }));
+      stepAttrs.push(ConversationTraceAssembly.intAttr({ key: "row_count", value: rowCount }));
     }
     return {
       traceId: frame.traceId,
-      spanId: hashId(`${frame.spanSeed}:query:${stepKey}`, 16),
+      spanId: ConversationTraceAssembly.hashId(`${frame.spanSeed}:query:${stepKey}`, 16),
       parentSpanId: frame.rootSpanId,
       name: GENIE_QUERY_SPAN_NAME,
       kind: "SPAN_KIND_INTERNAL",
-      startTimeUnixNano: msToNano(frame.startMs),
-      endTimeUnixNano: msToNano(frame.endMs),
+      startTimeUnixNano: ConversationTraceAssembly.msToNano(frame.startMs),
+      endTimeUnixNano: ConversationTraceAssembly.msToNano(frame.endMs),
       attributes: [
-        stringAttr({ key: "langwatch.span.type", value: "tool" }),
+        ConversationTraceAssembly.stringAttr({ key: "langwatch.span.type", value: "tool" }),
         ...stepAttrs,
-        ...originAttrs(frame.origin),
+        ...ConversationTraceAssembly.originAttrs(frame.origin),
       ],
       status: { code: frame.isCompleted ? 1 : 2 },
     } satisfies OtlpJsonSpan;
@@ -497,8 +512,8 @@ export class GenieTraceMapper {
       spanId: frame.rootSpanId,
       name: GENIE_MESSAGE_SPAN_NAME,
       kind: "SPAN_KIND_INTERNAL",
-      startTimeUnixNano: msToNano(frame.startMs),
-      endTimeUnixNano: msToNano(frame.endMs),
+      startTimeUnixNano: ConversationTraceAssembly.msToNano(frame.startMs),
+      endTimeUnixNano: ConversationTraceAssembly.msToNano(frame.endMs),
       attributes: GenieTraceMapper.rootAttributesOf(event, frame),
       status: frame.isCompleted ? { code: 1 } : { code: 2, message: frame.status || "unknown" },
     };
@@ -535,6 +550,6 @@ export class GenieTraceMapper {
       .filter((event) => !!event.action && event.action === wanted)
       .filter((event) => GenieTraceMapper.isSettledForRouting(event))
       .flatMap((event) => GenieTraceMapper.mapMessage(event, origin));
-    return assembleTraceRequest(spans, origin.profile);
+    return ConversationTraceAssembly.assembleTraceRequest(spans, origin.profile);
   }
 }

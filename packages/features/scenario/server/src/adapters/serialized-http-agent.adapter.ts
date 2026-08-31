@@ -19,12 +19,7 @@ import {
 import { JSONPath } from "jsonpath-plus";
 import { applyAuthentication } from "./http-auth.adapter";
 import type { RunParameterValues } from "@langwatch/scenario-contract";
-import {
-  fenceSecretRefs,
-  preserveSecretRefs,
-  redactSecrets,
-  resolveAuthSecrets,
-} from "./scenario-secret-reference.adapter";
+import { ScenarioSecretReferenceAdapter } from "./scenario-secret-reference.adapter";
 import type { HttpAgentData } from "@langwatch/scenario-contract";
 import type { ScenarioHttpPort } from "../ports/scenario-http.port";
 
@@ -81,9 +76,7 @@ function redactHeaders(headers: Record<string, string>): Record<string, string> 
  * Pick the upstream request id (first match wins). Different upstreams use
  * different header conventions — surface whichever the target chose.
  */
-function pickUpstreamRequestId(headers: {
-  get(name: string): string | null;
-}): string | undefined {
+function pickUpstreamRequestId(headers: { get(name: string): string | null }): string | undefined {
   return (
     headers.get("x-request-id") ??
     headers.get("x-amzn-requestid") ??
@@ -164,7 +157,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
 
   /** A message with every resolved secret value replaced by the placeholder. */
   private scrub(message: string): string {
-    return redactSecrets({ message, secrets: this.secrets });
+    return ScenarioSecretReferenceAdapter.redact({ message, secrets: this.secrets });
   }
 
   /**
@@ -177,10 +170,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
    */
   private headersForLogs(headers: Record<string, string>): Record<string, string> {
     return Object.fromEntries(
-      Object.entries(redactHeaders(headers)).map(([key, value]) => [
-        key,
-        this.scrub(value),
-      ]),
+      Object.entries(redactHeaders(headers)).map(([key, value]) => [key, this.scrub(value)]),
     );
   }
 
@@ -228,20 +218,21 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     for (const header of this.config.headers) {
       const key = header.key.trim();
       if (key) {
-        const { template, restore } = fenceSecretRefs({
+        const { template, restore } = ScenarioSecretReferenceAdapter.fence({
           template: header.value,
           secrets: this.secrets,
         });
-        headers[key] = restore(
-          renderHeaderTemplate({ template, context, headerKey: key }),
-        );
+        headers[key] = restore(renderHeaderTemplate({ template, context, headerKey: key }));
       }
     }
 
     const resolved = {
       ...headers,
       ...applyAuthentication(
-        resolveAuthSecrets({ auth: this.config.auth, secrets: this.secrets }),
+        ScenarioSecretReferenceAdapter.resolveAuth({
+          auth: this.config.auth,
+          secrets: this.secrets,
+        }),
       ),
     };
 
@@ -260,7 +251,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
    * exactly as written.
    */
   private buildUrl(context: Record<string, unknown>): string {
-    const { template, restore } = fenceSecretRefs({
+    const { template, restore } = ScenarioSecretReferenceAdapter.fence({
       template: this.config.url,
       secrets: this.secrets,
     });
@@ -376,7 +367,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
       return JSON.stringify({ messages: input.messages });
     }
 
-    const { template, restore } = preserveSecretRefs(this.config.bodyTemplate);
+    const { template, restore } = ScenarioSecretReferenceAdapter.preserve(this.config.bodyTemplate);
     return restore(renderBodyTemplate({ template, context }));
   }
 }

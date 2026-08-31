@@ -23,12 +23,6 @@ import { SimulationRepository } from "../simulation.repository";
 const DEFAULT_SET_ID = "default";
 const INTERNAL_SET_PREFIX = "__internal__";
 
-function expandSetIdFilter(scenarioSetId: string): string[] {
-  return scenarioSetId === DEFAULT_SET_ID || scenarioSetId === ""
-    ? [DEFAULT_SET_ID, ""]
-    : [scenarioSetId];
-}
-
 const TABLE_NAME = "simulation_runs" as const;
 
 export const RUN_ID_CAP = 10000;
@@ -99,123 +93,6 @@ type BatchAggregateRow = {
   MinStartedAt: string;
   MaxStartedAt: string;
 };
-
-/**
- * Maps a batch aggregate row to the shared summary counts.
- *
- * stalledCount stays out: the history page counts it from the preview items it
- * already holds, and the single-batch summary reads the StalledCount column.
- * The note stays out for the same reason: the history page reads it off the
- * preview rows, the single-batch summary off its own aggregate.
- */
-function mapBatchAggregateRow(
-  row: BatchAggregateRow,
-): Omit<SimulationBatchSummary, "stalledCount" | "note"> {
-  const firstCompletedAt = Number(row.FirstCompletedAt);
-  const allCompletedAt = Number(row.AllCompletedAt);
-
-  return {
-    batchRunId: row.BatchRunId,
-    totalCount: Number(row.TotalCount),
-    passCount: Number(row.PassCount),
-    failCount: Number(row.FailCount),
-    runningCount: Number(row.RunningCount),
-    settledCount: Number(row.SettledCount),
-    lastRunAt: Number(row.LastRunAt),
-    lastUpdatedAt: Number(row.LastUpdatedAt),
-    firstCompletedAt: firstCompletedAt > 0 ? firstCompletedAt : null,
-    allCompletedAt: allCompletedAt > 0 ? allCompletedAt : null,
-  };
-}
-
-/**
- * Returns an IN-tuple dedup predicate for simulation_runs.
- *
- * simulation_runs uses ReplacingMergeTree(UpdatedAt) with dedup key
- * (TenantId, ScenarioSetId, BatchRunId, ScenarioRunId). This predicate
- * resolves dedup using only lightweight key columns in the inner GROUP BY,
- * avoiding the per-row dedup anti-pattern which materializes ALL columns
- * per granule (~8K rows).
- *
- * @param whereFilters - The same WHERE filters from the outer query,
- *   duplicated here for partition pruning in the inner subquery.
- *
- * @see dev/docs/best_practices/clickhouse-queries.md — "Safe Pattern: IN-Tuple Dedup"
- */
-function simulationRunDedupPredicate(whereFilters: string): string {
-  return `AND (TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, UpdatedAt) IN (
-    SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
-    FROM ${TABLE_NAME}
-    WHERE ${whereFilters}
-    GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-  )`;
-}
-
-/**
- * Dedup predicate for a query that reads simulation_runs through the `t` alias.
- *
- * The outer columns MUST be table-qualified. RUN_COLUMNS aliases the timestamp
- * columns to strings (`toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt`)
- * and ClickHouse resolves WHERE against SELECT aliases, so an unqualified
- * `UpdatedAt` here compares a String against the subquery's DateTime64 and the
- * IN-tuple matches nothing. That failure is silent — the query succeeds and
- * returns zero rows — so it surfaces as a mysteriously empty result rather than
- * an error. Qualifying with `t.` binds to the column instead of the alias.
- */
-function qualifiedDedupPredicate(whereFilters: string): string {
-  return `AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
-    SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
-    FROM ${TABLE_NAME}
-    WHERE ${whereFilters}
-    GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-  )`;
-}
-
-/**
- * Strips the `t.` qualifier for reuse inside the dedup subquery, which selects
- * from the bare table and has no such alias in scope.
- */
-function unqualify(clause: string): string {
-  return clause.replace(/\bt\./g, "");
-}
-
-/**
- * Builds date filter clauses from startDate/endDate:
- *
- * - `havingClause`: Filters on max(CreatedAt) for exact batch-level filtering
- *   (post-aggregation). Used in HAVING.
- * - `whereClause`: Filters on StartedAt for partition pruning (pre-scan).
- *   simulation_runs is partitioned by toYearWeek(StartedAt). Without this,
- *   ClickHouse scans ALL partitions including cold storage.
- *
- * Both clauses use the same startDate/endDate range but on different columns.
- * The WHERE on StartedAt enables partition pruning (~12x faster), the HAVING
- * on max(CreatedAt) ensures exact filtering for edge cases where they differ.
- */
-function buildDateFilter({ startDate, endDate }: { startDate?: number; endDate?: number }): {
-  havingClause: string | null;
-  whereClause: string;
-  params: Record<string, string>;
-} {
-  const havingParts: string[] = [];
-  const whereParts: string[] = [];
-  const params: Record<string, string> = {};
-  if (startDate !== undefined) {
-    havingParts.push("toUnixTimestamp64Milli(max(CreatedAt)) >= toUInt64({startDateMs:String})");
-    whereParts.push("StartedAt >= fromUnixTimestamp64Milli(toUInt64({startDateMs:String}))");
-    params.startDateMs = String(startDate);
-  }
-  if (endDate !== undefined) {
-    havingParts.push("toUnixTimestamp64Milli(max(CreatedAt)) <= toUInt64({endDateMs:String})");
-    whereParts.push("StartedAt <= fromUnixTimestamp64Milli(toUInt64({endDateMs:String}))");
-    params.endDateMs = String(endDate);
-  }
-  return {
-    havingClause: havingParts.length > 0 ? havingParts.join(" AND ") : null,
-    whereClause: whereParts.length > 0 ? `AND ${whereParts.join(" AND ")}` : "",
-    params,
-  };
-}
 
 const RUN_COLUMNS = `
   ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
@@ -391,7 +268,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     startDate?: number;
     endDate?: number;
   }): Promise<SimulationSetData[]> {
-    const dateFilter = buildDateFilter({ startDate, endDate });
+    const dateFilter = SimulationClickHouseRepository.buildDateFilter({ startDate, endDate });
 
     const rows = await this.queryRows<{
       ScenarioSetId: string;
@@ -411,7 +288,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            ${dateFilter.whereClause}
-           ${simulationRunDedupPredicate(`TenantId = {tenantId:String} ${dateFilter.whereClause}`)}
+           ${SimulationClickHouseRepository.simulationRunDedupPredicate(`TenantId = {tenantId:String} ${dateFilter.whereClause}`)}
        )
        WHERE ArchivedAt IS NULL
        GROUP BY NormalizedSetId
@@ -482,7 +359,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
          OR (toString(toUnixTimestamp64Milli(max(CreatedAt))) = {cursorTs:String} AND BatchRunId > {cursorBatchRunId:String}))`
       : "1 = 1";
 
-    const dateFilter = buildDateFilter({ startDate, endDate });
+    const dateFilter = SimulationClickHouseRepository.buildDateFilter({ startDate, endDate });
 
     const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.havingClause].filter(Boolean).join(" AND ")}`;
 
@@ -494,10 +371,10 @@ export class SimulationClickHouseRepository extends SimulationRepository {
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
          ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}`,
+         ${SimulationClickHouseRepository.simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}`,
       {
         tenantId: projectId,
-        scenarioSetIds: expandSetIdFilter(scenarioSetId),
+        scenarioSetIds: SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId),
         ...dateFilter.params,
       },
     );
@@ -510,14 +387,14 @@ export class SimulationClickHouseRepository extends SimulationRepository {
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
          ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}
+         ${SimulationClickHouseRepository.simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}
        GROUP BY BatchRunId
        ${combinedHaving}
        ORDER BY LastRunAt DESC, BatchRunId ASC
        LIMIT {fetchLimit:UInt32}`,
       {
         tenantId: projectId,
-        scenarioSetIds: expandSetIdFilter(scenarioSetId),
+        scenarioSetIds: SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId),
         ...(decoded ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId } : {}),
         ...dateFilter.params,
         fetchLimit: String(validatedLimit + 1),
@@ -585,11 +462,11 @@ export class SimulationClickHouseRepository extends SimulationRepository {
          AND BatchRunId IN ({batchRunIds:Array(String)})
          AND ArchivedAt IS NULL
          ${startedAtWindow.whereClause}
-         ${simulationRunDedupPredicate("TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) AND BatchRunId IN ({batchRunIds:Array(String)})")}
+         ${SimulationClickHouseRepository.simulationRunDedupPredicate("TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) AND BatchRunId IN ({batchRunIds:Array(String)})")}
        ORDER BY CreatedAt ASC`,
           {
             tenantId: projectId,
-            scenarioSetIds: expandSetIdFilter(scenarioSetId),
+            scenarioSetIds: SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId),
             batchRunIds,
             ...startedAtWindow.params,
           },
@@ -640,7 +517,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       const note = (itemsByBatch.get(b.BatchRunId) ?? []).find((r) => r.Note !== "")?.Note ?? null;
 
       return {
-        ...mapBatchAggregateRow(b),
+        ...SimulationClickHouseRepository.mapBatchAggregateRow(b),
         stalledCount,
         note,
         items,
@@ -681,7 +558,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
        FROM ${TABLE_NAME}
        WHERE ${whereFilters}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate(whereFilters)}
+         ${SimulationClickHouseRepository.simulationRunDedupPredicate(whereFilters)}
        GROUP BY BatchRunId`,
       { tenantId: projectId, batchRunId },
     );
@@ -690,7 +567,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     if (!row) return null;
 
     return {
-      ...mapBatchAggregateRow(row),
+      ...SimulationClickHouseRepository.mapBatchAggregateRow(row),
       stalledCount: Number(row.StalledCount),
       note: row.Note === "" ? null : row.Note,
     };
@@ -730,7 +607,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     // --wait polls with just the batch id. An empty string is a real value
     // that selects the default set, so only an absent id drops the predicate.
     const scenarioSetIds =
-      scenarioSetId === undefined ? undefined : expandSetIdFilter(scenarioSetId);
+      scenarioSetId === undefined
+        ? undefined
+        : SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId);
     const setFilter = (alias: string) =>
       scenarioSetIds ? `AND ${alias}ScenarioSetId IN ({scenarioSetIds:Array(String)})` : "";
     const rows = await this.queryRows<ClickHouseSimulationRunRow & { ExportSortKey: string }>(
@@ -773,7 +652,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     startDate?: number;
     endDate?: number;
   }): Promise<number> {
-    const dateFilter = buildDateFilter({ startDate, endDate });
+    const dateFilter = SimulationClickHouseRepository.buildDateFilter({ startDate, endDate });
 
     const rows = await this.queryRows<{ BatchRunCount: string }>(
       `SELECT toString(count(DISTINCT BatchRunId)) AS BatchRunCount
@@ -782,10 +661,10 @@ export class SimulationClickHouseRepository extends SimulationRepository {
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
          ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}`,
+         ${SimulationClickHouseRepository.simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}`,
       {
         tenantId: projectId,
-        scenarioSetIds: expandSetIdFilter(scenarioSetId),
+        scenarioSetIds: SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId),
         ...dateFilter.params,
       },
     );
@@ -815,7 +694,10 @@ export class SimulationClickHouseRepository extends SimulationRepository {
          )
        ORDER BY BatchRunId ASC, CreatedAt ASC
        LIMIT 10000`,
-      { tenantId: projectId, scenarioSetIds: expandSetIdFilter(scenarioSetId) },
+      {
+        tenantId: projectId,
+        scenarioSetIds: SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId),
+      },
     );
 
     return rows.map((row) => mapClickHouseRowToScenarioRunData(row));
@@ -850,7 +732,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
         )`
       : "1 = 1";
 
-    const dateFilter = buildDateFilter({ startDate, endDate });
+    const dateFilter = SimulationClickHouseRepository.buildDateFilter({ startDate, endDate });
 
     const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.havingClause].filter(Boolean).join(" AND ")}`;
 
@@ -866,14 +748,14 @@ export class SimulationClickHouseRepository extends SimulationRepository {
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
          ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}
+         ${SimulationClickHouseRepository.simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}
        GROUP BY BatchRunId
        ${combinedHaving}
        ORDER BY MaxCreatedAt DESC, BatchRunId ASC
        LIMIT {fetchLimit:UInt32}`,
       {
         tenantId: projectId,
-        scenarioSetIds: expandSetIdFilter(scenarioSetId),
+        scenarioSetIds: SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId),
         ...(decoded ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId } : {}),
         ...dateFilter.params,
         fetchLimit: String(validatedLimit + 1),
@@ -952,7 +834,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
         )`
       : "1 = 1";
 
-    const dateFilter = buildDateFilter({ startDate, endDate });
+    const dateFilter = SimulationClickHouseRepository.buildDateFilter({ startDate, endDate });
 
     const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.havingClause].filter(Boolean).join(" AND ")}`;
 
@@ -973,7 +855,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
        WHERE TenantId = {tenantId:String}
          ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} ${dateFilter.whereClause}`)}
+         ${SimulationClickHouseRepository.simulationRunDedupPredicate(`TenantId = {tenantId:String} ${dateFilter.whereClause}`)}
        GROUP BY BatchRunId
        ${combinedHaving}
        ORDER BY MaxCreatedAt DESC, BatchRunId ASC
@@ -1038,7 +920,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     // Freshness probes poll frequently, so an unbounded StartedAt window
     // (scanning every partition, including cold storage) is never acceptable
     // here — floor the window at 30 days when the caller omits it.
-    const dateFilter = buildDateFilter({
+    const dateFilter = SimulationClickHouseRepository.buildDateFilter({
       startDate: startDate ?? Date.now() - 30 * 24 * 60 * 60 * 1000,
       endDate,
     });
@@ -1055,7 +937,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
          ${dateFilter.whereClause}`,
       {
         tenantId: projectId,
-        ...(scenarioSetId ? { scenarioSetIds: expandSetIdFilter(scenarioSetId) } : {}),
+        ...(scenarioSetId
+          ? { scenarioSetIds: SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId) }
+          : {}),
         ...dateFilter.params,
       },
     );
@@ -1096,7 +980,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     endDate?: number;
     filter: "external" | "internal-suites";
   }): Promise<SimulationExternalSetSummary[]> {
-    const dateFilter = buildDateFilter({ startDate, endDate });
+    const dateFilter = SimulationClickHouseRepository.buildDateFilter({ startDate, endDate });
 
     const havingClause = dateFilter.havingClause ? `HAVING ${dateFilter.havingClause}` : "";
 
@@ -1140,7 +1024,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
            WHERE TenantId = {tenantId:String}
              ${wherePredicate}
              ${dateFilter.whereClause}
-             ${simulationRunDedupPredicate(`TenantId = {tenantId:String} ${wherePredicate} ${dateFilter.whereClause}`)}
+             ${SimulationClickHouseRepository.simulationRunDedupPredicate(`TenantId = {tenantId:String} ${wherePredicate} ${dateFilter.whereClause}`)}
          )
          WHERE ArchivedAt IS NULL
          GROUP BY NormalizedSetId, BatchRunId
@@ -1184,7 +1068,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     if (scenarioIds !== undefined && scenarioIds.length === 0) {
       return [];
     }
-    const dateFilter = buildDateFilter({ startDate, endDate });
+    const dateFilter = SimulationClickHouseRepository.buildDateFilter({ startDate, endDate });
     const scenarioFilter =
       scenarioIds !== undefined ? "AND ScenarioId IN ({scenarioIds:Array(String)})" : "";
     const whereFilters = `TenantId = {tenantId:String} AND ScenarioId != '' ${scenarioFilter} ${dateFilter.whereClause}`;
@@ -1220,7 +1104,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
                 StartedAt, CreatedAt, UpdatedAt, ArchivedAt
          FROM ${TABLE_NAME}
          WHERE ${whereFilters}
-           ${simulationRunDedupPredicate(whereFilters)}
+           ${SimulationClickHouseRepository.simulationRunDedupPredicate(whereFilters)}
        )
        WHERE ArchivedAt IS NULL
        GROUP BY ScenarioId`,
@@ -1256,7 +1140,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     // vice-versa). Expand to both storage forms so archiving the default
     // set matches its rows — the same normalization every other set-scoped
     // query uses via expandSetIdFilter.
-    const scenarioSetIds = expandSetIdFilter(scenarioSetId);
+    const scenarioSetIds = SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId);
     // Dedup to the latest version per run before applying ArchivedAt IS NULL.
     // simulation_runs is ReplacingMergeTree(UpdatedAt); without dedup, an
     // older non-archived row can satisfy the filter even after the run was
@@ -1267,7 +1151,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
               WHERE TenantId = {tenantId:String}
                 AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
                 AND ArchivedAt IS NULL
-                ${simulationRunDedupPredicate(
+                ${SimulationClickHouseRepository.simulationRunDedupPredicate(
                   "TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)})",
                 )}
               LIMIT ${RUN_ID_CAP}`,
@@ -1346,7 +1230,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
          ${stableClause}
          ${dateClause}
          AND t.ArchivedAt IS NULL
-         ${qualifiedDedupPredicate(`TenantId = {tenantId:String} ${unqualify(stableClause)}`)}`,
+         ${SimulationClickHouseRepository.qualifiedDedupPredicate(`TenantId = {tenantId:String} ${SimulationClickHouseRepository.unqualify(stableClause)}`)}`,
       { tenantId: projectId, ...params },
     );
 
@@ -1417,7 +1301,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
          ${dateClause}
          ${cursorPredicate}
          AND t.ArchivedAt IS NULL
-         ${qualifiedDedupPredicate(`TenantId = {tenantId:String} ${unqualify(stableClause)}`)}
+         ${SimulationClickHouseRepository.qualifiedDedupPredicate(`TenantId = {tenantId:String} ${SimulationClickHouseRepository.unqualify(stableClause)}`)}
        ORDER BY ${EXPORT_SORT_KEY} ASC, t.ScenarioRunId ASC
        LIMIT {fetchLimit:UInt32}`,
       {
@@ -1475,7 +1359,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
 
     if (scenarioSetId) {
       stableParts.push("t.ScenarioSetId IN ({exportSetIds:Array(String)})");
-      params.exportSetIds = expandSetIdFilter(scenarioSetId);
+      params.exportSetIds = SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId);
     }
 
     if (scenarioId) {
@@ -1483,7 +1367,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       params.exportScenarioId = scenarioId;
     }
 
-    const dateFilter = buildDateFilter({ startDate, endDate });
+    const dateFilter = SimulationClickHouseRepository.buildDateFilter({ startDate, endDate });
     let dateClause = "";
     if (dateFilter.whereClause) {
       // buildDateFilter emits unqualified column names; the export queries read
@@ -1583,10 +1467,141 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       {
         tenantId: projectId,
         batchRunIds,
-        ...(scenarioSetId ? { scenarioSetIds: expandSetIdFilter(scenarioSetId) } : {}),
+        ...(scenarioSetId
+          ? { scenarioSetIds: SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId) }
+          : {}),
       },
     );
 
     return rows.map((row) => mapClickHouseRowToScenarioRunData(row));
+  }
+
+  private static expandSetIdFilter(scenarioSetId: string): string[] {
+    return scenarioSetId === DEFAULT_SET_ID || scenarioSetId === ""
+      ? [DEFAULT_SET_ID, ""]
+      : [scenarioSetId];
+  }
+
+  /**
+   * Maps a batch aggregate row to the shared summary counts.
+   *
+   * stalledCount stays out: the history page counts it from the preview items it
+   * already holds, and the single-batch summary reads the StalledCount column.
+   * The note stays out for the same reason: the history page reads it off the
+   * preview rows, the single-batch summary off its own aggregate.
+   */
+  private static mapBatchAggregateRow(
+    row: BatchAggregateRow,
+  ): Omit<SimulationBatchSummary, "stalledCount" | "note"> {
+    const firstCompletedAt = Number(row.FirstCompletedAt);
+    const allCompletedAt = Number(row.AllCompletedAt);
+
+    return {
+      batchRunId: row.BatchRunId,
+      totalCount: Number(row.TotalCount),
+      passCount: Number(row.PassCount),
+      failCount: Number(row.FailCount),
+      runningCount: Number(row.RunningCount),
+      settledCount: Number(row.SettledCount),
+      lastRunAt: Number(row.LastRunAt),
+      lastUpdatedAt: Number(row.LastUpdatedAt),
+      firstCompletedAt: firstCompletedAt > 0 ? firstCompletedAt : null,
+      allCompletedAt: allCompletedAt > 0 ? allCompletedAt : null,
+    };
+  }
+
+  /**
+   * Returns an IN-tuple dedup predicate for simulation_runs.
+   *
+   * simulation_runs uses ReplacingMergeTree(UpdatedAt) with dedup key
+   * (TenantId, ScenarioSetId, BatchRunId, ScenarioRunId). This predicate
+   * resolves dedup using only lightweight key columns in the inner GROUP BY,
+   * avoiding the per-row dedup anti-pattern which materializes ALL columns
+   * per granule (~8K rows).
+   *
+   * @param whereFilters - The same WHERE filters from the outer query,
+   *   duplicated here for partition pruning in the inner subquery.
+   *
+   * @see dev/docs/best_practices/clickhouse-queries.md — "Safe Pattern: IN-Tuple Dedup"
+   */
+  private static simulationRunDedupPredicate(whereFilters: string): string {
+    return `AND (TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, UpdatedAt) IN (
+      SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
+      FROM ${TABLE_NAME}
+      WHERE ${whereFilters}
+      GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+    )`;
+  }
+
+  /**
+   * Dedup predicate for a query that reads simulation_runs through the `t` alias.
+   *
+   * The outer columns MUST be table-qualified. RUN_COLUMNS aliases the timestamp
+   * columns to strings (`toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt`)
+   * and ClickHouse resolves WHERE against SELECT aliases, so an unqualified
+   * `UpdatedAt` here compares a String against the subquery's DateTime64 and the
+   * IN-tuple matches nothing. That failure is silent — the query succeeds and
+   * returns zero rows — so it surfaces as a mysteriously empty result rather than
+   * an error. Qualifying with `t.` binds to the column instead of the alias.
+   */
+  private static qualifiedDedupPredicate(whereFilters: string): string {
+    return `AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
+      SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
+      FROM ${TABLE_NAME}
+      WHERE ${whereFilters}
+      GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+    )`;
+  }
+
+  /**
+   * Strips the `t.` qualifier for reuse inside the dedup subquery, which selects
+   * from the bare table and has no such alias in scope.
+   */
+  private static unqualify(clause: string): string {
+    return clause.replace(/\bt\./g, "");
+  }
+
+  /**
+   * Builds date filter clauses from startDate/endDate:
+   *
+   * - `havingClause`: Filters on max(CreatedAt) for exact batch-level filtering
+   *   (post-aggregation). Used in HAVING.
+   * - `whereClause`: Filters on StartedAt for partition pruning (pre-scan).
+   *   simulation_runs is partitioned by toYearWeek(StartedAt). Without this,
+   *   ClickHouse scans ALL partitions including cold storage.
+   *
+   * Both clauses use the same startDate/endDate range but on different columns.
+   * The WHERE on StartedAt enables partition pruning (~12x faster), the HAVING
+   * on max(CreatedAt) ensures exact filtering for edge cases where they differ.
+   */
+  private static buildDateFilter({
+    startDate,
+    endDate,
+  }: {
+    startDate?: number;
+    endDate?: number;
+  }): {
+    havingClause: string | null;
+    whereClause: string;
+    params: Record<string, string>;
+  } {
+    const havingParts: string[] = [];
+    const whereParts: string[] = [];
+    const params: Record<string, string> = {};
+    if (startDate !== undefined) {
+      havingParts.push("toUnixTimestamp64Milli(max(CreatedAt)) >= toUInt64({startDateMs:String})");
+      whereParts.push("StartedAt >= fromUnixTimestamp64Milli(toUInt64({startDateMs:String}))");
+      params.startDateMs = String(startDate);
+    }
+    if (endDate !== undefined) {
+      havingParts.push("toUnixTimestamp64Milli(max(CreatedAt)) <= toUInt64({endDateMs:String})");
+      whereParts.push("StartedAt <= fromUnixTimestamp64Milli(toUInt64({endDateMs:String}))");
+      params.endDateMs = String(endDate);
+    }
+    return {
+      havingClause: havingParts.length > 0 ? havingParts.join(" AND ") : null,
+      whereClause: whereParts.length > 0 ? `AND ${whereParts.join(" AND ")}` : "",
+      params,
+    };
   }
 }

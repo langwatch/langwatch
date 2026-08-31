@@ -54,40 +54,14 @@ const SCENARIO_VERDICT_BY_LABEL: Record<string, string> = {
   inconclusive: "INCONCLUSIVE",
 };
 
-/**
- * Returns the trailing key for either `trace.attribute.<k>` (canonical) or
- * the legacy single-namespace `attribute.<k>`, or `null` when the value
- * isn't a trace-attribute reference at all. Folds the back-compat alias
- * into one call so callers don't have to branch on the prefix flavour.
- */
-function stripTraceAttributePrefix(value: string): string | null {
-  if (value.startsWith("trace.attribute.")) {
-    return value.slice("trace.attribute.".length);
-  }
-  if (value.startsWith(TRACE_ATTRIBUTE_PREFIX_LEGACY)) {
-    return value.slice(TRACE_ATTRIBUTE_PREFIX_LEGACY.length);
-  }
-  return null;
-}
-
 // ---------------------------------------------------------------------------
 // trace / traceId
 // ---------------------------------------------------------------------------
 
-function translateTraceId(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
-  const value = TraceQueryValues.extractStringValue(tag);
-  TraceQueryValues.validateValueLength(value);
-  const p = TraceQueryValues.nextParam(ctx, "traceId");
-  if (value.includes("*")) {
-    ctx.params[p] = value.replace(/\*/g, "%");
-    return TraceQueryValues.wrap(`TraceId LIKE {${p}:String}`, negated);
-  }
-  ctx.params[p] = value;
-  return TraceQueryValues.wrap(`TraceId = {${p}:String}`, negated);
-}
-
 const TRACE_ID_DEF: FieldDef = {
-  toClickHouse: translateTraceId,
+  // An arrow, not a bare reference: this const is evaluated at module load,
+  // before the class below is initialised.
+  toClickHouse: (tag, negated, ctx) => TraceQueryMetaFields.translateTraceId(tag, negated, ctx),
   evaluateInMemory: (tag, negated, trace) => {
     const value = TraceQueryValues.extractStringValue(tag);
     const id = trace.summary.traceId;
@@ -100,161 +74,16 @@ const TRACE_ID_DEF: FieldDef = {
 // has / none — existence categories
 // ---------------------------------------------------------------------------
 
-function translateExistence(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
-  const value = TraceQueryValues.extractStringValue(tag);
-  TraceQueryValues.validateValueLength(value);
-
-  // Dynamic per-attribute existence — accepts the legacy `attribute.<k>`
-  // form here. The `has:trace.attribute.<k>` namespaced form is handled
-  // alongside it so both surfaces work without a saved-query migration.
-  const traceAttrKey = stripTraceAttributePrefix(value);
-  if (traceAttrKey !== null) {
-    if (!traceAttrKey) {
-      throw new FilterParseError("attribute.<key> requires a key after the dot");
-    }
-    const p = TraceQueryValues.nextParam(ctx, "attrKey");
-    ctx.params[p] = traceAttrKey;
-    return TraceQueryValues.wrap(`Attributes[{${p}:String}] != ''`, negated);
-  }
-
-  switch (value) {
-    case "error":
-      return TraceQueryValues.wrap("ContainsErrorStatus = 1", negated);
-
-    case "eval":
-      return TraceQueryValues.wrap(
-        boundedSubquery("evaluation_runs", "ScheduledAt", "1 = 1"),
-        negated,
-      );
-
-    case "feedback":
-      return TraceQueryValues.wrap(
-        boundedSubquery("stored_spans", "StartTime", "has(`Events.Name`, 'user_feedback')"),
-        negated,
-      );
-
-    case "annotation":
-      return TraceQueryValues.wrap("length(AnnotationIds) > 0", negated);
-
-    case "conversation":
-      return TraceQueryValues.wrap("Attributes['gen_ai.conversation.id'] != ''", negated);
-
-    case "user":
-      return TraceQueryValues.wrap("Attributes['langwatch.user_id'] != ''", negated);
-
-    case "customer":
-      return TraceQueryValues.wrap("Attributes['langwatch.customer_id'] != ''", negated);
-
-    case "topic":
-      return TraceQueryValues.wrap("ifNull(TopicId, '') != ''", negated);
-
-    case "subtopic":
-      return TraceQueryValues.wrap("ifNull(SubTopicId, '') != ''", negated);
-
-    case "label":
-      return TraceQueryValues.wrap(
-        "Attributes['langwatch.labels'] != '' AND Attributes['langwatch.labels'] != '[]'",
-        negated,
-      );
-
-    case "model":
-      return TraceQueryValues.wrap("length(Models) > 0", negated);
-
-    case "service":
-      return TraceQueryValues.wrap("Attributes['service.name'] != ''", negated);
-
-    case "traceName":
-      return TraceQueryValues.wrap("ifNull(TraceName, '') != ''", negated);
-
-    case "rootSpanType":
-      return TraceQueryValues.wrap("ifNull(RootSpanType, '') != ''", negated);
-
-    default:
-      throw new FilterParseError(
-        `Unknown has/none value "${value}". Valid: ${HAS_VALUES.join(", ")}, attribute.<key>`,
-      );
-  }
-}
-
-/**
- * Which auxiliary collection a `has:<value>` / `none:<value>` reads, or `null`
- * when it's answered from the trace summary alone. `has` is value-polymorphic
- * so it carries no static `FieldDef.needs`;
- * `TraceQueryEvaluationService.needs` consults this instead.
- */
-export function existenceNeeds(value: string): "evaluations" | "events" | null {
-  if (value === "eval") return "evaluations";
-  if (value === "feedback") return "events";
-  return null;
-}
-
-function evaluateExistence(
-  tag: TagToken,
-  negated: boolean,
-  trace: InMemoryTrace,
-): boolean | Unsupported {
-  const value = TraceQueryValues.extractStringValue(tag);
-  const attrs = trace.summary.attributes;
-  const polarise = (present: boolean) => (negated ? !present : present);
-
-  const traceAttrKey = stripTraceAttributePrefix(value);
-  if (traceAttrKey !== null) {
-    // Empty key throws on the SQL side (422) — fail closed here.
-    if (!traceAttrKey) return UNSUPPORTED;
-    // Own-key read: the key is user-supplied, and a plain `attrs[key]` made
-    // `has:attribute.constructor` truthy on *every* trace (inherited
-    // `Object.prototype.constructor`) while the compiled
-    // `Attributes['constructor'] != ''` matched none of them.
-    return polarise(TraceQueryValues.readAttribute(attrs, traceAttrKey) !== "");
-  }
-
-  switch (value) {
-    case "error":
-      return polarise(trace.summary.containsErrorStatus);
-    case "eval":
-      if (trace.evaluations == null) return UNSUPPORTED;
-      return polarise(trace.evaluations.length > 0);
-    case "feedback":
-      if (trace.events == null) return UNSUPPORTED;
-      return polarise(trace.events.some((e) => e.name === "user_feedback"));
-    case "annotation":
-      return polarise(trace.summary.annotationIds.length > 0);
-    case "conversation":
-      return polarise((attrs["gen_ai.conversation.id"] ?? "") !== "");
-    case "user":
-      return polarise((attrs["langwatch.user_id"] ?? "") !== "");
-    case "customer":
-      return polarise((attrs["langwatch.customer_id"] ?? "") !== "");
-    case "topic":
-      return polarise((trace.summary.topicId ?? "") !== "");
-    case "subtopic":
-      return polarise((trace.summary.subTopicId ?? "") !== "");
-    case "label": {
-      const raw = attrs["langwatch.labels"] ?? "";
-      return polarise(raw !== "" && raw !== "[]");
-    }
-    case "model":
-      return polarise(trace.summary.models.length > 0);
-    case "service":
-      return polarise((attrs["service.name"] ?? "") !== "");
-    case "traceName":
-      return polarise((trace.summary.traceName ?? "") !== "");
-    case "rootSpanType":
-      return polarise((trace.summary.rootSpanType ?? "") !== "");
-    default:
-      // Unknown value throws on the SQL side — fail closed here.
-      return UNSUPPORTED;
-  }
-}
-
 const HAS_DEF: FieldDef = {
-  toClickHouse: (tag, negated, ctx) => translateExistence(tag, negated, ctx),
-  evaluateInMemory: (tag, negated, trace) => evaluateExistence(tag, negated, trace),
+  toClickHouse: (tag, negated, ctx) => TraceQueryMetaFields.translateExistence(tag, negated, ctx),
+  evaluateInMemory: (tag, negated, trace) =>
+    TraceQueryMetaFields.evaluateExistence(tag, negated, trace),
 };
 
 const NONE_DEF: FieldDef = {
-  toClickHouse: (tag, negated, ctx) => translateExistence(tag, !negated, ctx),
-  evaluateInMemory: (tag, negated, trace) => evaluateExistence(tag, !negated, trace),
+  toClickHouse: (tag, negated, ctx) => TraceQueryMetaFields.translateExistence(tag, !negated, ctx),
+  evaluateInMemory: (tag, negated, trace) =>
+    TraceQueryMetaFields.evaluateExistence(tag, !negated, trace),
 };
 
 // ---------------------------------------------------------------------------
@@ -370,19 +199,6 @@ const SCENARIO_RUN_DEF: FieldDef = {
 
 // scenario dimensions resolve through a `simulation_runs` subquery, a table the
 // in-memory trace doesn't carry — fail closed for now.
-function scenarioColumnDef(column: string): FieldDef {
-  return {
-    toClickHouse: (tag, negated, ctx) => {
-      const value = TraceQueryValues.extractStringValue(tag);
-      TraceQueryValues.validateValueLength(value);
-      const p = TraceQueryValues.nextParam(ctx, column);
-      ctx.params[p] = value;
-      return TraceQueryValues.wrap(scenarioRunSubquery(`${column} = {${p}:String}`), negated);
-    },
-    evaluateInMemory: () => UNSUPPORTED,
-  };
-}
-
 const SCENARIO_VERDICT_DEF: FieldDef = {
   toClickHouse: (tag, negated, ctx) => {
     const raw = TraceQueryValues.extractStringValue(tag);
@@ -417,6 +233,205 @@ const SCENARIO_STATUS_DEF: FieldDef = {
   evaluateInMemory: () => UNSUPPORTED,
 };
 
+/**
+ * The trace fields that are not columns.
+ *
+ * `trace_id` is matched against a normalised form rather than the stored
+ * string, and the existence fields — has evaluations, has events — are
+ * answered by a bounded subquery over another table rather than by reading
+ * anything on the trace itself. Both need to know which table to reach, which
+ * is what `existenceNeeds` answers for the evaluation path.
+ */
+export class TraceQueryMetaFields {
+  /**
+   * Returns the trailing key for either `trace.attribute.<k>` (canonical) or
+   * the legacy single-namespace `attribute.<k>`, or `null` when the value
+   * isn't a trace-attribute reference at all. Folds the back-compat alias
+   * into one call so callers don't have to branch on the prefix flavour.
+   */
+  private static stripTraceAttributePrefix(value: string): string | null {
+    if (value.startsWith("trace.attribute.")) {
+      return value.slice("trace.attribute.".length);
+    }
+    if (value.startsWith(TRACE_ATTRIBUTE_PREFIX_LEGACY)) {
+      return value.slice(TRACE_ATTRIBUTE_PREFIX_LEGACY.length);
+    }
+    return null;
+  }
+
+  static translateTraceId(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
+    const value = TraceQueryValues.extractStringValue(tag);
+    TraceQueryValues.validateValueLength(value);
+    const p = TraceQueryValues.nextParam(ctx, "traceId");
+    if (value.includes("*")) {
+      ctx.params[p] = value.replace(/\*/g, "%");
+      return TraceQueryValues.wrap(`TraceId LIKE {${p}:String}`, negated);
+    }
+    ctx.params[p] = value;
+    return TraceQueryValues.wrap(`TraceId = {${p}:String}`, negated);
+  }
+
+  static translateExistence(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
+    const value = TraceQueryValues.extractStringValue(tag);
+    TraceQueryValues.validateValueLength(value);
+
+    // Dynamic per-attribute existence — accepts the legacy `attribute.<k>`
+    // form here. The `has:trace.attribute.<k>` namespaced form is handled
+    // alongside it so both surfaces work without a saved-query migration.
+    const traceAttrKey = TraceQueryMetaFields.stripTraceAttributePrefix(value);
+    if (traceAttrKey !== null) {
+      if (!traceAttrKey) {
+        throw new FilterParseError("attribute.<key> requires a key after the dot");
+      }
+      const p = TraceQueryValues.nextParam(ctx, "attrKey");
+      ctx.params[p] = traceAttrKey;
+      return TraceQueryValues.wrap(`Attributes[{${p}:String}] != ''`, negated);
+    }
+
+    switch (value) {
+      case "error":
+        return TraceQueryValues.wrap("ContainsErrorStatus = 1", negated);
+
+      case "eval":
+        return TraceQueryValues.wrap(
+          boundedSubquery("evaluation_runs", "ScheduledAt", "1 = 1"),
+          negated,
+        );
+
+      case "feedback":
+        return TraceQueryValues.wrap(
+          boundedSubquery("stored_spans", "StartTime", "has(`Events.Name`, 'user_feedback')"),
+          negated,
+        );
+
+      case "annotation":
+        return TraceQueryValues.wrap("length(AnnotationIds) > 0", negated);
+
+      case "conversation":
+        return TraceQueryValues.wrap("Attributes['gen_ai.conversation.id'] != ''", negated);
+
+      case "user":
+        return TraceQueryValues.wrap("Attributes['langwatch.user_id'] != ''", negated);
+
+      case "customer":
+        return TraceQueryValues.wrap("Attributes['langwatch.customer_id'] != ''", negated);
+
+      case "topic":
+        return TraceQueryValues.wrap("ifNull(TopicId, '') != ''", negated);
+
+      case "subtopic":
+        return TraceQueryValues.wrap("ifNull(SubTopicId, '') != ''", negated);
+
+      case "label":
+        return TraceQueryValues.wrap(
+          "Attributes['langwatch.labels'] != '' AND Attributes['langwatch.labels'] != '[]'",
+          negated,
+        );
+
+      case "model":
+        return TraceQueryValues.wrap("length(Models) > 0", negated);
+
+      case "service":
+        return TraceQueryValues.wrap("Attributes['service.name'] != ''", negated);
+
+      case "traceName":
+        return TraceQueryValues.wrap("ifNull(TraceName, '') != ''", negated);
+
+      case "rootSpanType":
+        return TraceQueryValues.wrap("ifNull(RootSpanType, '') != ''", negated);
+
+      default:
+        throw new FilterParseError(
+          `Unknown has/none value "${value}". Valid: ${HAS_VALUES.join(", ")}, attribute.<key>`,
+        );
+    }
+  }
+
+  static evaluateExistence(
+    tag: TagToken,
+    negated: boolean,
+    trace: InMemoryTrace,
+  ): boolean | Unsupported {
+    const value = TraceQueryValues.extractStringValue(tag);
+    const attrs = trace.summary.attributes;
+    const polarise = (present: boolean) => (negated ? !present : present);
+
+    const traceAttrKey = TraceQueryMetaFields.stripTraceAttributePrefix(value);
+    if (traceAttrKey !== null) {
+      // Empty key throws on the SQL side (422) — fail closed here.
+      if (!traceAttrKey) return UNSUPPORTED;
+      // Own-key read: the key is user-supplied, and a plain `attrs[key]` made
+      // `has:attribute.constructor` truthy on *every* trace (inherited
+      // `Object.prototype.constructor`) while the compiled
+      // `Attributes['constructor'] != ''` matched none of them.
+      return polarise(TraceQueryValues.readAttribute(attrs, traceAttrKey) !== "");
+    }
+
+    switch (value) {
+      case "error":
+        return polarise(trace.summary.containsErrorStatus);
+      case "eval":
+        if (trace.evaluations == null) return UNSUPPORTED;
+        return polarise(trace.evaluations.length > 0);
+      case "feedback":
+        if (trace.events == null) return UNSUPPORTED;
+        return polarise(trace.events.some((e) => e.name === "user_feedback"));
+      case "annotation":
+        return polarise(trace.summary.annotationIds.length > 0);
+      case "conversation":
+        return polarise((attrs["gen_ai.conversation.id"] ?? "") !== "");
+      case "user":
+        return polarise((attrs["langwatch.user_id"] ?? "") !== "");
+      case "customer":
+        return polarise((attrs["langwatch.customer_id"] ?? "") !== "");
+      case "topic":
+        return polarise((trace.summary.topicId ?? "") !== "");
+      case "subtopic":
+        return polarise((trace.summary.subTopicId ?? "") !== "");
+      case "label": {
+        const raw = attrs["langwatch.labels"] ?? "";
+        return polarise(raw !== "" && raw !== "[]");
+      }
+      case "model":
+        return polarise(trace.summary.models.length > 0);
+      case "service":
+        return polarise((attrs["service.name"] ?? "") !== "");
+      case "traceName":
+        return polarise((trace.summary.traceName ?? "") !== "");
+      case "rootSpanType":
+        return polarise((trace.summary.rootSpanType ?? "") !== "");
+      default:
+        // Unknown value throws on the SQL side — fail closed here.
+        return UNSUPPORTED;
+    }
+  }
+
+  static scenarioColumnDef(column: string): FieldDef {
+    return {
+      toClickHouse: (tag, negated, ctx) => {
+        const value = TraceQueryValues.extractStringValue(tag);
+        TraceQueryValues.validateValueLength(value);
+        const p = TraceQueryValues.nextParam(ctx, column);
+        ctx.params[p] = value;
+        return TraceQueryValues.wrap(scenarioRunSubquery(`${column} = {${p}:String}`), negated);
+      },
+      evaluateInMemory: () => UNSUPPORTED,
+    };
+  }
+
+  /**
+   * Which auxiliary collection a `has:<value>` / `none:<value>` reads, or `null`
+   * when it's answered from the trace summary alone. `has` is value-polymorphic
+   * so it carries no static `FieldDef.needs`;
+   * `TraceQueryEvaluationService.needs` consults this instead.
+   */
+  static existenceNeeds(value: string): "evaluations" | "events" | null {
+    if (value === "eval") return "evaluations";
+    if (value === "feedback") return "events";
+    return null;
+  }
+}
+
 export const META_FIELD_DEFS = {
   has: HAS_DEF,
   none: NONE_DEF,
@@ -427,9 +442,9 @@ export const META_FIELD_DEFS = {
   prompt: PROMPT_DEF,
   spanId: SPAN_ID_DEF,
   scenarioRun: SCENARIO_RUN_DEF,
-  scenario: scenarioColumnDef("ScenarioId"),
-  scenarioSet: scenarioColumnDef("ScenarioSetId"),
-  scenarioBatch: scenarioColumnDef("BatchRunId"),
+  scenario: TraceQueryMetaFields.scenarioColumnDef("ScenarioId"),
+  scenarioSet: TraceQueryMetaFields.scenarioColumnDef("ScenarioSetId"),
+  scenarioBatch: TraceQueryMetaFields.scenarioColumnDef("BatchRunId"),
   scenarioVerdict: SCENARIO_VERDICT_DEF,
   scenarioStatus: SCENARIO_STATUS_DEF,
 } satisfies Record<string, FieldDef>;

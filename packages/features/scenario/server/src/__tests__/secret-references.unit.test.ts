@@ -4,13 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { AuthConfig } from "@langwatch/scenario-contract";
-import {
-  fenceSecretRefs,
-  preserveSecretRefs,
-  redactSecrets,
-  resolveAuthSecrets,
-  resolveSecretRefs,
-} from "../index";
+import { ScenarioSecretReferenceAdapter } from "../index";
 
 const SECRETS = { AGENT_TOKEN: "tok-live-123", OTHER: "other-value" };
 
@@ -18,7 +12,7 @@ describe("secret references", () => {
   describe("given a reference to a name the project has", () => {
     it("substitutes the value", () => {
       expect(
-        resolveSecretRefs({
+        ScenarioSecretReferenceAdapter.resolve({
           value: "Bearer {{ secrets.AGENT_TOKEN }}",
           secrets: SECRETS,
         }),
@@ -27,7 +21,7 @@ describe("secret references", () => {
 
     it("accepts the reference without inner spacing", () => {
       expect(
-        resolveSecretRefs({
+        ScenarioSecretReferenceAdapter.resolve({
           value: "{{secrets.AGENT_TOKEN}}",
           secrets: SECRETS,
         }),
@@ -36,7 +30,7 @@ describe("secret references", () => {
 
     it("substitutes every occurrence", () => {
       expect(
-        resolveSecretRefs({
+        ScenarioSecretReferenceAdapter.resolve({
           value: "{{ secrets.AGENT_TOKEN }}/{{ secrets.OTHER }}",
           secrets: SECRETS,
         }),
@@ -48,7 +42,7 @@ describe("secret references", () => {
     /** @scenario "A reference to a missing secret name stays verbatim in the request" */
     it("leaves the reference exactly as written", () => {
       expect(
-        resolveSecretRefs({
+        ScenarioSecretReferenceAdapter.resolve({
           value: "{{ secrets.NOT_A_SECRET }}",
           secrets: SECRETS,
         }),
@@ -56,9 +50,9 @@ describe("secret references", () => {
     });
 
     it("leaves it as written when the project has no secrets at all", () => {
-      expect(resolveSecretRefs({ value: "{{ secrets.AGENT_TOKEN }}", secrets: {} })).toBe(
-        "{{ secrets.AGENT_TOKEN }}",
-      );
+      expect(
+        ScenarioSecretReferenceAdapter.resolve({ value: "{{ secrets.AGENT_TOKEN }}", secrets: {} }),
+      ).toBe("{{ secrets.AGENT_TOKEN }}");
     });
   });
 
@@ -71,12 +65,12 @@ describe("secret references", () => {
       template: string;
       secrets: Record<string, string>;
     }) => {
-      const fenced = fenceSecretRefs({ template, secrets });
+      const fenced = ScenarioSecretReferenceAdapter.fence({ template, secrets });
       return fenced.restore(fenced.template);
     };
 
     it("keeps the resolved value out of what gets rendered", () => {
-      const fenced = fenceSecretRefs({
+      const fenced = ScenarioSecretReferenceAdapter.fence({
         template: "https://api.test/{{ secrets.AGENT_TOKEN }}",
         secrets: SECRETS,
       });
@@ -95,14 +89,14 @@ describe("secret references", () => {
     });
 
     it("holds a reference out without resolving it when nothing may be substituted", () => {
-      const fenced = preserveSecretRefs("body {{ secrets.AGENT_TOKEN }} end");
+      const fenced = ScenarioSecretReferenceAdapter.preserve("body {{ secrets.AGENT_TOKEN }} end");
 
       expect(fenced.template).not.toContain("secrets.AGENT_TOKEN");
       expect(fenced.restore(fenced.template)).toBe("body {{ secrets.AGENT_TOKEN }} end");
     });
 
     it("leaves a template with no reference in it byte for byte", () => {
-      const fenced = fenceSecretRefs({
+      const fenced = ScenarioSecretReferenceAdapter.fence({
         template: "https://api.test/{{ params.region }}",
         secrets: SECRETS,
       });
@@ -123,7 +117,7 @@ describe("secret references", () => {
   describe("given an auth config", () => {
     it("resolves a bearer token", () => {
       expect(
-        resolveAuthSecrets({
+        ScenarioSecretReferenceAdapter.resolveAuth({
           auth: { type: "bearer", token: "{{ secrets.AGENT_TOKEN }}" },
           secrets: SECRETS,
         }),
@@ -132,7 +126,7 @@ describe("secret references", () => {
 
     it("resolves an api key value and leaves the header name alone", () => {
       expect(
-        resolveAuthSecrets({
+        ScenarioSecretReferenceAdapter.resolveAuth({
           auth: {
             type: "api_key",
             header: "X-{{ secrets.AGENT_TOKEN }}",
@@ -149,7 +143,7 @@ describe("secret references", () => {
 
     it("resolves a basic username and password", () => {
       expect(
-        resolveAuthSecrets({
+        ScenarioSecretReferenceAdapter.resolveAuth({
           auth: {
             type: "basic",
             username: "{{ secrets.OTHER }}",
@@ -170,7 +164,7 @@ describe("secret references", () => {
         token: "{{ secrets.AGENT_TOKEN }}",
       };
 
-      resolveAuthSecrets({ auth, secrets: SECRETS });
+      ScenarioSecretReferenceAdapter.resolveAuth({ auth, secrets: SECRETS });
 
       expect(auth.token).toBe("{{ secrets.AGENT_TOKEN }}");
     });
@@ -179,9 +173,8 @@ describe("secret references", () => {
   describe("given a message that carries a resolved secret value", () => {
     it("replaces every occurrence with the placeholder", () => {
       expect(
-        redactSecrets({
-          message:
-            'Get "https://api.test?token=tok-live-123": dial tcp, sent tok-live-123',
+        ScenarioSecretReferenceAdapter.redact({
+          message: 'Get "https://api.test?token=tok-live-123": dial tcp, sent tok-live-123',
           secrets: SECRETS,
         }),
       ).toBe('Get "https://api.test?token=[redacted]": dial tcp, sent [redacted]');
@@ -189,7 +182,7 @@ describe("secret references", () => {
 
     it("leaves a message that carries none unchanged", () => {
       expect(
-        redactSecrets({
+        ScenarioSecretReferenceAdapter.redact({
           message: "HTTP 500: upstream is down",
           secrets: SECRETS,
         }),
@@ -197,9 +190,12 @@ describe("secret references", () => {
     });
 
     it("ignores an empty secret value rather than replacing everything", () => {
-      expect(redactSecrets({ message: "anything at all", secrets: { EMPTY: "" } })).toBe(
-        "anything at all",
-      );
+      expect(
+        ScenarioSecretReferenceAdapter.redact({
+          message: "anything at all",
+          secrets: { EMPTY: "" },
+        }),
+      ).toBe("anything at all");
     });
   });
 });

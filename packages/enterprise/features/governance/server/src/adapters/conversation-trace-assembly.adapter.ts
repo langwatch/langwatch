@@ -101,52 +101,6 @@ export type OtlpJsonAttr = {
 };
 
 /**
- * Named rather than positional because both halves are strings. Given two
- * positional arguments, a transposed call compiles and emits a
- * plausible-looking attribute with its key and value the wrong way round —
- * which no assertion catches unless it happens to pin that exact attribute,
- * and the Genie suite pins two of its seven.
- */
-export function stringAttr(params: { key: string; value: string }): OtlpJsonAttr {
-  return { key: params.key, value: { stringValue: params.value } };
-}
-
-export function intAttr(params: { key: string; value: number }): OtlpJsonAttr {
-  return { key: params.key, value: { intValue: params.value } };
-}
-
-export function originAttrs(origin: RoutingOrigin): OtlpJsonAttr[] {
-  return [
-    stringAttr({ key: "langwatch.origin.kind", value: "ingestion_source" }),
-    stringAttr({
-      key: "langwatch.ingestion_source.id",
-      value: origin.ingestionSourceId,
-    }),
-    stringAttr({
-      key: "langwatch.ingestion_source.organization_id",
-      value: origin.organizationId,
-    }),
-    stringAttr({
-      key: "langwatch.ingestion_source.source_type",
-      value: origin.sourceType,
-    }),
-    stringAttr({
-      key: PROVENANCE_ATTR_SOURCE,
-      value: origin.profile.provenanceSource,
-    }),
-  ];
-}
-
-/** 16-byte trace id / 8-byte span id, hex, derived from stable coordinates. */
-export function hashId(material: string, hexLength: 32 | 16): string {
-  return createHash("sha256").update(material).digest("hex").slice(0, hexLength);
-}
-
-export function msToNano(ms: number): string {
-  return `${Math.round(ms)}000000`;
-}
-
-/**
  * A field a source considers part of an identifier. Numbers are allowed
  * because at least one source counts attempts; they are stringified on the
  * way in so a numeric 0 and the string "0" cannot seed differently.
@@ -185,21 +139,6 @@ export interface ConversationIdentity {
   rootSpanId: string;
 }
 
-export function deriveConversationIdentity(
-  origin: RoutingOrigin,
-  seeds: ConversationSeeds,
-): ConversationIdentity {
-  const namespace = `${origin.profile.identityNamespace}:${origin.ingestionSourceId}`;
-  const join = (fields: IdentityField[]) => fields.map(String).join(":");
-  const spanSeed = `${namespace}:${join(seeds.span)}`;
-  return {
-    traceId: hashId(`${namespace}:${join(seeds.trace)}`, 32),
-    threadId: `${origin.ingestionSourceId}:${join(seeds.thread)}`,
-    spanSeed,
-    rootSpanId: hashId(`${spanSeed}:root`, 16),
-  };
-}
-
 /**
  * One span as the mappers build it, taken from the schema that validates it
  * downstream (`spanSchema`, schemas/otlp.ts) rather than from the transformer
@@ -214,21 +153,99 @@ export function deriveConversationIdentity(
 export type OtlpJsonSpan = z.input<typeof spanSchema>;
 
 /**
- * Wrap a source's spans for export. Returns null when nothing routed, which
- * every caller treats as "this run produced no conversations" rather than an
- * error — a pull with no conversations in it is the normal case.
+ * One conversation, assembled into an OTLP trace request.
+ *
+ * The part every conversation puller shares, whatever it pulled from: seed a
+ * stable trace and span identity from the conversation's own coordinates, and
+ * wrap the spans in the resource and scope the ingest expects.
+ *
+ * Identity is the reason this is one place rather than one per puller. The ids
+ * are DERIVED, so the same conversation pulled twice produces the same trace
+ * and the second pull updates the first. Two pullers deriving them differently
+ * would each own half the conversations and neither would ever restate.
  */
-export function assembleTraceRequest(
-  spans: OtlpJsonSpan[],
-  profile: ConversationRoutingProfile,
-): ExportTraceServiceRequest | null {
-  if (spans.length === 0) return null;
-  return {
-    resourceSpans: [
-      {
-        resource: { attributes: [], droppedAttributesCount: 0 },
-        scopeSpans: [{ scope: { name: profile.scopeName }, spans }],
-      },
-    ],
-  } as ExportTraceServiceRequest;
+export class ConversationTraceAssembly {
+  /**
+   * Named rather than positional because both halves are strings. Given two
+   * positional arguments, a transposed call compiles and emits a
+   * plausible-looking attribute with its key and value the wrong way round —
+   * which no assertion catches unless it happens to pin that exact attribute,
+   * and the Genie suite pins two of its seven.
+   */
+  static stringAttr(params: { key: string; value: string }): OtlpJsonAttr {
+    return { key: params.key, value: { stringValue: params.value } };
+  }
+
+  static intAttr(params: { key: string; value: number }): OtlpJsonAttr {
+    return { key: params.key, value: { intValue: params.value } };
+  }
+
+  static originAttrs(origin: RoutingOrigin): OtlpJsonAttr[] {
+    return [
+      ConversationTraceAssembly.stringAttr({
+        key: "langwatch.origin.kind",
+        value: "ingestion_source",
+      }),
+      ConversationTraceAssembly.stringAttr({
+        key: "langwatch.ingestion_source.id",
+        value: origin.ingestionSourceId,
+      }),
+      ConversationTraceAssembly.stringAttr({
+        key: "langwatch.ingestion_source.organization_id",
+        value: origin.organizationId,
+      }),
+      ConversationTraceAssembly.stringAttr({
+        key: "langwatch.ingestion_source.source_type",
+        value: origin.sourceType,
+      }),
+      ConversationTraceAssembly.stringAttr({
+        key: PROVENANCE_ATTR_SOURCE,
+        value: origin.profile.provenanceSource,
+      }),
+    ];
+  }
+
+  /** 16-byte trace id / 8-byte span id, hex, derived from stable coordinates. */
+  static hashId(material: string, hexLength: 32 | 16): string {
+    return createHash("sha256").update(material).digest("hex").slice(0, hexLength);
+  }
+
+  static msToNano(ms: number): string {
+    return `${Math.round(ms)}000000`;
+  }
+
+  static deriveConversationIdentity(
+    origin: RoutingOrigin,
+    seeds: ConversationSeeds,
+  ): ConversationIdentity {
+    const namespace = `${origin.profile.identityNamespace}:${origin.ingestionSourceId}`;
+    const join = (fields: IdentityField[]) => fields.map(String).join(":");
+    const spanSeed = `${namespace}:${join(seeds.span)}`;
+    return {
+      traceId: ConversationTraceAssembly.hashId(`${namespace}:${join(seeds.trace)}`, 32),
+      threadId: `${origin.ingestionSourceId}:${join(seeds.thread)}`,
+      spanSeed,
+      rootSpanId: ConversationTraceAssembly.hashId(`${spanSeed}:root`, 16),
+    };
+  }
+
+  /**
+   * Wrap a source's spans for export. Returns null when nothing routed, which
+   * every caller treats as "this run produced no conversations" rather than an
+   * error — a pull with no conversations in it is the normal case.
+   */
+  static assembleTraceRequest(
+    spans: OtlpJsonSpan[],
+    profile: ConversationRoutingProfile,
+  ): ExportTraceServiceRequest | null {
+    if (spans.length === 0) return null;
+    return {
+      resourceSpans: [
+        {
+          resource: { attributes: [], droppedAttributesCount: 0 },
+          scopeSpans: [{ scope: { name: profile.scopeName }, spans }],
+        },
+      ],
+    } as ExportTraceServiceRequest;
+  }
 }
