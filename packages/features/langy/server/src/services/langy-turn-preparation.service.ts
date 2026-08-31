@@ -121,6 +121,17 @@ export class LangyTurnPreparationService {
             projectId,
           }),
       this.override.resolve(),
+      // The live UI-action channel is flagged (`release_langy_ui_actions`), and
+      // the turn block may only advertise it while the dispatch route would
+      // answer. A composition with no resolver leaves it advertised, which is
+      // the flag's own default.
+      this.deps.uiActionSurface
+        ? this.deps.uiActionSurface.resolve({
+            userId,
+            projectId,
+            organizationId: credentials.organizationId,
+          })
+        : Promise.resolve(true),
     ]);
   }
 
@@ -229,7 +240,7 @@ export class LangyTurnPreparationService {
 
   private buildPreparedTurn(
     args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
-    [, handoffResult, , , memoryResult, overrideResult]: Awaited<
+    [, handoffResult, , , memoryResult, overrideResult, uiActionsOpenResult]: Awaited<
       ReturnType<LangyTurnPreparationService["readPreparation"]>
     >,
     capReachedNote: string,
@@ -262,8 +273,16 @@ export class LangyTurnPreparationService {
     const seedBlocks = [transcript, memory].filter(
       (block): block is string => !!block && block.trim().length > 0,
     );
+    // The resolver never rejects on its own, so a rejected slot can only mean
+    // the batch itself failed; the flag's default (on) is the same answer the
+    // resolver would have given.
+    const isUiActionSurfaceOpen =
+      uiActionsOpenResult.status === "fulfilled" ? uiActionsOpenResult.value : true;
     const { prompt, labelled } = composeLangyTurnPrompt({
-      contextBlock: this.deps.context.render(args.turnContext),
+      contextBlock: this.deps.context.render({
+        context: args.turnContext,
+        isUiActionSurfaceOpen,
+      }),
       capNote: capReachedNote,
       userText: args.userText,
     });

@@ -267,6 +267,7 @@ describe("renderLangyTurnContext — the live UI-action line", () => {
   });
 
   describe("given the UI-action surface is closed", () => {
+    /** @scenario "With page control rolled back, the agent is never offered the ui commands" */
     it("says nothing about the commands the dispatch route would 404", () => {
       const block = renderLangyTurnContext({
         context: { pageContext: [experimentChip] },

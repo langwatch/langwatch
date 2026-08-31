@@ -1,8 +1,22 @@
+import { Hono } from "hono";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
+import type * as AppLayerApp from "~/server/app-layer/app";
+import { getApp } from "~/server/app-layer/app";
 import type { SeedRunReport } from "../../../../scripts/dogfood/governance/_lib/seedRunner";
 
 vi.mock("../../../../scripts/dogfood/governance/seed-demo", () => ({
   runSeedDemo: vi.fn(),
+}));
+
+// The seed_demo handler reads nothing off the App — the cron key is the whole
+// gate — but `createServiceApp` still refuses a request whose transport root
+// installed none, so the suite composes an empty one and mounts the route the
+// way `api-router.ts` does.
+vi.mock("~/server/app-layer/app", async (importOriginal) => ({
+  ...(await importOriginal<typeof AppLayerApp>()),
+  getApp: () => ({}) as ReturnType<typeof AppLayerApp.getApp>,
+  tryGetApp: () => ({}) as ReturnType<typeof AppLayerApp.getApp>,
 }));
 
 const KEY = "test-cron-secret";
@@ -37,7 +51,10 @@ describe("/api/cron/seed_demo", () => {
 
   beforeAll(async () => {
     const cronMod = await import("../cron");
-    app = cronMod.app;
+    const testApp = new Hono();
+    testApp.use("*", appContextMiddlewareFor(getApp()));
+    testApp.route("/", cronMod.app);
+    app = testApp;
     const seedMod = await import("../../../../scripts/dogfood/governance/seed-demo");
     runSeedDemoMock = seedMod.runSeedDemo as unknown as ReturnType<typeof vi.fn>;
   }, 30_000);

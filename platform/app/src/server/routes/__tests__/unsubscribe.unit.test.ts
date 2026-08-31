@@ -1,3 +1,4 @@
+import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const appMock = vi.hoisted(() => ({
@@ -19,14 +20,24 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 import { InvalidUnsubscribeTokenError } from "@langwatch/automation-contract";
+import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
+import { getApp } from "~/server/app-layer/app";
 import { _resetMemoryRateLimitStore } from "~/server/rateLimit";
-import { app } from "../unsubscribe";
+import { app as unsubscribeApp } from "../unsubscribe";
 
 // Transport-mapping test only: the unsubscribe behaviour itself (token
 // verification, scope handling, persistence) is owned and tested by
 // AutomationService — here the service is a mock and the assertions
 // are about HTTP semantics (status codes, Allow header, rate limit).
 const confirmUnsubscribe = appMock.automation.confirmUnsubscribe;
+
+// `createServiceApp` mounts `appContextMiddleware`, which refuses a request
+// whose transport root installed no process App — the same refusal a route
+// mounted outside `api-router.ts` would meet in production. Mounted here the
+// way the router mounts it, so every assertion below is about the handler.
+const testApp = new Hono();
+testApp.use("*", appContextMiddlewareFor(getApp()));
+testApp.route("/", unsubscribeApp);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -39,7 +50,7 @@ function request({ method = "POST", token }: { method?: string; token?: string }
     token != null
       ? `/api/unsubscribe?token=${encodeURIComponent(token)}`
       : "/api/unsubscribe";
-  return app.request(url, { method });
+  return testApp.request(url, { method });
 }
 
 describe("POST /api/unsubscribe (one-click)", () => {
@@ -93,14 +104,14 @@ describe("POST /api/unsubscribe (one-click)", () => {
 
       // The limiter allows 10 requests per 60s window; the 11th is rejected.
       for (let i = 0; i < 10; i++) {
-        const ok = await app.request("/api/unsubscribe?token=t", {
+        const ok = await testApp.request("/api/unsubscribe?token=t", {
           method: "POST",
           headers,
         });
         expect(ok.status).toBe(200);
       }
 
-      const limited = await app.request("/api/unsubscribe?token=t", {
+      const limited = await testApp.request("/api/unsubscribe?token=t", {
         method: "POST",
         headers,
       });

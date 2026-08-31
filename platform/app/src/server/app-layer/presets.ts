@@ -200,6 +200,7 @@ import { createAppLangyCredentialComposition } from "~/runtime/app/features/lang
 import { AppLangySessionKeyMetricsAdapter } from "~/runtime/app/features/langy-session-key-metrics.adapter";
 import { resolveLangyHarness } from "~/runtime/app/features/langy-harness.adapter";
 import { renderLangyTurnContext } from "~/runtime/app/features/langy-turn-context.adapter";
+import { resolveLangyUiActionSurfaceOpen } from "~/runtime/app/features/langy-ui-action-surface.adapter";
 import {
   OpsExplainClickHouseRepository,
   OpsExplainClientResolver,
@@ -2559,6 +2560,9 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
       perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
       sessionKeys: langySessionKeys,
       context: { render: renderLangyTurnContext },
+      uiActionSurface: {
+        resolve: (input) => resolveLangyUiActionSurfaceOpen({ ...input, featureFlags }),
+      },
       metrics: {
         // The counter's published label for a failed turn is `error`; Langy
         // names the same outcome `failed`. Translate here rather than rename

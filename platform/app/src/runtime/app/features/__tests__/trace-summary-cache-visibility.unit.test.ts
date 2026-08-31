@@ -2,8 +2,11 @@ import { createTenantId } from "@langwatch/eventing";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import Redis from "ioredis";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { TraceSummaryRepository } from "@langwatch/trace-server";
-import { AppTraceQueryClassificationAdapter, AppTraceSummaryReaderAdapter } from "../trace";
+import {
+  TraceQueryClassificationAdapter,
+  type TraceSummaryRepository,
+} from "@langwatch/trace-server";
+import { AppTraceSummaryReaderAdapter } from "../trace";
 import { createAppTraceSummaryStore } from "../../trace-summary-fold.adapter";
 
 const summary: TraceSummaryData = {
@@ -96,8 +99,12 @@ describe("Trace summary cache visibility", () => {
   });
 });
 
+// The classifier that answers "does this query need the evaluations join?" moved
+// into `@langwatch/trace-server` with the rest of query compilation (3f559ed6),
+// and `AppTraceRuntime` composes the packaged one. This suite drives the same
+// object the runtime does, so the grammar stays pinned where it now lives.
 describe("Trace query classification", () => {
-  const classifier = AppTraceQueryClassificationAdapter.create();
+  const classifier = TraceQueryClassificationAdapter.create();
 
   it.each(["has:eval", 'has:"eval"', "none:eval", 'none:"eval"', "evaluatorVerdict:pass"])(
     "classifies %s through the canonical queryNeeds grammar",

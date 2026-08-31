@@ -1,15 +1,24 @@
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { hasLangyAccess } from "./langy-access.adapter";
 
+/**
+ * The two fields this gate reads off a resolved credential.
+ *
+ * Structural rather than `ResolvedApiKeyToken` itself, so the gate names what
+ * it uses and nothing more. The project half tracks `ProjectIdentity`: since
+ * a credential carries the identity instead of the project row with its team
+ * (`@langwatch/project-contract`), the organization is a field on the project
+ * and not a nested team.
+ */
 export type LangyIdentityToken =
   | {
       type: "legacyProjectKey";
-      project: { id: string; team: { organizationId: string } };
+      project: { id: string; organizationId: string };
     }
   | {
       type: "apiKey";
       userId: string | null;
-      project: { id: string; team: { organizationId: string } };
+      project: { id: string; organizationId: string };
     };
 
 export type LangyIdentityDenialReason = "unowned" | "no-access";

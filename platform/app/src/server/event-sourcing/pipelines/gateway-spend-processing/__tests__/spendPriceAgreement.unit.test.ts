@@ -46,7 +46,7 @@ import { deliverPayloadToRow, webhookDeliveryPM } from "~/runtime/app/features/w
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import { createTenantId, EventUtils } from "@langwatch/eventing";
 import {
-  GatewaySpendFoldProjection,
+  createGatewaySpendFoldProjection,
   type GatewaySpendState,
 } from "@langwatch/gateway-server";
 import type { ConfirmSpendCommandData } from "@langwatch/gateway-server";
@@ -222,9 +222,9 @@ describe("one price per gateway request", () => {
     };
 
     // The ledger folds it first.
-    const ledger = new GatewaySpendFoldProjection({
-      store: {} as FoldProjectionStore<GatewaySpendState>,
-    }).handleGatewaySpendConfirmed(confirmedEvent(confirmed), {} as GatewaySpendState);
+    const ledger = createGatewaySpendFoldProjection(
+      {} as FoldProjectionStore<GatewaySpendState>,
+    ).handleGatewaySpendConfirmed(confirmedEvent(confirmed), {} as GatewaySpendState);
 
     // A catalog deploy lands before the other two consumers run. Rating
     // now really would answer differently, so the assertions below are not

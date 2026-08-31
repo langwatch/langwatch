@@ -14,6 +14,7 @@ import {
   LangySessionKeyPort,
   LangyTurnContextPort,
   LangyTurnMetricsPort,
+  LangyUiActionSurfacePort,
   type LangyWorkerProbeInput,
   LangyWorkerPort,
 } from "../ports/langy-turn-runtime.port";
@@ -58,6 +59,7 @@ export interface LangyTurnServiceDeps {
   perDayPrCap: number;
   sessionKeys: LangySessionKeyPort;
   context: LangyTurnContextPort;
+  uiActionSurface?: LangyUiActionSurfacePort;
   metrics: LangyTurnMetricsPort;
   admission: LangyTurnAdmissionRepository;
   accessStore: LangyTurnAccessStore | null;
@@ -81,6 +83,7 @@ export type LangyTurnTechnicalPorts = {
   perDayPrCap: number;
   sessionKeys: LangySessionKeyPort;
   context: LangyTurnContextPort;
+  uiActionSurface?: LangyUiActionSurfacePort;
   metrics: LangyTurnMetricsPort;
   accessStore: LangyTurnAccessStore | null;
   handoffStore: LangyTurnHandoffStore | null;

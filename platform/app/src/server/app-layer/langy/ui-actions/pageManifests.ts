@@ -12,9 +12,10 @@ import {
  * a kind is only dispatchable when it appears here, and its payload is parsed
  * with the schema HERE before anything reaches the stream. The client-asserted
  * registration is never consulted for validation. A kind's domain prefix
- * (`workbench.`) names the page family it belongs to, which is how the turn
- * context knows to advertise the channel when a matching context chip is
- * attached.
+ * (`workbench.`) names the page family it belongs to; which context-chip kinds
+ * sit on such a page is `LANGY_UI_ACTION_CHIP_KINDS`
+ * (`@langwatch/langy-contract`), read by the turn block that advertises the
+ * channel.
  *
  * The manifest modules themselves are framework-free on purpose (see
  * `experiments-v3/actions/manifest.ts`), so importing them here pulls no React
@@ -31,11 +32,6 @@ export const PAGE_ACTION_MANIFESTS: Record<
   Record<string, PageActionDefinition>
 > = {
   workbench: WORKBENCH_ACTIONS,
-};
-
-/** Context-chip kinds that mean "the user is on a page with this manifest". */
-export const CHIP_KIND_TO_MANIFEST: Record<string, string> = {
-  experiment: "workbench",
 };
 
 /** Look one action kind up across every page manifest. */

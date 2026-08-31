@@ -17,11 +17,7 @@ import {
   SPAN_RECEIVED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
 import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
-import {
-  capOversizedAttributes,
-  DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
-  hasOversizedAttribute,
-} from "@langwatch/trace-server";
+import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES, TraceAttributeCap } from "@langwatch/trace-server";
 
 /**
  * Spans whose serialized command payload exceeds this threshold are spooled to S3 at
@@ -236,7 +232,7 @@ function leanSpanReceivedEvent(event: Event): Event {
   // (span.attributes, span.events[].attributes, span.links[].attributes, resource.attributes)
   // might need the 256 KB cap. Uses hasOversizedAttribute — the read-only counterpart
   // colocated with capOversizedAttributes — so the gate covers EVERY surface the action covers.
-  const needsNonIoCap = hasOversizedAttribute(
+  const needsNonIoCap = TraceAttributeCap.hasOversizedAttribute(
     data.span,
     data.resource ?? null,
     DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
@@ -290,7 +286,7 @@ function leanSpanReceivedEvent(event: Event): Event {
 
   // Step 5: Cap non-IO / nested / binary values on the cloned span.
   // IO attrs are already ≤ IO_PREVIEW_BYTES (64 KB) < DEFAULT_MAX (256 KB), so they are untouched.
-  capOversizedAttributes(clonedSpan, clonedResource);
+  TraceAttributeCap.capOversizedAttributes(clonedSpan, clonedResource);
 
   return {
     ...event,

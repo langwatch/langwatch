@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 import { hasLangyAccess } from "../langy-access.adapter";
 
@@ -24,11 +23,16 @@ describe("hasLangyAccess", () => {
         }),
       ).resolves.toBe(false);
 
+      // A server read says "no such scope" with the union's own discriminator,
+      // not with the browser's `NOT_TARGETED` sentinel: the service turns a
+      // project target's `organizationId` straight into an ORGANIZATION subject
+      // to look rules up by, so a placeholder id would be looked up as though it
+      // named a real organization. Absent stays absent.
       expect(isEnabled).toHaveBeenCalledWith("release_langy_enabled", {
         kind: "project",
         userId: "customer-1",
         projectId: "project-1",
-        organizationId: NOT_TARGETED,
+        organizationId: undefined,
       });
     });
   });

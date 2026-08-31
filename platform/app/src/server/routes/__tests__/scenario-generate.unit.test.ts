@@ -15,7 +15,11 @@
  */
 import { APICallError } from "ai";
 import { MockLanguageModelV3 } from "ai/test";
+import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
+import type * as AppLayerApp from "~/server/app-layer/app";
+import { getApp } from "~/server/app-layer/app";
 
 const mockGetServerAuthSession = vi.fn();
 vi.mock("~/server/auth", async (importOriginal) => ({
@@ -36,11 +40,29 @@ vi.mock("~/server/modelProviders/utils", async (importOriginal) => ({
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
+// The handler passes the App's two model-provider services straight to
+// `getVercelAIModel`, which is mocked above, so the values are never read —
+// but they have to exist, and `createServiceApp` refuses a request whose
+// transport root installed no App at all.
+vi.mock("~/server/app-layer/app", async (importOriginal) => ({
+  ...(await importOriginal<typeof AppLayerApp>()),
+  getApp: () =>
+    ({
+      modelProviders: { providerService: null },
+      managedProviders: null,
+    }) as unknown as ReturnType<typeof AppLayerApp.getApp>,
+}));
+
 // Import AFTER the mocks so the route binds the stubbed dependencies.
-import { app } from "../scenario-generate";
+import { app as scenarioGenerateApp } from "../scenario-generate";
+
+// Mounted the way `api-router.ts` mounts it, below the App-context root.
+const testApp = new Hono();
+testApp.use("*", appContextMiddlewareFor(getApp()));
+testApp.route("/", scenarioGenerateApp);
 
 const post = (body: unknown) =>
-  app.request("/api/scenario/generate", {
+  testApp.request("/api/scenario/generate", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),

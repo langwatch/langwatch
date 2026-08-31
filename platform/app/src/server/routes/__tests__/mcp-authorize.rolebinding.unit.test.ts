@@ -10,11 +10,14 @@
  * access" on Allow. The fix resolves access via RoleBindings
  * (hasProjectPermission), so RoleBinding-only members can authorize.
  */
+import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
+import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
 import type * as AppLayerApp from "~/server/app-layer/app";
+import { getApp } from "~/server/app-layer/app";
 import { appPermissionsService } from "~/test-utils/appPermissionsMock";
-import { app } from "../misc";
+import { app as miscApp } from "../misc";
 
 const PROJECT_ID = "project_1";
 const TEAM_ID = "team_1";
@@ -124,6 +127,14 @@ runtime.current = {
   permissions: appPermissionsService(mockPrisma),
 };
 
+// `createServiceApp` mounts `appContextMiddleware`, which refuses a request
+// whose transport root installed no process App. Mounted here the way
+// `api-router.ts` mounts it, so the assertions below are about the authorize
+// handler and not about a missing root.
+const testApp = new Hono();
+testApp.use("*", appContextMiddlewareFor(getApp()));
+testApp.route("/", miscApp);
+
 const validBody = {
   projectId: PROJECT_ID,
   redirect_uri: "https://example.com/callback",
@@ -134,7 +145,7 @@ const validBody = {
 };
 
 async function authorize() {
-  return app.request("http://localhost/api/mcp/authorize", {
+  return testApp.request("http://localhost/api/mcp/authorize", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(validBody),

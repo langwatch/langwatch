@@ -9,7 +9,7 @@ function apiKeyToken({ userId }: { userId: string | null }): LangyIdentityToken 
     userId,
     project: {
       id: "project-1",
-      team: { organizationId: "org-1" },
+      organizationId: "org-1",
     },
   };
 }

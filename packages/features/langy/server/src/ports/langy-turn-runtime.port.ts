@@ -79,7 +79,24 @@ export abstract class LangyTurnMetricsPort {
 
 /** Renders the already-validated transport context into Langy's system prompt. */
 export abstract class LangyTurnContextPort {
-  abstract render(context: object): string | null;
+  abstract render(input: { context: object; isUiActionSurfaceOpen: boolean }): string | null;
+}
+
+/**
+ * Answers whether the live UI-action channel is open for this turn.
+ *
+ * The turn block advertises `langwatch ui actions` only while the dispatch
+ * route would answer it; with the flag off that route is a dark 404, and an
+ * agent sent there spends the turn on a surface that behaves as if it were
+ * never deployed. Optional: a composition that supplies no resolver leaves the
+ * channel advertised, which is the flag's own default.
+ */
+export abstract class LangyUiActionSurfacePort {
+  abstract resolve(input: {
+    userId: string;
+    projectId: string;
+    organizationId: string;
+  }): Promise<boolean>;
 }
 
 /** Mints and revokes the restricted worker session credential. */
