@@ -42,9 +42,7 @@ export class AnomalyAlertDispatcherService {
     );
   }
 
-  async dispatchAlert(
-    input: AnomalyAlertDispatchInput,
-  ): Promise<AnomalyAlertDispatchResult> {
+  async dispatchAlert(input: AnomalyAlertDispatchInput): Promise<AnomalyAlertDispatchResult> {
     const parsed = safeParseDestinationConfig(input.rule.destinationConfig);
     if (!parsed.ok) {
       this.diagnostics.warn(
@@ -65,7 +63,7 @@ export class AnomalyAlertDispatcherService {
       return { dispatchTag: "log_only", outcomes: [] };
     }
 
-    const body = JSON.stringify(buildAlertPayload(input));
+    const body = JSON.stringify(AnomalyAlertDispatcherService.alertPayload(input));
     const outcomes: AnomalyAlertDispatchOutcome[] = [];
     for (let index = 0; index < parsed.data.destinations.length; index++) {
       outcomes.push(
@@ -77,7 +75,7 @@ export class AnomalyAlertDispatcherService {
         }),
       );
     }
-    return { dispatchTag: summariseOutcomes(outcomes), outcomes };
+    return { dispatchTag: AnomalyAlertDispatcherService.summariseOutcomes(outcomes), outcomes };
   }
 
   private async dispatchOne(input: {
@@ -143,7 +141,7 @@ export class AnomalyAlertDispatcherService {
         clearTimeout(timer);
       }
       if (attempt < this.maxRetries && this.retryBackoffMs > 0) {
-        await sleep(this.retryBackoffMs * 2 ** attempt);
+        await AnomalyAlertDispatcherService.sleep(this.retryBackoffMs * 2 ** attempt);
       }
     }
 
@@ -160,37 +158,37 @@ export class AnomalyAlertDispatcherService {
       reason: lastError ?? "unknown error",
     };
   }
-}
 
-function buildAlertPayload(input: AnomalyAlertDispatchInput) {
-  return {
-    ruleId: input.rule.id,
-    ruleName: input.rule.name,
-    ruleType: input.rule.ruleType,
-    severity: input.rule.severity,
-    organizationId: input.rule.organizationId,
-    alert: {
-      id: input.alert.id,
-      triggerWindowStartIso: input.alert.triggerWindowStart.toISOString(),
-      triggerWindowEndIso: input.alert.triggerWindowEnd.toISOString(),
-      triggerSpendUsd: input.alert.triggerSpendUsd,
-      triggerEventCount: input.alert.triggerEventCount,
-      detail: input.alert.detail,
-      detectedAtIso: input.alert.detectedAt.toISOString(),
-    },
-  };
-}
-
-function summariseOutcomes(outcomes: AnomalyAlertDispatchOutcome[]): string {
-  const succeeded = outcomes.filter((outcome) => outcome.status === "succeeded").length;
-  const failed = outcomes.length - succeeded;
-  if (succeeded > 0 && failed === 0) return `dispatched_webhook_${succeeded}`;
-  if (succeeded > 0) {
-    return `dispatched_webhook_${succeeded}_failed_${failed}`;
+  private static alertPayload(input: AnomalyAlertDispatchInput) {
+    return {
+      ruleId: input.rule.id,
+      ruleName: input.rule.name,
+      ruleType: input.rule.ruleType,
+      severity: input.rule.severity,
+      organizationId: input.rule.organizationId,
+      alert: {
+        id: input.alert.id,
+        triggerWindowStartIso: input.alert.triggerWindowStart.toISOString(),
+        triggerWindowEndIso: input.alert.triggerWindowEnd.toISOString(),
+        triggerSpendUsd: input.alert.triggerSpendUsd,
+        triggerEventCount: input.alert.triggerEventCount,
+        detail: input.alert.detail,
+        detectedAtIso: input.alert.detectedAt.toISOString(),
+      },
+    };
   }
-  return `failed_webhook_${failed}`;
-}
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  private static summariseOutcomes(outcomes: AnomalyAlertDispatchOutcome[]): string {
+    const succeeded = outcomes.filter((outcome) => outcome.status === "succeeded").length;
+    const failed = outcomes.length - succeeded;
+    if (succeeded > 0 && failed === 0) return `dispatched_webhook_${succeeded}`;
+    if (succeeded > 0) {
+      return `dispatched_webhook_${succeeded}_failed_${failed}`;
+    }
+    return `failed_webhook_${failed}`;
+  }
+
+  private static sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
 }

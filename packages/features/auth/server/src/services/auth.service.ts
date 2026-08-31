@@ -20,27 +20,6 @@ const tokenCacheKey = (token: string) => `${CACHE_PREFIX}${token}`;
 
 type CachedSession = { token: string; expiresAt: number };
 
-function parseCachedSessions(value: string | null): CachedSession[] {
-  if (!value) return [];
-  try {
-    const parsed: unknown = JSON.parse(value);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.flatMap((item): CachedSession[] => {
-      if (
-        typeof item === "object" &&
-        item !== null &&
-        typeof item.token === "string" &&
-        typeof item.expiresAt === "number"
-      ) {
-        return [{ token: item.token, expiresAt: item.expiresAt }];
-      }
-      return [];
-    });
-  } catch {
-    return [];
-  }
-}
-
 /** One process-owned service for browser session reads and revocation. */
 export class AuthService extends AuthCapability {
   static create(options: {
@@ -166,7 +145,7 @@ export class AuthService extends AuthCapability {
 
     try {
       const indexKey = activeSessionsKey(userId);
-      const cached = parseCachedSessions(await store.tryGet({ key: indexKey }));
+      const cached = AuthService.parseCachedSessions(await store.tryGet({ key: indexKey }));
       const retained = cached.filter(({ token }) => token === keepToken);
       for (const { token } of cached) {
         if (token !== keepToken) await store.delete({ key: tokenCacheKey(token) });
@@ -186,6 +165,27 @@ export class AuthService extends AuthCapability {
         { error, userId },
         "Failed to clear Better Auth session cache during revocation",
       );
+    }
+  }
+
+  private static parseCachedSessions(value: string | null): CachedSession[] {
+    if (!value) return [];
+    try {
+      const parsed: unknown = JSON.parse(value);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.flatMap((item): CachedSession[] => {
+        if (
+          typeof item === "object" &&
+          item !== null &&
+          typeof item.token === "string" &&
+          typeof item.expiresAt === "number"
+        ) {
+          return [{ token: item.token, expiresAt: item.expiresAt }];
+        }
+        return [];
+      });
+    } catch {
+      return [];
     }
   }
 }
