@@ -1962,7 +1962,7 @@ The process needs `LANGWATCH_API_KEY` in its environment. It is the same project
 
 ## Step 3: Add the connect function where the service starts
 
-Write a small function beside the code that starts the service. LangWatch calls it once per conversation turn, and it calls the agent the codebase already has. It is an adapter: build the input the agent expects, pass the run parameters into it, and return the reply text out of what the agent gives back.
+Write a small function beside the code that starts the service. It is the adapter between the messages that come from a scenario test and the agent in the codebase.
 
 Put it in the file that starts the service, or in a module that file imports at startup. The connection opens with the process, so the code has to run when the process runs.
 
