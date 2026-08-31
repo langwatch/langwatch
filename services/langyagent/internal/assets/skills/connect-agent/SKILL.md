@@ -8,7 +8,7 @@ compatibility: Works with Claude Code and similar coding agents. The `langwatch`
 
 # Connect Your Agent to LangWatch Simulations
 
-Make the user's own agent function a simulation target. The SDK opens an outbound connection to LangWatch from the process that already runs the agent, registers the agent with its environment and its run parameters, and receives one call per conversation turn. The customer's real code, dependencies, secrets and traces are what the simulation exercises.
+Connect the agent in this codebase to LangWatch, so test suites run from the platform against the real agent process. The SDK opens an outbound connection to LangWatch from the process that already runs the agent, registers the agent with its environment and its run parameters, and receives one call per conversation turn. The simulation exercises the real code, dependencies, secrets and traces.
 
 Three steps: install the SDK, decorate the function, start the process. Work through them in order, confirm the agent reads Online, run one test suite, then report what changed and the result.
 
@@ -96,7 +96,7 @@ TypeScript declares them with a zod schema in `parameters`, the way Step 3 shows
 
 Give every property a default, or the run must supply a value for it. Keep the schema flat and scalar: nested objects and arrays are not run parameters.
 
-valibot and arktype work the same way, and so does any other Standard Schema object that carries a JSON Schema converter. `parameters` also takes a definition map for a project with no schema library (`{ model: { options: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" } }`), or a plain JSON Schema object.
+valibot and arktype work the same way, and so does any other Standard Schema object that has a JSON Schema converter. `parameters` also takes a definition map for a project with no schema library (`{ model: { options: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" } }`), or a plain JSON Schema object.
 
 Declare a parameter for a value the tests must vary: a model, a plan, a tenant, a fixture id. `Literal` and `Enum` in Python, and `z.enum` in TypeScript, become a closed list that the run dialog offers as choices and the platform refuses a value outside of.
 
@@ -159,7 +159,7 @@ langwatch scenario create 'Order status question' \
 langwatch test-suite run 'Smoke' --target connected:support-agent@development --wait
 ```
 
-- `--target connected:<name>@<environment>` names the agent by identity. `connected:<agent-id>` works the same way; `langwatch agent list --format json` carries both.
+- `--target connected:<name>@<environment>` names the agent by identity. `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints both.
 - Write the situation and the criteria from the agent's real behavior in this codebase, not from the example. Include at least one criterion about a tool call or a lookup, which the judge verifies against the agent's own traces.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma. Rephrase instead.
 - `--test-suite` files the scenario into a test suite that exists. Create the test suite first.
@@ -175,7 +175,7 @@ Report to the user:
 - What changed in the codebase: the decorated function, the parameters it declares, the environment it registers under.
 - The result of the first run.
 
-Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and what the failure means for the user, and stop there. Do not paste the raw error text, stack trace or debug URL: those can carry secrets and tell the user nothing they can act on. Do NOT claim a scenario or a test suite ran when it did not.
+Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and what the failure means for the user, and stop there. Do not paste the raw error text, stack trace or debug URL: those can contain secrets and tell the user nothing they can act on. Do NOT claim a scenario or a test suite ran when it did not.
 
 A connected setup shows, on the run page: the conversation transcript, a trace link on each turn opening the agent's own spans, and judge reasoning that cites spans.
 
@@ -192,7 +192,7 @@ How to handle:
 
 ## Fallback: register an HTTP agent
 
-Use this path ONLY when the decorator is impossible: the agent is written in a language with no LangWatch SDK, or the code is out of reach and only a URL is available. The platform then calls a public URL once per conversation turn, and the setup carries three extra pieces of work: a reachable endpoint, a body template, and a `traceparent` middleware.
+Use this path ONLY when the decorator is impossible: the agent is written in a language with no LangWatch SDK, or the code is out of reach and only a URL is available. The platform then calls a public URL once per conversation turn, and the setup needs three extra pieces of work: a reachable endpoint, a body template, and a `traceparent` middleware.
 
 ### Locate the endpoint
 

@@ -57,7 +57,7 @@ The body template renders as a Liquid template on every turn, and `outputPath` i
 
 The URL and the header values render the same variables.
 
-For the response, set `outputPath` to where the reply text lives. If the endpoint answers `{"reply": "It ships on Tuesday."}`, set `outputPath` to `$.reply`. The platform reads the reply text at that path; the response needs no other fields.
+For the response, set `outputPath` to the JSONPath of the reply text. If the endpoint answers `{"reply": "It ships on Tuesday."}`, set `outputPath` to `$.reply`. The platform reads the reply text at that path; the response needs no other fields.
 
 ### Keep a value between turns
 
@@ -159,7 +159,7 @@ langwatch test-suite run 'Smoke' --target http:<agent-id> --wait
 | Symptom | Cause | Fix |
 |---|---|---|
 | The run fails with a connection error | The URL is not reachable from the LangWatch backend: an internal hostname, a firewall, or a stopped service. | Deploy the endpoint to a reachable URL, or use `langwatch agent dev` below for a local process. |
-| Every turn fails with 401 or 403 | The credential is missing or wrong: no header row or `auth` block, or the `{{ secrets.NAME }}` reference names a secret the project does not have. | Add the header row or `auth` block, and check the secret's name and project in **Settings > Secrets**. |
+| Every turn fails with 401 or 403 | The credential is missing or wrong: no header row or `auth` block, or the `{{ secrets.NAME }}` reference points at a secret the project does not have. | Add the header row or `auth` block, and check the secret's name and project in **Settings > Secrets**. |
 | The transcript shows empty replies or raw JSON | `outputPath` does not match the response shape, so no reply text is found. | Set `outputPath` to the JSONPath of the reply text in your endpoint's real response. |
 | Trace-dependent criteria come back inconclusive, and turns have no trace link | The server does not adopt the incoming `traceparent`, or it reports traces to a different LangWatch project. | Adopt the context as in step 4, and point the agent's tracing at the same project's API key. |
 
@@ -193,7 +193,7 @@ With no `--agent` flag, the command lists the project's HTTP agents to pick from
 
 ### How the tunnel is protected
 
-A tunnel URL is public, and a local agent process usually holds real model provider keys. `langwatch agent dev` mints a per-session secret, fronts your local port with a proxy that rejects any request missing the `X-LangWatch-Dev-Secret` header, and writes that header onto the agent's configuration for the session. Only the platform's scenario calls carry the secret. On exit, the command removes both the proxy and the header row.
+The tunnel URL is public, and your local agent process usually holds real model provider keys. `langwatch agent dev` mints a per-session secret, fronts your local port with a proxy that rejects any request missing the `X-LangWatch-Dev-Secret` header, and writes that header onto the agent's configuration for the session. Only the platform's scenario calls send the secret. On exit, the command removes both the proxy and the header row.
 
 `--no-auth` turns the proxy off, for a server that already authenticates every request. A bring-your-own tunnel (`--tunnel-url`) also runs without the proxy, so that tunnel endpoint must supply its own access control. The agent's own configured authentication headers pass through the tunnel unchanged either way.
 
@@ -203,7 +203,7 @@ While the tunnel is up, the agents list and the run target selector show a **loc
 
 The default transport is a Cloudflare quick tunnel on `trycloudflare.com`. The command shows Cloudflare's terms notice on the first run.
 
-- Quick tunnels carry no availability guarantee. Use them for the development loop, and run the test suites you rely on against a deployed URL.
+- Quick tunnels have no availability guarantee. Use them for the development loop, and run the test suites you rely on against a deployed URL.
 - Quick tunnels buffer server-sent events. This does not affect scenario calls, which are plain JSON requests; it only affects a streaming endpoint served through the same tunnel.
 - Quick tunnels cap at around 200 concurrent requests.
 
@@ -262,7 +262,7 @@ class Code:
 
 The mapped input is `None` on the first turn of a conversation, and afterwards exactly the value the code returned, with its JSON types: a dict stays a dict, a string stays a string. `session` needs no declared output. A turn that returns no `session` key keeps the previous value. The value is capped at 64 KB; a larger one fails the turn with `agent_payload_too_large`.
 
-[Testing agents behind authentication](/agent-testing/authenticated-agents) carries the worked OAuth2 client-credentials example, the secret rules and the runtime's limits.
+[Testing agents behind authentication](/agent-testing/authenticated-agents) has the worked OAuth2 client-credentials example, the secret rules and the runtime's limits.
 
 ## Next steps
 

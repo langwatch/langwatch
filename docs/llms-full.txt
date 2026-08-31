@@ -36056,7 +36056,7 @@ Also check: [Run plans](/agent-testing/run-plans), [Results](/agent-testing/resu
 title: Connect Your Agent
 sidebarTitle: Overview
 keywords: langwatch, agent simulations, connected agent, connect_agent, connectAgent, agent decorator, run parameters, environments, scenario suite, coding agent prompt
-description: Decorate the function that runs your agent and start the process. The agent registers itself as a simulation target, and scenario suites run against your real code.
+description: Decorate the function that runs your agent to connect it to LangWatch, so your team can run test suites from the platform against your actual agent.
 ---
 
 ## Getting Started
@@ -36108,7 +36108,7 @@ Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `la
 
 # Connect Your Agent to LangWatch Simulations
 
-Make the user's own agent function a simulation target. The SDK opens an outbound connection to LangWatch from the process that already runs the agent, registers the agent with its environment and its run parameters, and receives one call per conversation turn. The customer's real code, dependencies, secrets and traces are what the simulation exercises.
+Connect the agent in this codebase to LangWatch, so test suites run from the platform against the real agent process. The SDK opens an outbound connection to LangWatch from the process that already runs the agent, registers the agent with its environment and its run parameters, and receives one call per conversation turn. The simulation exercises the real code, dependencies, secrets and traces.
 
 Three steps: install the SDK, decorate the function, start the process. Work through them in order, confirm the agent reads Online, run one test suite, then report what changed and the result.
 
@@ -36237,7 +36237,7 @@ TypeScript declares them with a zod schema in `parameters`, the way Step 3 shows
 
 Give every property a default, or the run must supply a value for it. Keep the schema flat and scalar: nested objects and arrays are not run parameters.
 
-valibot and arktype work the same way, and so does any other Standard Schema object that carries a JSON Schema converter. `parameters` also takes a definition map for a project with no schema library (`{ model: { options: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" } }`), or a plain JSON Schema object.
+valibot and arktype work the same way, and so does any other Standard Schema object that has a JSON Schema converter. `parameters` also takes a definition map for a project with no schema library (`{ model: { options: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" } }`), or a plain JSON Schema object.
 
 Declare a parameter for a value the tests must vary: a model, a plan, a tenant, a fixture id. `Literal` and `Enum` in Python, and `z.enum` in TypeScript, become a closed list that the run dialog offers as choices and the platform refuses a value outside of.
 
@@ -36300,7 +36300,7 @@ langwatch scenario create 'Order status question' \
 langwatch test-suite run 'Smoke' --target connected:support-agent@development --wait
 ```
 
-- `--target connected:<name>@<environment>` names the agent by identity. `connected:<agent-id>` works the same way; `langwatch agent list --format json` carries both.
+- `--target connected:<name>@<environment>` names the agent by identity. `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints both.
 - Write the situation and the criteria from the agent's real behavior in this codebase, not from the example. Include at least one criterion about a tool call or a lookup, which the judge verifies against the agent's own traces.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma. Rephrase instead.
 - `--test-suite` files the scenario into a test suite that exists. Create the test suite first.
@@ -36316,7 +36316,7 @@ Report to the user:
 - What changed in the codebase: the decorated function, the parameters it declares, the environment it registers under.
 - The result of the first run.
 
-Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and what the failure means for the user, and stop there. Do not paste the raw error text, stack trace or debug URL: those can carry secrets and tell the user nothing they can act on. Do NOT claim a scenario or a test suite ran when it did not.
+Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and what the failure means for the user, and stop there. Do not paste the raw error text, stack trace or debug URL: those can contain secrets and tell the user nothing they can act on. Do NOT claim a scenario or a test suite ran when it did not.
 
 A connected setup shows, on the run page: the conversation transcript, a trace link on each turn opening the agent's own spans, and judge reasoning that cites spans.
 
@@ -36333,7 +36333,7 @@ How to handle:
 
 ## Fallback: register an HTTP agent
 
-Use this path ONLY when the decorator is impossible: the agent is written in a language with no LangWatch SDK, or the code is out of reach and only a URL is available. The platform then calls a public URL once per conversation turn, and the setup carries three extra pieces of work: a reachable endpoint, a body template, and a `traceparent` middleware.
+Use this path ONLY when the decorator is impossible: the agent is written in a language with no LangWatch SDK, or the code is out of reach and only a URL is available. The platform then calls a public URL once per conversation turn, and the setup needs three extra pieces of work: a reachable endpoint, a body template, and a `traceparent` middleware.
 
 ### Locate the endpoint
 
@@ -36537,7 +36537,7 @@ Decorate the function that already takes a conversation and returns your agent's
 
 ## 3. Start the process
 
-Start the service the way you always start it. A web server keeps the connection alive by itself, and one process carries every agent it declares over a single connection.
+Start the service the way you always start it. A web server keeps the connection alive by itself, and one process serves every agent it declares over a single connection.
 
 For a script whose only job is the agent, block at the end of the file:
 
@@ -36570,7 +36570,7 @@ Run a test suite against it by name and environment:
 langwatch test-suite run 'Smoke' --target connected:support-agent@development --wait
 ```
 
-`connected:<agent-id>` names the same row. Both forms are in `langwatch agent list --format json`.
+`connected:<agent-id>` is the same target. `langwatch agent list --format json` prints both forms.
 
 ## What the agent receives
 
@@ -36584,7 +36584,7 @@ The platform sends the same fields on every call. They describe the turn, and th
 | `session` | `session` | What the function returned as `session` on the previous turn, empty on the first |
 | `trace_id` | `traceId` | The id of the turn's trace |
 
-In Python the SDK reads the signature once, at decoration, and passes exactly the names the function declares. A function that declares `messages` and `thread_id` receives those two. A function that declares `**kwargs` receives all of them. A first parameter annotated `langwatch.AgentCall` receives one object carrying every field and the parameter values:
+In Python the SDK reads the signature once, at decoration, and passes exactly the names the function declares. A function that declares `messages` and `thread_id` receives those two. A function that declares `**kwargs` receives all of them. A first parameter annotated `langwatch.AgentCall` receives one object with every field and the parameter values:
 
 ```python
 @langwatch.connect_agent(name="support-agent")
@@ -36594,7 +36594,7 @@ async def support_agent(call: langwatch.AgentCall) -> str:
 
 In TypeScript the handler receives one object, `{ messages, newMessages, threadId, session, params, traceId }`.
 
-The function returns a string, one message, a list of messages, or a reply that carries a session value: `langwatch.AgentReply(output, session=...)` in Python, `{ output, session }` in TypeScript.
+The function returns a string, one message, a list of messages, or a reply with a session value: `langwatch.AgentReply(output, session=...)` in Python, `{ output, session }` in TypeScript.
 
 ## Run parameters
 
@@ -36664,7 +36664,7 @@ A run parameter is a value a run supplies, so one scenario covers several condit
 
     Give every property a default, or the run must supply a value for it. Keep the schema flat and scalar: nested objects and arrays are not run parameters.
 
-    Pass the schema object itself, not `schema["~standard"].jsonSchema` and not a validator instance. valibot and arktype work the same way: any Standard Schema object that carries a JSON Schema converter is accepted, and the SDK reads the converter without importing the library.
+    Pass the schema object itself, not `schema["~standard"].jsonSchema` and not a validator instance. valibot and arktype work the same way: the SDK accepts any Standard Schema object that has a JSON Schema converter, and reads the converter without importing the library.
 
     Two more forms exist for a project with no schema library. A definition map:
 
@@ -36680,9 +36680,9 @@ A run parameter is a value a run supplies, so one scenario covers several condit
 
 
 
-The platform normalizes the declaration into the same shape a scenario declares, up to 20 parameters per agent. A closed list becomes a set of choices in the run dialog and a value outside it is refused before the run starts. A type the platform cannot map is offered as text, and the SDK logs which parameter that happened to.
+The platform normalizes the declaration into the same shape a scenario declares, up to 20 parameters per agent. A closed list becomes a set of choices in the run dialog, and the platform refuses a value outside it before the run starts. A type the platform cannot map is offered as text, and the SDK logs which parameter that happened to.
 
-A parameter the run does not supply takes its default. A parameter with no default that the run does not supply is refused before the function is called, with the name in the message.
+A parameter the run does not supply takes its default. When a parameter has no default and the run does not supply it, the SDK refuses the call before it reaches the function, and the message includes the parameter name.
 
 Scenario-declared parameters and agent-declared parameters share one list. See [Run parameters](/agent-testing/run-parameters) for how a run supplies values, for secret parameters, and for what happens when two targets accept different names.
 
@@ -36717,9 +36717,9 @@ Scenario-declared parameters and agent-declared parameters share one list. See [
 
 
 
-The platform holds the value for the run, so the next turn reaches any instance and still carries it. The process stores no state, and a deployment with many pods needs no routing rule.
+The platform holds the value for the run, so the next turn reaches any instance with the value. The process stores no state, and a deployment with many pods needs no routing rule.
 
-An in-memory map is the alternative when you prefer to keep the state in your own process. Key it by `thread_id` and set `sticky=True` (`sticky: true`), which keeps every turn of one conversation on the instance that took the first one:
+To keep the state in your own process instead, use an in-memory map. Key it by `thread_id` and set `sticky=True` (`sticky: true`), which keeps every turn of one conversation on the instance that took the first one:
 
 
   ### Python
@@ -36759,7 +36759,7 @@ An agent that reads the whole `messages` list on every turn needs neither of the
 
 ## Environments and personal agents
 
-An agent registers under an environment, and each environment is its own row and its own target. `support-agent` in `production` and `support-agent` in `development` are two targets, so one comparison run puts your machine next to production.
+The agent registers under an environment. Each environment is its own row and its own target. `support-agent` in `production` and `support-agent` in `development` are two targets, so one comparison run puts your machine next to production.
 
 The SDK resolves the environment in this order:
 
@@ -36789,7 +36789,7 @@ One deployment with several pods is one row and several instances. The platform 
 | `enabled` | Whether this process connects. Default true, and false when `CI` is set, because a CI job is not a service anyone runs suites against. Pass `enabled=True` to override that. |
 | `LANGWATCH_AGENT_CONNECT=0` | Turns the connection off for a deployment without a code change. |
 
-Calls are delivered at most once. The SDK confirms a call when the function starts, and the platform never sends a confirmed call to a second instance, so a turn with side effects runs one time.
+The platform delivers each call at most once. The SDK confirms a call when the function starts, and the platform never sends a confirmed call to a second instance, so a turn with side effects runs one time.
 
 During a rolling deploy the platform closes the connections after the request drain and the SDK reconnects at once, so a new pod picks the agent up.
 
@@ -36811,19 +36811,19 @@ The connection is **outbound only**. The process opens one TLS connection to Lan
 
 **What the key needs.** Connecting needs `scenarios:manage`, and starting a run needs `scenarios:create`. An ingestion key cannot connect. A personal API key never exceeds the permissions its owner has, so a person who cannot run suites cannot connect an agent that runs them. A personal development agent can be run by its owner only.
 
-The API key travels in a request header, never in the URL, so it is not written to proxy logs or browser history. On a self-hosted deployment behind a private certificate authority, point the runtime at the certificate bundle: `SSL_CERT_FILE` for Python, `NODE_EXTRA_CA_CERTS` for Node.
+The SDK sends the API key in a request header, never in the URL, so proxy logs and browser history do not record it. On a self-hosted deployment behind a private certificate authority, point the runtime at the certificate bundle: `SSL_CERT_FILE` for Python, `NODE_EXTRA_CA_CERTS` for Node.
 
 ### Behind a proxy that blocks WebSockets
 
-The connection is a WebSocket by default. Some corporate proxies refuse the upgrade and answer it with an HTTP status such as 403 or 426. The SDK then switches to HTTP long polling on its own, prints one warning line that names the status, and the agent connects the same way: one POST registers, one request waits for the next turn, one POST carries each answer. No WebSocket egress is needed for this path, only outbound HTTPS.
+The connection is a WebSocket by default. Some corporate proxies refuse the upgrade and answer it with an HTTP status such as 403 or 426. The SDK then switches to HTTP long polling on its own, prints one warning line with the status, and the agent connects the same way: one POST registers, one request waits for the next turn, one POST sends each answer. No WebSocket egress is needed for this path, only outbound HTTPS.
 
 To use HTTP from the start, pass `transport="http"` in Python or `transport: "http"` in TypeScript, or set `LANGWATCH_AGENT_TRANSPORT=http` in the process environment. A poll waits up to 25 seconds on the platform side; a proxy with a shorter read timeout closes it early, and the SDK polls again.
 
-Declare parameters with their types and their options, and do not pass a raw parameter string into a privileged operation. The function's own safety is yours: LangWatch calls it, and what it does is your code.
+Declare parameters with their types and their options, and do not pass a raw parameter string into a privileged operation. LangWatch only calls the function. What the function does is your code, and its safety is yours.
 
 ## Troubleshooting
 
-The decorator never stops the application from starting. Every problem is one warning line on stdout that names the fix, and the process runs on.
+The decorator never stops the application from starting. Every problem is one warning line on stdout with the fix, and the process runs on.
 
 | Warning | Fix |
 |---|---|
@@ -36833,7 +36833,7 @@ The decorator never stops the application from starting. Every problem is one wa
 | The key is of the wrong type | An ingestion key cannot connect. Use a project or personal API key. |
 | The key has no `scenarios:manage` permission | Give the key that permission, or use a key that has it. |
 | The endpoint is unreachable | Check `LANGWATCH_ENDPOINT` and the outbound path to it. The SDK keeps reconnecting with a growing wait, so the agent appears as soon as the path opens. |
-| A parameter was refused | The name breaks the parameter name grammar, or the agent declares more than 20. The warning names the parameter. |
+| A parameter was refused | The name breaks the parameter name grammar, or the agent declares more than 20. The warning includes the parameter name. |
 | The environment name was refused | Use lower-case letters, digits, dashes and underscores, up to 32 characters. |
 
 ## Options reference
@@ -36909,7 +36909,7 @@ The trace link on a turn opens the full trace: the simulation's own steps first,
 <img className="block" src="/images/agent-testing/run-trace.png" alt="The trace waterfall with the simulation spans and the agent's own spans in one trace" />
 </Frame>
 
-The run settings also record which instance served each run, so a result from a deployment with several pods says where it came from.
+The run settings also record which instance served each run, so a result from a deployment with several pods shows which instance served it.
 
 ## Common failures
 
@@ -36954,7 +36954,7 @@ description: One agent name, one row per environment. Your machine, staging and 
 
 A connected agent registers with a name and an environment. Each pair is its own row on the **Agents** page and its own target, so `support-agent` in `production` and `support-agent` in `development` are two things you can run the same test suite against.
 
-The agents list groups the rows under the name, so the page reads as one agent with its environments under it. A target label carries the environment: `support-agent · production`, `support-agent · development (Alex)`.
+The agents list groups the rows under the name, so the page reads as one agent with its environments under it. The target label includes the environment: `support-agent · production`, `support-agent · development (Alex)`.
 
 ## How the environment is resolved
 
@@ -36967,7 +36967,7 @@ The SDK reads the first of these that has a value:
 
 Most services already set one of those variables per deployment, so the same code registers as `production` in production and as `development` on a laptop with no argument at all.
 
-An environment name holds lower-case letters, digits, dashes and underscores, up to 32 characters.
+Environment names use lower-case letters, digits, dashes and underscores, up to 32 characters.
 
 ## Personal agents
 
@@ -36979,9 +36979,9 @@ An environment name holds lower-case letters, digits, dashes and underscores, up
 | A project API key | The machine that registered it | Everyone on the project |
 | Any key, environment other than `development` | The project | Everyone on the project |
 
-A run against a teammate's personal agent is refused with `agent_owner_only`, and the message names the owner. The rule applies at every door: the run dialog, the CLI, the REST API and the MCP server.
+The platform refuses a run against a teammate's personal agent with `agent_owner_only`, and the message includes the owner's name. The rule applies at every door: the run dialog, the CLI, the REST API and the MCP server.
 
-The run dialog shows teammates' personal agents disabled. A tooltip on the card names the owner and says only they can run it.
+The run dialog shows teammates' personal agents disabled. The tooltip on the card gives the owner's name and says only they can run it.
 
 For a development machine the whole team runs suites against, give it its own environment name and it is shared like any other:
 
@@ -37026,17 +37026,17 @@ langwatch run-plan run --test-suite "Checkout" \
 
 Quote the target, because the shell reads `?` and `&` itself. A value after `?` is a [run parameter](/agent-testing/run-parameters) for that target alone.
 
-Every target of the run must be online when the run starts. A run naming an offline target is refused before any scenario is scheduled, with `agent_offline`.
+Every target of the run must be online when the run starts. The platform refuses a run with an offline target before it schedules any scenario, with `agent_offline`.
 
 ## What each environment costs to keep
 
 A connected process holds one outbound connection and answers a keepalive. It receives work only while a run is executing, so an environment that runs no suites costs one idle connection.
 
-An agent not seen for 30 days no longer appears in the list. It comes back when the process connects again, with the same row and its history. Deleting an agent also hides it only until the process connects again.
+The list hides an agent not seen for 30 days. It comes back when the process connects again, with the same row and its history. Deleting an agent also hides it only until the process connects again.
 
 ## Turning the connection off
 
-A deployment can opt out without a code change:
+Turn the connection off for a deployment without a code change:
 
 ```bash
 LANGWATCH_AGENT_CONNECT=0
@@ -37074,7 +37074,7 @@ description: Judge scenario criteria against what your agent did, tool calls, wr
 
 ## Connecting your agent traces to the scenario run
 
-Linked traces are the agent's own execution traces, which the judge fetches from LangWatch before its verdict. The agent returns final text; its traces carry what happened on the way there: the span tree, the tool calls with their inputs and outputs, the retrievals, the writes. The judge reads them next to the conversation, so it verifies a criterion about behavior against evidence.
+Linked traces are the agent's own execution traces, which the judge fetches from LangWatch before its verdict. The agent returns final text; its traces record what happened on the way there: the span tree, the tool calls with their inputs and outputs, the retrievals, the writes. The judge reads them next to the conversation, so it verifies a criterion about behavior against evidence.
 
 For example, a support agent replies "your order ships Tuesday". The reply alone cannot show whether the agent looked the order up or made the date up. The trace shows the `lookup_order` tool call and its result, and the judge scores the criterion "the agent looks up the order before answering" from that span.
 
@@ -37283,7 +37283,7 @@ The body template renders as a Liquid template on every turn, and `outputPath` i
 
 The URL and the header values render the same variables.
 
-For the response, set `outputPath` to where the reply text lives. If the endpoint answers `{"reply": "It ships on Tuesday."}`, set `outputPath` to `$.reply`. The platform reads the reply text at that path; the response needs no other fields.
+For the response, set `outputPath` to the JSONPath of the reply text. If the endpoint answers `{"reply": "It ships on Tuesday."}`, set `outputPath` to `$.reply`. The platform reads the reply text at that path; the response needs no other fields.
 
 ### Keep a value between turns
 
@@ -37387,7 +37387,7 @@ langwatch test-suite run 'Smoke' --target http:<agent-id> --wait
 | Symptom | Cause | Fix |
 |---|---|---|
 | The run fails with a connection error | The URL is not reachable from the LangWatch backend: an internal hostname, a firewall, or a stopped service. | Deploy the endpoint to a reachable URL, or use `langwatch agent dev` below for a local process. |
-| Every turn fails with 401 or 403 | The credential is missing or wrong: no header row or `auth` block, or the `{{ secrets.NAME }}` reference names a secret the project does not have. | Add the header row or `auth` block, and check the secret's name and project in **Settings > Secrets**. |
+| Every turn fails with 401 or 403 | The credential is missing or wrong: no header row or `auth` block, or the `{{ secrets.NAME }}` reference points at a secret the project does not have. | Add the header row or `auth` block, and check the secret's name and project in **Settings > Secrets**. |
 | The transcript shows empty replies or raw JSON | `outputPath` does not match the response shape, so no reply text is found. | Set `outputPath` to the JSONPath of the reply text in your endpoint's real response. |
 | Trace-dependent criteria come back inconclusive, and turns have no trace link | The server does not adopt the incoming `traceparent`, or it reports traces to a different LangWatch project. | Adopt the context as in step 4, and point the agent's tracing at the same project's API key. |
 
@@ -37421,7 +37421,7 @@ With no `--agent` flag, the command lists the project's HTTP agents to pick from
 
 ### How the tunnel is protected
 
-A tunnel URL is public, and a local agent process usually holds real model provider keys. `langwatch agent dev` mints a per-session secret, fronts your local port with a proxy that rejects any request missing the `X-LangWatch-Dev-Secret` header, and writes that header onto the agent's configuration for the session. Only the platform's scenario calls carry the secret. On exit, the command removes both the proxy and the header row.
+The tunnel URL is public, and your local agent process usually holds real model provider keys. `langwatch agent dev` mints a per-session secret, fronts your local port with a proxy that rejects any request missing the `X-LangWatch-Dev-Secret` header, and writes that header onto the agent's configuration for the session. Only the platform's scenario calls send the secret. On exit, the command removes both the proxy and the header row.
 
 `--no-auth` turns the proxy off, for a server that already authenticates every request. A bring-your-own tunnel (`--tunnel-url`) also runs without the proxy, so that tunnel endpoint must supply its own access control. The agent's own configured authentication headers pass through the tunnel unchanged either way.
 
@@ -37431,7 +37431,7 @@ While the tunnel is up, the agents list and the run target selector show a **loc
 
 The default transport is a Cloudflare quick tunnel on `trycloudflare.com`. The command shows Cloudflare's terms notice on the first run.
 
-- Quick tunnels carry no availability guarantee. Use them for the development loop, and run the test suites you rely on against a deployed URL.
+- Quick tunnels have no availability guarantee. Use them for the development loop, and run the test suites you rely on against a deployed URL.
 - Quick tunnels buffer server-sent events. This does not affect scenario calls, which are plain JSON requests; it only affects a streaming endpoint served through the same tunnel.
 - Quick tunnels cap at around 200 concurrent requests.
 
@@ -37490,7 +37490,7 @@ class Code:
 
 The mapped input is `None` on the first turn of a conversation, and afterwards exactly the value the code returned, with its JSON types: a dict stays a dict, a string stays a string. `session` needs no declared output. A turn that returns no `session` key keeps the previous value. The value is capped at 64 KB; a larger one fails the turn with `agent_payload_too_large`.
 
-[Testing agents behind authentication](/agent-testing/authenticated-agents) carries the worked OAuth2 client-credentials example, the secret rules and the runtime's limits.
+[Testing agents behind authentication](/agent-testing/authenticated-agents) has the worked OAuth2 client-credentials example, the secret rules and the runtime's limits.
 
 ## Next steps
 
@@ -37629,7 +37629,7 @@ Use evaluations for the parts inside the agent. Use agent testing to check the a
     The same scenarios against two agents, or one agent on two settings, side by side.
   </Card>
   <Card title="Connect your agent" icon="plug" href="/agent-testing/connect-your-agent">
-    Decorate the function that runs your agent, and let the judge read the agent's own traces.
+    Connect your agent from code, so the judge reads your agent's own traces.
   </Card>
   <Card title="Run from CI" icon="rotate" href="/agent-testing/run-from-ci">
     Start a test suite from a CI job and fail the job on a failed run.
@@ -54048,7 +54048,7 @@ Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `la
 
 # Connect Your Agent to LangWatch Simulations
 
-Make the user's own agent function a simulation target. The SDK opens an outbound connection to LangWatch from the process that already runs the agent, registers the agent with its environment and its run parameters, and receives one call per conversation turn. The customer's real code, dependencies, secrets and traces are what the simulation exercises.
+Connect the agent in this codebase to LangWatch, so test suites run from the platform against the real agent process. The SDK opens an outbound connection to LangWatch from the process that already runs the agent, registers the agent with its environment and its run parameters, and receives one call per conversation turn. The simulation exercises the real code, dependencies, secrets and traces.
 
 Three steps: install the SDK, decorate the function, start the process. Work through them in order, confirm the agent reads Online, run one test suite, then report what changed and the result.
 
@@ -54177,7 +54177,7 @@ TypeScript declares them with a zod schema in `parameters`, the way Step 3 shows
 
 Give every property a default, or the run must supply a value for it. Keep the schema flat and scalar: nested objects and arrays are not run parameters.
 
-valibot and arktype work the same way, and so does any other Standard Schema object that carries a JSON Schema converter. `parameters` also takes a definition map for a project with no schema library (`{ model: { options: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" } }`), or a plain JSON Schema object.
+valibot and arktype work the same way, and so does any other Standard Schema object that has a JSON Schema converter. `parameters` also takes a definition map for a project with no schema library (`{ model: { options: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" } }`), or a plain JSON Schema object.
 
 Declare a parameter for a value the tests must vary: a model, a plan, a tenant, a fixture id. `Literal` and `Enum` in Python, and `z.enum` in TypeScript, become a closed list that the run dialog offers as choices and the platform refuses a value outside of.
 
@@ -54240,7 +54240,7 @@ langwatch scenario create 'Order status question' \
 langwatch test-suite run 'Smoke' --target connected:support-agent@development --wait
 ```
 
-- `--target connected:<name>@<environment>` names the agent by identity. `connected:<agent-id>` works the same way; `langwatch agent list --format json` carries both.
+- `--target connected:<name>@<environment>` names the agent by identity. `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints both.
 - Write the situation and the criteria from the agent's real behavior in this codebase, not from the example. Include at least one criterion about a tool call or a lookup, which the judge verifies against the agent's own traces.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma. Rephrase instead.
 - `--test-suite` files the scenario into a test suite that exists. Create the test suite first.
@@ -54256,7 +54256,7 @@ Report to the user:
 - What changed in the codebase: the decorated function, the parameters it declares, the environment it registers under.
 - The result of the first run.
 
-Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and what the failure means for the user, and stop there. Do not paste the raw error text, stack trace or debug URL: those can carry secrets and tell the user nothing they can act on. Do NOT claim a scenario or a test suite ran when it did not.
+Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and what the failure means for the user, and stop there. Do not paste the raw error text, stack trace or debug URL: those can contain secrets and tell the user nothing they can act on. Do NOT claim a scenario or a test suite ran when it did not.
 
 A connected setup shows, on the run page: the conversation transcript, a trace link on each turn opening the agent's own spans, and judge reasoning that cites spans.
 
@@ -54273,7 +54273,7 @@ How to handle:
 
 ## Fallback: register an HTTP agent
 
-Use this path ONLY when the decorator is impossible: the agent is written in a language with no LangWatch SDK, or the code is out of reach and only a URL is available. The platform then calls a public URL once per conversation turn, and the setup carries three extra pieces of work: a reachable endpoint, a body template, and a `traceparent` middleware.
+Use this path ONLY when the decorator is impossible: the agent is written in a language with no LangWatch SDK, or the code is out of reach and only a URL is available. The platform then calls a public URL once per conversation turn, and the setup needs three extra pieces of work: a reachable endpoint, a body template, and a `traceparent` middleware.
 
 ### Locate the endpoint
 

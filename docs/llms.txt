@@ -30,7 +30,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ### Connect your agent
 
-- [Connect Your Agent](https://langwatch.ai/docs/agent-testing/connect-your-agent.md): Decorate the function that runs your agent and start the process. The agent registers itself as a simulation target, and scenario suites run against your real code.
+- [Connect Your Agent](https://langwatch.ai/docs/agent-testing/connect-your-agent.md): Decorate the function that runs your agent to connect it to LangWatch, so your team can run test suites from the platform against your actual agent.
 - [Targets](https://langwatch.ai/docs/agent-testing/targets.md): A target is the agent, prompt, code agent or workflow a run sends the conversation to, together with the parameters it runs with.
 - [Environments and Personal Agents](https://langwatch.ai/docs/agent-testing/environments.md): One agent name, one row per environment. Your machine, staging and production are separate targets that a single run compares.
 - [Linking Your Traces](https://langwatch.ai/docs/agent-testing/linking-your-traces.md): Judge scenario criteria against what your agent did, tool calls, writes and retrievals, read from its own traces rather than from its reply text.

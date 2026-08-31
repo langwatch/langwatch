@@ -50,8 +50,8 @@ export function ConnectAgentPanel({
       <VStack align="start" gap={1}>
         <Text fontWeight="medium">Connect an agent from code</Text>
         <Text fontSize="sm" color="fg.muted">
-          Decorate the function that runs your agent and start the process. It
-          appears here and simulations run against your own code.
+          Decorate the function that runs your agent to connect it to LangWatch.
+          It appears here, and test suites run against your actual agent.
         </Text>
       </VStack>
 
