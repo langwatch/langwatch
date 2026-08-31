@@ -1,6 +1,5 @@
 import { aiToolsRouter } from "./routers/governance/aiTools";
 import { governanceRouter } from "./routers/governance/governance";
-import { ingestionSourcesRouter } from "./routers/governance/ingestionSources";
 import { createTRPCRouter } from "~/server/api/trpc";
 import {
   createAuthzTrpcRouter,
@@ -867,7 +866,7 @@ const coreRouters = {
   personalVirtualKeys: enterpriseGatewayRouters.personalVirtualKeys,
   personalWorkspaceFeatures: personalWorkspaceFeaturesRouter,
   routingPolicy: enterpriseGatewayRouters.routingPolicy,
-  ingestionSources: ingestionSourcesRouter,
+  ingestionSources: enterpriseGovernanceRouters.ingestionSources,
   activityMonitor: enterpriseGovernanceRouters.activityMonitor,
   anomalyRules: enterpriseGovernanceRouters.anomalyRules,
   aiTools: aiToolsRouter,

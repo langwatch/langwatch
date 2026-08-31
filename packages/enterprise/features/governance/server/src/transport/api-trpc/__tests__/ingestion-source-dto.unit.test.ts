@@ -12,7 +12,7 @@
  * ADR-088 v7, Decision 9.
  */
 import { describe, expect, it } from "vitest";
-import { toIngestionSourceDto } from "../ingestionSources";
+import { toIngestionSourceDto } from "../ingestion-sources.api";
 
 const row = (overrides: Record<string, unknown> = {}) =>
   ({

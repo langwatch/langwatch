@@ -167,6 +167,11 @@ export {
   GovernanceTrpcApi,
   type GovernanceTrpcContext,
 } from "./transport/api-trpc/governance.api";
+export {
+  IngestionSourcesTrpcApi,
+  toIngestionSourceDto,
+  type IngestionSourcesTrpcContext,
+} from "./transport/api-trpc/ingestion-sources.api";
 
 /**
  * The public REST family this feature owns. The process supplies the bound

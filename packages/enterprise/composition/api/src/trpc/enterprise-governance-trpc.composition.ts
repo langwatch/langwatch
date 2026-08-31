@@ -27,6 +27,7 @@ import {
   DepartmentsTrpcApi,
   GovernanceTrpcApi,
   IngestionKeyTrpcApi,
+  IngestionSourcesTrpcApi,
   IngestionTemplatesTrpcApi,
   PersonalSessionsTrpcApi,
   SessionPolicyTrpcApi,
@@ -35,6 +36,7 @@ import {
   type DepartmentsTrpcContext,
   type GovernanceTrpcContext,
   type IngestionKeyTrpcContext,
+  type IngestionSourcesTrpcContext,
   type IngestionTemplatesTrpcContext,
   type PersonalSessionsTrpcContext,
   type SessionPolicyTrpcContext,
@@ -53,7 +55,8 @@ export type EnterpriseGovernanceTrpcContext = PersonalSessionsTrpcContext &
   IngestionTemplatesTrpcContext &
   ActivityMonitorTrpcContext &
   AnomalyRulesTrpcContext &
-  GovernanceTrpcContext;
+  GovernanceTrpcContext &
+  IngestionSourcesTrpcContext;
 
 /** One already-composed process policy, applied after a feature's input parser. */
 type EnterpriseTrpcPolicy = <TProcedure>(procedure: TProcedure) => TProcedure;
@@ -109,6 +112,10 @@ export class EnterpriseGovernanceTrpcComposition {
         protected: protectedProcedure,
         policy,
         ocsfExportPlanGate: planGateFor(ENTERPRISE_FEATURE_ERRORS.OCSF_EXPORT),
+      }),
+      ingestionSources: IngestionSourcesTrpcApi.create(root, {
+        protected: protectedProcedure,
+        policy,
       }),
     };
   }
