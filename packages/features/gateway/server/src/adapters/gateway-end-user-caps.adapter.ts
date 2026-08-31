@@ -1,4 +1,3 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
 import { PrismaGatewayBudgetRepository } from "../repositories/prisma/prisma.gateway-budget.repository";
 import { GatewayEndUserCapsService } from "../services/gateway-end-user-caps.service";
@@ -11,11 +10,19 @@ import { GatewayEndUserCapsService } from "../services/gateway-end-user-caps.ser
  * rather than in the service — and the Prisma repository stays private to the
  * package, which is what `private-runtime-export` asks for.
  */
+/**
+ * Whatever the budget repository accepts as its database handle. Taken from
+ * that factory rather than imported, because generated Prisma belongs below
+ * `repositories/prisma` and an adapter naming it would be a second place the
+ * containment rule has to be argued about.
+ */
+type BudgetDatabase = Parameters<typeof PrismaGatewayBudgetRepository.create>[0];
+
 export class GatewayEndUserCapsAdapter {
   private constructor() {}
 
   static create(options: {
-    database: PrismaClient;
+    database: BudgetDatabase;
     spend: GatewayBudgetSpendPort;
   }): GatewayEndUserCapsService {
     return GatewayEndUserCapsService.create({

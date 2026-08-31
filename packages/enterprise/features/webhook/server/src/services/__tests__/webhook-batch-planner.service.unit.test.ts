@@ -180,18 +180,18 @@ describe("WebhookBatchPlanner.plan", () => {
   });
 });
 
-describe("WebhookBatchPlanner.nextWakeAt", () => {
+describe("WebhookBatchPlanner.tryNextWakeAt", () => {
   const planner = () => WebhookBatchPlanner.for(endpoint());
 
   describe("given nothing left buffered", () => {
     it("arms no wake", () => {
-      expect(planner().nextWakeAt({ remaining: [], inFlight: 0, now: NOW })).toBeNull();
+      expect(planner().tryNextWakeAt({ remaining: [], inFlight: 0, now: NOW })).toBeNull();
     });
   });
 
   describe("given the in-flight cap is what is holding the buffer", () => {
     it("rechecks shortly, rather than waiting out a delay that is not the reason", () => {
-      expect(planner().nextWakeAt({ remaining: pending(1), inFlight: 2, now: NOW })).toBe(
+      expect(planner().tryNextWakeAt({ remaining: pending(1), inFlight: 2, now: NOW })).toBe(
         NOW + WEBHOOK_FLUSH_RECHECK_MS,
       );
     });
@@ -199,7 +199,7 @@ describe("WebhookBatchPlanner.nextWakeAt", () => {
 
   describe("given the coalescing delay is what is holding it", () => {
     it("wakes when the oldest envelope's wait is up", () => {
-      expect(planner().nextWakeAt({ remaining: pending(1), inFlight: 0, now: NOW })).toBe(
+      expect(planner().tryNextWakeAt({ remaining: pending(1), inFlight: 0, now: NOW })).toBe(
         NOW + 1_000,
       );
     });
@@ -209,7 +209,7 @@ describe("WebhookBatchPlanner.nextWakeAt", () => {
       // and a stream that wakes itself immediately is a spin.
       const remaining = pending(1, NOW - 10_000);
 
-      expect(planner().nextWakeAt({ remaining, inFlight: 0, now: NOW })).toBe(
+      expect(planner().tryNextWakeAt({ remaining, inFlight: 0, now: NOW })).toBe(
         NOW + WEBHOOK_FLUSH_RECHECK_MS,
       );
     });

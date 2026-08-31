@@ -87,7 +87,7 @@ export class WebhookBatchPlanner {
    * Anything still buffered arms a wake: the coalescing deadline when the
    * delay is holding it, a short recheck when the in-flight cap is.
    */
-  nextWakeAt({
+  tryNextWakeAt({
     remaining,
     inFlight,
     now,

@@ -478,7 +478,7 @@ async function flushEndpointStream({
     sourceEventId: sourceEventId ?? null,
     expectedRevision: existing?.revision ?? 0,
     state: { pending: remaining },
-    nextWakeAt: planner.nextWakeAt({ remaining, inFlight, now }),
+    nextWakeAt: planner.tryNextWakeAt({ remaining, inFlight, now }),
     messages,
     now,
   });
