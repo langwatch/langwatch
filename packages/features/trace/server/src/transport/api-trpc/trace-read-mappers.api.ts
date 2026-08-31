@@ -48,8 +48,7 @@ import {
 } from "@langwatch/trace-contract";
 import type { CodingAgentService, LogContentCategory } from "@langwatch/coding-agent-contract";
 import {
-  compileHiddenAttributeMatchers,
-  redactHiddenAttributesCompiled,
+  TraceAttributeRedactor,
 } from "../../services/trace-attribute-redaction.service";
 import type {
   CategoryVisibility,
@@ -574,12 +573,12 @@ export function redactV2Content<
     ...hiddenCategoryAttributeRules(protections, contentPrivacy),
   ];
   if (hidden.length > 0) {
-    const matchers = compileHiddenAttributeMatchers(hidden);
+    const redactor = TraceAttributeRedactor.for(hidden);
     if (dto.attributes) {
-      redacted.attributes = redactHiddenAttributesCompiled(dto.attributes, matchers);
+      redacted.attributes = redactor.redact(dto.attributes);
     }
     if (dto.params) {
-      redacted.params = redactHiddenAttributesCompiled(dto.params, matchers);
+      redacted.params = redactor.redact(dto.params);
     }
     // Span-detail events carry their own attribute records (list-item events
     // do not, hence the localized cast instead of a constraint field).
@@ -589,7 +588,7 @@ export function redactV2Content<
         event.attributes
           ? {
               ...event,
-              attributes: redactHiddenAttributesCompiled(event.attributes, matchers),
+              attributes: redactor.redact(event.attributes),
             }
           : event,
       );

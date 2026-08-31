@@ -1,4 +1,4 @@
-import { redactHiddenAttributes, type Protections } from "@langwatch/trace-server";
+import { TraceAttributeRedactor, type Protections } from "@langwatch/trace-server";
 import {
   TRACE_EDIT_SPAN_FIELDS,
   TRACE_EDIT_TRACE_FIELDS,
@@ -65,7 +65,7 @@ function readableFieldValue({
   const category = SPAN_FIELD_CONTENT_CATEGORY[field];
   if (category !== null && isDeniedByCategory[category]) return void 0;
   if (field === "params") {
-    return redactHiddenAttributes(spanPatch.params, hiddenAttributes);
+    return TraceAttributeRedactor.for(hiddenAttributes).redact(spanPatch.params);
   }
   return value;
 }
@@ -140,7 +140,7 @@ function redactMetadataEdits({
   for (const [key, value] of Object.entries(metadata)) {
     byAttributeKey[traceAttributeKeyForMetadata(key)] = value;
   }
-  const redacted = redactHiddenAttributes(byAttributeKey, hiddenAttributes);
+  const redacted = TraceAttributeRedactor.for(hiddenAttributes).redact(byAttributeKey);
   if (redacted === byAttributeKey) return metadata;
 
   const next: TraceMetadataEdits = {};

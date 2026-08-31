@@ -1,6 +1,6 @@
 import type { Evaluation } from "@langwatch/trace-contract";
 import { NON_BILLABLE_ATTR } from "@langwatch/trace-contract";
-import { redactHiddenAttributes } from "../../services/trace-attribute-redaction.service";
+import { TraceAttributeRedactor } from "../../services/trace-attribute-redaction.service";
 import {
   canReadCapturedContent,
   type Protections,
@@ -134,7 +134,7 @@ export function gateResources({
   protections: Protections;
 }): TraceResourceInfoDto {
   const redact = (attrs: Record<string, string>): Record<string, string> =>
-    redactHiddenAttributes(attrs, protections.hiddenAttributes) ?? attrs;
+    TraceAttributeRedactor.for(protections.hiddenAttributes).redact(attrs) ?? attrs;
   return {
     ...resources,
     resourceAttributes: redact(resources.resourceAttributes),

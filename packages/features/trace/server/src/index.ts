@@ -236,7 +236,7 @@ export {
   type CategoryVisibility,
   type Protections,
 } from "./services/trace-viewer-protections.service";
-export { redactHiddenAttributes } from "./services/trace-attribute-redaction.service";
+export { TraceAttributeRedactor } from "./services/trace-attribute-redaction.service";
 export {
   buildContentPrivacy,
   contentSearchTermsForViewer,

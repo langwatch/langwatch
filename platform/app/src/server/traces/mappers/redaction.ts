@@ -13,7 +13,7 @@ import type {
   TraceInput,
   TraceOutput,
 } from "@langwatch/trace-contract";
-import { redactHiddenAttributes, type Protections } from "@langwatch/trace-server";
+import { TraceAttributeRedactor, type Protections } from "@langwatch/trace-server";
 import { parsePythonInsideJson } from "~/utils/parsePythonInsideJson";
 
 // Stable display order for the content categories a drop policy can strip, so
@@ -218,9 +218,8 @@ export function applySpanProtections(
   // them. Hidden input/output content riding along inside params (e.g. the
   // raw gen_ai message attributes) is scrubbed by the redactions set.
   const transformedParams = redactObject(
-    redactHiddenAttributes(
+    TraceAttributeRedactor.for(protections.hiddenAttributes).redact(
       span.params as Record<string, unknown> | null | undefined,
-      protections.hiddenAttributes,
     ),
     redactions,
   );
@@ -295,7 +294,7 @@ export function applyDerivedTraceEventProtections(
     return {
       ...event,
       attributes:
-        redactHiddenAttributes(event.attributes, protections.hiddenAttributes) ??
+        TraceAttributeRedactor.for(protections.hiddenAttributes).redact(event.attributes) ??
         event.attributes,
     };
   });
