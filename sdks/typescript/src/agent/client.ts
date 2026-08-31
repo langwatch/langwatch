@@ -618,6 +618,26 @@ export class AgentClient {
       this.sendError({ callId: frame.callId, code, message });
     } finally {
       this.releaseCall({ callId: frame.callId, entry });
+      void this.flushSpans();
+    }
+  }
+
+  /**
+   * Exports the spans of the call now instead of at the exporter's next
+   * schedule. The judge reads the agent's spans right after the last turn,
+   * and a batch exporter would otherwise hold them for seconds, which is what
+   * made the judge report the spans missing.
+   */
+  private async flushSpans(): Promise<void> {
+    const provider = trace.getTracerProvider() as { getDelegate?: () => unknown };
+    const delegate =
+      typeof provider.getDelegate === "function" ? provider.getDelegate() : provider;
+    const flush = (delegate as { forceFlush?: () => Promise<void> } | null)?.forceFlush;
+    if (typeof flush !== "function") return;
+    try {
+      await flush.call(delegate);
+    } catch (error) {
+      this.logger.debug(`span flush after a call failed: ${describeError(error)}`);
     }
   }
 

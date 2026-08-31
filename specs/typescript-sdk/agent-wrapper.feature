@@ -388,3 +388,11 @@ Feature: connectAgent turns a function into a simulation target
       When a call frame carries a traceparent
       Then the active span context inside the handler has that trace id
       And call.traceId is that trace id
+
+  Rule: The spans of a call reach the platform before the judge reads them
+
+    Scenario: The spans of a call are exported as soon as the call answers
+      Given a tracer provider that exports in batches
+      When a call answers
+      Then the client flushes the provider once the result is sent
+      And a flush that fails is logged and does not fail the call

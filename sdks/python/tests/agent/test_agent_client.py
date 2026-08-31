@@ -477,6 +477,39 @@ async def test_traceparent_is_adopted_before_the_call(style):
     assert f"{span.parent.span_id:016x}" == REMOTE_SPAN_ID
 
 
+# @scenario "The spans of a call are exported as soon as the call answers"
+async def test_call_flushes_the_spans_after_the_result(monkeypatch):
+    import threading
+
+    flushed = threading.Event()
+    timeouts: list[Any] = []
+
+    class Provider:
+        def force_flush(self, timeout_millis: int | None = None) -> bool:
+            timeouts.append(timeout_millis)
+            flushed.set()
+            return True
+
+    monkeypatch.setattr(client_module.trace_api, "get_tracer_provider", lambda: Provider())
+
+    def agent(messages):
+        return "ok"
+
+    async with FakePlatform() as platform:
+        client, connection, _, ids = await connect(
+            platform, ConnectedAgent(agent, name="flushing")
+        )
+        try:
+            await connection.call(agent_id=ids["flushing"])
+            await connection.expect("ack")
+            await connection.expect("result")
+            assert await asyncio.to_thread(flushed.wait, 5)
+        finally:
+            await asyncio.to_thread(client.stop)
+
+    assert timeouts == [client_module.SPAN_FLUSH_TIMEOUT_MILLIS]
+
+
 # @scenario "A refused registration warns once, names the fix and disables the client"
 @pytest.mark.parametrize(
     "code,meta,expected",
@@ -766,3 +799,44 @@ async def test_seconds_until_reads_epoch_milliseconds_and_iso_strings():
 
     assert client_module._seconds_until(None) is None
     assert client_module._seconds_until("not a date") is None
+
+
+# @scenario "The handshake moves on to the next address when one does not answer"
+def test_connect_tries_the_next_resolved_address_after_a_short_delay(monkeypatch):
+    captured: dict[str, Any] = {}
+
+    def fake_connect(url: str, **options: Any) -> str:
+        captured["url"] = url
+        captured.update(options)
+        return "connection"
+
+    monkeypatch.setattr(client_module.websockets, "connect", fake_connect)
+    monkeypatch.delenv("LANGWATCH_ENDPOINT", raising=False)
+    client = AgentClient(
+        api_key="k", endpoint="https://app.langwatch.ai", should_install_process_hooks=False
+    )
+    client._resolve_settings()
+
+    assert client._connect() == "connection"
+    assert captured["url"] == "wss://app.langwatch.ai/api/v1/agents/connect"
+    assert captured["open_timeout"] == client_module.OPEN_TIMEOUT_SECONDS
+    assert captured["happy_eyeballs_delay"] == client_module.HAPPY_EYEBALLS_DELAY_SECONDS
+    assert 0 < captured["happy_eyeballs_delay"] < 1
+
+
+# @scenario "The address delay can be tuned from the environment"
+def test_happy_eyeballs_delay_reads_the_environment_and_keeps_the_default_otherwise(
+    monkeypatch,
+):
+    monkeypatch.delenv(client_module.HAPPY_EYEBALLS_DELAY_VARIABLE, raising=False)
+    assert client_module.resolve_happy_eyeballs_delay() == 0.25
+
+    monkeypatch.setenv(client_module.HAPPY_EYEBALLS_DELAY_VARIABLE, "1.5")
+    assert client_module.resolve_happy_eyeballs_delay() == 1.5
+
+    monkeypatch.setenv(client_module.HAPPY_EYEBALLS_DELAY_VARIABLE, "0")
+    assert client_module.resolve_happy_eyeballs_delay() == 0.0
+
+    for bad in ("", "  ", "soon", "-1", "nan"):
+        monkeypatch.setenv(client_module.HAPPY_EYEBALLS_DELAY_VARIABLE, bad)
+        assert client_module.resolve_happy_eyeballs_delay() == 0.25

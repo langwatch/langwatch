@@ -348,6 +348,23 @@ describe("the agent client, given a fake platform", () => {
   });
 
   describe("when the platform sends a call", () => {
+    /** @scenario "The spans of a call are exported as soon as the call answers" */
+    it("flushes the tracer provider once the result is sent", async () => {
+      const forceFlush = vi.fn(async () => undefined);
+      const providerSpy = vi
+        .spyOn(trace, "getTracerProvider")
+        .mockReturnValue({ getDelegate: () => ({ forceFlush }) } as never);
+      try {
+        const { connection } = await connectSupport(async () => "hello");
+
+        connection.send(callFrame({}));
+        await connection.nextFrame("result");
+        await vi.waitFor(() => expect(forceFlush).toHaveBeenCalledTimes(1));
+      } finally {
+        providerSpy.mockRestore();
+      }
+    });
+
     /** @scenario "A call frame reaches the handler as one object" */
     it("acks, runs the handler with the turn fields, and sends the result", async () => {
       const seen: AgentCall<Record<string, AgentParameterValue>>[] = [];
