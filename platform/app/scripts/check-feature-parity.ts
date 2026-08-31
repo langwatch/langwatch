@@ -839,7 +839,11 @@ const ANNOTATION_RE =
 const JSDOC_ANNOTATION_LINE_RE =
   /^[ \t]*\*[ \t]*@scenario[ \t]+(?:"([^"\r\n]+)"|'([^'\r\n]+)'|([^*\r\n]+?))[ \t]*(?:\r)?$/;
 
-function collectJsdocBlocks(src: string): Array<{ text: string; index: number }> {
+function collectJsdocBlocks({
+  src,
+}: {
+  src: string;
+}): Array<{ text: string; index: number }> {
   const blocks: Array<{ text: string; index: number }> = [];
   let i = 0;
   while (i < src.length) {
@@ -921,7 +925,7 @@ export function collectMalformedJsdocAnnotations({
 
   for (const file of files) {
     const src = readFileSync(file, "utf8");
-    for (const block of collectJsdocBlocks(src)) {
+    for (const block of collectJsdocBlocks({ src })) {
       const blockStartLine = src.slice(0, block.index).split("\n").length;
       const lines = block.text.split("\n");
       for (const [lineIndex, lineText] of lines.entries()) {
