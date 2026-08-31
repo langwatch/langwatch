@@ -415,12 +415,16 @@ describe("Prompts Skill", () => {
               "utf8"
             );
 
-            // Code should reference tag-based fetching
-            const usesTagFetch = /tag\s*=\s*["']production["']|tag\s*=\s*["']staging["']|{\s*tag:/.test(mainPy);
+            // The fetch passes a tag, and the file names the tag it deploys.
+            // A named constant, PROMPT_TAG = "production", is the shape most
+            // runs write, so the tag value need not sit at the call itself.
+            const passesATag = /tag\s*=[^=]|{\s*tag:/.test(mainPy);
+            const namesADeploymentTag = /["'](production|staging)["']/.test(mainPy);
 
             expect(
-              usesTagFetch,
-              "Expected code to fetch prompts by tag (e.g., tag='production' or tag='staging')"
+              passesATag && namesADeploymentTag,
+              `Expected code to fetch the prompt by tag and to name the tag it deploys. main.py:
+${mainPy}`
             ).toBe(true);
           },
           scenario.judge(),
