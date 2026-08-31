@@ -41,196 +41,206 @@ export interface ProjectMetadataSubscriberDeps {
 }
 
 /**
- * One queue lane per project, matching this subscriber's per-project dedup id.
+ * What a project's first trace tells us about the project.
  *
- * The queue's dedup key is global to the queue, but the check that decides
- * whether a duplicate is still squashable looks the existing job up in the
- * CURRENT group's job set. So a dedup id that spans groups never squashes:
- * the lookup misses, the key is treated as stale, and it is deleted before a
- * fresh job stages — which also drops the guard protecting the pending job in
- * the other group. A per-project dedup id therefore only bites under a
- * per-project lane, and inheriting the default per-trace lane silently turns
- * the dedup into a no-op that leaves one live job per concurrent trace.
- *
- * This subscriber's work is per-project and level-triggered — it asserts the
- * project's metadata from whichever trace happens to carry it — so all of a
- * project's jobs belong in one serialized lane where the dedup collapses them
- * to one. The queue prefixes `<tenantId>/fold/traceSummary/reactor/
- * projectMetadata/` around this key.
+ * Ingest is the only moment some of this is knowable — the SDK language, that
+ * the project is integrated at all — so it is read once, on the first real
+ * trace. `isRealFirstIngest` is the whole guard: a re-delivered first trace
+ * must not re-announce a project as newly integrated.
  */
-export function projectMetadataGroupKey(event: { tenantId: string }): string {
-  return `project-metadata:${event.tenantId}`;
-}
+export class ProjectMetadataSync {
+  /**
+   * Tracks the project's first real trace as an integration milestone, against
+   * the org admin: that is the same distinct_id posthog-js identifies the user
+   * with in the browser, so this server event joins the browser person.
+   */
+  private static async trackFirstTraceIntegrated({
+    projects,
+    recordProductEvent,
+    tenantId,
+    attrs,
+  }: {
+    projects: ProjectService;
+    recordProductEvent: ProjectMetadataSubscriberDeps["recordProductEvent"];
+    tenantId: string;
+    attrs: Record<string, string>;
+  }): Promise<void> {
+    const { userId } = await projects.resolveOrgAdmin(tenantId);
+    if (!userId) return;
 
-/**
- * Pure relevance guard, shared by `when` (pre-enqueue, sees the committed
- * fold state) and the handler (fail-open path). Sample traces (seeded from
- * the empty-state "Seed sample traces" path; every span carries
- * `langwatch.origin = "sample"`) are not a real first ingest. Flipping
- * `firstMessage` / `integrated` on them would prematurely dismiss the
- * empty-state onboarding card even though the user hasn't connected their own
- * app yet. Skip entirely — a real trace will trigger this subscriber again.
- */
-export function isRealFirstIngest(foldState: TraceSummaryData): boolean {
-  return foldState.attributes?.["langwatch.origin"] !== "sample";
-}
+    recordProductEvent({
+      userId,
+      event: "first_trace_integrated",
+      properties: {
+        sdk_language: attrs["sdk.language"] ?? "unknown",
+        sdk_framework: attrs["langwatch.sdk.framework"] ?? "unknown",
+      },
+      projectId: tenantId,
+    });
+  }
 
-/**
- * Tracks the project's first real trace as an integration milestone, against
- * the org admin: that is the same distinct_id posthog-js identifies the user
- * with in the browser, so this server event joins the browser person.
- */
-async function trackFirstTraceIntegrated({
-  projects,
-  recordProductEvent,
-  tenantId,
-  attrs,
-}: {
-  projects: ProjectService;
-  recordProductEvent: ProjectMetadataSubscriberDeps["recordProductEvent"];
-  tenantId: string;
-  attrs: Record<string, string>;
-}): Promise<void> {
-  const { userId } = await projects.resolveOrgAdmin(tenantId);
-  if (!userId) return;
+  private static async syncProjectMetadata(
+    deps: ProjectMetadataSubscriberDeps,
+    tenantId: string,
+    foldState: TraceSummaryData,
+  ): Promise<void> {
+    const project = await deps.projects.tryGetById(tenantId);
 
-  recordProductEvent({
-    userId,
-    event: "first_trace_integrated",
-    properties: {
-      sdk_language: attrs["sdk.language"] ?? "unknown",
-      sdk_framework: attrs["langwatch.sdk.framework"] ?? "unknown",
-    },
-    projectId: tenantId,
-  });
-}
+    if (!project) {
+      logger.warn({ tenantId }, "Project not found — skipping metadata update");
+      return;
+    }
 
-/**
- * Subscriber handler that marks the project as having received its first
- * message.
- *
- * Sets project.firstMessage = true, project.integrated (unless
- * optimization_studio), and detects the SDK language from span resource
- * attributes. On the firstMessage transition it also tracks the
- * `first_trace_integrated` analytics event against the org admin.
- *
- * Uses a long dedup TTL so we only hit the database once per project in a
- * given window.
- */
-export function createProjectMetadataHandler(
-  deps: ProjectMetadataSubscriberDeps,
-): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {
-  return async (_event, context) => {
-    const { tenantId, state: foldState } = context;
+    // Level-triggered, so it runs BEFORE the already-marked early return
+    // below: an established project is exactly the case that used to be
+    // unreachable here, and exactly the case the deploy backfill existed
+    // to repair.
+    await ProjectMetadataSync.assertClusteringSchedule(deps, tenantId);
 
-    if (!isRealFirstIngest(foldState)) return;
+    // Already marked — nothing to do
+    if (project.firstMessage && project.integrated) {
+      return;
+    }
 
+    await ProjectMetadataSync.markFirstMessage({
+      deps,
+      tenantId,
+      project,
+      attrs: foldState.attributes ?? {},
+    });
+  }
+
+  /**
+   * Own error handling: a bootstrap failure must not be reported as a metadata
+   * failure, and must not stop the metadata write that follows. Failing is
+   * survivable — the next trace re-asserts it.
+   */
+  private static async assertClusteringSchedule(
+    deps: ProjectMetadataSubscriberDeps,
+    tenantId: string,
+  ): Promise<void> {
     try {
-      await syncProjectMetadata(deps, tenantId, foldState);
+      await deps.bootstrapTopicClustering?.(tenantId);
     } catch (error) {
       logger.error(
         {
           tenantId,
           error: error instanceof Error ? error.message : String(error),
         },
-        "Failed to update project metadata — non-fatal",
+        "Topic clustering bootstrap failed — retried on this project's next trace (non-fatal)",
       );
     }
-  };
-}
-
-async function syncProjectMetadata(
-  deps: ProjectMetadataSubscriberDeps,
-  tenantId: string,
-  foldState: TraceSummaryData,
-): Promise<void> {
-  const project = await deps.projects.tryGetById(tenantId);
-
-  if (!project) {
-    logger.warn({ tenantId }, "Project not found — skipping metadata update");
-    return;
   }
 
-  // Level-triggered, so it runs BEFORE the already-marked early return
-  // below: an established project is exactly the case that used to be
-  // unreachable here, and exactly the case the deploy backfill existed
-  // to repair.
-  await assertClusteringSchedule(deps, tenantId);
-
-  // Already marked — nothing to do
-  if (project.firstMessage && project.integrated) {
-    return;
+  private static detectLanguage(attrs: Record<string, string>): string {
+    if (attrs["langwatch.platform"] === "optimization_studio") return "other";
+    const sdkLanguage = attrs["sdk.language"];
+    if (sdkLanguage === "python" || sdkLanguage === "typescript") {
+      return sdkLanguage;
+    }
+    return "other";
   }
 
-  await markFirstMessage({
+  private static async markFirstMessage({
     deps,
     tenantId,
     project,
-    attrs: foldState.attributes ?? {},
-  });
-}
+    attrs,
+  }: {
+    deps: ProjectMetadataSubscriberDeps;
+    tenantId: string;
+    project: { firstMessage: boolean; integrated: boolean };
+    attrs: Record<string, string>;
+  }): Promise<void> {
+    const isOptimizationStudio = attrs["langwatch.platform"] === "optimization_studio";
 
-/**
- * Own error handling: a bootstrap failure must not be reported as a metadata
- * failure, and must not stop the metadata write that follows. Failing is
- * survivable — the next trace re-asserts it.
- */
-async function assertClusteringSchedule(
-  deps: ProjectMetadataSubscriberDeps,
-  tenantId: string,
-): Promise<void> {
-  try {
-    await deps.bootstrapTopicClustering?.(tenantId);
-  } catch (error) {
-    logger.error(
-      {
-        tenantId,
-        error: error instanceof Error ? error.message : String(error),
+    await deps.projects.updateMetadata({
+      id: tenantId,
+      data: {
+        firstMessage: true,
+        integrated: isOptimizationStudio ? project.integrated : true,
+        language: ProjectMetadataSync.detectLanguage(attrs),
       },
-      "Topic clustering bootstrap failed — retried on this project's next trace (non-fatal)",
-    );
-  }
-}
-
-function detectLanguage(attrs: Record<string, string>): string {
-  if (attrs["langwatch.platform"] === "optimization_studio") return "other";
-  const sdkLanguage = attrs["sdk.language"];
-  if (sdkLanguage === "python" || sdkLanguage === "typescript") {
-    return sdkLanguage;
-  }
-  return "other";
-}
-
-async function markFirstMessage({
-  deps,
-  tenantId,
-  project,
-  attrs,
-}: {
-  deps: ProjectMetadataSubscriberDeps;
-  tenantId: string;
-  project: { firstMessage: boolean; integrated: boolean };
-  attrs: Record<string, string>;
-}): Promise<void> {
-  const isOptimizationStudio = attrs["langwatch.platform"] === "optimization_studio";
-
-  await deps.projects.updateMetadata({
-    id: tenantId,
-    data: {
-      firstMessage: true,
-      integrated: isOptimizationStudio ? project.integrated : true,
-      language: detectLanguage(attrs),
-    },
-  });
-
-  // Fired after the metadata write commits, so a failed write retries
-  // the event on the project's next trace instead of dropping it.
-  if (!project.firstMessage) {
-    await trackFirstTraceIntegrated({
-      projects: deps.projects,
-      recordProductEvent: deps.recordProductEvent,
-      tenantId,
-      attrs,
     });
+
+    // Fired after the metadata write commits, so a failed write retries
+    // the event on the project's next trace instead of dropping it.
+    if (!project.firstMessage) {
+      await ProjectMetadataSync.trackFirstTraceIntegrated({
+        projects: deps.projects,
+        recordProductEvent: deps.recordProductEvent,
+        tenantId,
+        attrs,
+      });
+    }
+  }
+
+  /**
+   * One queue lane per project, matching this subscriber's per-project dedup id.
+   *
+   * The queue's dedup key is global to the queue, but the check that decides
+   * whether a duplicate is still squashable looks the existing job up in the
+   * CURRENT group's job set. So a dedup id that spans groups never squashes:
+   * the lookup misses, the key is treated as stale, and it is deleted before a
+   * fresh job stages — which also drops the guard protecting the pending job in
+   * the other group. A per-project dedup id therefore only bites under a
+   * per-project lane, and inheriting the default per-trace lane silently turns
+   * the dedup into a no-op that leaves one live job per concurrent trace.
+   *
+   * This subscriber's work is per-project and level-triggered — it asserts the
+   * project's metadata from whichever trace happens to carry it — so all of a
+   * project's jobs belong in one serialized lane where the dedup collapses them
+   * to one. The queue prefixes `<tenantId>/fold/traceSummary/reactor/
+   * projectMetadata/` around this key.
+   */
+  static projectMetadataGroupKey(event: { tenantId: string }): string {
+    return `project-metadata:${event.tenantId}`;
+  }
+
+  /**
+   * Pure relevance guard, shared by `when` (pre-enqueue, sees the committed
+   * fold state) and the handler (fail-open path). Sample traces (seeded from
+   * the empty-state "Seed sample traces" path; every span carries
+   * `langwatch.origin = "sample"`) are not a real first ingest. Flipping
+   * `firstMessage` / `integrated` on them would prematurely dismiss the
+   * empty-state onboarding card even though the user hasn't connected their own
+   * app yet. Skip entirely — a real trace will trigger this subscriber again.
+   */
+  static isRealFirstIngest(foldState: TraceSummaryData): boolean {
+    return foldState.attributes?.["langwatch.origin"] !== "sample";
+  }
+
+  /**
+   * Subscriber handler that marks the project as having received its first
+   * message.
+   *
+   * Sets project.firstMessage = true, project.integrated (unless
+   * optimization_studio), and detects the SDK language from span resource
+   * attributes. On the firstMessage transition it also tracks the
+   * `first_trace_integrated` analytics event against the org admin.
+   *
+   * Uses a long dedup TTL so we only hit the database once per project in a
+   * given window.
+   */
+  static createProjectMetadataHandler(
+    deps: ProjectMetadataSubscriberDeps,
+  ): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {
+    return async (_event, context) => {
+      const { tenantId, state: foldState } = context;
+
+      if (!ProjectMetadataSync.isRealFirstIngest(foldState)) return;
+
+      try {
+        await ProjectMetadataSync.syncProjectMetadata(deps, tenantId, foldState);
+      } catch (error) {
+        logger.error(
+          {
+            tenantId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "Failed to update project metadata — non-fatal",
+        );
+      }
+    };
   }
 }

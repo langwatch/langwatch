@@ -24,8 +24,8 @@
  */
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import {
-  createProjectMetadataHandler,
   type ProjectMetadataSubscriberDeps,
+  ProjectMetadataSync,
 } from "../project-metadata.subscriber";
 import {
   createContext,
@@ -79,7 +79,7 @@ describe("given a project receiving its first real trace", () => {
   describe("when the same event is handled twice", () => {
     it("records the integration milestone once", async () => {
       const store = makeProjectStore({ firstMessage: false, integrated: false });
-      const handler = createProjectMetadataHandler({
+      const handler = ProjectMetadataSync.createProjectMetadataHandler({
         projects: store.projects as never,
         recordProductEvent,
       });
@@ -98,7 +98,7 @@ describe("given a project receiving its first real trace", () => {
 
     it("writes the metadata once, because the second delivery finds it set", async () => {
       const store = makeProjectStore({ firstMessage: false, integrated: false });
-      const handler = createProjectMetadataHandler({
+      const handler = ProjectMetadataSync.createProjectMetadataHandler({
         projects: store.projects as never,
         recordProductEvent,
       });
@@ -119,7 +119,7 @@ describe("given a project receiving its first real trace", () => {
      */
     it("re-asserts the same metadata", async () => {
       const store = makeProjectStore({ firstMessage: false, integrated: false });
-      const handler = createProjectMetadataHandler({
+      const handler = ProjectMetadataSync.createProjectMetadataHandler({
         projects: store.projects as never,
         recordProductEvent,
       });
@@ -137,7 +137,7 @@ describe("given a project receiving its first real trace", () => {
 describe("given a project that was already integrated", () => {
   it("records no milestone on any delivery", async () => {
     const store = makeProjectStore({ firstMessage: true, integrated: true });
-    const handler = createProjectMetadataHandler({
+    const handler = ProjectMetadataSync.createProjectMetadataHandler({
       projects: store.projects as never,
       recordProductEvent,
     });
@@ -160,7 +160,7 @@ describe("given a project that was already integrated", () => {
     it("re-asserts the clustering schedule on every delivery", async () => {
       const store = makeProjectStore({ firstMessage: true, integrated: true });
       const bootstrapTopicClustering = vi.fn().mockResolvedValue(undefined);
-      const handler = createProjectMetadataHandler({
+      const handler = ProjectMetadataSync.createProjectMetadataHandler({
         projects: store.projects as never,
         recordProductEvent,
         bootstrapTopicClustering,
@@ -178,7 +178,7 @@ describe("given a project that was already integrated", () => {
 describe("given a seeded sample trace", () => {
   it("changes nothing, however many times it is delivered", async () => {
     const store = makeProjectStore({ firstMessage: false, integrated: false });
-    const handler = createProjectMetadataHandler({
+    const handler = ProjectMetadataSync.createProjectMetadataHandler({
       projects: store.projects as never,
       recordProductEvent,
     });

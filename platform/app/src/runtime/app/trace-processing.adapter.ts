@@ -14,34 +14,31 @@ import {
   graphTriggerActivityGroupKey,
 } from "@langwatch/automation-server";
 import {
+  createOriginGateHandler,
   CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
   CUSTOM_EVAL_SYNC_DELAY_MS,
+  CustomEvaluationSync,
+  type EventingTracePipelineAdapterOptions,
   EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
   EXPERIMENT_METRICS_SYNC_DELAY_MS,
+  hasExperimentCostMetrics,
+  hasSimulationMetrics,
+  needsOriginResolution,
   ORIGIN_GATE_DEDUP_TTL_MS,
   ORIGIN_GATE_DELAY_MS,
   PROJECT_METADATA_WINDOW_MS,
+  ProjectMetadataSync,
   RecordSpanCommand,
   SIMULATION_METRICS_SYNC_DEDUP_TTL_MS,
   SIMULATION_METRICS_SYNC_DELAY_MS,
   SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS,
   TRACE_UPDATE_BROADCAST_WINDOW_MS,
+  type TraceDeferredOriginSchedulerPort,
+  TraceProcessingPipelinePort,
+  type TraceSummarySubscriber,
   TRACKED_EVENT_SYNC_DEDUP_TTL_MS,
   TRACKED_EVENT_SYNC_DELAY_MS,
-  TraceProcessingPipelinePort,
-  createOriginGateHandler,
-  customEvaluationSyncDedupId,
-  hasExperimentCostMetrics,
-  hasSimulationMetrics,
-  hasSyncableEvaluations,
-  hasSyncableFeedback,
-  isRealFirstIngest,
-  needsOriginResolution,
-  projectMetadataGroupKey,
-  trackedEventSyncDedupId,
-  type EventingTracePipelineAdapterOptions,
-  type TraceDeferredOriginSchedulerPort,
-  type TraceSummarySubscriber,
+  TrackedEventSync,
 } from "@langwatch/trace-server";
 import { ORIGIN_RESOLVED_EVENT_TYPE, SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
@@ -172,10 +169,10 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withProjectionSubscriber("customEvaluationSync", {
       fold: "traceSummary",
       events: [SPAN_RECEIVED_EVENT_TYPE],
-      when: hasSyncableEvaluations,
+      when: CustomEvaluationSync.hasSyncableEvaluations,
       delay: CUSTOM_EVAL_SYNC_DELAY_MS,
       ttl: CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
-      dedupId: customEvaluationSyncDedupId,
+      dedupId: CustomEvaluationSync.customEvaluationSyncDedupId,
       handler: (event, context) => deps.customEvaluationSyncHandler(event, context),
     })
     // Live span feedback (langwatch.event) → tracked event, same path as the
@@ -183,10 +180,10 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withProjectionSubscriber("trackedEventSync", {
       fold: "traceSummary",
       events: [SPAN_RECEIVED_EVENT_TYPE],
-      when: hasSyncableFeedback,
+      when: TrackedEventSync.hasSyncableFeedback,
       delay: TRACKED_EVENT_SYNC_DELAY_MS,
       ttl: TRACKED_EVENT_SYNC_DEDUP_TTL_MS,
-      dedupId: trackedEventSyncDedupId,
+      dedupId: TrackedEventSync.trackedEventSyncDedupId,
       handler: (event, context) => deps.trackedEventSyncHandler(event, context),
     })
     // SSE notification, throttled to the listener's own debounce; lossy by
@@ -202,12 +199,12 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
       handler: (event, context) => deps.traceUpdateBroadcastHandler(event, context),
     })
     // First-ingest project flags, one serialized lane and one dedup key per
-    // project (see projectMetadataGroupKey for why the two must pair).
+    // project (see ProjectMetadataSync.projectMetadataGroupKey for why the two must pair).
     .withProjectionSubscriber("projectMetadata", {
       fold: "traceSummary",
       runIn: ["worker"],
-      when: (_event, context) => isRealFirstIngest(context.state),
-      groupKeyFn: projectMetadataGroupKey,
+      when: (_event, context) => ProjectMetadataSync.isRealFirstIngest(context.state),
+      groupKeyFn: ProjectMetadataSync.projectMetadataGroupKey,
       ...throttledWindow<TraceProcessingEvent>({
         makeId: (event) => event.tenantId,
         windowMs: PROJECT_METADATA_WINDOW_MS,

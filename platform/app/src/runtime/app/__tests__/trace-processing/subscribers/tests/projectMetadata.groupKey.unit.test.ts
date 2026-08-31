@@ -11,7 +11,7 @@ vi.mock("@langwatch/observability", () => ({
 
 import { buildTraceDeps } from "../../core/support/traceProcessingFixtures";
 import { createTraceProcessingPipeline } from "~/runtime/app/trace-processing.adapter";
-import { projectMetadataGroupKey } from "@langwatch/trace-server";
+import { ProjectMetadataSync } from "@langwatch/trace-server";
 
 /**
  * The lane and the dedup id must describe the same unit of work. The queue
@@ -20,12 +20,12 @@ import { projectMetadataGroupKey } from "@langwatch/trace-server";
  * never collapses anything — it leaves one live job per concurrent trace and
  * deletes the guard on the job already pending elsewhere.
  */
-describe("projectMetadataGroupKey", () => {
+describe("ProjectMetadataSync.projectMetadataGroupKey", () => {
   describe("given two events for the same project", () => {
     describe("when they come from different traces", () => {
       it("routes them to the same lane", () => {
-        expect(projectMetadataGroupKey({ tenantId: "project_x" })).toBe(
-          projectMetadataGroupKey({ tenantId: "project_x" }),
+        expect(ProjectMetadataSync.projectMetadataGroupKey({ tenantId: "project_x" })).toBe(
+          ProjectMetadataSync.projectMetadataGroupKey({ tenantId: "project_x" }),
         );
       });
     });
@@ -33,14 +33,16 @@ describe("projectMetadataGroupKey", () => {
 
   describe("given events for different projects", () => {
     it("routes them to different lanes", () => {
-      expect(projectMetadataGroupKey({ tenantId: "project_x" })).not.toBe(
-        projectMetadataGroupKey({ tenantId: "project_y" }),
+      expect(ProjectMetadataSync.projectMetadataGroupKey({ tenantId: "project_x" })).not.toBe(
+        ProjectMetadataSync.projectMetadataGroupKey({ tenantId: "project_y" }),
       );
     });
   });
 
   it("keys the lane on the project alone", () => {
-    expect(projectMetadataGroupKey({ tenantId: "project_x" })).toBe("project-metadata:project_x");
+    expect(ProjectMetadataSync.projectMetadataGroupKey({ tenantId: "project_x" })).toBe(
+      "project-metadata:project_x",
+    );
   });
 });
 

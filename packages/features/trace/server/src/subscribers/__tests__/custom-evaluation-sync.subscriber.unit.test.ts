@@ -4,10 +4,8 @@ import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type { SpanReceivedEvent, TraceProcessingEvent } from "@langwatch/trace-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import {
+  CustomEvaluationSync,
   type CustomEvaluationSyncSubscriberDeps,
-  createCustomEvaluationSyncHandler,
-  extractEvaluationsFromSpan,
-  hasSyncableEvaluations,
 } from "../custom-evaluation-sync.subscriber";
 
 function makeOtlpSpan(evalPayloads: Record<string, unknown>[]): OtlpSpan {
@@ -138,7 +136,7 @@ describe("extractEvaluationsFromSpan", () => {
     it("extracts evaluation data from json_encoded_event attributes", () => {
       const span = makeOtlpSpan([{ name: "toxicity", score: 0.1, passed: true }]);
 
-      const result = extractEvaluationsFromSpan(span);
+      const result = CustomEvaluationSync.extractEvaluationsFromSpan(span);
 
       expect(result).toHaveLength(1);
       expect(result[0]).toMatchObject({
@@ -154,7 +152,7 @@ describe("extractEvaluationsFromSpan", () => {
       const span = makeOtlpSpan([]);
       span.events = [];
 
-      expect(extractEvaluationsFromSpan(span)).toHaveLength(0);
+      expect(CustomEvaluationSync.extractEvaluationsFromSpan(span)).toHaveLength(0);
     });
   });
 
@@ -171,7 +169,7 @@ describe("extractEvaluationsFromSpan", () => {
         ],
       } as unknown as OtlpSpan;
 
-      expect(extractEvaluationsFromSpan(span)).toHaveLength(0);
+      expect(CustomEvaluationSync.extractEvaluationsFromSpan(span)).toHaveLength(0);
     });
   });
 
@@ -179,7 +177,7 @@ describe("extractEvaluationsFromSpan", () => {
     it("filters it out", () => {
       const span = makeOtlpSpan([{ score: 0.5 }]);
 
-      expect(extractEvaluationsFromSpan(span)).toHaveLength(0);
+      expect(CustomEvaluationSync.extractEvaluationsFromSpan(span)).toHaveLength(0);
     });
   });
 });
@@ -206,7 +204,7 @@ describe("customEvaluationSync subscriber", () => {
 
   describe("when event is not a SpanReceivedEvent", () => {
     it("does not dispatch any commands", async () => {
-      const handler = createCustomEvaluationSyncHandler(deps);
+      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(deps);
       const state = createFoldState();
 
       await handler(createNonSpanEvent(), createContext(state));
@@ -217,7 +215,7 @@ describe("customEvaluationSync subscriber", () => {
 
   describe("when span has no evaluation events", () => {
     it("does not dispatch any commands", async () => {
-      const handler = createCustomEvaluationSyncHandler(deps);
+      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([]);
       span.events = [];
 
@@ -229,7 +227,7 @@ describe("customEvaluationSync subscriber", () => {
 
   describe("when span has evaluation events", () => {
     it("dispatches reportEvaluation for each evaluation", async () => {
-      const handler = createCustomEvaluationSyncHandler(deps);
+      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([
         { name: "toxicity", score: 0.1, passed: true },
         { name: "relevance", score: 0.9, passed: true, label: "good" },
@@ -241,7 +239,7 @@ describe("customEvaluationSync subscriber", () => {
     });
 
     it("uses deterministic evaluation IDs based on MD5 hash", async () => {
-      const handler = createCustomEvaluationSyncHandler(deps);
+      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([{ name: "toxicity", score: 0.1 }]);
 
       await handler(createSpanReceivedEvent(span), createContext(createFoldState()));
@@ -251,7 +249,7 @@ describe("customEvaluationSync subscriber", () => {
     });
 
     it("derives the evaluator ID from the injected slug rule, verbatim", async () => {
-      const handler = createCustomEvaluationSyncHandler(deps);
+      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([{ name: "My Custom Eval", score: 0.5 }]);
 
       await handler(createSpanReceivedEvent(span), createContext(createFoldState()));
@@ -265,7 +263,7 @@ describe("customEvaluationSync subscriber", () => {
     });
 
     it("sets evaluatorType to 'custom'", async () => {
-      const handler = createCustomEvaluationSyncHandler(deps);
+      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([{ name: "toxicity", score: 0.1 }]);
 
       await handler(createSpanReceivedEvent(span), createContext(createFoldState()));
@@ -275,7 +273,7 @@ describe("customEvaluationSync subscriber", () => {
     });
 
     it("sets traceId from the aggregate ID", async () => {
-      const handler = createCustomEvaluationSyncHandler(deps);
+      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([{ name: "toxicity", score: 0.1 }]);
 
       await handler(createSpanReceivedEvent(span), createContext(createFoldState()));
@@ -285,7 +283,7 @@ describe("customEvaluationSync subscriber", () => {
     });
 
     it("passes score, passed, label, details, and status to reportEvaluation", async () => {
-      const handler = createCustomEvaluationSyncHandler(deps);
+      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([
         {
           name: "toxicity",
@@ -308,7 +306,7 @@ describe("customEvaluationSync subscriber", () => {
     });
 
     it("defaults status to 'processed' when not provided and no error", async () => {
-      const handler = createCustomEvaluationSyncHandler(deps);
+      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([{ name: "toxicity", score: 0.1 }]);
 
       await handler(createSpanReceivedEvent(span), createContext(createFoldState()));
@@ -318,7 +316,7 @@ describe("customEvaluationSync subscriber", () => {
     });
 
     it("drops the verdict when the evaluation reports an error", async () => {
-      const handler = createCustomEvaluationSyncHandler(deps);
+      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([
         {
           name: "toxicity",
@@ -340,7 +338,7 @@ describe("customEvaluationSync subscriber", () => {
     });
 
     it("uses provided evaluation_id when present", async () => {
-      const handler = createCustomEvaluationSyncHandler(deps);
+      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([{ evaluation_id: "my-eval-1", name: "toxicity", score: 0.1 }]);
 
       await handler(createSpanReceivedEvent(span), createContext(createFoldState()));
@@ -350,7 +348,7 @@ describe("customEvaluationSync subscriber", () => {
     });
 
     it("uses provided evaluator_id when present", async () => {
-      const handler = createCustomEvaluationSyncHandler(deps);
+      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([{ evaluator_id: "my-evaluator", name: "toxicity", score: 0.1 }]);
 
       await handler(createSpanReceivedEvent(span), createContext(createFoldState()));
@@ -360,7 +358,7 @@ describe("customEvaluationSync subscriber", () => {
     });
 
     it("passes occurredAt from the event", async () => {
-      const handler = createCustomEvaluationSyncHandler(deps);
+      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([{ name: "toxicity", score: 0.1 }]);
       const eventOccurredAt = Date.now();
       const event = createSpanReceivedEvent(span, {
@@ -376,7 +374,7 @@ describe("customEvaluationSync subscriber", () => {
 
   describe("when event is too old", () => {
     it("skips processing", async () => {
-      const handler = createCustomEvaluationSyncHandler(deps);
+      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([{ name: "toxicity", score: 0.1 }]);
       const oldEvent = createSpanReceivedEvent(span, {
         occurredAt: Date.now() - 2 * 60 * 60 * 1000,
@@ -390,7 +388,7 @@ describe("customEvaluationSync subscriber", () => {
 
   describe("when evaluation has error info", () => {
     it("sets status to 'error' and passes error message", async () => {
-      const handler = createCustomEvaluationSyncHandler(deps);
+      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([
         {
           name: "toxicity",
@@ -414,7 +412,7 @@ describe("customEvaluationSync subscriber", () => {
         .mockRejectedValueOnce(new Error("network error"))
         .mockResolvedValueOnce(undefined);
 
-      const handler = createCustomEvaluationSyncHandler(deps);
+      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([
         { name: "toxicity", score: 0.1 },
         { name: "relevance", score: 0.9 },
@@ -430,7 +428,7 @@ describe("customEvaluationSync subscriber", () => {
 
   describe("when the same span is processed twice", () => {
     it("produces the same evaluation ID both times (idempotent)", async () => {
-      const handler = createCustomEvaluationSyncHandler(deps);
+      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([{ name: "toxicity", score: 0.1 }]);
       const event = createSpanReceivedEvent(span);
 
@@ -445,7 +443,7 @@ describe("customEvaluationSync subscriber", () => {
 
   describe("when evaluation has is_guardrail flag", () => {
     it("passes isGuardrail to reportEvaluation command", async () => {
-      const handler = createCustomEvaluationSyncHandler(deps);
+      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([{ name: "content filter", score: 1.0, is_guardrail: true }]);
 
       await handler(createSpanReceivedEvent(span), createContext(createFoldState()));
@@ -460,7 +458,9 @@ describe("customEvaluationSync subscriber", () => {
       it("returns true", () => {
         const span = makeOtlpSpan([{ name: "quality", score: 0.9 }]);
 
-        expect(hasSyncableEvaluations(createSpanReceivedEvent(span))).toBe(true);
+        expect(CustomEvaluationSync.hasSyncableEvaluations(createSpanReceivedEvent(span))).toBe(
+          true,
+        );
       });
     });
 
@@ -468,13 +468,15 @@ describe("customEvaluationSync subscriber", () => {
       it("returns false", () => {
         const span = makeOtlpSpan([]);
 
-        expect(hasSyncableEvaluations(createSpanReceivedEvent(span))).toBe(false);
+        expect(CustomEvaluationSync.hasSyncableEvaluations(createSpanReceivedEvent(span))).toBe(
+          false,
+        );
       });
     });
 
     describe("when event is not a SpanReceivedEvent", () => {
       it("returns false", () => {
-        expect(hasSyncableEvaluations(createNonSpanEvent())).toBe(false);
+        expect(CustomEvaluationSync.hasSyncableEvaluations(createNonSpanEvent())).toBe(false);
       });
     });
 
@@ -485,7 +487,7 @@ describe("customEvaluationSync subscriber", () => {
           occurredAt: Date.now() - 2 * 60 * 60 * 1000,
         });
 
-        expect(hasSyncableEvaluations(staleEvent)).toBe(false);
+        expect(CustomEvaluationSync.hasSyncableEvaluations(staleEvent)).toBe(false);
       });
     });
   });

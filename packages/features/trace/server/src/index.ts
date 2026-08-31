@@ -25,9 +25,7 @@ export {
 export {
   CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
   CUSTOM_EVAL_SYNC_DELAY_MS,
-  createCustomEvaluationSyncHandler,
-  customEvaluationSyncDedupId,
-  hasSyncableEvaluations,
+  CustomEvaluationSync,
 } from "./subscribers/custom-evaluation-sync.subscriber";
 export {
   EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
@@ -37,9 +35,7 @@ export {
 } from "./subscribers/experiment-metrics-sync.subscriber";
 export {
   PROJECT_METADATA_WINDOW_MS,
-  createProjectMetadataHandler,
-  isRealFirstIngest,
-  projectMetadataGroupKey,
+  ProjectMetadataSync,
 } from "./subscribers/project-metadata.subscriber";
 export {
   SIMULATION_METRICS_SYNC_DEDUP_TTL_MS,
@@ -58,9 +54,7 @@ export {
 export {
   TRACKED_EVENT_SYNC_DEDUP_TTL_MS,
   TRACKED_EVENT_SYNC_DELAY_MS,
-  createTrackedEventSyncHandler,
-  hasSyncableFeedback,
-  trackedEventSyncDedupId,
+  TrackedEventSync,
 } from "./subscribers/tracked-event-sync.subscriber";
 export { parseJsonStringValues } from "./services/otlp-trace-request.rules";
 export { SpanRecordIdentity } from "./services/span-record-identity.rules";

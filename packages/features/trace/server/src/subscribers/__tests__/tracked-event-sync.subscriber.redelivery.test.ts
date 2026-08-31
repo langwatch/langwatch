@@ -21,7 +21,7 @@
  * older than an hour — see the last case.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createTrackedEventSyncHandler } from "../tracked-event-sync.subscriber";
+import { TrackedEventSync } from "../tracked-event-sync.subscriber";
 import {
   createContext,
   createFoldState,
@@ -50,7 +50,7 @@ function makeTrackedEventSink() {
       recordTrackedEvent: async (input: Recorded) => {
         recorded.push(input);
       },
-    } as unknown as Parameters<typeof createTrackedEventSyncHandler>[0],
+    } as unknown as Parameters<typeof TrackedEventSync.createTrackedEventSyncHandler>[0],
     /** The identity the tracked-event store collapses on. */
     identities(): Set<string> {
       return new Set(recorded.map((input) => `${input.tenantId}:${input.eventId}`));
@@ -142,7 +142,7 @@ describe("given one span carrying live feedback", () => {
   describe("when the same span_received event is handled twice", () => {
     it("records one tracked-event identity across both deliveries", async () => {
       const sink = makeTrackedEventSink();
-      const handler = createTrackedEventSyncHandler(sink.deps);
+      const handler = TrackedEventSync.createTrackedEventSyncHandler(sink.deps);
       const event = createSpanReceivedEvent(feedbackSpan([thumbsUp]));
 
       await handler(event, createContext(createFoldState()));
@@ -154,7 +154,7 @@ describe("given one span carrying live feedback", () => {
 
     it("records the identical body both times", async () => {
       const sink = makeTrackedEventSink();
-      const handler = createTrackedEventSyncHandler(sink.deps);
+      const handler = TrackedEventSync.createTrackedEventSyncHandler(sink.deps);
       const event = createSpanReceivedEvent(feedbackSpan([thumbsUp]));
 
       await handler(event, createContext(createFoldState()));
@@ -167,7 +167,7 @@ describe("given one span carrying live feedback", () => {
 
     it("keeps the identity when the redelivery is half an hour later", async () => {
       const sink = makeTrackedEventSink();
-      const handler = createTrackedEventSyncHandler(sink.deps);
+      const handler = TrackedEventSync.createTrackedEventSyncHandler(sink.deps);
       const event = createSpanReceivedEvent(feedbackSpan([thumbsUp]));
 
       await handler(event, createContext(createFoldState()));
@@ -182,7 +182,7 @@ describe("given one span carrying live feedback", () => {
   describe("when the redelivery arrives after the staleness threshold", () => {
     it("records nothing further", async () => {
       const sink = makeTrackedEventSink();
-      const handler = createTrackedEventSyncHandler(sink.deps);
+      const handler = TrackedEventSync.createTrackedEventSyncHandler(sink.deps);
       const event = createSpanReceivedEvent(feedbackSpan([thumbsUp]));
 
       await handler(event, createContext(createFoldState()));
@@ -197,7 +197,7 @@ describe("given one span carrying live feedback", () => {
 describe("given two feedback events of the same type on one span", () => {
   it("separates them, so one delivery does not collapse two real votes", async () => {
     const sink = makeTrackedEventSink();
-    const handler = createTrackedEventSyncHandler(sink.deps);
+    const handler = TrackedEventSync.createTrackedEventSyncHandler(sink.deps);
     const event = createSpanReceivedEvent(
       feedbackSpan([thumbsUp, { ...thumbsUp, metrics: { vote: -1 } }]),
     );
@@ -209,7 +209,7 @@ describe("given two feedback events of the same type on one span", () => {
 
   it("gives each of them the same identity again on a redelivery", async () => {
     const sink = makeTrackedEventSink();
-    const handler = createTrackedEventSyncHandler(sink.deps);
+    const handler = TrackedEventSync.createTrackedEventSyncHandler(sink.deps);
     const event = createSpanReceivedEvent(
       feedbackSpan([thumbsUp, { ...thumbsUp, metrics: { vote: -1 } }]),
     );
@@ -231,7 +231,7 @@ describe("given a span whose feedback sits behind an unrelated span event", () =
    */
   it("mints a stable identity across deliveries", async () => {
     const sink = makeTrackedEventSink();
-    const handler = createTrackedEventSyncHandler(sink.deps);
+    const handler = TrackedEventSync.createTrackedEventSyncHandler(sink.deps);
     const event = createSpanReceivedEvent(
       spanWithEvents([
         // The evaluation channel really does carry a JSON blob, so the two
