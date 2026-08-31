@@ -16,6 +16,17 @@
 -- this ahead of the release with CREATE INDEX CONCURRENTLY - which cannot
 -- run here, because Prisma wraps each migration in a transaction - and this
 -- statement then becomes the no-op that records the same intent.
+--
+-- That escape hatch has one trap, and it is the reason this comment is long:
+-- a CREATE INDEX CONCURRENTLY that FAILS leaves an invalid index behind
+-- under this exact name. IF NOT EXISTS would then match it and skip, and the
+-- planner never uses an invalid index - so the migration would report success
+-- while the read stayed broken, which is the worst of both. Anyone taking the
+-- concurrent path must check
+--   SELECT indisvalid FROM pg_index WHERE indexrelid =
+--     '"Grant_organizationId_roleKey_live_idx"'::regclass;
+-- and DROP INDEX before retrying. Left alone, the plain build below is safe:
+-- it takes a lock that blocks writes to Grant, not reads, for the build.
 CREATE INDEX IF NOT EXISTS "Grant_organizationId_roleKey_live_idx"
   ON "Grant" ("organizationId", "roleKey")
   WHERE "revokedAt" IS NULL;
