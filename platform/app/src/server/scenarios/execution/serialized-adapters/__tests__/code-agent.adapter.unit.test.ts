@@ -4,6 +4,7 @@
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { closeNlpFetchDispatchers } from "../../../../nlpgo/timeouts";
 import type { CodeAgentData } from "../../types";
 
 // Capture withActiveSpan calls so the timeout/error paths can be verified.
@@ -77,6 +78,24 @@ const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
+// Undici's Agent does not read back the timeouts it was constructed with, so
+// the only way to assert on the dispatcher the adapter passes is to record the
+// constructor's arguments. The global fetch above stays the interception point.
+const agentOptions = vi.hoisted(() => [] as Record<string, unknown>[]);
+
+vi.mock("undici", async () => {
+  const actual = await vi.importActual<typeof import("undici")>("undici");
+  return {
+    ...actual,
+    Agent: class RecordingAgent extends actual.Agent {
+      constructor(opts?: Record<string, unknown>) {
+        agentOptions.push(opts ?? {});
+        super(opts);
+      }
+    },
+  };
+});
+
 describe("SerializedCodeAgentAdapter", () => {
   const defaultConfig: CodeAgentData = {
     type: "code",
@@ -112,9 +131,16 @@ describe("SerializedCodeAgentAdapter", () => {
     scenarioConfig: {} as AgentInput["scenarioConfig"],
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     withActiveSpanCalls.length = 0;
+    agentOptions.length = 0;
+    // createNlpFetchDispatcher now memoizes by timeoutMs at module scope
+    // (nlpgo/timeouts.ts). Without clearing the cache here, a dispatcher
+    // built by an earlier test for the same timeoutMs is returned again
+    // without touching the mocked undici.Agent constructor, so agentOptions
+    // stays empty and this test's assertions see stale/undefined values.
+    await closeNlpFetchDispatchers();
     // Pin the timeout explicitly so the test doesn't rely on ambient env.
     // Stubbed, not assigned: a raw assignment here outlives the file and
     // reaches whatever else shares this vitest worker.
@@ -388,6 +414,26 @@ describe("SerializedCodeAgentAdapter", () => {
 
       const fetchOptions = mockFetch.mock.calls[0]![1];
       expect(fetchOptions.signal).toBeInstanceOf(AbortSignal);
+    });
+
+    // The abort signal above is not the only deadline in play: undici's own
+    // headersTimeout lives on the dispatcher and defaults to 300s, so without
+    // one sized to this adapter's deadline a longer run dies at 300s no matter
+    // how far out the abort is armed.
+    it("passes a dispatcher whose headers timeout matches the adapter's own fetch timeout", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+      await adapter.call(defaultInput);
+
+      const fetchOptions = mockFetch.mock.calls[0]![1];
+      expect(fetchOptions.dispatcher).toBeDefined();
+      expect(agentOptions.at(-1)?.headersTimeout).toBeGreaterThan(300_000);
+      expect(agentOptions.at(-1)?.headersTimeout).toBe(
+        agentOptions.at(-1)?.bodyTimeout,
+      );
     });
 
     it("sets run_evaluations to false and do_not_trace to true", async () => {

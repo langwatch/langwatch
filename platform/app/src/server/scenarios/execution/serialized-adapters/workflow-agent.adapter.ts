@@ -23,6 +23,8 @@ import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
 import { randomBytes } from "crypto";
 import {
+  createNlpFetchDispatcher,
+  type FetchInitWithDispatcher,
   resolveFloorFetchTimeoutMs,
   resolveMaxFetchTimeoutMs,
 } from "../../../nlpgo/timeouts";
@@ -225,32 +227,15 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
     };
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), fetchTimeoutMs());
+    const timeoutMs = fetchTimeoutMs();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      let response: Response;
-      try {
-        response = await fetch(`${this.nlpServiceUrl}/go/studio/execute_sync`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(event),
-          signal: controller.signal,
-        });
-      } catch (fetchError) {
-        const cause =
-          fetchError instanceof Error && "cause" in fetchError
-            ? ` (cause: ${String(
-                (fetchError as Error & { cause?: unknown }).cause,
-              )})`
-            : "";
-        throw new Error(
-          `Workflow execution failed: fetch to ${this.nlpServiceUrl}/go/studio/execute_sync failed - ${
-            fetchError instanceof Error
-              ? fetchError.message
-              : String(fetchError)
-          }${cause}`,
-        );
-      }
+      const response = await this.postExecuteSync({
+        body: JSON.stringify(event),
+        signal: controller.signal,
+        timeoutMs,
+      });
 
       if (!response.ok) {
         let errorMessage = "";
@@ -280,6 +265,42 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
       return result.result;
     } finally {
       clearTimeout(timeout);
+    }
+  }
+
+  private async postExecuteSync({
+    body,
+    signal,
+    timeoutMs,
+  }: {
+    body: string;
+    signal: AbortSignal;
+    timeoutMs: number;
+  }): Promise<Response> {
+    try {
+      const fetchInit: FetchInitWithDispatcher = {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+        signal,
+        dispatcher: createNlpFetchDispatcher({ timeoutMs }),
+      };
+      return await fetch(
+        `${this.nlpServiceUrl}/go/studio/execute_sync`,
+        fetchInit,
+      );
+    } catch (fetchError) {
+      const cause =
+        fetchError instanceof Error && "cause" in fetchError
+          ? ` (cause: ${String(
+              (fetchError as Error & { cause?: unknown }).cause,
+            )})`
+          : "";
+      throw new Error(
+        `Workflow execution failed: fetch to ${this.nlpServiceUrl}/go/studio/execute_sync failed - ${
+          fetchError instanceof Error ? fetchError.message : String(fetchError)
+        }${cause}`,
+      );
     }
   }
 
