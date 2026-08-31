@@ -68,7 +68,7 @@ function RunDrawerBody({
 }
 
 /**
- * The header offers Open Scenario alone, so the drawer starts no run of its
+ * The header offers Edit Scenario alone, so the drawer starts no run of its
  * own. A rerun goes through the run dialog, which is the one place a run plan
  * name is resolved.
  */

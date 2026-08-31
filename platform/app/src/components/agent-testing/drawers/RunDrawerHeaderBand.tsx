@@ -102,7 +102,7 @@ function HeaderActions({
           data-testid="run-drawer-open-scenario"
         >
           <Icon as={Edit2} boxSize={3.5} />
-          Open Scenario
+          Edit Scenario
         </Button>
       )}
       <ScenarioRunActions

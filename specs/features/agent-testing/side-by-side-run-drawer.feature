@@ -122,10 +122,10 @@ Feature: The wide run detail drawer
     And the line breaks the judge wrote are kept, and the text still wraps
 
   @integration
-  Scenario: The drawer header offers Open Scenario for the scenario that ran
+  Scenario: The drawer header offers Edit Scenario for the scenario that ran
     Given a run open in the drawer
     When its header is read
-    Then one labelled "Open Scenario" control for the scenario is offered
+    Then one labelled "Edit Scenario" control for the scenario is offered
     And using it opens the scenario editor
 
   @integration
@@ -133,7 +133,7 @@ Feature: The wide run detail drawer
     Given a run open in the drawer
     When its header is read
     Then no separate Play and Edit icon buttons are offered
-    And a single "Open Scenario" button is shown next to the overflow menu
+    And a single "Edit Scenario" button is shown next to the overflow menu
     And a run of that scenario is triggered from inside the scenario editor
       through its "Save & Run" control
 
