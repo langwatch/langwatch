@@ -826,3 +826,90 @@ reserved name contains a dash. Making it guard the slugified NAME instead
 would newly refuse a project called "Settings" — a product decision, not a
 cleanup one. The test records what the code does and says why it does not
 claim more.
+
+## service-quality: 10 -> 4, and the baseline ratcheted (2026-08-31)
+
+Three more services came off, and the seven stale baseline entries went to
+four.
+
+**`authz-grants.service.ts`** (511): the three checks every grant write runs
+were private methods that each took a `repository` parameter, and all six
+call sites passed the same value — `this.options.repository`, destructured
+on the line above. `AuthzGrantGuardsService` holds it once. 410 lines.
+
+The thirteen ledger pass-throughs below stayed. They are contract methods
+with 100+ call sites between them; collapsing that facade is a redesign.
+
+**`experiment.service.ts`** (749) held four sub-domains. The evaluations
+workbench came out as three collaborators — slug minting, reference
+checking, and the seven workbench operations — and `PostgresUniqueConflict`
+went to an adapter, which is where reading P2002 and the driver's two
+constraint shapes belongs. 415 lines.
+
+**`usage-limit.service.ts`** (827) answered two unrelated questions: report
+a hard limit to our internal channels, and warn the customer's own admins
+on the way up. `UsageWarningService` owns the second. The alert cooldown was
+three exported module-level singletons in a service module and is now an
+adapter. 320 lines.
+
+### The baseline only shrinks if something shrinks it
+
+`service-quality-baseline.json` is meant to ratchet, but nothing tightens an
+entry when the file gets smaller — it keeps the old number and the file is
+free to grow back. Three had drifted, holding 310 lines of regrowth room
+between them, measured with the policy's own
+`collectServiceQualityCeilings` and applied as min(existing, measured).
+
+The other four are stale for the opposite reason: the file has grown PAST
+its ceiling. Tightening cannot fix those and must not paper over them.
+
+## Where to put things, learned the hard way
+
+Two attempts added a violation instead of removing one, and both are worth
+knowing before the next extraction:
+
+- **`services/` admits only `<subject>.service.ts`.** A `.rules.ts` there is
+  a `feature-source-layout` violation, which is how the existing `*.rules.ts`
+  files elsewhere in the tree got onto that list. `ProjectSlugService` is a
+  service for that reason.
+- **`ports/` wants an abstract Port class.** Structural interfaces that
+  composition satisfies with plain objects are not that, so shared types go
+  in the feature's contract package instead — where the usage-limit ones now
+  sit, next to the notifier inputs that are the same kind of thing.
+- **Technology qualifiers are dotted.** `postgres.unique-conflict.adapter.ts`,
+  not `postgres-unique-conflict`.
+
+## Sabotage found four untested paths
+
+Every extraction was sabotage-checked, and four sabotages passed, which is
+the interesting result — each one named code that no test exercised:
+
+| what was broken | nothing failed, so |
+| --- | --- |
+| skipping the workbench reference check on save | 16 tests written for it |
+| storing run results in the version snapshot | 1 test written for it |
+
+`WorkbenchMissingReferenceError` — the refusal a customer reads as "this
+evaluation points at something that no longer exists" — was tested nowhere
+at all. The new tests pin the distinction that matters most in that path: an
+evaluator or workflow service that is DOWN must not read as one that is
+GONE. One is a retry; the other tells the customer to go and fix a workbench
+that is fine.
+
+Elsewhere the existing tests carried the moves, and said so under sabotage:
+the grant guards fail 2/2/1, the ingestion tally 2, the slug transforms
+1/3/10, the usage-warning rules 1/1/1.
+
+## A dead guard, reported not fixed
+
+`ProjectSlugService.mint` refuses a slug equal to a reserved top-level route
+(`admin`, `api`, `settings`, ...). It cannot fire: the slug is always
+`${slugified}-${idPrefix}`, so it is `settings-`, never `settings`, and no
+reserved name contains a dash. Making it guard the slugified NAME would
+newly refuse a project called "Settings" — a product decision, not a cleanup
+one. The test records what the code does rather than claiming more.
+
+## Running total
+
+architecture-lint violations 845 -> 832 for the session, with
+`comment-block-size` at 0 and `service-quality` at 4.
