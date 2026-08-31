@@ -1,12 +1,12 @@
 import type { AutomationService } from "@langwatch/automation-contract";
 import {
-  AutomationClock,
+  AutomationClockPort,
   AutomationEmailCapService,
   AutomationEmailCapStorePort,
   AutomationPersistCapService,
   PostgresAutomationAdapter,
-  SchedulerWake,
-  UnsubscribeTokenVerifier,
+  SchedulerWakePort,
+  UnsubscribeTokenVerifierPort,
   type AutomationTestFirePort,
 } from "@langwatch/automation-server";
 import {
@@ -59,19 +59,19 @@ export function createAppAutomationEmailCaps(redis: SchedulerRedis): AutomationE
   return AutomationEmailCapService.create({ store });
 }
 
-export class AppAutomationClock extends AutomationClock {
+export class AppAutomationClock extends AutomationClockPort {
   now(): Date {
     return new Date();
   }
 }
 
-class AppUnsubscribeTokenVerifier extends UnsubscribeTokenVerifier {
+class AppUnsubscribeTokenVerifier extends UnsubscribeTokenVerifierPort {
   tryVerify(token: string) {
     return verifyUnsubscribeToken(token);
   }
 }
 
-class AppSchedulerWake extends SchedulerWake {
+class AppSchedulerWake extends SchedulerWakePort {
   constructor(private readonly redis: SchedulerRedis) {
     super();
   }
@@ -87,7 +87,7 @@ export class AppAutomationRuntime {
     private readonly database: PrismaClient,
     private readonly redis: SchedulerRedis,
     private readonly graph: AppAutomationGraphPorts,
-    private readonly clock: AutomationClock,
+    private readonly clock: AutomationClockPort,
     private readonly testFire: AutomationTestFirePort,
     private readonly persistCaps: AutomationPersistCapService,
   ) {}
@@ -96,7 +96,7 @@ export class AppAutomationRuntime {
     database: PrismaClient;
     redis?: SchedulerRedis;
     graph: AppAutomationGraphPorts;
-    clock?: AutomationClock;
+    clock?: AutomationClockPort;
     testFire: AutomationTestFirePort;
     persistCaps: AutomationPersistCapService;
   }): AppAutomationRuntime {

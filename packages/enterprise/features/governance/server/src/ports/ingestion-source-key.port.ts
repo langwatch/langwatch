@@ -45,3 +45,7 @@ export abstract class IngestionKeyIssuerPort {
     awaitProjection: false;
   }): Promise<void>;
 }
+
+export abstract class IngestionKeyCapability {
+  abstract ensureForProject(input: IngestionKeyMintCommand): Promise<IssuedIngestionKey>;
+}

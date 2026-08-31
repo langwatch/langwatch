@@ -4,7 +4,7 @@ import {
   type AutomationPersistCapBreach,
 } from "@langwatch/automation-contract";
 import { AutomationRunawayPort } from "../ports/automation-runaway.port";
-import { AutomationClock } from "../ports/automation-clock.port";
+import { AutomationClockPort } from "../ports/automation-clock.port";
 import { TriggerRepository } from "../repositories/trigger.repository";
 
 export { RUNAWAY_PAUSE_REASON };
@@ -19,13 +19,13 @@ export class RunawayContainmentService {
   private constructor(
     private readonly runaway: AutomationRunawayPort,
     private readonly triggers: TriggerRepository,
-    private readonly clock: AutomationClock,
+    private readonly clock: AutomationClockPort,
   ) {}
 
   static create(input: {
     runaway: AutomationRunawayPort;
     triggers: TriggerRepository;
-    clock: AutomationClock;
+    clock: AutomationClockPort;
   }): RunawayContainmentService {
     return new RunawayContainmentService(input.runaway, input.triggers, input.clock);
   }

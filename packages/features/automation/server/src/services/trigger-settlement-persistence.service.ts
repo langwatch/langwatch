@@ -4,7 +4,7 @@ import { DispatchError, isDispatchError, pMapLimited } from "@langwatch/eventing
 import { createLogger } from "@langwatch/observability";
 import type { Project, ProjectService } from "@langwatch/project-contract";
 import type { TraceService } from "@langwatch/trace-contract";
-import type { AutomationClock } from "../ports/automation-clock.port";
+import type { AutomationClockPort } from "../ports/automation-clock.port";
 import type {
   AutomationSettlementMatchConfirmationPort,
   AutomationSettlementObservabilityPort,
@@ -21,7 +21,7 @@ type PersistenceComposition = {
   traces: TraceService;
   confirmation: AutomationSettlementMatchConfirmationPort;
   persistActions: AutomationPersistActionService;
-  clock: AutomationClock;
+  clock: AutomationClockPort;
   observability: AutomationSettlementObservabilityPort;
 };
 

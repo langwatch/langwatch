@@ -8,7 +8,7 @@ import {
 import type { AutomationService } from "@langwatch/automation-contract";
 import { DispatchError } from "@langwatch/eventing";
 import type { TraceRecord } from "@langwatch/trace-contract";
-import type { AutomationClock } from "../ports/automation-clock.port";
+import type { AutomationClockPort } from "../ports/automation-clock.port";
 import type { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port";
 import type { AutomationEmailCapService } from "./email-cap.service";
 
@@ -24,7 +24,7 @@ type EmailComposition = {
   automation: AutomationService;
   delivery: AutomationNotificationDeliveryPort;
   emailCaps: AutomationEmailCapService;
-  clock: AutomationClock;
+  clock: AutomationClockPort;
   emailHourlyCap: number;
   tenantDailyCap: number;
 };

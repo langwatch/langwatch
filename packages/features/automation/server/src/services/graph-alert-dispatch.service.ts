@@ -7,7 +7,7 @@ import {
   type SlackTemplateType,
 } from "@langwatch/automation-contract";
 import { DispatchError } from "@langwatch/eventing";
-import type { AutomationClock } from "../ports/automation-clock.port";
+import type { AutomationClockPort } from "../ports/automation-clock.port";
 import type { AutomationGraphDeliveryPort } from "../ports/automation-graph-delivery.port";
 import type {
   GraphAlertDispatchInput,
@@ -32,7 +32,7 @@ export class GraphAlertDispatchService {
     private readonly emailCaps: AutomationEmailCapService,
     private readonly delivery: AutomationNotificationDeliveryPort,
     private readonly webhooks: AutomationWebhookProviderPort,
-    private readonly clock: AutomationClock,
+    private readonly clock: AutomationClockPort,
     private readonly emailHourlyCap: number,
     private readonly tenantDailyCap: number,
   ) {}
@@ -42,7 +42,7 @@ export class GraphAlertDispatchService {
     emailCaps: AutomationEmailCapService;
     delivery: AutomationNotificationDeliveryPort;
     webhooks: AutomationWebhookProviderPort;
-    clock: AutomationClock;
+    clock: AutomationClockPort;
     emailHourlyCap: number;
     tenantDailyCap: number;
   }): GraphAlertDispatchService {

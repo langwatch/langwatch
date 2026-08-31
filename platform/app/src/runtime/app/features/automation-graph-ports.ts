@@ -3,7 +3,7 @@ import type { AuthzService } from "@langwatch/authz-contract";
 import type { SlackPayload } from "@langwatch/automation-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import {
-  type AutomationClock,
+  type AutomationClockPort,
   AutomationDispatchErrorPort,
   type AutomationGraphDeliveryPort,
   AutomationGraphNotifierPort,
@@ -302,7 +302,7 @@ class AppAutomationGraphNotifierAdapter extends AutomationGraphNotifierPort {
 export function createAutomationGraphPorts(input: {
   mailer: EmailDeliveryPort;
   redis: Redis | Cluster | null;
-  clock: AutomationClock;
+  clock: AutomationClockPort;
   emailCaps: AutomationEmailCapService;
   delivery: AutomationGraphDeliveryPort;
   projects: ProjectService;

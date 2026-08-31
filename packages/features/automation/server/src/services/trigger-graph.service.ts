@@ -17,7 +17,7 @@ import type {
   AutomationSlackBotTokenDecryptorPort,
 } from "../ports/automation-graph.port";
 import { AutomationRunawayPort } from "../ports/automation-runaway.port";
-import { AutomationClock } from "../ports/automation-clock.port";
+import { AutomationClockPort } from "../ports/automation-clock.port";
 import { GraphTriggerEvaluationService } from "./graph-trigger-evaluation.service";
 import { GraphTriggerHeartbeatService } from "./graph-trigger-heartbeat.service";
 import { RunawayContainmentService } from "./runaway-containment.service";
@@ -42,7 +42,7 @@ export class AutomationGraphService {
     dispatchErrors: AutomationDispatchErrorPort;
     heartbeat: AutomationHeartbeatPort;
     runaway: AutomationRunawayPort;
-    clock: AutomationClock;
+    clock: AutomationClockPort;
     baseHost: string;
   }): AutomationGraphService {
     return new AutomationGraphService(

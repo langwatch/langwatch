@@ -14,7 +14,7 @@ import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectService } from "@langwatch/project-contract";
 import { TraceNotFoundError, type TraceRecord, type TraceService } from "@langwatch/trace-contract";
-import type { AutomationClock } from "../ports/automation-clock.port";
+import type { AutomationClockPort } from "../ports/automation-clock.port";
 import type { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port";
 import type {
   AutomationSlackProviderPort,
@@ -41,7 +41,7 @@ type NotificationComposition = {
   emailCaps: AutomationEmailCapService;
   slack: AutomationSlackProviderPort;
   webhooks: AutomationWebhookProviderPort;
-  clock: AutomationClock;
+  clock: AutomationClockPort;
   observability: AutomationSettlementObservabilityPort;
   baseHost: string;
   emailHourlyCap: number;

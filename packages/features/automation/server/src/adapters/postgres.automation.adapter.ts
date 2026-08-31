@@ -1,9 +1,9 @@
 import { AutomationService } from "../services/automation.service";
 import type { AutomationService as AutomationCapability } from "@langwatch/automation-contract";
-import type { UnsubscribeTokenVerifier } from "../ports/unsubscribe-token.port";
-import type { AutomationClock } from "../ports/automation-clock.port";
-import type { ScheduledJobStore } from "../ports/scheduled-jobs.port";
-import type { SchedulerWake } from "../ports/scheduler-wake.port";
+import type { UnsubscribeTokenVerifierPort } from "../ports/unsubscribe-token.port";
+import type { AutomationClockPort } from "../ports/automation-clock.port";
+import type { ScheduledJobStorePort } from "../ports/scheduled-jobs.port";
+import type { SchedulerWakePort } from "../ports/scheduler-wake.port";
 import { ReportScheduleService } from "../services/report-schedule.service";
 import { AutomationGraphService } from "../services/trigger-graph.service";
 import { AutomationTemplateService } from "../services/automation-template.service";
@@ -33,10 +33,10 @@ export class PostgresAutomationAdapter {
   private constructor(
     private readonly input: {
       database: object;
-      verifier: UnsubscribeTokenVerifier;
-      jobs: ScheduledJobStore;
-      clock: AutomationClock;
-      wake: SchedulerWake;
+      verifier: UnsubscribeTokenVerifierPort;
+      jobs: ScheduledJobStorePort;
+      clock: AutomationClockPort;
+      wake: SchedulerWakePort;
       projects: ProjectService;
       analytics: AnalyticsService;
       notifier: AutomationGraphNotifierPort;
@@ -53,10 +53,10 @@ export class PostgresAutomationAdapter {
 
   static create(input: {
     database: object;
-    verifier: UnsubscribeTokenVerifier;
-    jobs: ScheduledJobStore;
-    clock: AutomationClock;
-    wake: SchedulerWake;
+    verifier: UnsubscribeTokenVerifierPort;
+    jobs: ScheduledJobStorePort;
+    clock: AutomationClockPort;
+    wake: SchedulerWakePort;
     projects: ProjectService;
     analytics: AnalyticsService;
     notifier: AutomationGraphNotifierPort;

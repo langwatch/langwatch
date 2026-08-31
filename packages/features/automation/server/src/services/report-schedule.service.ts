@@ -5,20 +5,20 @@ import {
   type ReportActionParams,
   type ReportScheduleInput,
 } from "@langwatch/automation-contract";
-import { AutomationClock } from "../ports/automation-clock.port";
-import { ScheduledJobStore } from "../ports/scheduled-jobs.port";
-import { SchedulerWake } from "../ports/scheduler-wake.port";
+import { AutomationClockPort } from "../ports/automation-clock.port";
+import { ScheduledJobStorePort } from "../ports/scheduled-jobs.port";
+import { SchedulerWakePort } from "../ports/scheduler-wake.port";
 export class ReportScheduleService {
   private constructor(
-    private readonly jobs: ScheduledJobStore,
-    private readonly clock: AutomationClock,
-    private readonly wake: SchedulerWake,
+    private readonly jobs: ScheduledJobStorePort,
+    private readonly clock: AutomationClockPort,
+    private readonly wake: SchedulerWakePort,
   ) {}
 
   static create(deps: {
-    jobs: ScheduledJobStore;
-    clock: AutomationClock;
-    wake: SchedulerWake;
+    jobs: ScheduledJobStorePort;
+    clock: AutomationClockPort;
+    wake: SchedulerWakePort;
   }): ReportScheduleService {
     return new ReportScheduleService(deps.jobs, deps.clock, deps.wake);
   }

@@ -117,7 +117,7 @@ export {
 export { AutomationSettlementDispatchService } from "./services/trigger-settlement-dispatch.service";
 export { AutomationSettlementMatchConfirmationService } from "./services/automation-settlement-match-confirmation.service";
 export { GraphAlertDispatchService } from "./services/graph-alert-dispatch.service";
-export { AutomationClock } from "./ports/automation-clock.port";
+export { AutomationClockPort } from "./ports/automation-clock.port";
 export { AutomationIntentRetentionPort } from "./ports/automation-intent-retention.port";
 export { AutomationScheduledIntentPort } from "./ports/automation-scheduled-intent.port";
 export {
@@ -127,9 +127,9 @@ export {
   type TestFireSlackWebhook,
   type TestFireWebhook,
 } from "./ports/automation-test-fire.port";
-export { SchedulerWake } from "./ports/scheduler-wake.port";
-export { UnsubscribeTokenVerifier } from "./ports/unsubscribe-token.port";
-export { ScheduledJobStore, type ScheduledJobRecord } from "./ports/scheduled-jobs.port";
+export { SchedulerWakePort } from "./ports/scheduler-wake.port";
+export { UnsubscribeTokenVerifierPort } from "./ports/unsubscribe-token.port";
+export { ScheduledJobStorePort, type ScheduledJobRecord } from "./ports/scheduled-jobs.port";
 export {
   AutomationTrpcApi,
   type AutomationTrpcContext,

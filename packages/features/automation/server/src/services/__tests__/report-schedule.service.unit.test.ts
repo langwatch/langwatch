@@ -1,21 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { AutomationClock } from "../../ports/automation-clock.port";
-import { ScheduledJobStore, type ScheduledJobRecord } from "../../ports/scheduled-jobs.port";
-import { SchedulerWake } from "../../ports/scheduler-wake.port";
+import { AutomationClockPort } from "../../ports/automation-clock.port";
+import { ScheduledJobStorePort, type ScheduledJobRecord } from "../../ports/scheduled-jobs.port";
+import { SchedulerWakePort } from "../../ports/scheduler-wake.port";
 import { ReportScheduleService } from "../report-schedule.service";
 
-class Clock extends AutomationClock {
+class Clock extends AutomationClockPort {
   now(): Date {
     return new Date("2026-01-01T08:00:00Z");
   }
 }
-class Wake extends SchedulerWake {
+class Wake extends SchedulerWakePort {
   count = 0;
   publish(): void {
     this.count++;
   }
 }
-class Jobs extends ScheduledJobStore {
+class Jobs extends ScheduledJobStorePort {
   rows: ScheduledJobRecord[] = [];
   async upsertForTarget(input: {
     projectId: string;

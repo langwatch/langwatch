@@ -5,7 +5,7 @@ export type ScheduledJobRecord = {
   active: boolean;
 };
 
-export abstract class ScheduledJobStore {
+export abstract class ScheduledJobStorePort {
   abstract upsertForTarget(input: {
     projectId: string;
     targetType: string;

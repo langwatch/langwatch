@@ -1,3 +1,3 @@
-export abstract class AutomationClock {
+export abstract class AutomationClockPort {
   abstract now(): Date;
 }

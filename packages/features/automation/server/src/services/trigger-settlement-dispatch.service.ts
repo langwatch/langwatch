@@ -10,7 +10,7 @@ import type {
   PersistMatchIntent,
 } from "../intents/trigger-settlement.intent";
 import { TRIGGER_SETTLEMENT_INTENT_TYPES } from "../intents/trigger-settlement.intent";
-import type { AutomationClock } from "../ports/automation-clock.port";
+import type { AutomationClockPort } from "../ports/automation-clock.port";
 import type { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port";
 import type {
   AutomationSlackProviderPort,
@@ -38,7 +38,7 @@ type SettlementComposition = {
   emailCaps: AutomationEmailCapService;
   slack: AutomationSlackProviderPort;
   webhooks: AutomationWebhookProviderPort;
-  clock: AutomationClock;
+  clock: AutomationClockPort;
   observability: AutomationSettlementObservabilityPort;
   baseHost: string;
   emailHourlyCap: number;

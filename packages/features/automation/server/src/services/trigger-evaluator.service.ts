@@ -16,7 +16,7 @@ import type {
   AutomationLoggerPort,
   AutomationSlackBotTokenDecryptorPort,
 } from "../ports/automation-graph.port";
-import type { AutomationClock } from "../ports/automation-clock.port";
+import type { AutomationClockPort } from "../ports/automation-clock.port";
 import type { CustomGraphRepository } from "../repositories/custom-graph.repository";
 import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository";
 import type { TriggerRepository } from "../repositories/trigger.repository";
@@ -104,7 +104,7 @@ export type GraphTriggerEvaluationDeps = {
   logger: AutomationLoggerPort;
   slackTokens: AutomationSlackBotTokenDecryptorPort;
   dispatchErrors: AutomationDispatchErrorPort;
-  clock: AutomationClock;
+  clock: AutomationClockPort;
   baseHost: string;
 };
 

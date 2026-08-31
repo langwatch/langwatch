@@ -9,7 +9,7 @@ import {
 } from "@langwatch/trace-contract";
 import { SlackProviderAdapter } from "../../../adapters/slack-provider.adapter";
 import { WebhookProviderAdapter } from "../../../adapters/webhook-provider.adapter";
-import { AutomationClock } from "../../automation-clock.port";
+import { AutomationClockPort } from "../../automation-clock.port";
 import { AutomationEmailCapStorePort } from "../../email-cap.port";
 import { AutomationNotificationDeliveryPort } from "../../automation-notification-delivery.port";
 import {
@@ -508,7 +508,7 @@ class SettlementConfirmation extends AutomationSettlementMatchConfirmationPort {
   }
 }
 
-class SettlementClock extends AutomationClock {
+class SettlementClock extends AutomationClockPort {
   now(): Date {
     return new Date("2026-01-01T00:00:00.000Z");
   }

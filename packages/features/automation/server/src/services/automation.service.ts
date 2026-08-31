@@ -32,8 +32,8 @@ import { EmailSuppressionNameRepository } from "../repositories/email-suppressio
 import { EmailSuppressionRepository } from "../repositories/email-suppression.repository";
 import { TriggerFireHistoryRepository } from "../repositories/trigger-fire-history.repository";
 import { TriggerRepository } from "../repositories/trigger.repository";
-import { UnsubscribeTokenVerifier } from "../ports/unsubscribe-token.port";
-import { AutomationClock } from "../ports/automation-clock.port";
+import { UnsubscribeTokenVerifierPort } from "../ports/unsubscribe-token.port";
+import { AutomationClockPort } from "../ports/automation-clock.port";
 import { ReportScheduleService } from "./report-schedule.service";
 import { CustomGraphRepository } from "../repositories/custom-graph.repository";
 import { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository";
@@ -49,9 +49,9 @@ export class AutomationService extends AutomationCapability {
     private readonly history: TriggerFireHistoryRepository,
     private readonly suppressions: EmailSuppressionRepository,
     private readonly names: EmailSuppressionNameRepository,
-    private readonly verifier: UnsubscribeTokenVerifier,
+    private readonly verifier: UnsubscribeTokenVerifierPort,
     private readonly reportSchedules: ReportScheduleService,
-    private readonly clock: AutomationClock,
+    private readonly clock: AutomationClockPort,
     private readonly customGraphs: CustomGraphRepository,
     private readonly webhookDeliveries: WebhookDeliveryRepository,
     private readonly graph: AutomationGraphService,
@@ -66,9 +66,9 @@ export class AutomationService extends AutomationCapability {
     history: TriggerFireHistoryRepository;
     suppressions: EmailSuppressionRepository;
     names: EmailSuppressionNameRepository;
-    verifier: UnsubscribeTokenVerifier;
+    verifier: UnsubscribeTokenVerifierPort;
     reportSchedules: ReportScheduleService;
-    clock: AutomationClock;
+    clock: AutomationClockPort;
     customGraphs: CustomGraphRepository;
     webhookDeliveries: WebhookDeliveryRepository;
     graph: AutomationGraphService;

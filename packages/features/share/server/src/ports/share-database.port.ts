@@ -36,6 +36,11 @@ type TransactionCall = {
   ): Promise<TResult>;
 }["bivariant"];
 
+/** Process-owned database capability used by Share's private repositories. */
+export abstract class ShareDatabasePort {
+  abstract readonly database: ShareDatabase;
+}
+
 /** Structural process-owned database capability accepted by Share composition. */
 export type ShareDatabase = {
   shareLink: ShareLinkDelegate;

@@ -1,5 +1,5 @@
 import type { WebhookDeliveryInput } from "@langwatch/automation-contract";
-import type { AutomationClock } from "../ports/automation-clock.port";
+import type { AutomationClockPort } from "../ports/automation-clock.port";
 import { AutomationGraphDeliveryPort } from "../ports/automation-graph-delivery.port";
 import { PrismaEmailSuppressionRepository } from "../repositories/prisma/prisma.email-suppression.repository";
 import { PrismaTriggerRepository } from "../repositories/prisma/prisma.trigger.repository";
@@ -22,7 +22,7 @@ export class PostgresAutomationGraphDeliveryAdapter extends AutomationGraphDeliv
 
   static create(input: {
     database: object;
-    clock: AutomationClock;
+    clock: AutomationClockPort;
   }): PostgresAutomationGraphDeliveryAdapter {
     return new PostgresAutomationGraphDeliveryAdapter(
       PrismaTriggerRepository.create(input.database, input.clock),

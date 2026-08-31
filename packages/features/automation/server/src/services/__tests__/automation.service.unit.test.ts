@@ -12,12 +12,12 @@ import { EmailSuppressionNameRepository } from "../../repositories/email-suppres
 import { TriggerFireHistoryRepository } from "../../repositories/trigger-fire-history.repository";
 import { TriggerRepository } from "../../repositories/trigger.repository";
 import type { ReportScheduleTarget } from "../../repositories/trigger.repository";
-import { UnsubscribeTokenVerifier } from "../../ports/unsubscribe-token.port";
+import { UnsubscribeTokenVerifierPort } from "../../ports/unsubscribe-token.port";
 import { ReportScheduleService } from "../report-schedule.service";
-import { AutomationClock } from "../../ports/automation-clock.port";
-import { ScheduledJobStore } from "../../ports/scheduled-jobs.port";
+import { AutomationClockPort } from "../../ports/automation-clock.port";
+import { ScheduledJobStorePort } from "../../ports/scheduled-jobs.port";
 import type { ScheduledJobRecord } from "../../ports/scheduled-jobs.port";
-import { SchedulerWake } from "../../ports/scheduler-wake.port";
+import { SchedulerWakePort } from "../../ports/scheduler-wake.port";
 import { CustomGraphRepository } from "../../repositories/custom-graph.repository";
 import { WebhookDeliveryRepository } from "../../repositories/webhook-delivery.repository";
 import { GraphTriggerSentRepository } from "../../repositories/graph-trigger-sent.repository";
@@ -113,12 +113,12 @@ class Names extends EmailSuppressionNameRepository {
     return Promise.resolve(new Map<string, string>());
   }
 }
-class Verifier extends UnsubscribeTokenVerifier {
+class Verifier extends UnsubscribeTokenVerifierPort {
   tryVerify() {
     return null;
   }
 }
-class Jobs extends ScheduledJobStore {
+class Jobs extends ScheduledJobStorePort {
   rows: ScheduledJobRecord[] = [];
   async upsertForTarget(input: {
     projectId: string;
@@ -147,12 +147,12 @@ class Jobs extends ScheduledJobStore {
     return Promise.resolve(this.rows);
   }
 }
-class Clock extends AutomationClock {
+class Clock extends AutomationClockPort {
   now() {
     return new Date("2026-01-01T00:00:00Z");
   }
 }
-class Wake extends SchedulerWake {
+class Wake extends SchedulerWakePort {
   publish() {}
 }
 class Triggers extends TriggerRepository {
