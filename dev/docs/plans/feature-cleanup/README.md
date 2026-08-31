@@ -1794,3 +1794,50 @@ sabotage that proved it took a minute, and the fix was a handful of tests. The
 pattern is consistent enough to state plainly: **code that exists twice is
 usually code that is tested zero times**, because each copy looks like the
 other's coverage.
+
+## Round: the last small duplicates, and one large one left alone
+
+`emitSystemPrompt` (coding-agent, two transcript builders) and `quantile`
+(experiment, two confidence-interval calculations) each had one home made for
+them. Both were untested in both copies — the fourth and fifth time this
+cleanup has found that pairing — and each sabotage passed before the tests
+were written and fails after.
+
+### The analytics ClickHouse layer exists twice
+
+Widening the sweep to all of `packages`, `platform/app` and `apps`, and to
+arrow consts as well as function declarations, turned up 69 duplicated bodies.
+Thirteen of the top fourteen are one thing:
+
+```
+packages/features/analytics/server/src/clickhouse/   ← live
+platform/app/src/server/analytics/clickhouse/        ← 5,780 lines, no importer
+```
+
+Four files each — `aggregation-builder`, `field-mappings`,
+`filter-translator`, `metric-translator`. `translatePerformanceMetric` alone
+is 141 duplicated lines, `buildGroupByUnionAllQuery` 93.
+
+Facts established, since the conclusion depends on all of them:
+
+- **Nothing outside that directory imports the fork.** The only importers are
+  its own four files and its own tests; the live path is
+  `app-layer` → `@langwatch/analytics-server` → `AnalyticsAdapter` →
+  `ClickHouseAnalyticsRepository` → the PACKAGE's `buildTimeseriesQuery`.
+- **The two are functionally the same.** A line diff says 326 differing lines,
+  but normalising whitespace shows the differences are line wrapping, an
+  import moved to `@langwatch/analytics-contract`, and
+  `crypto.randomUUID()` → `randomUUID()`. No behavioural difference.
+- **The fork's 11 test files are UNIQUE.** None of their names appear among
+  the package's 13. Nine need ClickHouse. They cover cross-evaluator group-by,
+  join time bounds, memory safety, model group attribution, offline-experiment
+  joinability and trace/eval mix inflation.
+
+So this is a MIGRATION, not a deletion: the coverage is real and it is the only
+copy of itself, but it runs against a query builder no request reaches.
+
+**Not done, deliberately.** Moving those tests needs the package to export its
+builders — it exports neither `buildTimeseriesQuery` nor a `clickhouse`
+subpath — which is an API decision, and it needs nine ClickHouse integration
+tests re-run, which cannot be done here. Deleting the fork without moving them
+would drop eleven real test files.
