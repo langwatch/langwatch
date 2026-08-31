@@ -22,13 +22,31 @@ import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
 import { randomBytes } from "crypto";
+import {
+  resolveFloorFetchTimeoutMs,
+  resolveMaxFetchTimeoutMs,
+} from "../../../nlpgo/timeouts";
 import type { RunParameterValues } from "../../parameters";
 import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { WorkflowAgentData } from "../types";
 import { SerializedAgentAdapter } from "./serialized-agent.adapter";
 
-/** Timeout for NLP service requests (2 minutes) — matches code adapter. */
-const NLP_FETCH_TIMEOUT_MS = 120_000;
+/**
+ * How long to wait on the NLP service for one turn.
+ *
+ * This adapter has no per-agent `timeoutMs` budget to add headroom above
+ * (unlike the code adapter's `CodeAgentData`, `WorkflowAgentData` carries
+ * none) — so the deadline is simply the floor, bounded by the platform's
+ * operator-configurable maximum. See `../../../nlpgo/timeouts.ts` for what
+ * the floor derives from and why: it used to be this file's own hardcoded
+ * `NLP_FETCH_TIMEOUT_MS = 120_000`, entirely independent of the code
+ * adapter's copy and with no env override, which is exactly the drift that
+ * caused a live production timeout when the engine's own ceiling was
+ * raised and this one wasn't told.
+ */
+function fetchTimeoutMs(): number {
+  return Math.min(resolveMaxFetchTimeoutMs(), resolveFloorFetchTimeoutMs());
+}
 
 /**
  * Serialized workflow agent adapter that uses pre-fetched workflow DSL.
@@ -207,7 +225,7 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
     };
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), NLP_FETCH_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), fetchTimeoutMs());
 
     try {
       let response: Response;

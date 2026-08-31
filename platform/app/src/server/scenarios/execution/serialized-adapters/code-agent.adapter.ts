@@ -16,74 +16,15 @@ import { SpanKind } from "@opentelemetry/api";
 import { randomBytes } from "crypto";
 import { getLangWatchTracer } from "langwatch";
 import { LATEST_SPEC_VERSION } from "../../../../optimization_studio/types/dsl";
+import {
+  NLP_FETCH_HEADROOM_MS,
+  resolveFloorFetchTimeoutMs,
+  resolveMaxFetchTimeoutMs,
+} from "../../../nlpgo/timeouts";
 import type { RunParameterValues } from "../../parameters";
 import { resolveFieldMappings, sourceFieldOf } from "../resolve-field-mappings";
 import type { CodeAgentData } from "../types";
 import { SerializedAgentAdapter } from "./serialized-agent.adapter";
-
-/** Timeout for NLP service requests (2 minutes) */
-const NLP_FETCH_TIMEOUT_MS = 120_000;
-
-/**
- * Slack added to the fetch deadline when the agent asks for a code budget
- * longer than {@link NLP_FETCH_TIMEOUT_MS}, so this adapter never becomes a
- * second, lower ceiling that aborts the request while the engine is still
- * inside the budget it was given.
- */
-const NLP_FETCH_HEADROOM_MS = 30_000;
-
-/** Operator knob naming the platform's maximum for one scenario turn. */
-const NLP_FETCH_MAX_TIMEOUT_ENV = "NLP_FETCH_MAX_TIMEOUT_MS";
-
-/** Used when {@link NLP_FETCH_MAX_TIMEOUT_ENV} is unset or unusable (15 minutes). */
-const NLP_FETCH_MAX_TIMEOUT_DEFAULT_MS = 900_000;
-
-/**
- * The platform's own maximum for one scenario turn, from the environment.
- *
- * This is a bound on how long a scenario worker will hold a socket open, and
- * nothing else. The engine ceiling
- * (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`) bounds how long the agent's
- * *Python* may run; it does not bound this process. Without a maximum here, an
- * agent config carrying an absurd `timeoutMs` parks a worker on a socket for as
- * long as the number says — up to ~24.9 days, where `setTimeout` stops honoring
- * the delay at all.
- *
- * The default of 15 minutes sits above the engine's shipped 12-minute ceiling
- * family, so on default settings the engine gets to enforce and REPORT its
- * timeout before this deadline fires. That ordering is a consequence of the two
- * defaults, NOT an invariant this code enforces: an operator who raises
- * `NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS` above this value must raise this
- * one too, or the platform aborts the fetch first and the caller sees a generic
- * fetch-side `error.kind: "timeout"` instead of the engine's diagnosis.
- *
- * Clamp, never reject — the same contract the engine keeps for its own knobs.
- * Unset, empty, non-numeric, non-finite, zero and negative all read as "use the
- * default"; a nonsensical ceiling must not fail the scenario run.
- *
- * Read per call rather than at module load so a worker started before the
- * variable was set is not pinned to a stale value, and so tests can exercise
- * the real parse without reloading the module.
- *
- * The scenario child process is spawned with a fixed env allowlist
- * (`buildChildProcessEnv` in ../child-environment.ts), which is what carries
- * this variable from the operator's environment to here, and it runs under
- * `SKIP_ENV_VALIDATION`, which makes the validated `~/env.mjs` proxy return raw
- * strings with no defaults applied. Hence the direct read.
- *
- * @internal Exported for testing.
- */
-export function resolveMaxFetchTimeoutMs(): number {
-  const raw = process.env[NLP_FETCH_MAX_TIMEOUT_ENV];
-  if (raw === undefined || raw.trim() === "") {
-    return NLP_FETCH_MAX_TIMEOUT_DEFAULT_MS;
-  }
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return NLP_FETCH_MAX_TIMEOUT_DEFAULT_MS;
-  }
-  return parsed;
-}
 
 /** Categories for adapter failures, surfaced as the `error.kind` span attribute. */
 type AdapterErrorKind = "timeout" | "fetch" | "http" | "nlp_error";
@@ -306,8 +247,8 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
    * the identifier and units the engine reads (`nodeTimeout` in
    * services/nlpgo/app/engine/engine.go). It is a request for a SHORTER
    * budget only: the code executor clamps it to the operator's ceiling
-   * (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`, 60s when unset), so a larger
-   * value buys the agent nothing. Omitted when unset, which leaves the engine
+   * (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`, 600s when unset — see
+   * `services/nlpgo/config.go`), so a larger value buys the agent nothing. Omitted when unset, which leaves the engine
    * on that operator default.
    */
   private buildCodeNode(
@@ -347,8 +288,9 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
   /**
    * How long to wait on the NLP service for one turn.
    *
-   * Always at least {@link NLP_FETCH_TIMEOUT_MS}, and above the agent's own
-   * code budget when that budget is longer, so the engine gets to enforce (and
+   * Always at least {@link resolveFloorFetchTimeoutMs}'s result — the engine's
+   * own code-block ceiling plus headroom — and above the agent's own code
+   * budget when that budget is longer, so the engine gets to enforce (and
    * report) the timeout rather than the request being aborted from here —
    * bounded by {@link resolveMaxFetchTimeoutMs}, this platform's operator-
    * configurable maximum for one turn.
@@ -363,18 +305,19 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
    * a `.max()` any more, since the ceiling is now read from the environment.
    *
    * The ceiling bounds the deadline whether or not the agent named a budget:
-   * an operator who sets it below {@link NLP_FETCH_TIMEOUT_MS} has asked for a
-   * shorter socket hold than the default floor, and gets it.
+   * an operator who sets it below the floor has asked for a shorter socket
+   * hold than the engine's own ceiling, and gets it.
    */
   private fetchTimeoutMs(): number {
     const { timeoutMs } = this.config;
+    const floorTimeoutMs = resolveFloorFetchTimeoutMs();
     const maxTimeoutMs = resolveMaxFetchTimeoutMs();
     if (timeoutMs === undefined) {
-      return Math.min(maxTimeoutMs, NLP_FETCH_TIMEOUT_MS);
+      return Math.min(maxTimeoutMs, floorTimeoutMs);
     }
     return Math.min(
       maxTimeoutMs,
-      Math.max(NLP_FETCH_TIMEOUT_MS, timeoutMs + NLP_FETCH_HEADROOM_MS),
+      Math.max(floorTimeoutMs, timeoutMs + NLP_FETCH_HEADROOM_MS),
     );
   }
 

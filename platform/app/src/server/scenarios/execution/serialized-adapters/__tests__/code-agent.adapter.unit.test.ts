@@ -115,6 +115,10 @@ describe("SerializedCodeAgentAdapter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     withActiveSpanCalls.length = 0;
+    // Pin the timeout explicitly so the test doesn't rely on ambient env.
+    // Stubbed, not assigned: a raw assignment here outlives the file and
+    // reaches whatever else shares this vitest worker.
+    vi.stubEnv("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", "600");
     // clearAllMocks keeps implementations, so pin the no-active-context
     // default here; tests that need a trace context override it themselves.
     mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
@@ -122,6 +126,10 @@ describe("SerializedCodeAgentAdapter", () => {
       traceId: undefined,
     }));
     mockFetch.mockResolvedValue(nlpResponse({ output: "processed: Hello" }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("has AGENT role", () => {
@@ -721,7 +729,7 @@ describe("SerializedCodeAgentAdapter", () => {
           const settled = expect(callPromise).rejects.toBeInstanceOf(
             SerializedCodeAgentAdapterError,
           );
-          await vi.advanceTimersByTimeAsync(120_001);
+          await vi.advanceTimersByTimeAsync(630_001);
           await settled;
         } finally {
           vi.useRealTimers();
@@ -753,13 +761,13 @@ describe("SerializedCodeAgentAdapter", () => {
             .catch((e: SerializedCodeAgentAdapterError) => {
               captured = e;
             });
-          await vi.advanceTimersByTimeAsync(120_001);
+          await vi.advanceTimersByTimeAsync(630_001);
           await callPromise;
         } finally {
           vi.useRealTimers();
         }
         expect(captured?.kind).toBe("timeout");
-        expect(captured?.message).toContain("did not respond within 120000ms");
+        expect(captured?.message).toContain("did not respond within 630000ms");
       });
     });
 
@@ -1153,7 +1161,7 @@ describe("SerializedCodeAgentAdapter", () => {
       expect(armedFetchTimeoutMs()).toBe(200_000);
     });
 
-    it("bounds the default deadline too when set below the 2-minute floor", async () => {
+    it("bounds the default deadline too when set below the floor", async () => {
       vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "45000");
 
       await callWith(defaultConfig);
@@ -1161,10 +1169,10 @@ describe("SerializedCodeAgentAdapter", () => {
       expect(armedFetchTimeoutMs()).toBe(45_000);
     });
 
-    it("leaves the default deadline at 2 minutes under the default ceiling", async () => {
+    it("leaves the default deadline at the engine ceiling + headroom (630s) under the default max", async () => {
       await callWith(defaultConfig);
 
-      expect(armedFetchTimeoutMs()).toBe(120_000);
+      expect(armedFetchTimeoutMs()).toBe(630_000);
     });
 
     it("is read per call, so a change between turns takes effect", async () => {
