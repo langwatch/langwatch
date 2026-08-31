@@ -1739,3 +1739,58 @@ than an unrestructured one, and the cost of starting over was a minute.
 `transport/` is next by volume but is mostly route handlers, which are the
 framework's shape rather than loose helpers. The three big directories now
 average well under one function per file.
+
+## Round: duplication, found on purpose this time
+
+Every previous duplicate was found by accident, while folding. This round
+looked for them: hash the body of every function of four or more lines across
+the feature packages and report the collisions. Eight came back.
+
+### The one worth reading
+
+The model-provider feature had two authorization services side by side, and the
+write rule written twice — `writePermission` in one, `requiredPermission` in
+the other, byte for byte — plus two copies of the `getDecision` call. One
+answers, one refuses. Joining them surfaced something the dedup did not cause:
+
+| what answers "may this actor write a model-provider scope" | PROJECT tier |
+| --- | --- |
+| the service the write path really checks | `project:update` |
+| the tRPC route's `serviceAuthorizedPolicy` declaration | `project:manage` |
+| platform/app's legacy `requiredManagePermission` | `project:manage` |
+
+`project:update` is in MEMBER_ADDITIONS; `project:manage` is in
+ADMIN_ADDITIONS. So on the project tier the enforced requirement is
+member-level and the declared one is admin-level, and the route's own policy
+`reason` says the service is what checks.
+
+Nothing pinned any of it — changing `team:manage` to `team:view` left all 124
+tests green. Thirteen tests now pin the mapping for all three tiers on both
+read and write, and the tRPC docblock, which stated `project:manage`, now
+describes what is enforced and names the divergence. **The permission itself is
+unchanged**: which answer is right is a product decision.
+
+### The rest
+
+- `toCanonicalModels`, identical in the REST and tRPC writes — one reader now,
+  and the two wire shapes it accepts (a string array, and
+  `{ modelId, displayName }`) are pinned, since dropping the older one left
+  every test green.
+- `addReservedTokenSum`, identical in both trace projections, which a parity
+  test already asserts agree. One owner.
+- The evaluation metric keys, written four times in the analytics package —
+  once as a const list with a derived type, twice as hand-written unions (one
+  under the SAME type name), each with its own predicate.
+
+Left alone deliberately: `isBlocklisted` and its 23-key payload blocklist are
+identical across the trace and analytics packages, and neither depends on the
+other. Consolidating needs a new cross-feature dependency edge, which is an
+architectural call rather than a cleanup.
+
+### What the sweep is worth
+
+Four of the eight duplicates hid a path nothing tested — in each case the
+sabotage that proved it took a minute, and the fix was a handful of tests. The
+pattern is consistent enough to state plainly: **code that exists twice is
+usually code that is tested zero times**, because each copy looks like the
+other's coverage.
