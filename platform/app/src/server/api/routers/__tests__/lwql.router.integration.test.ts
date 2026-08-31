@@ -64,7 +64,7 @@ vi.mock("../../utils", async (importOriginal) => {
 });
 
 import { createTestApp } from "~/server/app-layer/presets";
-import { lwqlRouter } from "../analytics";
+import { appRouter } from "../../root";
 
 const featureFlags = MemoryFeatureFlagService.create();
 const testApp = createTestApp({ featureFlags });
@@ -91,7 +91,7 @@ function createTestCaller() {
     organizationRole: undefined,
   } as any;
 
-  return lwqlRouter.createCaller(ctx);
+  return appRouter.createCaller(ctx).analytics.lwql;
 }
 
 /**

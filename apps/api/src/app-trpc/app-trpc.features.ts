@@ -14,6 +14,13 @@
  * once per feature. That is the difference this file makes: a restated copy of
  * the same chain per feature could drift, and one cannot.
  */
+import type { AnalyticsReadInput, AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
+import type {
+  AnalyticsTrpcContext,
+  AnalyticsTrpcPorts,
+  LangWatchQLTrpcContext,
+  LangWatchQLTrpcPorts,
+} from "@langwatch/analytics-server";
 import type {
   AnnotationScoreTrpcContext,
   AnnotationTrpcContext,
@@ -27,6 +34,8 @@ import type {
   DashboardTrpcContext,
   GraphTrpcContext,
   GraphTrpcPorts,
+  SavedWorkbenchChartTrpcContext,
+  SavedWorkbenchChartTrpcPorts,
 } from "@langwatch/dashboard-server";
 import type { EvaluationTrpcContext } from "@langwatch/evaluation-server";
 import type { ExperimentTrpcContext, ExperimentTrpcPorts } from "@langwatch/experiment-server";
@@ -57,6 +66,10 @@ import type {
 import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 
 import {
+  createAnalyticsTrpcRouter,
+  createLangWatchQLTrpcRouter,
+} from "../features/analytics/analytics-trpc.mount";
+import {
   createAnnotationScoreTrpcRouter,
   createAnnotationTrpcRouter,
 } from "../features/annotation/annotation-trpc.mount";
@@ -71,6 +84,7 @@ import {
 import {
   createDashboardTrpcRouter,
   createGraphTrpcRouter,
+  createSavedWorkbenchChartTrpcRouter,
 } from "../features/dashboard/dashboard-trpc.mount";
 import {
   createDataPrivacyTrpcRouter,
@@ -113,10 +127,33 @@ export interface AppTrpcFeaturePorts<
   TMappingsOut,
   TPrivacyRule,
   TPrivacySnapshot,
+  TReadInput extends AnalyticsReadInput,
+  TTimeseriesInput extends AnalyticsTimeseriesInput,
   TWorkbenchState,
   TWorkflowVersion,
   TPublishedComponent,
 > {
+  /**
+   * One namespace, three transports, two owners — so one entry with a group
+   * per transport inside it.
+   *
+   * `reads` answers the charted `analytics.*` reads, `workbench` the
+   * LangWatchQL doors under `analytics.lwql`, and `savedCharts` the stored
+   * workbench charts under `analytics.savedWorkbenchCharts` — which belong to
+   * Dashboard, because that is where the `saved-workbench-chart` subject
+   * lives even though the name a member reaches it through is this one.
+   *
+   * What all three reach for is the same kind of thing: the shared analytics
+   * input schemas and the filter catalogue this deployment offers, the
+   * workbench rollout gate, the member's own content protections, and the
+   * project identity a restricted statement executes as. None of it is
+   * Analytics' or Dashboard's to know.
+   */
+  analytics: {
+    reads: AnalyticsTrpcPorts<TTimeseriesInput, TReadInput, TFilterField>;
+    workbench: LangWatchQLTrpcPorts;
+    savedCharts: SavedWorkbenchChartTrpcPorts;
+  };
   /**
    * The annotation queue rows, the trace reads that resolve an item's content
    * for a reviewer, the correction overlay a suggested output is carried into,
@@ -240,7 +277,8 @@ export interface AppTrpcFeaturePorts<
  * on.
  */
 export function createAppTrpcFeatures<
-  TContext extends AnnotationTrpcContext &
+  TContext extends AnalyticsTrpcContext &
+    AnnotationTrpcContext &
     AnnotationScoreTrpcContext &
     ApiKeyTrpcContext &
     BugReportTrpcContext &
@@ -254,7 +292,9 @@ export function createAppTrpcFeatures<
     IdentityTrpcContext &
     IntegrationsChecksTrpcContext &
     JoinRequestTrpcContext &
+    LangWatchQLTrpcContext &
     PublicEnvTrpcContext &
+    SavedWorkbenchChartTrpcContext &
     UserTrpcContext &
     WorkflowOptimizationTrpcContext &
     WorkflowTrpcContext,
@@ -269,6 +309,8 @@ export function createAppTrpcFeatures<
   TMappingsOut,
   TPrivacyRule,
   TPrivacySnapshot,
+  TReadInput extends AnalyticsReadInput,
+  TTimeseriesInput extends AnalyticsTimeseriesInput,
   TWorkbenchState,
   TWorkflowVersion,
   TPublishedComponent,
@@ -284,6 +326,8 @@ export function createAppTrpcFeatures<
     TMappingsOut,
     TPrivacyRule,
     TPrivacySnapshot,
+    TReadInput,
+    TTimeseriesInput,
     TWorkbenchState,
     TWorkflowVersion,
     TPublishedComponent
@@ -292,6 +336,22 @@ export function createAppTrpcFeatures<
   const { mount, ports } = options;
 
   return {
+    // One wire namespace assembled from three packaged transports, exactly as
+    // the client has always called it: the charted reads at `analytics.*`, the
+    // workbench at `analytics.lwql`, and the saved charts at
+    // `analytics.savedWorkbenchCharts`. Merged here rather than at the caller
+    // so the whole namespace is one entry in this list, and so nothing outside
+    // it can add a fourth door onto the same name.
+    analytics: mount.root.mergeRouters(
+      createAnalyticsTrpcRouter({ ...mount, ports: ports.analytics.reads }),
+      mount.root.router({
+        lwql: createLangWatchQLTrpcRouter({ ...mount, ports: ports.analytics.workbench }),
+        savedWorkbenchCharts: createSavedWorkbenchChartTrpcRouter({
+          ...mount,
+          ports: ports.analytics.savedCharts,
+        }),
+      }),
+    ),
     annotation: createAnnotationTrpcRouter({ ...mount, ports: ports.annotation }),
     annotationScore: createAnnotationScoreTrpcRouter(mount),
     apiKey: createApiKeyTrpcRouter({ ...mount, recordAudit: ports.apiKeyAudit }),

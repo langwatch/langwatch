@@ -51,7 +51,7 @@ vi.mock("../../utils", async (importOriginal) => {
 
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { createTestApp } from "~/server/app-layer/presets";
-import { lwqlRouter } from "../analytics";
+import { appRouter } from "../../root";
 
 wireDefaultTestApp();
 
@@ -73,7 +73,7 @@ function createCaller() {
       isEnabled: mockFeatureFlagIsEnabled,
     } as unknown as FeatureFlagService,
   });
-  return lwqlRouter.createCaller({
+  return appRouter.createCaller({
     session: { user: { id: "user_test_123" }, expires: "2099-01-01" },
     app,
     req: undefined,
@@ -82,7 +82,7 @@ function createCaller() {
     permissionChecked: false,
     publiclyShared: false,
     organizationRole: undefined,
-  } as any);
+  } as any).analytics.lwql;
 }
 
 /** Declares the granularity parameter alongside both reserved period bounds. */

@@ -177,7 +177,21 @@ import {
 } from "~/utils/memberRoleConstraints";
 import { toError } from "~/utils/posthogErrorCapture";
 import { agentsRouter } from "~/runtime/app/internal-api/agents.router";
-import { analyticsRouter } from "./routers/analytics";
+import { timeseriesInput } from "~/server/analytics/registry";
+import { sharedFiltersInputSchema } from "~/server/analytics/types";
+import { MAX_LWQL_LENGTH } from "~/server/analytics/lwql";
+import { lwqlEnabled } from "~/server/analytics/lwql/access";
+import {
+  lwqlGranularityStepSchema,
+  lwqlTimeWindowSchema,
+} from "~/server/analytics/lwql/timeWindowSchema";
+import {
+  mapDashboardSavedWorkbenchChartError,
+  validateSavedWorkbenchChartDefinition,
+} from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
+import { availableFilters } from "~/server/filters/registry";
+import { resolveLangWatchQLCaller } from "./routers/analytics/lwqlCaller";
+import { enforceWorkbenchEnabled } from "./routers/analytics/workbenchAccessMiddleware";
 import type { SlackActionParams, Trigger } from "@langwatch/automation-contract";
 import { PostgresSavedViewAdapter } from "@langwatch/dashboard-server";
 import { createSharedTraceTrpcPorts, createTracesV2TrpcPorts } from "~/runtime/app/features/trace";
@@ -1121,6 +1135,43 @@ const workflowCopyLineageSelect = {
 } as const;
 
 /**
+ * The `.use()` surface every tRPC procedure builder shares. Named at the one
+ * seam that chains the workbench rollout gate onto a builder whose input
+ * generics belong to the feature package, so the gate below needs no `any`.
+ */
+type ChainableProcedure = { use(middleware: unknown): ChainableProcedure };
+
+/**
+ * The workbench rollout gate, applied AFTER the policy so a caller is placed by
+ * RBAC first and gated by the experiment second: a member who may not touch the
+ * project must not learn from the answer whether the experiment is on for it.
+ */
+const requireWorkbenchEnabled = <TProcedure>(procedure: TProcedure): TProcedure =>
+  (procedure as unknown as ChainableProcedure).use(
+    enforceWorkbenchEnabled,
+  ) as unknown as TProcedure;
+
+/**
+ * The one resolution both LangWatchQL doors run their statements as. It hashes
+ * the project's LangWatchQL secret into the tenant capability the query runs
+ * as, so it stays here and never leaves the calling procedure.
+ */
+const resolveRunCaller = (ctx: TRPCContext, input: { projectId: string }) =>
+  resolveLangWatchQLCaller({ ctx, projectId: input.projectId });
+
+/** The member's own content protections for one project. */
+const resolveWorkbenchProtections = (ctx: TRPCContext, input: { projectId: string }) =>
+  getUserProtectionsForProject(ctx, { projectId: input.projectId });
+
+/** The same rollout decision, read rather than enforced. */
+const isWorkbenchEnabled = (ctx: TRPCContext, input: { projectId: string }) =>
+  lwqlEnabled({
+    featureFlags: ctx.app.featureFlags,
+    projectId: input.projectId,
+    projects: ctx.app.projects.projectService,
+  });
+
+/**
  * Every packaged tRPC surface, installed in ONE call against this process's
  * mount. Adding a feature to `@langwatch/platform-api`'s list mounts it here;
  * there is no second enumeration to keep in step, which is what stops a
@@ -1129,6 +1180,56 @@ const workflowCopyLineageSelect = {
 const appTrpcFeatures = createAppTrpcFeatures({
   mount: { ...appTrpcMount, publicProcedure: appTrpcRoot.procedure },
   ports: {
+    /**
+     * One namespace, three transports. The reads, the LangWatchQL workbench and
+     * the saved workbench charts all answer under `analytics.*`, and what each
+     * needs from this process is the same kind of thing: the shared analytics
+     * input schemas, this deployment's filter catalogue, the rollout gate, the
+     * member's own content protections, and the project identity a restricted
+     * statement executes as.
+     */
+    analytics: {
+      reads: {
+        // The two schemas are this process's because the same shapes are the
+        // REST analytics body and the traces filter input: one definition, here,
+        // is what keeps those surfaces from drifting.
+        timeseriesInputSchema: timeseriesInput,
+        sharedFiltersSchema: sharedFiltersInputSchema,
+        filterFieldSchema: filterFieldsEnum,
+        filterFieldRequiresKey: (field) => Boolean(availableFilters[field].requiresKey),
+        filterFieldRequiresSubkey: (field) => Boolean(availableFilters[field].requiresSubkey),
+      },
+
+      workbench: {
+        requireWorkbenchEnabled,
+        isWorkbenchEnabled,
+        maxStatementLength: MAX_LWQL_LENGTH,
+        timeWindowSchema: lwqlTimeWindowSchema,
+        granularityStepSchema: lwqlGranularityStepSchema,
+        resolveProtections: resolveWorkbenchProtections,
+        resolveRunCaller,
+      },
+
+      savedCharts: {
+        requireWorkbenchEnabled,
+        timeWindowSchema: lwqlTimeWindowSchema,
+        granularityStepSchema: lwqlGranularityStepSchema,
+        resolveProtections: resolveWorkbenchProtections,
+        resolveRunCaller,
+        // Admitted against the CALLER's own protections before it is stored,
+        // which is the one place they are known: a member who cannot read costs
+        // must not be able to save a chart that selects them.
+        admitDefinition: (ctx: TRPCContext, input) =>
+          validateSavedWorkbenchChartDefinition({
+            projectId: input.projectId,
+            protections: input.protections,
+            definition: input.definition,
+            lwql: ctx.app.langWatchQL,
+          }),
+        mapError: mapDashboardSavedWorkbenchChartError,
+      },
+    },
+
     annotation: {
       // Queue rows are still application-owned storage, and the request's own
       // client is what reaches them.
@@ -1989,7 +2090,6 @@ const coreRouters = {
   traceEditOverlay: traceEditOverlayRouter,
   codingAgents: codingAgentsRouter,
   spans: spansRouter,
-  analytics: analyticsRouter,
   monitors: monitorsRouter,
   costs: costsRouter,
   plan: planRouter,

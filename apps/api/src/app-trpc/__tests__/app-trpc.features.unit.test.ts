@@ -16,6 +16,13 @@
  * every port refuses, because building a surface is what registers its access
  * decisions — the part the audits read.
  */
+import {
+  analyticsReadInputSchema,
+  analyticsTimeseriesInputSchema,
+  type AnalyticsReadInput,
+  type AnalyticsTimeseriesInput,
+} from "@langwatch/analytics-contract";
+import type { AnalyticsTrpcContext, LangWatchQLTrpcContext } from "@langwatch/analytics-server";
 import type {
   AnnotationScoreTrpcContext,
   AnnotationTrpcContext,
@@ -25,7 +32,11 @@ import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
 import type { ApiKeyTrpcContext } from "@langwatch/api-key-server";
 import type { FrontDoorTrpcContext, PublicEnvTrpcContext } from "@langwatch/auth-server";
 import { declareAuthzMiddleware } from "@langwatch/authz-contract";
-import type { DashboardTrpcContext, GraphTrpcContext } from "@langwatch/dashboard-server";
+import type {
+  DashboardTrpcContext,
+  GraphTrpcContext,
+  SavedWorkbenchChartTrpcContext,
+} from "@langwatch/dashboard-server";
 import type { DataPrivacyTrpcContext } from "@langwatch/data-privacy-server";
 import type { EvaluationTrpcContext } from "@langwatch/evaluation-server";
 import type { ExperimentTrpcContext } from "@langwatch/experiment-server";
@@ -47,7 +58,8 @@ import { createAppTrpcFeatures, type AppTrpcFeaturePorts } from "../app-trpc.fea
  * Stating it here is what makes a feature whose context grows a compile error
  * in this suite rather than a surprise in the app.
  */
-type TestContext = AnnotationTrpcContext &
+type TestContext = AnalyticsTrpcContext &
+  AnnotationTrpcContext &
   AnnotationScoreTrpcContext &
   ApiKeyTrpcContext &
   BugReportTrpcContext &
@@ -61,7 +73,9 @@ type TestContext = AnnotationTrpcContext &
   IdentityTrpcContext &
   IntegrationsChecksTrpcContext &
   JoinRequestTrpcContext &
+  LangWatchQLTrpcContext &
   PublicEnvTrpcContext &
+  SavedWorkbenchChartTrpcContext &
   UserTrpcContext &
   WorkflowOptimizationTrpcContext &
   WorkflowTrpcContext;
@@ -71,6 +85,18 @@ const passThrough =
   () =>
   ({ next }: { next: () => Promise<unknown> }) =>
     next();
+
+/**
+ * A rollout gate that lets every procedure through.
+ *
+ * Chained onto the builder as the surface is BUILT, so unlike the ports below
+ * it cannot refuse: a refusing gate would mean no workbench procedure exists to
+ * read the names of.
+ */
+const passThroughGate = <TProcedure>(procedure: TProcedure): TProcedure => procedure;
+
+/** The period a workbench caller reports over, as the two doors parse it. */
+const testTimeWindowSchema = z.object({ start: z.date(), end: z.date() });
 
 const middlewares: AppTrpcPolicyMiddlewares = {
   tracer: passThrough(),
@@ -91,9 +117,10 @@ const middlewares: AppTrpcPolicyMiddlewares = {
 /**
  * Every port refuses when called.
  *
- * Three are real Zod schemas rather than refusals, because those three are
- * read while the surface is being BUILT — they become the procedures' input
- * parsers — so a refusal there could not be mounted at all.
+ * The exceptions are real Zod schemas and a pass-through gate rather than
+ * refusals, because those are read while the surface is being BUILT — they
+ * become the procedures' input parsers and their chained middleware — so a
+ * refusal there could not be mounted at all.
  */
 function refusingPorts(): AppTrpcFeaturePorts<
   AnnotationTrpcPorts,
@@ -105,6 +132,8 @@ function refusingPorts(): AppTrpcFeaturePorts<
   Record<string, unknown>,
   Record<string, unknown>,
   Record<string, unknown>,
+  AnalyticsReadInput,
+  AnalyticsTimeseriesInput,
   Record<string, unknown>,
   Record<string, unknown>,
   Record<string, unknown>
@@ -129,6 +158,36 @@ function refusingPorts(): AppTrpcFeaturePorts<
     );
 
   return {
+    // Every schema here is read while the surface is BUILT — the parsers become
+    // the procedures' own — and so is the rollout gate, which is chained onto
+    // each builder. Refusals in those places could not be mounted at all.
+    analytics: {
+      reads: {
+        timeseriesInputSchema: analyticsTimeseriesInputSchema,
+        sharedFiltersSchema: analyticsReadInputSchema,
+        filterFieldSchema: z.enum(["metadata.user_id"]),
+        filterFieldRequiresKey: refuse("analytics.reads.filterFieldRequiresKey"),
+        filterFieldRequiresSubkey: refuse("analytics.reads.filterFieldRequiresSubkey"),
+      },
+      workbench: {
+        requireWorkbenchEnabled: passThroughGate,
+        isWorkbenchEnabled: refuse("analytics.workbench.isWorkbenchEnabled"),
+        maxStatementLength: 8_000,
+        timeWindowSchema: testTimeWindowSchema,
+        granularityStepSchema: z.number(),
+        resolveProtections: refuse("analytics.workbench.resolveProtections"),
+        resolveRunCaller: refuse("analytics.workbench.resolveRunCaller"),
+      },
+      savedCharts: {
+        requireWorkbenchEnabled: passThroughGate,
+        timeWindowSchema: testTimeWindowSchema,
+        granularityStepSchema: z.number(),
+        resolveProtections: refuse("analytics.savedCharts.resolveProtections"),
+        resolveRunCaller: refuse("analytics.savedCharts.resolveRunCaller"),
+        admitDefinition: refuse("analytics.savedCharts.admitDefinition"),
+        mapError: refuse("analytics.savedCharts.mapError"),
+      },
+    },
     annotation: refuseEvery("annotation"),
     apiKeyAudit: refuse("apiKeyAudit"),
     bugReports: refuseEvery("bugReports"),
@@ -180,6 +239,29 @@ function buildFeatures() {
   });
 }
 
+/**
+ * Every door under the `analytics` namespace, as the client calls them.
+ *
+ * Named here rather than inline because the merge is the only entry in the list
+ * that assembles more than one packaged transport, and the whole point of
+ * naming them is that all three owners' doors are present on one wire name.
+ */
+const ANALYTICS_PROCEDURES = [
+  "dataForFilter",
+  "feedbacks",
+  "getTimeseries",
+  "lwql.availability",
+  "lwql.query",
+  "lwql.schema",
+  "savedWorkbenchCharts.create",
+  "savedWorkbenchCharts.delete",
+  "savedWorkbenchCharts.getAll",
+  "savedWorkbenchCharts.getById",
+  "savedWorkbenchCharts.run",
+  "savedWorkbenchCharts.update",
+  "topUsedDocuments",
+];
+
 /** The procedure paths one mounted router answers on. */
 const procedureNamesOf = (router: unknown): string[] =>
   Object.keys((router as { _def: { procedures: Record<string, unknown> } })._def.procedures).sort();
@@ -188,6 +270,7 @@ describe("the app tRPC feature list", () => {
   describe("given one process mount", () => {
     it("builds every namespace the app process serves from this package", () => {
       expect(Object.keys(buildFeatures()).sort()).toEqual([
+        "analytics",
         "annotation",
         "annotationScore",
         "apiKey",
@@ -212,6 +295,12 @@ describe("the app tRPC feature list", () => {
     it("hands back the packaged transport for each namespace, procedure names intact", () => {
       const features = buildFeatures();
 
+      // One namespace, three packaged transports. The dotted names are what
+      // makes the merge visible: the charted reads answer at the top of
+      // `analytics.*`, the workbench under `lwql.`, and the saved charts under
+      // `savedWorkbenchCharts.` — so a door dropped from the merge, or one that
+      // quietly moved to a different name, fails here rather than at a client.
+      expect(procedureNamesOf(features.analytics)).toEqual(ANALYTICS_PROCEDURES);
       expect(procedureNamesOf(features.annotationScore)).toEqual([
         "delete",
         "getAll",

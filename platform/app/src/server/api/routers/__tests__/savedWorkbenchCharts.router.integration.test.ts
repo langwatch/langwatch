@@ -48,13 +48,13 @@ import { getLangWatchQLService } from "~/server/analytics/lwql/lwql.service";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "../../../db";
 import type { Permission } from "../../rbac";
+import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-import { savedWorkbenchChartsRouter } from "../analytics";
 
 const featureFlags = MemoryFeatureFlagService.create();
 const testApp = createTestApp({ featureFlags });
 
-type Caller = ReturnType<typeof savedWorkbenchChartsRouter.createCaller>;
+type Caller = ReturnType<typeof appRouter.createCaller>["analytics"]["savedWorkbenchCharts"];
 
 const ns = `swbc-${nanoid(8)}`;
 const ORG = `org-${ns}`;
@@ -165,7 +165,7 @@ async function seedCaller(orgId: string, perms: Permission[]): Promise<Caller> {
       scopeId: orgId,
     },
   });
-  return savedWorkbenchChartsRouter.createCaller(
+  return appRouter.createCaller(
     createInnerTRPCContext({
       app: testApp,
       session: {
@@ -173,7 +173,7 @@ async function seedCaller(orgId: string, perms: Permission[]): Promise<Caller> {
         expires: new Date(Date.now() + 3_600_000).toISOString(),
       } as any,
     }),
-  );
+  ).analytics.savedWorkbenchCharts;
 }
 
 /** The refusal an awaited call produced, or a failure if it produced none. */

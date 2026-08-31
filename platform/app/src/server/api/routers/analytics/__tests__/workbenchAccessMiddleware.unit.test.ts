@@ -9,7 +9,7 @@
  * default, and nothing fails — the surface is simply reachable with the flag
  * off. Reading the composed chain is what notices.
  *
- * No database, no containers: this reads the routers as they are built.
+ * No database, no containers: this reads the mounted router as it was built.
  *
  * @see specs/analytics/lwql-saved-charts.feature
  * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
@@ -17,29 +17,37 @@
 
 import { describe, expect, it } from "vitest";
 
-import { lwqlRouter, savedWorkbenchChartsRouter } from "../../analytics";
+import { appRouter } from "../../../root";
 import { enforceWorkbenchEnabled } from "../workbenchAccessMiddleware";
 
-/** The middleware chain tRPC composed for each procedure, keyed by its name. */
-function chainsOf(router: unknown): Record<string, unknown[]> {
+/**
+ * The middleware chain tRPC composed for each procedure under one namespace,
+ * keyed by the name that namespace answers on.
+ *
+ * Read off the real `appRouter` rather than off a router built here: the claim
+ * is that the gate is attached to the surface the process SERVES, and a
+ * separately built copy could carry it while the mounted one did not.
+ */
+function chainsOf(namespace: string): Record<string, unknown[]> {
   const procedures = (
-    router as {
+    appRouter as unknown as {
       _def: {
         procedures: Record<string, { _def: { middlewares: unknown[] } }>;
       };
     }
   )._def.procedures;
 
+  const prefix = `${namespace}.`;
+
   return Object.fromEntries(
-    Object.entries(procedures).map(([name, procedure]) => [
-      name,
-      procedure._def.middlewares,
-    ]),
+    Object.entries(procedures)
+      .filter(([path]) => path.startsWith(prefix))
+      .map(([path, procedure]) => [path.slice(prefix.length), procedure._def.middlewares]),
   );
 }
 
-function gatedProcedures(router: unknown): string[] {
-  return Object.entries(chainsOf(router))
+function gatedProcedures(namespace: string): string[] {
+  return Object.entries(chainsOf(namespace))
     .filter(([, chain]) => chain.includes(enforceWorkbenchEnabled))
     .map(([name]) => name)
     .sort();
@@ -51,7 +59,7 @@ describe("the workbench feature gate", () => {
       // The exact list first: two derived-and-compared arrays could both be
       // empty — a `_def` shape change would pass vacuously — and the names pin
       // the `_def.procedures` reading this file depends on.
-      expect(gatedProcedures(savedWorkbenchChartsRouter)).toEqual([
+      expect(gatedProcedures("analytics.savedWorkbenchCharts")).toEqual([
         "create",
         "delete",
         "getAll",
@@ -60,8 +68,8 @@ describe("the workbench feature gate", () => {
         "update",
       ]);
       // And the closure: a sixth procedure added without the gate fails here.
-      expect(gatedProcedures(savedWorkbenchChartsRouter)).toEqual(
-        Object.keys(chainsOf(savedWorkbenchChartsRouter)).sort(),
+      expect(gatedProcedures("analytics.savedWorkbenchCharts")).toEqual(
+        Object.keys(chainsOf("analytics.savedWorkbenchCharts")).sort(),
       );
     });
   });
@@ -70,7 +78,7 @@ describe("the workbench feature gate", () => {
     it("gates everything except the procedure whose answer is the switch", () => {
       // `availability` reads the switch rather than being refused by it: it is
       // what the navigation asks, and it has to be able to answer "off".
-      expect(gatedProcedures(lwqlRouter)).toEqual(["query", "schema"]);
+      expect(gatedProcedures("analytics.lwql")).toEqual(["query", "schema"]);
     });
   });
 });
