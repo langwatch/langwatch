@@ -172,6 +172,10 @@ export {
   toIngestionSourceDto,
   type IngestionSourcesTrpcContext,
 } from "./transport/api-trpc/ingestion-sources.api";
+export {
+  AiToolsTrpcApi,
+  type AiToolsTrpcContext,
+} from "./transport/api-trpc/ai-tools.api";
 
 /**
  * The public REST family this feature owns. The process supplies the bound

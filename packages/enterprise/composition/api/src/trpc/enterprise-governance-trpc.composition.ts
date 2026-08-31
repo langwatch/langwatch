@@ -23,6 +23,7 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   ActivityMonitorTrpcApi,
+  AiToolsTrpcApi,
   AnomalyRulesTrpcApi,
   DepartmentsTrpcApi,
   GovernanceTrpcApi,
@@ -32,6 +33,7 @@ import {
   PersonalSessionsTrpcApi,
   SessionPolicyTrpcApi,
   type ActivityMonitorTrpcContext,
+  type AiToolsTrpcContext,
   type AnomalyRulesTrpcContext,
   type DepartmentsTrpcContext,
   type GovernanceTrpcContext,
@@ -56,7 +58,8 @@ export type EnterpriseGovernanceTrpcContext = PersonalSessionsTrpcContext &
   ActivityMonitorTrpcContext &
   AnomalyRulesTrpcContext &
   GovernanceTrpcContext &
-  IngestionSourcesTrpcContext;
+  IngestionSourcesTrpcContext &
+  AiToolsTrpcContext;
 
 /** One already-composed process policy, applied after a feature's input parser. */
 type EnterpriseTrpcPolicy = <TProcedure>(procedure: TProcedure) => TProcedure;
@@ -114,6 +117,10 @@ export class EnterpriseGovernanceTrpcComposition {
         ocsfExportPlanGate: planGateFor(ENTERPRISE_FEATURE_ERRORS.OCSF_EXPORT),
       }),
       ingestionSources: IngestionSourcesTrpcApi.create(root, {
+        protected: protectedProcedure,
+        policy,
+      }),
+      aiTools: AiToolsTrpcApi.create(root, {
         protected: protectedProcedure,
         policy,
       }),
