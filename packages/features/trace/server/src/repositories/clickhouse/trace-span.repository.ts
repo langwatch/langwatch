@@ -49,73 +49,6 @@ type SpanSummaryRow = {
   StatusCode: number | string | null;
 };
 
-const numberOrNull = (value: string | number | null | undefined): number | null => {
-  if (value === null || value === void 0 || value === "") {
-    return null;
-  }
-
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-};
-
-const mapStatus = (value: number | string | null): "ok" | "error" | "unset" => {
-  if (value === null) {
-    return "unset";
-  }
-
-  if (Number(value) === 2) {
-    return "error";
-  }
-
-  return Number(value) === 1 ? "ok" : "unset";
-};
-
-const mapSummary = (row: SpanSummaryRow) => {
-  const explicitCost = numberOrNull(row.Cost);
-  const cost = explicitCost !== null && explicitCost > 0 ? explicitCost : null;
-
-  return {
-    spanId: row.SpanId,
-    parentSpanId: row.ParentSpanId,
-    name: row.SpanName,
-    type: row.SpanType || null,
-    startTimeMs: Number(row.StartTimeMs),
-    endTimeMs: Number(row.StartTimeMs) + Number(row.DurationMs),
-    durationMs: Number(row.DurationMs),
-    status: mapStatus(row.StatusCode),
-    model: row.Model || null,
-    toolName: row.ToolName || null,
-    cost,
-    inputTokens: numberOrNull(row.InputTokens),
-    outputTokens: numberOrNull(row.OutputTokens),
-    cacheReadTokens: numberOrNull(row.CacheReadTokens),
-    cacheCreationTokens: numberOrNull(row.CacheCreationTokens),
-    updatedAtMs: Number(row.UpdatedAtMs),
-    costInput: {
-      attrs: {
-        "gen_ai.response.model": row.ResponseModel || void 0,
-        "gen_ai.request.model": row.Model || void 0,
-        "gen_ai.usage.cache_read.input_tokens": row.CacheReadTokens || void 0,
-        "gen_ai.usage.cache_creation.input_tokens": row.CacheCreationTokens || void 0,
-        "gen_ai.usage.cache_creation_1h.input_tokens": row.CacheCreation1hTokens || void 0,
-        "gen_ai.usage.input_chars": row.InputChars || void 0,
-        "gen_ai.usage.audio_seconds": row.AudioSeconds || void 0,
-        "gen_ai.usage.input_audio_tokens": row.InputAudioTokens || void 0,
-        "gen_ai.usage.output_audio_tokens": row.OutputAudioTokens || void 0,
-        "langwatch.model.inputCostPerToken": row.CustomInputRate || void 0,
-        "langwatch.model.outputCostPerToken": row.CustomOutputRate || void 0,
-        "langwatch.model.cacheReadCostPerToken": row.CustomCacheReadRate || void 0,
-        "langwatch.model.cacheCreationCostPerToken": row.CustomCacheCreationRate || void 0,
-        "langwatch.model.cacheCreation1hCostPerToken": row.CustomCacheCreation1hRate || void 0,
-        "langwatch.span.cost": row.LwSpanCost || void 0,
-      },
-      model: row.ResponseModel || row.Model || void 0,
-      promptTokens: numberOrNull(row.InputTokens),
-      completionTokens: numberOrNull(row.OutputTokens),
-    },
-  };
-};
-
 const summarySelect = `
   SpanId,
   ParentSpanId,
@@ -167,75 +100,6 @@ type EvaluationEventRow = {
   EventType: string;
   Attributes: Record<string, string>;
 };
-
-function textualContext(value: unknown): string {
-  if (typeof value === "string") {
-    try {
-      return textualContext(JSON.parse(value));
-    } catch {
-      return value.trim();
-    }
-  }
-
-  if (Array.isArray(value)) {
-    return value.map(textualContext).filter(Boolean).join("\n").trim();
-  }
-
-  if (typeof value === "object" && value !== null) {
-    return JSON.stringify(value);
-  }
-
-  return "";
-}
-
-function mapEvaluationSpan(row: EvaluationSpanRow): EvaluationTraceSpan {
-  let rawContexts: unknown;
-
-  try {
-    rawContexts = JSON.parse(row.Contexts);
-  } catch {
-    rawContexts = [];
-  }
-
-  const ragContextTexts = Array.isArray(rawContexts)
-    ? rawContexts
-        .map((context) => {
-          if (typeof context === "object" && context !== null) {
-            const content = Object.entries(context).find(([key]) => key === "content")?.[1];
-            return textualContext(content ?? context);
-          }
-          return textualContext(context);
-        })
-        .filter(Boolean)
-    : [];
-
-  return {
-    type: row.SpanType || "span",
-    model: row.Model || null,
-    ragContextTexts,
-  };
-}
-
-function mapEvaluationEvent(row: EvaluationEventRow): EvaluationTraceEvent {
-  const metrics: EvaluationTraceEvent["metrics"] = [];
-  const details: EvaluationTraceEvent["details"] = [];
-
-  for (const [key, value] of Object.entries(row.Attributes)) {
-    if (
-      key === "vote" ||
-      key === "score" ||
-      key.startsWith("metrics.") ||
-      key.startsWith("event.metrics.")
-    ) {
-      const metricKey = key.replace(/^(event\.)?metrics\./, "");
-      metrics.push({ key: metricKey, value: Number(value) || 0 });
-    } else {
-      details.push({ key, value });
-    }
-  }
-
-  return { eventType: row.EventType, metrics, details };
-}
 
 /** Concrete, tenant-scoped span-tree persistence for ClickHouse. */
 export class ClickHouseTraceSpanRepository extends TraceRepository {
@@ -290,7 +154,7 @@ export class ClickHouseTraceSpanRepository extends TraceRepository {
         traceId: input.traceId,
       });
     }
-    return rows.map(mapEvaluationSpan);
+    return rows.map((row) => ClickHouseTraceSpanRepository.mapEvaluationSpan(row));
   }
 
   async findEvaluationEvents(input: EvaluationTraceReadInput): Promise<EvaluationTraceEvent[]> {
@@ -343,7 +207,7 @@ export class ClickHouseTraceSpanRepository extends TraceRepository {
         traceId: input.traceId,
       });
     }
-    return rows.map(mapEvaluationEvent);
+    return rows.map((row) => ClickHouseTraceSpanRepository.mapEvaluationEvent(row));
   }
 
   async tryFindIngestLag(input: { tenantId: string }): Promise<TraceIngestLagSample | null> {
@@ -445,7 +309,9 @@ export class ClickHouseTraceSpanRepository extends TraceRepository {
       },
       format: "JSONEachRow",
     });
-    return (await result.json<SpanSummaryRow>()).map(mapSummary);
+    return (await result.json<SpanSummaryRow>()).map((row) =>
+      ClickHouseTraceSpanRepository.mapSummary(row),
+    );
   }
 
   private async queryPage(
@@ -494,7 +360,7 @@ export class ClickHouseTraceSpanRepository extends TraceRepository {
       format: "JSONEachRow",
     });
     const rows = await result.json<SpanSummaryRow>();
-    const mapped = rows.map(mapSummary);
+    const mapped = rows.map((row) => ClickHouseTraceSpanRepository.mapSummary(row));
     return {
       rows: mapped.slice(0, input.limit),
       hasMore: mapped.length > input.limit,
@@ -540,7 +406,147 @@ export class ClickHouseTraceSpanRepository extends TraceRepository {
       format: "JSONEachRow",
     });
     const row = (await result.json<{ occurredAtMs: string | number | null }>())[0];
-    const value = numberOrNull(row?.occurredAtMs);
+    const value = ClickHouseTraceSpanRepository.numberOrNull(row?.occurredAtMs);
     return value !== null && value > 0 ? value : void 0;
+  }
+
+  private static numberOrNull(value: string | number | null | undefined): number | null {
+    if (value === null || value === void 0 || value === "") {
+      return null;
+    }
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  private static mapStatus(value: number | string | null): "ok" | "error" | "unset" {
+    if (value === null) {
+      return "unset";
+    }
+
+    if (Number(value) === 2) {
+      return "error";
+    }
+
+    return Number(value) === 1 ? "ok" : "unset";
+  }
+
+  private static mapSummary(row: SpanSummaryRow) {
+    const explicitCost = ClickHouseTraceSpanRepository.numberOrNull(row.Cost);
+    const cost = explicitCost !== null && explicitCost > 0 ? explicitCost : null;
+
+    return {
+      spanId: row.SpanId,
+      parentSpanId: row.ParentSpanId,
+      name: row.SpanName,
+      type: row.SpanType || null,
+      startTimeMs: Number(row.StartTimeMs),
+      endTimeMs: Number(row.StartTimeMs) + Number(row.DurationMs),
+      durationMs: Number(row.DurationMs),
+      status: ClickHouseTraceSpanRepository.mapStatus(row.StatusCode),
+      model: row.Model || null,
+      toolName: row.ToolName || null,
+      cost,
+      inputTokens: ClickHouseTraceSpanRepository.numberOrNull(row.InputTokens),
+      outputTokens: ClickHouseTraceSpanRepository.numberOrNull(row.OutputTokens),
+      cacheReadTokens: ClickHouseTraceSpanRepository.numberOrNull(row.CacheReadTokens),
+      cacheCreationTokens: ClickHouseTraceSpanRepository.numberOrNull(row.CacheCreationTokens),
+      updatedAtMs: Number(row.UpdatedAtMs),
+      costInput: {
+        attrs: {
+          "gen_ai.response.model": row.ResponseModel || void 0,
+          "gen_ai.request.model": row.Model || void 0,
+          "gen_ai.usage.cache_read.input_tokens": row.CacheReadTokens || void 0,
+          "gen_ai.usage.cache_creation.input_tokens": row.CacheCreationTokens || void 0,
+          "gen_ai.usage.cache_creation_1h.input_tokens": row.CacheCreation1hTokens || void 0,
+          "gen_ai.usage.input_chars": row.InputChars || void 0,
+          "gen_ai.usage.audio_seconds": row.AudioSeconds || void 0,
+          "gen_ai.usage.input_audio_tokens": row.InputAudioTokens || void 0,
+          "gen_ai.usage.output_audio_tokens": row.OutputAudioTokens || void 0,
+          "langwatch.model.inputCostPerToken": row.CustomInputRate || void 0,
+          "langwatch.model.outputCostPerToken": row.CustomOutputRate || void 0,
+          "langwatch.model.cacheReadCostPerToken": row.CustomCacheReadRate || void 0,
+          "langwatch.model.cacheCreationCostPerToken": row.CustomCacheCreationRate || void 0,
+          "langwatch.model.cacheCreation1hCostPerToken": row.CustomCacheCreation1hRate || void 0,
+          "langwatch.span.cost": row.LwSpanCost || void 0,
+        },
+        model: row.ResponseModel || row.Model || void 0,
+        promptTokens: ClickHouseTraceSpanRepository.numberOrNull(row.InputTokens),
+        completionTokens: ClickHouseTraceSpanRepository.numberOrNull(row.OutputTokens),
+      },
+    };
+  }
+
+  private static textualContext(value: unknown): string {
+    if (typeof value === "string") {
+      try {
+        return ClickHouseTraceSpanRepository.textualContext(JSON.parse(value));
+      } catch {
+        return value.trim();
+      }
+    }
+
+    if (Array.isArray(value)) {
+      return value
+        .map((item) => ClickHouseTraceSpanRepository.textualContext(item))
+        .filter(Boolean)
+        .join("\n")
+        .trim();
+    }
+
+    if (typeof value === "object" && value !== null) {
+      return JSON.stringify(value);
+    }
+
+    return "";
+  }
+
+  private static mapEvaluationSpan(row: EvaluationSpanRow): EvaluationTraceSpan {
+    let rawContexts: unknown;
+
+    try {
+      rawContexts = JSON.parse(row.Contexts);
+    } catch {
+      rawContexts = [];
+    }
+
+    const ragContextTexts = Array.isArray(rawContexts)
+      ? rawContexts
+          .map((context) => {
+            if (typeof context === "object" && context !== null) {
+              const content = Object.entries(context).find(([key]) => key === "content")?.[1];
+              return ClickHouseTraceSpanRepository.textualContext(content ?? context);
+            }
+            return ClickHouseTraceSpanRepository.textualContext(context);
+          })
+          .filter(Boolean)
+      : [];
+
+    return {
+      type: row.SpanType || "span",
+      model: row.Model || null,
+      ragContextTexts,
+    };
+  }
+
+  private static mapEvaluationEvent(row: EvaluationEventRow): EvaluationTraceEvent {
+    const metrics: EvaluationTraceEvent["metrics"] = [];
+    const details: EvaluationTraceEvent["details"] = [];
+
+    for (const [key, value] of Object.entries(row.Attributes)) {
+      if (
+        key === "vote" ||
+        key === "score" ||
+        key.startsWith("metrics.") ||
+        key.startsWith("event.metrics.")
+      ) {
+        const metricKey = key.replace(/^(event\.)?metrics\./, "");
+        metrics.push({ key: metricKey, value: Number(value) || 0 });
+      } else {
+        details.push({ key, value });
+      }
+    }
+
+    return { eventType: row.EventType, metrics, details };
   }
 }

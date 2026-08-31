@@ -1,10 +1,6 @@
 import { nanoid } from "nanoid";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
-function toPgTimestampUtc(value: Date): Date {
-  return new Date(Math.floor(value.getTime() / 1000) * 1000);
-}
-
 import {
   GithubPullRequestsRepository,
   type GithubBranchCheckRow,
@@ -13,30 +9,6 @@ import {
   type UpsertGithubBranchCheckInput,
   type UpsertGithubPullRequestInput,
 } from "../github-pull-requests.repository";
-
-/**
- * Repositories are stored lowercased so a lookup matches whatever casing the
- * session reported. Applied on both the read and the write side here, which is
- * what makes it an invariant of the table rather than a convention callers have
- * to remember.
- */
-const normalizeFullName = (repositoryFullName: string): string =>
-  repositoryFullName.toLowerCase();
-
-/**
- * The host half of the same key, folded for the same reason.
- *
- * Every key this table is addressed by spans (organization, host, repository,
- * branch or number), so folding the repository alone still lets one repository
- * split in two: a caller naming `GitHub.com` matches no row a caller naming
- * `github.com` wrote. Hosts are case insensitive, `host` arrives straight off a
- * public query parameter, and a session records whatever casing its git remote
- * carries, so both spellings genuinely reach this layer.
- *
- * `headBranch` is deliberately never folded: `feat/X` and `feat/x` really are
- * two branches.
- */
-const normalizeHost = (repositoryHost: string): string => repositoryHost.toLowerCase();
 
 type PullRequestRecord = {
   organizationId: string;
@@ -70,73 +42,9 @@ type BranchCheckRecord = {
   lastRequestedAt: Date;
 };
 
-function toPullRequestRow(record: PullRequestRecord): GithubPullRequestRow {
-  return {
-    organizationId: record.organizationId,
-    repositoryHost: record.repositoryHost,
-    repositoryFullName: record.repositoryFullName,
-    headBranch: record.headBranch,
-    prNumber: record.prNumber,
-    htmlUrl: record.htmlUrl,
-    title: record.title,
-    state: record.state,
-    isDraft: record.isDraft,
-    authorLogin: record.authorLogin,
-    prCreatedAt: record.prCreatedAt,
-    prClosedAt: record.prClosedAt,
-    prMergedAt: record.prMergedAt,
-    prUpdatedAt: record.prUpdatedAt,
-    mappedAt: record.mappedAt,
-    lastCheckedAt: record.lastCheckedAt,
-  };
-}
-
-/**
- * The predicate that makes a snapshot write monotonic: accept it only when the
- * stored row has no source timestamp, or has one at or before the incoming
- * snapshot's.
- *
- * `lte` rather than `lt` on purpose. GitHub redelivers, and two events can
- * share one `updated_at` (a label added in the same second as an edit, say), so
- * refusing an equal timestamp would make the winner depend on which delivery
- * arrived first.
- */
-function freshnessGuard(prUpdatedAt: Date) {
-  return {
-    OR: [{ prUpdatedAt: null }, { prUpdatedAt: { lte: prUpdatedAt } }],
-  };
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
-}
-
-function toBranchCheckRow(record: BranchCheckRecord): GithubBranchCheckRow {
-  return {
-    organizationId: record.organizationId,
-    repositoryHost: record.repositoryHost,
-    repositoryFullName: record.repositoryFullName,
-    headBranch: record.headBranch,
-    lastCheckedAt: record.lastCheckedAt,
-    prCount: record.prCount,
-    notFoundAt: record.notFoundAt,
-    recheckAfter: record.recheckAfter,
-    attempts: record.attempts,
-    lastRequestedAt: record.lastRequestedAt,
-  };
-}
-
-function isGithubPullRequestsDatabase(database: object): database is PrismaClient {
-  return (
-    "githubPullRequest" in database &&
-    "githubBranchPullRequestCheck" in database &&
-    "$executeRaw" in database
-  );
-}
-
 export class PrismaGithubPullRequestsRepository extends GithubPullRequestsRepository {
   static create(database: object): PrismaGithubPullRequestsRepository {
-    if (!isGithubPullRequestsDatabase(database)) {
+    if (!PrismaGithubPullRequestsRepository.isGithubPullRequestsDatabase(database)) {
       throw new Error("GitHub pull-request persistence requires Prisma");
     }
 
@@ -177,8 +85,10 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
   private async writeSnapshot(pullRequest: UpsertGithubPullRequestInput): Promise<void> {
     const key = {
       organizationId: pullRequest.organizationId,
-      repositoryHost: normalizeHost(pullRequest.repositoryHost),
-      repositoryFullName: normalizeFullName(pullRequest.repositoryFullName),
+      repositoryHost: PrismaGithubPullRequestsRepository.normalizeHost(pullRequest.repositoryHost),
+      repositoryFullName: PrismaGithubPullRequestsRepository.normalizeFullName(
+        pullRequest.repositoryFullName,
+      ),
       prNumber: pullRequest.prNumber,
     };
     const snapshot = {
@@ -194,7 +104,7 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
       prUpdatedAt: pullRequest.prUpdatedAt,
       lastCheckedAt: new Date(),
     };
-    const guard = freshnessGuard(pullRequest.prUpdatedAt);
+    const guard = PrismaGithubPullRequestsRepository.freshnessGuard(pullRequest.prUpdatedAt);
 
     const updated = await this.prisma.githubPullRequest.updateMany({
       where: { ...key, ...guard },
@@ -209,7 +119,7 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
         data: { ...key, ...snapshot },
       });
     } catch (error) {
-      if (!isUniqueViolation(error)) {
+      if (!PrismaGithubPullRequestsRepository.isUniqueViolation(error)) {
         throw error;
       }
       await this.prisma.githubPullRequest.updateMany({
@@ -236,13 +146,14 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
     const records = await this.prisma.githubPullRequest.findMany({
       where: {
         organizationId,
-        repositoryHost: normalizeHost(repositoryHost),
-        repositoryFullName: normalizeFullName(repositoryFullName),
+        repositoryHost: PrismaGithubPullRequestsRepository.normalizeHost(repositoryHost),
+        repositoryFullName:
+          PrismaGithubPullRequestsRepository.normalizeFullName(repositoryFullName),
         headBranch: { in: [...headBranches] },
       },
       orderBy: { prCreatedAt: "asc" },
     });
-    return records.map(toPullRequestRow);
+    return records.map((record) => PrismaGithubPullRequestsRepository.toPullRequestRow(record));
   }
 
   async findAllByBranchKeys({
@@ -263,14 +174,16 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
       where: {
         organizationId,
         OR: keys.map((key) => ({
-          repositoryHost: normalizeHost(key.repositoryHost),
-          repositoryFullName: normalizeFullName(key.repositoryFullName),
+          repositoryHost: PrismaGithubPullRequestsRepository.normalizeHost(key.repositoryHost),
+          repositoryFullName: PrismaGithubPullRequestsRepository.normalizeFullName(
+            key.repositoryFullName,
+          ),
           headBranch: key.headBranch,
         })),
       },
       orderBy: { prCreatedAt: "asc" },
     });
-    return records.map(toPullRequestRow);
+    return records.map((record) => PrismaGithubPullRequestsRepository.toPullRequestRow(record));
   }
 
   async tryFindByNumber({
@@ -288,25 +201,28 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
       where: {
         organizationId_repositoryHost_repositoryFullName_prNumber: {
           organizationId,
-          repositoryHost: normalizeHost(repositoryHost),
-          repositoryFullName: normalizeFullName(repositoryFullName),
+          repositoryHost: PrismaGithubPullRequestsRepository.normalizeHost(repositoryHost),
+          repositoryFullName:
+            PrismaGithubPullRequestsRepository.normalizeFullName(repositoryFullName),
           prNumber,
         },
       },
     });
-    return record ? toPullRequestRow(record) : null;
+    return record ? PrismaGithubPullRequestsRepository.toPullRequestRow(record) : null;
   }
 
   async refreshSnapshot(input: RefreshGithubPullRequestSnapshotInput): Promise<void> {
     await this.prisma.githubPullRequest.updateMany({
       where: {
         organizationId: input.organizationId,
-        repositoryHost: normalizeHost(input.repositoryHost),
-        repositoryFullName: normalizeFullName(input.repositoryFullName),
+        repositoryHost: PrismaGithubPullRequestsRepository.normalizeHost(input.repositoryHost),
+        repositoryFullName: PrismaGithubPullRequestsRepository.normalizeFullName(
+          input.repositoryFullName,
+        ),
         prNumber: input.prNumber,
         // A live read is answered while a page is open, so a webhook can store
         // a newer snapshot between the read and this write.
-        ...freshnessGuard(input.prUpdatedAt),
+        ...PrismaGithubPullRequestsRepository.freshnessGuard(input.prUpdatedAt),
       },
       data: {
         title: input.title,
@@ -335,13 +251,14 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
       where: {
         organizationId_repositoryHost_repositoryFullName_headBranch: {
           organizationId,
-          repositoryHost: normalizeHost(repositoryHost),
-          repositoryFullName: normalizeFullName(repositoryFullName),
+          repositoryHost: PrismaGithubPullRequestsRepository.normalizeHost(repositoryHost),
+          repositoryFullName:
+            PrismaGithubPullRequestsRepository.normalizeFullName(repositoryFullName),
           headBranch,
         },
       },
     });
-    return record ? toBranchCheckRow(record) : null;
+    return record ? PrismaGithubPullRequestsRepository.toBranchCheckRow(record) : null;
   }
 
   /**
@@ -355,7 +272,9 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
    * already exist, so in practice every create comes from demand.
    */
   async upsertBranchCheck(input: UpsertGithubBranchCheckInput): Promise<void> {
-    const repositoryFullName = normalizeFullName(input.repositoryFullName);
+    const repositoryFullName = PrismaGithubPullRequestsRepository.normalizeFullName(
+      input.repositoryFullName,
+    );
     const bookkeeping = {
       lastCheckedAt: input.lastCheckedAt,
       prCount: input.prCount,
@@ -367,14 +286,14 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
       where: {
         organizationId_repositoryHost_repositoryFullName_headBranch: {
           organizationId: input.organizationId,
-          repositoryHost: normalizeHost(input.repositoryHost),
+          repositoryHost: PrismaGithubPullRequestsRepository.normalizeHost(input.repositoryHost),
           repositoryFullName,
           headBranch: input.headBranch,
         },
       },
       create: {
         organizationId: input.organizationId,
-        repositoryHost: normalizeHost(input.repositoryHost),
+        repositoryHost: PrismaGithubPullRequestsRepository.normalizeHost(input.repositoryHost),
         repositoryFullName,
         headBranch: input.headBranch,
         ...bookkeeping,
@@ -424,15 +343,19 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
     leaseMs: number;
     shouldRecordDemand: boolean;
   }): Promise<boolean> {
-    const fullName = normalizeFullName(repositoryFullName);
-    const host = normalizeHost(repositoryHost);
+    const fullName = PrismaGithubPullRequestsRepository.normalizeFullName(repositoryFullName);
+    const host = PrismaGithubPullRequestsRepository.normalizeHost(repositoryHost);
     // Naive-UTC `::timestamp` literals: a raw JS Date binds as `timestamptz`
     // and the comparison then runs through the session timezone, which on a
     // developer's machine makes a fifteen-minute backoff look already elapsed
     // and lets every racer claim. See `toPgTimestampUtc`.
-    const at = toPgTimestampUtc(now);
-    const leaseUntil = toPgTimestampUtc(new Date(now.getTime() + leaseMs));
-    const freshSince = toPgTimestampUtc(new Date(now.getTime() - freshMappingMs));
+    const at = PrismaGithubPullRequestsRepository.toPgTimestampUtc(now);
+    const leaseUntil = PrismaGithubPullRequestsRepository.toPgTimestampUtc(
+      new Date(now.getTime() + leaseMs),
+    );
+    const freshSince = PrismaGithubPullRequestsRepository.toPgTimestampUtc(
+      new Date(now.getTime() - freshMappingMs),
+    );
     const claimed = await this.prisma.$executeRaw`
       INSERT INTO "GithubBranchPullRequestCheck" (
         "id", "organizationId", "repositoryHost", "repositoryFullName",
@@ -481,8 +404,9 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
     await this.prisma.githubBranchPullRequestCheck.updateMany({
       where: {
         organizationId,
-        repositoryHost: normalizeHost(repositoryHost),
-        repositoryFullName: normalizeFullName(repositoryFullName),
+        repositoryHost: PrismaGithubPullRequestsRepository.normalizeHost(repositoryHost),
+        repositoryFullName:
+          PrismaGithubPullRequestsRepository.normalizeFullName(repositoryFullName),
         headBranch,
         lastRequestedAt: { lte: staleBefore },
       },
@@ -506,8 +430,9 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
     await this.prisma.githubBranchPullRequestCheck.updateMany({
       where: {
         organizationId,
-        repositoryHost: normalizeHost(repositoryHost),
-        repositoryFullName: normalizeFullName(repositoryFullName),
+        repositoryHost: PrismaGithubPullRequestsRepository.normalizeHost(repositoryHost),
+        repositoryFullName:
+          PrismaGithubPullRequestsRepository.normalizeFullName(repositoryFullName),
         headBranch,
         // Only a branch waiting longer than this. A row already due sooner is
         // left alone, which is also what keeps a live lookup claim, whose lease
@@ -543,7 +468,7 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
       orderBy: { recheckAfter: "asc" },
       take: limit,
     });
-    return records.map(toBranchCheckRow);
+    return records.map((record) => PrismaGithubPullRequestsRepository.toBranchCheckRow(record));
   }
 
   /**
@@ -566,12 +491,107 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
   async deleteStaleBefore({ before }: { before: Date }): Promise<{
     branchChecks: number;
   }> {
-    const cutoff = toPgTimestampUtc(before);
+    const cutoff = PrismaGithubPullRequestsRepository.toPgTimestampUtc(before);
     const branchChecks = await this.prisma.$executeRaw`
       DELETE FROM "GithubBranchPullRequestCheck"
       WHERE "lastRequestedAt" < ${cutoff}::timestamp
       -- @tenancy: GitHub branch bookkeeping retention sweep (system-owned maintenance)
     `;
     return { branchChecks };
+  }
+
+  private static toPgTimestampUtc(value: Date): Date {
+    return new Date(Math.floor(value.getTime() / 1000) * 1000);
+  }
+
+  /**
+   * Repositories are stored lowercased so a lookup matches whatever casing the
+   * session reported. Applied on both the read and the write side here, which is
+   * what makes it an invariant of the table rather than a convention callers have
+   * to remember.
+   */
+  private static normalizeFullName(repositoryFullName: string): string {
+    return repositoryFullName.toLowerCase();
+  }
+
+  /**
+   * The host half of the same key, folded for the same reason.
+   *
+   * Every key this table is addressed by spans (organization, host, repository,
+   * branch or number), so folding the repository alone still lets one repository
+   * split in two: a caller naming `GitHub.com` matches no row a caller naming
+   * `github.com` wrote. Hosts are case insensitive, `host` arrives straight off a
+   * public query parameter, and a session records whatever casing its git remote
+   * carries, so both spellings genuinely reach this layer.
+   *
+   * `headBranch` is deliberately never folded: `feat/X` and `feat/x` really are
+   * two branches.
+   */
+  private static normalizeHost(repositoryHost: string): string {
+    return repositoryHost.toLowerCase();
+  }
+
+  private static toPullRequestRow(record: PullRequestRecord): GithubPullRequestRow {
+    return {
+      organizationId: record.organizationId,
+      repositoryHost: record.repositoryHost,
+      repositoryFullName: record.repositoryFullName,
+      headBranch: record.headBranch,
+      prNumber: record.prNumber,
+      htmlUrl: record.htmlUrl,
+      title: record.title,
+      state: record.state,
+      isDraft: record.isDraft,
+      authorLogin: record.authorLogin,
+      prCreatedAt: record.prCreatedAt,
+      prClosedAt: record.prClosedAt,
+      prMergedAt: record.prMergedAt,
+      prUpdatedAt: record.prUpdatedAt,
+      mappedAt: record.mappedAt,
+      lastCheckedAt: record.lastCheckedAt,
+    };
+  }
+
+  /**
+   * The predicate that makes a snapshot write monotonic: accept it only when the
+   * stored row has no source timestamp, or has one at or before the incoming
+   * snapshot's.
+   *
+   * `lte` rather than `lt` on purpose. GitHub redelivers, and two events can
+   * share one `updated_at` (a label added in the same second as an edit, say), so
+   * refusing an equal timestamp would make the winner depend on which delivery
+   * arrived first.
+   */
+  private static freshnessGuard(prUpdatedAt: Date) {
+    return {
+      OR: [{ prUpdatedAt: null }, { prUpdatedAt: { lte: prUpdatedAt } }],
+    };
+  }
+
+  private static isUniqueViolation(error: unknown): boolean {
+    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+  }
+
+  private static toBranchCheckRow(record: BranchCheckRecord): GithubBranchCheckRow {
+    return {
+      organizationId: record.organizationId,
+      repositoryHost: record.repositoryHost,
+      repositoryFullName: record.repositoryFullName,
+      headBranch: record.headBranch,
+      lastCheckedAt: record.lastCheckedAt,
+      prCount: record.prCount,
+      notFoundAt: record.notFoundAt,
+      recheckAfter: record.recheckAfter,
+      attempts: record.attempts,
+      lastRequestedAt: record.lastRequestedAt,
+    };
+  }
+
+  private static isGithubPullRequestsDatabase(database: object): database is PrismaClient {
+    return (
+      "githubPullRequest" in database &&
+      "githubBranchPullRequestCheck" in database &&
+      "$executeRaw" in database
+    );
   }
 }

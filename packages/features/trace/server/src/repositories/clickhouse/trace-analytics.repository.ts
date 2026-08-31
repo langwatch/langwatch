@@ -19,42 +19,6 @@ const READ_BACK_FOLD_INSERT_SETTINGS = {
   input_format_skip_unknown_fields: 0,
 } as const;
 
-function parseClickHouseDateTimeMs(value: string): number {
-  const milliseconds = new Date(value.replace(" ", "T") + "Z").getTime();
-  return Number.isNaN(milliseconds) ? 0 : milliseconds;
-}
-
-function asNumber(value: unknown): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function asNullableNumber(value: unknown): number | null {
-  if (value === null || value === undefined) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function asNullableString(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
-}
-
-function asStringArray(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string")
-    : [];
-}
-
-function asStringMap(value: unknown): Record<string, string> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
-
-  return Object.fromEntries(
-    Object.entries(value).filter(
-      (entry): entry is [string, string] => typeof entry[1] === "string",
-    ),
-  );
-}
-
 /**
  * ClickHouse write shape for the slim `trace_analytics` table (ADR-034 Phase 2,
  * migration 00039).
@@ -122,63 +86,6 @@ interface ClickHouseTraceAnalyticsWriteRecord {
   _retention_days: number;
 }
 
-function toClickHouseRecord(
-  row: TraceAnalyticsRow,
-  retentionDays: number,
-  appliedEventIds: readonly string[] = [],
-): ClickHouseTraceAnalyticsWriteRecord {
-  return {
-    TenantId: row.tenantId,
-    TraceId: row.traceId,
-    Version: row.version,
-    OccurredAt: new Date(row.occurredAtMs),
-    CreatedAt: new Date(row.createdAtMs),
-    UpdatedAt: new Date(row.updatedAtMs),
-
-    TraceName: row.traceName,
-    TopicId: row.topicId,
-    SubTopicId: row.subTopicId,
-    UserId: row.userId,
-    ConversationId: row.conversationId,
-    CustomerId: row.customerId,
-    Origin: row.origin,
-    Models: row.models,
-    Labels: row.labels,
-
-    TotalCost: row.totalCost,
-    NonBilledCost: row.nonBilledCost,
-    TotalDurationMs: String(Math.round(row.totalDurationMs)),
-    TimeToFirstTokenMs: row.timeToFirstTokenMs !== null ? Math.round(row.timeToFirstTokenMs) : null,
-    TokensPerSecond: row.tokensPerSecond !== null ? Math.round(row.tokensPerSecond) : null,
-    PromptTokens: row.promptTokens,
-    CompletionTokens: row.completionTokens,
-    CacheReadTokens: row.cacheReadTokens,
-    CacheWriteTokens: row.cacheWriteTokens,
-    ReasoningTokens: row.reasoningTokens,
-    HasError: row.hasError,
-    HasAnnotation: row.hasAnnotation,
-
-    Attributes: row.attributes,
-
-    SpanCount: Math.max(0, Math.round(row.spanCount)),
-    AnnotationIds: row.annotationIds,
-    RootSpanStartTimeMs: String(Math.max(0, Math.round(row.rootSpanStartTimeMs))),
-    TraceNameFromFallback: row.traceNameFromFallback,
-    RootMetadataFromFallback: row.rootMetadataFromFallback,
-    TraceNameUserOverridden: row.traceNameUserOverridden,
-    LastEventOccurredAt: String(Math.max(0, Math.round(row.lastEventOccurredAt))),
-    EarliestSpanStartMs: String(Math.max(0, Math.round(row.earliestSpanStartMs))),
-
-    AppliedEventIds: [...appliedEventIds],
-
-    // NOTE: `row.hasSignal` is deliberately NOT serialised — there is no
-    // HasSignal column. Readers derive the verdict from the columns above via
-    // TRACE_ANALYTICS_HAS_SIGNAL_SQL, and `fromRecord` re-derives it on the
-    // way back, so the flag round-trips without a schema change.
-    _retention_days: retentionDays,
-  };
-}
-
 export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsRepository {
   private constructor(
     private readonly options: {
@@ -210,7 +117,13 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
       const client = await this.options.resolveClient(row.tenantId);
       await client.insert({
         table: TABLE_NAME,
-        values: [toClickHouseRecord(row, retentionDays, appliedEventIds)],
+        values: [
+          TraceAnalyticsClickHouseRepository.toClickHouseRecord(
+            row,
+            retentionDays,
+            appliedEventIds,
+          ),
+        ],
         format: "JSONEachRow",
         clickhouse_settings: READ_BACK_FOLD_INSERT_SETTINGS,
       });
@@ -254,7 +167,7 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
       await client.insert({
         table: TABLE_NAME,
         values: entries.map(({ row, retentionDays, appliedEventIds }) =>
-          toClickHouseRecord(
+          TraceAnalyticsClickHouseRepository.toClickHouseRecord(
             row,
             retentionDays ?? this.options.defaultRetentionDays,
             appliedEventIds,
@@ -353,29 +266,7 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
   }
 
   /**
-   * One ClickHouse attempt for {@link tryFindByTraceIdWithApplied}.
-   *
-   * Dedups with the IN-tuple pattern (max(UpdatedAt) per key), never FINAL: the
-   * ReplacingMergeTree only physically collapses rows sharing the full sort key
-   * `(TenantId, OccurredAt, TraceId)`. Freezing the anchor (ADR-071 step 3) is
-   * what lets a trace's versions share that key, but rows written before the
-   * freeze — and a trace whose anchor a post-miss rebuild re-stamped — still
-   * carry more than one OccurredAt, so superseded versions persist until TTL.
-   * The inner dedup subquery reads only three narrow scalar columns —
-   * `TenantId`, `TraceId` and `max(UpdatedAt)`, the last of which is the RMT
-   * version column rather than part of the sort key — and no heavy Attributes
-   * map. It is NOT a keyed seek: `TraceId` is third in the sort key and the
-   * inner scope carries no `OccurredAt` predicate (deliberately — see below), so
-   * it is a tenant-wide scan over the trace's versions. What keeps it cheap is
-   * the narrow column set, not the key prefix.
-   *
-   * `window` bounds OccurredAt on the OUTER read only, keeping it a
-   * partition-pruned point read. The inner dedup is deliberately UNWINDOWED so
-   * it resolves the TRUE latest version: windowing it too would let a trace
-   * whose latest version's OccurredAt drifted outside the window read back as a
-   * stale older version (a non-null result no fallback catches). Unwindowed, the
-   * same case yields an empty outer read, which the executor's unwindowed retry
-   * recovers.
+   * How two versions sharing `max(UpdatedAt)` are ranked, as SQL.
    *
    * ORDER BY breaks UpdatedAt ties, and is NOT the
    * `ORDER BY <version> DESC LIMIT 1` anti-pattern in
@@ -425,6 +316,39 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
    * serialisation runs only over the handful of candidate rows that survived
    * the IN-tuple.
    */
+  private static readonly LATEST_VERSION_ORDER = `
+        ORDER BY
+          LastEventOccurredAt DESC,
+          SpanCount DESC,
+          length(AppliedEventIds) DESC,
+          OccurredAt ASC,
+          toString(AppliedEventIds) DESC`;
+
+  /**
+   * One ClickHouse attempt for {@link tryFindByTraceIdWithApplied}.
+   *
+   * Dedups with the IN-tuple pattern (max(UpdatedAt) per key), never FINAL: the
+   * ReplacingMergeTree only physically collapses rows sharing the full sort key
+   * `(TenantId, OccurredAt, TraceId)`. Freezing the anchor (ADR-071 step 3) is
+   * what lets a trace's versions share that key, but rows written before the
+   * freeze — and a trace whose anchor a post-miss rebuild re-stamped — still
+   * carry more than one OccurredAt, so superseded versions persist until TTL.
+   * The inner dedup subquery reads only three narrow scalar columns —
+   * `TenantId`, `TraceId` and `max(UpdatedAt)`, the last of which is the RMT
+   * version column rather than part of the sort key — and no heavy Attributes
+   * map. It is NOT a keyed seek: `TraceId` is third in the sort key and the
+   * inner scope carries no `OccurredAt` predicate (deliberately — see below), so
+   * it is a tenant-wide scan over the trace's versions. What keeps it cheap is
+   * the narrow column set, not the key prefix.
+   *
+   * `window` bounds OccurredAt on the OUTER read only, keeping it a
+   * partition-pruned point read. The inner dedup is deliberately UNWINDOWED so
+   * it resolves the TRUE latest version: windowing it too would let a trace
+   * whose latest version's OccurredAt drifted outside the window read back as a
+   * stale older version (a non-null result no fallback catches). Unwindowed, the
+   * same case yields an empty outer read, which the executor's unwindowed retry
+   * recovers.
+   */
   private async queryLatestVersion({
     tenantId,
     traceId,
@@ -455,12 +379,7 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
               AND TraceId = {traceId:String}
             GROUP BY TenantId, TraceId
           )
-        ORDER BY
-          LastEventOccurredAt DESC,
-          SpanCount DESC,
-          length(AppliedEventIds) DESC,
-          OccurredAt ASC,
-          toString(AppliedEventIds) DESC
+        ${TraceAnalyticsClickHouseRepository.LATEST_VERSION_ORDER}
         LIMIT 1
       `,
       query_params: {
@@ -475,85 +394,194 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
     const record = rows[0];
     if (!record) return null;
     return {
-      row: fromRecord(record),
-      appliedEventIds: asStringArray(record.AppliedEventIds),
+      row: TraceAnalyticsClickHouseRepository.fromRecord(record),
+      appliedEventIds: TraceAnalyticsClickHouseRepository.asStringArray(record.AppliedEventIds),
     };
   }
-}
 
-/**
- * Decode a raw ClickHouse record into a {@link TraceAnalyticsRow}. The inverse
- * of {@link toClickHouseRecord}: DateTime64 columns come back as strings, the
- * UInt64 epoch-ms columns as strings, arrays/maps as themselves. A
- * pre-migration record simply omits the 00056 / 00061 fields, so the parsers
- * fall back to the documented defaults (0 / empty / false).
- *
- * DateTime64 columns MUST go through `parseClickHouseDateTimeMs`, never
- * `new Date(str)`: ClickHouse emits them without a zone suffix
- * ("2026-07-24 12:00:00.123") and V8 reads a bare datetime as LOCAL time. On a
- * non-UTC host that skews the storage anchor by the machine's offset, and the
- * fold reads that anchor back as frozen and writes it out again — so the row
- * moves partition and shifts its TTL deadline by the offset, permanently, on
- * the first cache miss. (The span timing baseline is immune by construction:
- * `EarliestSpanStartMs` rides as a UInt64 epoch-ms string, which is exactly why
- * migration 00056 chose that type for the read-back columns.)
- */
-function fromRecord(record: Record<string, unknown>): TraceAnalyticsRow {
-  return {
-    tenantId: String(record.TenantId ?? ""),
-    traceId: String(record.TraceId ?? ""),
-    version: String(record.Version ?? ""),
-    occurredAtMs: parseClickHouseDateTimeMs(String(record.OccurredAt)),
-    createdAtMs: parseClickHouseDateTimeMs(String(record.CreatedAt)),
-    updatedAtMs: parseClickHouseDateTimeMs(String(record.UpdatedAt)),
+  private static parseClickHouseDateTimeMs(value: string): number {
+    const milliseconds = new Date(value.replace(" ", "T") + "Z").getTime();
+    return Number.isNaN(milliseconds) ? 0 : milliseconds;
+  }
 
-    traceName: String(record.TraceName ?? ""),
-    topicId: asNullableString(record.TopicId),
-    subTopicId: asNullableString(record.SubTopicId),
-    userId: asNullableString(record.UserId),
-    conversationId: asNullableString(record.ConversationId),
-    customerId: asNullableString(record.CustomerId),
-    origin: String(record.Origin ?? ""),
-    models: asStringArray(record.Models),
-    labels: asStringArray(record.Labels),
+  private static asNumber(value: unknown): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
 
-    totalCost: asNullableNumber(record.TotalCost),
-    nonBilledCost: asNullableNumber(record.NonBilledCost),
-    totalDurationMs: asNumber(record.TotalDurationMs),
-    timeToFirstTokenMs: asNullableNumber(record.TimeToFirstTokenMs),
-    tokensPerSecond: asNullableNumber(record.TokensPerSecond),
-    promptTokens: asNullableNumber(record.PromptTokens),
-    completionTokens: asNullableNumber(record.CompletionTokens),
-    cacheReadTokens: asNullableNumber(record.CacheReadTokens),
-    cacheWriteTokens: asNullableNumber(record.CacheWriteTokens),
-    reasoningTokens: asNullableNumber(record.ReasoningTokens),
-    hasError: Boolean(record.HasError),
-    hasAnnotation:
-      record.HasAnnotation === null || record.HasAnnotation === undefined
-        ? null
-        : Boolean(record.HasAnnotation),
+  private static asNullableNumber(value: unknown): number | null {
+    if (value === null || value === undefined) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
 
-    attributes: asStringMap(record.Attributes),
+  private static asNullableString(value: unknown): string | null {
+    return typeof value === "string" && value.length > 0 ? value : null;
+  }
 
-    // Derived, not read — there is no HasSignal column. Mirrors
-    // TRACE_ANALYTICS_HAS_SIGNAL_SQL door for door, including the version
-    // door: a pre-00056 row decodes SpanCount/EarliestSpanStartMs as default
-    // 0, but everything written back then had passed the write-gate.
-    hasSignal:
-      asNumber(record.SpanCount) > 0 ||
-      asNumber(record.EarliestSpanStartMs) > 0 ||
-      !["", "0"].includes(
-        asStringMap(record.Attributes)["langwatch.reserved.log_record_count"] ?? "",
-      ) ||
-      String(record.Version ?? "") < TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
+  private static asStringArray(value: unknown): string[] {
+    return Array.isArray(value)
+      ? value.filter((item): item is string => typeof item === "string")
+      : [];
+  }
 
-    spanCount: asNumber(record.SpanCount),
-    annotationIds: asStringArray(record.AnnotationIds),
-    rootSpanStartTimeMs: asNumber(record.RootSpanStartTimeMs),
-    traceNameFromFallback: Boolean(record.TraceNameFromFallback),
-    rootMetadataFromFallback: Boolean(record.RootMetadataFromFallback),
-    traceNameUserOverridden: Boolean(record.TraceNameUserOverridden),
-    lastEventOccurredAt: asNumber(record.LastEventOccurredAt),
-    earliestSpanStartMs: asNumber(record.EarliestSpanStartMs),
-  };
+  private static asStringMap(value: unknown): Record<string, string> {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
+
+    return Object.fromEntries(
+      Object.entries(value).filter(
+        (entry): entry is [string, string] => typeof entry[1] === "string",
+      ),
+    );
+  }
+
+  private static toClickHouseRecord(
+    row: TraceAnalyticsRow,
+    retentionDays: number,
+    appliedEventIds: readonly string[] = [],
+  ): ClickHouseTraceAnalyticsWriteRecord {
+    return {
+      TenantId: row.tenantId,
+      TraceId: row.traceId,
+      Version: row.version,
+      OccurredAt: new Date(row.occurredAtMs),
+      CreatedAt: new Date(row.createdAtMs),
+      UpdatedAt: new Date(row.updatedAtMs),
+
+      TraceName: row.traceName,
+      TopicId: row.topicId,
+      SubTopicId: row.subTopicId,
+      UserId: row.userId,
+      ConversationId: row.conversationId,
+      CustomerId: row.customerId,
+      Origin: row.origin,
+      Models: row.models,
+      Labels: row.labels,
+
+      TotalCost: row.totalCost,
+      NonBilledCost: row.nonBilledCost,
+      TotalDurationMs: String(Math.round(row.totalDurationMs)),
+      TimeToFirstTokenMs:
+        row.timeToFirstTokenMs !== null ? Math.round(row.timeToFirstTokenMs) : null,
+      TokensPerSecond: row.tokensPerSecond !== null ? Math.round(row.tokensPerSecond) : null,
+      PromptTokens: row.promptTokens,
+      CompletionTokens: row.completionTokens,
+      CacheReadTokens: row.cacheReadTokens,
+      CacheWriteTokens: row.cacheWriteTokens,
+      ReasoningTokens: row.reasoningTokens,
+      HasError: row.hasError,
+      HasAnnotation: row.hasAnnotation,
+
+      Attributes: row.attributes,
+
+      SpanCount: Math.max(0, Math.round(row.spanCount)),
+      AnnotationIds: row.annotationIds,
+      RootSpanStartTimeMs: String(Math.max(0, Math.round(row.rootSpanStartTimeMs))),
+      TraceNameFromFallback: row.traceNameFromFallback,
+      RootMetadataFromFallback: row.rootMetadataFromFallback,
+      TraceNameUserOverridden: row.traceNameUserOverridden,
+      LastEventOccurredAt: String(Math.max(0, Math.round(row.lastEventOccurredAt))),
+      EarliestSpanStartMs: String(Math.max(0, Math.round(row.earliestSpanStartMs))),
+
+      AppliedEventIds: [...appliedEventIds],
+
+      // NOTE: `row.hasSignal` is deliberately NOT serialised — there is no
+      // HasSignal column. Readers derive the verdict from the columns above via
+      // TRACE_ANALYTICS_HAS_SIGNAL_SQL, and `fromRecord` re-derives it on the
+      // way back, so the flag round-trips without a schema change.
+      _retention_days: retentionDays,
+    };
+  }
+
+  /**
+   * Decode a raw ClickHouse record into a {@link TraceAnalyticsRow}. The inverse
+   * of {@link toClickHouseRecord}: DateTime64 columns come back as strings, the
+   * UInt64 epoch-ms columns as strings, arrays/maps as themselves. A
+   * pre-migration record simply omits the 00056 / 00061 fields, so the parsers
+   * fall back to the documented defaults (0 / empty / false).
+   *
+   * DateTime64 columns MUST go through `parseClickHouseDateTimeMs` on this
+   * class, never
+   * `new Date(str)`: ClickHouse emits them without a zone suffix
+   * ("2026-07-24 12:00:00.123") and V8 reads a bare datetime as LOCAL time. On a
+   * non-UTC host that skews the storage anchor by the machine's offset, and the
+   * fold reads that anchor back as frozen and writes it out again — so the row
+   * moves partition and shifts its TTL deadline by the offset, permanently, on
+   * the first cache miss. (The span timing baseline is immune by construction:
+   * `EarliestSpanStartMs` rides as a UInt64 epoch-ms string, which is exactly why
+   * migration 00056 chose that type for the read-back columns.)
+   */
+  private static fromRecord(record: Record<string, unknown>): TraceAnalyticsRow {
+    return {
+      tenantId: String(record.TenantId ?? ""),
+      traceId: String(record.TraceId ?? ""),
+      version: String(record.Version ?? ""),
+      occurredAtMs: TraceAnalyticsClickHouseRepository.parseClickHouseDateTimeMs(
+        String(record.OccurredAt),
+      ),
+      createdAtMs: TraceAnalyticsClickHouseRepository.parseClickHouseDateTimeMs(
+        String(record.CreatedAt),
+      ),
+      updatedAtMs: TraceAnalyticsClickHouseRepository.parseClickHouseDateTimeMs(
+        String(record.UpdatedAt),
+      ),
+
+      traceName: String(record.TraceName ?? ""),
+      topicId: TraceAnalyticsClickHouseRepository.asNullableString(record.TopicId),
+      subTopicId: TraceAnalyticsClickHouseRepository.asNullableString(record.SubTopicId),
+      userId: TraceAnalyticsClickHouseRepository.asNullableString(record.UserId),
+      conversationId: TraceAnalyticsClickHouseRepository.asNullableString(record.ConversationId),
+      customerId: TraceAnalyticsClickHouseRepository.asNullableString(record.CustomerId),
+      origin: String(record.Origin ?? ""),
+      models: TraceAnalyticsClickHouseRepository.asStringArray(record.Models),
+      labels: TraceAnalyticsClickHouseRepository.asStringArray(record.Labels),
+
+      totalCost: TraceAnalyticsClickHouseRepository.asNullableNumber(record.TotalCost),
+      nonBilledCost: TraceAnalyticsClickHouseRepository.asNullableNumber(record.NonBilledCost),
+      totalDurationMs: TraceAnalyticsClickHouseRepository.asNumber(record.TotalDurationMs),
+      timeToFirstTokenMs: TraceAnalyticsClickHouseRepository.asNullableNumber(
+        record.TimeToFirstTokenMs,
+      ),
+      tokensPerSecond: TraceAnalyticsClickHouseRepository.asNullableNumber(record.TokensPerSecond),
+      promptTokens: TraceAnalyticsClickHouseRepository.asNullableNumber(record.PromptTokens),
+      completionTokens: TraceAnalyticsClickHouseRepository.asNullableNumber(
+        record.CompletionTokens,
+      ),
+      cacheReadTokens: TraceAnalyticsClickHouseRepository.asNullableNumber(record.CacheReadTokens),
+      cacheWriteTokens: TraceAnalyticsClickHouseRepository.asNullableNumber(
+        record.CacheWriteTokens,
+      ),
+      reasoningTokens: TraceAnalyticsClickHouseRepository.asNullableNumber(record.ReasoningTokens),
+      hasError: Boolean(record.HasError),
+      hasAnnotation:
+        record.HasAnnotation === null || record.HasAnnotation === undefined
+          ? null
+          : Boolean(record.HasAnnotation),
+
+      attributes: TraceAnalyticsClickHouseRepository.asStringMap(record.Attributes),
+
+      // Derived, not read — there is no HasSignal column. Mirrors
+      // TRACE_ANALYTICS_HAS_SIGNAL_SQL door for door, including the version
+      // door: a pre-00056 row decodes SpanCount/EarliestSpanStartMs as default
+      // 0, but everything written back then had passed the write-gate.
+      hasSignal:
+        TraceAnalyticsClickHouseRepository.asNumber(record.SpanCount) > 0 ||
+        TraceAnalyticsClickHouseRepository.asNumber(record.EarliestSpanStartMs) > 0 ||
+        !["", "0"].includes(
+          TraceAnalyticsClickHouseRepository.asStringMap(record.Attributes)[
+            "langwatch.reserved.log_record_count"
+          ] ?? "",
+        ) ||
+        String(record.Version ?? "") < TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
+
+      spanCount: TraceAnalyticsClickHouseRepository.asNumber(record.SpanCount),
+      annotationIds: TraceAnalyticsClickHouseRepository.asStringArray(record.AnnotationIds),
+      rootSpanStartTimeMs: TraceAnalyticsClickHouseRepository.asNumber(record.RootSpanStartTimeMs),
+      traceNameFromFallback: Boolean(record.TraceNameFromFallback),
+      rootMetadataFromFallback: Boolean(record.RootMetadataFromFallback),
+      traceNameUserOverridden: Boolean(record.TraceNameUserOverridden),
+      lastEventOccurredAt: TraceAnalyticsClickHouseRepository.asNumber(record.LastEventOccurredAt),
+      earliestSpanStartMs: TraceAnalyticsClickHouseRepository.asNumber(record.EarliestSpanStartMs),
+    };
+  }
 }
