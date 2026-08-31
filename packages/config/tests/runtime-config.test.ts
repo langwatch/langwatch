@@ -81,6 +81,70 @@ describe("RuntimeConfig", () => {
     });
   });
 
+  describe("given a leaf marked optional", () => {
+    // `optional` is what separates a URL a deployment may omit from one it must
+    // set, and it is a single ternary in `configUrl` / `configSecret`. Nothing
+    // exercised the absent case, so making those helpers ignore the flag
+    // entirely left the suite green.
+    it("resolves to undefined when the environment does not set it", () => {
+      const config = RuntimeConfig.create({
+        name: "optional service",
+        definition: RuntimeConfig.define({
+          endpoint: Config.url({ optional: true }),
+          token: Config.secret({ optional: true }),
+        }),
+        source: {},
+      });
+
+      expect(config.value).toEqual({ endpoint: undefined, token: undefined });
+    });
+
+    it("still refuses a value of the wrong shape when one is set", () => {
+      expect(() =>
+        RuntimeConfig.create({
+          name: "optional service",
+          definition: RuntimeConfig.define({ endpoint: Config.url({ optional: true }) }),
+          source: { ENDPOINT: "not a url" },
+        }),
+      ).toThrow(InvalidRuntimeConfigError);
+    });
+  });
+
+  describe("given a leaf that is not optional", () => {
+    it("refuses to resolve when the environment does not set it", () => {
+      expect(() =>
+        RuntimeConfig.create({
+          name: "required service",
+          definition: RuntimeConfig.define({ endpoint: Config.url() }),
+          source: {},
+        }),
+      ).toThrow(InvalidRuntimeConfigError);
+    });
+
+    it("refuses to resolve a secret the environment does not set", () => {
+      // Distinct from the empty-string case below: `min(1)` rejects "" whether
+      // or not the leaf is optional, so only an absent value tells the two
+      // apart.
+      expect(() =>
+        RuntimeConfig.create({
+          name: "required service",
+          definition: RuntimeConfig.define({ token: Config.secret() }),
+          source: {},
+        }),
+      ).toThrow(InvalidRuntimeConfigError);
+    });
+
+    it("refuses an empty secret", () => {
+      expect(() =>
+        RuntimeConfig.create({
+          name: "required service",
+          definition: RuntimeConfig.define({ token: Config.secret() }),
+          source: { TOKEN: "" },
+        }),
+      ).toThrow(InvalidRuntimeConfigError);
+    });
+  });
+
   it("exports the inferred value shape for service factories", () => {
     const definition = RuntimeConfig.define({
       endpoint: Config.url({ optional: true }),

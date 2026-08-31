@@ -291,17 +291,11 @@ type WidenPrimitive<Value> = Value extends string
 function configUrl(options?: { env?: string; optional?: false }): ConfigLeaf<string>;
 function configUrl(options: { env?: string; optional: true }): ConfigLeaf<string | undefined>;
 function configUrl(options?: { env?: string; optional?: boolean }): ConfigLeaf<string | undefined> {
-  if (options?.optional) {
-    return {
-      _configLeaf: true,
-      schema: z.string().url().optional(),
-      env: options.env,
-    };
-  }
+  const schema = z.string().url();
 
   return {
     _configLeaf: true,
-    schema: z.string().url(),
+    schema: options?.optional ? schema.optional() : schema,
     env: options?.env,
   };
 }
@@ -312,17 +306,11 @@ function configSecret(options?: {
   env?: string;
   optional?: boolean;
 }): ConfigLeaf<string | undefined> {
-  if (options?.optional) {
-    return {
-      _configLeaf: true,
-      schema: z.string().min(1).optional(),
-      env: options.env,
-    };
-  }
+  const schema = z.string().min(1);
 
   return {
     _configLeaf: true,
-    schema: z.string().min(1),
+    schema: options?.optional ? schema.optional() : schema,
     env: options?.env,
   };
 }
