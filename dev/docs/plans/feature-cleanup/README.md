@@ -203,3 +203,50 @@ Now covered directly, all sabotage-verified:
 - `AuthzGrantSnapshotService` — the cache key separates organizations and
   callers, the epoch is what makes a revocation take effect, and the age bound
   is the backstop for whatever fails to bump it.
+
+## Round: R2, and what a dead config object was hiding (2026-08-31)
+
+**R2 has a smaller true surface than the file listing suggests.** Seven files
+are named `*.service.ts` and contain no class. Only some of those are wrong:
+
+- `trace-attribute-redaction.service.ts` genuinely was — `compile`, `apply` and
+  `apply-with-precompiled-matchers` are one object with state, and the third
+  existed only so a request could compile once. Now `TraceAttributeRedactor`.
+- `model-provider-defaults-scopes.service.ts` was fifteen lines, one function,
+  one caller in the same directory. Folded in.
+- `langy-prompt-value.service.ts` was a byte-identical copy of a function the
+  contract already exported. Deleted; the memory service reads the contract's.
+- `trace-query-evaluation.service.ts` and `langy-conversation-memory.service.ts`
+  are pure transforms whose callers bring a fresh input each time. A class
+  there holds nothing and would be the static-holder shape `layer-class`
+  already flags. **Leave them.**
+- `gateway-end-user-caps.service.ts` is the known R1 entry, blocked on
+  composition.
+
+The `.rules.ts` files are not R2 candidates either — that suffix is the trace
+package's established name for a module of pure rules, and there are fifteen
+of them.
+
+**The find.** `webhook-delivery.service.ts` is the largest service in the repo
+and its class was forty lines of one-line delegations under 1300 lines of
+module functions. Extracting the batching policy (`WebhookBatchPlanner`) left
+one unused-variable warning behind: `WEBHOOK_DELIVERY_OUTBOX`, declared and
+never referenced — and it was already dead before the extraction.
+
+It is not dead code. It is the outbox configuration the delivery process was
+supposed to hand the runtime, and the builder chain ended at `.transient()`
+without the `.outbox(...)` call its three governance siblings all make. Every
+webhook send has therefore been running on runtime defaults:
+
+    retry window   4m03s   (1+2+4+8+16+32+60+60+60s, the default backoff)
+    instead of     68h36m  (the ladder the code documents)
+    lease          30s instead of 120s
+    concurrency    1 instead of 4
+
+A receiver down for a ten-minute deploy lost its webhooks permanently. Fixed,
+with six cases that fail if the call is removed again.
+
+**Worth generalising:** an unused-variable warning on a *configuration object*
+is a wiring bug, not dead code. A sweep for other process managers missing
+`.outbox(...)` found one more candidate, which turned out to configure it in
+its pipeline file instead — so webhook delivery was the only one.
