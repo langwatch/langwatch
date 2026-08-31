@@ -37,7 +37,7 @@ class AppTraceSummaryProjectionAdapter extends TraceSummaryProjectionPort {
     traceId: string;
     window?: TraceSummaryReadWindow;
   }): Promise<TraceSummaryData | null> {
-    return this.repository.findByTraceId(input.tenantId, input.traceId, {
+    return this.repository.findByTraceId({ tenantId: input.tenantId, traceId: input.traceId }, {
       window: input.window,
     });
   }

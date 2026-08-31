@@ -406,7 +406,7 @@ describe("trace_analytics slim fold (integration)", () => {
 
     describe("when the same hoisted dimensions are read from both tables", () => {
       it("matches TotalCost, TimeToFirstTokenMs, Models, TopicId, Origin to the cent", async () => {
-        const summary = await summaryRepo.findByTraceId(tenantId, traceId);
+        const summary = await summaryRepo.findByTraceId({ tenantId, traceId });
         expect(summary).not.toBeNull();
 
         const slimResult = await ch.query({

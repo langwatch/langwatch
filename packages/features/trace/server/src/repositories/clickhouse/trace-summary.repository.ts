@@ -195,8 +195,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
   }
 
   async findByTraceId(
-    tenantId: string,
-    traceId: string,
+    { tenantId, traceId }: { tenantId: string; traceId: string },
     options?: FindByTraceIdOptions,
   ): Promise<TraceSummaryData | null> {
     EventUtils.validateTenantId({ tenantId }, "TraceSummaryClickHouseRepository.findByTraceId");

@@ -53,7 +53,7 @@ export class TraceSummaryService {
       full?: boolean;
     },
   ): Promise<TraceSummaryData> {
-    const result = await this.repository.findByTraceId(tenantId, traceId, options);
+    const result = await this.repository.findByTraceId({ tenantId, traceId }, options);
     if (!result) throw new TraceNotFoundError(traceId);
 
     const cutoff = options?.visibilityCutoffMs;

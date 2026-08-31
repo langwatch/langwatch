@@ -119,7 +119,7 @@ function recordingRepo(): {
 
 describe("TraceSummaryClickHouseRepository.findByTraceId (integration)", () => {
   it("returns the trace when no occurredAtMs hint is passed", async () => {
-    const result = await repo.findByTraceId(tenantId, presentTraceId);
+    const result = await repo.findByTraceId({ tenantId, traceId: presentTraceId });
 
     expect(result).not.toBeNull();
     expect(result?.traceId).toBe(presentTraceId);
@@ -128,7 +128,7 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (integration)", () => {
   it("resolves OccurredAt and bounds the heavy read for a hint-less call", async () => {
     const { repo: rec, queries } = recordingRepo();
 
-    const result = await rec.findByTraceId(tenantId, presentTraceId);
+    const result = await rec.findByTraceId({ tenantId, traceId: presentTraceId });
 
     expect(result?.traceId).toBe(presentTraceId);
     // One cheap resolve (min(OccurredAt)) + the heavy read, and the heavy read
@@ -143,7 +143,7 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (integration)", () => {
   it("skips the heavy read entirely for a trace that does not exist", async () => {
     const { repo: rec, queries } = recordingRepo();
 
-    const result = await rec.findByTraceId(tenantId, `missing-${nanoid()}`);
+    const result = await rec.findByTraceId({ tenantId, traceId: `missing-${nanoid()}` });
 
     expect(result).toBeNull();
     // The light resolve confirms absence; the heavy unbounded read is never

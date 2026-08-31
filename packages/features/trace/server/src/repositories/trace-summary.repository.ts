@@ -32,8 +32,7 @@ export interface TraceSummaryRepository {
     }>,
   ): Promise<void>;
   findByTraceId(
-    tenantId: string,
-    traceId: string,
+    trace: { tenantId: string; traceId: string },
     options?: FindByTraceIdOptions,
   ): Promise<TraceSummaryData | null>;
 }
@@ -42,8 +41,7 @@ export class NullTraceSummaryRepository implements TraceSummaryRepository {
   async upsert(_data: TraceSummaryData, _tenantId: string): Promise<void> {}
 
   async findByTraceId(
-    _tenantId: string,
-    _traceId: string,
+    _trace: { tenantId: string; traceId: string },
     _options?: FindByTraceIdOptions,
   ): Promise<TraceSummaryData | null> {
     return null;
