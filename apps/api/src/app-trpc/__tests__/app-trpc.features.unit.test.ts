@@ -41,7 +41,11 @@ import type { DataPrivacyTrpcContext } from "@langwatch/data-privacy-server";
 import type { EvaluationTrpcContext } from "@langwatch/evaluation-server";
 import type { ExperimentTrpcContext } from "@langwatch/experiment-server";
 import type { BugReportTrpcContext } from "@langwatch/ops-server";
-import type { GroupTrpcContext, JoinRequestTrpcContext } from "@langwatch/organization-server";
+import type {
+  GroupTrpcContext,
+  JoinRequestTrpcContext,
+  OnboardingTrpcContext,
+} from "@langwatch/organization-server";
 import type { IntegrationsChecksTrpcContext } from "@langwatch/project-server";
 import type { IdentityTrpcContext, UserTrpcContext } from "@langwatch/user-server";
 import type {
@@ -74,6 +78,7 @@ type TestContext = AnalyticsTrpcContext &
   IntegrationsChecksTrpcContext &
   JoinRequestTrpcContext &
   LangWatchQLTrpcContext &
+  OnboardingTrpcContext &
   PublicEnvTrpcContext &
   SavedWorkbenchChartTrpcContext &
   UserTrpcContext &
@@ -97,6 +102,9 @@ const passThroughGate = <TProcedure>(procedure: TProcedure): TProcedure => proce
 
 /** The period a workbench caller reports over, as the two doors parse it. */
 const testTimeWindowSchema = z.object({ start: z.date(), end: z.date() });
+
+/** The sign-up questionnaire, as the process hands its schema to onboarding. */
+const testSignUpDataSchema = z.object({ utmCampaign: z.string().optional() });
 
 const middlewares: AppTrpcPolicyMiddlewares = {
   tracer: passThrough(),
@@ -133,6 +141,7 @@ function refusingPorts(): AppTrpcFeaturePorts<
   Record<string, unknown>,
   Record<string, unknown>,
   AnalyticsReadInput,
+  typeof testSignUpDataSchema,
   AnalyticsTimeseriesInput,
   Record<string, unknown>,
   Record<string, unknown>,
@@ -216,6 +225,13 @@ function refusingPorts(): AppTrpcFeaturePorts<
     identity: refuseEvery("identity"),
     integrationsChecks: refuseEvery("integrationsChecks"),
     joinRequests: refuseEvery("joinRequests"),
+    // The questionnaire schema is read while the surface is BUILT — it becomes
+    // `initializeOrganization`'s own input parser — so it is a real schema
+    // rather than a refusal.
+    onboarding: {
+      ...(refuseEvery("onboarding") as object),
+      signUpDataSchema: testSignUpDataSchema,
+    } as never,
     prisma: refuseEvery("prisma"),
     user: refuseEvery("user"),
     workflows: {
@@ -285,6 +301,7 @@ describe("the app tRPC feature list", () => {
         "identity",
         "integrationsChecks",
         "joinRequests",
+        "onboarding",
         "optimization",
         "publicEnv",
         "user",
@@ -333,6 +350,14 @@ describe("the app tRPC feature list", () => {
         "setForScope",
       ]);
       expect(procedureNamesOf(features.identity)).toEqual(["completeVerification"]);
+      // The sign-up ceremony. Its follow-ups all answer through ports, so what
+      // this pins is that the two names the sign-up screens call are the
+      // packaged ones — mounted beside the `organization.createAndAssign` they
+      // are built on rather than assembled a second time in the app router.
+      expect(procedureNamesOf(features.onboarding)).toEqual([
+        "initializeOrganization",
+        "setIntegrationMethod",
+      ]);
       // The project's setup rollup. Its evidence comes from nine other
       // verticals through a port, so the one thing this pins is that the
       // procedure the onboarding surfaces call is the packaged one.

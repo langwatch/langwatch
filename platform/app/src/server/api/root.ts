@@ -49,7 +49,12 @@ import {
   fireScenarioCreatedNurturing,
   fireWorkflowCreatedNurturing,
 } from "~/server/app-layer/billing/nurturing/featureAdoption";
+import {
+  fireIntegrationMethodNurturing,
+  mapProductSelectionToIntegrationMethod,
+} from "~/server/app-layer/billing/nurturing/productInterest";
 import { afterPromptCreated } from "~/server/app-layer/billing/nurturing/promptCreation";
+import { fireSignupNurturingCalls } from "~/server/app-layer/billing/nurturing/signupIdentification";
 import { prisma } from "~/server/db";
 import { trackServerEvent } from "~/server/posthog";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -247,7 +252,6 @@ import { langyEgressRouter } from "~/runtime/app/internal-api/langy.router";
 import { llmModelCostsRouter } from "~/runtime/app/internal-api/model-provider.router";
 import { modelProviderRouter } from "~/runtime/app/internal-api/model-provider.router";
 import { monitorsRouter } from "~/runtime/app/internal-api/monitor.router";
-import { onboardingRouter } from "./routers/onboarding/onboarding.router";
 import { presenceRouter } from "~/runtime/app/internal-api/presence.router";
 import { projectRouter } from "~/runtime/app/internal-api/project.router";
 import { roleBindingRouter } from "~/runtime/app/internal-api/role-binding.router";
@@ -531,6 +535,15 @@ function checkAuditLogPermission() {
 
 /** The request app, as the organization ports read it off the tRPC context. */
 const organizationCtx = (ctx: unknown) => ctx as TRPCContext;
+
+/**
+ * The sign-up questionnaire's answers, as this process reads them back.
+ *
+ * The onboarding transport carries them opaquely — the schema is this
+ * process's, so the shape is not the feature package's to know — and every
+ * consumer of them is on this side of the port.
+ */
+const asSignUpData = (value: unknown) => value as z.infer<typeof signUpDataSchema> | undefined;
 
 /** The invitation service, built per call against the request's Prisma. */
 const invitesFor = (ctx: unknown) => {
@@ -1578,6 +1591,62 @@ const appTrpcFeatures = createAppTrpcFeatures({
         }),
     },
 
+    /**
+     * The four follow-ups the sign-up ceremony reaches for that are not the
+     * organization's, plus the questionnaire schema its input is built from.
+     *
+     * The catalogue is an Enterprise governance capability; the personal
+     * workspace is provisioned through the USER application, which names the
+     * person the workspace belongs to rather than attributing it to whoever
+     * asked; the first project goes through this process's own `project.create`
+     * so it runs that surface's authorization, audit and Langy provisioning
+     * instead of a second copy of them; and both sign-up notifications are
+     * this deployment's marketing traffic.
+     *
+     * The questionnaire's own fields are read HERE for the same reason the
+     * schema is supplied here: `utmCampaign` is a field of this process's
+     * sign-up form, so the transport forwards the answers opaquely and the
+     * process reads what it put in them.
+     */
+    onboarding: {
+      signUpDataSchema,
+      ensureDefaultAiToolCatalog: (ctx: TRPCContext, input) =>
+        ctx.app.governance.aiToolEnsureDefaultCatalog(input),
+      ensurePersonalWorkspace: (ctx: TRPCContext, input) =>
+        ctx.app.users.ensurePersonalWorkspace(input),
+      createProject: (ctx: TRPCContext, input) => projectRouter.createCaller(ctx).create(input),
+      sendSlackSignupEvent: (ctx: TRPCContext, input) =>
+        ctx.app.notifications.sendSlackSignupEvent({
+          ...input,
+          signUpData: asSignUpData(input.signUpData),
+          utmCampaign: asSignUpData(input.signUpData)?.utmCampaign,
+        }),
+      sendHubspotSignupForm: (ctx: TRPCContext, input) =>
+        ctx.app.notifications.sendHubspotSignupForm({
+          ...input,
+          signUpData: asSignUpData(input.signUpData),
+        }),
+      // Named field by field rather than spread: the nurturing call REQUIRES
+      // the two identity keys, present-and-undefined included, and a spread of
+      // optional ones would let a rename drop them silently.
+      fireSignupNurturing: (input) =>
+        fireSignupNurturingCalls({
+          userId: input.userId,
+          email: input.email,
+          name: input.name,
+          organizationId: input.organizationId,
+          organizationName: input.organizationName,
+          signUpData: asSignUpData(input.signUpData),
+          primaryIntent: input.primaryIntent,
+        }),
+      recordIntegrationMethod: ({ userId, selection }) =>
+        fireIntegrationMethodNurturing({
+          userId,
+          integrationMethod: mapProductSelectionToIntegrationMethod(selection),
+        }),
+      reportError: (error, context) => captureException(toError(error), context),
+    },
+
     prisma,
 
     /**
@@ -2122,7 +2191,6 @@ const coreRouters = {
   dataRetention: dataRetentionRouter,
   emailSuppression: emailSuppressionRouter,
   translate: translateRouter,
-  onboarding: onboardingRouter,
   scenarios: scenarioRouter,
   suites: suiteRouter,
   role: roleRouter,

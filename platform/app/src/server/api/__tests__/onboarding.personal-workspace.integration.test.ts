@@ -13,7 +13,8 @@
  * they created anything. The plan-count assertions here are what keep that
  * from coming back.
  *
- * Hits real Postgres through the real router and the real
+ * Hits real Postgres through the mounted `onboarding.*` surface — the
+ * packaged transport with this process's ports bound — and the real
  * PersonalWorkspaceService. Requires: PostgreSQL database (Prisma).
  *
  * Spec: specs/features/onboarding/intent-fork.feature
@@ -28,8 +29,8 @@ import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/r
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import { createInnerTRPCContext } from "../../../trpc";
-import { onboardingRouter } from "../onboarding.router";
+import { createInnerTRPCContext } from "../trpc";
+import { appRouter } from "../root";
 
 const suffix = nanoid(8);
 
@@ -49,7 +50,7 @@ async function seedUser(label: string) {
 }
 
 function callerFor(user: { id: string; name: string | null; email: string | null }) {
-  return onboardingRouter.createCaller(
+  return appRouter.createCaller(
     createInnerTRPCContext({
       session: {
         user: { id: user.id, name: user.name, email: user.email },
@@ -57,7 +58,7 @@ function callerFor(user: { id: string; name: string | null; email: string | null
       },
       permissionChecked: false,
     }) as never,
-  );
+  ).onboarding;
 }
 
 async function personalWorkspaceOf({

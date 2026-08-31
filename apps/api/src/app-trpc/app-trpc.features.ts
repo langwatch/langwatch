@@ -45,6 +45,8 @@ import type {
   GroupTrpcPorts,
   JoinRequestTrpcContext,
   JoinRequestTrpcPorts,
+  OnboardingTrpcContext,
+  OnboardingTrpcPorts,
 } from "@langwatch/organization-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
@@ -64,6 +66,7 @@ import type {
   WorkflowTrpcPorts,
 } from "@langwatch/workflow-server";
 import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
+import type { ZodTypeAny } from "zod";
 
 import {
   createAnalyticsTrpcRouter,
@@ -99,6 +102,7 @@ import { createBugReportTrpcRouter } from "../features/ops/ops-trpc.mount";
 import {
   createGroupTrpcRouter,
   createJoinRequestTrpcRouter,
+  createOnboardingTrpcRouter,
 } from "../features/organization/organization-trpc.mount";
 import { createIntegrationsChecksTrpcRouter } from "../features/project/project-trpc.mount";
 import { createIdentityTrpcRouter, createUserTrpcRouter } from "../features/user/user-trpc.mount";
@@ -128,6 +132,7 @@ export interface AppTrpcFeaturePorts<
   TPrivacyRule,
   TPrivacySnapshot,
   TReadInput extends AnalyticsReadInput,
+  TSignUpDataSchema extends ZodTypeAny,
   TTimeseriesInput extends AnalyticsTimeseriesInput,
   TWorkbenchState,
   TWorkflowVersion,
@@ -236,6 +241,19 @@ export interface AppTrpcFeaturePorts<
    */
   joinRequests: JoinRequestTrpcPorts;
   /**
+   * The sign-up ceremony's four follow-ups, plus the questionnaire schema its
+   * input is built from.
+   *
+   * Every one of them is somebody else's: the standard AI tool catalogue is
+   * an Enterprise governance capability a core package may not name, the
+   * signer's personal workspace is provisioned through the user application
+   * that names the person, the first project is created through the process's
+   * own project surface so it runs that surface's authorization and audit,
+   * and both sign-up notifications are this deployment's marketing traffic.
+   * What the organization package keeps is the ceremony itself.
+   */
+  onboarding: OnboardingTrpcPorts<TSignUpDataSchema>;
+  /**
    * The process's database client. One surface takes it directly: the
    * evaluation mount builds its custom-evaluator read on the client rather
    * than on a request context, because that read is the same table scan for
@@ -293,6 +311,7 @@ export function createAppTrpcFeatures<
     IntegrationsChecksTrpcContext &
     JoinRequestTrpcContext &
     LangWatchQLTrpcContext &
+    OnboardingTrpcContext &
     PublicEnvTrpcContext &
     SavedWorkbenchChartTrpcContext &
     UserTrpcContext &
@@ -310,6 +329,7 @@ export function createAppTrpcFeatures<
   TPrivacyRule,
   TPrivacySnapshot,
   TReadInput extends AnalyticsReadInput,
+  TSignUpDataSchema extends ZodTypeAny,
   TTimeseriesInput extends AnalyticsTimeseriesInput,
   TWorkbenchState,
   TWorkflowVersion,
@@ -327,6 +347,7 @@ export function createAppTrpcFeatures<
     TPrivacyRule,
     TPrivacySnapshot,
     TReadInput,
+    TSignUpDataSchema,
     TTimeseriesInput,
     TWorkbenchState,
     TWorkflowVersion,
@@ -377,6 +398,9 @@ export function createAppTrpcFeatures<
       ports: ports.integrationsChecks,
     }),
     joinRequests: createJoinRequestTrpcRouter({ ...mount, ports: ports.joinRequests }),
+    // The sign-up ceremony, beside the `organization.createAndAssign` it is
+    // built on: same package, same questionnaire schema, same opt-out reason.
+    onboarding: createOnboardingTrpcRouter({ ...mount, ports: ports.onboarding }),
     // A procedure rather than a router: the client calls `publicEnv({})` at
     // the root, and giving it a namespace would rename it.
     publicEnv: createPublicEnvTrpcProcedure({ ...mount, ports: ports.auth }),

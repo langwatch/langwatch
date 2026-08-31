@@ -1,7 +1,7 @@
 /**
  * App-process transport mounts for the organization vertical: the organization
- * itself with its membership and invitations, plus the group and join-request
- * surfaces.
+ * itself with its membership and invitations, the sign-up ceremony that
+ * creates the first of each, plus the group and join-request surfaces.
  *
  * Behaviour is package-owned (`@langwatch/organization-server`); this supplies
  * the process's root, authenticated procedure, policy chain, and the
@@ -14,6 +14,7 @@ import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@lan
 import {
   GroupTrpcApi,
   JoinRequestTrpcApi,
+  OnboardingTrpcApi,
   OrganizationTrpcApi,
   PersonalWorkspaceFeaturesTrpcApi,
   type PersonalWorkspaceFeaturesTrpcContext,
@@ -21,6 +22,8 @@ import {
   type GroupTrpcPorts,
   type JoinRequestTrpcContext,
   type JoinRequestTrpcPorts,
+  type OnboardingTrpcContext,
+  type OnboardingTrpcPorts,
   type OrganizationTrpcContext,
   type OrganizationTrpcPorts,
 } from "@langwatch/organization-server";
@@ -50,6 +53,19 @@ export function createOrganizationTrpcRouter<
   const procedures = { ...service, auditLogPolicy: service.custom(mount.auditLogCheck) };
 
   return OrganizationTrpcApi.create(mount.root, procedures, mount.ports);
+}
+
+/** Mounts `onboarding.*` on the app process's tRPC root. */
+export function createOnboardingTrpcRouter<
+  TContext extends OnboardingTrpcContext,
+  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
+  TRoot extends AnyTRPCRootTypes,
+  TSignUpDataSchema extends z.ZodTypeAny,
+>(
+  mount: TrpcApiMount<TContext, TOptions, TRoot> &
+    TrpcApiPorts<OnboardingTrpcPorts<TSignUpDataSchema>>,
+) {
+  return OnboardingTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
 }
 
 /** Mounts `group.*` on the app process's tRPC root. */

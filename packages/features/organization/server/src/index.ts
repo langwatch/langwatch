@@ -38,6 +38,13 @@ export {
   type JoinRequestTrpcPorts,
 } from "./transport/api-trpc/join-request.api";
 export {
+  OnboardingTrpcApi,
+  onboardingIntegrationMethodSchema,
+  type OnboardingIntegrationMethod,
+  type OnboardingTrpcContext,
+  type OnboardingTrpcPorts,
+} from "./transport/api-trpc/onboarding.api";
+export {
   OrganizationTrpcApi,
   type OrganizationTrpcContext,
   type OrganizationTrpcPorts,
