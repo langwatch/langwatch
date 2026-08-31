@@ -17,16 +17,22 @@ import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 
 wireDefaultTestApp();
 
+/** Who the write is attributed to. The refusal happens before it is read. */
+const CALLER = { id: "user-1" };
+
 describe("model provider defaults — codex refusal for the run-time agent-under-test surface", () => {
   describe("given a DEFAULT role default set to a codex model", () => {
     /** @scenario "The server refuses Codex outside the allowed surfaces" */
     it("refuses the write", async () => {
       await expect(
-        getApp().modelProviders.setDefault({
-          scope: { scopeType: "PROJECT", scopeId: "proj-1" },
-          key: "DEFAULT",
-          model: CODEX_DEFAULT_MODEL,
-        }),
+        getApp().modelProviders.setDefault(
+          {
+            scope: { scopeType: "PROJECT", scopeId: "proj-1" },
+            key: "DEFAULT",
+            model: CODEX_DEFAULT_MODEL,
+          },
+          CALLER,
+        ),
       ).rejects.toThrow(/coding-assistant surfaces only/);
     });
   });
@@ -35,11 +41,14 @@ describe("model provider defaults — codex refusal for the run-time agent-under
     /** @scenario "The server refuses Codex outside the allowed surfaces" */
     it("refuses the write", async () => {
       await expect(
-        getApp().modelProviders.setDefault({
-          scope: { scopeType: "PROJECT", scopeId: "proj-1" },
-          key: "scenarios.agent_under_test",
-          model: CODEX_DEFAULT_MODEL,
-        }),
+        getApp().modelProviders.setDefault(
+          {
+            scope: { scopeType: "PROJECT", scopeId: "proj-1" },
+            key: "scenarios.agent_under_test",
+            model: CODEX_DEFAULT_MODEL,
+          },
+          CALLER,
+        ),
       ).rejects.toThrow(/coding-assistant surfaces only/);
     });
   });
