@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { handleGetPrompt } from "../tools/get-prompt.js";
-import { getPrompt } from "../langwatch-api.js";
+import { handleUpdatePrompt } from "../tools/update-prompt.js";
+import { getPrompt, updatePrompt } from "../langwatch-api.js";
 
 // Partial mock (spread over the real module) rather than a full replacement:
 // Scenario 11 dynamically imports create-mcp-server.js, which re-exports other
@@ -8,10 +9,11 @@ import { getPrompt } from "../langwatch-api.js";
 // Only getPrompt needs to be a fake for these tests.
 vi.mock("../langwatch-api.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../langwatch-api.js")>();
-  return { ...actual, getPrompt: vi.fn() };
+  return { ...actual, getPrompt: vi.fn(), updatePrompt: vi.fn() };
 });
 
 const mockGetPrompt = vi.mocked(getPrompt);
+const mockUpdatePrompt = vi.mocked(updatePrompt);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -351,6 +353,304 @@ describe("MCP server platform_get_prompt tool registration", () => {
       // Fails against current code: no "format" key is registered at all.
       expect(shapeKeys).toContain("format");
       expect(tool?.description ?? "").toMatch(/format/i);
+    });
+  });
+});
+
+/**
+ * Write-path spec (issue #5666 AC5-9). These tests define the contract the
+ * fix must implement: after updatePrompt succeeds, the tool re-fetches the
+ * prompt via getPrompt to derive authoritative state (the mutation response
+ * alone does not carry applied tags), finds the new version by matching the
+ * request's commitMessage, and reports versionId and deployment state from
+ * that version's tags (the built-in "latest" tag is never a deployment).
+ * On updatePrompt failure with tags requested, the tool re-fetches and
+ * matches by commitMessage to detect the committed-but-untagged version
+ * (the platform commits the version before assigning tags).
+ */
+
+/** No single output line may pair a version number with a deployment tag name. */
+function expectNoLineMixesVersionAndTag(result: string, tags: string[]) {
+  for (const line of result.split("\n")) {
+    const hasTag = tags.some((t) => line.includes(t));
+    if (hasTag) {
+      expect(line).not.toMatch(/\bv?\d+\b.*\b(version)\b|\bversion\b.*\bv?\d+\b/i);
+    }
+  }
+}
+
+describe("handleUpdatePrompt()", () => {
+  const { getPrompt: mockedGetPrompt } = { getPrompt: mockGetPrompt };
+
+  describe("when the server applies different tags than the request asked for", () => {
+    /** @scenario "Deriving tag and deployment state from the server response, not the request" */
+    it("reflects the tags the server applied, not the request's tags", async () => {
+      mockUpdatePrompt.mockResolvedValue({
+        id: "prompt_1",
+        handle: "my-prompt",
+        latestVersionNumber: 4,
+      } as any);
+      mockedGetPrompt.mockResolvedValue({
+        id: "prompt_1",
+        handle: "my-prompt",
+        latestVersionNumber: 4,
+        versions: [
+          {
+            version: 4,
+            versionId: "ver_new004",
+            commitMessage: "Update greeting",
+            tags: ["staging", "latest"],
+          },
+        ],
+      } as any);
+
+      const result = await handleUpdatePrompt({
+        idOrHandle: "my-prompt",
+        commitMessage: "Update greeting",
+        tags: ["production"],
+      });
+
+      expect(result).toContain("staging");
+      // The request asked for production but the server did not apply it;
+      // echoing the request's tags is exactly the bug under test.
+      expect(result).not.toContain("production");
+    });
+  });
+
+  describe("when an update without tags lands on a prompt with existing deployments", () => {
+    /** @scenario "Reporting a new version as not deployed and existing deployments as untouched" */
+    it("states the new version is not deployed and production/staging were left untouched", async () => {
+      mockUpdatePrompt.mockResolvedValue({
+        id: "prompt_1",
+        handle: "my-prompt",
+        latestVersionNumber: 6,
+      } as any);
+      mockedGetPrompt.mockResolvedValue({
+        id: "prompt_1",
+        handle: "my-prompt",
+        latestVersionNumber: 6,
+        versions: [
+          {
+            version: 6,
+            versionId: "ver_new006",
+            commitMessage: "Tweak wording",
+            tags: ["latest"],
+          },
+          {
+            version: 5,
+            versionId: "ver_old005",
+            commitMessage: "Prior stable",
+            tags: ["production", "staging"],
+          },
+        ],
+      } as any);
+
+      const result = await handleUpdatePrompt({
+        idOrHandle: "my-prompt",
+        commitMessage: "Tweak wording",
+      });
+
+      expect(result).toMatch(/not deployed/i);
+      expect(result).toMatch(/production/);
+      expect(result).toMatch(/staging/);
+      expect(result).toMatch(/untouched|unchanged|still point/i);
+      expectNoLineMixesVersionAndTag(result, ["production", "staging"]);
+    });
+  });
+
+  describe("when a requested tag was actually assigned by the server", () => {
+    /** @scenario "Using the word deployed only when a tag was actually assigned" */
+    it("says the new version is deployed to production", async () => {
+      mockUpdatePrompt.mockResolvedValue({
+        id: "prompt_1",
+        handle: "my-prompt",
+        latestVersionNumber: 7,
+      } as any);
+      mockedGetPrompt.mockResolvedValue({
+        id: "prompt_1",
+        handle: "my-prompt",
+        latestVersionNumber: 7,
+        versions: [
+          {
+            version: 7,
+            versionId: "ver_new007",
+            commitMessage: "Ship it",
+            tags: ["production", "latest"],
+          },
+        ],
+      } as any);
+
+      const result = await handleUpdatePrompt({
+        idOrHandle: "my-prompt",
+        commitMessage: "Ship it",
+        tags: ["production"],
+      });
+
+      expect(result).toMatch(/deployed/i);
+      expect(result).toContain("production");
+      expectNoLineMixesVersionAndTag(result, ["production"]);
+    });
+  });
+
+  describe("when the requested tag did not previously exist on the prompt", () => {
+    /** @scenario "Assigning a tag that did not previously exist on the prompt" */
+    it("says the new version is deployed to canary", async () => {
+      mockUpdatePrompt.mockResolvedValue({
+        id: "prompt_1",
+        handle: "my-prompt",
+        latestVersionNumber: 2,
+      } as any);
+      mockedGetPrompt.mockResolvedValue({
+        id: "prompt_1",
+        handle: "my-prompt",
+        latestVersionNumber: 2,
+        versions: [
+          {
+            version: 2,
+            versionId: "ver_new002",
+            commitMessage: "First canary",
+            tags: ["canary", "latest"],
+          },
+        ],
+      } as any);
+
+      const result = await handleUpdatePrompt({
+        idOrHandle: "my-prompt",
+        commitMessage: "First canary",
+        tags: ["canary"],
+      });
+
+      expect(result).toMatch(/deployed/i);
+      expect(result).toContain("canary");
+    });
+  });
+
+  describe("when the server response carries only the built-in latest tag", () => {
+    /** @scenario "Never presenting the built-in latest tag as a deployment after an update" */
+    it("does not list latest as a deployment", async () => {
+      mockUpdatePrompt.mockResolvedValue({
+        id: "prompt_1",
+        handle: "my-prompt",
+        latestVersionNumber: 3,
+      } as any);
+      mockedGetPrompt.mockResolvedValue({
+        id: "prompt_1",
+        handle: "my-prompt",
+        latestVersionNumber: 3,
+        versions: [
+          {
+            version: 3,
+            versionId: "ver_new003",
+            commitMessage: "Plain update",
+            tags: ["latest"],
+          },
+        ],
+      } as any);
+
+      const result = await handleUpdatePrompt({
+        idOrHandle: "my-prompt",
+        commitMessage: "Plain update",
+      });
+
+      expect(result).not.toMatch(/deployed to.*latest/i);
+      expect(result).not.toMatch(/\*\*Tags\*\*.*latest/);
+    });
+  });
+
+  describe("when the update creates a new version", () => {
+    /** @scenario "Including the new version's versionId" */
+    it("includes the new version's versionId", async () => {
+      mockUpdatePrompt.mockResolvedValue({
+        id: "prompt_1",
+        handle: "my-prompt",
+        latestVersionNumber: 9,
+      } as any);
+      mockedGetPrompt.mockResolvedValue({
+        id: "prompt_1",
+        handle: "my-prompt",
+        latestVersionNumber: 9,
+        versions: [
+          {
+            version: 9,
+            versionId: "ver_new009",
+            commitMessage: "Add disclaimer",
+            tags: ["latest"],
+          },
+        ],
+      } as any);
+
+      const result = await handleUpdatePrompt({
+        idOrHandle: "my-prompt",
+        commitMessage: "Add disclaimer",
+      });
+
+      expect(result).toContain("ver_new009");
+    });
+  });
+
+  describe("when tag assignment fails but the version was committed", () => {
+    /** @scenario "Reporting a version as created but untagged when tag assignment fails and a matching version is found" */
+    it("reports the version as created and untagged, with its versionId and the failed tag", async () => {
+      const { LangWatchApiError } = await import("../langwatch-api.js");
+      mockUpdatePrompt.mockRejectedValue(
+        new LangWatchApiError("Tag assignment rejected", 422, "{}")
+      );
+      mockedGetPrompt.mockResolvedValue({
+        id: "prompt_1",
+        handle: "my-prompt",
+        latestVersionNumber: 8,
+        versions: [
+          {
+            version: 8,
+            versionId: "ver_orphan8",
+            commitMessage: "Risky change",
+            tags: ["latest"],
+          },
+        ],
+      } as any);
+
+      const result = await handleUpdatePrompt({
+        idOrHandle: "my-prompt",
+        commitMessage: "Risky change",
+        tags: ["production"],
+      });
+
+      expect(result).toMatch(/created/i);
+      expect(result).toMatch(/untagged|not.*(tagged|deployed)/i);
+      expect(result).toContain("ver_orphan8");
+      expect(result).toContain("production");
+    });
+  });
+
+  describe("when tag assignment fails and no matching version exists", () => {
+    /** @scenario "Reporting a plain failure when tag assignment fails and no matching version is found" */
+    it("reports a plain failure with no versionId", async () => {
+      const { LangWatchApiError } = await import("../langwatch-api.js");
+      mockUpdatePrompt.mockRejectedValue(
+        new LangWatchApiError("Tag assignment rejected", 422, "{}")
+      );
+      mockedGetPrompt.mockResolvedValue({
+        id: "prompt_1",
+        handle: "my-prompt",
+        latestVersionNumber: 8,
+        versions: [
+          {
+            version: 8,
+            versionId: "ver_other08",
+            commitMessage: "Unrelated commit",
+            tags: ["latest"],
+          },
+        ],
+      } as any);
+
+      const result = await handleUpdatePrompt({
+        idOrHandle: "my-prompt",
+        commitMessage: "Risky change",
+        tags: ["production"],
+      });
+
+      expect(result).toMatch(/fail/i);
+      expect(result).not.toContain("ver_other08");
     });
   });
 });
