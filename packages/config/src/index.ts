@@ -145,10 +145,18 @@ export class RuntimeConfig<Value extends Record<string, unknown>> {
     );
   }
 
+  /**
+   * The definition, unchanged.
+   *
+   * It exists for the `const` inference: without it a caller would have to
+   * write `as const` on every definition to keep its literal types, and those
+   * literals are what `ConfigValue` reads to give the resolved config its
+   * shape.
+   */
   static define<const Definition extends RuntimeConfigDefinition>(
     definition: Definition,
   ): Definition {
-    return defineRuntimeConfig(definition);
+    return definition;
   }
 
   private constructor(
@@ -346,12 +354,6 @@ export const Config = {
 
 function isSchema<T>(value: unknown): value is z.ZodType<T> {
   return typeof value === "object" && value !== null && "safeParse" in value;
-}
-
-export function defineRuntimeConfig<const Definition extends RuntimeConfigDefinition>(
-  definition: Definition,
-): Definition {
-  return definition;
 }
 
 // These switches intentionally retain the old instrumentation policy: only
