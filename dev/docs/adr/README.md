@@ -67,6 +67,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [094](./094-simulation-execution-on-process-manager-substrate.md) | Simulation execution on the process-manager substrate — durable execute/cancel intents, stall & cancel-grace watchdogs | Accepted |
 | [098](./098-post-event-work-subscribers-and-process-managers.md) | Post-event work is subscribers and process managers — the reactor vocabulary is retired | Accepted |
 | [110](./110-grant-aggregates-are-grants.md)                       | A grant aggregate is a grant, not an organization                                           | Proposed (supersedes ADR-092 §13's aggregate choice) |
+| [130](./130-per-worker-identity-isolation-is-the-operators-choice.md) | Per-worker identity isolation is the operator's choice                                  | Proposed                                          |
 
 ## When to Write an ADR
 
