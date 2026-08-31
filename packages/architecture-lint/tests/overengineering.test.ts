@@ -65,6 +65,42 @@ describe("lintOverengineering", () => {
       expect(violation?.message).toContain("`this.inner`");
     });
 
+    it("does not count a forward that reshapes what it was given", () => {
+      // An anti-corruption layer converts on the way through, so deleting it
+      // would move the conversion to every caller. `AppPersonalUsageReader`
+      // turns a portable window into the app's Date pair; `LangyClient` parses
+      // each input against the contract before sending it.
+      write(
+        "packages/features/example/server/src/services/example.service.ts",
+        `export class ExampleAdapter {
+  constructor(private readonly inner: Inner) {}
+  a(input: In): Out { return this.inner.a(this.toInner(input)); }
+  b(input: In): Out { return this.inner.b(this.toInner(input)); }
+  c(input: In): Out { return this.inner.c(this.toInner(input)); }
+  d(input: In): Out { return this.inner.d(this.toInner(input)); }
+  e(input: In): Out { return this.inner.e(this.toInner(input)); }
+}`,
+      );
+
+      expect(lint().filter((violation) => violation.policy === "layer-class")).toEqual([]);
+    });
+
+    it("still counts a forward that hands its parameters straight on", () => {
+      write(
+        "packages/features/example/server/src/services/example.service.ts",
+        `export class ExampleService {
+  constructor(private readonly inner: Inner) {}
+  a(one: In, two: In): Out { return this.inner.a(one, two); }
+  b(one: In, two: In): Out { return this.inner.b(one, two); }
+  c(one: In, two: In): Out { return this.inner.c(one, two); }
+  d(one: In, two: In): Out { return this.inner.d(one, two); }
+  e(one: In, two: In): Out { return this.inner.e(one, two); }
+}`,
+      );
+
+      expect(lint()[0]?.policy).toBe("layer-class");
+    });
+
     it("counts the arrow-property spelling a binding facade uses", () => {
       write(
         "packages/features/example/server/src/services/example.service.ts",

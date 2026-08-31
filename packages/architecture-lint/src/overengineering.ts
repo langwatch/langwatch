@@ -99,6 +99,49 @@ function isPrivate(member: ts.ClassElement): boolean {
  * `return` or as an arrow's expression body. `await` in front counts; a guard,
  * a mapping or a second statement does not.
  */
+/**
+ * Whether the forward reshapes what it was given on the way through.
+ *
+ * `this.repository.findSummary(this.toAppInput(input))` is an anti-corruption
+ * layer: it converts the contract's portable window into the app's `Date` pair,
+ * and deleting the class would move that conversion to every caller. A hop that
+ * hands its own parameters straight on is the thing this policy is about, since
+ * holding the collaborator at the caller loses nothing.
+ *
+ * Conservative on purpose: anything that is not plainly a parameter or a spread
+ * counts as a transform, and a method taking no arguments still counts as a
+ * hop.
+ */
+function parametersOf(member: MethodLike): readonly ts.ParameterDeclaration[] {
+  const declaration = member.declaration;
+  if (ts.isMethodDeclaration(declaration)) return declaration.parameters;
+  if (
+    ts.isPropertyDeclaration(declaration) &&
+    declaration.initializer &&
+    (ts.isArrowFunction(declaration.initializer) ||
+      ts.isFunctionExpression(declaration.initializer))
+  ) {
+    return declaration.initializer.parameters;
+  }
+
+  return [];
+}
+
+function transformsItsArguments(member: MethodLike, call: ts.CallExpression): boolean {
+  const parameters = new Set(
+    parametersOf(member)
+      .map((parameter) => parameter.name)
+      .filter((name): name is ts.Identifier => ts.isIdentifier(name))
+      .map((name) => name.text),
+  );
+
+  return call.arguments.some(
+    (argument) =>
+      !ts.isSpreadElement(argument) &&
+      !(ts.isIdentifier(argument) && parameters.has(argument.text)),
+  );
+}
+
 function delegationReceiver(member: MethodLike): string | undefined {
   const { name, body } = member;
   if (!body) return undefined;
@@ -119,6 +162,7 @@ function delegationReceiver(member: MethodLike): string | undefined {
   const callee = expression.expression;
   if (!ts.isPropertyAccessExpression(callee)) return undefined;
   if (callee.name.text !== name) return undefined;
+  if (transformsItsArguments(member, expression)) return undefined;
 
   // The receiver must be a `this.…` chain, not a free function or an import.
   const path: string[] = [];
