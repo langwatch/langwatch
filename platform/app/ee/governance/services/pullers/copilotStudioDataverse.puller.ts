@@ -944,82 +944,30 @@ export class CopilotStudioDataversePuller
       `/providers/Microsoft.CostManagement/query?api-version=${AZURE_COST_API_VERSION}`;
     let pageCount = 0;
 
-    while (url && pageCount < MAX_PAGES_PER_RUN) {
+    // The run's deadline and abort signal are read in the loop's own condition
+    // rather than inside its body, so that leaving the loop always means the
+    // same thing: a page is still owed, and the window is held.
+    while (url && pageCount < MAX_PAGES_PER_RUN && !runIsOver(options)) {
       pageCount += 1;
-      if (runIsOver(options)) break;
 
-      const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-      const response = await ssrfSafeFetch(url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "content-type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(azureCostRequestBody(window)),
-        signal: options.signal
-          ? AbortSignal.any([options.signal, timeout])
-          : timeout,
-        // Carries a token minted from the customer's secret, so a redirect
-        // must not hand it to whoever answers.
-        followRedirects: false,
+      const page = await this.readAzureCostPage({
+        url,
+        token,
+        window,
+        options,
+        subscriptionId,
       });
+      if (page === null) return null;
+      days.push(...page.days);
 
-      if (!response.ok) {
-        // 429 is ordinary operation here, not an exception: the very first
-        // real request against a live subscription was throttled. Every
-        // refusal holds the window either way — the next scheduled run is the
-        // retry, and sleeping in place would burn this run's deadline and
-        // risk it being killed holding the transcripts it already read.
-        logger.warn(
-          { status: response.status, subscriptionId },
-          response.status === 429
-            ? "copilot studio dataverse: Azure asked the cost read to retry later (HTTP 429); holding the window for the next run"
-            : "copilot studio dataverse: Azure refused the cost read; holding the window for the next run",
-        );
-        return null;
-      }
+      if (page.nextLink === null) return days;
 
-      const read = readAzureCostRows({ response: await response.json() });
-      if (read.malformed) {
-        // An HTTP 200 whose body is not the shape this reads. Held, not
-        // recorded: taken as an empty window it would read as a genuinely
-        // free week and be marked priced, which is the exact confusion the
-        // row-level count below exists to prevent one level down.
-        logger.warn(
-          { subscriptionId },
-          "copilot studio dataverse: Azure answered the cost read with an unrecognised body; holding the window for the next run",
-        );
-        return null;
-      }
-      days.push(...read.days);
-      if (read.unreadableRows > 0) {
-        // Counted here and nowhere else. It must never reach the run's own
-        // error count, which would cost the run its conversations.
-        logger.warn(
-          { unreadableRows: read.unreadableRows, subscriptionId },
-          "copilot studio dataverse: some Azure cost rows could not be read; the rest of the window is recorded",
-        );
-      }
-
-      if (read.nextLink === null) return days;
-
-      // A next page the run will not follow means the window was read in
-      // part, and a partial window must never be reported as priced: the
-      // meters that live on the pages behind it would keep their previous
-      // figures with nothing marking them stale. Held instead, so the next
-      // run asks again from the top.
-      if (!read.nextLink.startsWith("https://management.azure.com/")) {
-        // The refused link carries the ARM token if followed. Logged like the
-        // transcript walk's own refusal, because a silent stall here is
-        // indistinguishable from a permissions problem.
-        logger.error(
-          { refusedHost: hostOf(read.nextLink), subscriptionId },
-          "copilot studio dataverse: refusing an Azure cost next-page link that is not Azure Resource Manager; holding the window",
-        );
-        return null;
-      }
-      url = read.nextLink;
+      const next = this.azureCostNextPageUrl({
+        nextLink: page.nextLink,
+        subscriptionId,
+      });
+      if (next === null) return null;
+      url = next;
     }
 
     // Fell out of the loop with a page still owed — the page cap, the run's
@@ -1030,6 +978,107 @@ export class CopilotStudioDataversePuller
       "copilot studio dataverse: the Azure cost read ran out of run before it ran out of pages; holding the window",
     );
     return null;
+  }
+
+  /**
+   * Ask Azure for one page of the cost window and read it.
+   *
+   * Returns null for every refusal — an HTTP one, or a body that is not the
+   * shape this reads — because they all mean the same thing to the caller:
+   * the window is held for the next run.
+   */
+  private async readAzureCostPage(params: {
+    url: string;
+    token: string;
+    window: { fromDay: string; toDay: string };
+    options: PullRunOptions;
+    subscriptionId: string;
+  }): Promise<ReturnType<typeof readAzureCostRows> | null> {
+    const { url, token, window, options, subscriptionId } = params;
+
+    const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+    const response = await ssrfSafeFetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(azureCostRequestBody(window)),
+      signal: options.signal
+        ? AbortSignal.any([options.signal, timeout])
+        : timeout,
+      // Carries a token minted from the customer's secret, so a redirect
+      // must not hand it to whoever answers.
+      followRedirects: false,
+    });
+
+    if (!response.ok) {
+      // 429 is ordinary operation here, not an exception: the very first
+      // real request against a live subscription was throttled. Every
+      // refusal holds the window either way — the next scheduled run is the
+      // retry, and sleeping in place would burn this run's deadline and
+      // risk it being killed holding the transcripts it already read.
+      logger.warn(
+        { status: response.status, subscriptionId },
+        response.status === 429
+          ? "copilot studio dataverse: Azure asked the cost read to retry later (HTTP 429); holding the window for the next run"
+          : "copilot studio dataverse: Azure refused the cost read; holding the window for the next run",
+      );
+      return null;
+    }
+
+    const read = readAzureCostRows({ response: await response.json() });
+    if (read.malformed) {
+      // An HTTP 200 whose body is not the shape this reads. Held, not
+      // recorded: taken as an empty window it would read as a genuinely
+      // free week and be marked priced, which is the exact confusion the
+      // row-level count below exists to prevent one level down.
+      logger.warn(
+        { subscriptionId },
+        "copilot studio dataverse: Azure answered the cost read with an unrecognised body; holding the window for the next run",
+      );
+      return null;
+    }
+
+    if (read.unreadableRows > 0) {
+      // Counted here and nowhere else. It must never reach the run's own
+      // error count, which would cost the run its conversations.
+      logger.warn(
+        { unreadableRows: read.unreadableRows, subscriptionId },
+        "copilot studio dataverse: some Azure cost rows could not be read; the rest of the window is recorded",
+      );
+    }
+
+    return read;
+  }
+
+  /**
+   * Accept the next-page link only if Azure Resource Manager itself served it.
+   *
+   * A next page the run will not follow means the window was read in part, and
+   * a partial window must never be reported as priced: the meters that live on
+   * the pages behind it would keep their previous figures with nothing marking
+   * them stale. Null instead, so the next run asks again from the top.
+   */
+  private azureCostNextPageUrl(params: {
+    nextLink: string;
+    subscriptionId: string;
+  }): string | null {
+    const { nextLink, subscriptionId } = params;
+
+    if (!nextLink.startsWith("https://management.azure.com/")) {
+      // The refused link carries the ARM token if followed. Logged like the
+      // transcript walk's own refusal, because a silent stall here is
+      // indistinguishable from a permissions problem.
+      logger.error(
+        { refusedHost: hostOf(nextLink), subscriptionId },
+        "copilot studio dataverse: refusing an Azure cost next-page link that is not Azure Resource Manager; holding the window",
+      );
+      return null;
+    }
+
+    return nextLink;
   }
 
   /**
