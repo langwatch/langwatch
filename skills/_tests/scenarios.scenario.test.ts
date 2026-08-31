@@ -789,13 +789,18 @@ describe("Scenarios Skill", () => {
             // the "caller" is silent and the scenario degrades to a
             // text scenario with a voice adapter bolted on. The
             // `voice=` kwarg must live INSIDE a `UserSimulatorAgent(...)`
-            // call, not in a comment, docstring, or unrelated dict.
+            // call, not in a comment, docstring, or unrelated dict. The
+            // value may be a module constant, which is what most runs
+            // write, so the voice id is looked for in the file rather
+            // than at the call.
             expect(
               testContent,
-              'Expected UserSimulatorAgent(voice="elevenlabs/..." | "openai/...") so the simulated caller speaks'
-            ).toMatch(
-              /UserSimulatorAgent\s*\([\s\S]*?voice\s*=\s*["'](?:elevenlabs|openai)\/[^"']+["']/
-            );
+              'Expected UserSimulatorAgent(voice=...) so the simulated caller speaks'
+            ).toMatch(/UserSimulatorAgent\s*\([\s\S]*?voice\s*=\s*\S/);
+            expect(
+              testContent,
+              'Expected an "elevenlabs/..." or "openai/..." voice id for the simulated caller'
+            ).toMatch(/["'](?:elevenlabs|openai)\/[^"']+["']/);
           },
           scenario.judge(),
         ],
@@ -871,13 +876,17 @@ describe("Scenarios Skill", () => {
               /\b(?:scenario\.)?(?:openAIRealtimeAgent|pipecatAgent|elevenLabsAgent|geminiLiveAgent|twilioAgent|composableAgent)\s*\(/
             );
 
-            // Verify the simulator was configured with a voice inside the userSimulatorAgent call
+            // The simulator carries a voice inside the userSimulatorAgent
+            // call. The value may be a module constant, so the voice id is
+            // looked for in the file rather than at the call.
             expect(
               testContent,
-              'Expected userSimulatorAgent({ voice: "openai/..." | "elevenlabs/..." }) so the simulated caller speaks'
-            ).toMatch(
-              /userSimulatorAgent\s*\(\s*\{[^}]*?voice\s*:\s*["'](?:elevenlabs|openai)\/[^"']+["']/
-            );
+              "Expected userSimulatorAgent({ voice: ... }) so the simulated caller speaks"
+            ).toMatch(/userSimulatorAgent\s*\(\s*\{[^}]*?voice\s*:\s*\S/);
+            expect(
+              testContent,
+              'Expected an "elevenlabs/..." or "openai/..." voice id for the simulated caller'
+            ).toMatch(/["'](?:elevenlabs|openai)\/[^"']+["']/);
           },
           scenario.judge(),
         ],
