@@ -552,6 +552,49 @@ describe("frontend UI architecture boundaries", () => {
     expect(policies([]).filter((policy) => policy === "ui-browser-capability")).toHaveLength(3);
   });
 
+  it("reads code, not the comments that explain why the code avoids something", () => {
+    // The header of apps/ui/src/behavior/public-config.ts explains that the
+    // browser has no `process.env`, and naming it was reported as using it.
+    // A guard that punishes the comment documenting the guard teaches people
+    // to delete the comment.
+    writeCatalogue([{ id: "prompt-studio" }]);
+    write(
+      "apps/ui/src/features/prompt-studio/route.ts",
+      [
+        "/**",
+        " * Deliberately reads no `process.env`: the browser has none, and the",
+        " * values arrive through the meta tag the shell injects. Nor does it name",
+        " * an AppRouter type, or reach for localStorage or fetch.",
+        " */",
+        "// process.env and AppRouter again, in a line comment",
+        'export const shell = "meta";',
+      ].join("\n"),
+    );
+
+    expect(policies([])).not.toContain("ui-backend-access");
+    expect(policies([])).not.toContain("ui-browser-capability");
+  });
+
+  it("still sees a capability used in code on the same line as a comment", () => {
+    writeCatalogue([{ id: "prompt-studio" }]);
+    write(
+      "apps/ui/src/features/prompt-studio/route.ts",
+      "const mode = process.env.NODE_ENV; // read at build time\n",
+    );
+
+    expect(policies([]).filter((policy) => policy === "ui-backend-access")).toHaveLength(1);
+  });
+
+  it("does not mistake a capability named inside a string literal for a comment", () => {
+    writeCatalogue([{ id: "prompt-studio" }]);
+    write(
+      "apps/ui/src/features/prompt-studio/route.ts",
+      'export const message = "read process.env on the server";\n',
+    );
+
+    expect(policies([]).filter((policy) => policy === "ui-backend-access")).toHaveLength(1);
+  });
+
   it("accepts the two-scope private web hierarchy and recursive browser-safe screen closure", () => {
     const agentWeb = webPackage("agent", {
       "./screens/agent-management": "./src/screens/agent-management/index.ts",

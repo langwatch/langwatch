@@ -414,8 +414,42 @@ function forbiddenBrowserCapabilityImport(specifier: string): string | undefined
   return BROWSER_CAPABILITY_IMPORTS.find(([pattern]) => pattern.test(specifier))?.[1];
 }
 
+/**
+ * The source with its comments blanked out, positions intact.
+ *
+ * The capability checks below are regex searches over the raw file, so a
+ * docblock that NAMES a capability in order to explain why the module avoids
+ * it was reported as a use of it. `apps/ui/src/behavior/public-config.ts` is
+ * the case that found this: its header explains that the browser has no
+ * `process.env`, and saying so was the violation.
+ *
+ * Comments are replaced by spaces rather than removed, so every offset a
+ * later check reports still lines up with the file on disk. Newlines survive
+ * for the same reason.
+ */
+function withoutComments(source: string): string {
+  const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.JSX, source);
+  const characters = source.split("");
+  for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
+    if (
+      token !== ts.SyntaxKind.SingleLineCommentTrivia &&
+      token !== ts.SyntaxKind.MultiLineCommentTrivia
+    ) {
+      continue;
+    }
+
+    for (let index = scanner.getTokenStart(); index < scanner.getTokenEnd(); index += 1) {
+      if (characters[index] !== "\n") characters[index] = " ";
+    }
+  }
+
+  return characters.join("");
+}
+
 function browserCapabilitySourceViolations(source: string): string[] {
-  return BROWSER_CAPABILITY_SOURCE.filter(([pattern]) => pattern.test(source)).map(
+  const code = withoutComments(source);
+
+  return BROWSER_CAPABILITY_SOURCE.filter(([pattern]) => pattern.test(code)).map(
     ([, description]) => description,
   );
 }
@@ -700,7 +734,8 @@ function lintUiSourceBoundaries(
       }
     }
 
-    if (/\bAppRouter\b/.test(source)) {
+    const code = withoutComments(source);
+    if (/\bAppRouter\b/.test(code)) {
       violations.push({
         policy: "ui-backend-access",
         file,
@@ -708,7 +743,7 @@ function lintUiSourceBoundaries(
           "Browser UI may not reference AppRouter; define portable transport contracts instead.",
       });
     }
-    if (/\bprocess\.env\b/.test(source)) {
+    if (/\bprocess\.env\b/.test(code)) {
       violations.push({
         policy: "ui-backend-access",
         file,
