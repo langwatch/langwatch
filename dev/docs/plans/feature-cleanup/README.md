@@ -1100,3 +1100,96 @@ Breaking any of the five now fails between one and three tests.
 
 architecture-lint violations **845 -> 822**. `comment-block-size` 0,
 `service-quality` 3, `service-quality-baseline` 4.
+
+## The sweep, finished except one (2026-08-31)
+
+The earlier sweep counted only `function` declarations. Counting module-level
+arrow consts too — `const x = (a) => {...}` is a module-level function by any
+useful definition — found the list was longer. Seventeen services are now
+folded; `webhook-delivery` is the one left.
+
+| service | helpers folded |
+| --- | --- |
+| `workflow-nlp-execution` | 7 |
+| `currency` | 5 |
+| `trace-attribute-extraction` | 5 |
+| `graph-trigger-heartbeat` | 4 |
+| `notification` (billing) | 5 |
+| `dataset` | 4 |
+| `suite` | 4 |
+| `audit-log` | 3 |
+| `webhook-health` | 3 |
+| `evaluator-native` | 3 |
+| `coding-agent-pull-request-assignment` | 3 |
+| `anomaly-alert-dispatcher` | 3 |
+| `auth` | 1 |
+
+### The tool, and the four ways it was wrong
+
+Each failure mode below silently produced something that compiled or looked
+right, and each is now an assertion that stops the run instead:
+
+1. **A bare reference is not a call.** `.map(cleanId)`,
+   `filter(isAgentTarget)`, `toPayload: confirmedDeliverPayload` pass the
+   function as a value; a rewrite looking for `name(` misses them.
+2. **Docblocks end three different ways** — `/** ... */` on one line, `*/` on
+   its own line, and `... text. */` trailing the last line. Missing a case
+   orphans the comment above the next declaration, which is the defect
+   141a2c210e left behind and this session fixed.
+3. **Brace matching over raw text is unsafe.** Template literals and comments
+   contain braces. The class's closing brace is `}` in column 0; that is the
+   reliable marker.
+4. **An expression-bodied arrow is not a method.** `const x = (a) => expr` and
+   `=> ({...})` need an explicit `return` first. Detecting the end by
+   searching for the next `};` swallowed whole declarations — including, once,
+   the class being folded into. The rule is now: an arrow is foldable only if
+   `=> {` appears before any line ends a statement.
+
+The tool refuses rather than guessing on (1) and (4). Nine expression-bodied
+arrows were converted by hand.
+
+### Type errors the test runs could not see
+
+Vitest transpiles without checking types, so a package whose tests pass can
+still fail `tsc --noEmit`. Three did, and one was mine: the usage-limit split
+moved `BillingCooldownCache` to an adapter and imported the adapter's runtime
+values but not its type. Six annotations referred to a name that no longer
+existed, and 241 tests passed over it.
+
+**Every package touched this session now typechecks — 18 of them, checked one
+by one.** Running a package's tests is not the same as checking it.
+
+### More untested paths, found the same way
+
+| what nothing guarded | why it matters | tests |
+| --- | --- | --- |
+| `CurrencyService` (whole service) | picks the currency a customer is billed in | 20 |
+| `DatasetService.getDatasetWithRecords` | what a run is handed, and how much of it | 11 |
+| the audit-log `args` bound | written on every privileged action | 8 |
+| the health card's rate and p95 | a customer reads these to judge their receiver | 7 |
+
+Two of the currency tests could not exist without mocking geoip. The rule is
+that a private address SKIPS the lookup, and a real lookup of `10.0.0.4`
+returns nothing anyway — so the outcome is identical whether the guard runs
+or not, and only the absent call proves it. The first draft passed under both
+sabotages.
+
+### Two more dead guards, recorded not fixed
+
+Following the `ProjectSlugService` precedent:
+
+- `WebhookHealthService.p95Of` clamps its index with
+  `Math.min(length - 1, ...)`. For any whole n at least 1, `floor(0.95n)` is
+  already at most `n - 1`, so the clamp never binds.
+- `DatasetService.selectRecords` clamps a negative index with
+  `Math.max(_, 0)`, but the schema is `z.number().int().nonnegative()` and
+  refuses one first.
+
+Both tests say what the code does rather than crediting a guard that cannot
+fire.
+
+## Where this session ended
+
+architecture-lint violations **845 -> 822**. `comment-block-size` 0,
+`service-quality` 3, `service-quality-baseline` 4. Every touched package
+typechecks and its tests pass.
