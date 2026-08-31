@@ -15,17 +15,7 @@ import {
   applyTraceFullRecordProtections,
   internalTraceFullReadProtections,
 } from "../../repositories/clickhouse/trace-full-protection.mapper";
-import {
-  collectDroppedCategories,
-  deserializeStoredAttributes,
-  deserializeStoredValue,
-  extractFullRecordEvents,
-  mapNormalizedSpanToFullRecordSpan,
-  mapStoredSpanRow,
-  mapTraceMetadata,
-  type StoredSpanRow,
-  withoutEventReferences,
-} from "./trace-full-record.mapper";
+import { type StoredSpanRow, TraceFullRecordMapper } from "./trace-full-record.mapper";
 
 const PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 const MAX_SPANS = 10_000;
@@ -81,11 +71,15 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordPort {
 
     const rows = await this.spans(client, input, input.occurredAtMs ?? summary.OccurredAtMs);
     const resolved = await this.resolveAll(input.tenantId, rows);
-    const normalized = resolved.map(({ row, attributes }) => mapStoredSpanRow(row, attributes));
-    const spans = normalized.map(mapNormalizedSpanToFullRecordSpan);
+    const normalized = resolved.map(({ row, attributes }) =>
+      TraceFullRecordMapper.mapStoredSpanRow(row, attributes),
+    );
+    const spans = normalized.map((span) =>
+      TraceFullRecordMapper.mapNormalizedSpanToFullRecordSpan(span),
+    );
     const fullIo = resolved.some(({ recalled }) => recalled) ? this.io.recompute(normalized) : null;
-    const droppedCategories = collectDroppedCategories(normalized);
-    const events = extractFullRecordEvents({
+    const droppedCategories = TraceFullRecordMapper.collectDroppedCategories(normalized);
+    const events = TraceFullRecordMapper.extractFullRecordEvents({
       spans,
       projectId: input.tenantId,
       traceId: summary.TraceId,
@@ -94,7 +88,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordPort {
     const record: TraceFullRecord = {
       trace_id: summary.TraceId,
       project_id: input.tenantId,
-      metadata: mapTraceMetadata(summary.Attributes),
+      metadata: TraceFullRecordMapper.mapTraceMetadata(summary.Attributes),
       timestamps: {
         started_at: summary.OccurredAtMs,
         inserted_at: summary.CreatedAtMs,
@@ -229,7 +223,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordPort {
   > {
     const plans = rows.map((row) => ({
       row,
-      original: deserializeStoredAttributes(row.SpanAttributes),
+      original: TraceFullRecordMapper.deserializeStoredAttributes(row.SpanAttributes),
     }));
     const reads = new Map<string, PayloadReference>();
     for (const plan of plans) {
@@ -255,14 +249,14 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordPort {
     );
 
     return plans.map(({ row, original }) => {
-      const attributes = withoutEventReferences(original);
+      const attributes = TraceFullRecordMapper.withoutEventReferences(original);
       let recalled = false;
       for (const reference of ClickHouseTraceFullRecordRepository.eventReferences(original)) {
         const value = values.get(
           ClickHouseTraceFullRecordRepository.referenceKey(row.TraceId, reference),
         );
         if (value !== null && value !== void 0) {
-          attributes[reference.attrKey] = deserializeStoredValue(value);
+          attributes[reference.attrKey] = TraceFullRecordMapper.deserializeStoredValue(value);
           recalled = true;
         }
       }

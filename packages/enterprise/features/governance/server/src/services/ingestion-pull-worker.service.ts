@@ -18,10 +18,7 @@ import {
   COPILOT_ROUTING_PROFILE,
   CopilotStudioTraceMapper,
 } from "../adapters/copilot-studio-trace-mapper.adapter";
-import {
-  GENIE_ROUTING_PROFILE,
-  mapGenieEventsToTraceRequest,
-} from "../adapters/genie-trace-mapper.adapter";
+import { GENIE_ROUTING_PROFILE, GenieTraceMapper } from "../adapters/genie-trace-mapper.adapter";
 import type {
   ConversationRoutingProfile,
   RoutingOrigin,
@@ -44,7 +41,7 @@ type ConversationRouting = {
 };
 
 const CONVERSATION_ROUTING = new Map<string, ConversationRouting>([
-  ["databricks_genie", { profile: GENIE_ROUTING_PROFILE, map: mapGenieEventsToTraceRequest }],
+  ["databricks_genie", { profile: GENIE_ROUTING_PROFILE, map: GenieTraceMapper.toTraceRequest }],
   [
     "copilot_studio_dataverse",
     { profile: COPILOT_ROUTING_PROFILE, map: CopilotStudioTraceMapper.toTraceRequest },

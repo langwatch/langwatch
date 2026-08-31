@@ -21,7 +21,7 @@ import {
   type ConversationRoutingProfile,
   GENIE_ROUTING_PROFILE,
   KNOWN_AGENT_IDENTITIES,
-  mapGenieEventsToTraceRequest,
+  GenieTraceMapper,
 } from "../genie-trace-mapper.adapter";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 
@@ -76,7 +76,7 @@ function attributesOf(request: unknown) {
 describe("given a source mapping its own conversations", () => {
   describe("when the batch carries the events its own profile recognises", () => {
     it("routes the events its own profile recognises", () => {
-      const request = mapGenieEventsToTraceRequest({
+      const request = GenieTraceMapper.toTraceRequest({
         events: [conversationEvent("copilot_conversation")],
         origin: {
           ...ORIGIN,
@@ -92,7 +92,7 @@ describe("given a source mapping its own conversations", () => {
     });
 
     it("emits spans a second source's batch can actually be ingested from", () => {
-      const request = mapGenieEventsToTraceRequest({
+      const request = GenieTraceMapper.toTraceRequest({
         events: [conversationEvent("copilot_conversation")],
         origin: {
           ...ORIGIN,
@@ -112,7 +112,7 @@ describe("given a source mapping its own conversations", () => {
 
     /** @scenario "The conversation shape travels with the source, not with Genie" */
     it("names its own agent and provenance rather than inheriting Genie's", () => {
-      const request = mapGenieEventsToTraceRequest({
+      const request = GenieTraceMapper.toTraceRequest({
         events: [conversationEvent("copilot_conversation")],
         origin: {
           ...ORIGIN,
@@ -130,7 +130,7 @@ describe("given a source mapping its own conversations", () => {
   describe("when the batch carries a Genie question instead", () => {
     /** @scenario "The conversation shape travels with the source, not with Genie" */
     it("leaves another source's events alone", () => {
-      const request = mapGenieEventsToTraceRequest({
+      const request = GenieTraceMapper.toTraceRequest({
         events: [conversationEvent("genie_query")],
         origin: {
           ...ORIGIN,
@@ -147,7 +147,7 @@ describe("given a source mapping its own conversations", () => {
 describe("given Genie's own profile", () => {
   describe("when a question is mapped", () => {
     it("produces exactly what it produced before profiles existed", () => {
-      const request = mapGenieEventsToTraceRequest({
+      const request = GenieTraceMapper.toTraceRequest({
         events: [conversationEvent("genie_query")],
         origin: ORIGIN,
       });
@@ -164,7 +164,7 @@ describe("given Genie's own profile", () => {
   describe("when the event names the author's directory id", () => {
     it("still carries the author through for the identity stack to resolve", () => {
       const event = conversationEvent("genie_query");
-      const request = mapGenieEventsToTraceRequest({
+      const request = GenieTraceMapper.toTraceRequest({
         events: [
           {
             ...event,

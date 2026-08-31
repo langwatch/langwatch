@@ -20,10 +20,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import {
-  GENIE_ROUTING_PROFILE,
-  mapGenieEventsToTraceRequest,
-} from "../genie-trace-mapper.adapter";
+import { GENIE_ROUTING_PROFILE, GenieTraceMapper } from "../genie-trace-mapper.adapter";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 
 const ORIGIN = {
@@ -118,7 +115,7 @@ describe("when the event names the space the question was asked in", () => {
   // drop it silently — which is how it went unasserted in the first place.
   it("produces this exact request, attribute for attribute", () => {
     expect(
-      mapGenieEventsToTraceRequest({
+      GenieTraceMapper.toTraceRequest({
         events: [genieEvent(completedMessage(), { spaceId: "space-7" })],
         origin: ORIGIN,
       }),
@@ -338,7 +335,7 @@ describe("when the event names the space the question was asked in", () => {
 describe("when the Genie mapper runs over the capture shape", () => {
   it("produces this exact request, attribute for attribute", () => {
     expect(
-      mapGenieEventsToTraceRequest({
+      GenieTraceMapper.toTraceRequest({
         events: [genieEvent(completedMessage())],
         origin: ORIGIN,
       }),
@@ -552,7 +549,7 @@ describe("when the Genie mapper runs over the capture shape", () => {
 describe("when a Genie message failed", () => {
   it("produces this exact request, attribute for attribute", () => {
     expect(
-      mapGenieEventsToTraceRequest({
+      GenieTraceMapper.toTraceRequest({
         events: [
           genieEvent(
             completedMessage({
@@ -689,7 +686,7 @@ describe("when a Genie message failed", () => {
 describe("when a Genie answer was regenerated", () => {
   it("produces this exact request, attribute for attribute", () => {
     expect(
-      mapGenieEventsToTraceRequest({
+      GenieTraceMapper.toTraceRequest({
         events: [genieEvent(completedMessage({ auto_regenerate_count: 2 }))],
         origin: ORIGIN,
       }),
@@ -917,7 +914,7 @@ describe("when the payload does not parse", () => {
         question: "What was pulled?",
       },
     };
-    expect(mapGenieEventsToTraceRequest({ events: [broken], origin: ORIGIN }))
+    expect(GenieTraceMapper.toTraceRequest({ events: [broken], origin: ORIGIN }))
       .toMatchInlineSnapshot(`
       {
         "resourceSpans": [
