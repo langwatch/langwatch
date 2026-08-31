@@ -1618,3 +1618,59 @@ seven, and most hold one or two — a `create` helper beside its class, or a
 genuinely shared utility. `stored-span-row.codec.ts` stays deliberately
 untouched, since its four exports reach platform/app span-storage integration
 paths that cannot be run here.
+
+## Round: the tail
+
+Ten more classes across gateway, trace, suite and experiment — the spend
+filters and grouping, budget resolution, span-record identity, gen-ai span,
+trace-summary projection, query fields, the suite-run repository, and the two
+`IdUtils` objects.
+
+Both `IdUtils` were the same shape in two packages: a
+`const IdUtils = { fn, fn } as const` namespace over module functions. They are
+`SpanRecordIdentity` and `ExperimentRunIds` now, named for what they identify
+rather than for being utilities.
+
+### The one that was not a rename
+
+Fifteen platform/app tests import `applySpanToSummary` from a FIXTURE that
+wraps the package export with the projection runtime bound. The call-site
+rewrite pointed them at `TraceSummaryFoldProjection.applySpanToSummary` — the
+same name, a different function, without the bound runtime. Both take the same
+argument shape, so it would have compiled and the tests would have exercised
+the wrong thing.
+
+It surfaced only because the fixture ALSO declares
+`export function applySpanToSummary`, which the rewrite mangled into a member
+access and vitest refused to parse. `pnpm typecheck` would never have said so:
+`tsconfig.tsgo.json` excludes `**/__tests__/**`, so a test file is checked only
+by running it.
+
+The lesson is not "be careful". It is that a same-name symbol reached through a
+DIFFERENT module is invisible to every check used so far — the name grep finds
+it, the import-block rewriter skips it, the typechecker does not see test
+files, and the test still passes if the two functions happen to agree. The only
+reliable question is which module each consumer imports the name FROM.
+
+### The eager-const rule, third instance
+
+`FIELD_DEFS` joined `META_FIELD_DEFS` and `spendFilterQueryShape`: a module
+const that CALLS a class member is evaluated before the class exists, so it
+moves below the class and the members it calls become public. Three files, one
+rule, and the compiler catches it every time the reference is a direct call
+rather than one buried in an object literal.
+
+### The full hazard list
+
+Every rewrite hazard this cleanup has hit, in the order they bite:
+
+1. **Prose** — `\s*\(` matches "categorical (evaluation_runs)" in a docblock.
+2. **Declarations** — the pattern rewrites a method or function DECLARATION as
+   readily as a call: a port's type literal, a class's own member, a consumer
+   with a method of the same name, a fixture with a function of the same name.
+3. **Collisions** — `collectDroppedCategories`, `wrap`, `hasPersistableSignal`,
+   `groupByColumn`: same name, different function, four times.
+4. **Spread calls** — `...originAttrs(` is preceded by a dot.
+5. **Import paths** — `../index`, `@langwatch/<pkg>`, an `as` alias, and the
+   module path are four different spellings of the same import.
+6. **apps/** — a fourth root, alongside packages, platform/app and the tests.
