@@ -19,6 +19,7 @@ import {
   planLimitCooldown,
   planLimitInFlight,
   resourceLimitCooldown,
+  type BillingCooldownCache,
 } from "../adapters/memory.cooldown-cache.adapter";
 import { NullNotificationRecordAdapter } from "../adapters/null-notification-record.adapter";
 

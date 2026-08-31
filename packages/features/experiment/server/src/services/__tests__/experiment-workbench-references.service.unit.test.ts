@@ -71,7 +71,9 @@ function servicesAnswering(answers: Answers = {}) {
   });
 }
 
-const target = (over: Record<string, unknown>) => ({
+type TargetType = "prompt" | "agent" | "evaluator" | "workflow";
+
+const target = (over: { type: TargetType } & Record<string, unknown>) => ({
   id: "target_1",
   name: "Target",
   inputs: [],

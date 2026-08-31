@@ -21,6 +21,8 @@ import type { SecretService } from "@langwatch/secret-contract";
 import { WorkflowNotFoundError, type WorkflowService } from "@langwatch/workflow-contract";
 import type { TargetConfig } from "@langwatch/scenario-contract";
 import { ScenarioTargetPrefetchService } from "../scenario-target-prefetch.service";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import { ScenarioModelParametersService } from "../scenario-model-parameters.service";
 import { ScenarioWorkflowHydratorService } from "../scenario-workflow-hydrator.service";
 
 const PROJECT_ID = "project-1";
@@ -62,7 +64,11 @@ function serviceAnswering(answers: Answers = {}) {
     agents,
     workflows,
     secrets,
-    workflowHydrator: ScenarioWorkflowHydratorService.create(),
+    // Never reached: every workflow lookup below answers not-found, so the
+    // target is refused before anything is hydrated.
+    workflowHydrator: ScenarioWorkflowHydratorService.create(
+      ScenarioModelParametersService.create({} as unknown as ModelProviderService),
+    ),
     legacyDefaultModel: "openai/gpt-5-mini",
   });
 }
