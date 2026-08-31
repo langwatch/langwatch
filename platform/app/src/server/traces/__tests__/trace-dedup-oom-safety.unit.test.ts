@@ -45,22 +45,45 @@ function extractFunctionBody(source: string, functionName: string): string {
         `Pattern: ${pattern.source}`,
     );
   }
-  return match[0];
+  return withoutComments(match[0]);
+}
+
+/**
+ * Comments are stripped before any of these assertions read the source,
+ * because every one of them is a substring check and comments talk about the
+ * very patterns being checked. A note explaining why the dedup uses
+ * `max(UpdatedAt)` satisfied `toContain("max(UpdatedAt)")` on its own — the
+ * SQL could drop the aggregate and the guard would still pass — and a comment
+ * mentioning `LIMIT 1 BY` would fail the opposite assertion while the query
+ * was fine.
+ */
+function withoutComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
 }
 
 describe("trace dedup OOM safety", () => {
+  function repoRoot(): string {
+    let dir = __dirname;
+    while (!fs.existsSync(path.join(dir, "pnpm-workspace.yaml"))) {
+      const parent = path.dirname(dir);
+      if (parent === dir) throw new Error("no workspace root above this test");
+      dir = parent;
+    }
+    return dir;
+  }
+
   const traceServicePath = path.resolve(__dirname, "..", "clickhouse-trace.service.ts");
   const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
 
-  // ADR-051 moved the clustering domain into app-layer; the OOM-guarded
-  // ClickHouse fetch lives in clustering.ts there now.
-  const topicClusteringPath = path.resolve(
-    __dirname,
-    "..",
-    "..",
-    "app-layer",
-    "topic-clustering",
-    "clustering.ts",
+  /**
+   * The clustering domain has moved twice — into app-layer, then out into the
+   * topic feature package — and this read followed neither. Resolved from the
+   * workspace root so the next move fails loudly on the path instead of
+   * silently taking the whole suite out of CI.
+   */
+  const topicClusteringPath = path.join(
+    repoRoot(),
+    "packages/features/topic/server/src/intents/topic-clustering-runner.intent.ts",
   );
   const topicClusteringSource = fs.readFileSync(topicClusteringPath, "utf-8");
 
@@ -266,24 +289,11 @@ describe("trace dedup OOM safety", () => {
   // simulation.clickhouse.repository.ts: entire file (@regression #3158)
   // ---------------------------------------------------------------------------
   describe("SimulationClickHouseRepository (entire file)", () => {
-    const simulationRepoPath = path.resolve(
-      __dirname,
-      "..",
-      "..",
-      "..",
-      "..",
-      "..",
-      "..",
-      "packages",
-      "features",
-      "simulation",
-      "server",
-      "src",
-      "repositories",
-      "clickhouse",
-      "simulation.clickhouse.repository.ts",
+    const simulationRepoPath = path.join(
+      repoRoot(),
+      "packages/features/scenario/server/src/repositories/clickhouse/simulation-clickhouse.repository.ts",
     );
-    const simulationRepoSource = fs.readFileSync(simulationRepoPath, "utf-8");
+    const simulationRepoSource = withoutComments(fs.readFileSync(simulationRepoPath, "utf-8"));
 
     it("does not use LIMIT 1 BY anywhere", () => {
       expect(simulationRepoSource).not.toContain("LIMIT 1 BY");
@@ -294,24 +304,11 @@ describe("trace dedup OOM safety", () => {
   // Canonical Experiment run repository: entire file (@regression #3158)
   // ---------------------------------------------------------------------------
   describe("ClickHouseExperimentRunRepository (entire file)", () => {
-    const experimentRunServicePath = path.resolve(
-      __dirname,
-      "..",
-      "..",
-      "..",
-      "..",
-      "..",
-      "..",
-      "packages",
-      "features",
-      "experiment",
-      "server",
-      "src",
-      "repositories",
-      "clickhouse",
-      "clickhouse.experiment-run.repository.ts",
+    const experimentRunServicePath = path.join(
+      repoRoot(),
+      "packages/features/experiment/server/src/repositories/clickhouse/clickhouse.experiment-run.repository.ts",
     );
-    const experimentRunServiceSource = fs.readFileSync(experimentRunServicePath, "utf-8");
+    const experimentRunServiceSource = withoutComments(fs.readFileSync(experimentRunServicePath, "utf-8"));
 
     it("does not use LIMIT 1 BY anywhere", () => {
       expect(experimentRunServiceSource).not.toContain("LIMIT 1 BY");
