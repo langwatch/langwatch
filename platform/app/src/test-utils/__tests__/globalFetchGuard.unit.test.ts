@@ -60,5 +60,17 @@ describe("guardAgainstGlobalFetch", () => {
         expect(globalThis.fetch).toBe(realFetch);
       });
     });
+
+    // The same assertion as inside the suite, made once every cleanup has run.
+    // That one holds only while it is not the first test of its suite, since
+    // it reads what the cleanups before it left behind. This one does not
+    // depend on the order the tests above it are written in.
+    describe("when an unguarded test reads a global the guard does not own", () => {
+      it("still finds the value the other suite installed", () => {
+        expect(
+          (globalThis as { langwatchGuardProbe?: symbol }).langwatchGuardProbe,
+        ).toBe(probe);
+      });
+    });
   });
 });
