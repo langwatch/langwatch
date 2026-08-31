@@ -37,11 +37,15 @@ const frontendFeatureFlagSchema = z.enum([...FRONTEND_FEATURE_FLAGS] as [
  * Input order is preserved and ids the caller is not a member of are dropped
  * silently, so the result cannot be used as a membership oracle.
  */
-async function resolveMemberOrganizationIds(
-  prisma: PrismaClient,
-  userId: string,
-  organizationIds: string[],
-): Promise<string[]> {
+async function resolveMemberOrganizationIds({
+  prisma,
+  userId,
+  organizationIds,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  organizationIds: string[];
+}): Promise<string[]> {
   const person = await prisma.user.findUnique({
     where: { id: userId },
     select: {
@@ -185,11 +189,11 @@ export const featureFlagRouter = createTRPCRouter({
         return { enabled: false };
       }
 
-      const allowedOrganizationIds = await resolveMemberOrganizationIds(
-        ctx.prisma,
+      const allowedOrganizationIds = await resolveMemberOrganizationIds({
+        prisma: ctx.prisma,
         userId,
-        input.organizationIds,
-      );
+        organizationIds: input.organizationIds,
+      });
 
       if (allowedOrganizationIds.length === 0) {
         return { enabled: false };
@@ -245,11 +249,11 @@ export const featureFlagRouter = createTRPCRouter({
         return { enabledByOrganizationId: {} as Record<string, boolean> };
       }
 
-      const allowedOrganizationIds = await resolveMemberOrganizationIds(
-        ctx.prisma,
+      const allowedOrganizationIds = await resolveMemberOrganizationIds({
+        prisma: ctx.prisma,
         userId,
-        input.organizationIds,
-      );
+        organizationIds: input.organizationIds,
+      });
 
       const entries = await Promise.all(
         allowedOrganizationIds.map(

@@ -59,7 +59,7 @@ const FLAG = "release_ui_ai_governance_enabled" as const;
  * the whole list, not one per organization — so the mock answers
  * `user.findUnique` and applies the nested `organizationId in:` filter itself.
  */
-function buildMockPrisma(memberOf: Set<string>) {
+function buildMockPrisma({ memberOf }: { memberOf: Set<string> }) {
   return {
     user: {
       findUnique: vi.fn(({ where, select }: any) => {
@@ -76,7 +76,7 @@ function buildMockPrisma(memberOf: Set<string>) {
   } as unknown as PrismaClient;
 }
 
-function buildCaller(prisma: PrismaClient) {
+function buildCaller({ prisma }: { prisma: PrismaClient }) {
   const ctx = createInnerTRPCContext({
     session: { user: { id: USER_ID }, expires: "1" },
     req: undefined,
@@ -96,9 +96,9 @@ describe("featureFlag.isEnabledForEachOrganization", () => {
 
   describe("when the user is a member of every input organization", () => {
     it("returns the flag state per organization", async () => {
-      const caller = buildCaller(
-        buildMockPrisma(new Set([OWN_ORG_A, OWN_ORG_B])),
-      );
+      const caller = buildCaller({
+        prisma: buildMockPrisma({ memberOf: new Set([OWN_ORG_A, OWN_ORG_B]) }),
+      });
       mockIsEnabled.mockImplementation(
         async (_flag, opts: any) => opts.organizationId === OWN_ORG_B,
       );
@@ -119,7 +119,9 @@ describe("featureFlag.isEnabledForEachOrganization", () => {
 
   describe("when the input mixes member and non-member organizations", () => {
     it("omits non-member ids from the map rather than reporting them false", async () => {
-      const caller = buildCaller(buildMockPrisma(new Set([OWN_ORG_A])));
+      const caller = buildCaller({
+        prisma: buildMockPrisma({ memberOf: new Set([OWN_ORG_A]) }),
+      });
       mockIsEnabled.mockResolvedValue(true);
 
       const result = await caller.isEnabledForEachOrganization({
@@ -144,8 +146,8 @@ describe("featureFlag.isEnabledForEachOrganization", () => {
         { length: 65 },
         (_, index) => `org_${index}`,
       );
-      const prisma = buildMockPrisma(new Set(organizationIds));
-      const caller = buildCaller(prisma);
+      const prisma = buildMockPrisma({ memberOf: new Set(organizationIds) });
+      const caller = buildCaller({ prisma });
 
       await caller.isEnabledForEachOrganization({
         flag: FLAG,
@@ -158,8 +160,8 @@ describe("featureFlag.isEnabledForEachOrganization", () => {
 
   describe("when the input list is empty", () => {
     it("returns an empty map without touching prisma or featureFlagService", async () => {
-      const prisma = buildMockPrisma(new Set([OWN_ORG_A]));
-      const caller = buildCaller(prisma);
+      const prisma = buildMockPrisma({ memberOf: new Set([OWN_ORG_A]) });
+      const caller = buildCaller({ prisma });
 
       const result = await caller.isEnabledForEachOrganization({
         flag: FLAG,

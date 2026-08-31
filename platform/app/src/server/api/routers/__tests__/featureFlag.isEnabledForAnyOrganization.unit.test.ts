@@ -62,7 +62,7 @@ const FLAG = "release_ui_ai_governance_enabled" as const;
  * the whole list, not one per organization — so the mock answers
  * `user.findUnique` and applies the nested `organizationId in:` filter itself.
  */
-function buildMockPrisma(memberOf: Set<string>) {
+function buildMockPrisma({ memberOf }: { memberOf: Set<string> }) {
   return {
     user: {
       findUnique: vi.fn(({ where, select }: any) => {
@@ -79,7 +79,7 @@ function buildMockPrisma(memberOf: Set<string>) {
   } as unknown as PrismaClient;
 }
 
-function buildCaller(prisma: PrismaClient) {
+function buildCaller({ prisma }: { prisma: PrismaClient }) {
   const ctx = createInnerTRPCContext({
     session: { user: { id: USER_ID }, expires: "1" },
     req: undefined,
@@ -99,9 +99,9 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
 
   describe("when the user is a member of every input organization", () => {
     it("evaluates the flag for those organizations", async () => {
-      const caller = buildCaller(
-        buildMockPrisma(new Set([OWN_ORG_A, OWN_ORG_B])),
-      );
+      const caller = buildCaller({
+        prisma: buildMockPrisma({ memberOf: new Set([OWN_ORG_A, OWN_ORG_B]) }),
+      });
       mockIsEnabled.mockImplementation(
         async (_flag, opts: any) => opts.organizationId === OWN_ORG_B,
       );
@@ -121,7 +121,9 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
 
   describe("when the input mixes member and non-member organizations", () => {
     it("silently filters non-member ids before evaluating the flag", async () => {
-      const caller = buildCaller(buildMockPrisma(new Set([OWN_ORG_A])));
+      const caller = buildCaller({
+        prisma: buildMockPrisma({ memberOf: new Set([OWN_ORG_A]) }),
+      });
       mockIsEnabled.mockImplementation(
         async (_flag, opts: any) => opts.organizationId === OWN_ORG_A,
       );
@@ -142,7 +144,9 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
 
   describe("when the user is a member of none of the input organizations", () => {
     it("returns enabled:false without evaluating the flag", async () => {
-      const caller = buildCaller(buildMockPrisma(new Set()));
+      const caller = buildCaller({
+        prisma: buildMockPrisma({ memberOf: new Set() }),
+      });
 
       const result = await caller.isEnabledForAnyOrganization({
         flag: FLAG,
@@ -154,8 +158,12 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
     });
 
     it("returns the same shape as a member with the flag off, so the response cannot oracle membership", async () => {
-      const nonMemberCaller = buildCaller(buildMockPrisma(new Set()));
-      const memberCaller = buildCaller(buildMockPrisma(new Set([OWN_ORG_A])));
+      const nonMemberCaller = buildCaller({
+        prisma: buildMockPrisma({ memberOf: new Set() }),
+      });
+      const memberCaller = buildCaller({
+        prisma: buildMockPrisma({ memberOf: new Set([OWN_ORG_A]) }),
+      });
       mockIsEnabled.mockResolvedValue(false);
 
       const nonMemberResult = await nonMemberCaller.isEnabledForAnyOrganization(
@@ -180,8 +188,8 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
         { length: 65 },
         (_, index) => `org_${index}`,
       );
-      const prisma = buildMockPrisma(new Set(organizationIds));
-      const caller = buildCaller(prisma);
+      const prisma = buildMockPrisma({ memberOf: new Set(organizationIds) });
+      const caller = buildCaller({ prisma });
 
       await caller.isEnabledForAnyOrganization({
         flag: FLAG,
@@ -194,8 +202,8 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
 
   describe("when the input list is empty", () => {
     it("returns enabled:false without touching prisma or featureFlagService", async () => {
-      const prisma = buildMockPrisma(new Set([OWN_ORG_A]));
-      const caller = buildCaller(prisma);
+      const prisma = buildMockPrisma({ memberOf: new Set([OWN_ORG_A]) });
+      const caller = buildCaller({ prisma });
 
       const result = await caller.isEnabledForAnyOrganization({
         flag: FLAG,
