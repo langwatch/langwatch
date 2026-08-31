@@ -822,12 +822,21 @@ export class MetricDataPointClickHouseRepository
    * would otherwise scan every partition between them only to discard the rows.
    *
    * The predecessor is sought in two passes, near before far, because the far
-   * pass is the expensive one and almost no bucket needs it. The first pass
-   * looks back {@link PREDECESSOR_LOOKBACK_MS}; the second looks from there to
-   * the edge of retention, and only for the buckets the first pass left without
-   * a predecessor. The two ranges abut and do not overlap, so their union is
-   * the single retention-wide range this replaced — the same rows, reached
-   * without making every bucket pay the wide read.
+   * pass is the expensive one and a bucket in a series that is being written to
+   * does not need it. The first pass looks back
+   * {@link PREDECESSOR_LOOKBACK_MS}; the second looks from there to the edge of
+   * retention, and only for the buckets the first pass left without a
+   * predecessor. The two ranges abut and do not overlap, so their union is the
+   * single retention-wide range this replaced — the same rows, reached without
+   * making every bucket pay the wide read.
+   *
+   * Two cases do reach the far pass every time, and both are bounded. A series
+   * whose first points are arriving has no predecessor at any distance, so its
+   * buckets fall through and the wide seek returns nothing; under series churn
+   * this is the common path, not the rare one, and it costs one extra round
+   * trip on top of what the single-pass read already cost. A gap longer than
+   * the near window is the other, and it is the case the far pass exists for.
+   * Neither is a regression, but neither is rare either.
    *
    * What the wide read costs is partitions. The table partitions by ISO week,
    * so a retention-wide reverse seek opens every weekly part the series appears
@@ -872,7 +881,7 @@ export class MetricDataPointClickHouseRepository
       seeks,
       unique,
       predecessor: { fromMs: nearMs, toMs: 0 },
-      withBucketRows: true,
+      shouldReadBucketRows: true,
     });
 
     const unresolved =
@@ -890,7 +899,7 @@ export class MetricDataPointClickHouseRepository
         seeks: unresolved,
         unique,
         predecessor: { fromMs: retentionMs, toMs: nearMs },
-        withBucketRows: false,
+        shouldReadBucketRows: false,
       });
     }
 
@@ -907,7 +916,7 @@ export class MetricDataPointClickHouseRepository
    *
    * `predecessor` is the half-open window behind each bucket start the reverse
    * seek may look in, as distances rather than instants so both bounds stay
-   * shared scalars however many buckets the chunk holds. `withBucketRows` is
+   * shared scalars however many buckets the chunk holds. `shouldReadBucketRows` is
    * off for a pass that only widens the predecessor search: those buckets'
    * own rows are already in hand, and re-reading them would double the
    * statement to return what it just returned.
@@ -918,14 +927,14 @@ export class MetricDataPointClickHouseRepository
     seeks,
     unique,
     predecessor,
-    withBucketRows,
+    shouldReadBucketRows,
   }: {
     client: Awaited<ReturnType<ClickHouseClientResolver>>;
     tenantId: string;
     seeks: readonly { seriesId: string; start: number }[];
     unique: Map<string, MetricRollupSourcePoint>;
     predecessor: { fromMs: number; toMs: number };
-    withBucketRows: boolean;
+    shouldReadBucketRows: boolean;
   }): Promise<void> {
     // Half the cap, and the divisor is a size bound rather than a
     // statement-count one: the successor read emits one statement whatever its
@@ -964,7 +973,7 @@ export class MetricDataPointClickHouseRepository
               AND metric_data_points.TimeUnixMs < fromUnixTimestamp64Milli({from${index}:Int64} - {lookbackToMs:Int64})
               AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({from${index}:Int64} - {lookbackFromMs:Int64})
             ORDER BY metric_data_points.TimeUnixMs DESC, TimeUnixNano DESC, PointId DESC LIMIT 1)`;
-        if (!withBucketRows) return [predecessorSeek];
+        if (!shouldReadBucketRows) return [predecessorSeek];
         return [
           predecessorSeek,
           `(SELECT ${ROLLUP_SELECT}
