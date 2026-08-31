@@ -27,7 +27,7 @@
     },
     {
       "file": "packages/enterprise/features/webhook/server/src/services/webhook-delivery.service.ts",
-      "moduleLines": 1335,
+      "moduleLines": 1215,
       "methodLines": 80,
       "statements": 24,
       "complexity": 24,
@@ -51,7 +51,7 @@
     },
     {
       "file": "packages/features/dataset/server/src/services/dataset.service.ts",
-      "moduleLines": 692,
+      "moduleLines": 665,
       "methodLines": 80,
       "statements": 24,
       "complexity": 24,
@@ -91,8 +91,8 @@
     },
     {
       "file": "packages/features/prompt/server/src/services/prompt.service.ts",
-      "moduleLines": 1648,
-      "methodLines": 213,
+      "moduleLines": 1485,
+      "methodLines": 206,
       "statements": 24,
       "complexity": 31,
       "lineLength": 160
