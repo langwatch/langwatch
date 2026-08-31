@@ -31,6 +31,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   collectGoBindings,
+  collectMalformedJsdocAnnotations,
   discoverFeatureFiles,
   isEntryModule,
   isInert,
@@ -256,6 +257,46 @@ describe("discoverFeatureFiles", () => {
         expect(discoverFeatureFiles([specs]).length).toBe(1);
       });
     });
+  });
+});
+
+describe("collectMalformedJsdocAnnotations", () => {
+  it("reports a scenario tag embedded in a multi-line JSDoc block", () => {
+    const tests = join(root, "tests");
+    mkdirSync(tests);
+    writeFileSync(
+      join(tests, "parity.test.ts"),
+      [
+        "/**",
+        " * Explains the case.",
+        ' * @scenario "A scenario in a JSDoc body"',
+        " */",
+        'it("covers the case", () => {});',
+      ].join("\n"),
+      "utf8",
+    );
+
+    expect(collectMalformedJsdocAnnotations([tests])).toEqual([
+      expect.objectContaining({
+        title: "A scenario in a JSDoc body",
+        ref: expect.objectContaining({
+          file: expect.stringContaining("parity.test.ts"),
+        }),
+        reason: expect.stringContaining("multi-line JSDoc"),
+      }),
+    ]);
+  });
+
+  it("does not report the supported single-line JSDoc form", () => {
+    const tests = join(root, "tests");
+    mkdirSync(tests);
+    writeFileSync(
+      join(tests, "parity.test.ts"),
+      '/** @scenario "A supported annotation" */\nit("covers the case", () => {});',
+      "utf8",
+    );
+
+    expect(collectMalformedJsdocAnnotations([tests])).toEqual([]);
   });
 });
 
