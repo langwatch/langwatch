@@ -25,11 +25,4 @@ export type GatewayClickHouseClient = {
   }): Promise<void>;
 };
 
-export type GatewayClickHouseResolver = (
-  tenantId: string,
-) => Promise<GatewayClickHouseClient>;
-
-/** Resolves the tenant-scoped ClickHouse client at the Gateway boundary. */
-export abstract class GatewayClickHousePort {
-  abstract resolve(tenantId: string): Promise<GatewayClickHouseClient>;
-}
+export type GatewayClickHouseResolver = (tenantId: string) => Promise<GatewayClickHouseClient>;

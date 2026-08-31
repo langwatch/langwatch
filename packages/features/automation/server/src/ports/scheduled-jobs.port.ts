@@ -24,5 +24,3 @@ export abstract class ScheduledJobStore {
     targetType: string;
   }): Promise<ScheduledJobRecord[]>;
 }
-
-export abstract class ScheduledJobStorePort extends ScheduledJobStore {}
