@@ -131,7 +131,7 @@ Values arrive validated against the declaration. A value the declaration refuses
 
 ### Lifecycle
 
-The connection starts on the next tick after the first `connectAgent` call, once per process, and one connection carries every agent the process declares. It uses the global `WebSocket` when the runtime has one and the `ws` package otherwise. While connected, it keeps the event loop alive, so a script that only declares an agent serves until Ctrl-C.
+The connection starts on the next tick after the first `connectAgent` call, once per process, and one connection carries every agent the process declares. It uses the global `WebSocket` when the runtime has one and the `ws` package otherwise. An open WebSocket keeps the event loop alive while it is connected. The HTTP fallback waits between empty polls on an unreferenced timer, and so does the reconnect backoff, so a script that only declares an agent needs its own keep-alive, for example `setInterval(() => {}, 1 << 30)`.
 
 SIGINT, SIGTERM and normal exit send a deregistration, so the agent reads Offline at once. A dropped connection is retried with a growing wait, from 1 second to 30 seconds.
 

@@ -242,7 +242,9 @@ langwatch.agent.serve()   # Python, at the bottom of the script
 ```
 
 ```typescript
-// TypeScript: the connection holds the event loop open, so the script serves until Ctrl-C
+// TypeScript: keep the script alive yourself. The WebSocket holds the event loop
+// while connected, but the HTTP fallback and the reconnect wait do not.
+setInterval(() => {}, 1 << 30);
 // Run it with the project's TypeScript runner, for example `tsx agent.ts`
 ```
 
@@ -525,7 +527,13 @@ Then start your service the way you always start it. The start command does not 
 
   In Python, call `langwatch.agent.serve()` at the end of the script. It blocks until Ctrl-C.
 
-  In TypeScript the connection holds the event loop open by itself, so the script serves until Ctrl-C. Run it with whatever runner the project uses, for example `tsx agent.ts`.
+  In TypeScript, keep the script alive yourself. An open WebSocket holds the event loop while it is connected, but the HTTP fallback and the reconnect wait use unreferenced timers, so a script with no server of its own can exit between polls.
+
+  ```typescript
+  setInterval(() => {}, 1 << 30);
+  ```
+
+  Run the script with whatever runner the project uses, for example `tsx agent.ts`.
 </Note>
 
 ## 3. Confirm it is online

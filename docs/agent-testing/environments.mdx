@@ -104,20 +104,26 @@ LANGWATCH_AGENT_CONNECT=0
     ```python
     import os
 
+    import langwatch
+
     @langwatch.connect_agent(
         name="support-agent",
         enabled=os.environ.get("APP_ENV") != "production" and not os.environ.get("CI"),
     )
+    async def support_agent(messages: list[dict]) -> str:
+        return await run_my_agent(messages)
     ```
   </Tab>
   <Tab title="TypeScript">
     ```typescript
+    import { connectAgent } from "langwatch/agent";
+
     connectAgent(
       {
         name: "support-agent",
         enabled: process.env.APP_ENV !== "production" && !process.env.CI,
       },
-      handler,
+      async ({ messages }) => await runMyAgent(messages),
     );
     ```
   </Tab>
