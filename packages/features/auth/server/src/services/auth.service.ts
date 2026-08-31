@@ -166,7 +166,7 @@ export class AuthService extends AuthCapability {
 
     try {
       const indexKey = activeSessionsKey(userId);
-      const cached = parseCachedSessions(await store.get({ key: indexKey }));
+      const cached = parseCachedSessions(await store.tryGet({ key: indexKey }));
       const retained = cached.filter(({ token }) => token === keepToken);
       for (const { token } of cached) {
         if (token !== keepToken) await store.delete({ key: tokenCacheKey(token) });

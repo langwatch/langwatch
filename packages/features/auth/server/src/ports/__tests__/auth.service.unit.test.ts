@@ -146,7 +146,7 @@ class Sessions extends AuthSessionRepository {
 class Store extends AuthSecondaryStorePort {
   readonly values = new Map<string, string>();
   readonly deleted = vi.fn();
-  async get({ key }: { key: string }): Promise<string | null> {
+  async tryGet({ key }: { key: string }): Promise<string | null> {
     return this.values.get(key) ?? null;
   }
   async set({ key, value }: { key: string; value: string }): Promise<void> {
@@ -299,7 +299,7 @@ describe("AuthService", () => {
 
   it("still revokes persisted sessions when the cache operation fails", async () => {
     class FailingStore extends AuthSecondaryStorePort {
-      async get(): Promise<string | null> {
+      async tryGet(): Promise<string | null> {
         throw new Error("redis unavailable");
       }
       async set(): Promise<void> {

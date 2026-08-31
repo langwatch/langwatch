@@ -107,7 +107,7 @@ class RedisAuthSecondaryStore extends AuthSecondaryStorePort {
     super();
   }
 
-  async get({ key }: { key: string }): Promise<string | null> {
+  async tryGet({ key }: { key: string }): Promise<string | null> {
     return this.redis.get(key);
   }
 
