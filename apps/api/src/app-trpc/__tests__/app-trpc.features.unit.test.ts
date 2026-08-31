@@ -29,7 +29,7 @@ import type { DashboardTrpcContext, GraphTrpcContext } from "@langwatch/dashboar
 import type { EvaluationTrpcContext } from "@langwatch/evaluation-server";
 import type { ExperimentTrpcContext } from "@langwatch/experiment-server";
 import type { GroupTrpcContext, JoinRequestTrpcContext } from "@langwatch/organization-server";
-import type { IdentityTrpcContext } from "@langwatch/user-server";
+import type { IdentityTrpcContext, UserTrpcContext } from "@langwatch/user-server";
 import type {
   WorkflowOptimizationTrpcContext,
   WorkflowTrpcContext,
@@ -56,6 +56,7 @@ type TestContext = AnnotationTrpcContext &
   IdentityTrpcContext &
   JoinRequestTrpcContext &
   PublicEnvTrpcContext &
+  UserTrpcContext &
   WorkflowOptimizationTrpcContext &
   WorkflowTrpcContext;
 
@@ -124,6 +125,7 @@ function refusingPorts(): AppTrpcFeaturePorts<
     identity: refuseEvery("identity"),
     joinRequests: refuseEvery("joinRequests"),
     prisma: refuseEvery("prisma"),
+    user: refuseEvery("user"),
     workflows: {
       lifecycle: refuseEvery("workflows.lifecycle"),
       optimization: refuseEvery("workflows.optimization"),
@@ -166,6 +168,7 @@ describe("the app tRPC feature list", () => {
         "joinRequests",
         "optimization",
         "publicEnv",
+        "user",
         "workflow",
       ]);
     });
@@ -193,6 +196,36 @@ describe("the app tRPC feature list", () => {
         "update",
       ]);
       expect(procedureNamesOf(features.identity)).toEqual(["completeVerification"]);
+      // The account surface only. `personalUsage`, `budgetOverview` and
+      // `cliBootstrap` answer on the same `user.*` name in the app, but they
+      // read governance data and are mounted from the Enterprise composition,
+      // so a copy of them appearing here would mean the feature had grown a
+      // second owner.
+      expect(procedureNamesOf(features.user)).toEqual([
+        "changePassword",
+        "deactivate",
+        "dismissPasskeyNudge",
+        "dismissTraceExplorerTour",
+        "getAccountInfo",
+        "getLinkedAccounts",
+        "getSsoStatus",
+        "getTraceExplorerTourPreference",
+        "hasPassword",
+        "homePagePickerState",
+        "isAdmin",
+        "passkeyNudge",
+        "personalBudget",
+        "personalContext",
+        "reactivate",
+        "register",
+        "removeAvatar",
+        "requestBudgetIncrease",
+        "setAvatar",
+        "setLastHomePath",
+        "setPassword",
+        "unlinkAccount",
+        "updateLastLogin",
+      ]);
       // Two namespaces for one feature, and the studio's own is not a subset of
       // the lifecycle's: naming both is what would catch either being dropped.
       expect(procedureNamesOf(features.optimization)).toEqual([

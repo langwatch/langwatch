@@ -45,7 +45,6 @@ export {
   createOrganizationTrpcRouter,
   createPersonalWorkspaceFeaturesTrpcRouter,
 } from "../features/organization/organization-trpc.mount";
-export { createUserTrpcRouter } from "../features/user/user-trpc.mount";
 export {
   createAnalyticsTrpcRouter,
   createLangWatchQLTrpcRouter,

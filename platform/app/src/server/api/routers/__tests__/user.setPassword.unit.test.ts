@@ -13,7 +13,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
-import { userRouter } from "../user";
+import { appRouter } from "../../root";
 
 vi.mock("../../../../env.mjs", () => ({
   env: { NEXTAUTH_PROVIDER: "email", BASE_HOST: "http://localhost:5560" },
@@ -61,7 +61,7 @@ describe("userRouter.setPassword", () => {
         },
       } as never,
     });
-    return userRouter.createCaller(ctx);
+    return appRouter.createCaller(ctx).user;
   };
 
   const call = (password = "a-good-password") => createCaller().setPassword({ password });

@@ -2,23 +2,24 @@
  * The governance vertical's Enterprise tRPC surfaces, composed for the legacy
  * web application's router root.
  *
- * Three transports live here: the CLI/device sessions surface every user
- * reaches on their own devices (`personalSessions`), the org-scoped session
- * policy an admin turns from `/governance` (`sessionPolicy`), and the
- * ingestion-keys mint/rotate/list surface that powers the /me Trace Ingest
- * grid (`ingestionKey`). Each router's behaviour — procedure names, input and
- * output shapes, refusals — belongs to the governance feature package. What
- * this composition owns is the wiring: which policy wraps which declaration,
- * and which process capability answers each port.
+ * Every governance transport the application serves is built here: the member
+ * surfaces they reach on their own devices and their own /me page
+ * (`personalDashboard`, `personalSessions`, `ingestionKey`), and the org-scoped
+ * ones an admin turns from `/governance`. Each router's behaviour — procedure
+ * names, input and output shapes, refusals — belongs to the governance feature
+ * package. What this composition owns is the wiring: which policy wraps which
+ * declaration, and which process capability answers each port.
  *
  * It sits in the Enterprise API composition rather than in `apps/api` for the
  * same reason its siblings do: a core package may not depend on an Enterprise
  * one. Everything the process must supply arrives through `create`, so this
  * package never imports an application.
  *
- * The rest of the governance surface — ingestion sources, anomaly rules, AI
- * tools, departments, the top-level `governance.*` router — still owns its
- * procedures in `platform/app` and follows in the same shape as it moves.
+ * One of them does not answer on a `governance.*` name at all:
+ * `personalDashboard` is merged into the `user` namespace by the process,
+ * because `user.personalUsage`, `user.budgetOverview` and `user.cliBootstrap`
+ * are the names the /me page and the CLI call. Where a procedure lives is
+ * decided by the data it reads; what it is called is decided by the wire.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
@@ -30,6 +31,7 @@ import {
   IngestionKeyTrpcApi,
   IngestionSourcesTrpcApi,
   IngestionTemplatesTrpcApi,
+  PersonalDashboardTrpcApi,
   PersonalSessionsTrpcApi,
   SessionPolicyTrpcApi,
   type ActivityMonitorTrpcContext,
@@ -40,6 +42,7 @@ import {
   type IngestionKeyTrpcContext,
   type IngestionSourcesTrpcContext,
   type IngestionTemplatesTrpcContext,
+  type PersonalDashboardTrpcContext,
   type PersonalSessionsTrpcContext,
   type SessionPolicyTrpcContext,
 } from "@langwatch/enterprise-governance-server";
@@ -50,7 +53,8 @@ import {
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 
 /** Every context requirement the surfaces place on the process. */
-export type EnterpriseGovernanceTrpcContext = PersonalSessionsTrpcContext &
+export type EnterpriseGovernanceTrpcContext = PersonalDashboardTrpcContext &
+  PersonalSessionsTrpcContext &
   SessionPolicyTrpcContext &
   IngestionKeyTrpcContext &
   DepartmentsTrpcContext &
@@ -81,6 +85,16 @@ export class EnterpriseGovernanceTrpcComposition {
     const { root, protectedProcedure, policy } = options;
 
     return {
+      /**
+       * The /me dashboard's governance reads. The process merges this router
+       * into the `user` namespace beside the packaged account surface: those
+       * three procedure names are what the page and the CLI call, and the
+       * answers are this contract's own shapes.
+       */
+      personalDashboard: PersonalDashboardTrpcApi.create(root, {
+        protected: protectedProcedure,
+        policy,
+      }),
       personalSessions: PersonalSessionsTrpcApi.create(root, {
         protected: protectedProcedure,
         policy,

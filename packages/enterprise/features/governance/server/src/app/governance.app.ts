@@ -36,9 +36,11 @@ import {
   RoutingPolicyModelMustBeConcreteError,
   RoutingPolicyMustHaveProviderError,
   RoutingPolicyMustHaveScopeError,
+  type CliBootstrapResult,
   type CreateRoutingPolicyInput,
   type DeleteRoutingPolicyInput,
   type FindRoutingPolicyInput,
+  type GovernanceBudgetOverviewForUser,
   type GovernanceCallSurface,
   type GovernanceService,
   type IngestionTemplate,
@@ -46,10 +48,8 @@ import {
   type ListPersonalVirtualKeysInput,
   type ListRoutingPoliciesInput,
   type PersonalVirtualKey,
-  type PersonalUsageBreakdown,
-  type PersonalUsageBucket,
   type PersonalUsageQueryInput,
-  type PersonalUsageSummary,
+  type PersonalUsageWindow,
   type RoutingPolicy,
   type SetDefaultRoutingPolicyInput,
   type UpdateRoutingPolicyInput,
@@ -57,6 +57,10 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
+import {
+  PersonalUsageDashboardService,
+  type PersonalUsageRollup,
+} from "../services/personal-usage-dashboard.service";
 
 /**
  * A member already holds an unrevoked personal key under this label.
@@ -199,9 +203,17 @@ export interface GovernancePersonalVirtualKeyPorts {
 /** What the process composes this feature's application from. */
 export interface GovernanceAppDependencies {
   governance: GovernanceService;
-  /** Reads the organization a project belongs to, for the project-scoped REST family. */
-  projects: Pick<ProjectService, "getOrganizationId">;
-  organizations: Pick<OrganizationService, "ensurePersonalWorkspace">;
+  /**
+   * The organization a project belongs to, for the project-scoped REST family,
+   * and the organization's hidden governance project, which is the tenant an
+   * ingestion source's usage rows land in.
+   */
+  projects: Pick<ProjectService, "getOrganizationId" | "tryFindInternal">;
+  /**
+   * The member's personal workspace: created on demand when they mint their
+   * first key, read as it stands when they open their own dashboard.
+   */
+  organizations: Pick<OrganizationService, "ensurePersonalWorkspace" | "tryFindPersonalWorkspace">;
   /**
    * The process's permission engine. Read directly rather than through a port
    * because the one question this feature asks it — may the caller see somebody
@@ -236,7 +248,15 @@ export class GovernanceApp {
     return new GovernanceApp(dependencies);
   }
 
-  private constructor(private readonly dependencies: GovernanceAppDependencies) {}
+  private constructor(private readonly dependencies: GovernanceAppDependencies) {
+    this.personalUsageDashboards = PersonalUsageDashboardService.create({
+      governance: dependencies.governance,
+      organizations: dependencies.organizations,
+      projects: dependencies.projects,
+    });
+  }
+
+  private readonly personalUsageDashboards: PersonalUsageDashboardService;
 
   // ── Ingestion templates ───────────────────────────────────────────────────
 
@@ -444,35 +464,81 @@ export class GovernanceApp {
     }
   }
 
+  // ── The member's own dashboard ────────────────────────────────────────────
+
+  /**
+   * Whether the caller belongs to this organization at all.
+   *
+   * Answered rather than enforced because the /me door re-checks membership
+   * after `organization:view` and sends its own refusal: the permission says
+   * the caller may act on an organization, this says the one they named is
+   * theirs, which is what keeps a personal rollup inside their own tenant.
+   */
+  isOrganizationMember(input: { organizationId: string; userId: string }): Promise<boolean> {
+    return this.dependencies.personalVirtualKeys.isOrganizationMember(input);
+  }
+
+  /**
+   * One person's own usage against a tenant the caller has already resolved:
+   * the totals, the per-day buckets, and the split by model.
+   */
+  personalUsage(input: PersonalUsageQueryInput): Promise<PersonalUsageRollup> {
+    return this.personalUsageDashboards.rollup(input);
+  }
+
+  /**
+   * The same rollup for the caller's own /me screen, over the tenants their
+   * traffic actually lands in. Zeros before their first request, so the page
+   * renders rather than refusing.
+   */
+  personalUsageDashboard(
+    input: { organizationId: string; window?: PersonalUsageWindow },
+    by: GovernanceCaller,
+  ): Promise<PersonalUsageRollup> {
+    return this.personalUsageDashboards.read({
+      userId: by.id,
+      organizationId: input.organizationId,
+      window: input.window,
+    });
+  }
+
+  /**
+   * Every budget that binds the caller's own keys in this organization, each
+   * labelled with its scope, most binding first.
+   *
+   * The caller is always the subject: a member reads their OWN overview, which
+   * is why the user id comes from `by` rather than from the input. One source,
+   * so the /me screen and the CLI's login epilogue can never report different
+   * numbers for the same budget.
+   */
+  personalBudgetOverview(
+    input: { organizationId: string; includeTopModels?: boolean },
+    by: GovernanceCaller,
+  ): Promise<GovernanceBudgetOverviewForUser> {
+    return this.dependencies.governance.personalBudgetOverviewForUser({
+      organizationId: input.organizationId,
+      userId: by.id,
+      includeTopModels: input.includeTopModels,
+    });
+  }
+
+  /**
+   * What the CLI's login-completion ceremony renders: the tools and providers
+   * this organization publishes to the caller, and their monthly budget.
+   */
+  cliBootstrap(
+    input: { organizationId: string },
+    by: GovernanceCaller,
+  ): Promise<CliBootstrapResult> {
+    return this.dependencies.governance.cliBootstrapResolve({
+      userId: by.id,
+      organizationId: input.organizationId,
+    });
+  }
+
   // ── Routing policies ──────────────────────────────────────────────────────
 
   /** Policies in an organization, optionally narrowed to one scope's choices. */
-  /**
-   * One person's own usage: the totals, the per-day buckets, and the split by
-   * model.
-   *
-   * Three reads rather than one because they answer different questions, and
-   * issued together because ClickHouse multiplexes them happily — a caller
-   * awaiting them in sequence pays three round trips for one screen. That is
-   * a fact about the store, not about a transport, so it is decided here
-   * rather than in whichever door happens to ask.
-   */
-  async personalUsage(
-    input: PersonalUsageQueryInput,
-  ): Promise<{
-    summary: PersonalUsageSummary;
-    dailyBuckets: PersonalUsageBucket[];
-    breakdownByModel: PersonalUsageBreakdown[];
-  }> {
-    const [summary, dailyBuckets, breakdownByModel] = await Promise.all([
-      this.dependencies.governance.personalUsageSummary(input),
-      this.dependencies.governance.personalUsageDailyBuckets(input),
-      this.dependencies.governance.personalUsageBreakdownByModel(input),
-    ]);
-
-    return { summary, dailyBuckets, breakdownByModel };
-  }
-
   listRoutingPolicies(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]> {
     return this.dependencies.governance.routingPolicyList(input);
   }

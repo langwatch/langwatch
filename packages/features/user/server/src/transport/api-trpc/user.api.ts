@@ -21,13 +21,14 @@
  *                        where the answer is not already narrowed to the
  *                        caller.
  *
- * Three more of the /me dashboard's procedures — `personalUsage`,
- * `budgetOverview` and `cliBootstrap` — are mounted beside these by the
- * process rather than living here. Their answers ARE the Enterprise
- * governance contract's wire shapes, and a core feature package may not
- * import an Enterprise contract (`langwatch/package-boundaries`). Restating
- * those shapes here would fork the contract, so the process keeps them until
- * they move to the governance feature that owns them.
+ * Three more of the /me dashboard's procedures answer on the same `user.*`
+ * name and are not here: `personalUsage`, `budgetOverview` and
+ * `cliBootstrap`. Their answers ARE the Enterprise governance contract's wire
+ * shapes, and a core feature package may not import an Enterprise contract
+ * (`langwatch/package-boundaries`), so they belong to the governance feature
+ * that owns that data — `PersonalDashboardTrpcApi` in
+ * `@langwatch/enterprise-governance-server` — and the process merges the two
+ * routers into one namespace.
  *
  * Every procedure acts on the SESSION's user. The only user id in any input
  * is `deactivate`/`reactivate`'s, and those two check self-or-instance-admin

@@ -10,7 +10,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
-import { userRouter } from "../user";
+import { appRouter } from "../../root";
 
 // The raw env names an IdP; what this route keys off is the RESOLVED provider
 // below, so the two can disagree and that is the point of the coercion tests.
@@ -91,7 +91,7 @@ describe("userRouter.register()", () => {
       user: { findFirst: userFindFirstMock },
     };
     (ctx as any).prisma = prismaMock;
-    return userRouter.createCaller(ctx);
+    return appRouter.createCaller(ctx).user;
   };
 
   describe("when registration succeeds", () => {

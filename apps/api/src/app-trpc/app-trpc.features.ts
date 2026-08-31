@@ -36,7 +36,12 @@ import type {
   JoinRequestTrpcPorts,
 } from "@langwatch/organization-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { IdentityTrpcContext, IdentityTrpcPorts } from "@langwatch/user-server";
+import type {
+  IdentityTrpcContext,
+  IdentityTrpcPorts,
+  UserTrpcContext,
+  UserTrpcPorts,
+} from "@langwatch/user-server";
 import type {
   WorkflowOptimizationTrpcContext,
   WorkflowOptimizationTrpcPorts,
@@ -70,7 +75,7 @@ import {
   createGroupTrpcRouter,
   createJoinRequestTrpcRouter,
 } from "../features/organization/organization-trpc.mount";
-import { createIdentityTrpcRouter } from "../features/user/user-trpc.mount";
+import { createIdentityTrpcRouter, createUserTrpcRouter } from "../features/user/user-trpc.mount";
 import {
   createWorkflowOptimizationTrpcRouter,
   createWorkflowTrpcRouter,
@@ -150,6 +155,14 @@ export interface AppTrpcFeaturePorts<
    */
   prisma: PrismaClient;
   /**
+   * The deployment's own answers behind the signed-in person's account: its
+   * auth provider and passkey policy, its Auth0 tenant, its password hashing,
+   * the account and organization rows the /me screens read, the signup
+   * throttle, product analytics and the budget-increase mail. All of it is
+   * this process's, none of it the user feature's.
+   */
+  user: UserTrpcPorts;
+  /**
    * One feature, two namespaces, so one entry with the two groups inside it.
    *
    * `lifecycle` answers for `workflow.*`: the copy lineage the workflow
@@ -188,6 +201,7 @@ export function createAppTrpcFeatures<
     IdentityTrpcContext &
     JoinRequestTrpcContext &
     PublicEnvTrpcContext &
+    UserTrpcContext &
     WorkflowOptimizationTrpcContext &
     WorkflowTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
@@ -239,6 +253,10 @@ export function createAppTrpcFeatures<
       ...mount,
       ports: ports.workflows.optimization,
     }),
+    // The signed-in person's own account. The process merges the Enterprise
+    // /me dashboard reads into the same namespace, so `user.*` answers from
+    // two owners on one wire name.
+    user: createUserTrpcRouter({ ...mount, ports: ports.user }),
     workflow: createWorkflowTrpcRouter({ ...mount, ports: ports.workflows.lifecycle }),
   };
 }

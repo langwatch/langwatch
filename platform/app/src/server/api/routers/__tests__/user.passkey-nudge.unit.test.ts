@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
-import { userRouter } from "../user";
+import { appRouter } from "../../root";
 
 const { deploymentOffersPasskeysMock } = vi.hoisted(() => ({
   deploymentOffersPasskeysMock: vi.fn(),
 }));
 
-vi.mock("~/server/app-layer/identity/signin-method-policy", () => ({
+// Partial: the router root's graph reads this module's other exports too, so
+// replacing the whole module would leave the sign-in runtime without them.
+vi.mock("~/server/app-layer/identity/signin-method-policy", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/server/app-layer/identity/signin-method-policy")>()),
   deploymentOffersPasskeys: deploymentOffersPasskeysMock,
 }));
 
@@ -38,7 +41,7 @@ describe("userRouter.passkeyNudge", () => {
         },
       } as never,
     });
-    return userRouter.createCaller(context);
+    return appRouter.createCaller(context).user;
   };
 
   it("offers passkeys when the deployment and user status permit it", async () => {

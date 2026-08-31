@@ -31,7 +31,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { ProjectIdentity } from "@langwatch/project-contract";
+import type { ProjectIdentity, ProjectService } from "@langwatch/project-contract";
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
@@ -163,9 +163,13 @@ function buildApi(
 
   const app = GovernanceApp.create({
     governance,
-    projects: { getOrganizationId },
+    projects: {
+      getOrganizationId,
+      tryFindInternal: unreachable<ProjectService["tryFindInternal"]>(),
+    },
     organizations: {
       ensurePersonalWorkspace: unreachable<OrganizationService["ensurePersonalWorkspace"]>(),
+      tryFindPersonalWorkspace: unreachable<OrganizationService["tryFindPersonalWorkspace"]>(),
     },
     permissions: { getDecision: unreachable<AuthzService["getDecision"]>() },
     personalVirtualKeys: {

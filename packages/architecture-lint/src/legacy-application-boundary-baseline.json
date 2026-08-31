@@ -16,7 +16,6 @@
       "platform/app/src/server/analytics/utils.ts": ["../../hooks/useFilterParams"],
       "platform/app/src/server/api/rbac.ts": ["~/env.mjs"],
       "platform/app/src/server/api/routers/currency.ts": ["~/env.mjs"],
-      "platform/app/src/server/api/routers/user.ts": ["../../../env.mjs"],
       "platform/app/src/server/app-layer/bug-reports/bug-report-slack.ts": ["~/env.mjs"],
       "platform/app/src/server/app-layer/config.ts": ["../../env-create.mjs"],
       "platform/app/src/server/app-layer/ops/metrics-collector.ts": ["~/shared/ops/latency"],

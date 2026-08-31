@@ -9,7 +9,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
-import { userRouter } from "../user";
+import { appRouter } from "../../root";
 
 vi.mock("../../../../env.mjs", () => ({
   env: { NEXTAUTH_PROVIDER: "google", BASE_HOST: "http://localhost:5560" },
@@ -54,7 +54,7 @@ describe("userRouter.changePassword", () => {
       app: {} as never,
     });
     (ctx as any).prisma = { account: { findFirst: accountFindFirst } };
-    return userRouter.createCaller(ctx);
+    return appRouter.createCaller(ctx).user;
   };
 
   const call = () =>

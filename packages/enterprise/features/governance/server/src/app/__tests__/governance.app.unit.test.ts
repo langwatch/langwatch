@@ -19,6 +19,7 @@ import {
   type IngestionTemplate,
 } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
+import type { ProjectService } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
   GovernanceApp,
@@ -54,9 +55,13 @@ function buildApp(overrides: Partial<TestGovernanceService> = {}) {
 
   const app = GovernanceApp.create({
     governance,
-    projects: { getOrganizationId },
+    projects: {
+      getOrganizationId,
+      tryFindInternal: unreachable<ProjectService["tryFindInternal"]>(),
+    },
     organizations: {
       ensurePersonalWorkspace: unreachable<OrganizationService["ensurePersonalWorkspace"]>(),
+      tryFindPersonalWorkspace: unreachable<OrganizationService["tryFindPersonalWorkspace"]>(),
     },
     permissions: { getDecision: unreachable<AuthzService["getDecision"]>() },
     personalVirtualKeys: {

@@ -136,6 +136,10 @@ export {
   type RoutingPolicyTrpcContext,
 } from "./transport/api-trpc/routing-policy.api";
 export {
+  PersonalDashboardTrpcApi,
+  type PersonalDashboardTrpcContext,
+} from "./transport/api-trpc/personal-dashboard.api";
+export {
   PersonalSessionsTrpcApi,
   type PersonalSessionsTrpcContext,
 } from "./transport/api-trpc/personal-sessions.api";

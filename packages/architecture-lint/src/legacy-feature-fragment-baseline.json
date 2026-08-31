@@ -632,7 +632,6 @@
     {"feature":"user","file":"platform/app/src/pages/governance/users.tsx","kind":"page-shell"},
     {"feature":"user","file":"platform/app/src/pages/governance/users/[id].tsx","kind":"page-shell"},
     {"feature":"user","file":"platform/app/src/pages/ops/backoffice/users.tsx","kind":"page-shell"},
-    {"feature":"user","file":"platform/app/src/server/api/routers/user.ts","kind":"transport"},
     {"feature":"webhook","file":"platform/app/src/components/webhooks/WebhookDeliveriesDrawer.tsx","kind":"page-shell"},
     {"feature":"webhook","file":"platform/app/src/components/webhooks/WebhookDestinationCell.tsx","kind":"page-shell"},
     {"feature":"webhook","file":"platform/app/src/components/webhooks/WebhookEndpointDrawer.tsx","kind":"page-shell"},

@@ -123,8 +123,12 @@ import { declareAuthzMiddleware, type AuthzPermission } from "@langwatch/authz-c
 import { RoleBindingScopeType, type PrismaClient } from "~/generated/prisma/client";
 import { fireTeamMemberInvitedNurturing } from "~/server/app-layer/billing/nurturing/featureAdoption";
 import { fireInviteAcceptedNurturingCalls } from "~/server/app-layer/billing/nurturing/inviteAcceptance";
+import { deploymentOffersPasskeys } from "~/server/app-layer/identity/signin-method-policy";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
-import { MemberSeatLimitReachedError } from "~/server/app-layer/organizations/errors";
+import {
+  MemberSeatLimitReachedError,
+  NoAdminConfiguredError,
+} from "~/server/app-layer/organizations/errors";
 import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";
 import {
   probeOrganizationPermission,
@@ -176,9 +180,13 @@ import {
   redactActionParamsFor,
 } from "~/runtime/app/features/automation-adapters/providers/registry";
 import { decryptSlackBotToken } from "~/runtime/app/features/automation-adapters/providers/slack/server";
+import { Auth0ApiError, changeAuth0Password } from "~/server/auth0/passwordService";
 import { RecentItemsService } from "~/server/home/recent-items.service";
 import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
+import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRequestEmail";
 import { wrapAiCall } from "~/server/modelProviders/aiCallFailedError";
+import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
+import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 import { rateLimit } from "~/server/rateLimit";
 import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
 import { getClientIp } from "~/utils/getClientIp";
@@ -208,7 +216,6 @@ import { secretsRouter } from "~/runtime/app/internal-api/secrets.router";
 import { setupSkillsRouter } from "./routers/setupSkills";
 import { teamRouter } from "~/runtime/app/internal-api/team.router";
 import { topicsRouter } from "~/runtime/app/internal-api/topic.router";
-import { userRouter } from "./routers/user";
 import type { resolveAnnotationSuggestionTarget } from "@langwatch/annotation-contract";
 import {
   createOrUpdateQueueItems,
@@ -218,9 +225,11 @@ import { AuthApp } from "@langwatch/auth-server";
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import { pMapLimited } from "@langwatch/eventing";
 import { featureByKey } from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
 import { WorkflowVersionRequiredError, type StudioWorkflow } from "@langwatch/workflow-contract";
 import { TRPCError } from "@trpc/server";
 import { generateText } from "ai";
+import { compare, hash } from "bcrypt";
 import { createPatch } from "diff";
 import { nanoid } from "nanoid";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
@@ -234,6 +243,38 @@ import { coerceMonitorMappings, mappingStateSchema } from "~/server/tracer/trace
 import { ClickHouseTraceService } from "~/server/traces/clickhouse-trace.service";
 import { TraceEditOverlayService } from "~/server/traces/edit-overlay/traceEditOverlay.service";
 import { slugify } from "~/utils/slugify";
+
+/**
+ * The `user.*` surface's own logger, kept under the name its lines have always
+ * carried: a rename here would break every saved query that reads them.
+ */
+const userLogger = createLogger("langwatch:user-router");
+
+/**
+ * The Auth0 Management API's refusals, as outcomes. The user package turns each
+ * one into the message the customer reads; anything that is not an Auth0
+ * refusal keeps travelling as itself and degrades to an unknown error with a
+ * trace id.
+ *
+ * The outcomes are `as const` rather than annotated with the package's own
+ * union: naming that type here would mean importing a feature SERVER package
+ * into the router root for a type alone, and the literal types the assertion
+ * preserves are what the port checks its answer against anyway.
+ */
+function auth0Outcome(error: Auth0ApiError) {
+  switch (error.code) {
+    case "weak_password":
+      return { outcome: "weak_password", message: error.message } as const;
+    case "insufficient_scope":
+      return { outcome: "insufficient_scope" } as const;
+    case "password_grant_not_enabled":
+      return { outcome: "password_grant_not_enabled" } as const;
+    case "not_configured":
+      return { outcome: "not_configured" } as const;
+    default:
+      return { outcome: "failed" } as const;
+  }
+}
 
 /** This process's concrete policy chain, in the order the mounts apply it. */
 const appTrpcMiddlewares: AppTrpcPolicyMiddlewares = {
@@ -1273,6 +1314,136 @@ const appTrpcFeatures = createAppTrpcFeatures({
 
     prisma,
 
+    /**
+     * Everything behind `user.*` that belongs to this deployment rather than
+     * to the person: which provider signs them in, whether passkeys exist
+     * here, how a password is hashed and where the Auth0 tenant is, the
+     * account and organization rows the /me screens read, the signup throttle,
+     * product analytics, and the mail a budget-increase request sends.
+     *
+     * Spec: packages/features/user/specs/user.feature,
+     *       specs/settings/user-avatar.feature.
+     */
+    user: {
+      resolveAuthProvider,
+      deploymentOffersPasskeys,
+      appBaseUrl: () => env.NEXTAUTH_URL ?? env.BASE_HOST ?? null,
+      clientIp: (ctx: TRPCContext) => getClientIp(ctx.req) ?? "unknown",
+      rateLimit,
+      trackServerEvent,
+
+      hashPassword: ({ password }) => hash(password, 10),
+      passwordMatches: ({ password, hash: stored }) => compare(password, stored),
+      tryFindCredentialAccount: (ctx: TRPCContext, { userId }) =>
+        ctx.prisma.account.findFirst({
+          where: { userId, provider: "credential" },
+          select: { id: true, password: true },
+        }),
+      writeCredentialPassword: async (ctx: TRPCContext, { accountId, passwordHash }) => {
+        await ctx.prisma.account.update({
+          where: { id: accountId },
+          data: { password: passwordHash },
+        });
+      },
+      tryFindAuth0DatabaseAccount: (ctx: TRPCContext, { userId }) =>
+        ctx.prisma.account.findFirst({
+          where: {
+            userId,
+            provider: "auth0",
+            providerAccountId: { startsWith: "auth0|" },
+          },
+          select: { providerAccountId: true },
+        }),
+      changeAuth0Password: async (input) => {
+        try {
+          const result = await changeAuth0Password(input);
+          return result.ok ? { outcome: "changed" } : { outcome: "wrong_password" };
+        } catch (error) {
+          if (error instanceof Auth0ApiError) return auth0Outcome(error);
+          throw error;
+        }
+      },
+
+      emailIsTaken: async (ctx: TRPCContext, { email }) =>
+        (await ctx.prisma.user.findFirst({
+          where: { email: { equals: email, mode: "insensitive" } },
+        })) !== null,
+      listLinkedAccounts: (ctx: TRPCContext, { userId }) =>
+        ctx.prisma.account.findMany({
+          where: { userId },
+          select: { id: true, provider: true, providerAccountId: true },
+        }),
+      // Serializable isolation prevents the read of the account count from being
+      // a stale snapshot if a concurrent unlink commits between this
+      // transaction's count and its delete.
+      unlinkAccount: (ctx: TRPCContext, { userId, accountId }) =>
+        ctx.prisma.$transaction(
+          async (tx) => {
+            const accountCount = await tx.account.count({ where: { userId } });
+            if (accountCount <= 1) return "last_account" as const;
+            const account = await tx.account.findFirst({
+              where: { id: accountId, userId },
+            });
+            if (!account) return "not_found" as const;
+            await tx.account.delete({ where: { id: accountId } });
+            return "unlinked" as const;
+          },
+          { isolationLevel: "Serializable" },
+        ),
+      revokeCliTokensForUser: async (ctx: TRPCContext, input) => {
+        await ctx.app.governance.cliTokenRevokeForUser(input);
+      },
+
+      isOrganizationMember: async (ctx: TRPCContext, { userId, organizationId }) =>
+        (await ctx.prisma.organizationUser.findUnique({
+          where: { userId_organizationId: { userId, organizationId } },
+        })) !== null,
+      tryResolveSupportContact: (ctx: TRPCContext, { organizationId }) =>
+        resolveSupportContact({ prisma: ctx.prisma, organizationId }),
+      resolveBudgetIncreaseRecipient: async (ctx: TRPCContext, { organizationId }) => {
+        const adminEmail = await resolveOrgAdminEmail({ prisma: ctx.prisma, organizationId });
+        if (!adminEmail) {
+          userLogger.warn(
+            { organizationId },
+            "budget increase requested but the organization has no admin",
+          );
+          throw new NoAdminConfiguredError();
+        }
+        return adminEmail;
+      },
+      sendBudgetIncreaseRequest: (ctx: TRPCContext, input) =>
+        sendBudgetIncreaseRequestEmail({ mailer: ctx.app.mailer, ...input }),
+      tryGetOrganizationName: async (ctx: TRPCContext, { organizationId }) =>
+        (
+          await ctx.prisma.organization.findUnique({
+            where: { id: organizationId },
+            select: { name: true },
+          })
+        )?.name ?? null,
+      tryGetUserContact: (ctx: TRPCContext, { userId }) =>
+        ctx.prisma.user.findUnique({
+          where: { id: userId },
+          select: { email: true, name: true },
+        }),
+      tryFindFirstProjectSlug: async (ctx: TRPCContext, { organizationId, userId }) =>
+        (
+          await ctx.prisma.project.findFirst({
+            where: {
+              team: { organizationId, members: { some: { userId } } },
+              archivedAt: null,
+            },
+            orderBy: { createdAt: "asc" },
+            select: { slug: true },
+          })
+        )?.slug ?? null,
+
+      tryResolveDefaultRoutingPolicy: (ctx: TRPCContext, input) =>
+        ctx.app.governance.tryResolveDefaultRoutingPolicyForUser(input),
+      listPersonalVirtualKeys: (ctx: TRPCContext, input) =>
+        ctx.app.governance.personalVirtualKeyList(input),
+      checkBudget: (ctx: TRPCContext, input) => ctx.app.gatewayStores.budgetDecisions.check(input),
+    },
+
     workflows: {
       lifecycle: {
         hasProjectPermission: (ctx, input) =>
@@ -1670,7 +1841,14 @@ const coreRouters = {
   featureFlag: featureFlagRouter,
   modelProvider: modelProviderRouter,
   llmModelCost: llmModelCostsRouter,
-  user: userRouter,
+  // Two owners, one wire name. The packaged account surface comes from the
+  // one list; `user.personalUsage`, `user.budgetOverview` and
+  // `user.cliBootstrap` read governance data and are owned by that feature,
+  // the same way `governance` below merges its two.
+  user: appTrpcRoot.mergeRouters(
+    appTrpcFeatures.user,
+    enterpriseGovernanceRouters.personalDashboard,
+  ),
   bugReports: bugReportsRouter,
   ssoConnections: enterpriseRouters.ssoConnections,
   setupSkills: setupSkillsRouter,
