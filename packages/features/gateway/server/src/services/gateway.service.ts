@@ -135,12 +135,24 @@ export class GatewayService extends GatewayServiceContract {
     return this.withScopeReach(result, project.team.organizationId);
   }
 
-  async tryGet(id: string, organizationId: string): Promise<GatewayBudgetWithSeats | null> {
+  async tryGet({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayBudgetWithSeats | null> {
     const tenantIds = await this.listSpendTenantIds(organizationId);
     return this.repository.tryGet({ id, organizationId, tenantIds });
   }
 
-  async tryGetWithHealth(id: string, organizationId: string): Promise<GatewayBudgetHealth | null> {
+  async tryGetWithHealth({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayBudgetHealth | null> {
     const tenantIds = await this.listSpendTenantIds(organizationId);
     const result = await this.repository.tryGetWithHealth({
       id,
@@ -158,7 +170,13 @@ export class GatewayService extends GatewayServiceContract {
     return { ...result, unreachableByAnyKey: !scopeReach.reachable };
   }
 
-  async tryGetDetail(id: string, organizationId: string): Promise<GatewayBudgetDetail | null> {
+  async tryGetDetail({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayBudgetDetail | null> {
     const tenantIds = await this.listSpendTenantIds(organizationId);
     const detail = await this.repository.tryGetDetail({ id, organizationId, tenantIds });
     if (!detail) {
@@ -249,8 +267,11 @@ export class GatewayService extends GatewayServiceContract {
     return this.cacheRules.listPage(input);
   }
 
-  tryCacheRuleGet(id: string, organizationId: string): Promise<GatewayCacheRuleResource | null> {
-    return this.cacheRules.tryGet(id, organizationId);
+  tryCacheRuleGet(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayCacheRuleResource | null> {
+    return this.cacheRules.tryGet(input);
   }
 
   cacheRuleCreate(input: CreateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
@@ -269,8 +290,11 @@ export class GatewayService extends GatewayServiceContract {
     return this.guardrails.list(projectId);
   }
 
-  tryGuardrailGet(id: string, projectId: string): Promise<GatewayGuardrailResource | null> {
-    return this.guardrails.tryGet(id, projectId);
+  tryGuardrailGet(input: {
+    id: string;
+    projectId: string;
+  }): Promise<GatewayGuardrailResource | null> {
+    return this.guardrails.tryGet(input);
   }
 
   guardrailCreate(input: CreateGatewayGuardrailInput): Promise<GatewayGuardrailResource> {

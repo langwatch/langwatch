@@ -47,7 +47,13 @@ export class PrismaGatewayGuardrailRepository extends GatewayGuardrailRepository
     );
   }
 
-  async tryGet(id: string, projectId: string): Promise<GatewayGuardrailResource | null> {
+  async tryGet({
+    id,
+    projectId,
+  }: {
+    id: string;
+    projectId: string;
+  }): Promise<GatewayGuardrailResource | null> {
     const row = await this.database.gatewayGuardrail.findFirst({
       where: { id, projectId, archivedAt: null },
     });

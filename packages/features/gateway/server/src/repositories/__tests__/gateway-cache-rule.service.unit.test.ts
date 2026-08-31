@@ -47,7 +47,13 @@ class MemoryCacheRuleRepository extends GatewayCacheRuleRepository {
     return this.list();
   }
 
-  tryGet(id: string, organizationId: string): Promise<GatewayCacheRuleResource | null> {
+  tryGet({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayCacheRuleResource | null> {
     if (this.rule?.id === id && this.rule.organizationId === organizationId) {
       return Promise.resolve(this.rule);
     }

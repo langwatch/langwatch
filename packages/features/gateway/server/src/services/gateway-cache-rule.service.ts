@@ -31,8 +31,8 @@ export class GatewayCacheRulePersistence {
     return this.repository.listPage(input);
   }
 
-  tryGet(id: string, organizationId: string): Promise<GatewayCacheRuleResource | null> {
-    return this.repository.tryGet(id, organizationId);
+  tryGet(input: { id: string; organizationId: string }): Promise<GatewayCacheRuleResource | null> {
+    return this.repository.tryGet(input);
   }
 
   create(input: CreateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
@@ -41,7 +41,10 @@ export class GatewayCacheRulePersistence {
 
   async update(input: UpdateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
     const parsed = updateGatewayCacheRuleInputSchema.parse(input);
-    const existing = await this.repository.tryGet(parsed.id, parsed.organizationId);
+    const existing = await this.repository.tryGet({
+      id: parsed.id,
+      organizationId: parsed.organizationId,
+    });
     if (!existing) {
       throw new GatewayCacheRuleNotFoundError();
     }
@@ -50,7 +53,10 @@ export class GatewayCacheRulePersistence {
 
   async archive(input: ArchiveGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
     const parsed = archiveGatewayCacheRuleInputSchema.parse(input);
-    const existing = await this.repository.tryGet(parsed.id, parsed.organizationId);
+    const existing = await this.repository.tryGet({
+      id: parsed.id,
+      organizationId: parsed.organizationId,
+    });
     if (!existing) {
       throw new GatewayCacheRuleNotFoundError();
     }

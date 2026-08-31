@@ -71,7 +71,13 @@ export class PrismaGatewayCacheRuleRepository extends GatewayCacheRuleRepository
     return rows.map(toResource);
   }
 
-  async tryGet(id: string, organizationId: string): Promise<GatewayCacheRuleResource | null> {
+  async tryGet({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayCacheRuleResource | null> {
     const row = await this.database.gatewayCacheRule.findFirst({
       where: { id, organizationId, archivedAt: null },
     });

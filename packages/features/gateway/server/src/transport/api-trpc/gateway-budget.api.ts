@@ -159,10 +159,10 @@ export class GatewayBudgetTrpcApi {
       get: policy("gatewayBudgets:view")(procedure.input(gatewayBudgetApiBudgetInputSchema)).query(
         async ({ ctx, input }) => {
           await ctx.app.gateway.assertOrganizationExists(input.organizationId);
-          const detail = await ctx.app.gateway.budgetDecisions.tryGetDetail(
-            input.id,
-            input.organizationId,
-          );
+          const detail = await ctx.app.gateway.budgetDecisions.tryGetDetail({
+            id: input.id,
+            organizationId: input.organizationId,
+          });
           if (!detail) {
             throw new TRPCError({ code: "NOT_FOUND", message: "budget not found" });
           }

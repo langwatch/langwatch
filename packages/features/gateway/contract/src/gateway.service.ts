@@ -52,12 +52,18 @@ export abstract class GatewayService {
   abstract listWithHealth(organizationId: string): Promise<GatewayBudgetListWithHealth>;
   abstract listForProjectWithHealth(projectId: string): Promise<GatewayBudgetListWithHealth>;
   abstract listPageWithHealth(input: GatewayBudgetPageInput): Promise<GatewayBudgetListWithHealth>;
-  abstract tryGet(id: string, organizationId: string): Promise<GatewayBudgetWithSeats | null>;
-  abstract tryGetWithHealth(
-    id: string,
-    organizationId: string,
-  ): Promise<GatewayBudgetHealth | null>;
-  abstract tryGetDetail(id: string, organizationId: string): Promise<GatewayBudgetDetail | null>;
+  abstract tryGet(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayBudgetWithSeats | null>;
+  abstract tryGetWithHealth(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayBudgetHealth | null>;
+  abstract tryGetDetail(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayBudgetDetail | null>;
   abstract scopeReach(input: GatewayBudgetScopeReachInput): Promise<GatewayBudgetScopeReachResult>;
   abstract create(input: CreateGatewayBudgetInput): Promise<GatewayBudgetResource>;
   abstract update(input: UpdateGatewayBudgetInput): Promise<GatewayBudgetResource>;
@@ -80,16 +86,19 @@ export abstract class GatewayService {
     limit: number;
     cursor: GatewayCacheRuleCursor | null;
   }): Promise<GatewayCacheRuleResource[]>;
-  abstract tryCacheRuleGet(
-    id: string,
-    organizationId: string,
-  ): Promise<GatewayCacheRuleResource | null>;
+  abstract tryCacheRuleGet(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayCacheRuleResource | null>;
   abstract cacheRuleCreate(input: CreateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource>;
   abstract cacheRuleUpdate(input: UpdateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource>;
   abstract cacheRuleArchive(input: ArchiveGatewayCacheRuleInput): Promise<GatewayCacheRuleResource>;
 
   abstract guardrailList(projectId: string): Promise<GatewayGuardrailResource[]>;
-  abstract tryGuardrailGet(id: string, projectId: string): Promise<GatewayGuardrailResource | null>;
+  abstract tryGuardrailGet(input: {
+    id: string;
+    projectId: string;
+  }): Promise<GatewayGuardrailResource | null>;
   abstract guardrailCreate(input: CreateGatewayGuardrailInput): Promise<GatewayGuardrailResource>;
   abstract guardrailUpdate(input: UpdateGatewayGuardrailInput): Promise<GatewayGuardrailResource>;
   abstract guardrailArchive(input: ArchiveGatewayGuardrailInput): Promise<void>;

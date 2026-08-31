@@ -13,7 +13,10 @@ export abstract class GatewayCacheRuleRepository {
     limit: number;
     cursor: GatewayCacheRuleCursor | null;
   }): Promise<GatewayCacheRuleResource[]>;
-  abstract tryGet(id: string, organizationId: string): Promise<GatewayCacheRuleResource | null>;
+  abstract tryGet(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayCacheRuleResource | null>;
   abstract create(input: CreateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource>;
   abstract update(input: UpdateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource>;
   abstract archive(input: ArchiveGatewayCacheRuleInput): Promise<GatewayCacheRuleResource>;

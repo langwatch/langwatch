@@ -63,11 +63,7 @@ import {
   PAGE_LIMIT_MAX,
 } from "../../adapters/gateway-wire-pagination.adapter";
 import type { GatewayVirtualKeyScope } from "../../ports/gateway-virtual-key.port";
-import type {
-  GatewayActor,
-  GatewayApp,
-  GatewayVirtualKeyBudgetInput,
-} from "#app/gateway.app";
+import type { GatewayActor, GatewayApp, GatewayVirtualKeyBudgetInput } from "#app/gateway.app";
 
 const logger = createLogger("langwatch:api:gateway-platform");
 
@@ -904,7 +900,11 @@ export function createGatewayPlatformRestApp(options: {
       const id = c.req.param("id");
       const organizationId = await app.organizationIdForProject(project.id);
       try {
-        const vk = await app.requireVisibleVirtualKeyForProjectCredential({ project, id, organizationId });
+        const vk = await app.requireVisibleVirtualKeyForProjectCredential({
+          project,
+          id,
+          organizationId,
+        });
         return c.json({ virtual_key: await app.toVirtualKeySnakeDto(vk) });
       } catch (error) {
         return trpcErrorResponse(c, error);
@@ -964,7 +964,11 @@ export function createGatewayPlatformRestApp(options: {
       const organizationId = await app.organizationIdForProject(project.id);
       let vk;
       try {
-        vk = await app.requireVisibleVirtualKeyForProjectCredential({ project, id, organizationId });
+        vk = await app.requireVisibleVirtualKeyForProjectCredential({
+          project,
+          id,
+          organizationId,
+        });
       } catch (error) {
         return trpcErrorResponse(c, error);
       }
@@ -1036,9 +1040,7 @@ export function createGatewayPlatformRestApp(options: {
         // Absent `scopes` means "not re-scoping", which is what the
         // application's update pre-flight reads to decide whether the stored
         // guardrail attachments have to be revalidated against a new project.
-        const scopes = body.data.scopes
-          ? scopesFromWire(body.data.scopes, project.id)
-          : undefined;
+        const scopes = body.data.scopes ? scopesFromWire(body.data.scopes, project.id) : undefined;
         // The SAME pre-flight the tRPC update runs: update on a scope the key
         // already lives in, manage on every new scope, the destination anchored
         // and manageable when it moves, attachments judged against the project
@@ -1474,7 +1476,7 @@ export function createGatewayPlatformRestApp(options: {
       const id = c.req.param("id");
       const organizationId = await app.organizationIdForProject(project.id);
       const service = app.budgetDecisions;
-      const found = await service.tryGetWithHealth(id, organizationId);
+      const found = await service.tryGetWithHealth({ id, organizationId });
       if (!found) {
         return errorResponse(c, {
           status: 404,
@@ -1882,7 +1884,7 @@ export function createGatewayPlatformRestApp(options: {
       const id = c.req.param("id");
       const organizationId = await app.organizationIdForProject(project.id);
       const service = app.budgetDecisions;
-      const row = await service.tryCacheRuleGet(id, organizationId);
+      const row = await service.tryCacheRuleGet({ id, organizationId });
       if (!row) {
         return errorResponse(c, {
           status: 404,

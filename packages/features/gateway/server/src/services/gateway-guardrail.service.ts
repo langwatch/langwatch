@@ -52,8 +52,8 @@ export class GatewayGuardrailCatalogue {
     return this.repository.listBundleEntries(projectId);
   }
 
-  tryGet(id: string, projectId: string): Promise<GatewayGuardrailResource | null> {
-    return this.repository.tryGet(id, projectId);
+  tryGet(input: { id: string; projectId: string }): Promise<GatewayGuardrailResource | null> {
+    return this.repository.tryGet(input);
   }
 
   async create(input: CreateGatewayGuardrailInput): Promise<GatewayGuardrailResource> {
@@ -74,7 +74,10 @@ export class GatewayGuardrailCatalogue {
 
   async update(input: UpdateGatewayGuardrailInput): Promise<GatewayGuardrailResource> {
     const parsed = updateGatewayGuardrailInputSchema.parse(input);
-    const existing = await this.repository.tryGet(parsed.id, parsed.projectId);
+    const existing = await this.repository.tryGet({
+      id: parsed.id,
+      projectId: parsed.projectId,
+    });
     if (!existing) {
       throw new GatewayGuardrailNotFoundError();
     }
@@ -97,7 +100,10 @@ export class GatewayGuardrailCatalogue {
 
   async archive(input: ArchiveGatewayGuardrailInput): Promise<void> {
     const parsed = archiveGatewayGuardrailInputSchema.parse(input);
-    const existing = await this.repository.tryGet(parsed.id, parsed.projectId);
+    const existing = await this.repository.tryGet({
+      id: parsed.id,
+      projectId: parsed.projectId,
+    });
     if (!existing) {
       throw new GatewayGuardrailNotFoundError();
     }
