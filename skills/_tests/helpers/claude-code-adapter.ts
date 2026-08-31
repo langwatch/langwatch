@@ -264,7 +264,11 @@ export function createClaudeCodeAgent({
 					process.env.CLAUDE_BIN ||
 					execSync("which claude", { encoding: "utf8" }).trim();
 
+				// Pin the model. The user's default in ~/.claude/settings.json can be
+				// a more expensive tier, and these tests run many sub Claudes.
 				const args = [
+					"--model",
+					"opus",
 					"--output-format",
 					"stream-json",
 					"-p",
