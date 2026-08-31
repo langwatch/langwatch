@@ -103,6 +103,99 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
     # specs/langy/langy-selfhost-install.feature for the operator's story).
 
   # ===========================================================================
+  # Policy-locked clusters: trading per-worker identity isolation for an install
+  #
+  # ADR-130. The guards above are about the pod-to-HOST boundary. These are
+  # about the boundary between one worker and the next, which costs the
+  # container root plus five capabilities. A cluster running Pod Security
+  # Admission "restricted", or a policy engine that requires runAsNonRoot,
+  # refuses that pod outright — so on those clusters the choice is not
+  # "isolated or less isolated", it is "Langy or no Langy".
+  #
+  # The failure this replaces was not a refusal. Helm merges the operator's
+  # capability drop with the chart's adds, so the pod still REQUESTS the five
+  # capabilities; and the kernel clears them anyway on the transition to a
+  # non-root UID. The pod was admitted, went healthy, and died at the first
+  # chown during provisioning — which reads like a Langy bug rather than a
+  # policy outcome.
+  #
+  # Same shape as acceptUnsandboxedRuntime above, one rung down: the invariant
+  # that survives is that nobody gives up sibling isolation by ACCIDENT.
+  # ===========================================================================
+
+  @unit @unimplemented
+  Scenario: The chart refuses to render without per-worker identity isolation unless it is accepted
+    Given the chart manages the langy-agent pod
+    And the operator has turned per-worker identity isolation off
+    And the operator has not accepted the reduced isolation
+    When an operator renders the chart to deploy it
+    Then the deploy fails before producing any manifests
+    And the failure states that one conversation's worker will be able to read
+      another's live credentials and conversation content
+    And the failure names the value that accepts that risk deliberately
+
+  @unit @unimplemented
+  Scenario: An operator can accept the reduced isolation and render a non-root pod
+    Given the chart manages the langy-agent pod
+    And the operator has turned per-worker identity isolation off
+    And the operator has accepted the reduced isolation
+    When an operator renders the chart to deploy it
+    Then the pod renders successfully
+    And the pod runs as a non-root user
+    And the pod requests no capabilities at all
+    # The point of the posture: this spec is admissible under Pod Security
+    # Admission "restricted" and the common policy-engine rules without any
+    # per-namespace or per-RuntimeClass exemption.
+
+  @unit @unimplemented
+  Scenario: The default install keeps per-worker identity isolation
+    Given an operator installs the umbrella chart with default values
+    When the chart renders
+    Then the agent keeps per-worker identity isolation
+    And the acceptance value is not required for the render to succeed
+    # Turning it off is the deviation, and it is the operator's to write down.
+
+  @e2e @unimplemented
+  Scenario: A cluster that refuses root admits the agent once isolation is traded away
+    Given a cluster whose policy requires every pod to run as a non-root user
+    And the operator has turned per-worker identity isolation off and accepted it
+    When they install the chart
+    Then the agent pod is admitted
+    And it starts and serves conversations
+    # This is the scenario the whole posture exists for. Without it the install
+    # is refused at admission; with the default posture on such a cluster there
+    # is no configuration that both satisfies the policy and runs the agent.
+
+  @unit @unimplemented
+  Scenario: An install that trades away isolation says so where an operator will find it
+    Given the agent is configured without per-worker identity isolation
+    When the manager starts
+    Then it warns that one conversation's worker can read another's live
+      credentials and conversation content
+    And the warning is emitted at startup rather than on first use
+    # So it lands in the first support bundle, instead of being reconstructed
+    # from someone's values file after an incident. The wording matters: the
+    # exposure is the worker's process environment and its session directory,
+    # not a credential file — there isn't one.
+
+  @unit @unimplemented
+  Scenario: An unrecognised isolation setting fails closed
+    Given the agent is configured with an isolation value the manager does not know
+    When the manager starts
+    Then it refuses to start
+    And it never falls back to running workers under one identity
+    # The dangerous posture is never what a typo selects.
+
+  @unit @unimplemented
+  Scenario: The manager does not reserve worker identities it cannot enforce
+    Given the agent is running without per-worker identity isolation
+    When a conversation's worker is provisioned
+    Then no distinct identity is reserved for it
+    And each conversation still gets its own directories
+    # Reserving an identity nothing applies is a claim in the code that a
+    # later reader will believe.
+
+  # ===========================================================================
   # Restricted clusters: rendering asks for no permission the operator lacks
   # ===========================================================================
 
@@ -161,8 +254,13 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
       UID, so per-worker isolation actually functions
     And its root filesystem is read-only and privilege escalation is disabled
     # As UID 1000 with all capabilities dropped the manager physically cannot
-    # perform per-worker UID isolation — that was the known-broken prior config,
-    # which also silently re-opened cross-worker credential theft.
+    # perform per-worker UID isolation. That combination used to be reachable
+    # only by mistake, which is why it is called out here: it looked like a
+    # hardening win and silently re-opened cross-worker credential theft.
+    # ADR-130 makes the same pod shape reachable ON PURPOSE, for clusters whose
+    # policy admits nothing else — but it is a posture the operator selects and
+    # acknowledges, not a default and not an accident. The e2e manifest keeps
+    # the isolated posture, because what it exists to mirror is production.
 
   Scenario: The e2e manifest documents its two intentional local-only divergences
     Given the local end-to-end pod manifest for langy-agent

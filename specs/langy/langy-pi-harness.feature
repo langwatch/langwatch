@@ -161,6 +161,12 @@ Feature: Langy can run a conversation on the pi harness
     Then the shared stash directory lets a worker pass through it
     And the stash stays unlistable, so sibling conversation ids stay hidden
     And a stash created earlier with a stricter mode is repaired on provision
+    # The unlistable property is a consequence of the worker being someone
+    # OTHER than the stash's owner. Under the shared-identity posture (ADR-130)
+    # the worker runs as the manager, so it holds the owner bits and the stash
+    # is listable to it: sibling conversation ids stop being hidden. That is
+    # part of what an operator trades there, and it is why this scenario names
+    # per-conversation identities in its Given rather than assuming them.
 
   # Conversation content must not sit on the manager's disk indefinitely
   # after the user moved on; a day covers every cache tier the store serves.
