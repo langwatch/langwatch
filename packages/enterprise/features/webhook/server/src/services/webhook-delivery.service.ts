@@ -1201,6 +1201,7 @@ export class WebhookDeliveryService {
           };
         })
         .toPayload((event) => event.data as unknown as JsonValue)
-        .transient();
+        .transient()
+        .outbox(WEBHOOK_DELIVERY_OUTBOX);
   }
 }
