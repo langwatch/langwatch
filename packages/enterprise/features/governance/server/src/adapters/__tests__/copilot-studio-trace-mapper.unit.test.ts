@@ -24,7 +24,7 @@ import {
   COPILOT_CONVERSATION_SPAN_NAME,
   COPILOT_ROUTING_PROFILE,
   COPILOT_TURN_SPAN_NAME,
-  mapCopilotEventsToTraceRequest,
+  CopilotStudioTraceMapper,
 } from "../copilot-studio-trace-mapper.adapter";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 
@@ -148,7 +148,7 @@ function copilotEvent(
 }
 
 function spansOf(events: NormalizedPullEvent[]) {
-  const request = mapCopilotEventsToTraceRequest({ events, origin: ORIGIN });
+  const request = CopilotStudioTraceMapper.toTraceRequest({ events, origin: ORIGIN });
   return request?.resourceSpans?.[0]?.scopeSpans?.[0]?.spans ?? [];
 }
 
@@ -260,7 +260,7 @@ describe("given two sources reading the same environment", () => {
     const other = { ...ORIGIN, ingestionSourceId: "source-2" };
     const mine = spansOf([copilotEvent(transcriptRow({ activities: CHAT }))]);
     const theirs =
-      mapCopilotEventsToTraceRequest({
+      CopilotStudioTraceMapper.toTraceRequest({
         events: [copilotEvent(transcriptRow({ activities: CHAT }))],
         origin: other,
       })?.resourceSpans?.[0]?.scopeSpans?.[0]?.spans ?? [];
@@ -344,6 +344,58 @@ describe("given a conversation Microsoft stored across several rows", () => {
     expect(secondAt).toBeGreaterThanOrEqual(0);
     expect(tenthAt).toBeGreaterThanOrEqual(0);
     expect(secondAt).toBeLessThan(tenthAt);
+  });
+
+  /**
+   * What the batch order is actually FOR.
+   *
+   * Activities are re-sorted by timestamp after the rows are merged, so
+   * whenever every activity carries a distinct time the batch order leaves no
+   * trace in the output — the "2 before 10" test above passes on the
+   * timestamps alone, and reversing the batch comparator does not fail it.
+   *
+   * The comparator decides ties. Two activities stamped at the same
+   * millisecond keep the order they arrived in, and that order is the merged
+   * row order, which is what the batch number sets. Dataverse chops a row at a
+   * megabyte without regard to timing, so a question and its answer landing on
+   * the same stamp across two pieces is exactly the case that needs this.
+   */
+  /** @scenario "A conversation stored across several rows is still one conversation" */
+  it("breaks a same-millisecond tie by batch number, not by arrival", () => {
+    const SAME_MS = 1_787_685_300_000;
+    const earlier = transcriptRow({
+      activities: [
+        userMessage({
+          id: "c0000000-0000-4000-8000-00000000000a",
+          text: "asked first",
+          ms: SAME_MS,
+        }),
+      ],
+      batchId: 0,
+      transcriptId: "row-tie-0",
+    });
+    const later = transcriptRow({
+      activities: [
+        userMessage({
+          id: "c0000000-0000-4000-8000-00000000000b",
+          text: "asked second",
+          ms: SAME_MS,
+        }),
+      ],
+      batchId: 1,
+      transcriptId: "row-tie-1",
+    });
+
+    // Handed over in the WRONG order, so only the batch number can order them.
+    const said = spansOf([copilotEvent(later), copilotEvent(earlier)])
+      .map((span) => attrsOf(span)["langwatch.input"] as string | undefined)
+      .filter((value): value is string => typeof value === "string");
+    const firstAt = said.findIndex((value) => value.includes("asked first"));
+    const secondAt = said.findIndex((value) => value.includes("asked second"));
+
+    expect(firstAt).toBeGreaterThanOrEqual(0);
+    expect(secondAt).toBeGreaterThanOrEqual(0);
+    expect(firstAt).toBeLessThan(secondAt);
   });
 
   /**
@@ -992,7 +1044,9 @@ describe("given events that are not Copilot conversations", () => {
       ...copilotEvent(transcriptRow({ activities: CHAT })),
       action: "anthropic_admin_usage_report",
     };
-    expect(mapCopilotEventsToTraceRequest({ events: [foreign], origin: ORIGIN })).toBeNull();
+    expect(
+      CopilotStudioTraceMapper.toTraceRequest({ events: [foreign], origin: ORIGIN }),
+    ).toBeNull();
   });
 
   it("routes nothing for a row with no conversation in it", () => {

@@ -16,7 +16,7 @@ import type {
 } from "../ports/ingestion-pull-worker.port";
 import {
   COPILOT_ROUTING_PROFILE,
-  mapCopilotEventsToTraceRequest,
+  CopilotStudioTraceMapper,
 } from "../adapters/copilot-studio-trace-mapper.adapter";
 import {
   GENIE_ROUTING_PROFILE,
@@ -47,7 +47,7 @@ const CONVERSATION_ROUTING = new Map<string, ConversationRouting>([
   ["databricks_genie", { profile: GENIE_ROUTING_PROFILE, map: mapGenieEventsToTraceRequest }],
   [
     "copilot_studio_dataverse",
-    { profile: COPILOT_ROUTING_PROFILE, map: mapCopilotEventsToTraceRequest },
+    { profile: COPILOT_ROUTING_PROFILE, map: CopilotStudioTraceMapper.toTraceRequest },
   ],
 ]);
 
