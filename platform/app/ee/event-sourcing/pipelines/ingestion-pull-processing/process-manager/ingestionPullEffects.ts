@@ -30,10 +30,16 @@ export const INGESTION_PULL_LEASE_DURATION_MS = 10 * 60 * 1000;
 export const INGESTION_PULL_CONCURRENCY = 4;
 
 export interface IngestionPullRunPort {
-  run(params: {
-    sourceId: string;
-    cursor: string | null;
-  }): Promise<{ nextCursor: string | null; eventCount: number }>;
+  run(params: { sourceId: string; cursor: string | null }): Promise<{
+    nextCursor: string | null;
+    eventCount: number;
+    /**
+     * Input the run could not read while still advancing past it. Required
+     * rather than optional so a partial success cannot reach the durable
+     * completion as a clean one by a port simply omitting the field.
+     */
+    errorCount: number;
+  }>;
 }
 
 /** The pipeline commands the effect reports its outcome through. */
@@ -46,6 +52,7 @@ export interface IngestionPullOutcomeCommands {
     scheduledFor: number;
     nextCursor: string | null;
     eventCount: number;
+    errorCount: number;
   }): Promise<void>;
   recordRunFailed(args: {
     tenantId: string;
