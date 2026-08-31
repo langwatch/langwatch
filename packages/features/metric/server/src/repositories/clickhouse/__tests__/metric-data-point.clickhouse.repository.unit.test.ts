@@ -3,7 +3,7 @@ import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
 import { describe, expect, it, vi, type Mock } from "vitest";
 import { MetricDataPointClickHouseRepository } from "../clickhouse.metric-data-point.repository";
 import type { MetricClickHouseClient } from "../clickhouse.metric-data-point.repository";
-import { rawRow } from "../clickhouse.metric-data-point.mapper";
+import { MetricDataPointMapper } from "../clickhouse.metric-data-point.mapper";
 import { METRIC_ROLLUP_INTERVAL_MS } from "@langwatch/metric-contract";
 import { point } from "@langwatch/metric-server/testing";
 
@@ -379,7 +379,7 @@ describe("MetricDataPointClickHouseRepository", () => {
 
   it("reports the missing authoritative column and row identity", async () => {
     const pointToRead = pointAt({ timeUnixMs: base + 1_000 });
-    const stored = rawRow({ point: pointToRead, retentionDays: 30 });
+    const stored = MetricDataPointMapper.rawRow({ point: pointToRead, retentionDays: 30 });
     const { BucketCounts: _bucketCounts, ...missingBucketCounts } = stored;
     const query: MetricClickHouseClient["query"] = async (request) => {
       if (request.query.includes("{seriesIds:Array(String)}")) return response([]);

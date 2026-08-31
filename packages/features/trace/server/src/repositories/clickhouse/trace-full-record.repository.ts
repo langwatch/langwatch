@@ -12,8 +12,8 @@ import { TraceFullRecordPort } from "../../ports/trace-full-record.port";
 import type { TraceFullIoPort } from "../../ports/trace-full-io.port";
 import type { TracePayloadReaderPort } from "../../ports/trace-payload-reader.port";
 import {
-  applyTraceFullRecordProtections,
   internalTraceFullReadProtections,
+  TraceFullProtectionMapper,
 } from "../../repositories/clickhouse/trace-full-protection.mapper";
 import { type StoredSpanRow, TraceFullRecordMapper } from "./trace-full-record.mapper";
 
@@ -113,7 +113,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordPort {
       ...(events.length > 0 ? { events } : {}),
       ...(droppedCategories.length > 0 ? { privacy: { droppedCategories } } : {}),
     };
-    return applyTraceFullRecordProtections(record, internalTraceFullReadProtections);
+    return TraceFullProtectionMapper.apply(record, internalTraceFullReadProtections);
   }
 
   async getThread(input: TraceFullThreadReadInput): Promise<TraceFullRecord[]> {

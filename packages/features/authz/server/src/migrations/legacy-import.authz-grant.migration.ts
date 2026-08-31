@@ -80,9 +80,9 @@ import type {
 } from "../repositories/authz-migration.repository";
 import { deriveGrantId } from "../adapters/eventing.authz-grant.adapter";
 import {
+  AuthzGrantMapper,
   PRINCIPAL_TO_DB,
   SHARE_LINK_PERMISSION,
-  shareVisibilityAudience,
 } from "../repositories/prisma/prisma.authz-grant.mapper";
 
 export { AUTHZ_ENGINE_MIGRATION_NAME };
@@ -1008,7 +1008,7 @@ export class AuthzExpectedFactsMapper {
     if (row.maxViews !== null) resource.maxViews = row.maxViews;
     return {
       grantId: row.id,
-      principal: shareVisibilityAudience({
+      principal: AuthzGrantMapper.shareVisibilityAudience({
         visibility: row.visibility,
         organizationId,
         projectId: row.projectId,
@@ -1300,7 +1300,7 @@ export class AuthzMigrationProofMapper {
     head: ResourceGrantRow;
   }): CheckResult {
     const { row } = link;
-    const principal = shareVisibilityAudience({
+    const principal = AuthzGrantMapper.shareVisibilityAudience({
       visibility: row.visibility,
       organizationId,
       projectId: row.projectId,

@@ -2,8 +2,8 @@ import type { TraceFullRecord } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import {
-  applyTraceFullRecordProtections,
   internalTraceFullReadProtections,
+  TraceFullProtectionMapper,
 } from "../trace-full-protection.mapper";
 
 const trace = (): TraceFullRecord => ({
@@ -41,13 +41,13 @@ const trace = (): TraceFullRecord => ({
 
 describe("Trace full-record protections", () => {
   it("keeps the explicit internal policy all-visible", () => {
-    expect(applyTraceFullRecordProtections(trace(), internalTraceFullReadProtections)).toEqual(
+    expect(TraceFullProtectionMapper.apply(trace(), internalTraceFullReadProtections)).toEqual(
       trace(),
     );
   });
 
   it("keeps shape while redacting hidden capture and costs for a future actor-aware adapter", () => {
-    const protectedTrace = applyTraceFullRecordProtections(trace(), {
+    const protectedTrace = TraceFullProtectionMapper.apply(trace(), {
       canSeeCapturedInput: false,
       canSeeCapturedOutput: false,
       canSeeCosts: false,

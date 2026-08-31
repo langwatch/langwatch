@@ -67,24 +67,6 @@ const RESOURCE_KIND_FROM_DB: Record<GrantResourceKindDb, ResourceGrantTerms["kin
   THREAD: "thread",
 };
 
-/**
- * The stored column is a plain `TEXT` — Prisma has no enum behind it, and the
- * row can be read back from a database an older writer, a hand-run statement
- * or a partially applied migration also touched. So the value is PARSED, not
- * asserted: `undefined` for anything that is not one of the two kinds, which
- * `grantRowToFact` then treats exactly as it treats a missing column.
- *
- * Casting instead put `RESOURCE_KIND_FROM_DB[<anything>]` in front of the
- * engine as `kind: undefined`, which reads as a resource grant that names no
- * kind of thing — a share row that matches whichever resource is asked about.
- */
-function resourceKindFromDb(value: string | null): ResourceGrantTerms["kind"] | undefined {
-  if (value === "TRACE" || value === "THREAD") {
-    return RESOURCE_KIND_FROM_DB[value];
-  }
-  return undefined;
-}
-
 export interface GrantRowShape {
   id: string;
   organizationId: string;
@@ -108,75 +90,6 @@ export interface GrantRowShape {
   occurredAt: Date;
 }
 
-export function grantFactToRow({
-  grant,
-  organizationId,
-}: {
-  grant: GrantFact;
-  organizationId: string;
-}): GrantRowShape {
-  return {
-    id: grant.grantId,
-    organizationId,
-    principalType: PRINCIPAL_TO_DB[grant.principal.type],
-    principalId: grant.principal.id,
-    roleKey: grant.roleKey,
-    legacyRole: grant.legacyRole ?? null,
-    source: grant.source,
-    // The ledger and Prisma scope enums share their five value names.
-    scopeType: grant.scope.type,
-    scopeId: grant.scope.id,
-    token: grant.resource?.token ?? null,
-    permission: grant.resource?.permission ?? null,
-    resourceKind: grant.resource != null ? RESOURCE_KIND_TO_DB[grant.resource.kind] : null,
-    projectId: grant.resource?.projectId ?? null,
-    createdByUserId: grant.resource?.createdByUserId ?? null,
-    expiresAt: grant.resource?.expiresAtMs != null ? new Date(grant.resource.expiresAtMs) : null,
-    maxViews: grant.resource?.maxViews ?? null,
-    occurredAt: new Date(grant.occurredAtMs),
-  };
-}
-
-export function grantRowToFact(row: GrantRowShape): GrantFact {
-  const resourceKind = resourceKindFromDb(row.resourceKind);
-  const fact: GrantFact = {
-    grantId: row.id,
-    principal: {
-      type: PRINCIPAL_FROM_DB[row.principalType],
-      id: row.principalId,
-    },
-    roleKey: row.roleKey,
-    scope: { type: row.scopeType as LedgerScopeType, id: row.scopeId },
-    source: row.source as GrantEventSource,
-    occurredAtMs: row.occurredAt.getTime(),
-  };
-  if (row.legacyRole != null) {
-    fact.legacyRole = row.legacyRole as LegacyBindingRole;
-  }
-  // All four identity columns or none, and the kind has to parse as one of
-  // the two the tier supports. Partial resource identity is not a grant.
-  if (
-    row.token != null &&
-    row.permission != null &&
-    resourceKind !== undefined &&
-    row.projectId != null
-  ) {
-    const resource: NonNullable<GrantFact["resource"]> = {
-      kind: resourceKind,
-      projectId: row.projectId,
-      token: row.token,
-      permission: row.permission,
-    };
-    if (row.createdByUserId != null) {
-      resource.createdByUserId = row.createdByUserId;
-    }
-    if (row.expiresAt != null) resource.expiresAtMs = row.expiresAt.getTime();
-    if (row.maxViews != null) resource.maxViews = row.maxViews;
-    fact.resource = resource;
-  }
-  return fact;
-}
-
 export interface RoleRowShape {
   id: string;
   organizationId: string;
@@ -185,36 +98,6 @@ export interface RoleRowShape {
   permissions: string[];
   kind: string;
   occurredAt: Date;
-}
-
-export function roleFactToRow({
-  role,
-  organizationId,
-}: {
-  role: RoleFact;
-  organizationId: string;
-}): RoleRowShape {
-  return {
-    id: role.roleId,
-    organizationId,
-    name: role.name,
-    description: role.description ?? null,
-    permissions: role.permissions,
-    kind: role.kind,
-    occurredAt: new Date(role.occurredAtMs),
-  };
-}
-
-export function roleRowToFact(row: RoleRowShape): RoleFact {
-  const fact: RoleFact = {
-    roleId: row.id,
-    name: row.name,
-    permissions: row.permissions,
-    kind: row.kind as RoleFact["kind"],
-    occurredAtMs: row.occurredAt.getTime(),
-  };
-  if (row.description != null) fact.description = row.description;
-  return fact;
 }
 
 export interface CompatBindingRowShape {
@@ -229,70 +112,6 @@ export interface CompatBindingRowShape {
   customRoleId: string | null;
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId: string;
-}
-
-/**
- * The compat head projects only what the legacy tables can express:
- * scope ∈ ORGANIZATION|TEAM|PROJECT, principal ∈ user|group|api_key, and a
- * roleKey the `TeamUserRole` enum can carry. RESOURCE and PLATFORM rows,
- * collective principals (team/organization/project/anyone), and
- * `lite-member` (an org-level concept `RoleBinding` never represented) are
- * future-head-only; the legacy resolver never answered for them, so their
- * absence from the compat view changes nothing it reads.
- *
- * roleKey → (role, customRoleId), the inverse of
- * `roleKeyForTeamRole` in @langwatch/authz-contract (roles.ts): admin→ADMIN,
- * member→MEMBER, viewer→VIEWER, custom:<id>→(`legacyRole` ?? CUSTOM, id).
- *
- * That last arm is not cosmetic. `roleKey` alone cannot say which built-in
- * role a custom binding ALSO carried, and the legacy resolver reads it: a
- * custom role with an empty permission list falls through to the row's own
- * `role`, so writing CUSTOM where the legacy row said ADMIN silently
- * downgrades the principal to viewer (matchers.ts, `roleKeyForTeamRole`).
- * Imported facts therefore carry `legacyRole` and the compat row reproduces
- * it; ledger-born custom grants have no legacy row to preserve and stay
- * CUSTOM.
- */
-export function grantFactToCompatBinding({
-  grant,
-  organizationId,
-}: {
-  grant: GrantFact;
-  organizationId: string;
-}): CompatBindingRowShape | null {
-  const { scope, principal, roleKey } = grant;
-  if (scope.type !== "ORGANIZATION" && scope.type !== "TEAM" && scope.type !== "PROJECT") {
-    return null;
-  }
-  if (principal.type !== "user" && principal.type !== "group" && principal.type !== "apiKey") {
-    return null;
-  }
-  if (roleKey == null || principal.id == null) return null;
-
-  let role: TeamUserRole;
-  let customRoleId: string | null = null;
-  if (roleKey === "admin") role = "ADMIN";
-  else if (roleKey === "member") role = "MEMBER";
-  else if (roleKey === "viewer") role = "VIEWER";
-  else if (roleKey.startsWith("custom:")) {
-    role = grant.legacyRole ?? "CUSTOM";
-    customRoleId = roleKey.slice("custom:".length);
-  } else {
-    // lite-member (and any future key the enum cannot carry).
-    return null;
-  }
-
-  return {
-    id: grant.grantId,
-    organizationId,
-    userId: principal.type === "user" ? principal.id : null,
-    groupId: principal.type === "group" ? principal.id : null,
-    apiKeyId: principal.type === "apiKey" ? principal.id : null,
-    role,
-    customRoleId,
-    scopeType: scope.type,
-    scopeId: scope.id,
-  };
 }
 
 /**
@@ -369,51 +188,242 @@ export type ShareLinkAudience =
   | { type: "organization"; id: string }
   | { type: "project"; id: string };
 
-export function shareVisibilityAudience({
-  visibility,
-  organizationId,
-  projectId,
-}: {
-  visibility: CompatShareLinkRowShape["visibility"];
-  organizationId: string;
-  projectId: string;
-}): ShareLinkAudience {
-  return authzShareAudience({ visibility, organizationId, projectId });
-}
-
 /**
- * RESOURCE facts only. A fact at any other scope, a resource fact carrying
- * no terms, or one whose principal names an audience `ShareVisibility`
- * cannot express maps to null — the caller skips it, silently: these are
- * shapes the legacy table never held, not failures.
+ * Grants and roles between their fact form and the rows that store them.
  *
- * `organizationId` is taken, not stored: `ShareLink` has no organization
- * column (its tenancy is the project). It is here so the signature matches
- * every other mapping in this file, and so a caller cannot project a row
- * without having resolved the organization it belongs to.
+ * Both directions, plus the two compatibility shapes the older binding and
+ * share-link readers still expect. They belong together because a fact written
+ * one way and read back another is an authorisation that silently changes
+ * meaning, and that is only checkable while the pair sits in one place.
  */
-export function grantFactToCompatShareLink({
-  grant,
-  organizationId: _organizationId,
-}: {
-  grant: GrantFact;
-  organizationId: string;
-}): CompatShareLinkRowShape | null {
-  const { scope, principal, resource } = grant;
-  if (scope.type !== "RESOURCE") return null;
-  if (!resource) return null;
-  const visibility = SHARE_VISIBILITY_BY_PRINCIPAL[principal.type];
-  if (!visibility) return null;
+export class AuthzGrantMapper {
+  /**
+   * The stored column is a plain `TEXT` — Prisma has no enum behind it, and the
+   * row can be read back from a database an older writer, a hand-run statement
+   * or a partially applied migration also touched. So the value is PARSED, not
+   * asserted: `undefined` for anything that is not one of the two kinds, which
+   * `grantRowToFact` then treats exactly as it treats a missing column.
+   *
+   * Casting instead put `RESOURCE_KIND_FROM_DB[<anything>]` in front of the
+   * engine as `kind: undefined`, which reads as a resource grant that names no
+   * kind of thing — a share row that matches whichever resource is asked about.
+   */
+  private static resourceKindFromDb(value: string | null): ResourceGrantTerms["kind"] | undefined {
+    if (value === "TRACE" || value === "THREAD") {
+      return RESOURCE_KIND_FROM_DB[value];
+    }
+    return undefined;
+  }
 
-  return {
-    id: grant.grantId,
-    token: resource.token,
-    resourceType: RESOURCE_KIND_TO_DB[resource.kind],
-    resourceId: scope.id,
-    projectId: resource.projectId,
-    userId: resource.createdByUserId ?? null,
+  static grantFactToRow({
+    grant,
+    organizationId,
+  }: {
+    grant: GrantFact;
+    organizationId: string;
+  }): GrantRowShape {
+    return {
+      id: grant.grantId,
+      organizationId,
+      principalType: PRINCIPAL_TO_DB[grant.principal.type],
+      principalId: grant.principal.id,
+      roleKey: grant.roleKey,
+      legacyRole: grant.legacyRole ?? null,
+      source: grant.source,
+      // The ledger and Prisma scope enums share their five value names.
+      scopeType: grant.scope.type,
+      scopeId: grant.scope.id,
+      token: grant.resource?.token ?? null,
+      permission: grant.resource?.permission ?? null,
+      resourceKind: grant.resource != null ? RESOURCE_KIND_TO_DB[grant.resource.kind] : null,
+      projectId: grant.resource?.projectId ?? null,
+      createdByUserId: grant.resource?.createdByUserId ?? null,
+      expiresAt: grant.resource?.expiresAtMs != null ? new Date(grant.resource.expiresAtMs) : null,
+      maxViews: grant.resource?.maxViews ?? null,
+      occurredAt: new Date(grant.occurredAtMs),
+    };
+  }
+
+  static grantRowToFact(row: GrantRowShape): GrantFact {
+    const resourceKind = AuthzGrantMapper.resourceKindFromDb(row.resourceKind);
+    const fact: GrantFact = {
+      grantId: row.id,
+      principal: {
+        type: PRINCIPAL_FROM_DB[row.principalType],
+        id: row.principalId,
+      },
+      roleKey: row.roleKey,
+      scope: { type: row.scopeType as LedgerScopeType, id: row.scopeId },
+      source: row.source as GrantEventSource,
+      occurredAtMs: row.occurredAt.getTime(),
+    };
+    if (row.legacyRole != null) {
+      fact.legacyRole = row.legacyRole as LegacyBindingRole;
+    }
+    // All four identity columns or none, and the kind has to parse as one of
+    // the two the tier supports. Partial resource identity is not a grant.
+    if (
+      row.token != null &&
+      row.permission != null &&
+      resourceKind !== undefined &&
+      row.projectId != null
+    ) {
+      const resource: NonNullable<GrantFact["resource"]> = {
+        kind: resourceKind,
+        projectId: row.projectId,
+        token: row.token,
+        permission: row.permission,
+      };
+      if (row.createdByUserId != null) {
+        resource.createdByUserId = row.createdByUserId;
+      }
+      if (row.expiresAt != null) resource.expiresAtMs = row.expiresAt.getTime();
+      if (row.maxViews != null) resource.maxViews = row.maxViews;
+      fact.resource = resource;
+    }
+    return fact;
+  }
+
+  static roleFactToRow({
+    role,
+    organizationId,
+  }: {
+    role: RoleFact;
+    organizationId: string;
+  }): RoleRowShape {
+    return {
+      id: role.roleId,
+      organizationId,
+      name: role.name,
+      description: role.description ?? null,
+      permissions: role.permissions,
+      kind: role.kind,
+      occurredAt: new Date(role.occurredAtMs),
+    };
+  }
+
+  static roleRowToFact(row: RoleRowShape): RoleFact {
+    const fact: RoleFact = {
+      roleId: row.id,
+      name: row.name,
+      permissions: row.permissions,
+      kind: row.kind as RoleFact["kind"],
+      occurredAtMs: row.occurredAt.getTime(),
+    };
+    if (row.description != null) fact.description = row.description;
+    return fact;
+  }
+
+  /**
+   * The compat head projects only what the legacy tables can express:
+   * scope ∈ ORGANIZATION|TEAM|PROJECT, principal ∈ user|group|api_key, and a
+   * roleKey the `TeamUserRole` enum can carry. RESOURCE and PLATFORM rows,
+   * collective principals (team/organization/project/anyone), and
+   * `lite-member` (an org-level concept `RoleBinding` never represented) are
+   * future-head-only; the legacy resolver never answered for them, so their
+   * absence from the compat view changes nothing it reads.
+   *
+   * roleKey → (role, customRoleId), the inverse of
+   * `roleKeyForTeamRole` in @langwatch/authz-contract (roles.ts): admin→ADMIN,
+   * member→MEMBER, viewer→VIEWER, custom:<id>→(`legacyRole` ?? CUSTOM, id).
+   *
+   * That last arm is not cosmetic. `roleKey` alone cannot say which built-in
+   * role a custom binding ALSO carried, and the legacy resolver reads it: a
+   * custom role with an empty permission list falls through to the row's own
+   * `role`, so writing CUSTOM where the legacy row said ADMIN silently
+   * downgrades the principal to viewer (matchers.ts, `roleKeyForTeamRole`).
+   * Imported facts therefore carry `legacyRole` and the compat row reproduces
+   * it; ledger-born custom grants have no legacy row to preserve and stay
+   * CUSTOM.
+   */
+  static grantFactToCompatBinding({
+    grant,
+    organizationId,
+  }: {
+    grant: GrantFact;
+    organizationId: string;
+  }): CompatBindingRowShape | null {
+    const { scope, principal, roleKey } = grant;
+    if (scope.type !== "ORGANIZATION" && scope.type !== "TEAM" && scope.type !== "PROJECT") {
+      return null;
+    }
+    if (principal.type !== "user" && principal.type !== "group" && principal.type !== "apiKey") {
+      return null;
+    }
+    if (roleKey == null || principal.id == null) return null;
+
+    let role: TeamUserRole;
+    let customRoleId: string | null = null;
+    if (roleKey === "admin") role = "ADMIN";
+    else if (roleKey === "member") role = "MEMBER";
+    else if (roleKey === "viewer") role = "VIEWER";
+    else if (roleKey.startsWith("custom:")) {
+      role = grant.legacyRole ?? "CUSTOM";
+      customRoleId = roleKey.slice("custom:".length);
+    } else {
+      // lite-member (and any future key the enum cannot carry).
+      return null;
+    }
+
+    return {
+      id: grant.grantId,
+      organizationId,
+      userId: principal.type === "user" ? principal.id : null,
+      groupId: principal.type === "group" ? principal.id : null,
+      apiKeyId: principal.type === "apiKey" ? principal.id : null,
+      role,
+      customRoleId,
+      scopeType: scope.type,
+      scopeId: scope.id,
+    };
+  }
+
+  static shareVisibilityAudience({
     visibility,
-    expiresAt: resource.expiresAtMs != null ? new Date(resource.expiresAtMs) : null,
-    maxViews: resource.maxViews ?? null,
-  };
+    organizationId,
+    projectId,
+  }: {
+    visibility: CompatShareLinkRowShape["visibility"];
+    organizationId: string;
+    projectId: string;
+  }): ShareLinkAudience {
+    return authzShareAudience({ visibility, organizationId, projectId });
+  }
+
+  /**
+   * RESOURCE facts only. A fact at any other scope, a resource fact carrying
+   * no terms, or one whose principal names an audience `ShareVisibility`
+   * cannot express maps to null — the caller skips it, silently: these are
+   * shapes the legacy table never held, not failures.
+   *
+   * `organizationId` is taken, not stored: `ShareLink` has no organization
+   * column (its tenancy is the project). It is here so the signature matches
+   * every other mapping in this file, and so a caller cannot project a row
+   * without having resolved the organization it belongs to.
+   */
+  static grantFactToCompatShareLink({
+    grant,
+    organizationId: _organizationId,
+  }: {
+    grant: GrantFact;
+    organizationId: string;
+  }): CompatShareLinkRowShape | null {
+    const { scope, principal, resource } = grant;
+    if (scope.type !== "RESOURCE") return null;
+    if (!resource) return null;
+    const visibility = SHARE_VISIBILITY_BY_PRINCIPAL[principal.type];
+    if (!visibility) return null;
+
+    return {
+      id: grant.grantId,
+      token: resource.token,
+      resourceType: RESOURCE_KIND_TO_DB[resource.kind],
+      resourceId: scope.id,
+      projectId: resource.projectId,
+      userId: resource.createdByUserId ?? null,
+      visibility,
+      expiresAt: resource.expiresAtMs != null ? new Date(resource.expiresAtMs) : null,
+      maxViews: resource.maxViews ?? null,
+    };
+  }
 }

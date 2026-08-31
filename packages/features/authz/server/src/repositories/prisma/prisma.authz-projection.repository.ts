@@ -39,11 +39,7 @@ import {
 } from "../../projections/authz-grant.projection";
 import { AuthzMigrationOwnershipMapper } from "../../migrations/legacy-import.authz-grant.migration";
 import type { AuthzDatabase } from "../authz-read.repository";
-import {
-  grantFactToCompatBinding,
-  grantFactToCompatShareLink,
-  grantRowToFact,
-} from "./prisma.authz-grant.mapper";
+import { AuthzGrantMapper } from "./prisma.authz-grant.mapper";
 
 const logger = createLogger("langwatch:authz:projection-compat");
 
@@ -271,15 +267,15 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
         return;
       }
       const { revokedAt: _revokedAt, ...factRow } = authoritative;
-      return this.upsertCompatForGrant(grantRowToFact(factRow), organizationId);
+      return this.upsertCompatForGrant(AuthzGrantMapper.grantRowToFact(factRow), organizationId);
     }
 
-    return this.upsertCompatForGrant(grantRowToFact(row), organizationId);
+    return this.upsertCompatForGrant(AuthzGrantMapper.grantRowToFact(row), organizationId);
   }
 
   /** Write the binding and share-link compat heads for a live grant fact. */
   private async upsertCompatForGrant(
-    grant: ReturnType<typeof grantRowToFact>,
+    grant: ReturnType<typeof AuthzGrantMapper.grantRowToFact>,
     organizationId: string,
   ): Promise<void> {
     // UPDATE-only for migration-sourced facts (ADR-110: nothing legacy
@@ -292,7 +288,7 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
     // exactly the visible change the migration promises not to make.
     const migrationSourced = AuthzMigrationOwnershipMapper.includes(grant.source);
 
-    const binding = grantFactToCompatBinding({ grant, organizationId });
+    const binding = AuthzGrantMapper.grantFactToCompatBinding({ grant, organizationId });
     if (binding) {
       const { id, ...rest } = binding;
       if (migrationSourced) {
@@ -309,7 +305,7 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
       }
     }
 
-    const link = grantFactToCompatShareLink({ grant, organizationId });
+    const link = AuthzGrantMapper.grantFactToCompatShareLink({ grant, organizationId });
     if (link) {
       const { id, ...rest } = link;
       if (migrationSourced) {
@@ -342,8 +338,8 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
       select: GRANT_FACT_COLUMNS,
     });
     if (!row) return;
-    const binding = grantFactToCompatBinding({
-      grant: grantRowToFact(row),
+    const binding = AuthzGrantMapper.grantFactToCompatBinding({
+      grant: AuthzGrantMapper.grantRowToFact(row),
       organizationId: row.organizationId,
     });
     if (!binding) return;
