@@ -664,8 +664,10 @@ before repointing, never by name similarity. That mattered: `agent-issue-
 reports` looked like a rename of `agent-report-discovery` by name, and is
 not — the spec `bug-reports.ts` actually wants is "Bug Reports Intake".
 
-Five are left alone, and deliberately. Two sit in generated Prisma output.
-The other three name specs with no confident equivalent. **A confident
+Six occurrences are left alone, and deliberately. Two sit in generated Prisma
+output (the same spec, cited from two generated files). The other four name
+specs with no confident equivalent anywhere: workflow-agent-mapping,
+install-cli-card, drawer-opt-in-routing and scenario-job-id-uniqueness. **A confident
 pointer at the wrong spec is harder to notice than a broken one**, so a guess
 would have made them worse.
 
