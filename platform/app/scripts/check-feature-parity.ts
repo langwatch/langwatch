@@ -838,7 +838,7 @@ const ANNOTATION_RE =
 
 const JSDOC_BLOCK_RE = /\/\*\*[\s\S]*?\*\//g;
 const JSDOC_ANNOTATION_LINE_RE =
-  /^[ \t]*\*[ \t]*@scenario[ \t]+(?:"([^"\r\n]+)"|'([^'\r\n]+)')[ \t]*(?:\r)?$/;
+  /^[ \t]*\*[ \t]*@scenario[ \t]+(?:"([^"\r\n]+)"|'([^'\r\n]+)'|([^*\r\n]+?))[ \t]*(?:\r)?$/;
 
 function isFollowedByTestCall(src: string, start: number): boolean {
   const len = src.length;
@@ -889,7 +889,7 @@ export function collectMalformedJsdocAnnotations(
       for (const [lineIndex, lineText] of lines.entries()) {
         const match = lineText.match(JSDOC_ANNOTATION_LINE_RE);
         if (!match) continue;
-        const title = (match[1] ?? match[2] ?? "").trim();
+        const title = (match[1] ?? match[2] ?? match[3] ?? "").trim();
         malformed.push({
           title,
           ref: {
