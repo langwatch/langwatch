@@ -732,10 +732,18 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      service and matches it here, and the chart has no way to check that pairing,
      so it does not pretend to. */}}
 {{- define "langwatch.codeBlockTimeoutSeconds" -}}
-{{- $seconds := int (.Values.langwatch_nlp.codeBlockTimeoutSeconds | default 600) -}}
+{{- $raw := .Values.langwatch_nlp.codeBlockTimeoutSeconds | default 600 -}}
+{{- $seconds := int $raw -}}
 {{- $streamIdleTimeoutSeconds := 720 -}}
 {{- $safetyMarginSeconds := 10 -}}
 {{- $maxSeconds := sub $streamIdleTimeoutSeconds $safetyMarginSeconds -}}
+{{/* An explicit 0 never reaches this check: `default` above counts it as empty and
+     substitutes 600, so 0 is indistinguishable from unset by the time we get here.
+     Everything else unusable does reach it — `int` reads a value it cannot parse as
+     a whole number as 0, and passes a negative one straight through. */}}
+{{- if lt $seconds 1 -}}
+{{- fail (printf "langwatch_nlp.codeBlockTimeoutSeconds must be a positive whole number of seconds, at most %d. Got %v. Helm reads a value it cannot parse as a whole number — text, a fraction, exponent notation, or a number past int64 — as 0, and passes a negative one through unchanged, so without this check either would reach every nlpgo caller as its ceiling." $maxSeconds $raw) -}}
+{{- end -}}
 {{- if gt $seconds $maxSeconds -}}
 {{- fail (printf "langwatch_nlp.codeBlockTimeoutSeconds must stay at or below %d — the engine's %ds stream idle timeout (NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS) minus the %ds safety margin (CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS in platform/app/src/server/nlpgo/timeouts.ts) that lets nlpgo report its own timeout before the enclosing Lambda deadline fires. Got %d." $maxSeconds $streamIdleTimeoutSeconds $safetyMarginSeconds $seconds) -}}
 {{- end -}}

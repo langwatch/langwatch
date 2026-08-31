@@ -106,6 +106,10 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Pin the timeout explicitly so the test doesn't rely on ambient env.
+    // Stubbed, not assigned: a raw assignment here outlives the file and
+    // reaches whatever else shares this vitest worker.
+    vi.stubEnv("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", "600");
     // clearAllMocks keeps implementations, so pin the no-active-context
     // default here; tests that need a trace context override it themselves.
     mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
@@ -113,6 +117,10 @@ describe("SerializedWorkflowAgentAdapter", () => {
       traceId: undefined,
     }));
     mockFetch.mockResolvedValue(nlpResponse({ output: "Hi there!" }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   describe("basic contract", () => {

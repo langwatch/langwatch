@@ -57,6 +57,26 @@ emitted_ceiling_count() {
     grep -c 'name: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS' || true
 }
 
+# Renders with the given flags and asserts all three callers carry $3.
+expect_ceiling_everywhere() {
+  local label="$1" flags="$2" expected="$3" values count
+  if ! render "$flags"; then
+    fail "$label" "render failed, expected $expected to be accepted: $render_out"
+    return
+  fi
+  values=$(emitted_ceilings)
+  count=$(emitted_ceiling_count)
+  if [ "$values" != "$expected" ]; then
+    fail "$label" "expected every caller to get $expected, got: $(echo "$values" | tr '\n' ' ')"
+    return
+  fi
+  if [ "$count" != "3" ]; then
+    fail "$label" "expected the app, the workers and the NLP service to carry it (3), got $count"
+    return
+  fi
+  echo "ok   [$label] $expected carried by all $count callers"
+}
+
 # @scenario "Every nlpgo caller is given the same code-block ceiling"
 test_default_ceiling_reaches_every_caller() {
   local values count
@@ -82,6 +102,36 @@ test_default_ceiling_reaches_every_caller() {
 test_ceiling_above_stream_idle_timeout_is_refused() {
   expect_render_fails "at idle timeout" "--set langwatch_nlp.codeBlockTimeoutSeconds=720"
   expect_render_fails "above idle timeout" "--set langwatch_nlp.codeBlockTimeoutSeconds=900"
+}
+
+# Helm's `int` reads a value it cannot parse as a whole number as 0, which
+# clears every upper bound, and does not coerce a negative one at all — before
+# the lower-bound guard, `abc` shipped a ceiling of 0 to all three callers and
+# `-5` reached the deployment verbatim, both RC 0.
+#
+# An explicit 0 is the one unusable-looking value that cannot be refused here:
+# `default 600` counts it as empty and substitutes the default before the check
+# runs, so 0 is indistinguishable from unset and correctly yields 600.
+# @scenario "A ceiling that is not a positive whole number refuses to render"
+test_non_positive_ceiling_refuses_to_render() {
+  expect_render_fails "ceiling (text)" \
+    "--set langwatch_nlp.codeBlockTimeoutSeconds=abc"
+  expect_render_fails "ceiling (negative)" \
+    "--set langwatch_nlp.codeBlockTimeoutSeconds=-5"
+  expect_render_fails "ceiling (fraction)" \
+    "--set langwatch_nlp.codeBlockTimeoutSeconds=710.9"
+  expect_render_fails "ceiling (exponent)" \
+    "--set-string langwatch_nlp.codeBlockTimeoutSeconds=1e3"
+  expect_render_fails "ceiling (past int64)" \
+    "--set-string langwatch_nlp.codeBlockTimeoutSeconds=99999999999999999999"
+
+  # Pinned alongside, so the guard cannot narrow what a valid ceiling is.
+  expect_ceiling_everywhere "ceiling (explicit default)" \
+    "--set langwatch_nlp.codeBlockTimeoutSeconds=600" 600
+  expect_ceiling_everywhere "ceiling (at the maximum)" \
+    "--set langwatch_nlp.codeBlockTimeoutSeconds=710" 710
+  expect_ceiling_everywhere "ceiling (explicit zero)" \
+    "--set langwatch_nlp.codeBlockTimeoutSeconds=0" 600
 }
 
 # @scenario "The chart's ceiling matches the Lambda clamp's ceiling exactly"
@@ -154,6 +204,7 @@ test_reserved_timeout_envs_are_refused_everywhere() {
 
 test_default_ceiling_reaches_every_caller
 test_ceiling_above_stream_idle_timeout_is_refused
+test_non_positive_ceiling_refuses_to_render
 test_ceiling_matches_the_lambda_clamp_boundary
 test_ceiling_is_checked_with_the_service_disabled
 test_external_service_renders_on_the_default

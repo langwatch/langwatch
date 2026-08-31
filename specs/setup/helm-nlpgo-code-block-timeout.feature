@@ -48,6 +48,13 @@ Feature: One checked code-block ceiling reaches every process that talks to nlpg
       Then the install is refused, because such a ceiling races the stream shutting down
 
     @e2e
+    Scenario: A ceiling that is not a positive whole number refuses to render
+      Given a ceiling that is not a positive whole number
+      When the chart renders
+      Then the install is refused, naming the value the operator actually wrote
+      But an explicit zero still yields the default, because it cannot be told apart from unset
+
+    @e2e
     Scenario: The chart's ceiling matches the Lambda clamp's ceiling exactly
       Given a ceiling at the highest value the Lambda client will honour unchanged
       When the chart renders
