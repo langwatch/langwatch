@@ -95,6 +95,7 @@ Feature: Governance visibility rides a single feature flag
       | how to gate a nav entry (conditional render + a11y considerations) |
       | how to test gating in BDD + integration tests                   |
 
+  @unit
   Scenario: The cross-org flag check rejects arbitrary organization ids
     Given a user logged into LangWatch who is a member of org A only
     When the workspace switcher asks whether `release_ui_ai_governance_enabled`
@@ -106,3 +107,23 @@ Feature: Governance visibility rides a single feature flag
     And a user with zero matching memberships gets exactly the same
       `{ enabled: false }` response shape as a member whose flag is off,
       so the response cannot be used as a membership oracle
+
+  @unit
+  Scenario: The single-flag check refuses to be targeted by someone else's ids
+    Given a user logged into LangWatch who is a member of org A only
+    When they ask whether `release_ui_ai_governance_enabled` is enabled while
+      naming org B, or a project owned by org B, as the targeting context
+    Then the foreign identifier is dropped before the flag service sees it
+    And the flag is evaluated with no targeting context at all, returning the
+      value any caller would get, so the answer says nothing about org B
+    And a project id that resolves to no organization is dropped the same way
+    And naming a project of org B together with org B itself does not help:
+      the pair is internally consistent, so the scope lineage guard permits it,
+      and membership is what stops it
+
+  @unit
+  Scenario: A disabled seat is not a membership for flag targeting
+    Given an admin disabled a user's seat in org A, leaving the membership row
+    When that user asks whether a flag is enabled for org A
+    Then the organization is dropped as if they had never been a member
+    And the same holds for the cross-org check over a list containing org A

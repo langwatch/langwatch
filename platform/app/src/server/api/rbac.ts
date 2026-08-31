@@ -1098,6 +1098,55 @@ async function getCurrentOrganizationRole(args: {
   return currentRoleOf(await getCurrentMembership(args));
 }
 
+/**
+ * Whether the user is a CURRENT member of the organization, with no regard
+ * for what the membership lets them do.
+ *
+ * Exported for the other kind of caller: a procedure that takes an
+ * organization id as *targeting input* rather than as a resource to read.
+ * It has no permission to test — there is nothing of the organization's in
+ * the response — but it still must not evaluate against an id the caller
+ * has no business naming, or the answer itself becomes the leak.
+ *
+ * Routed through the same row and the same disabled-seat policy as every
+ * scoped permission path so a tenancy fix keeps landing in one place. A
+ * caller who checks `OrganizationUser` directly gets a subtly different
+ * answer: the row survives an admin disabling the seat, and a raw existence
+ * check reads that as membership.
+ */
+export async function isCurrentOrganizationMember(args: {
+  prisma: PrismaClient;
+  userId: string;
+  organizationId: string;
+}): Promise<boolean> {
+  return (await getCurrentOrganizationRole(args)) !== null;
+}
+
+/**
+ * Whether the user is a current member of the organization that owns the
+ * project, with no regard for whether they could open the project.
+ *
+ * The tenancy half of a project check on its own: the same resolution
+ * {@link resolveProjectPermission} runs before it reads a single binding, and
+ * deliberately without the binding walk that decides actual access. For the
+ * targeting-input caller described on {@link isCurrentOrganizationMember},
+ * tenancy is the boundary that matters and a permission walk per call is not
+ * worth its cost.
+ *
+ * Shares {@link resolveProjectPermissionContext} rather than repeating the
+ * project -> team -> organization lookup, so an unknown project, a disabled
+ * seat, and a non-member all keep answering the same way here as they do on
+ * every permission path.
+ */
+export async function isCurrentProjectOrganizationMember(
+  ctx: { prisma: PrismaClient; session: Session | null },
+  projectId: string,
+): Promise<boolean> {
+  return !(
+    "refused" in (await resolveProjectPermissionContext(ctx, projectId))
+  );
+}
+
 /** A denial reached before any binding was read. */
 function refused(denialReason?: AuthzDenialReason): PermissionResult {
   return {

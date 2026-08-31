@@ -1,12 +1,126 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
+import type { Session } from "~/server/auth";
 import { featureFlagService } from "../../featureFlag";
 import { FRONTEND_FEATURE_FLAGS } from "../../featureFlag/frontendFeatureFlags";
 import type { FeatureFlagKey } from "../../featureFlag/registry";
 import { NOT_TARGETED } from "../../featureFlag/targeting";
+import {
+  isCurrentOrganizationMember,
+  isCurrentProjectOrganizationMember,
+} from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const logger = createLogger("langwatch:feature-flag-router");
+
+/** What both membership filters need off the request, and nothing more. */
+type TargetingContext = { prisma: PrismaClient; session: Session };
+
+/**
+ * The two targeting scopes as they arrive: an id, or `null` for a surface that
+ * has no such scope. The filter takes this shape and returns it, so the
+ * validated input and the type it is filtered into cannot drift apart.
+ */
+const targetingSchema = z.object({
+  projectId: z.string().nullable(),
+  organizationId: z.string().nullable(),
+});
+
+type Targeting = z.infer<typeof targetingSchema>;
+
+/**
+ * The targeting identifiers the caller is actually allowed to be evaluated
+ * against, which is not the same as the ones they sent.
+ *
+ * Both ids arrive as client input and both reach the store's targeting rules,
+ * so an id the caller does not belong to would let them read that tenant's
+ * flag state one boolean at a time. Neither is a resource being read — there
+ * is no tenant data in the response — so there is no permission to test, only
+ * membership.
+ *
+ * An id that does not survive is dropped, not rejected. The flag is then
+ * evaluated without that targeting dimension and returns the value any caller
+ * would get for it, so the response cannot distinguish "not a member" from
+ * "flag off" and the procedure cannot be used as a membership oracle.
+ *
+ * A project is reached through the organization that owns its team. That is
+ * the tenancy boundary — the one `resolveProjectPermissionContext` fails
+ * closed on before it reads a single binding — and deliberately not the whole
+ * of project access, which additionally needs a binding walk
+ * (`resolveProjectPermission`). So an org member can be targeted by any
+ * project id in their own organization, including one in a team they hold no
+ * binding to. That is the intended level: what leaks at worst is which
+ * features are on for a project inside a tenant the caller already belongs to,
+ * and charging a full permission walk to every flag check on the page would
+ * cost more than it buys. The cross-tenant answer is the one that mattered,
+ * and that one is closed.
+ */
+async function allowedTargeting({
+  ctx,
+  input,
+}: {
+  ctx: TargetingContext;
+  input: Targeting;
+}): Promise<Targeting> {
+  const userId = ctx.session.user.id;
+  const { projectId, organizationId } = input;
+
+  // `null` in and `null` out carry the meaning the wire contract gives them:
+  // no such scope. A dropped id comes back as `null` rather than as a refusal,
+  // so a non-member gets the answer every untargeted caller gets and the
+  // response cannot be read as a membership oracle. A scope the caller never
+  // stated costs no query.
+  const [allowedOrganizationId, allowedProjectId] = await Promise.all([
+    organizationId === null
+      ? Promise.resolve(null)
+      : isCurrentOrganizationMember({
+          prisma: ctx.prisma,
+          userId,
+          organizationId,
+        }).then((member) => (member ? organizationId : null)),
+    projectId === null
+      ? Promise.resolve(null)
+      : isCurrentProjectOrganizationMember(ctx, projectId).then((member) =>
+          member ? projectId : null,
+        ),
+  ]);
+
+  return {
+    projectId: allowedProjectId,
+    organizationId: allowedOrganizationId,
+  };
+}
+
+/**
+ * The subset of `organizationIds` the user is a current member of, in input
+ * order, with the rest silently dropped.
+ *
+ * OrganizationUser is org-scoped under the single-organization invariant of
+ * guardOrganizationId, so a single `in:` query would be rejected for spanning
+ * multiple orgs. Resolve per-id; the user's org count is bounded by their
+ * workspace list.
+ */
+async function filterToMemberships({
+  ctx,
+  userId,
+  organizationIds,
+}: {
+  ctx: { prisma: PrismaClient };
+  userId: string;
+  organizationIds: string[];
+}): Promise<string[]> {
+  const memberships = await Promise.all(
+    organizationIds.map((organizationId) =>
+      isCurrentOrganizationMember({
+        prisma: ctx.prisma,
+        userId,
+        organizationId,
+      }),
+    ),
+  );
+  return organizationIds.filter((_, i) => memberships[i]);
+}
 
 const frontendFeatureFlagSchema = z.enum([...FRONTEND_FEATURE_FLAGS] as [
   string,
@@ -33,36 +147,52 @@ export const featureFlagRouter = createTRPCRouter({
    * then match nothing. JSON has no `undefined`, so `null` also carries the
    * "not known yet" case; the client disables the query in that case.
    *
+   * Both are also client input, so both are filtered through
+   * {@link allowedTargeting} before they reach the store: an id the caller is
+   * not a current member of becomes `null`, the same as never having stated a
+   * scope, and the flag is evaluated without it. Without that filter the
+   * procedure answers "is flag X on for org Y" for any org id an authenticated
+   * user cares to type.
+   *
    * @param flag - The feature flag key (must be in FRONTEND_FEATURE_FLAGS)
    * @param projectId - Project ID for project-level targeting, or null
    * @param organizationId - Organization ID for org-level targeting, or null
    * @returns { enabled: boolean }
    */
   isEnabled: protectedProcedure
-    .input(
-      z.object({
-        flag: frontendFeatureFlagSchema,
-        projectId: z.string().nullable(),
-        organizationId: z.string().nullable(),
-      }),
-    )
+    .input(targetingSchema.extend({ flag: frontendFeatureFlagSchema }))
+    // The membership filter in the resolver is the real authorization check.
+    // These ids are targeting input, not resources, so there is no permission
+    // for the rbac middleware to test on them.
     .noPermission({
       reason:
         "feature flags are read per authenticated user; no tenant data is exposed",
       allow: {
-        projectId: "for flag targeting rules, not resource access",
-        organizationId: "for flag targeting rules, not resource access",
+        projectId: "targeting only, and filtered to the caller's memberships",
+        organizationId:
+          "targeting only, and filtered to the caller's memberships",
       },
     })
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
+      const targeting = await allowedTargeting({ ctx, input });
 
+      // Both the ids asked for and the ids that survived, because they are
+      // different questions. Logging only the survivors makes a caller probing
+      // organizations they do not belong to look exactly like a caller who
+      // sent no targeting at all, which is the one shape worth being able to
+      // see. Dropped-but-legitimate is common enough that this stays at debug
+      // rather than warning: a client whose cached organization id has gone
+      // stale (seat revoked, organization switched) sends one on every flag
+      // check for as long as the cache lives.
       logger.debug(
         {
           userId,
           flag: input.flag,
-          projectId: input.projectId,
-          organizationId: input.organizationId,
+          requestedProjectId: input.projectId,
+          requestedOrganizationId: input.organizationId,
+          projectId: targeting.projectId,
+          organizationId: targeting.organizationId,
         },
         "Feature flag check requested",
       );
@@ -81,8 +211,8 @@ export const featureFlagRouter = createTRPCRouter({
         {
           distinctId: userId,
           defaultValue: false,
-          projectId: input.projectId ?? NOT_TARGETED,
-          organizationId: input.organizationId ?? NOT_TARGETED,
+          projectId: targeting.projectId ?? NOT_TARGETED,
+          organizationId: targeting.organizationId ?? NOT_TARGETED,
         },
       );
 
@@ -103,12 +233,17 @@ export const featureFlagRouter = createTRPCRouter({
    * soon as one organization has it enabled.
    *
    * The procedure first intersects `organizationIds` with the caller's
-   * actual `OrganizationUser` memberships and silently drops the rest —
-   * otherwise an authenticated user could probe the flag state of arbitrary
-   * organizations they have no business knowing about. Silent drop (rather
-   * than throwing on the first unknown id) keeps the response shape
-   * indistinguishable between "flag off" and "not a member", so the
-   * procedure cannot be used as a membership oracle either.
+   * actual current memberships and silently drops the rest — otherwise an
+   * authenticated user could probe the flag state of arbitrary organizations
+   * they have no business knowing about. Silent drop (rather than throwing on
+   * the first unknown id) keeps the response shape indistinguishable between
+   * "flag off" and "not a member", so the procedure cannot be used as a
+   * membership oracle either.
+   *
+   * "Current" is doing work there: a seat an admin disabled keeps its
+   * `OrganizationUser` row, so the intersection is resolved through
+   * {@link isCurrentOrganizationMember} rather than by asking whether the row
+   * exists.
    *
    * @param flag - The feature flag key (must be in FRONTEND_FEATURE_FLAGS)
    * @param organizationIds - Organizations to evaluate the flag against
@@ -135,21 +270,11 @@ export const featureFlagRouter = createTRPCRouter({
         return { enabled: false };
       }
 
-      // OrganizationUser is org-scoped under the single-organization
-      // invariant of guardOrganizationId, so a single `in:` query would
-      // be rejected for spanning multiple orgs. Resolve memberships
-      // per-id; the user's org count is bounded by their workspace list.
-      const memberships = await Promise.all(
-        input.organizationIds.map((organizationId) =>
-          ctx.prisma.organizationUser.findUnique({
-            where: { userId_organizationId: { userId, organizationId } },
-            select: { organizationId: true },
-          }),
-        ),
-      );
-      const allowedOrganizationIds = memberships
-        .filter((m): m is { organizationId: string } => m !== null)
-        .map((m) => m.organizationId);
+      const allowedOrganizationIds = await filterToMemberships({
+        ctx,
+        userId,
+        organizationIds: input.organizationIds,
+      });
 
       if (allowedOrganizationIds.length === 0) {
         return { enabled: false };
@@ -205,17 +330,11 @@ export const featureFlagRouter = createTRPCRouter({
         return { enabledByOrganizationId: {} as Record<string, boolean> };
       }
 
-      const memberships = await Promise.all(
-        input.organizationIds.map((organizationId) =>
-          ctx.prisma.organizationUser.findUnique({
-            where: { userId_organizationId: { userId, organizationId } },
-            select: { organizationId: true },
-          }),
-        ),
-      );
-      const allowedOrganizationIds = memberships
-        .filter((m): m is { organizationId: string } => m !== null)
-        .map((m) => m.organizationId);
+      const allowedOrganizationIds = await filterToMemberships({
+        ctx,
+        userId,
+        organizationIds: input.organizationIds,
+      });
 
       const entries = await Promise.all(
         allowedOrganizationIds.map(
