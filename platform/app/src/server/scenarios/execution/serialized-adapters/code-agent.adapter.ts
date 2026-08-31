@@ -15,6 +15,7 @@ import { AgentRole } from "@langwatch/scenario";
 import { SpanKind } from "@opentelemetry/api";
 import { randomBytes } from "crypto";
 import { getLangWatchTracer } from "langwatch";
+import { type Response as UndiciResponse, fetch as undiciFetch } from "undici";
 import { LATEST_SPEC_VERSION } from "../../../../optimization_studio/types/dsl";
 import {
   createNlpFetchDispatcher,
@@ -390,7 +391,7 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
         }, fetchTimeoutMs);
 
         try {
-          let response: Response;
+          let response: UndiciResponse;
           try {
             const fetchInit: FetchInitWithDispatcher = {
               method: "POST",
@@ -401,7 +402,11 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
                 timeoutMs: fetchTimeoutMs,
               }),
             };
-            response = await fetch(url, fetchInit);
+            // undici's own fetch, not the global one: Node's global fetch is
+            // bound to the undici bundled with Node, which rejects a
+            // dispatcher built by this package with "invalid onRequestStart
+            // method" (see mailer/providers/resend.ts for the same fix).
+            response = await undiciFetch(url, fetchInit);
           } catch (fetchError) {
             if (timedOut) {
               span.setAttribute(

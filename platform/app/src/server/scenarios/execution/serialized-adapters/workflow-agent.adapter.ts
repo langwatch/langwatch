@@ -22,6 +22,7 @@ import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
 import { randomBytes } from "crypto";
+import { type Response as UndiciResponse, fetch as undiciFetch } from "undici";
 import {
   createNlpFetchDispatcher,
   type FetchInitWithDispatcher,
@@ -276,7 +277,7 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
     body: string;
     signal: AbortSignal;
     timeoutMs: number;
-  }): Promise<Response> {
+  }): Promise<UndiciResponse> {
     try {
       const fetchInit: FetchInitWithDispatcher = {
         method: "POST",
@@ -285,7 +286,11 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
         signal,
         dispatcher: createNlpFetchDispatcher({ timeoutMs }),
       };
-      return await fetch(
+      // undici's own fetch, not the global one: Node's global fetch is bound
+      // to the undici bundled with Node, which rejects a dispatcher built by
+      // this package with "invalid onRequestStart method" (see
+      // mailer/providers/resend.ts for the same fix).
+      return await undiciFetch(
         `${this.nlpServiceUrl}/go/studio/execute_sync`,
         fetchInit,
       );

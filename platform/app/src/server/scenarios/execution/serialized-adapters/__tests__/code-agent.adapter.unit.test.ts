@@ -74,19 +74,20 @@ import {
 
 const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
 
-// Mock global fetch
-const mockFetch = vi.fn();
-vi.stubGlobal("fetch", mockFetch);
+// The adapter calls undici's own fetch, so that export is the interception
+// point. Hoisted, because the vi.mock factory below is hoisted above this file.
+const mockFetch = vi.hoisted(() => vi.fn());
 
 // Undici's Agent does not read back the timeouts it was constructed with, so
 // the only way to assert on the dispatcher the adapter passes is to record the
-// constructor's arguments. The global fetch above stays the interception point.
+// constructor's arguments.
 const agentOptions = vi.hoisted(() => [] as Record<string, unknown>[]);
 
 vi.mock("undici", async () => {
   const actual = await vi.importActual<typeof import("undici")>("undici");
   return {
     ...actual,
+    fetch: mockFetch,
     Agent: class RecordingAgent extends actual.Agent {
       constructor(opts?: Record<string, unknown>) {
         agentOptions.push(opts ?? {});
@@ -95,6 +96,20 @@ vi.mock("undici", async () => {
     },
   };
 });
+
+// The global fetch must never be used with an npm-undici dispatcher: Node's
+// global fetch is bound to the undici bundled with Node, and rejects one with
+// "invalid onRequestStart method". Pointing the global at the same mock would
+// let a regression back to it pass this suite, which is how that bug reached
+// production once already.
+vi.stubGlobal(
+  "fetch",
+  vi.fn(() => {
+    throw new Error(
+      "the adapter must call undici's fetch, not the global fetch",
+    );
+  }),
+);
 
 describe("SerializedCodeAgentAdapter", () => {
   const defaultConfig: CodeAgentData = {
