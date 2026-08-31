@@ -612,3 +612,30 @@ The difference from `server/rbac/**`, which the same one-liner did fix: those
 call `checkRoleBindingPermission` directly, `isOnEngine` answers false under
 the default App, and the fake IS used — proven by the predicate sabotage
 failing there.
+
+## Round: saved views (2026-08-31)
+
+`SavedViewService`, untested. Twenty-one cases, two rules.
+
+**Ownership.** A personal view belongs to one person, and reaching for
+somebody else's is refused as NOT FOUND — the same class and the same message
+as an id that does not exist. A case now asserts the two are
+*indistinguishable*, because a distinct error would confirm the id names a
+real view belonging to another user. The refusal also happens before the view
+is touched.
+
+**Seeding.** First access seeds a project's defaults; a project that has some
+gets the rest backfilled by NAME, so a renamed view is not re-created. Both
+are for the legacy tab strip only — the traces-v2 lens UI brings its own
+defaults from code, and seeding on its behalf would double-populate the tab
+strip a customer sees. That guard has its own case, and sabotaging it fails.
+
+**A comment that described an error nobody wrote.** `delete` and `rename` both
+carried `@throws {SavedViewNotOwnedError}`. No such class exists anywhere in
+the repository — grep finds it in exactly those two docblocks. What they throw
+is `SavedViewNotFoundError`, which is the more interesting fact, so the
+comments now say why rather than naming a fiction.
+
+That is a third shape of the same underlying problem this tracker keeps
+recording: **the code moved and the thing describing it did not.** A path, a
+signature, an assertion satisfied by prose — and now a docblock.
