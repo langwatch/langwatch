@@ -107,9 +107,9 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_ui_comparison_leaderboard_enabled",
   // The Agent Testing v2 interface: one page with Scenarios and Results
   // tabs, test suites as folders, run notes, scenario versions, and the
-  // wide run drawer (specs/features/agent-testing/). Off by default and
-  // purely additive: the current Simulations pages and menu group are
-  // untouched while it is off, and the backend it calls is unflagged.
+  // wide run drawer (specs/features/agent-testing/). On by default; a rule
+  // keeps a project on the Simulations pages, which are untouched while it
+  // is off. The backend it calls is unflagged.
   "release_ui_agent_testing_v2_enabled",
   // The identifier-first front door: the sign-in, sign-up and invitation
   // screens (D13, ADR-117). Deliberately NOT a PostHog flag — every screen it

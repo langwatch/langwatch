@@ -9,6 +9,7 @@ import type {
   BatchSummary,
   ScenarioRunData,
 } from "~/server/scenarios/scenario-event.types";
+import { readTestingInterface } from "~/server/suites/platform-path";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
 import { scenarioRunPlatformUrl } from "../scenario-run-platform-url";
@@ -202,6 +203,10 @@ secured.access(requires("scenarios:view")).get(
       { projectId: project.id, scenarioSetId, batchRunId },
       "Listing simulation runs",
     );
+    const ui = await readTestingInterface({
+      projectId: project.id,
+      organizationId: c.get("apiKeyOrganizationId"),
+    });
 
     const simulationRuns = getApp().simulations.runs;
 
@@ -226,6 +231,7 @@ secured.access(requires("scenarios:view")).get(
           platformUrl: scenarioRunPlatformUrl({
             projectSlug: project.slug,
             scenarioRunId: r.scenarioRunId,
+            ui,
           }),
         })),
         hasMore: false,
@@ -248,6 +254,7 @@ secured.access(requires("scenarios:view")).get(
           platformUrl: scenarioRunPlatformUrl({
             projectSlug: project.slug,
             scenarioRunId: r.scenarioRunId,
+            ui,
           }),
         })),
         hasMore: result.hasMore,
@@ -273,6 +280,7 @@ secured.access(requires("scenarios:view")).get(
         platformUrl: scenarioRunPlatformUrl({
           projectSlug: project.slug,
           scenarioRunId: r.scenarioRunId,
+          ui,
         }),
       })),
       hasMore: result.hasMore,
@@ -311,6 +319,10 @@ secured.access(requires("scenarios:view")).get(
       { projectId: project.id, scenarioRunId },
       "Getting simulation run",
     );
+    const ui = await readTestingInterface({
+      projectId: project.id,
+      organizationId: c.get("apiKeyOrganizationId"),
+    });
 
     const simulationRuns = getApp().simulations.runs;
     const run = await simulationRuns.getScenarioRunData({
@@ -327,6 +339,7 @@ secured.access(requires("scenarios:view")).get(
       platformUrl: scenarioRunPlatformUrl({
         projectSlug: project.slug,
         scenarioRunId: run.scenarioRunId,
+        ui,
       }),
     });
   },

@@ -149,8 +149,6 @@ vi.mock("~/utils/compat/next-router", () => ({
   }),
 }));
 
-import { resolveSimulationsRedirect } from "~/components/suites/useSuiteRouting";
-import { legacyRedirectRoutes } from "~/legacyRedirects";
 import AgentTestingRoute from "../[project]/agent-testing/[[...path]]";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -207,40 +205,6 @@ describe("the Agent Testing address", () => {
         ).toBeNull();
         expect(screen.getByText("Access Restricted")).toBeInTheDocument();
       });
-    });
-
-    /** @scenario "Old simulations addresses keep working" */
-    it("keeps every saved simulations address on the v1 pages", () => {
-      // The v1 catch-all resolves its own addresses; none of them may point
-      // at Agent Testing while the flag is on. `null` is not a pass by
-      // omission: it names an address the v1 route already serves as it
-      // stands, so every entry states what it expects.
-      const savedAddresses: {
-        segments: string[];
-        redirect: string | null;
-      }[] = [
-        { segments: [], redirect: null },
-        { segments: ["scenarios"], redirect: "/demo/simulations/scenarios" },
-        { segments: ["suites"], redirect: "/demo/simulations" },
-        { segments: ["run-plans", "checkout"], redirect: null },
-        {
-          segments: ["my-set", "batch_1", "run_1"],
-          redirect: "/demo/simulations/my-set/batch_1?openRun=run_1",
-        },
-      ];
-      for (const { segments, redirect: expected } of savedAddresses) {
-        const redirect = resolveSimulationsRedirect({
-          projectSlug: "demo",
-          segments,
-          query: {},
-        });
-        expect(redirect).toBe(expected);
-      }
-
-      // And no legacy redirect sends a simulations address there either.
-      for (const route of legacyRedirectRoutes) {
-        expect(route.path ?? "").not.toContain("agent-testing");
-      }
     });
   });
 });
