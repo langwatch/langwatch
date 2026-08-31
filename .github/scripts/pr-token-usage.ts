@@ -1,6 +1,6 @@
 // Builds and upserts the sticky "coding agent usage" comment on a pull
 // request, from the LangWatch pull-request usage API
-// (GET /api/coding-agent/pull-request-usage): sessions, tokens and estimated
+// (GET /api/v1/coding-agent/pull-request-usage): sessions, tokens and estimated
 // cost per contributor and agent, plus a per-model breakdown, over the pull
 // request's whole lifetime.
 //

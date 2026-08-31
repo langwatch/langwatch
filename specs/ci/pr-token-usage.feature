@@ -4,7 +4,7 @@ Feature: PR token usage comment
   So that the cost of the work is visible next to the work itself
 
   The data comes from the LangWatch pull-request usage API
-  (GET /api/coding-agent/pull-request-usage), which rolls a pull request's
+  (GET /api/v1/coding-agent/pull-request-usage), which rolls a pull request's
   whole lifetime up into sessions, tokens and cost per contributor and agent.
   The workflow only reads and comments: it never gates a merge.
 
