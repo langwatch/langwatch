@@ -2579,10 +2579,6 @@
                           "minLength": 1,
                           "maxLength": 64
                         },
-                        "description": {
-                          "type": "string",
-                          "maxLength": 2000
-                        },
                         "parameters": {
                           "type": "object",
                           "additionalProperties": {},
@@ -4188,7 +4184,7 @@
             }
           }
         },
-        "description": "Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes only a new description; anything else answers 422 agent_register_only.",
+        "description": "Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes no edit and answers 422 agent_register_only.",
         "tags": [
           "Agents"
         ],
@@ -4507,7 +4503,7 @@
             }
           }
         },
-        "description": "Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes only a new description; anything else answers 422 agent_register_only.",
+        "description": "Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes no edit and answers 422 agent_register_only.",
         "tags": [
           "Agents"
         ],
@@ -11564,7 +11560,7 @@
             }
           }
         },
-        "description": "Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Authenticate with your own organization API key and nothing else: no project id is sent anywhere. Rows appear only for projects you may view, and cost only for those you may price.",
+        "description": "Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Authenticate with an organization API key and nothing else: no project id is sent anywhere. A key created for you reads with your own access; an organization service key, such as one a continuous integration job holds, reads with the access its bindings grant. Rows appear only for projects the key may view, and cost only for those it may price.",
         "summary": "Get pull request usage",
         "tags": [
           "Coding Agents"

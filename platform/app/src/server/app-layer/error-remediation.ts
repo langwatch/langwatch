@@ -321,12 +321,6 @@ const registry = {
       "Send a key scoped to your own personal workspace; being allowed to view a workspace is not the same as it being yours",
     ],
   },
-  user_bound_key_required: {
-    tips: [
-      "Send an API key created for your own user; an organization service key names no person to answer for",
-      "Create one under Settings > API Keys while signed in as yourself",
-    ],
-  },
 
   // ---- agent cache ----
   // Read by agent code inside a run, so the tips name the next call rather

@@ -46,8 +46,14 @@ export interface PullRequestUsageV1Fixture {
   narrowedToken: string;
   /** The same holder's key, bound to project A with a role that cannot price. */
   viewerToken: string;
-  /** An organization service key created for no user. */
+  /** An organization service key created for no user, bound org-wide. */
   serviceToken: string;
+  /** The id behind serviceToken, which the audit trail names the actor by. */
+  serviceKeyId: string;
+  /** A service key whose bindings grant viewing but never pricing. */
+  serviceViewerToken: string;
+  /** A service key bound to project A alone. */
+  serviceProjectToken: string;
   /** A legacy project API key, carrying neither organization nor user. */
   legacyProjectKey: string;
   /** Another organization entirely, whose key must learn nothing here. */
@@ -116,23 +122,23 @@ async function mintKey({
   name,
   userId,
   organizationId,
-  binding,
+  bindings,
 }: {
   ns: string;
   name: string;
   userId: string | null;
   organizationId: string;
-  binding: KeyBinding;
-}): Promise<string> {
+  bindings: KeyBinding[];
+}): Promise<{ token: string; id: string }> {
   const created = await ApiKeyService.create(prisma).create({
     name: `${name}-${ns}`,
     userId,
     createdByUserId: userId,
     organizationId,
     permissionMode: "all",
-    bindings: [binding],
+    bindings,
   });
-  return created.token;
+  return { token: created.token, id: created.apiKey.id };
 }
 
 export async function seedPullRequestUsageV1Fixture({
@@ -189,54 +195,90 @@ export async function seedPullRequestUsageV1Fixture({
     organizationId: otherOrganization.id,
   });
 
+  const projectBinding = (role: TeamUserRole): KeyBinding => ({
+    role,
+    scopeType: RoleBindingScopeType.PROJECT,
+    scopeId: projectA.id,
+  });
+  const service = await mintKey({
+    ...keyArgs,
+    name: "pr-usage-v1-service",
+    userId: null,
+    bindings: [orgAdminBinding(organization.id)],
+  });
+
   return {
     organization,
     team,
     callerUserId,
     projectAId: projectA.id,
     projectBId: projectB.id,
-    callerToken: await mintKey({
-      ...keyArgs,
-      name: "pr-usage-v1-caller",
-      userId: callerUserId,
-      binding: orgAdminBinding(organization.id),
-    }),
-    narrowedToken: await mintKey({
-      ...keyArgs,
-      name: "pr-usage-v1-narrowed",
-      userId: callerUserId,
-      binding: {
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.PROJECT,
-        scopeId: projectA.id,
-      },
-    }),
-    viewerToken: await mintKey({
-      ...keyArgs,
-      name: "pr-usage-v1-viewer",
-      userId: callerUserId,
-      binding: {
-        role: TeamUserRole.VIEWER,
-        scopeType: RoleBindingScopeType.PROJECT,
-        scopeId: projectA.id,
-      },
-    }),
-    serviceToken: await mintKey({
-      ...keyArgs,
-      name: "pr-usage-v1-service",
-      userId: null,
-      binding: orgAdminBinding(organization.id),
-    }),
+    callerToken: (
+      await mintKey({
+        ...keyArgs,
+        name: "pr-usage-v1-caller",
+        userId: callerUserId,
+        bindings: [orgAdminBinding(organization.id)],
+      })
+    ).token,
+    narrowedToken: (
+      await mintKey({
+        ...keyArgs,
+        name: "pr-usage-v1-narrowed",
+        userId: callerUserId,
+        bindings: [projectBinding(TeamUserRole.ADMIN)],
+      })
+    ).token,
+    viewerToken: (
+      await mintKey({
+        ...keyArgs,
+        name: "pr-usage-v1-viewer",
+        userId: callerUserId,
+        bindings: [projectBinding(TeamUserRole.VIEWER)],
+      })
+    ).token,
+    serviceToken: service.token,
+    serviceKeyId: service.id,
+    // Viewing without pricing, on both projects. Project-scoped VIEWER
+    // bindings rather than one org-scoped VIEWER: a built-in role bound at
+    // organization scope grants project-tier permissions only as ADMIN
+    // (role-binding-resolver), so "may view, may not price" is a
+    // project-scope grant by construction.
+    serviceViewerToken: (
+      await mintKey({
+        ...keyArgs,
+        name: "pr-usage-v1-service-viewer",
+        userId: null,
+        bindings: [
+          projectBinding(TeamUserRole.VIEWER),
+          {
+            role: TeamUserRole.VIEWER,
+            scopeType: RoleBindingScopeType.PROJECT,
+            scopeId: projectB.id,
+          },
+        ],
+      })
+    ).token,
+    serviceProjectToken: (
+      await mintKey({
+        ...keyArgs,
+        name: "pr-usage-v1-service-project",
+        userId: null,
+        bindings: [projectBinding(TeamUserRole.ADMIN)],
+      })
+    ).token,
     legacyProjectKey: projectA.apiKey,
     otherOrganization,
     otherOrgUserId,
-    otherOrgToken: await mintKey({
-      ns,
-      name: "pr-usage-v1-other",
-      userId: otherOrgUserId,
-      organizationId: otherOrganization.id,
-      binding: orgAdminBinding(otherOrganization.id),
-    }),
+    otherOrgToken: (
+      await mintKey({
+        ns,
+        name: "pr-usage-v1-other",
+        userId: otherOrgUserId,
+        organizationId: otherOrganization.id,
+        bindings: [orgAdminBinding(otherOrganization.id)],
+      })
+    ).token,
   };
 }
 

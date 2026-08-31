@@ -1720,13 +1720,6 @@ const presentations = {
     describe: () =>
       "Check the key is current and copied in full. If it was revoked or rotated, create a new one in Settings > API Keys.",
   },
-  user_bound_key_required: {
-    // The key authenticated, so the answer is which key to send instead: one
-    // created for the caller's own user, not an organization service key.
-    title: "That API key belongs to no user",
-    describe: () =>
-      "This answers for you personally, so it needs an API key created for your own user. An organization service key covers no single person and can't answer for one.",
-  },
   credential_class_mismatch: {
     // Both classes are named, because the fix is to swap one for the other
     // and a caller holding several keys cannot otherwise tell which is which.
