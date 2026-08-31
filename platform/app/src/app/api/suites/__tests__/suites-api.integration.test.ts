@@ -691,6 +691,19 @@ describe("Feature: Suites REST API", () => {
       });
     });
 
+    describe("when the project reads Agent Testing", () => {
+      it("answers with the plan address of that interface", async () => {
+        const suite = await createSuite({ name: "Address Suite" });
+
+        const res = await helpers.api.get(`/api/suites/${suite.id}`);
+
+        const body = await res.json();
+        expect(body.platformUrl).toContain(
+          `/${testProject.slug}/agent-testing/results/${suite.slug}`,
+        );
+      });
+    });
+
     describe("when suite does not exist", () => {
       it("returns 404", async () => {
         const res = await helpers.api.get("/api/suites/nonexistent-id");

@@ -69,7 +69,7 @@ const sampleSuite: TestSuite = {
   createdAt: "2024-01-01T00:00:00Z",
   updatedAt: "2024-01-02T00:00:00Z",
   platformUrl:
-    "https://app.langwatch.ai/proj/simulations/test-suites/suite_abc123",
+    "https://app.langwatch.ai/proj/agent-testing/suites/checkout",
 };
 
 const sampleScenario: ScenarioSummary = {
@@ -270,7 +270,7 @@ describe("handleRunTestSuite()", () => {
       planName: "Checkout Support Bot",
       created: true,
       platformUrl:
-        "https://app.langwatch.ai/proj/simulations/batches/batch_123",
+        "https://app.langwatch.ai/proj/agent-testing/results/regression-plan",
     };
 
     let result: string;
