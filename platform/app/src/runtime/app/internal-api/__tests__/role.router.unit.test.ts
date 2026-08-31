@@ -10,6 +10,7 @@
  */
 import { type AuthzDeclaration, authzDeclarationOf } from "@langwatch/authz-contract";
 import type { Role } from "@langwatch/role-contract";
+import { RoleApp, type RoleAppDependencies } from "@langwatch/role-server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AppAuditLogRuntime } from "~/runtime/app/features/audit-log";
 import type { RequestAppServices } from "~/runtime/app/requestApp";
@@ -62,13 +63,19 @@ function buildContext({
       denialReason: permitted ? undefined : ("no-binding" as const),
     }),
   };
-  const roles = {
-    list: async (input: { organizationId: string }) => {
-      listed.push(input);
-      return [role];
+  // The REAL `RoleApp` over a stubbed service: the mounted procedures read
+  // `app.roles.listRoles` / `getRole`, which is the application's surface, and
+  // a hand-written double in its place would be asserting the mount against a
+  // shape production does not have.
+  const roles = RoleApp.create({
+    roles: {
+      list: async (input: { organizationId: string }) => {
+        listed.push(input);
+        return [role];
+      },
+      get: async () => role,
     },
-    get: async () => role,
-  };
+  } as unknown as RoleAppDependencies);
   // Only the two services the mounted chain actually reaches. The composed
   // test App is deliberately not used: it would drag every unrelated runtime
   // into a test about who may call these seven procedures.
@@ -102,8 +109,9 @@ describe("role transport mount", () => {
   describe("given the composed routers", () => {
     /** @scenario "The role transport moves without changing who may call it" */
     it("keeps the legacy role procedure names the browser calls", () => {
-      const procedures = (roleRouter as unknown as { _def: { procedures: Record<string, unknown> } })
-        ._def.procedures;
+      const procedures = (
+        roleRouter as unknown as { _def: { procedures: Record<string, unknown> } }
+      )._def.procedures;
 
       expect(Object.keys(procedures).sort()).toEqual([
         "assignToUser",
@@ -226,9 +234,9 @@ describe("role transport mount", () => {
     it("loads a role by id through the service the custom check already used", async () => {
       const { context } = buildContext({ permitted: true });
 
-      await expect(
-        roleRouter.createCaller(context).getById({ roleId: ROLE_ID }),
-      ).resolves.toEqual(role);
+      await expect(roleRouter.createCaller(context).getById({ roleId: ROLE_ID })).resolves.toEqual(
+        role,
+      );
     });
   });
 });

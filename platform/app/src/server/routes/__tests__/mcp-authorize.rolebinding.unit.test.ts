@@ -56,9 +56,7 @@ const { mockPrisma, mockRedis, runtime, SESSION } = vi.hoisted(() => {
       // org-level MEMBER role. The MEMBER org role alone grants no project-level
       // permission, so authorization still hinges on the TEAM binding below.
       organizationUser: {
-        findFirst: vi
-          .fn()
-          .mockResolvedValue({ role: "MEMBER", disabledAt: null }),
+        findFirst: vi.fn().mockResolvedValue({ role: "MEMBER", disabledAt: null }),
       },
       // checkPermissionFromBindings: user belongs to no groups …
       groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
@@ -125,6 +123,14 @@ vi.mock("~/utils/encryption", () => ({
 runtime.current = {
   redis: mockRedis,
   permissions: appPermissionsService(mockPrisma),
+  // The handler reads the project row through the App rather than from prisma
+  // directly. `ProjectApp.tryGetById` delegates straight to the service with
+  // no rule of its own, so the row still comes from `mockPrisma` below and the
+  // ordering the archived-project case depends on is unchanged: this read
+  // happens BEFORE the permission probe's own `project.findUnique`.
+  projects: {
+    tryGetById: (id: string) => mockPrisma.project.findUnique({ where: { id } }),
+  },
 };
 
 // `createServiceApp` mounts `appContextMiddleware`, which refuses a request

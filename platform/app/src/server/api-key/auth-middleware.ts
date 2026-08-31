@@ -131,7 +131,11 @@ export function createUnifiedAuthMiddleware({
   const refusal = authRefusalBody(errorEnvelope);
 
   return async (c, next) => {
-    const { apiKeys } = c.var.langwatchApp;
+    // The api-key APPLICATION is the management surface; resolving an inbound
+    // credential is the service's job and the App hands it out beside it.
+    // `App.apiKeys` was the service itself until the feature applications
+    // landed on the App, and every other reader moved with it.
+    const apiKeys = c.var.langwatchApp.apiKeys.apiKeyService;
     const outcome = await resolveProjectPrincipal({
       apiKeys,
       // Diagnostic context for auth failures — lets on-call attribute a 401 to
@@ -328,7 +332,11 @@ export function createOrgAuthMiddleware({
   const refusal = authRefusalBody(errorEnvelope);
 
   return async (c, next) => {
-    const { apiKeys } = c.var.langwatchApp;
+    // The api-key APPLICATION is the management surface; resolving an inbound
+    // credential is the service's job and the App hands it out beside it.
+    // `App.apiKeys` was the service itself until the feature applications
+    // landed on the App, and every other reader moved with it.
+    const apiKeys = c.var.langwatchApp.apiKeys.apiKeyService;
     const outcome = await resolveOrgPrincipal({
       prisma,
       apiKeys,

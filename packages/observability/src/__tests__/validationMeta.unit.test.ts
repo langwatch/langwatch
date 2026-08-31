@@ -37,9 +37,7 @@ describe("validationMeta", () => {
     };
 
     it("names the failing path with array indices", () => {
-      expect(validationMeta(error)?.issues[0]?.path).toBe(
-        "spans[0].timestamps.started_at",
-      );
+      expect(validationMeta(error)?.issues[0]?.path).toBe("spans[0].timestamps.started_at");
     });
 
     /** @scenario A field of the wrong type reports both types by name */
@@ -240,6 +238,35 @@ describe("validationMeta", () => {
   });
 
   describe("when the failure is a union", () => {
+    it("follows the Zod 4 branch issues so the real reasons are visible", () => {
+      // Zod 4 hangs the arms' issue arrays off `errors`, not a `ZodError` per
+      // arm off `unionErrors`. Reading only the Zod 3 spelling reported the
+      // collector's every union rejection as a bare `invalid_union` at `<root>`.
+      const error = {
+        issues: [
+          {
+            code: "invalid_union",
+            path: [],
+            errors: [
+              [
+                {
+                  code: "invalid_type",
+                  path: ["timestamps", "started_at"],
+                  expected: "number",
+                  received: "string",
+                },
+              ],
+            ],
+          },
+        ],
+      };
+
+      const meta = validationMeta(error);
+      expect(meta?.issueCount).toBe(2);
+      expect(meta?.issues.map((i) => i.code)).toEqual(["invalid_union", "invalid_type"]);
+      expect(meta?.issues.map((i) => i.path)).toEqual(["<root>", "timestamps.started_at"]);
+    });
+
     it("follows the branch errors so the real reasons are visible", () => {
       const error = {
         issues: [

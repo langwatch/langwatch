@@ -70,9 +70,14 @@ const get = async (path: string) => {
   root.use(
     "*",
     appContextMiddlewareFor({
+      // Resolving an inbound credential is the api-key SERVICE's job, and the
+      // App hands that service out through `ApiKeyApp.apiKeyService` — the seam
+      // every key-authenticated route reads on the way in.
       apiKeys: {
-        tryResolveToken: (...args: unknown[]) => resolve(...args),
-        markUsed: (...args: unknown[]) => markUsed(...args),
+        apiKeyService: {
+          tryResolveToken: (...args: unknown[]) => resolve(...args),
+          markUsed: (...args: unknown[]) => markUsed(...args),
+        },
       },
       experiments: {
         isActive: async ({ projectId, id }: { projectId: string; id: string }) =>

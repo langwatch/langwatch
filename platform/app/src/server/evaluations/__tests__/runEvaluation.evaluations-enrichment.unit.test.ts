@@ -39,7 +39,6 @@ vi.mock("~/runtime/app/features/evaluator-native-observability.adapter", async (
   return {
     ...actual,
     executeNativeEvaluation: executeNativeEvaluationMock,
-    augmentEvaluationResult: ({ result }: { result: unknown }) => result,
   };
 });
 
@@ -58,8 +57,22 @@ vi.mock("@langwatch/evaluator-contract", async (importOriginal) => {
   };
 });
 
-import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
+import type { EvaluatorService, EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { runEvaluationForTrace } from "../runEvaluation";
+
+// `runEvaluation` reaches the result augmenter as `evaluators.augmentResult`.
+// It is the evaluator feature's own rule and has its own tests; here it stays
+// a pass-through so the read under test is what the assertions see.
+const evaluators = {
+  augmentResult: ({ result }: { result: unknown }) => result,
+} as unknown as EvaluatorService;
+
+/** The services this path never reaches, named so each call is complete. */
+const unusedServices = {
+  modelProviders: {} as never,
+  managedProviders: {} as never,
+  workflows: {} as never,
+};
 
 // Registered above in the mocked AVAILABLE_EVALUATORS; cast past the real
 // EvaluatorTypes union which doesn't know about the test fixture.
@@ -120,6 +133,9 @@ describe("runEvaluationForTrace evaluations enrichment", () => {
         } as never,
         protections,
         evaluations: {} as never,
+        traceCanonicalisation: {} as never,
+        evaluators,
+        ...unusedServices,
       });
 
       // The enrichment must have queried the trace's evaluations...
@@ -159,6 +175,9 @@ describe("runEvaluationForTrace evaluations enrichment", () => {
           } as never,
           protections,
           evaluations: {} as never,
+          traceCanonicalisation: {} as never,
+          evaluators,
+          ...unusedServices,
         }),
       ).resolves.toBeDefined();
 

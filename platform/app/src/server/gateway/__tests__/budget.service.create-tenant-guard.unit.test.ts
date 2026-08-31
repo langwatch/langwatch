@@ -11,7 +11,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 
-import { GatewayService } from "@langwatch/gateway-server";
+import { PrismaGatewayAdapter } from "@langwatch/gateway-server";
 
 const REACHED_TRANSACTION = "REACHED_TRANSACTION";
 
@@ -34,6 +34,34 @@ function mockPrisma(overrides: { team?: unknown; project?: unknown }): PrismaCli
   } as unknown as PrismaClient;
 }
 
+/**
+ * The process's own composition, over the fake database.
+ *
+ * The two guards live one layer apart now: the TEAM check is
+ * `PrismaGatewayBudgetRepository.create`'s, and the PROJECT check is the
+ * service's, proved through the `ProjectService` it is built with. Composing
+ * the pair the way `PrismaGatewayAdapter` composes it keeps both under test.
+ */
+function serviceOver(prisma: PrismaClient, project: unknown) {
+  return PrismaGatewayAdapter.create({
+    database: prisma,
+    projects: {
+      tryGetWithTeam: vi
+        .fn()
+        .mockResolvedValue(
+          project
+            ? { id: "project_ok", teamId: "team_ok", team: { organizationId: "org_caller" } }
+            : null,
+        ),
+      listTraceDestinations: vi.fn().mockResolvedValue([]),
+    } as never,
+    evaluators: {} as never,
+    monitors: {} as never,
+    changes: {} as never,
+    audit: {} as never,
+  }).build();
+}
+
 const baseInput = {
   organizationId: "org_caller",
   name: "Q budget",
@@ -46,7 +74,7 @@ describe("GatewayService.create cross-org scope guard", () => {
   describe("when a TEAM-scoped budget targets a team in another organization", () => {
     /** @scenario "A team or project budget scoped to another organization is rejected" */
     it("rejects with a clear BAD_REQUEST", async () => {
-      const sut = GatewayService.create(mockPrisma({ team: null }));
+      const sut = serviceOver(mockPrisma({ team: null }), null);
       await expect(
         sut.create({
           ...baseInput,
@@ -58,7 +86,7 @@ describe("GatewayService.create cross-org scope guard", () => {
 
   describe("when a PROJECT-scoped budget targets a project in another organization", () => {
     it("rejects with a clear BAD_REQUEST", async () => {
-      const sut = GatewayService.create(mockPrisma({ project: null }));
+      const sut = serviceOver(mockPrisma({ project: null }), null);
       await expect(
         sut.create({
           ...baseInput,
@@ -70,7 +98,7 @@ describe("GatewayService.create cross-org scope guard", () => {
 
   describe("when the TEAM belongs to the caller's organization", () => {
     it("passes the guard and proceeds to persist", async () => {
-      const sut = GatewayService.create(mockPrisma({ team: { id: "team_ok" } }));
+      const sut = serviceOver(mockPrisma({ team: { id: "team_ok" } }), null);
       await expect(
         sut.create({
           ...baseInput,

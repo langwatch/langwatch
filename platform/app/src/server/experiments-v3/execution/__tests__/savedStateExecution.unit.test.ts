@@ -7,13 +7,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PersistedEvaluationsV3State } from "~/experiments-v3/types/persistence";
 
-const findBySlugAndType = vi.hoisted(() => vi.fn());
+const tryGetBySlugAndType = vi.hoisted(() => vi.fn());
 const loadExecutionData = vi.hoisted(() => vi.fn());
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
 vi.mock("../dataLoader", () => ({ loadExecutionData }));
 
+import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { ExperimentService } from "@langwatch/experiment-contract";
 import { buildStateFromWorkbench, prepareSavedStateExecution } from "../savedStateExecution";
+
+// The experiment read is a parameter now, not a module the file reaches for,
+// so the stub is passed in rather than mocked over an import.
+const experiments = { tryGetBySlugAndType } as unknown as ExperimentService;
+const evaluators = {} as EvaluatorService;
 
 const datasetNamed = (id: string) => ({
   id,
@@ -36,7 +43,7 @@ const twoDatasetState = (activeDatasetId: string) =>
   }) as unknown as PersistedEvaluationsV3State;
 
 beforeEach(() => {
-  findBySlugAndType.mockReset();
+  tryGetBySlugAndType.mockReset();
   loadExecutionData.mockReset();
   loadExecutionData.mockResolvedValue({
     datasetRows: [],
@@ -62,7 +69,7 @@ describe("buildStateFromWorkbench", () => {
 describe("prepareSavedStateExecution", () => {
   describe("given a saved workbench whose second dataset is active", () => {
     beforeEach(() => {
-      findBySlugAndType.mockResolvedValue({
+      tryGetBySlugAndType.mockResolvedValue({
         id: "experiment_1",
         slug: "two-datasets",
         workbenchState: twoDatasetState("dataset-2"),
@@ -71,16 +78,22 @@ describe("prepareSavedStateExecution", () => {
 
     it("loads the active dataset instead of the first one", async () => {
       await prepareSavedStateExecution({
+        experiments,
+        evaluators,
         projectId: "project_1",
         slug: "two-datasets",
       });
 
       expect(loadExecutionData).toHaveBeenCalledTimes(1);
-      expect(loadExecutionData.mock.calls[0]?.[0]?.dataset?.id).toBe("dataset-2");
+      // `loadExecutionData` takes its arguments positionally, and the dataset
+      // is the second of them.
+      expect(loadExecutionData.mock.calls[0]?.[1]?.id).toBe("dataset-2");
     });
 
     it("hands the orchestrator a state still pointing at that dataset", async () => {
       const prepared = await prepareSavedStateExecution({
+        experiments,
+        evaluators,
         projectId: "project_1",
         slug: "two-datasets",
       });
@@ -92,13 +105,15 @@ describe("prepareSavedStateExecution", () => {
 
   describe("given the active dataset id names no dataset", () => {
     it("refuses the run rather than executing a different dataset", async () => {
-      findBySlugAndType.mockResolvedValue({
+      tryGetBySlugAndType.mockResolvedValue({
         id: "experiment_1",
         slug: "dangling-active-dataset",
         workbenchState: twoDatasetState("dataset-deleted"),
       });
 
       const prepared = await prepareSavedStateExecution({
+        experiments,
+        evaluators,
         projectId: "project_1",
         slug: "dangling-active-dataset",
       });

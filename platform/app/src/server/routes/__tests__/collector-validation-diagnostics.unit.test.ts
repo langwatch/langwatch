@@ -37,12 +37,22 @@ vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
   tryGetApp: () => null,
   getApp: vi.fn(() => ({
+    // Resolving an inbound credential is the api-key SERVICE's job, and the
+    // App hands that service out through `ApiKeyApp.apiKeyService` — the seam
+    // every key-authenticated route reads on the way in.
     apiKeys: {
-      tryResolveToken: mockResolve,
-      markUsed: vi.fn(),
+      apiKeyService: {
+        tryResolveToken: mockResolve,
+        markUsed: vi.fn(),
+      },
     },
     usage: { checkLimit: mockCheckLimit },
-    traces: { collection: { ingestNormalizedSpan: mockIngestNormalizedSpan } },
+    // Ingestion is NOT on `TraceApp`: the App names the span/log/metric
+    // collection services apart as `traceIngestion`, which is what every OTLP
+    // and collector handler reads.
+    traceIngestion: {
+      collection: { ingestNormalizedSpan: mockIngestNormalizedSpan },
+    },
     evaluations: { reportEvaluation: vi.fn() },
     planProvider: { getActivePlan: vi.fn() },
     usageLimits: { notifyPlanLimitReached: vi.fn() },
@@ -50,8 +60,7 @@ vi.mock("~/server/app-layer/app", () => ({
 }));
 
 vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/server/api-key/auth-middleware")>();
+  const actual = await importOriginal<typeof import("~/server/api-key/auth-middleware")>();
   return {
     ...actual,
     extractCredentials: vi.fn(() => ({

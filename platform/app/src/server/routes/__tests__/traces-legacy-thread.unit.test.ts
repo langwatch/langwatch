@@ -9,6 +9,7 @@
  */
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { TraceAppDependencies } from "@langwatch/trace-server";
 import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
 import { getApp } from "~/server/app-layer/app";
 import { z } from "zod";
@@ -20,8 +21,7 @@ const mockResolve = vi.fn();
 const mockMarkUsed = vi.fn();
 
 vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/server/api-key/auth-middleware")>();
+  const actual = await importOriginal<typeof import("~/server/api-key/auth-middleware")>();
   return {
     ...actual,
     extractCredentials: vi.fn(() => ({
@@ -48,20 +48,32 @@ vi.mock("~/server/tracer/spanToReadableSpan", () => ({
   formatSpansDigest: vi.fn().mockReturnValue("formatted trace"),
 }));
 
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: vi.fn(() => ({
-    apiKeys: {
-      tryResolveToken: mockResolve,
-      markUsed: mockMarkUsed,
-    },
-    share: { createShare: vi.fn(), unshare: vi.fn() },
-    traces: {
-      read: { getTracesByThreadId: mockGetTracesByThreadId },
-    },
-  })),
-}));
+vi.mock("~/server/app-layer/app", async () => {
+  const { TraceApp } = await import("@langwatch/trace-server");
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: vi.fn(() => ({
+      // Resolving an inbound credential is the api-key SERVICE's job, and the
+      // App hands that service out through `ApiKeyApp.apiKeyService` — the seam
+      // every key-authenticated route reads on the way in.
+      apiKeys: {
+        apiKeyService: {
+          tryResolveToken: mockResolve,
+          markUsed: mockMarkUsed,
+        },
+      },
+      share: { createShare: vi.fn(), unshare: vi.fn() },
+      // The real `TraceApp` over the stubbed legacy read port. Resolving a
+      // drawer read in full (`{ full: true }`, #4991) is the application's own
+      // rule, and it is exactly what this suite asserts — a hand-written double
+      // standing in its place would decide the answer instead of the code.
+      traces: TraceApp.create({
+        traces: { read: { getTracesByThreadId: mockGetTracesByThreadId } },
+      } as unknown as TraceAppDependencies),
+    })),
+  };
+});
 
 vi.mock("~/server/api/ports/traces.schemas", () => ({
   getAllForProjectInput: z.object({

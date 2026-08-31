@@ -55,10 +55,11 @@ vi.mock("~/runtime/app/features/langy-api-key-actor-session.adapter", () => ({
 const featureFlags = MemoryFeatureFlagService.create();
 const processApp = createTestApp({ featureFlags, redis: null });
 const mockIsEnabled = vi.spyOn(featureFlags, "isEnabled");
-const mockResolve = vi.spyOn(processApp.apiKeys, "tryResolveToken");
-const mockMarkUsed = vi.spyOn(processApp.apiKeys, "markUsed");
-const mockStartConversationTurn = vi.spyOn(processApp.langy, "startConversationTurn");
-const mockGetEventsAfter = vi.spyOn(processApp.langy, "getEventsAfter");
+const mockResolve = vi.spyOn(processApp.apiKeys.apiKeyService, "tryResolveToken");
+// Spied so the real late-markUsed write never runs; no case reads the calls.
+vi.spyOn(processApp.apiKeys.apiKeyService, "markUsed");
+const mockStartConversationTurn = vi.spyOn(processApp.langy.langyService, "startConversationTurn");
+const mockGetEventsAfter = vi.spyOn(processApp.langy.langyService, "getEventsAfter");
 
 // Imported AFTER every mock, same as the sibling suite.
 const { app: langyApp } = await import("../langy-api");

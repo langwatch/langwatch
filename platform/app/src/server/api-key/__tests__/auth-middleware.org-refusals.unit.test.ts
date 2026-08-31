@@ -62,9 +62,13 @@ function buildApp(options: { prisma: PrismaClient; refusals?: "respond" | "throw
   });
   app.use(
     appContextMiddlewareFor({
+      // Credential resolution lives on the api-key service, which the App
+      // hands out through `ApiKeyApp.apiKeyService`.
       apiKeys: {
-        resolveOrganizationToken: resolveOrgOnly,
-        markUsed,
+        apiKeyService: {
+          resolveOrganizationToken: resolveOrgOnly,
+          markUsed,
+        },
       },
       projects: {},
     } as App),

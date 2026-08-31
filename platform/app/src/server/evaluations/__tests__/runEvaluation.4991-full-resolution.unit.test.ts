@@ -59,7 +59,6 @@ vi.mock("~/runtime/app/features/evaluator-native-observability.adapter", async (
   return {
     ...actual,
     executeNativeEvaluation: executeNativeEvaluationMock,
-    augmentEvaluationResult: ({ result }: { result: unknown }) => result,
   };
 });
 
@@ -78,8 +77,22 @@ vi.mock("@langwatch/evaluator-contract", async (importOriginal) => {
   };
 });
 
-import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
+import type { EvaluatorService, EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { runEvaluationForTrace } from "../runEvaluation";
+
+// `runEvaluation` reaches the result augmenter as `evaluators.augmentResult`.
+// It is the evaluator feature's own rule and has its own tests; here it stays
+// a pass-through so the read under test is what the assertions see.
+const evaluators = {
+  augmentResult: ({ result }: { result: unknown }) => result,
+} as unknown as EvaluatorService;
+
+/** The services this path never reaches, named so each call is complete. */
+const unusedServices = {
+  modelProviders: {} as never,
+  managedProviders: {} as never,
+  workflows: {} as never,
+};
 
 const evaluatorType = "test/evaluator" as EvaluatorTypes;
 
@@ -143,15 +156,14 @@ describe("runEvaluation — #4991 full blob resolution on evaluator reads", () =
           protections,
           evaluations: {} as never,
           traceCanonicalisation,
+          evaluators,
+          ...unusedServices,
         });
 
         expectConstructedWithDeps();
-        expect(getByIdMock).toHaveBeenCalledWith(
-          "project-1",
-          "trace-1",
-          expect.anything(),
-          { full: true },
-        );
+        expect(getByIdMock).toHaveBeenCalledWith("project-1", "trace-1", expect.anything(), {
+          full: true,
+        });
       });
     });
   });
@@ -179,6 +191,8 @@ describe("runEvaluation — #4991 full blob resolution on evaluator reads", () =
           protections,
           evaluations: {} as never,
           traceCanonicalisation,
+          evaluators,
+          ...unusedServices,
         });
 
         expectConstructedWithDeps();

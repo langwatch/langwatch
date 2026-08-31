@@ -72,14 +72,15 @@ interface RawIssue {
   format?: unknown;
   minimum?: unknown;
   maximum?: unknown;
+  /** Zod 3 spelling of a union's per-arm failures: one `ZodError` per arm. */
   unionErrors?: unknown;
+  /** Zod 4 spelling of the same: one array of issues per arm. */
+  errors?: unknown;
 }
 
 function hasIssues(error: unknown): error is { issues: RawIssue[] } {
   return (
-    !!error &&
-    typeof error === "object" &&
-    Array.isArray((error as { issues?: unknown }).issues)
+    !!error && typeof error === "object" && Array.isArray((error as { issues?: unknown }).issues)
   );
 }
 
@@ -182,6 +183,25 @@ function metaForIssue(issue: RawIssue): ValidationIssueMeta {
 }
 
 /**
+ * The per-arm issues of a union failure, under either Zod spelling.
+ *
+ * Zod 3 hangs a whole `ZodError` off `unionErrors`; Zod 4 hangs the arms'
+ * issue arrays off `errors`. Reading only the older one leaves every union
+ * rejection recorded as a bare `invalid_union` at the union's own node — no
+ * field, no rule — which is precisely the diagnostic this metadata exists to
+ * provide.
+ */
+function unionBranches(issue: RawIssue): RawIssue[][] {
+  if (Array.isArray(issue.unionErrors)) {
+    return issue.unionErrors.filter(hasIssues).map((nested) => nested.issues);
+  }
+  if (Array.isArray(issue.errors)) {
+    return issue.errors.filter((branch): branch is RawIssue[] => Array.isArray(branch));
+  }
+  return [];
+}
+
+/**
  * Flatten a Zod error into issues, following `invalid_union` into the branch
  * errors it nests. A union failure whose branches are hidden reports only that
  * "something did not match", which is the least useful thing it could say.
@@ -202,12 +222,8 @@ function collectIssues(
     counter.total += 1;
     if (into.length < maxIssues) into.push(metaForIssue(issue));
 
-    if (Array.isArray(issue.unionErrors)) {
-      for (const nested of issue.unionErrors) {
-        if (hasIssues(nested)) {
-          collectIssues(nested.issues, into, counter, maxIssues);
-        }
-      }
+    for (const branch of unionBranches(issue)) {
+      collectIssues(branch, into, counter, maxIssues);
     }
   }
 }

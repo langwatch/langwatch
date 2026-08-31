@@ -73,9 +73,9 @@ vi.mock("~/runtime/app/features/langy-api-key-actor-session.adapter", () => ({
 const featureFlags = MemoryFeatureFlagService.create();
 const processApp = createTestApp({ featureFlags, redis: null });
 const mockIsEnabled = vi.spyOn(featureFlags, "isEnabled");
-const mockResolve = vi.spyOn(processApp.apiKeys, "tryResolveToken");
-const mockMarkUsed = vi.spyOn(processApp.apiKeys, "markUsed");
-const mockStartConversationTurn = vi.spyOn(processApp.langy, "startConversationTurn");
+const mockResolve = vi.spyOn(processApp.apiKeys.apiKeyService, "tryResolveToken");
+const mockMarkUsed = vi.spyOn(processApp.apiKeys.apiKeyService, "markUsed");
+const mockStartConversationTurn = vi.spyOn(processApp.langy.langyService, "startConversationTurn");
 
 // ─── App under test ───────────────────────────────────────────────────────────
 // Imported after the process App and transport dependencies are mocked.

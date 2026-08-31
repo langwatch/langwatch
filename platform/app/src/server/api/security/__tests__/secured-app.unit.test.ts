@@ -26,11 +26,13 @@ const noopSecret: MiddlewareHandler = async (_c, next) => next();
  * drives `app.hono` directly IS the root, so it supplies the App the way an
  * internal re-dispatch does, through the request's bindings.
  *
- * Empty on purpose: what these cases assert is the strategy chain's ORDER and
- * the envelope a refusal is rendered in, and neither reads a facet off the
- * App. A double with facets would suggest they do.
+ * Nearly empty on purpose: what these cases assert is the strategy chain's
+ * ORDER and the envelope a refusal is rendered in, and neither reads a facet
+ * off the App. The one facet named is the api-key service the project-auth
+ * strategy resolves before it looks at the request — no case here sends a
+ * credential, so it is never called, but it has to be reachable.
  */
-const bindings = () => appContextBindingsFor({} as App);
+const bindings = () => appContextBindingsFor({ apiKeys: { apiKeyService: {} } } as unknown as App);
 
 describe("SecuredApp", () => {
   describe("when a route is registered through access()", () => {

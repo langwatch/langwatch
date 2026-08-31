@@ -15,25 +15,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 //    dropped `trace` on retry, so a guardrail retried after a transient
 //    500 lost `droppedCategories` and could report clean.
 
-const { stagedLangevalsFetchMock, augmentEvaluationResultMock } = vi.hoisted(() => ({
+const { stagedLangevalsFetchMock, augmentResultMock } = vi.hoisted(() => ({
   stagedLangevalsFetchMock: vi.fn(),
-  augmentEvaluationResultMock: vi.fn(),
+  augmentResultMock: vi.fn(),
 }));
 
 vi.mock("~/server/langevals/stagedFetch", () => ({
   stagedLangevalsFetch: stagedLangevalsFetchMock,
 }));
-
-vi.mock("~/runtime/app/features/evaluator-native-observability.adapter", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("~/runtime/app/features/evaluator-native-observability.adapter")
-    >();
-  return {
-    ...actual,
-    augmentEvaluationResult: augmentEvaluationResultMock,
-  };
-});
 
 vi.mock("@langwatch/evaluator-contract", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@langwatch/evaluator-contract")>();
@@ -50,9 +39,25 @@ vi.mock("@langwatch/evaluator-contract", async (importOriginal) => {
   };
 });
 
-import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
+import type { EvaluatorService, EvaluatorTypes } from "@langwatch/evaluator-contract";
 import type { Trace } from "@langwatch/trace-contract";
 import { runEvaluation } from "../runEvaluation";
+
+// The result augmenter is the evaluator feature's own, reached as
+// `evaluators.augmentResult`; it used to be a free function in the native
+// observability adapter, which is why this stub used to be a module mock. It
+// stays a stub either way — what the augmenter decides has its own tests, and
+// this file is about the request that goes out to langevals.
+const evaluators = {
+  augmentResult: (...args: unknown[]) => augmentResultMock(...args),
+} as unknown as EvaluatorService;
+
+/** The services this path never reaches, named so each call is complete. */
+const unusedServices = {
+  modelProviders: {} as never,
+  managedProviders: {} as never,
+  workflows: {} as never,
+};
 
 // Registered above in the mocked AVAILABLE_EVALUATORS; cast past the real
 // EvaluatorTypes union which doesn't know about the test fixture.
@@ -75,9 +80,7 @@ const serverErrorResponse = () => ({
 describe("runEvaluation langevals request", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    augmentEvaluationResultMock.mockImplementation(
-      ({ result }: { result: unknown }) => result,
-    );
+    augmentResultMock.mockImplementation(({ result }: { result: unknown }) => result);
   });
 
   describe("given an evaluator that declares extra fields beyond the canonical 6", () => {
@@ -98,6 +101,8 @@ describe("runEvaluation langevals request", () => {
           },
         },
         settings: {},
+        evaluators,
+        ...unusedServices,
       });
 
       expect(stagedLangevalsFetchMock).toHaveBeenCalledTimes(1);
@@ -136,6 +141,8 @@ describe("runEvaluation langevals request", () => {
         data: { type: "default", data: { input: "hello", output: "world" } },
         settings,
         trace,
+        evaluators,
+        ...unusedServices,
       });
 
       // One initial attempt + exactly one retry.
@@ -148,7 +155,7 @@ describe("runEvaluation langevals request", () => {
 
       // The retried attempt must still see the trace's droppedCategories —
       // the augmenter uses them to flag ingestion-redacted content.
-      expect(augmentEvaluationResultMock).toHaveBeenCalledWith(
+      expect(augmentResultMock).toHaveBeenCalledWith(
         expect.objectContaining({ droppedCategories: ["pii"] }),
       );
     });
@@ -164,6 +171,8 @@ describe("runEvaluation langevals request", () => {
           evaluatorType,
           data: { type: "default", data: { input: "hello", output: "world" } },
           settings: {},
+          evaluators,
+          ...unusedServices,
         }),
       ).rejects.toThrowError(/^500 /);
 

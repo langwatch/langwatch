@@ -42,15 +42,27 @@ vi.mock("~/server/middleware/rate-limit-langy", () => ({
   LANGY_WARMS_PER_MINUTE: 60,
 }));
 
-vi.mock("~/server/app-layer/app", () => ({
-  tryGetApp: () => null,
-  getApp: () => ({
-    langy: { startConversationTurn, warmConversationWorker },
-    permissions: { getDecision, checkScopeLineage },
+vi.mock("~/server/app-layer/app", async () => {
+  const { LangyApp } = await import("@langwatch/langy-server");
+  // The REAL application, over a stubbed service. `startTurn` is where the
+  // adoption flag is threaded into the turn service and where the
+  // idempotencyKey/requestId alias is resolved, so a hand-stubbed `langy`
+  // would answer the very questions this suite asks.
+  const langy = LangyApp.create({
+    langy: { startConversationTurn, warmConversationWorker } as never,
     // No Redis: the live edge is not what this suite is about.
     redis: null,
-  }),
-}));
+    broadcast: {} as never,
+  });
+  return {
+    tryGetApp: () => null,
+    getApp: () => ({
+      langy,
+      permissions: { getDecision, checkScopeLineage },
+      redis: null,
+    }),
+  };
+});
 
 vi.mock("~/runtime/app/features/audit-log", () => ({ auditLog }));
 

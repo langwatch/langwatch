@@ -1,10 +1,13 @@
 import type {
   AuthzGetDecisionInput,
   AuthzGetProjectAnyDecisionInput,
+  AuthzPrincipalRef,
+  AuthzRequireProjectPermissionInput,
   AuthzScopeLineageResult,
   AuthzService,
   PermissionDecision,
 } from "@langwatch/authz-contract";
+import { AuthzService as AuthzServiceImpl } from "@langwatch/authz-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { AuthzFeature } from "~/runtime/app/features/authz";
 
@@ -115,6 +118,47 @@ class ResolverBackedTestAuthzService {
    */
   async checkScopeLineage(): Promise<AuthzScopeLineageResult> {
     return { kind: "consistent" };
+  }
+
+  /**
+   * The one decision `authorizeProjectPermission` reads, answered from the
+   * same legacy resolvers `getDecision` uses.
+   */
+  async checkByIds({
+    principal,
+    permission,
+    projectId,
+  }: {
+    principal: AuthzPrincipalRef;
+    permission: AuthzGetDecisionInput["permission"];
+    projectId?: string | undefined;
+  }): Promise<{
+    allowed: boolean;
+    organizationRole: PermissionDecision["organizationRole"];
+  }> {
+    const decision = await this.getDecision({
+      userId: principal.id,
+      permission,
+      scope: { tier: "project", id: projectId ?? "" },
+    });
+
+    return { allowed: decision.permitted, organizationRole: decision.organizationRole };
+  }
+
+  /**
+   * Production's refusal mapping, run over the decision above.
+   *
+   * The Lite-Member branch and the plain denial live on
+   * `AuthzService.authorizeProjectPermission` now — `requireProjectPermission`
+   * in `~/server/auth/permissions` only delegates to it. Borrowing the method
+   * rather than restating its two branches here is what keeps the suites that
+   * drive that wrapper asserting the product's rule instead of this double's.
+   */
+  authorizeProjectPermission(input: AuthzRequireProjectPermissionInput): Promise<void> {
+    return AuthzServiceImpl.prototype.authorizeProjectPermission.call(
+      this as unknown as AuthzServiceImpl,
+      input,
+    );
   }
 }
 

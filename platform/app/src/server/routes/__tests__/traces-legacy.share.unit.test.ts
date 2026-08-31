@@ -46,9 +46,14 @@ const mockUnshare = vi.fn();
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: vi.fn(() => ({
+    // Resolving an inbound credential is the api-key SERVICE's job, and the
+    // App hands that service out through `ApiKeyApp.apiKeyService` — the seam
+    // every key-authenticated route reads on the way in.
     apiKeys: {
-      tryResolveToken: mockResolve,
-      markUsed: mockMarkUsed,
+      apiKeyService: {
+        tryResolveToken: mockResolve,
+        markUsed: mockMarkUsed,
+      },
     },
     share: {
       createShare: mockCreateShare,

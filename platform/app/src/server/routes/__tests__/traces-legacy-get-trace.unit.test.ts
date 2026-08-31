@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import type { TraceAppDependencies } from "@langwatch/trace-server";
 import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
 import { getApp } from "~/server/app-layer/app";
 import type { Trace } from "@langwatch/trace-contract";
@@ -18,8 +19,7 @@ const mockMarkUsed = vi.fn();
 // extractCredentials reads request headers; mock it to return a usable credential.
 // enforceApiKeyCeiling enforces RBAC ceiling; mock it to be a no-op.
 vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/server/api-key/auth-middleware")>();
+  const actual = await importOriginal<typeof import("~/server/api-key/auth-middleware")>();
   return {
     ...actual,
     extractCredentials: vi.fn(() => ({
@@ -51,27 +51,41 @@ vi.mock("~/server/tracer/spanToReadableSpan", () => ({
 }));
 
 // Stub the process App used by both the handler-managed auth and trace reader.
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: vi.fn(() => ({
-    apiKeys: {
-      tryResolveToken: mockResolve,
-      markUsed: mockMarkUsed,
-    },
-    share: {
-      createShare: vi.fn(),
-      unshare: vi.fn(),
-    },
-    evaluations: {},
-    traces: {
-      read: {
-        getById: mockGetById,
-        getEvaluationsMultiple: mockGetEvaluationsMultiple,
+vi.mock("~/server/app-layer/app", async () => {
+  const { TraceApp } = await import("@langwatch/trace-server");
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: vi.fn(() => ({
+      // Resolving an inbound credential is the api-key SERVICE's job, and the
+      // App hands that service out through `ApiKeyApp.apiKeyService` — the seam
+      // every key-authenticated route reads on the way in.
+      apiKeys: {
+        apiKeyService: {
+          tryResolveToken: mockResolve,
+          markUsed: mockMarkUsed,
+        },
       },
-    },
-  })),
-}));
+      share: {
+        createShare: vi.fn(),
+        unshare: vi.fn(),
+      },
+      evaluations: {},
+      // The real `TraceApp` over the stubbed legacy read port. Resolving a
+      // drawer read in full (`{ full: true }`, #4991) is the application's own
+      // rule, and it is exactly what this suite asserts — a hand-written double
+      // standing in its place would decide the answer instead of the code.
+      traces: TraceApp.create({
+        traces: {
+          read: {
+            getById: mockGetById,
+            getEvaluationsMultiple: mockGetEvaluationsMultiple,
+          },
+        },
+      } as unknown as TraceAppDependencies),
+    })),
+  };
+});
 
 // Stub the schema used by the search route to avoid Zod import issues.
 // Top-level `z` is safe to close over in a vi.mock factory — vitest hoists
@@ -115,13 +129,7 @@ const fakeProject = {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function makeRequest({
-  traceId,
-  query = {},
-}: {
-  traceId: string;
-  query?: Record<string, string>;
-}) {
+function makeRequest({ traceId, query = {} }: { traceId: string; query?: Record<string, string> }) {
   const searchParams = new URLSearchParams(query).toString();
   const url = `http://localhost/api/trace/${traceId}${searchParams ? `?${searchParams}` : ""}`;
   return testApp.request(url, {
@@ -161,12 +169,9 @@ describe("legacy GET /api/trace/:id (singular)", () => {
       // with THREE args; it must pass { full: true } as the fourth arg.
       await makeRequest({ traceId: "trace-abc", query: { format: "json" } });
 
-      expect(mockGetById).toHaveBeenCalledWith(
-        "project-123",
-        "trace-abc",
-        expect.any(Object),
-        { full: true },
-      );
+      expect(mockGetById).toHaveBeenCalledWith("project-123", "trace-abc", expect.any(Object), {
+        full: true,
+      });
     });
 
     it("returns 200 with the trace json", async () => {

@@ -10,7 +10,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { explainHandledError } from "~/features/errors/logic/presentation";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { GatewayService } from "@langwatch/gateway-server";
+import { PrismaGatewayAdapter } from "@langwatch/gateway-server";
 import { budgetPeriodFloorMs, effectiveBudgetPeriod } from "@langwatch/gateway-server";
 
 describe("budgetPeriodFloorMs on an anchored budget", () => {
@@ -74,13 +74,9 @@ describe("budgetPeriodFloorMs on an anchored budget", () => {
 
     // Inside the period the reset opened, the reset instant outranks the
     // anchored start: the forgiven spend stays forgiven.
-    expect(budgetPeriodFloorMs(row, new Date("2026-07-10T00:00:00.000Z"))).toBe(
-      resetAt.getTime(),
-    );
+    expect(budgetPeriodFloorMs(row, new Date("2026-07-10T00:00:00.000Z"))).toBe(resetAt.getTime());
     // One millisecond before the anchored boundary it still holds...
-    expect(budgetPeriodFloorMs(row, new Date("2026-07-17T08:59:59.999Z"))).toBe(
-      resetAt.getTime(),
-    );
+    expect(budgetPeriodFloorMs(row, new Date("2026-07-17T08:59:59.999Z"))).toBe(resetAt.getTime());
     // ...and at the boundary the cycle takes over again, unmoved by the
     // reset. A reset forgives spend; it never re-phases the cycle.
     expect(budgetPeriodFloorMs(row, new Date("2026-07-17T09:00:00.000Z"))).toBe(
@@ -202,6 +198,34 @@ describe("GatewayService.create with a cycle anchor", () => {
     } as unknown as PrismaClient;
   }
 
+  /**
+   * The process's own composition, over the fake database.
+   *
+   * `GatewayService` takes a repository and a `ProjectService` now rather than
+   * a `PrismaClient`, and the anchor refusal itself moved into
+   * `PrismaGatewayBudgetRepository.create`. Composing the pair the way
+   * `PrismaGatewayAdapter` composes it is what keeps that refusal reachable.
+   */
+  function serviceOver(prisma: PrismaClient) {
+    return PrismaGatewayAdapter.create({
+      database: prisma,
+      projects: {
+        tryGetWithTeam: vi
+          .fn()
+          .mockResolvedValue({
+            id: "project_1",
+            teamId: "team_1",
+            team: { organizationId: "org_1" },
+          }),
+        listTraceDestinations: vi.fn().mockResolvedValue([]),
+      } as never,
+      evaluators: {} as never,
+      monitors: {} as never,
+      changes: {} as never,
+      audit: {} as never,
+    }).build();
+  }
+
   const baseInput = {
     organizationId: "org_1",
     scope: { kind: "PROJECT" as const, projectId: "project_1" },
@@ -214,7 +238,7 @@ describe("GatewayService.create with a cycle anchor", () => {
   /** @scenario "A cycle anchor needs a cyclic window" */
   it("refuses an anchor on the two windows that do not cycle", async () => {
     for (const window of ["TOTAL", "MANUAL"] as const) {
-      const sut = GatewayService.create(mockPrisma());
+      const sut = serviceOver(mockPrisma());
       // The whole refusal contract, not just the code: the message is what
       // the REST body carries, the fault is what decides whether this is an
       // incident or routine, and meta.window is the caller's own value.
@@ -245,7 +269,7 @@ describe("GatewayService.create with a cycle anchor", () => {
   });
 
   it("accepts an anchor on a cyclic window", async () => {
-    const sut = GatewayService.create(mockPrisma());
+    const sut = serviceOver(mockPrisma());
     await expect(sut.create({ ...baseInput, window: "MONTH" })).rejects.toThrow(
       REACHED_TRANSACTION,
     );
@@ -253,10 +277,10 @@ describe("GatewayService.create with a cycle anchor", () => {
 
   it("leaves the two non-cycling windows alone when no anchor is sent", async () => {
     for (const window of ["TOTAL", "MANUAL"] as const) {
-      const sut = GatewayService.create(mockPrisma());
-      await expect(
-        sut.create({ ...baseInput, window, cycleAnchorAt: null }),
-      ).rejects.toThrow(REACHED_TRANSACTION);
+      const sut = serviceOver(mockPrisma());
+      await expect(sut.create({ ...baseInput, window, cycleAnchorAt: null })).rejects.toThrow(
+        REACHED_TRANSACTION,
+      );
     }
   });
 });

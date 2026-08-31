@@ -21,19 +21,27 @@ const mockWarn = vi.fn();
 vi.mock("~/server/app-layer/app", () => ({
   tryGetApp: () => null,
   getApp: vi.fn(() => ({
+    // Resolving an inbound credential is the api-key SERVICE's job, and the
+    // App hands that service out through `ApiKeyApp.apiKeyService` — the seam
+    // every key-authenticated route reads on the way in.
     apiKeys: {
-      tryResolveToken: mockResolve,
-      markUsed: mockMarkUsed,
+      apiKeyService: {
+        tryResolveToken: mockResolve,
+        markUsed: mockMarkUsed,
+      },
     },
     usage: { checkLimit: mockCheckLimit },
     planProvider: {
       getActivePlan: vi.fn().mockResolvedValue({ name: "free" }),
     },
     usageLimits: { notifyPlanLimitReached: vi.fn() },
-    governance: {
-      policy: { resolveSourceNonBillable: vi.fn().mockResolvedValue(false) },
-    },
-    traces: {
+    // `applyReceiverProvenance*` is handed `c.app.governance` itself as its
+    // policy, so the service's methods sit at the top of this facet.
+    governance: { resolveSourceNonBillable: vi.fn().mockResolvedValue(false) },
+    // Ingestion is NOT on `TraceApp`: the App names the span/log/metric
+    // collection services apart as `traceIngestion`, which is what every OTLP
+    // and collector handler reads.
+    traceIngestion: {
       collection: { handleOtlpTraceRequest: mockHandleTraces },
       logCollection: { handleOtlpLogRequest: mockHandleLogs },
       metricCollection: { handleOtlpMetricRequest: mockHandleMetrics },
@@ -42,8 +50,7 @@ vi.mock("~/server/app-layer/app", () => ({
 }));
 
 vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/server/api-key/auth-middleware")>();
+  const actual = await importOriginal<typeof import("~/server/api-key/auth-middleware")>();
   return {
     ...actual,
     extractCredentials: mockExtractCredentials,
@@ -331,8 +338,7 @@ describe("OTLP endpoint path canonicalisation", () => {
         path: "/api/otel/v1/logs",
         payload: logPayload,
         headers: {
-          "x-langwatch-otlp-corrected-path":
-            headers.get("x-langwatch-otlp-corrected-path") ?? "",
+          "x-langwatch-otlp-corrected-path": headers.get("x-langwatch-otlp-corrected-path") ?? "",
         },
       });
 

@@ -31,8 +31,10 @@
  * @see src/server/api/trpc.ts (transformer: superjson, errorFormatter)
  */
 
-import type { Hono } from "hono";
+import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
+import type { App } from "~/server/app-layer/app";
 
 // fetchRequestHandler is the adapter the route delegates to. We replace it
 // with a throwing stub so the route takes its error path. The mock is hoisted
@@ -71,9 +73,17 @@ describe("tRPC route empty-body guard (langwatch#5219)", () => {
         throw new Error(BOOM);
       });
 
-      const { app } = await import("~/server/routes/trpc");
+      // The transport is built from a process App now, and `createServiceApp`
+      // refuses a request whose root installed none — so it is mounted the way
+      // `createApiRouter` mounts it. Nothing here reads the App: the adapter
+      // that would build the tRPC context is the stub throwing above.
+      const { createTRPCApp } = await import("~/server/routes/trpc");
+      const processApp = {} as App;
+      const root = new Hono();
+      root.use("*", appContextMiddlewareFor(processApp));
+      root.route("/", createTRPCApp(processApp));
 
-      const res = await app.request("http://localhost/api/trpc/analytics.getTimeseries", {
+      const res = await root.request("http://localhost/api/trpc/analytics.getTimeseries", {
         method: "GET",
       });
 
@@ -192,9 +202,7 @@ describe("honoFetchForNode null-body guard (langwatch#5219)", () => {
       fetch: vi.fn().mockResolvedValue(new Response("404 Not Found", { status: 404 })),
     } as unknown as Hono;
 
-    const response = await honoFetchForNode(honoApp)(
-      new Request("http://localhost/api/nope"),
-    );
+    const response = await honoFetchForNode(honoApp)(new Request("http://localhost/api/nope"));
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: "Not Found" });
