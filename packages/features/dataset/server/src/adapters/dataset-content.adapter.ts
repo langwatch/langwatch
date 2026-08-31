@@ -9,7 +9,6 @@ import {
   type DeleteDatasetRecordsInput,
   type UpdateDatasetRecordInput,
 } from "@langwatch/dataset-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { DatasetContentPort } from "../ports/dataset.port";
 import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
 import { DatasetContentRepository } from "../repositories/prisma/dataset-content.repository";
@@ -23,7 +22,6 @@ export class DatasetContentAdapter extends DatasetContentPort {
   private readonly chunks: DatasetChunkService;
 
   private constructor(
-    private readonly database: PrismaClient,
     private readonly datasets: DatasetContentRepository,
     private readonly records: DatasetRecordContentRepository,
     private readonly storageResolver: DatasetStorageResolver,
@@ -33,17 +31,11 @@ export class DatasetContentAdapter extends DatasetContentPort {
   }
 
   static create(options: {
-    database: PrismaClient;
     datasets: DatasetContentRepository;
     records: DatasetRecordContentRepository;
     storageResolver: DatasetStorageResolver;
   }): DatasetContentAdapter {
-    return new DatasetContentAdapter(
-      options.database,
-      options.datasets,
-      options.records,
-      options.storageResolver,
-    );
+    return new DatasetContentAdapter(options.datasets, options.records, options.storageResolver);
   }
 
   async listRecords({ dataset, input }: { dataset: Dataset; input: DatasetPageInput }) {

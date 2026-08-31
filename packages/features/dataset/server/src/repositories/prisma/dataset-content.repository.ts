@@ -3,6 +3,15 @@ import type { Dataset, Prisma, PrismaClient } from "@langwatch/prisma-client/gen
 /**
  * Input types derived from Prisma for type safety
  */
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type DatasetContentDatabase = Pick<
+  PrismaClient,
+  "dataset" | "datasetRecord" | "$transaction" | "$queryRaw" | "$executeRaw"
+>;
+
 export type CreateDatasetInput = Omit<
   Prisma.DatasetCreateInput,
   "project" | "datasetRecords" | "batchEvaluations"
@@ -55,7 +64,7 @@ export const DATASET_MUTATION_TXN_TIMEOUT_MS = 120_000;
 export const DATASET_MUTATION_TXN_MAX_WAIT_MS = 10_000;
 
 /** A `PrismaClient`, or the transaction-scoped client `$transaction` hands back. */
-type DatasetContentClient = PrismaClient | Prisma.TransactionClient;
+type DatasetContentClient = DatasetContentDatabase | Prisma.TransactionClient;
 
 type CountableDataset = {
   id: string;
@@ -75,10 +84,10 @@ export class DatasetContentRepository {
   private constructor(
     private readonly prisma: DatasetContentClient,
     /** Absent on a transaction-scoped instance — only the root can open one. */
-    private readonly root: PrismaClient | null,
+    private readonly root: DatasetContentDatabase | null,
   ) {}
 
-  static create(prisma: PrismaClient): DatasetContentRepository {
+  static create(prisma: DatasetContentDatabase): DatasetContentRepository {
     return new DatasetContentRepository(prisma, prisma);
   }
 

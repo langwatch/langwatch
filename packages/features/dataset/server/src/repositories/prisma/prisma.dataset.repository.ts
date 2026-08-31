@@ -13,6 +13,12 @@ import {
 
 type Database = Pick<PrismaClient, "dataset">;
 
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type DatasetDatabase = Pick<PrismaClient, "dataset">;
+
 export class PrismaDatasetRepository extends DatasetRepository {
   private constructor(private readonly database: Database) {
     super();
@@ -54,11 +60,7 @@ export class PrismaDatasetRepository extends DatasetRepository {
     return row ? toDataset(row) : null;
   }
 
-  async list(input: {
-    projectId: string;
-    page: number;
-    limit: number;
-  }): Promise<DatasetSummary[]> {
+  async list(input: { projectId: string; page: number; limit: number }): Promise<DatasetSummary[]> {
     const rows = await this.database.dataset.findMany({
       where: { projectId: input.projectId, archivedAt: null },
       orderBy: { createdAt: "desc" },
@@ -118,11 +120,7 @@ export class PrismaDatasetRepository extends DatasetRepository {
     return archived;
   }
 
-  async restore(input: {
-    id: string;
-    projectId: string;
-    slug: string;
-  }): Promise<Dataset> {
+  async restore(input: { id: string; projectId: string; slug: string }): Promise<Dataset> {
     const changed = await this.database.dataset.updateMany({
       where: { id: input.id, projectId: input.projectId },
       data: { slug: input.slug, archivedAt: null },
@@ -146,8 +144,7 @@ export class PrismaDatasetRepository extends DatasetRepository {
       where: { id: input.id, projectId: input.projectId },
       data: { mapping: input.mapping as Prisma.InputJsonValue },
     });
-    if (changed.count === 0)
-      throw new Error("Dataset was not found while updating mapping");
+    if (changed.count === 0) throw new Error("Dataset was not found while updating mapping");
     const updated = await this.tryFindById({
       id: input.id,
       projectId: input.projectId,

@@ -21,7 +21,7 @@ import type {
   DatasetColumns,
 } from "@langwatch/dataset-contract";
 import type { Readable } from "node:stream";
-import type { Dataset, Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Dataset, Prisma } from "@langwatch/prisma-client/generated";
 import { DatasetContentRepository } from "../repositories/prisma/dataset-content.repository";
 import { DatasetRecordContentRepository } from "../repositories/prisma/dataset-record-content.repository";
 import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
@@ -42,22 +42,15 @@ import { stripNullBytes } from "../services/sanitize";
 /** Owns upload lifecycle behavior; routes only see DatasetService's contract. */
 export class DatasetUploadAdapter implements DatasetUploadPort {
   static create(options: {
-    prisma: PrismaClient;
     datasets: DatasetContentRepository;
     records: DatasetRecordContentRepository;
     storageResolver: DatasetStorageResolver;
   }): DatasetUploadAdapter {
-    return new DatasetUploadAdapter(
-      options.prisma,
-      options.datasets,
-      options.records,
-      options.storageResolver,
-    );
+    return new DatasetUploadAdapter(options.datasets, options.records, options.storageResolver);
   }
   private readonly chunks: DatasetChunkService;
 
   constructor(
-    private readonly prisma: PrismaClient,
     private readonly datasets: DatasetContentRepository,
     private readonly records: DatasetRecordContentRepository,
     private readonly storageResolver: DatasetStorageResolver,

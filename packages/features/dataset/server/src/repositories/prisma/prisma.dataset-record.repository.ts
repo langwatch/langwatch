@@ -8,6 +8,12 @@ import { DatasetRecordRepository } from "../dataset-record.repository";
 
 type Database = Pick<PrismaClient, "datasetRecord">;
 
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type DatasetRecordDatabase = Pick<PrismaClient, "datasetRecord">;
+
 export class PrismaDatasetRecordRepository extends DatasetRecordRepository {
   private constructor(private readonly database: Database) {
     super();

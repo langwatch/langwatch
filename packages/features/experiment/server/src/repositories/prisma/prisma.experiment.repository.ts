@@ -17,6 +17,10 @@ import {
   type ExperimentRowState,
 } from "../experiment.repository";
 
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
 export type ExperimentDatabase = Pick<
   PrismaClient,
   "experiment" | "experimentVersion" | "$transaction"

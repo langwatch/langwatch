@@ -31,7 +31,11 @@ type ExperimentClickHouseClient = {
   }): Promise<QueryResult>;
 };
 
-type ExperimentRunVersionDatabase = Pick<PrismaClient, "workflowVersion">;
+/**
+ * The one Postgres delegate this ClickHouse repository reads, so composition
+ * can name it without reaching for the generated client itself.
+ */
+export type ExperimentRunVersionDatabase = Pick<PrismaClient, "workflowVersion">;
 
 type ClickHouseExperimentRunRepositoryOptions = {
   database: ExperimentRunVersionDatabase;
@@ -133,8 +137,7 @@ const parseRecord = (value: string | null): Record<string, unknown> | undefined 
     return undefined;
   }
 };
-const runKey = (experimentId: string, runId: string): string =>
-  `${experimentId}:${runId}`;
+const runKey = (experimentId: string, runId: string): string => `${experimentId}:${runId}`;
 
 export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
   static create(
@@ -143,9 +146,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
     return new ClickHouseExperimentRunRepository(options);
   }
 
-  private constructor(
-    private readonly options: ClickHouseExperimentRunRepositoryOptions,
-  ) {
+  private constructor(private readonly options: ClickHouseExperimentRunRepositoryOptions) {
     super();
   }
 
@@ -417,8 +418,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
 
   private async requireClient(projectId: string): Promise<ExperimentClickHouseClient> {
     const client = await this.options.resolveClient(projectId);
-    if (!client)
-      throw new Error(`ClickHouse client unavailable for project ${projectId}`);
+    if (!client) throw new Error(`ClickHouse client unavailable for project ${projectId}`);
     return client;
   }
 
@@ -459,9 +459,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
     if (rows.length === 0) return [];
     const range = computeOccurredAtRangeForRuns(rows);
     this.warnIfRunsAreOld(projectId, range.minMs, rows.length);
-    const runPairs = rows.map((row) =>
-      this.options.tupleParam([row.ExperimentId, row.RunId]),
-    );
+    const runPairs = rows.map((row) => this.options.tupleParam([row.ExperimentId, row.RunId]));
     const [breakdownResult, costResult, versions] = await Promise.all([
       client.query({
         query: `
@@ -568,8 +566,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
       ...new Set(
         items
           .filter(
-            (item) =>
-              item.ResultType === "target" && item.TraceId && item.TargetCost === null,
+            (item) => item.ResultType === "target" && item.TraceId && item.TargetCost === null,
           )
           .flatMap((item) => (item.TraceId ? [item.TraceId] : [])),
       ),
@@ -604,11 +601,8 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
         format: "JSONEachRow",
       });
       const costs = new Map(
-        (await result.json<{ TraceId: string; TotalCost: number | null }>()).flatMap(
-          (row) =>
-            row.TotalCost && row.TotalCost > 0
-              ? [[row.TraceId, row.TotalCost] as const]
-              : [],
+        (await result.json<{ TraceId: string; TotalCost: number | null }>()).flatMap((row) =>
+          row.TotalCost && row.TotalCost > 0 ? [[row.TraceId, row.TotalCost] as const] : [],
         ),
       );
       const counts = new Map<string, number>();
@@ -654,8 +648,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
   }
 }
 function timestamps(row: RunRow) {
-  const parse = (value: string): number =>
-    new Date(`${value.replace(" ", "T")}Z`).getTime();
+  const parse = (value: string): number => new Date(`${value.replace(" ", "T")}Z`).getTime();
   return {
     createdAt: parse(row.CreatedAt),
     updatedAt: parse(row.UpdatedAt),
@@ -699,11 +692,7 @@ function mapRun(
   });
 }
 
-function mapRunWithItems(
-  run: RunRow,
-  items: ItemRow[],
-  projectId: string,
-): ExperimentRunWithItems {
+function mapRunWithItems(run: RunRow, items: ItemRow[], projectId: string): ExperimentRunWithItems {
   const dataset: ExperimentRunWithItems["dataset"] = [];
   const evaluations: ExperimentRunWithItems["evaluations"] = [];
   for (const item of items) {

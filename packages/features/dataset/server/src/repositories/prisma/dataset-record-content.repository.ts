@@ -1,8 +1,4 @@
-import type {
-  DatasetRecord,
-  Prisma,
-  PrismaClient,
-} from "@langwatch/prisma-client/generated";
+import type { DatasetRecord, Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
 /**
  * Repository layer for dataset record data access.
@@ -10,10 +6,16 @@ import type {
  *
  * {@link DatasetRecord} represents individual rows/entries within a {@link Dataset}.
  */
-export class DatasetRecordContentRepository {
-  private constructor(private readonly prisma: PrismaClient) {}
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type DatasetRecordContentDatabase = Pick<PrismaClient, "datasetRecord" | "$transaction">;
 
-  static create(prisma: PrismaClient): DatasetRecordContentRepository {
+export class DatasetRecordContentRepository {
+  private constructor(private readonly prisma: DatasetRecordContentDatabase) {}
+
+  static create(prisma: DatasetRecordContentDatabase): DatasetRecordContentRepository {
     return new DatasetRecordContentRepository(prisma);
   }
 

@@ -7,12 +7,14 @@ import type { DatasetService } from "@langwatch/dataset-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   PrismaExperimentRepository,
   type ExperimentDatabase,
 } from "../repositories/prisma/prisma.experiment.repository";
-import { ClickHouseExperimentRunRepository } from "../repositories/clickhouse/clickhouse.experiment-run.repository";
+import {
+  ClickHouseExperimentRunRepository,
+  type ExperimentRunVersionDatabase,
+} from "../repositories/clickhouse/clickhouse.experiment-run.repository";
 import { ClickHouseExperimentDspyRepository } from "../repositories/clickhouse/clickhouse.experiment-dspy.repository";
 import type { ExperimentDspyRetentionPort } from "../ports/experiment-dspy-retention.port";
 import type { ExperimentWorkbenchUpdatesPort } from "../ports/experiment-workbench-updates.port";
@@ -21,7 +23,7 @@ import { ExperimentService } from "../services/experiment.service";
 
 export type PostgresExperimentAdapterOptions = {
   /** The primary Postgres store plus workflow-version metadata for run reads. */
-  database: ExperimentDatabase & Pick<PrismaClient, "workflowVersion">;
+  database: ExperimentDatabase & ExperimentRunVersionDatabase;
   /** `null` explicitly represents a deployment without ClickHouse. */
   resolveClickHouseClient: (projectId: string) => Promise<{
     insert(input: {
