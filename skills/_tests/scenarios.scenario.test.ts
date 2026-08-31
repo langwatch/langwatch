@@ -731,7 +731,7 @@ describe("Scenarios Skill", () => {
           scenario.judgeAgent({
             model: judgeModel,
             criteria: [
-              "Agent created a voice scenario test using one of Scenario's voice adapters (OpenAIRealtimeAgentAdapter, ElevenLabsAgentAdapter, PipecatAgentAdapter, GeminiLiveAgentAdapter, or TwilioAgentAdapter) — NOT a generic text-only scenario",
+              "Agent created a voice scenario test using one of Scenario's voice adapters (OpenAIRealtimeAgentAdapter, ElevenLabsAgentAdapter, PipecatAgentAdapter, GeminiLiveAgentAdapter, TwilioAgentAdapter, or ComposableVoiceAgent) — NOT a generic text-only scenario",
               "Agent seeded a voice on the UserSimulatorAgent (e.g. `voice=\"elevenlabs/...\"` or `voice=\"openai/...\"`) so the simulated caller speaks rather than types",
               "Agent used the `langwatch scenario-docs` CLI command to read Scenario documentation, OR explicitly read the voice docs surface (voice/getting-started, voice/choosing-an-adapter, voice/capability-matrix, voice/recipes/*)",
             ],
