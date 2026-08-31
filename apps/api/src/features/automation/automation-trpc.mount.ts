@@ -25,7 +25,7 @@ import {
   type TrpcApiPorts,
   type TrpcApiPublicMount,
 } from "@langwatch/api/trpc";
-import { translateFilterToClickHouse } from "@langwatch/trace-server";
+import { TraceQueryClickHouse } from "@langwatch/trace-server";
 import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 
 /**
@@ -48,7 +48,7 @@ export function createAutomationTrpcRouter<
     // A dry run over a zero-width window: only whether the author's query
     // compiles is being asked, so the window never reaches ClickHouse.
     assertTraceFilterQueryCompiles: ({ query, projectId }) => {
-      translateFilterToClickHouse(query, projectId, { from: 0, to: 0 });
+      TraceQueryClickHouse.translateFilter(query, projectId, { from: 0, to: 0 });
     },
   });
 }

@@ -483,7 +483,7 @@ import {
 } from "~/runtime/app/features/topic";
 import { maybeExtractSpanMedia } from "./traces/edge-media-extraction";
 import { maybeSpool } from "./traces/edge-spool";
-import { translateFilterToClickHouse } from "@langwatch/trace-server";
+import { TraceQueryClickHouse } from "@langwatch/trace-server";
 import { LogRecordStorageService } from "./traces/log-record-storage.service";
 import { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
@@ -2197,7 +2197,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
                 pageSize: limit,
                 visibilityCutoffMs: null,
                 filterWhere:
-                  translateFilterToClickHouse(query, projectId, { from, to }) ?? undefined,
+                  TraceQueryClickHouse.translateFilter(query, projectId, { from, to }) ?? undefined,
               });
               const projectUrl = `${config.baseHost}/${projectSlug}`;
               return page.items.map((item) => toReportTraceRow({ item, projectUrl }));

@@ -6,7 +6,7 @@ import {
   type RangeFacetDef,
 } from "../trace-facet-registry.clickhouse.adapter";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import { translateFilterToClickHouse } from "../trace-query.clickhouse.adapter";
+import { TraceQueryClickHouse } from "../trace-query.clickhouse.adapter";
 import { TraceQueryEvaluationService } from "../../services/trace-query-evaluation.service";
 
 const evaluateQueryInMemory = TraceQueryEvaluationService.matches;
@@ -701,7 +701,7 @@ describe("FieldDef SQL/read parity", () => {
       "[%s] compiles against its registry expression",
       (key, def) => {
         const literal = def.kind === "range" ? "1" : "x";
-        const compiled = translateFilterToClickHouse(`${key}:${literal}`, "tenant-1", {
+        const compiled = TraceQueryClickHouse.translateFilter(`${key}:${literal}`, "tenant-1", {
           from: 0,
           to: 1,
         });
@@ -751,7 +751,7 @@ describe("given a filter field that collides with an Object.prototype member", (
   describe("when the save-time gate compiles it", () => {
     it.each(PROTOTYPE_FIELDS)("[%s] is rejected as an unknown field", (field) => {
       expect(() =>
-        translateFilterToClickHouse(`${field}:x`, "tenant-1", {
+        TraceQueryClickHouse.translateFilter(`${field}:x`, "tenant-1", {
           from: 0,
           to: 1,
         }),
@@ -854,7 +854,7 @@ describe("the in-memory free-text narrowing", () => {
 
     // The same filter compiled for ClickHouse does reach span names, which is
     // the asymmetry the spec records.
-    const compiled = translateFilterToClickHouse("codex", "tenant-1", {
+    const compiled = TraceQueryClickHouse.translateFilter("codex", "tenant-1", {
       from: 0,
       to: 1,
     });
@@ -887,7 +887,7 @@ describe("the in-memory free-text narrowing", () => {
 
 describe("free text compiled to ClickHouse", () => {
   function compile(query: string) {
-    return translateFilterToClickHouse(query, "tenant-1", {
+    return TraceQueryClickHouse.translateFilter(query, "tenant-1", {
       from: 1000,
       to: 2000,
     });

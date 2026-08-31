@@ -39,8 +39,8 @@ import {
   spendFiltersFromQuery,
   type SpendGroupByKey,
   spendSummaryStatusFilter,
-  USD_DISPLAY_STRING_FORMAT,
 } from "@langwatch/gateway-server";
+import { USD_DISPLAY_STRING_FORMAT } from "@langwatch/gateway-contract";
 import { requires } from "@langwatch/api";
 import {
   type ApiErrorBody,

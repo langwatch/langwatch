@@ -6,7 +6,7 @@
  * well as captured I/O" rule against real ClickHouse, for BOTH free-text paths:
  *
  *   Path A, the traces-v2 search bar (also what Langy searches through):
- *            `translateFilterToClickHouse` compiles the query and the generated
+ *            `TraceQueryClickHouse.translateFilter` compiles the query and the generated
  *            SQL is executed here, so an invalid subquery or a mis-bound param
  *            fails the test rather than passing a string assertion.
  *   Path B, the legacy messages list and public search endpoint, driven
@@ -22,7 +22,7 @@ import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { translateFilterToClickHouse } from "@langwatch/trace-server";
+import { TraceQueryClickHouse } from "@langwatch/trace-server";
 import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
@@ -69,8 +69,7 @@ function traceRow({
     LastEventOccurredAt: new Date(now),
     ComputedIOSchemaVersion: "v1",
     ComputedInput: input === null ? null : JSON.stringify({ type: "text", value: input }),
-    ComputedOutput:
-      output === null ? null : JSON.stringify({ type: "text", value: output }),
+    ComputedOutput: output === null ? null : JSON.stringify({ type: "text", value: output }),
     TotalDurationMs: 100,
     SpanCount: 1,
     ContainsErrorStatus: false,
@@ -153,7 +152,7 @@ vi.mock("~/server/db", () => ({
  * generated SQL against the seeded data and return the trace ids it selects.
  */
 async function searchViaCompiledFilter(query: string): Promise<string[]> {
-  const compiled = translateFilterToClickHouse(query, tenantId, {
+  const compiled = TraceQueryClickHouse.translateFilter(query, tenantId, {
     from: now - 60_000,
     to: now + 60_000,
   });

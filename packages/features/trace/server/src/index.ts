@@ -94,10 +94,7 @@ export { TraceEventDerivationPort } from "./ports/trace-event-derivation.port";
 export { TraceQueryFieldValuesPort } from "./ports/query-field-values.port";
 
 export { TraceQueryClassificationAdapter } from "./adapters/trace-query-classification.adapter";
-export {
-  extractFreeTextTerms,
-  translateFilterToClickHouse,
-} from "./adapters/trace-query.clickhouse.adapter";
+export { TraceQueryClickHouse } from "./adapters/trace-query.clickhouse.adapter";
 
 export {
   FACET_REGISTRY,

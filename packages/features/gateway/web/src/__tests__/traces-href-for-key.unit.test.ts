@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseFragment } from "@langwatch/trace-web";
-import { translateFilterToClickHouse } from "@langwatch/trace-server";
+import { TraceQueryClickHouse } from "@langwatch/trace-server";
 import { resolveTracesHrefForKey, tracesHrefForKey } from "../traces-href-for-key";
 
 /**
@@ -36,7 +36,7 @@ describe("tracesHrefForKey", () => {
 
   describe("when the query language reads the filter it produced", () => {
     const parsed = parseFragment(href.slice(href.indexOf("#")));
-    const translated = translateFilterToClickHouse(
+    const translated = TraceQueryClickHouse.translateFilter(
       parsed?.overrides.query ?? "",
       "project_test",
       { from: 1714435200000, to: 1715040000000 },
@@ -98,7 +98,7 @@ describe("tracesHrefForKey narrowed to one model", () => {
     });
 
     describe("when the query language reads the two clauses back", () => {
-      const translated = translateFilterToClickHouse(
+      const translated = TraceQueryClickHouse.translateFilter(
         parsed?.overrides.query ?? "",
         "project_test",
         { from: 1714435200000, to: 1715040000000 },

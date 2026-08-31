@@ -13,21 +13,16 @@ import {
   UNSUPPORTED,
   type Unsupported,
 } from "../adapters/trace-query-evaluation.adapter";
-import {
-  MAX_NODE_COUNT,
-  normalizeQuery,
-  translateFilterToClickHouse,
-} from "../adapters/trace-query.clickhouse.adapter";
+import { MAX_NODE_COUNT, TraceQueryClickHouse } from "../adapters/trace-query.clickhouse.adapter";
 import { FIELD_DEF_BY_NAME } from "../adapters/trace-query-fields.clickhouse.adapter";
 import { existenceNeeds } from "../adapters/trace-query-meta-fields.clickhouse.adapter";
 import {
   EVENT_ATTRIBUTE_PREFIX,
   EVENT_ATTRIBUTE_PREFIX_LEGACY,
-  extractStringValue,
-  readAttribute,
   SPAN_ATTRIBUTE_PREFIX,
   TRACE_ATTRIBUTE_PREFIX,
   TRACE_ATTRIBUTE_PREFIX_LEGACY,
+  TraceQueryValues,
 } from "../adapters/trace-query-values.clickhouse.adapter";
 
 const logger = createLogger("langwatch:traces:filter-evaluate");
@@ -63,7 +58,7 @@ export class TraceQueryEvaluationService {
     // FilterFieldUnknownError for unknown fields. Anything it rejects fails closed.
     let compiled: { sql: string; params: Record<string, unknown> } | null;
     try {
-      compiled = translateFilterToClickHouse(queryText, "__in_memory__", {
+      compiled = TraceQueryClickHouse.translateFilter(queryText, "__in_memory__", {
         from: 0,
         to: 0,
       });
@@ -75,7 +70,7 @@ export class TraceQueryEvaluationService {
 
     let ast: LiqeQuery;
     try {
-      ast = parseTraceQuerySyntax(normalizeQuery(queryText));
+      ast = parseTraceQuerySyntax(TraceQueryClickHouse.normalizeQuery(queryText));
     } catch {
       return false;
     }
@@ -108,7 +103,7 @@ export class TraceQueryEvaluationService {
     const needs = new Set<FieldNeeds>();
     let ast: LiqeQuery;
     try {
-      ast = parseTraceQuerySyntax(normalizeQuery(queryText));
+      ast = parseTraceQuerySyntax(TraceQueryClickHouse.normalizeQuery(queryText));
     } catch {
       return needs;
     }
@@ -254,7 +249,7 @@ export class TraceQueryEvaluationService {
     // free-text filter stop matching, which is a live dispatch behaviour. Missing
     // the narrow span-name-only case costs less than breaking that, and a
     // dispatcher that starts loading spans becomes exact with no change here.
-    const value = extractStringValue(tag).toLowerCase();
+    const value = TraceQueryValues.extractStringValue(tag).toLowerCase();
     const inputMatch = TraceQueryEvaluationService.ilikeContains(
       trace.summary.computedInput,
       value,
@@ -297,8 +292,8 @@ export class TraceQueryEvaluationService {
   ): boolean | Unsupported {
     // Empty key throws on the SQL side (422) — fail closed.
     if (!key) return UNSUPPORTED;
-    const value = extractStringValue(tag);
-    const matched = readAttribute(trace.summary.attributes, key) === value;
+    const value = TraceQueryValues.extractStringValue(tag);
+    const matched = TraceQueryValues.readAttribute(trace.summary.attributes, key) === value;
     return negated ? !matched : matched;
   }
 
@@ -310,8 +305,10 @@ export class TraceQueryEvaluationService {
   ): boolean | Unsupported {
     if (!key) return UNSUPPORTED;
     if (trace.events == null) return UNSUPPORTED;
-    const value = extractStringValue(tag);
-    const matched = trace.events.some((e) => readAttribute(e.attributes, key) === value);
+    const value = TraceQueryValues.extractStringValue(tag);
+    const matched = trace.events.some(
+      (e) => TraceQueryValues.readAttribute(e.attributes, key) === value,
+    );
     return negated ? !matched : matched;
   }
 
@@ -368,7 +365,7 @@ export class TraceQueryEvaluationService {
     // from the value rather than a static `FieldDef.needs`.
     if (fieldName === "has" || fieldName === "none") {
       try {
-        const need = existenceNeeds(extractStringValue(tag));
+        const need = existenceNeeds(TraceQueryValues.extractStringValue(tag));
         if (need) needs.add(need);
       } catch {
         // Non-literal value — nothing to resolve.

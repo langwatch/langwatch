@@ -16,12 +16,7 @@ import {
   LABEL_DEF,
   MODEL_DEF,
 } from "./trace-query-custom-fields.clickhouse.adapter";
-import {
-  categorical,
-  crossTableCategorical,
-  crossTableRange,
-  range,
-} from "./trace-query-translators.clickhouse.adapter";
+import { TraceQueryTranslators } from "./trace-query-translators.clickhouse.adapter";
 import { META_FIELD_DEFS } from "./trace-query-meta-fields.clickhouse.adapter";
 
 // ---------------------------------------------------------------------------
@@ -47,7 +42,7 @@ function categoricalFacet(key: string): FieldDef {
     throw new Error(`facet '${key}' is not a categorical facet`);
   }
   if (!def.read) throw new Error(`facet '${key}' has no in-memory read`);
-  return categorical(def.expression, def.read, def.key);
+  return TraceQueryTranslators.categorical(def.expression, def.read, def.key);
 }
 
 /** Auto-derived `trace_summaries` range: numeric comparison + summary read. */
@@ -57,7 +52,7 @@ function rangeFacet(key: string): FieldDef {
     throw new Error(`facet '${key}' is not a range facet`);
   }
   if (!def.read) throw new Error(`facet '${key}' has no in-memory read`);
-  return range(def.expression, def.read, def.key);
+  return TraceQueryTranslators.range(def.expression, def.read, def.key);
 }
 
 /**
@@ -71,7 +66,7 @@ function crossCategoricalFacet(key: string, needs: FieldNeeds, read: Categorical
   if (def.kind !== "categorical") {
     throw new Error(`facet '${key}' is not a categorical facet`);
   }
-  return crossTableCategorical(
+  return TraceQueryTranslators.crossTableCategorical(
     def.table,
     TABLE_TIME_COLUMNS[def.table],
     def.expression,
@@ -86,7 +81,7 @@ function crossRangeFacet(key: string, needs: FieldNeeds, read: RangeRead): Field
   if (def.kind !== "range") {
     throw new Error(`facet '${key}' is not a range facet`);
   }
-  return crossTableRange(
+  return TraceQueryTranslators.crossTableRange(
     def.table,
     TABLE_TIME_COLUMNS[def.table],
     def.expression,

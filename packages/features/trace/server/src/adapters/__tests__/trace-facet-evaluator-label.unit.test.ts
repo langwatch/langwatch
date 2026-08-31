@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { FACET_REGISTRY } from "../trace-facet-registry.clickhouse.adapter";
-import { translateFilterToClickHouse } from "../trace-query.clickhouse.adapter";
+import { TraceQueryClickHouse } from "../trace-query.clickhouse.adapter";
 import { SEARCH_FIELDS } from "@langwatch/trace-contract";
 
 const TENANT = "project_test";
 const TIME_RANGE = { from: 1714435200000, to: 1715040000000 };
 
-const translate = (query: string) => translateFilterToClickHouse(query, TENANT, TIME_RANGE);
+const translate = (query: string) =>
+  TraceQueryClickHouse.translateFilter(query, TENANT, TIME_RANGE);
 
 /**
  * `evaluatorLabel` is wired the same way as `evaluatorVerdict`: a categorical

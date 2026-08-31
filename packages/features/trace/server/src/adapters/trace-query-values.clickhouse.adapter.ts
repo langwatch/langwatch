@@ -33,115 +33,129 @@ export const EVENT_ATTRIBUTE_PREFIX = "event.attribute.";
  */
 export const SPAN_ATTRIBUTE_PREFIX = "span.attribute.";
 
-export function extractStringValue(tag: TagToken): string {
-  if (tag.expression.type === "LiteralExpression") {
-    return String(tag.expression.value);
-  }
-  if (tag.expression.type === "RegexExpression") {
-    return String(tag.expression.value);
-  }
-  throw new FilterParseError("Unsupported value expression");
-}
-
-export function extractNumericValue(tag: TagToken): number {
-  if (tag.expression.type !== "LiteralExpression") {
-    throw new FilterParseError("Expected a numeric value");
-  }
-  const raw = tag.expression.value;
-  const num = typeof raw === "number" ? raw : parseFloat(String(raw));
-  if (Number.isNaN(num)) {
-    throw new FilterParseError(`Not a number: ${String(raw)}`);
-  }
-  return num;
-}
-
-/**
- * Generate a unique parameter name for the ClickHouse SDK to bind. Pass a
- * semantic `base` (e.g. `"traceId"`) so the resulting query reads naturally —
- * `WHERE TraceId = {traceId_0:String}` instead of `{f0:String}`. The trailing
- * counter keeps names unique when the same field appears multiple times in
- * one query.
- */
-export function nextParam(ctx: TranslationContext, base = "f"): string {
-  const name = `${base}${base === "f" ? "" : "_"}${ctx.paramCounter}`;
-  ctx.paramCounter++;
-  return name;
-}
-
-export function validateValueLength(value: string): void {
-  if (value.length > MAX_VALUE_LENGTH) {
-    throw new FilterParseError(`Filter value too long (max ${MAX_VALUE_LENGTH} characters)`);
-  }
-}
-
-export function validateAttributeKey(key: string): void {
-  if (key.length === 0) {
-    throw new FilterParseError("Attribute key cannot be empty");
-  }
-  if (key.length > MAX_ATTRIBUTE_KEY_LENGTH) {
-    throw new FilterParseError(
-      `Attribute key too long (max ${MAX_ATTRIBUTE_KEY_LENGTH} characters)`,
-    );
-  }
-  if (!ATTRIBUTE_KEY_PATTERN.test(key)) {
-    throw new FilterParseError(
-      "Attribute key contains invalid characters — use letters, digits, '.', '_', '-', '/' or ':'",
-    );
-  }
-}
-
-export function wrap(sql: string, negated: boolean): string {
-  return negated ? `NOT (${sql})` : sql;
-}
-
 // ---------------------------------------------------------------------------
 // In-memory helpers (used by the field defs' `evaluateInMemory` side)
 // ---------------------------------------------------------------------------
 
 /**
- * Own-property read of an attribute map, mirroring ClickHouse's
- * `Attributes[<key>]` — own keys only, `''` when the key is absent.
+ * Values and parameters on their way into a ClickHouse trace query.
  *
- * Filter keys are user-supplied, so a bare `attrs[key]` resolves `constructor`
- * / `toString` / `__proto__` off `Object.prototype` and hands back a function
- * (or the prototype object) that ClickHouse would never produce. That is not
- * cosmetic: `has:attribute.constructor` read `(attrs[key] ?? "") !== ""` as
- * `true` on every trace while the compiled `Attributes['constructor'] != ''`
- * matched none of them.
+ * The leaf of the query translator: nothing here knows about fields, tables or
+ * filters, only about turning a caller's value into something safe to bind.
+ * Two of these are the reason it is a layer at all — `nextParam` mints the
+ * placeholder names so a value is never interpolated into SQL, and
+ * `validateValueLength` and `validateAttributeKey` refuse before that happens.
  */
-export function readAttribute(attrs: Record<string, string>, key: string): string {
-  return Object.hasOwn(attrs, key) ? (attrs[key] ?? "") : "";
-}
-
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/**
- * In-memory equivalent of the `LIKE` match the wildcard translators emit: the
- * SQL side turns a user `*` into `%` and does a full-string `LIKE`, so here we
- * split on `*`, escape the literal segments, and anchor the resulting regex.
- */
-export function likeMatch(actual: string, pattern: string): boolean {
-  const regex = pattern.split("*").map(escapeRegExp).join(".*");
-  return new RegExp(`^${regex}$`).test(actual);
-}
-
-/**
- * Parses a JSON-encoded string array stored on `Attributes` (`langwatch.labels`
- * / `langwatch.prompt_ids`), mirroring the trigger matcher's `parseJsonArray`.
- * `JSON.parse` already strips the surrounding quotes the SQL side trims with
- * `trim(BOTH '"' FROM …)`. Returns `null` for absent/malformed values.
- */
-export function parseJsonStringArray(raw: string | undefined): string[] | null {
-  if (!raw) return null;
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      return parsed.filter((v): v is string => typeof v === "string");
-    }
-  } catch {
-    // Not valid JSON — treat as absent.
+export class TraceQueryValues {
+  private static escapeRegExp(s: string): string {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
-  return null;
+
+  static extractStringValue(tag: TagToken): string {
+    if (tag.expression.type === "LiteralExpression") {
+      return String(tag.expression.value);
+    }
+    if (tag.expression.type === "RegexExpression") {
+      return String(tag.expression.value);
+    }
+    throw new FilterParseError("Unsupported value expression");
+  }
+
+  static extractNumericValue(tag: TagToken): number {
+    if (tag.expression.type !== "LiteralExpression") {
+      throw new FilterParseError("Expected a numeric value");
+    }
+    const raw = tag.expression.value;
+    const num = typeof raw === "number" ? raw : parseFloat(String(raw));
+    if (Number.isNaN(num)) {
+      throw new FilterParseError(`Not a number: ${String(raw)}`);
+    }
+    return num;
+  }
+
+  /**
+   * Generate a unique parameter name for the ClickHouse SDK to bind. Pass a
+   * semantic `base` (e.g. `"traceId"`) so the resulting query reads naturally —
+   * `WHERE TraceId = {traceId_0:String}` instead of `{f0:String}`. The trailing
+   * counter keeps names unique when the same field appears multiple times in
+   * one query.
+   */
+  static nextParam(ctx: TranslationContext, base = "f"): string {
+    const name = `${base}${base === "f" ? "" : "_"}${ctx.paramCounter}`;
+    ctx.paramCounter++;
+    return name;
+  }
+
+  static validateValueLength(value: string): void {
+    if (value.length > MAX_VALUE_LENGTH) {
+      throw new FilterParseError(`Filter value too long (max ${MAX_VALUE_LENGTH} characters)`);
+    }
+  }
+
+  static validateAttributeKey(key: string): void {
+    if (key.length === 0) {
+      throw new FilterParseError("Attribute key cannot be empty");
+    }
+    if (key.length > MAX_ATTRIBUTE_KEY_LENGTH) {
+      throw new FilterParseError(
+        `Attribute key too long (max ${MAX_ATTRIBUTE_KEY_LENGTH} characters)`,
+      );
+    }
+    if (!ATTRIBUTE_KEY_PATTERN.test(key)) {
+      throw new FilterParseError(
+        "Attribute key contains invalid characters — use letters, digits, '.', '_', '-', '/' or ':'",
+      );
+    }
+  }
+
+  static wrap(sql: string, negated: boolean): string {
+    return negated ? `NOT (${sql})` : sql;
+  }
+
+  /**
+   * Own-property read of an attribute map, mirroring ClickHouse's
+   * `Attributes[<key>]` — own keys only, `''` when the key is absent.
+   *
+   * Filter keys are user-supplied, so a bare `attrs[key]` resolves `constructor`
+   * / `toString` / `__proto__` off `Object.prototype` and hands back a function
+   * (or the prototype object) that ClickHouse would never produce. That is not
+   * cosmetic: `has:attribute.constructor` read `(attrs[key] ?? "") !== ""` as
+   * `true` on every trace while the compiled `Attributes['constructor'] != ''`
+   * matched none of them.
+   */
+  static readAttribute(attrs: Record<string, string>, key: string): string {
+    return Object.hasOwn(attrs, key) ? (attrs[key] ?? "") : "";
+  }
+
+  /**
+   * In-memory equivalent of the `LIKE` match the wildcard translators emit: the
+   * SQL side turns a user `*` into `%` and does a full-string `LIKE`, so here we
+   * split on `*`, escape the literal segments, and anchor the resulting regex.
+   */
+  static likeMatch(actual: string, pattern: string): boolean {
+    const regex = pattern
+      .split("*")
+      .map((part) => TraceQueryValues.escapeRegExp(part))
+      .join(".*");
+    return new RegExp(`^${regex}$`).test(actual);
+  }
+
+  /**
+   * Parses a JSON-encoded string array stored on `Attributes` (`langwatch.labels`
+   * / `langwatch.prompt_ids`), mirroring the trigger matcher's `parseJsonArray`.
+   * `JSON.parse` already strips the surrounding quotes the SQL side trims with
+   * `trim(BOTH '"' FROM …)`. Returns `null` for absent/malformed values.
+   */
+  static parseJsonStringArray(raw: string | undefined): string[] | null {
+    if (!raw) return null;
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((v): v is string => typeof v === "string");
+      }
+    } catch {
+      // Not valid JSON — treat as absent.
+    }
+    return null;
+  }
 }

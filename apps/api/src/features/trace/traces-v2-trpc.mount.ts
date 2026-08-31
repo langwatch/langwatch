@@ -20,10 +20,9 @@ import {
   type TrpcApiPorts,
 } from "@langwatch/api/trpc";
 import {
-  extractFreeTextTerms,
   SharedTraceTrpcApi,
+  TraceQueryClickHouse,
   TracesV2TrpcApi,
-  translateFilterToClickHouse,
   type SharedTraceTrpcContext,
   type SharedTraceTrpcPorts,
   type TracesV2TrpcContext,
@@ -56,7 +55,10 @@ export function createTracesV2TrpcRouter<
 ) {
   return TracesV2TrpcApi.create(mount.root, createTrpcApiService(mount), {
     ...mount.ports,
-    queryTranslation: { translateFilterToClickHouse, extractFreeTextTerms },
+    queryTranslation: {
+      translateFilterToClickHouse: TraceQueryClickHouse.translateFilter,
+      extractFreeTextTerms: TraceQueryClickHouse.extractFreeTextTerms,
+    },
   });
 }
 

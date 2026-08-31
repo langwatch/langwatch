@@ -20,7 +20,7 @@ import {
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
 import type { TraceListQuery, TraceListReadPort } from "@langwatch/trace-contract";
 import { AppTraceRuntime } from "~/runtime/app/features/trace";
-import { FACET_REGISTRY, translateFilterToClickHouse } from "@langwatch/trace-server";
+import { FACET_REGISTRY, TraceQueryClickHouse } from "@langwatch/trace-server";
 import { boundedSubquery } from "@langwatch/trace-server/testing";
 
 const tenantId = `test-trace-list-${nanoid()}`;
@@ -487,7 +487,7 @@ describe("TraceListClickHouseRepository filtering across row versions", () => {
 
   /** The filter the sidebar compiles, so the test reads the production SQL. */
   const filterFor = (queryText: string) => {
-    const compiled = translateFilterToClickHouse(queryText, versionTenant, timeRange);
+    const compiled = TraceQueryClickHouse.translateFilter(queryText, versionTenant, timeRange);
     if (!compiled) throw new Error(`"${queryText}" compiled to no filter`);
     return compiled;
   };
