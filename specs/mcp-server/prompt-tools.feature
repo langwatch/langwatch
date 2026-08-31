@@ -169,6 +169,26 @@ Feature: MCP Prompt Tools
     Then the response states that version and deployment details are unavailable
     And the response includes no version number and no deployment line
 
+  # The confirmation re-fetch is best-effort: its failure must never turn a
+  # successful update into a tool error, which would invite a dangerous retry.
+  @unit
+  Scenario: Reporting success without details when the confirmation read fails
+    Given platform_update_prompt succeeds
+    And the confirmation re-fetch of the prompt fails
+    When the agent calls platform_update_prompt
+    Then the response still reports the update as successful
+    And the response states that version and deployment details are unavailable because the confirmation read failed
+    And the response includes no version number and no deployment line
+
+  @unit
+  Scenario: Preserving the tag-assignment failure when the confirmation read fails
+    Given platform_update_prompt is called with tags and the server rejects the tag assignment
+    And the confirmation re-fetch of the prompt fails
+    When the agent calls platform_update_prompt
+    Then the response reports the tag-assignment failure
+    And the response does not claim whether a new version was created
+    And the response states the confirmation read failed
+
   # --- Write path continued: field carry-forward and tag stability (issue #5666 AC10-11) ---
 
   @integration
