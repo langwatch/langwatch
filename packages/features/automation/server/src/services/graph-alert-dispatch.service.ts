@@ -57,7 +57,11 @@ export class GraphAlertDispatchService {
     );
   }
 
-  dispatch(input: GraphAlertDispatchInput): Promise<GraphAlertDispatchResult> {
+  // `async` so the unsupported-action branch REJECTS rather than throwing
+  // synchronously out of a method whose type says it returns a promise. The
+  // one caller wraps its await in try/catch so both were caught, but a caller
+  // reaching for `.catch()` would not have been.
+  async dispatch(input: GraphAlertDispatchInput): Promise<GraphAlertDispatchResult> {
     switch (input.trigger.action) {
       case "SEND_EMAIL":
         return this.sendEmail(input);
