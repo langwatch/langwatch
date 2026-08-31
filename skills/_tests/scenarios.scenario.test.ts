@@ -17,7 +17,10 @@ import {
   removeSkillTestWorkDir,
   SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
-import { startConnectedAgentFixture } from "./helpers/connected-agent-fixture";
+import {
+	type RunningConnectedAgent,
+	startConnectedAgentFixture,
+} from "./helpers/connected-agent-fixture";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -908,13 +911,18 @@ describe("Scenarios Skill", () => {
 
         // One agent row per test run, so two runs never read each other's levers.
         const agentName = `skill-test-support-${Date.now().toString(36)}`;
-        const running = await startConnectedAgentFixture({
-          workingDirectory: tempFolder,
-          name: agentName,
-          env: process.env,
-        });
+        // The startup is inside the try: it throws when the fixture exits
+        // early or never comes online, and the work dir holds the .env with
+        // the API key, so it has to be removed on that path too.
+        let running: RunningConnectedAgent | undefined;
 
         try {
+          running = await startConnectedAgentFixture({
+            workingDirectory: tempFolder,
+            name: agentName,
+            env: process.env,
+          });
+
           const result = await scenario.run({
             setId: SKILL_TESTS_SET_ID,
             name: "Platform scenarios from a connected agent's levers",
@@ -977,7 +985,7 @@ describe("Scenarios Skill", () => {
 
           expect(result.success).toBe(true);
         } finally {
-          await running.stop();
+          await running?.stop();
           removeSkillTestWorkDir(tempFolder);
         }
       },

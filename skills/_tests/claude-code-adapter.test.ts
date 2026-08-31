@@ -174,7 +174,7 @@ describe("Claude Code transcript conversion", () => {
 		]);
 
 		it("caps the call input and says how much it dropped", () => {
-			const call = (messages[0].content as any[])[1];
+			const call = (messages[0]!.content as any[])[1];
 			expect(call.type).toBe("tool-call");
 			expect(call.input.command.length).toBeLessThan(31_000);
 			expect(call.input.command).toContain("cat > report.html");
@@ -182,12 +182,33 @@ describe("Claude Code transcript conversion", () => {
 		});
 
 		it("caps the result the same way", () => {
-			const result = (messages[1].content as any[])[0];
+			const result = (messages[1]!.content as any[])[0];
 			expect(result.type).toBe("tool-result");
 			expect(result.output.value.length).toBeLessThan(9000);
 			expect(result.output.value).toMatch(/more characters/);
 		});
 		
+		it("caps a string nested inside the input too", () => {
+			const nested = claudeCodeTranscriptToModelMessages([
+				{
+					role: "assistant",
+					content: [
+						{
+							type: "tool_use",
+							id: "toolu_nested",
+							name: "Write",
+							input: { payload: { html: huge }, files: [huge] },
+						},
+					],
+				},
+			]);
+
+			const call = (nested[0]!.content as any[])[1];
+			expect(call.input.payload.html.length).toBeLessThan(31_000);
+			expect(call.input.payload.html).toMatch(/more characters/);
+			expect(call.input.files[0].length).toBeLessThan(31_000);
+		});
+
 		it("leaves a small tool call alone", () => {
 			const small = claudeCodeTranscriptToModelMessages([
 				{

@@ -212,6 +212,43 @@ describe("given a MESSAGE_SNAPSHOT carrying Anthropic-format content blocks", ()
     });
   });
 
+  describe("when a cited text block is the whole turn", () => {
+    /** @scenario "A text block keeps the citations it carries" */
+    it("ACCEPTS the turn and keeps the citations without a tool_use block beside them", () => {
+      const citations = [
+        {
+          type: "char_location",
+          cited_text: "Refunds take five working days.",
+          document_index: 0,
+          document_title: "Refund policy",
+          start_char_index: 0,
+          end_char_index: 31,
+        },
+      ];
+      const parsed = parseMessages([
+        {
+          id: "msg-5",
+          role: "assistant",
+          content: [
+            {
+              type: "text",
+              text: "Refunds take five working days.",
+              citations,
+            },
+          ],
+        },
+      ]);
+      expect(parsed.success).toBe(true);
+      if (!parsed.success) return;
+      const content = parsed.data.messages[0]!.content as unknown[];
+      expect(content[0]).toEqual({
+        type: "text",
+        text: "Refunds take five working days.",
+        citations,
+      });
+    });
+  });
+
   describe("when a user turn holds a tool_result block", () => {
     /** @scenario "A user turn with Anthropic tool_result blocks validates on the wire" */
     it("ACCEPTS the turn and keeps the tool_use_id and content of the result", () => {

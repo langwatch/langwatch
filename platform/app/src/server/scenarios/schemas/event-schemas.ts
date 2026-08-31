@@ -327,6 +327,9 @@ const anthropicRedactedThinkingBlockSchema = z.object({
  * `tool_result` block and strip its `tool_use_id` and `content`. The refine
  * keeps this member to messages that actually carry an Anthropic-only block,
  * so a plain text array keeps validating through the members that came before.
+ * A text block with `citations` counts as one: no schema before this member
+ * declares that field, so a cited turn routed to them would reach the
+ * transcript with its citations stripped.
  */
 const scenarioAnthropicMessageSchema = z.object({
   role: z.string().optional(),
@@ -340,9 +343,18 @@ const scenarioAnthropicMessageSchema = z.object({
         anthropicRedactedThinkingBlockSchema,
       ]),
     )
-    .refine((blocks) => blocks.some((block) => block.type !== "text"), {
-      message: "An Anthropic message carries at least one non-text block",
-    }),
+    .refine(
+      (blocks) =>
+        blocks.some(
+          (block) =>
+            block.type !== "text" ||
+            (block.citations !== undefined && block.citations !== null),
+        ),
+      {
+        message:
+          "An Anthropic message carries at least one non-text block, or a text block with citations",
+      },
+    ),
 });
 
 /**

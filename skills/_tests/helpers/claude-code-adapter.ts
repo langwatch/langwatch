@@ -391,23 +391,29 @@ const MAX_TOOL_RESULT_CHARS = 8000;
  */
 const MAX_TOOL_INPUT_CHARS = 30000;
 
-function truncateText(text: string, limit: number): string {
+function truncateText({ text, limit }: { text: string; limit: number }): string {
 	if (text.length <= limit) return text;
 	const dropped = text.length - limit;
 	return `${text.slice(0, limit)}\n… [${dropped} more characters]`;
 }
 
-/** The call cap over the string fields of a tool call, structure kept. */
+/**
+ * The call cap over the string fields of a tool call, structure kept.
+ *
+ * Nested objects and arrays are walked, not only the top level: a payload such
+ * as `{ body: { html } }` carries the same unbounded text a top-level field
+ * would, and it reaches every judge prompt the same way.
+ */
 function truncateToolInput(input: unknown): unknown {
-	if (input == null || typeof input !== "object" || Array.isArray(input)) {
-		return input;
+	if (typeof input === "string") {
+		return truncateText({ text: input, limit: MAX_TOOL_INPUT_CHARS });
 	}
+	if (Array.isArray(input)) return input.map((item) => truncateToolInput(item));
+	if (input == null || typeof input !== "object") return input;
 	return Object.fromEntries(
 		Object.entries(input as Record<string, unknown>).map(([key, value]) => [
 			key,
-			typeof value === "string"
-				? truncateText(value, MAX_TOOL_INPUT_CHARS)
-				: value,
+			truncateToolInput(value),
 		]),
 	);
 }
@@ -505,10 +511,10 @@ function userMessagesFromBlocks({
 			toolName: toolNamesByCallId.get(block.tool_use_id) ?? "tool",
 			output: {
 				type: block.is_error ? "error-text" : "text",
-				value: truncateText(
-					toolResultText(block.content),
-					MAX_TOOL_RESULT_CHARS,
-				),
+				value: truncateText({
+					text: toolResultText(block.content),
+					limit: MAX_TOOL_RESULT_CHARS,
+				}),
 			},
 		}));
 	if (toolResults.length > 0) {

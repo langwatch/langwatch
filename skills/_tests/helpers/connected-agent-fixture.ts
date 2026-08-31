@@ -99,6 +99,13 @@ function spawnAgentProcess({
 	child.on("exit", () => {
 		exited = true;
 	});
+	// A spawn that never starts, `uv` missing from PATH above all, emits
+	// "error" and no "exit". Without this the error is unhandled and the wait
+	// below runs its full timeout before saying anything useful.
+	child.on("error", (error: Error) => {
+		output += `failed to start the fixture: ${error.message}\n`;
+		exited = true;
+	});
 
 	return { child, output: () => output, hasExited: () => exited };
 }

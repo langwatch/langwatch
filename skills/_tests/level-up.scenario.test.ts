@@ -36,7 +36,13 @@ function copySkillToWorkDir(tempFolder: string) {
  * several runs do, and the tracing then correctly sits next to the calls
  * instead of in the entry file.
  */
-function expectTracingInSource(tempFolder: string, extension: string) {
+function expectTracingInSource({
+	tempFolder,
+	extension,
+}: {
+	tempFolder: string;
+	extension: string;
+}) {
   const sources = fs
     .readdirSync(tempFolder, { recursive: true, withFileTypes: true })
     .filter(
@@ -98,7 +104,7 @@ describe("Level-up Skill", () => {
             toolCallFix(state);
             assertSkillWasRead(state, "level-up");
             // Verify tracing was added
-            expectTracingInSource(tempFolder, ".py");
+            expectTracingInSource({ tempFolder, extension: ".py" });
           },
           scenario.judge(),
         ],
@@ -146,7 +152,7 @@ describe("Level-up Skill", () => {
           (state) => {
             toolCallFix(state);
             assertSkillWasRead(state, "level-up");
-            expectTracingInSource(tempFolder, ".ts");
+            expectTracingInSource({ tempFolder, extension: ".ts" });
           },
           scenario.judge(),
         ],
@@ -192,7 +198,7 @@ describe("Level-up Skill", () => {
           (state) => {
             toolCallFix(state);
             assertSkillWasRead(state, "level-up");
-            expectTracingInSource(tempFolder, ".py");
+            expectTracingInSource({ tempFolder, extension: ".py" });
           },
           scenario.judge(),
         ],
@@ -238,7 +244,7 @@ describe("Level-up Skill", () => {
           (state) => {
             toolCallFix(state);
             assertSkillWasRead(state, "level-up");
-            expectTracingInSource(tempFolder, ".ts");
+            expectTracingInSource({ tempFolder, extension: ".ts" });
           },
           scenario.judge(),
         ],
