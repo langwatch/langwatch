@@ -69,6 +69,7 @@ const seeded = (names: string[]) =>
 
 describe("SavedViewService.getAll", () => {
   describe("given a project nobody has opened yet", () => {
+    /** @scenario A project nobody has opened yet is given the default views */
     it("seeds it with the default views", async () => {
       const { service, calls } = serviceWith({ count: 0, existing: [] });
 
@@ -79,6 +80,7 @@ describe("SavedViewService.getAll", () => {
   });
 
   describe("given a project that already has views", () => {
+    /** @scenario A project that already has views gains only the defaults it lacks */
     it("adds only the defaults it is missing, keeping what is there", async () => {
       // Matched by name, so a renamed view is not re-created and the
       // customer's own edits survive.
@@ -92,6 +94,7 @@ describe("SavedViewService.getAll", () => {
       expect(names?.length ?? 0).toBeGreaterThan(0);
     });
 
+    /** @scenario A renamed default is not created again */
     it("writes nothing when it already has every default", async () => {
       const first = serviceWith({ count: 0, existing: [] });
       await first.service.getAll({ projectId: "project-1" });
@@ -107,6 +110,7 @@ describe("SavedViewService.getAll", () => {
   });
 
   describe("given the traces-v2 lens kind", () => {
+    /** @scenario The traces-v2 lens strip is left alone */
     it("seeds nothing, because that UI brings its own defaults", async () => {
       // Seeding here would double-populate the customer's tab strip.
       const { service, calls } = serviceWith({ count: 0, existing: [] });
@@ -149,6 +153,7 @@ describe.each([
   ],
 ])("SavedViewService.%s", (_name, act) => {
   describe("given a view the whole project shares", () => {
+    /** @scenario A view the project shares can be changed by any member */
     it("lets any member act on it", async () => {
       const { service } = serviceWith({ byId: { id: "view-1", userId: null } });
 
@@ -157,12 +162,14 @@ describe.each([
   });
 
   describe("given somebody's personal view", () => {
+    /** @scenario A personal view can be changed by its owner */
     it("lets its owner act on it", async () => {
       const { service } = serviceWith({ byId: { id: "view-1", userId: "user-1" } });
 
       await expect(act(service, "user-1")).resolves.toBeDefined();
     });
 
+    /** @scenario A personal view is refused to everybody else */
     it("refuses anyone else", async () => {
       const { service } = serviceWith({ byId: { id: "view-1", userId: "user-2" } });
 
@@ -181,6 +188,7 @@ describe.each([
   });
 
   describe("given an id that does not exist", () => {
+    /** @scenario The refusal does not reveal that the view exists */
     it("answers exactly as it does for somebody else's view", async () => {
       // Deliberately indistinguishable: a different error here would confirm
       // that the id names a real view belonging to someone else.
@@ -233,6 +241,7 @@ describe("SavedViewService.reorder", () => {
       expect((error as SavedViewReorderError).missingIds).toEqual(["view-elsewhere"]);
     });
 
+    /** @scenario Reordering with an id the project does not have changes nothing */
     it("writes no order at all, rather than a partial one", async () => {
       const { service, calls } = serviceWith({ existing: seeded(["A"]) });
 
