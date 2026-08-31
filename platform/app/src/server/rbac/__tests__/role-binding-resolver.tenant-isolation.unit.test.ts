@@ -2,6 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 
 import { checkRoleBindingPermission, type ScopeRef } from "../role-binding-resolver";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+
+// `checkRoleBindingPermission` asks `getApp().permissions.isOnEngine` before
+// it falls through to the binding resolution these cases exercise, so the
+// singleton has to exist even though the decision under test is the legacy one.
+wireDefaultTestApp();
 
 // The API-key ceiling path (resolveApiKeyPermission → checkRoleBindingPermission
 // for the owning user) resolves the user's bindings through collectBindingsForUser.

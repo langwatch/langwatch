@@ -17,6 +17,14 @@ import { describe, expect, it, vi } from "vitest";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { resolveApiKeyPermission, type ScopeRef } from "../role-binding-resolver";
 
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+
+// `checkRoleBindingPermission` asks `getApp().permissions.isOnEngine` before
+// it falls through to the binding resolution these cases exercise, so the
+// singleton has to exist even though the decision under test is the legacy one.
+wireDefaultTestApp();
+
+
 const ORG = "org_1";
 const TEAM = "team_1";
 const PROJECT = "project_1";
