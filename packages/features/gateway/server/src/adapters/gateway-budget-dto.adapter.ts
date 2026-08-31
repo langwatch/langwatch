@@ -10,12 +10,12 @@
 import type { GatewayBudgetWithSeats } from "@langwatch/gateway-contract";
 import { effectiveBudgetPeriod } from "../adapters/gateway-period.adapter";
 import { metadataFromRow } from "./gateway-resource-metadata.adapter";
-import { toWireEnum } from "@langwatch/gateway-contract";
 import {
   decimalUsdToNanoUsd,
   nanoUsdToDecimalString,
+  toWireEnum,
   usdDisplayString,
-} from "./gateway-wire-money.adapter";
+} from "@langwatch/gateway-contract";
 
 /**
  * What this row reports as spend, in both units, or null when there is no
@@ -40,13 +40,12 @@ function spendFields(b: GatewayBudgetWithSeats, spendAvailable: boolean) {
   }
   const nano = b.spentNanoUsd ?? decimalUsdToNanoUsd(b.spentUsd);
   return {
-    spent_usd:
-      nano === null ? usdDisplayString(b.spentUsd) : nanoUsdToDecimalString(nano),
+    spent_usd: nano === null ? usdDisplayString(b.spentUsd) : nanoUsdToDecimalString(nano),
     spent_nano_usd: nano,
   };
 }
 
-export /**
+/**
  * The budget row on the wire.
  *
  * `readAt` is the instant the spend on the row was totalled at, for the
@@ -55,7 +54,7 @@ export /**
  * print a fresh period beside the previous period's figure. Callers with no
  * spend read take the wall clock.
  */
-function toBudgetDto({
+export function toBudgetDto({
   budget: b,
   memberCount,
   spendAvailable = true,
@@ -116,8 +115,6 @@ function toBudgetDto({
     // A budget nothing can reach never accrues and never blocks, which on
     // every other field reads exactly like a budget that was simply never
     // breached. This is the only place the wire tells the two apart.
-    ...(reachable === undefined
-      ? {}
-      : { scope_reach: reachable ? "reachable" : "unreachable" }),
+    ...(reachable === undefined ? {} : { scope_reach: reachable ? "reachable" : "unreachable" }),
   };
 }

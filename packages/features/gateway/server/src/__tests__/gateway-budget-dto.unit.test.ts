@@ -6,7 +6,8 @@
 
 import { describe, expect, it } from "vitest";
 import { Prisma } from "@langwatch/prisma-client/generated";
-import { decimalUsdToNanoUsd, toBudgetDto, type GatewayBudgetWithSeats } from "../index";
+import { decimalUsdToNanoUsd } from "@langwatch/gateway-contract";
+import { toBudgetDto, type GatewayBudgetWithSeats } from "../index";
 
 function budget(overrides: Partial<GatewayBudgetWithSeats> = {}): GatewayBudgetWithSeats {
   const now = new Date("2026-08-01T00:00:00.000Z");

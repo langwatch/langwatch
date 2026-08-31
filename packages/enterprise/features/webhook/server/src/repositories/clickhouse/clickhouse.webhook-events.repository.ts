@@ -6,7 +6,7 @@ import type {
   WebhookSpendEventRow,
   WebhookSpendEventStatus,
 } from "../../services/webhook-envelope.service";
-import { nanoUsdToDecimalString } from "../../adapters/nano-usd.adapter";
+import { nanoUsdToDecimalString } from "@langwatch/gateway-contract";
 
 const SPEND_TABLE = "gateway_spend";
 const SPEND_ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, VirtualKeyId,

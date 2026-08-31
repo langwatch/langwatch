@@ -33,6 +33,7 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
+    "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/model-provider-contract": "workspace:*",

@@ -51,7 +51,6 @@ export {
 export * from "./adapters/gateway-period.adapter";
 export * from "./adapters/gateway-resource-metadata.adapter";
 export * from "./adapters/gateway-spend-filters.adapter";
-export * from "./adapters/gateway-spend-parse.adapter";
 export * from "./adapters/gateway-spend-grouping.adapter";
 export * from "./processes/gateway-spend-commands.process";
 export * from "./processes/gateway-spend-settlement.process";
@@ -63,11 +62,9 @@ export * from "./adapters/eventing.gateway-spend.adapter";
 export * from "./adapters/gateway-spend-constants.adapter";
 export * from "./adapters/gateway-spend-events.adapter";
 export * from "./adapters/gateway-window.adapter";
-export * from "./adapters/gateway-wire-money.adapter";
 export * from "./adapters/gateway-wire-pagination.adapter";
 export * from "./adapters/gateway-routing-policy-select.adapter";
 export * from "./adapters/virtual-key-crypto.adapter";
-export { nanoUsdToDecimalString } from "./adapters/gateway-wire-money.adapter";
 export type * from "./services/gateway.service";
 export type * from "./ports/gateway-budget-spend.port";
 

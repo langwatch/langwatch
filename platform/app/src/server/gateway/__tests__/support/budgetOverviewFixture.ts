@@ -9,7 +9,7 @@
  * copying 300 lines of seed.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import { usdToNanoUsd } from "@langwatch/gateway-server";
+import { usdToNanoUsd } from "@langwatch/gateway-contract";
 import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 

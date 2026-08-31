@@ -17,7 +17,7 @@ import type {
   GatewayBudgetClickHouseRepository,
 } from "@langwatch/gateway-server";
 import { GatewayService } from "@langwatch/gateway-server";
-import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-server";
+import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-contract";
 
 function stubTemplate(overrides: Partial<GatewayBudget> = {}): GatewayBudget {
   return {

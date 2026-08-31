@@ -5,7 +5,7 @@ import {
   type PulledUsageCostStatus,
 } from "@langwatch/enterprise-governance-contract";
 import type { PulledUsageRatePort } from "../ports/pulled-usage-rate.port";
-import { usdToNanoUsd } from "../adapters/nano-usd.adapter";
+import { usdToNanoUsd } from "@langwatch/gateway-contract";
 
 export type PulledUsageQuantities = {
   tokensInput: number;

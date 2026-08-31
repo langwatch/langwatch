@@ -30,7 +30,7 @@ import {
   type GatewayVirtualKeySpend,
   GatewayVirtualKeySpendPort,
 } from "../../ports/gateway-virtual-key-spend.port";
-import { usdDisplayString } from "../../adapters/gateway-wire-money.adapter";
+import { usdDisplayString } from "@langwatch/gateway-contract";
 
 const TRACE_SUMMARIES_TABLE = "trace_summaries";
 const VK_ATTRIBUTE = "langwatch.virtual_key_id";

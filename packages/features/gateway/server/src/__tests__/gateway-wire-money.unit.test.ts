@@ -11,7 +11,7 @@ import {
   nanoUsdToDecimalString,
   usdDisplayString,
   usdToNanoUsd,
-} from "../index";
+} from "@langwatch/gateway-contract";
 
 /**
  * The value a customer reported on `GET /virtual-keys/{id}/spend`: 45

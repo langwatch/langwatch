@@ -36,7 +36,7 @@ import { handlerManagedAuth } from "@langwatch/platform-api/app-rest";
 import type { App } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
-import { usdToNanoUsd } from "@langwatch/gateway-server";
+import { usdToNanoUsd } from "@langwatch/gateway-contract";
 import {
   parseOtlpLogs,
   parseOtlpMetrics,

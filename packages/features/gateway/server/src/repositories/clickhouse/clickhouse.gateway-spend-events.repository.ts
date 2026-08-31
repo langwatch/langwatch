@@ -27,10 +27,9 @@ import {
   SPEND_STATUS_IN_FLIGHT,
   type SpendEventStatus,
 } from "../../adapters/gateway-spend-filters.adapter";
-import { parseSummedNanoUsd } from "../../adapters/gateway-spend-parse.adapter";
+import { nanoUsdToDecimalString, parseSummedNanoUsd } from "@langwatch/gateway-contract";
 import type { SpendBucket, SpendGroupByKey } from "../../adapters/gateway-spend-grouping.adapter";
 import { bucketExpression, groupByColumn } from "../../adapters/gateway-spend-grouping.adapter";
-import { nanoUsdToDecimalString } from "../../adapters/gateway-wire-money.adapter";
 import {
   decodeSpendEventsCursor,
   decodeSpendSummariesCursor,

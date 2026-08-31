@@ -19,7 +19,7 @@
  * prunes partitions per dev/docs/best_practices/clickhouse-queries.md, and
  * the trace_summaries reads apply the IN-tuple / argMax dedup pattern.
  */
-import { nanoUsdToDecimalString, parseSummedNanoUsd } from "./governance-money";
+import { nanoUsdToDecimalString, parseSummedNanoUsd } from "@langwatch/gateway-contract";
 
 type PersonalUsageClickHouseClient = {
   query(input: {

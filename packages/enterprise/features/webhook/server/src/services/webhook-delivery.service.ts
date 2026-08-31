@@ -15,7 +15,7 @@ import { eventMatches, type WebhookEndpointView } from "@langwatch/enterprise-we
 import { WebhookBatchPlanner, type PendingEnvelope } from "./webhook-batch-planner.service";
 import { WebhookEnvelopeService, type WebhookSpendEventRow } from "./webhook-envelope.service";
 import type { WebhookDestinationConfig } from "./webhook-destination.service";
-import { nanoUsdToDecimalString } from "../adapters/nano-usd.adapter";
+import { nanoUsdToDecimalString } from "@langwatch/gateway-contract";
 
 export const GATEWAY_SPEND_ADMITTED_EVENT_TYPE = "lw.gateway.spend.admitted" as const;
 export const GATEWAY_SPEND_CONFIRMED_EVENT_TYPE = "lw.gateway.spend.confirmed" as const;

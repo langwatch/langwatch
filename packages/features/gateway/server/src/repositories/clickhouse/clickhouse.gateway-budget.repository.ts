@@ -63,8 +63,7 @@ import {
   PROVIDER_BUCKET_SEPARATOR,
 } from "../../adapters/gateway-bucket-scope.adapter";
 import { spendTargetsForBudgets } from "../../adapters/gateway-budget-spend-target.adapter";
-import { parseSummedNanoUsd } from "../../adapters/gateway-spend-parse.adapter";
-import { nanoUsdToDecimalString } from "../../adapters/gateway-wire-money.adapter";
+import { nanoUsdToDecimalString, parseSummedNanoUsd } from "@langwatch/gateway-contract";
 
 const EVENTS_TABLE = "gateway_budget_ledger_events" as const;
 const TOTALS_TABLE = "gateway_budget_scope_totals" as const;
@@ -493,10 +492,7 @@ function rollupRowMatchesTarget(
  * and adding those as floats would put drift back into a figure the ledger
  * holds exactly.
  */
-function sumRollupRowsForTarget(
-  rows: RollupScopeRow[],
-  target: BudgetSpendTarget,
-): bigint {
+function sumRollupRowsForTarget(rows: RollupScopeRow[], target: BudgetSpendTarget): bigint {
   const scope = scopeToClickHouse(target.scope);
   return rows
     .filter((r) => rollupRowMatchesTarget(r, target, scope))
@@ -564,9 +560,7 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
     const tenantId = rows[0]!.tenantId;
     const gatewayRequestId = rows[0]!.gatewayRequestId;
     if (rows.some((r) => r.tenantId !== tenantId)) {
-      throw new Error(
-        "GatewayBudgetClickHouseRepository.insertDebit: rows span multiple tenants",
-      );
+      throw new Error("GatewayBudgetClickHouseRepository.insertDebit: rows span multiple tenants");
     }
     if (rows.some((r) => r.gatewayRequestId !== gatewayRequestId)) {
       throw new Error(
@@ -967,11 +961,7 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
     // instead of racing the wall clock across a MINUTE or HOUR boundary.
     now: Date = new Date(),
   ): Promise<ScopeSpend[]> {
-    return this.getSpendForTargetsAcrossTenants(
-      [tenantId],
-      toSpendTargets(budgets, now),
-      now,
-    );
+    return this.getSpendForTargetsAcrossTenants([tenantId], toSpendTargets(budgets, now), now);
   }
 
   /**
@@ -993,11 +983,7 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
     budgets: GatewayBudgetResource[] | BudgetSpendTarget[],
     now: Date = new Date(),
   ): Promise<ScopeSpend[]> {
-    return this.getSpendForTargetsAcrossTenants(
-      tenantIds,
-      toSpendTargets(budgets, now),
-      now,
-    );
+    return this.getSpendForTargetsAcrossTenants(tenantIds, toSpendTargets(budgets, now), now);
   }
 
   /**

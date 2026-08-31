@@ -58,7 +58,7 @@ import {
   listVirtualKeyProjectScopes,
   resolveScopeTargetsBatch,
 } from "./prisma.gateway-budget-scope-target.repository";
-import { usdToNanoUsd } from "../../adapters/gateway-wire-money.adapter";
+import { usdToNanoUsd } from "@langwatch/gateway-contract";
 import { keysetAfter } from "../../adapters/gateway-wire-pagination.adapter";
 import {
   GatewayBudgetRepository,

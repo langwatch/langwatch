@@ -1,6 +1,13 @@
 /**
  * Money at the REST wire seam.
  *
+ * This lives in the contract rather than in one feature's server because four
+ * packages publish the same money fields — the gateway, governance, webhooks
+ * and the enterprise API composition — and each had grown its own copy of
+ * these conversions. Four copies of a rounding rule agree until one of them is
+ * fixed, and then the same amount reads two ways depending on which surface a
+ * customer asks.
+ *
  * Every amount this surface publishes is published twice: the `_usd` decimal
  * STRING, which is the display value, and the `_nano_usd` integer, which is
  * the canonical figure to do arithmetic on. The spend surfaces already carry
@@ -143,4 +150,22 @@ export function decimalUsdToNanoUsd(value: { toString(): string }): number | nul
     return null;
   }
   return Number(nano);
+}
+
+/**
+ * A ClickHouse `SUM` of nano-USD as a JSON number.
+ *
+ * ClickHouse serialises Int64 as a string, so the sum arrives as text and
+ * stays exact until it is deliberately rendered. Past
+ * `Number.MAX_SAFE_INTEGER` it refuses rather than returning a number that has
+ * quietly lost its low digits, and it refuses a negative total: a summed spend
+ * below zero is a query fault, not an amount to publish.
+ */
+export function parseSummedNanoUsd(value: unknown): number {
+  const parsed = BigInt(String(value ?? 0));
+  if (parsed > BigInt(Number.MAX_SAFE_INTEGER) || parsed < 0n) {
+    throw new Error(`Summed nano-USD value ${parsed} exceeds the safe integer range`);
+  }
+
+  return Number(parsed);
 }

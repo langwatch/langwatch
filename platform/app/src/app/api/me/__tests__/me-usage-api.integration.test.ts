@@ -16,7 +16,7 @@ import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { nanoUsdToDecimalString } from "@langwatch/gateway-server";
+import { nanoUsdToDecimalString } from "@langwatch/gateway-contract";
 import {
   clearClickHouseTestApp,
   installClickHouseTestApp,

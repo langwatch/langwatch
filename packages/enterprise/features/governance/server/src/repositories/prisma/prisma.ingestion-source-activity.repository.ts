@@ -40,7 +40,7 @@ import {
   type GovernanceClickHouseClientPort,
   type GovernanceClickHouseResolverPort,
 } from "../../ports/ingestion-source-activity.port";
-import { nanoUsdToDecimalString, usdToNanoUsd } from "../../adapters/nano-usd.adapter";
+import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-contract";
 
 const INTERNAL_GOVERNANCE_PROJECT_KIND = "internal_governance";
 

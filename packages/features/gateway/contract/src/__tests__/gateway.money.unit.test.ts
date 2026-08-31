@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { nanoUsdToDecimalString, usdToNanoUsd } from "../nano-usd.adapter";
+import { nanoUsdToDecimalString, usdToNanoUsd } from "../gateway.money";
 
 describe("usdToNanoUsd", () => {
   describe("given an ordinary amount", () => {

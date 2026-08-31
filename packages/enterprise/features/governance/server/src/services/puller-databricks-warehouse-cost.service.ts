@@ -34,7 +34,7 @@
  */
 
 import { z } from "zod";
-import { nanoUsdToDecimalString, usdToNanoUsd } from "../adapters/nano-usd.adapter";
+import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-contract";
 
 /**
  * How far back a cost-bearing source keeps reading questions it has already
