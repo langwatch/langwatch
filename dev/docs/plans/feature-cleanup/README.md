@@ -493,6 +493,20 @@ the standard spells out — the error class, `logic/codes.ts` (sorted), and
 `logic/presentation.ts` in the same commit — and `codes.unit.test.ts` is
 runnable, so the registration is verifiable without a platform/app typecheck.
 
+There turned out to be a **fourth** site, in the app rather than a package:
+`codexGatewayModel.getCodexVercelAIModel`, which refuses a restricted model
+reaching the AI gateway. It threw a plain Error too. Both it and the litellm
+path throw the same code now; the error carries the two sentences the two
+paths need — the gateway knows the feature it was running, the litellm path
+knows only that this is not a coding-assistant surface — because the remedy
+is the same either way. Both are pinned in the contract's error test, since
+they are what the classifier matches.
+
+And the classifier is not itself a smell: its other eight rules match Node
+TLS codes, OpenAI's own rejection prose and module-loader failures. **Needle
+matching is the only option for an error we did not throw.** The codex rule
+was the single one pointed at our own code, which is why it stood out.
+
 **The execution gate runs twice and the two are not redundant**: once on the
 model reference before any lookup, once on the provider it resolved to,
 because a model id that looks ordinary can still reach the Codex provider
@@ -508,3 +522,22 @@ is deliberate (it is the filter parser's own line, ours, clamped by
 `safeProse`), so it is recorded in ALLOWED_PER_CODE with the reason, which is
 what the failure message asks for. The exemption is per-code: a different
 entry echoing `reason` is still caught.
+
+### And a third, in the same area
+
+`model-provider-defaults.codex-refusal` — two cases, both failing with
+"Cannot read properties of undefined (reading 'id')". `setDefault` grew a
+second parameter (the caller, who is both the author of the value and the
+actor of the write) and the test still passed one argument.
+
+That one matters more than an ordinary red test, because both cases carry a
+`@scenario` annotation for "The server refuses Codex outside the allowed
+surfaces". The parity check counts a scenario as bound when a test claims it
+— it does not know the test throws before reaching the assertion. So the
+spec read as covered while the guard behind it was inert. Restored, and
+sabotage-verified against the write-side check it exists to protect.
+
+**Three red guards in one afternoon, all in the same feature.** The shapes
+differ — a path that moved, a signature that grew an argument, an assertion
+satisfied by a comment — but the failure mode is the same: the suite goes
+quiet and nothing says the rule stopped being enforced.
