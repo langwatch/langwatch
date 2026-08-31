@@ -323,6 +323,13 @@ export const flushEndpointSchema = z.object({
 });
 export type FlushEndpointPayload = z.infer<typeof flushEndpointSchema>;
 
+/**
+ * What the process runtime invokes for one intent. Named so the service can
+ * declare what it hands back instead of deferring to `ReturnType<typeof ...>`,
+ * which told a reader nothing and hid the payload each executor accepts.
+ */
+type IntentExecutor<Payload> = (payload: Payload, context: IntentContext) => Promise<void>;
+
 export interface WebhookDeliveryProcessDeps {
   processStore: ProcessStore;
   endpoints: WebhookDeliveryEndpointService;
@@ -511,7 +518,7 @@ async function endpointsSubscribedTo({
  * type and append the envelope to each endpoint's coalescing stream. The
  * append and any due batches commit atomically per endpoint.
  */
-function runDeliver(deps: WebhookDeliveryProcessDeps) {
+function runDeliver(deps: WebhookDeliveryProcessDeps): IntentExecutor<DeliverPayload> {
   return async (payload: DeliverPayload, _context: IntentContext): Promise<void> => {
     const organizationId = payload.attribution?.organization_id ?? "";
     if (!organizationId) {
@@ -595,7 +602,7 @@ async function appendReplayToEndpointStream({
  * The wake-armed half of coalescing: ship whatever became due (delay
  * elapsed or in-flight freed) for one endpoint's stream.
  */
-function runFlushEndpoint(deps: WebhookDeliveryProcessDeps) {
+function runFlushEndpoint(deps: WebhookDeliveryProcessDeps): IntentExecutor<FlushEndpointPayload> {
   return async (payload: FlushEndpointPayload, _context: IntentContext): Promise<void> => {
     const endpoint = await deps.endpoints.tryGetDeliverable({
       organizationId: payload.organizationId,
@@ -813,7 +820,7 @@ async function recordWebhookBatchOutcome({
  * Level 2: deliver one frozen batch to one endpoint through whichever
  * transport it named, and record what came back.
  */
-function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps) {
+function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps): IntentExecutor<SendBatchPayload> {
   return async (payload: SendBatchPayload, context: IntentContext): Promise<void> => {
     // The service's deliverable read owns the liveness predicate. A deleted
     // or disabled endpoint drains its queue without delivering: the spend
@@ -1134,15 +1141,15 @@ export class WebhookDeliveryService {
     await appendReplayToEndpointStream({ ...input, deps: this.deps });
   }
 
-  runDeliver(): ReturnType<typeof runDeliver> {
+  runDeliver(): IntentExecutor<DeliverPayload> {
     return runDeliver(this.deps);
   }
 
-  runFlushEndpoint(): ReturnType<typeof runFlushEndpoint> {
+  runFlushEndpoint(): IntentExecutor<FlushEndpointPayload> {
     return runFlushEndpoint(this.deps);
   }
 
-  runWebhookSendBatch(): ReturnType<typeof runWebhookSendBatch> {
+  runWebhookSendBatch(): IntentExecutor<SendBatchPayload> {
     return runWebhookSendBatch(this.deps);
   }
 
