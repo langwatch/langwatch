@@ -35,8 +35,6 @@ import { RetroactiveRetentionRepository } from "../repositories/retroactive-rete
 import type { DataRetentionCacheStore } from "../stores/data-retention-cache.store";
 import { StorageMeterService } from "./storage-meter.service";
 
-export { ScopeTargetNotFoundError } from "@langwatch/data-retention-contract";
-
 export class DataRetentionService extends DataRetentionServiceContract {
   static create(options: {
     repository: DataRetentionRepository;
