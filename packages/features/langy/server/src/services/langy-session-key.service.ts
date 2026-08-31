@@ -3,7 +3,10 @@ import {
   type ApiKeyService,
 } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
-import type { LangyCredentialSession } from "@langwatch/langy-contract";
+import {
+  langyCandidatePermissions,
+  type LangyCredentialSession,
+} from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   LangySessionKeyPort,
@@ -14,35 +17,22 @@ import type { LangySessionKeyRepository } from "../repositories/langy-session-ke
 const logger = createLogger("langwatch:langy:session-key");
 const sessionKeyLifetimeMs = 6 * 60 * 60 * 1000;
 
-export const LANGY_CANDIDATE_PERMISSIONS = [
-  "project:view",
-  "traces:view",
-  "traces:create",
-  "traces:update",
-  "evaluations:view",
-  "evaluations:create",
-  "evaluations:update",
-  "datasets:view",
-  "datasets:create",
-  "datasets:update",
-  "scenarios:view",
-  "scenarios:create",
-  "scenarios:update",
-  "annotations:view",
-  "annotations:create",
-  "annotations:update",
-  "analytics:view",
-  "analytics:create",
-  "analytics:update",
-  "prompts:view",
-  "prompts:create",
-  "prompts:update",
-  "triggers:view",
-  "workflows:view",
-  "workflows:create",
-  "workflows:update",
-  "experiments:view",
-] as const;
+/**
+ * The permission ceiling a Langy session key may ask for, DERIVED from the
+ * policy rather than hand-kept beside it (#7389).
+ *
+ * A hand-written list cannot say why a line is absent, and three production
+ * 403s came from lines nobody remembered to add. `langyCandidatePermissions()`
+ * walks the permission registry and keeps every grain the policy calls
+ * `granted`, so the list can no longer fall behind the vocabulary.
+ *
+ * This is a CEILING, not a grant: `mint` intersects it with the permissions
+ * the requesting human actually holds, so widening it can never give anyone
+ * access they did not already have by hand.
+ */
+export const LANGY_CANDIDATE_PERMISSIONS = Object.freeze(
+  langyCandidatePermissions(),
+);
 
 export type LangySessionKeyRevocation =
   | "revoked"

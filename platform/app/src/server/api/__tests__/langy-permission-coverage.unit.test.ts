@@ -26,8 +26,19 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { hasPermissionWithHierarchy } from "~/server/api/rbac";
+
 import { LANGY_CANDIDATE_PERMISSIONS } from "@langwatch/langy-server";
-import { classifyForLangy } from "@langwatch/langy-contract";
+import {
+  ALL_PERMISSION_ACTIONS,
+  ALL_PERMISSION_FAMILIES,
+  classifyForLangy,
+  LANGY_ACTION_BUCKET_TOTAL,
+  LANGY_AUTH_SCOPE_FAMILY_NAMES,
+  LANGY_CLASSIFIED_ACTIONS,
+  LANGY_CLASSIFIED_FAMILIES,
+  LANGY_FAMILY_BUCKET_TOTAL,
+} from "@langwatch/langy-contract";
 import {
   experimentRoutePermissions,
   permissionsDemandedByRoutes,

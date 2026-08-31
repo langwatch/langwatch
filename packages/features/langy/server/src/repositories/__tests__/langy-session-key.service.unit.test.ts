@@ -94,6 +94,58 @@ describe("LangySessionKeyService", () => {
     expect(metrics.record).toHaveBeenCalledWith({ operation: "minted" });
   });
 
+  // The widening #7389 shipped, pinned where it actually lands: on the key.
+  // The candidate list is a CEILING, so a holder who holds everything Langy
+  // may ask for is the only caller whose minted key shows the ceiling's full
+  // shape — and that shape is the owner's 2026-08-21 rule, which the coverage
+  // guard states over the const and this states over the mint.
+  it("carries the full tenant-data write surface onto a key whose holder holds it", async () => {
+    const repository = new SessionKeyRepository();
+    const apiKeyCreate: ApiKeyService["create"] = vi.fn(async () => {
+      const apiKey = Object.assign(Object.create(null), { id: "key-1" });
+      return { token: "session-token", apiKey };
+    });
+    const apiKeys: ApiKeyService = Object.create(ApiKeyService.prototype);
+    apiKeys.create = apiKeyCreate;
+    const authz: AuthzService = Object.create(AuthzService.prototype);
+    authz.effectivePermissions = vi.fn(async () => [...LANGY_CANDIDATE_PERMISSIONS]);
+
+    await createService({
+      repository,
+      apiKeys,
+      authz,
+      metrics: new SessionKeyMetrics(),
+    }).mint({
+      session: { user: { id: "user-1" } },
+      projectId: "project-1",
+      organizationId: "organization-1",
+    });
+
+    const granted = (apiKeyCreate as ReturnType<typeof vi.fn>).mock.calls[0]![0]
+      .permissions as string[];
+
+    // Full CRUD on tenant data, including the grains the pre-#7389 list
+    // withheld. The user's own permissions remain the ceiling; this is the
+    // ceiling itself.
+    for (const permission of [
+      "scenarios:manage",
+      "datasets:delete",
+      "traces:manage",
+      "triggers:manage",
+      "experiments:manage",
+      "gatewayBudgets:manage",
+      "virtualKeys:create",
+    ]) {
+      expect(granted, permission).toContain(permission);
+    }
+
+    // The lines that remain. `project` is reached only to READ, because its
+    // writes are the credential surface; `langy` and `ops` are absent at every
+    // grain, because neither is tenant data.
+    expect(granted.filter((p) => p.startsWith("project:"))).toEqual(["project:view"]);
+    expect(granted.filter((p) => p.startsWith("langy:") || p.startsWith("ops:"))).toEqual([]);
+  });
+
   it("refuses a non-Langy key and reaps only expired session keys", async () => {
     const repository = new SessionKeyRepository();
     repository.key = {

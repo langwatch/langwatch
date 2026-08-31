@@ -266,7 +266,13 @@ describe("requireApiKeyPermission()", () => {
     describe("when a Langy session key asks for a permission it is never delegated", () => {
       it("answers 403 with the not-delegable code and a tip that does not send the user to an admin", async () => {
         resolveMock.mockResolvedValue(false);
-        const { app, handler } = appWith(langySessionKeyToken, "triggers:create");
+        const { app, handler } = appWith(
+          langySessionKeyToken,
+          // Never delegable: secrets have no safe read (the original incident
+          // grain, `triggers:create`, is delegable since the 2026-08-21
+          // widening).
+          "secrets:view",
+        );
 
         const res = await app.request("/");
         const body = (await res.json()) as {

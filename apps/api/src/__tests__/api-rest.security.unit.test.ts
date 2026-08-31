@@ -142,7 +142,10 @@ describe("ApiRestSecurity", () => {
       apiKeys.tryResolveToken.mockResolvedValue({ ...currentKey, isLangySessionKey: true });
       const authz = authzService();
       authz.hasApiKeyPermission.mockResolvedValue(false);
-      const app = projectApp(policyOver({ apiKeys, authz }), { permission: "triggers:create" });
+      // Never delegable: secrets have no safe read. The original incident
+      // grain was `triggers:create`, which is delegable since the 2026-08-21
+      // widening (#7389).
+      const app = projectApp(policyOver({ apiKeys, authz }), { permission: "secrets:view" });
 
       const response = await app.request("/api/secret", {
         headers: { authorization: "Bearer current-token", "X-Project-Id": "project-1" },
