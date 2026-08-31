@@ -22,8 +22,10 @@
  *
  * @see specs/rbac/unified-authorization-engine.feature
  */
+import type { AuthzPrincipalRef } from "@langwatch/authz";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { Prisma } from "~/generated/prisma/client";
 import { PrismaClient } from "~/generated/prisma/client";
 import { createPrismaPgAdapter } from "~/server/prismaPgAdapter";
 import { GrantsAuthzReadRepository } from "../repositories/authz-read.grants.repository";
@@ -148,15 +150,14 @@ describe("given an organization holding many live grants", () => {
 
   it("answers an API-key permission check without reading every grant", async () => {
     const repository = new GrantsAuthzReadRepository(
-      prisma as unknown as ConstructorParameters<
-        typeof GrantsAuthzReadRepository
-      >[0],
+      prisma as unknown as Prisma.TransactionClient,
     );
+    const principal: AuthzPrincipalRef = { type: "apiKey", id: apiKeyId };
 
     grantQueries.length = 0;
     const permissions = await repository.findCustomRolePermissions({
       organizationId,
-      principal: { type: "apiKey", id: apiKeyId } as never,
+      principal,
       customRoleIds: [roleId],
     });
 
