@@ -281,6 +281,7 @@ export const APP_ERROR_CODES = [
   "model_provider_scope_forbidden",
   "model_provider_scopes_required",
   "model_provider_test_rate_limited",
+  "model_restricted_for_execution",
   "model_restricted_for_feature",
   "monitor_evaluator_required",
   "no_admin_configured",

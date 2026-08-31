@@ -1,9 +1,9 @@
 import {
-  CODING_ASSISTANT_SURFACES_ONLY_NEEDLE,
   DEFAULT_AZURE_API_VERSION,
   isCodexModel,
   ModelProviderInvalidError,
   ModelProviderNotFoundError,
+  ModelRestrictedForExecutionError,
   modelProviderExecutionParametersSchema,
   modelProviderExecutionPrepareInputSchema,
   translateModelIdForLitellm,
@@ -96,9 +96,7 @@ export class ModelProviderExecutionService {
 
   private assertCodexCanNotExecute(model: string, provider: string | null): void {
     if (isCodexModel(model) || provider === "openai_codex") {
-      throw new Error(
-        `"${model}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot run workflows, evaluations or the playground.`,
-      );
+      throw new ModelRestrictedForExecutionError({ model, provider });
     }
   }
 

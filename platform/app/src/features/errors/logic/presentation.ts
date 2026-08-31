@@ -833,6 +833,14 @@ const presentations = {
     describe: () =>
       "No default model is set yet. Open Settings, then Default Models, and pick one for your organization.",
   },
+  model_restricted_for_execution: {
+    // The same licence as `model_restricted_for_feature`, hit at the other
+    // end: a codex model arriving at a surface it cannot run on, which is
+    // usually a default saved before the restriction existed.
+    title: "This model can't run here",
+    describe: () =>
+      "It's licensed for coding-assistant features only. Pick a different default model in your project's model settings.",
+  },
   model_restricted_for_feature: {
     // Distinct from `model_not_configured`: a model IS set, but it's
     // licensed for Langy and the quick assists only (see

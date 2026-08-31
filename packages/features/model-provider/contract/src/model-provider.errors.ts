@@ -127,6 +127,37 @@ export class ModelRestrictedForFeatureError extends HandledError {
   }
 }
 
+/**
+ * The same licence rule as {@link ModelRestrictedForFeatureError}, caught at
+ * the other enforcement point: a codex model reaching execution rather than
+ * being chosen as a feature's default.
+ *
+ * It is a separate code because the two are separate remedies — the feature
+ * error names the feature whose default to change, and this one is a model
+ * arriving at a surface it cannot run on, which may be a saved value that
+ * predates the restriction.
+ */
+export class ModelRestrictedForExecutionError extends HandledError {
+  declare readonly code: "model_restricted_for_execution";
+
+  readonly model: string;
+  readonly provider: string | null;
+
+  constructor(input: { model: string; provider: string | null }) {
+    super(
+      "model_restricted_for_execution",
+      `"${input.model}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot run workflows, evaluations or the playground.`,
+      {
+        httpStatus: 400,
+        meta: { model: input.model, provider: input.provider },
+      },
+    );
+    this.name = "ModelRestrictedForExecutionError";
+    this.model = input.model;
+    this.provider = input.provider;
+  }
+}
+
 export class ModelProviderNotFoundError extends HandledError {
   declare readonly code: "model_provider_not_found";
 
