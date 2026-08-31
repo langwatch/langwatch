@@ -1193,3 +1193,76 @@ fire.
 architecture-lint violations **845 -> 822**. `comment-block-size` 0,
 `service-quality` 3, `service-quality-baseline` 4. Every touched package
 typechecks and its tests pass.
+
+## The sweep is finished, and three files say why they are not (2026-08-31)
+
+Twenty-nine services folded. The three left are left for one reason, and it
+is the same reason each time: **their module-line ceiling is ratcheted flush
+against the file, and folding costs a line.**
+
+| service | lines | ceiling |
+| --- | --- | --- |
+| `dataset-chunk.service.ts` | 1014 | 1015 |
+| `seat-event-subscription.service.ts` | 604 | 605 |
+| `organization.service.ts` | 1414 | 1388 (already over) |
+
+`seat-event-subscription` was folded, measured 606 against 605, and
+**reverted**. Extracting a method to pay for it makes the module LONGER — a
+signature, a docblock, a closing brace and a call line, for a body that only
+moves — so the usual remedy does not apply. Raising the ceiling to fit an
+improvement is the thing the baseline exists to stop.
+
+Each of these needs a real reduction first. `seat-event-subscription`'s
+144-line `createSeatEventCheckout` has a coherent piece in it — cancelling
+stale PENDING subscriptions from an abandoned checkout and deleting their
+orphaned invites — that comes out cleanly once something else has bought the
+lines back.
+
+### webhook-delivery, on the second attempt
+
+The 25-function file that defeated the tooling two rounds ago went through
+cleanly once the tool's four bugs were fixed. Three things the compiler could
+not have caught:
+
+- `WEBHOOK_DELIVERY_OUTBOX` holds `retryDelayMs: webhookRetryDelayMs` at
+  module scope, evaluated **before** the class initialises. Naming the folded
+  static there is a temporal-dead-zone `ReferenceError` with a clean
+  typecheck. It is an arrow now. That 90 tests import the module is the proof.
+- `...attributedColumns(x)` is a spread, and `...` ends in a dot, so a
+  lookbehind guarding against member access skips it.
+- `toPayload: confirmedDeliverPayload` passes the function as a value.
+
+A fourth, found by the compiler: rewriting call sites AFTER assembling the
+class turns `async appendReplayToEndpointStream(` — which reads exactly like
+a call preceded by a space — into `async this.appendReplayToEndpointStream(`.
+The tool rewrites the original source now, where a declaration still says
+`function name(` and cannot be mistaken for one.
+
+### Two more coverage gaps, and one lesson about how to look
+
+| what nothing guarded | tests |
+| --- | --- |
+| the audit-log `args` bound — written on every privileged action | 8 |
+| the health card's success rate and p95 | 7 |
+| `ilikeContains` lowering the COLUMN, not just the query | 2 |
+
+The last is the interesting one. There WAS a case-insensitive test — query
+`"HELLO"` against `"say hello world"` — but the query is lowered before it
+reaches the comparison, so only an upper-case COLUMN exercises the column's
+own lowering. Removing `.toLowerCase()` passed 168 tests. An in-memory half
+that became case-sensitive would quietly stop an automation firing on traces
+the trace list still shows, which is the SQL-versus-read divergence that
+parity table exists to catch and records shipping once before.
+
+**And a lesson about sabotage itself:** breaking `SpanCostService.coerceToNumber`
+changed nothing in `trace-server`'s suite, which reads as "untested". It is
+not — its tests live under `platform/app/src/runtime/app/__tests__/`, and the
+package's own run never reaches them. Under the suite that actually covers
+it, the same sabotage fails six. A package-scoped run is not proof that a
+package's code is untested.
+
+## Where this session ended
+
+architecture-lint **845 -> 822** across 30 commits. `comment-block-size` 0,
+`service-quality` 3, `service-quality-baseline` 4. Every touched package
+typechecks and its tests pass, and no violation was traded for another.
