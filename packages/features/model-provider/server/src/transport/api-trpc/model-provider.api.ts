@@ -32,6 +32,7 @@
  * specs/model-providers/model-default-config-cascade.feature.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import { CustomModelList } from "../../adapters/custom-model-list.adapter";
 import {
   modelDefaultConfigDeleteTrpcInputSchema,
   modelDefaultConfigSaveTrpcInputSchema,
@@ -205,24 +206,6 @@ function toLegacyProviderMap(providers: Record<string, CanonicalProvider>) {
   );
 }
 
-function toCanonicalModels(value: unknown, type: "chat" | "embedding") {
-  if (!Array.isArray(value)) return undefined;
-  return value.flatMap((model) => {
-    if (typeof model === "string") return [{ id: model, label: model, type }];
-    if (!model || typeof model !== "object") return [];
-    const item = model as { modelId?: unknown; displayName?: unknown };
-    return typeof item.modelId === "string"
-      ? [
-          {
-            id: item.modelId,
-            label: typeof item.displayName === "string" ? item.displayName : item.modelId,
-            type,
-          },
-        ]
-      : [];
-  });
-}
-
 /**
  * Installs the complete `modelProvider.*` tRPC surface on a process-owned
  * root. The procedure and the policy bag are injected by the process so its
@@ -314,8 +297,11 @@ export class ModelProviderTrpcApi {
             name: input.name,
             enabled: input.enabled,
             customKeys: input.customKeys as Record<string, unknown> | null | undefined,
-            customModels: toCanonicalModels(input.customModels, "chat"),
-            customEmbeddingsModels: toCanonicalModels(input.customEmbeddingsModels, "embedding"),
+            customModels: CustomModelList.toCanonical(input.customModels, "chat"),
+            customEmbeddingsModels: CustomModelList.toCanonical(
+              input.customEmbeddingsModels,
+              "embedding",
+            ),
             extraHeaders: input.extraHeaders,
             defaultModel: input.defaultModel,
             routingHandle: input.routingHandle,

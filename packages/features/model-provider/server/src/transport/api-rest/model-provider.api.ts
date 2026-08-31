@@ -1,4 +1,5 @@
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import { CustomModelList } from "../../adapters/custom-model-list.adapter";
 import { createLogger } from "@langwatch/observability";
 import { type OrganizationService, TeamNotFoundError } from "@langwatch/organization-contract";
 import type { MiddlewareHandler } from "hono";
@@ -185,8 +186,11 @@ export function createModelProvidersRestApp(options: {
         provider,
         enabled: data.enabled,
         customKeys: data.customKeys as Record<string, unknown> | undefined,
-        customModels: toCanonicalModels(data.customModels, "chat"),
-        customEmbeddingsModels: toCanonicalModels(data.customEmbeddingsModels, "embedding"),
+        customModels: CustomModelList.toCanonical(data.customModels, "chat"),
+        customEmbeddingsModels: CustomModelList.toCanonical(
+          data.customEmbeddingsModels,
+          "embedding",
+        ),
         extraHeaders: data.extraHeaders,
         defaultModel,
       });
@@ -242,22 +246,4 @@ function toLegacyProviders(
       },
     ]),
   );
-}
-
-function toCanonicalModels(value: unknown, type: "chat" | "embedding") {
-  if (!Array.isArray(value)) return undefined;
-  return value.flatMap((model) => {
-    if (typeof model === "string") return [{ id: model, label: model, type }];
-    if (!model || typeof model !== "object") return [];
-    const item = model as { modelId?: unknown; displayName?: unknown };
-    return typeof item.modelId === "string"
-      ? [
-          {
-            id: item.modelId,
-            label: typeof item.displayName === "string" ? item.displayName : item.modelId,
-            type,
-          },
-        ]
-      : [];
-  });
 }
