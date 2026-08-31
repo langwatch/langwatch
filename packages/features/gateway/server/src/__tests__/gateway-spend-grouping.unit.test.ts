@@ -3,13 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import {
-  assertGroupingIsWalkable,
-  FixedGatewaySettlementPolicy,
-  isIanaTimeZone,
-  isMovableGroupBy,
-  windowHasSettled,
-} from "@langwatch/gateway-server";
+import { FixedGatewaySettlementPolicy, GatewaySpendGrouping } from "@langwatch/gateway-server";
 
 const NOW = 1_800_000_000_000;
 /**
@@ -44,8 +38,8 @@ describe("given a spend rollup grouping", () => {
     it("names model and provider as movable", () => {
       // The fold replaces the REQUESTED model and provider with the ones that
       // actually served the request, so a row can change group after the fact.
-      expect(isMovableGroupBy("model")).toBe(true);
-      expect(isMovableGroupBy("provider")).toBe(true);
+      expect(GatewaySpendGrouping.isMovableGroupBy("model")).toBe(true);
+      expect(GatewaySpendGrouping.isMovableGroupBy("provider")).toBe(true);
     });
 
     it("names the attribution dimensions as fixed", () => {
@@ -56,7 +50,7 @@ describe("given a spend rollup grouping", () => {
         "principal",
         "request_type",
       ] as const) {
-        expect(isMovableGroupBy(key)).toBe(false);
+        expect(GatewaySpendGrouping.isMovableGroupBy(key)).toBe(false);
       }
     });
   });
@@ -64,7 +58,7 @@ describe("given a spend rollup grouping", () => {
   describe("when the window can still change", () => {
     it("refuses a movable grouping", () => {
       const refusal = refusalFrom(() =>
-        assertGroupingIsWalkable({
+        GatewaySpendGrouping.assertGroupingIsWalkable({
           keys: ["model"],
           bucket: "none",
           toMs: LIVE_WINDOW_END,
@@ -78,7 +72,7 @@ describe("given a spend rollup grouping", () => {
 
     it("serves a grouping whose key cannot move", () => {
       expect(() =>
-        assertGroupingIsWalkable({
+        GatewaySpendGrouping.assertGroupingIsWalkable({
           keys: ["end_user", "virtual_key"],
           bucket: "none",
           toMs: LIVE_WINDOW_END,
@@ -91,7 +85,7 @@ describe("given a spend rollup grouping", () => {
 
     it("serves a movable grouping when the caller accepts an inexact read", () => {
       expect(() =>
-        assertGroupingIsWalkable({
+        GatewaySpendGrouping.assertGroupingIsWalkable({
           keys: ["model"],
           bucket: "none",
           toMs: LIVE_WINDOW_END,
@@ -108,7 +102,7 @@ describe("given a spend rollup grouping", () => {
       // races ahead of its admission has its instant rewritten and the
       // request changes bucket.
       const refusal = refusalFrom(() =>
-        assertGroupingIsWalkable({
+        GatewaySpendGrouping.assertGroupingIsWalkable({
           keys: ["end_user"],
           bucket: "day",
           toMs: LIVE_WINDOW_END,
@@ -124,10 +118,14 @@ describe("given a spend rollup grouping", () => {
   describe("when the window has settled", () => {
     it("serves the movable grouping it would have refused", () => {
       expect(
-        windowHasSettled({ toMs: SETTLED_WINDOW_END, nowMs: NOW, settlementPolicy }),
+        GatewaySpendGrouping.windowHasSettled({
+          toMs: SETTLED_WINDOW_END,
+          nowMs: NOW,
+          settlementPolicy,
+        }),
       ).toBe(true);
       expect(() =>
-        assertGroupingIsWalkable({
+        GatewaySpendGrouping.assertGroupingIsWalkable({
           keys: ["model", "provider"],
           bucket: "day",
           toMs: SETTLED_WINDOW_END,
@@ -142,7 +140,7 @@ describe("given a spend rollup grouping", () => {
   describe("when the refusal is rendered", () => {
     it("names which dimensions moved and when the window settles", () => {
       const refusal = refusalFrom(() =>
-        assertGroupingIsWalkable({
+        GatewaySpendGrouping.assertGroupingIsWalkable({
           keys: ["model"],
           bucket: "hour",
           toMs: LIVE_WINDOW_END,
@@ -160,7 +158,7 @@ describe("given a spend rollup grouping", () => {
   describe("when a time zone is named", () => {
     it("accepts the named zones the store can load", () => {
       for (const zone of ["UTC", "Europe/Amsterdam", "Etc/GMT+5", "Zulu"]) {
-        expect(isIanaTimeZone(zone), zone).toBe(true);
+        expect(GatewaySpendGrouping.isIanaTimeZone(zone), zone).toBe(true);
       }
     });
 
@@ -171,17 +169,14 @@ describe("given a spend rollup grouping", () => {
       // them here turns a value the caller chose into an unknown error thrown
       // from a place they cannot see.
       for (const offset of ["+05:00", "+0500", "-08:00", "+05"]) {
-        expect(
-          () => new Intl.DateTimeFormat("en-US", { timeZone: offset }),
-          offset,
-        ).not.toThrow();
-        expect(isIanaTimeZone(offset), offset).toBe(false);
+        expect(() => new Intl.DateTimeFormat("en-US", { timeZone: offset }), offset).not.toThrow();
+        expect(GatewaySpendGrouping.isIanaTimeZone(offset), offset).toBe(false);
       }
     });
 
     it("still refuses a name no zone database has", () => {
-      expect(isIanaTimeZone("Nowhere/Special")).toBe(false);
-      expect(isIanaTimeZone("")).toBe(false);
+      expect(GatewaySpendGrouping.isIanaTimeZone("Nowhere/Special")).toBe(false);
+      expect(GatewaySpendGrouping.isIanaTimeZone("")).toBe(false);
     });
   });
 });

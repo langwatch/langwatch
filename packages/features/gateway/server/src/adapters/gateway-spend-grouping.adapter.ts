@@ -52,118 +52,129 @@ const COLUMN_BY_KEY: Record<SpendGroupByKey, string> = {
   request_type: "RequestType",
 };
 
-export function groupByColumn(key: SpendGroupByKey): string {
-  return COLUMN_BY_KEY[key];
-}
-
 export const SPEND_BUCKETS = ["none", "hour", "day"] as const;
 export type SpendBucket = (typeof SPEND_BUCKETS)[number];
 
 /**
- * Whether this is a named zone the runtime knows.
+ * How a spend rollup is grouped and bucketed.
  *
- * Asked before the query is built so an unknown zone is a 400 naming
- * `timezone`. ClickHouse would otherwise refuse it in `formatDateTime` and the
- * caller would read an unknown error about a value they chose. Existence is
- * checked by a construction attempt rather than against a list, because the
- * zone database ships with the runtime and any list here would go stale
- * against it.
- *
- * A fixed offset is refused even though the runtime accepts it. `Intl` takes
- * `+05:00`, `+0500` and `-08:00`; ClickHouse loads zones by name only and
- * answers `Cannot load time zone +05:00`, which would reach the caller as an
- * unknown error rather than the documented refusal. Every named zone starts
- * with a letter and no offset spelling does, so the first character settles
- * it.
+ * Two of these decide whether a read is answerable at all rather than how it
+ * looks. A group that can MOVE while a page walk is in progress — by model,
+ * by provider, into time buckets — would double-count some requests and miss
+ * others, so `isMovableGroupBy` and `windowHasSettled` decide together whether
+ * the walk is safe, and `assertGroupingIsWalkable` refuses when it is not.
  */
-export function isIanaTimeZone(zone: string): boolean {
-  if (!/^[A-Za-z]/.test(zone)) return false;
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: zone });
-    return true;
-  } catch {
-    return false;
+export class GatewaySpendGrouping {
+  static groupByColumn(key: SpendGroupByKey): string {
+    return COLUMN_BY_KEY[key];
   }
-}
 
-/**
- * A time bucket rendered as a sortable string, so every grouping dimension is
- * a String and one cursor comparison covers them all. The offset is applied
- * inside ClickHouse rather than after the fact: a day boundary is the
- * caller's local midnight, and re-bucketing UTC days client-side cannot
- * recover the requests that fell on the other side of it.
- */
-export function bucketExpression({
-  bucket,
-  timezoneParam,
-}: {
-  bucket: Exclude<SpendBucket, "none">;
-  timezoneParam: string;
-}): string {
-  const start = bucket === "hour" ? "toStartOfHour" : "toStartOfDay";
-  const format = bucket === "hour" ? "%Y-%m-%dT%H:00:00" : "%Y-%m-%d";
-  return `formatDateTime(${start}(OccurredAt, {${timezoneParam}:String}), '${format}', {${timezoneParam}:String})`;
-}
+  /**
+   * Whether this is a named zone the runtime knows.
+   *
+   * Asked before the query is built so an unknown zone is a 400 naming
+   * `timezone`. ClickHouse would otherwise refuse it in `formatDateTime` and the
+   * caller would read an unknown error about a value they chose. Existence is
+   * checked by a construction attempt rather than against a list, because the
+   * zone database ships with the runtime and any list here would go stale
+   * against it.
+   *
+   * A fixed offset is refused even though the runtime accepts it. `Intl` takes
+   * `+05:00`, `+0500` and `-08:00`; ClickHouse loads zones by name only and
+   * answers `Cannot load time zone +05:00`, which would reach the caller as an
+   * unknown error rather than the documented refusal. Every named zone starts
+   * with a letter and no offset spelling does, so the first character settles
+   * it.
+   */
+  static isIanaTimeZone(zone: string): boolean {
+    if (!/^[A-Za-z]/.test(zone)) return false;
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: zone });
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
-/** True when a late outcome can still move a row between groups on this key. */
-export function isMovableGroupBy(key: SpendGroupByKey): boolean {
-  return MOVABLE_GROUP_BY_KEYS.includes(key);
-}
+  /**
+   * A time bucket rendered as a sortable string, so every grouping dimension is
+   * a String and one cursor comparison covers them all. The offset is applied
+   * inside ClickHouse rather than after the fact: a day boundary is the
+   * caller's local midnight, and re-bucketing UTC days client-side cannot
+   * recover the requests that fell on the other side of it.
+   */
+  static bucketExpression({
+    bucket,
+    timezoneParam,
+  }: {
+    bucket: Exclude<SpendBucket, "none">;
+    timezoneParam: string;
+  }): string {
+    const start = bucket === "hour" ? "toStartOfHour" : "toStartOfDay";
+    const format = bucket === "hour" ? "%Y-%m-%dT%H:00:00" : "%Y-%m-%d";
+    return `formatDateTime(${start}(OccurredAt, {${timezoneParam}:String}), '${format}', {${timezoneParam}:String})`;
+  }
 
-/**
- * A window is settled once its end is older than the settlement grace: past
- * that, every admission inside it has either resolved or been settled by the
- * sweeper, so no fold is still waiting to rewrite a row's model or provider.
- *
- * The grace is read from the settlement process manager rather than restated
- * here, so an operator who widens `LW_SPEND_SETTLEMENT_GRACE_MS` widens this
- * guard with it instead of leaving two numbers to disagree.
- */
-export function windowHasSettled({
-  toMs,
-  nowMs,
-  settlementPolicy,
-}: {
-  toMs: number;
-  nowMs: number;
-  settlementPolicy: GatewaySettlementPolicyPort;
-}): boolean {
-  return toMs <= nowMs - settlementPolicy.graceMs();
-}
+  /** True when a late outcome can still move a row between groups on this key. */
+  static isMovableGroupBy(key: SpendGroupByKey): boolean {
+    return MOVABLE_GROUP_BY_KEYS.includes(key);
+  }
 
-/**
- * Refuse a grouping whose key can still move under the walk, unless the
- * caller has said they accept an inexact read.
- *
- * A time bucket counts as movable for the same reason model and provider do,
- * and for a subtler cause: the fold's admitted handler sets the occurred-at
- * unconditionally while every outcome handler preserves the one already
- * there, so an outcome that races ahead of its own admission has its instant
- * rewritten when the admission lands. A request can therefore change buckets,
- * and over a month boundary change partitions.
- */
-export function assertGroupingIsWalkable({
-  keys,
-  bucket,
-  toMs,
-  nowMs,
-  allowUnstable,
-  settlementPolicy,
-}: {
-  keys: SpendGroupByKey[];
-  bucket: SpendBucket;
-  toMs: number;
-  nowMs: number;
-  allowUnstable: boolean;
-  settlementPolicy: GatewaySettlementPolicyPort;
-}): void {
-  if (allowUnstable) return;
-  if (windowHasSettled({ toMs, nowMs, settlementPolicy })) return;
-  const movable: string[] = keys.filter(isMovableGroupBy);
-  if (bucket !== "none") movable.push(`bucket:${bucket}`);
-  if (movable.length === 0) return;
-  throw new GatewaySpendGroupByUnstableError({
-    groupBy: movable,
-    settlesAtMs: toMs + settlementPolicy.graceMs(),
-  });
+  /**
+   * A window is settled once its end is older than the settlement grace: past
+   * that, every admission inside it has either resolved or been settled by the
+   * sweeper, so no fold is still waiting to rewrite a row's model or provider.
+   *
+   * The grace is read from the settlement process manager rather than restated
+   * here, so an operator who widens `LW_SPEND_SETTLEMENT_GRACE_MS` widens this
+   * guard with it instead of leaving two numbers to disagree.
+   */
+  static windowHasSettled({
+    toMs,
+    nowMs,
+    settlementPolicy,
+  }: {
+    toMs: number;
+    nowMs: number;
+    settlementPolicy: GatewaySettlementPolicyPort;
+  }): boolean {
+    return toMs <= nowMs - settlementPolicy.graceMs();
+  }
+
+  /**
+   * Refuse a grouping whose key can still move under the walk, unless the
+   * caller has said they accept an inexact read.
+   *
+   * A time bucket counts as movable for the same reason model and provider do,
+   * and for a subtler cause: the fold's admitted handler sets the occurred-at
+   * unconditionally while every outcome handler preserves the one already
+   * there, so an outcome that races ahead of its own admission has its instant
+   * rewritten when the admission lands. A request can therefore change buckets,
+   * and over a month boundary change partitions.
+   */
+  static assertGroupingIsWalkable({
+    keys,
+    bucket,
+    toMs,
+    nowMs,
+    allowUnstable,
+    settlementPolicy,
+  }: {
+    keys: SpendGroupByKey[];
+    bucket: SpendBucket;
+    toMs: number;
+    nowMs: number;
+    allowUnstable: boolean;
+    settlementPolicy: GatewaySettlementPolicyPort;
+  }): void {
+    if (allowUnstable) return;
+    if (GatewaySpendGrouping.windowHasSettled({ toMs, nowMs, settlementPolicy })) return;
+    const movable: string[] = keys.filter((key) => GatewaySpendGrouping.isMovableGroupBy(key));
+    if (bucket !== "none") movable.push(`bucket:${bucket}`);
+    if (movable.length === 0) return;
+    throw new GatewaySpendGroupByUnstableError({
+      groupBy: movable,
+      settlesAtMs: toMs + settlementPolicy.graceMs(),
+    });
+  }
 }

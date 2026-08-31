@@ -1,19 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { attributedUserBucketScopeId } from "../gateway-bucket-scope.adapter";
-import { resolveApplicableBudgets } from "../../repositories/prisma/prisma.gateway-budget-resolution.repository";
+import { PrismaGatewayBudgetResolutionRepository } from "../../repositories/prisma/prisma.gateway-budget-resolution.repository";
 
 /**
  * Resolution unit over a stubbed Prisma: the queries this service runs are
  * findMany over budgets, group memberships, and the key's own team scopes,
  * so a small stub is the whole database.
  */
-function prismaStub({
-  budgets,
-  teamScopes = [],
-}: {
-  budgets: unknown[];
-  teamScopes?: unknown[];
-}) {
+function prismaStub({ budgets, teamScopes = [] }: { budgets: unknown[]; teamScopes?: unknown[] }) {
   return {
     gatewayBudget: { findMany: vi.fn().mockResolvedValue(budgets) },
     groupMember: { findMany: vi.fn().mockResolvedValue([]) },
@@ -35,12 +29,9 @@ const template = (over: Record<string, unknown> = {}) => ({
 describe("attributed-user template resolution", () => {
   /** @scenario A template resolves to the request's own bucket when the end user is known */
   it("buckets by anchor and end user, provider filter riding the suffix", async () => {
-    const resolved = await resolveApplicableBudgets({
+    const resolved = await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
       client: prismaStub({
-        budgets: [
-          template(),
-          template({ id: "budget_tpl_openai", providerKey: "mp_openai" }),
-        ],
+        budgets: [template(), template({ id: "budget_tpl_openai", providerKey: "mp_openai" })],
       }),
       target: {
         organizationId: "org_1",
@@ -49,9 +40,7 @@ describe("attributed-user template resolution", () => {
       },
     });
     const plain = resolved.find((r) => r.budget.id === "budget_tpl")!;
-    expect(plain.bucketScopeId).toBe(
-      attributedUserBucketScopeId("vk_anchor", "end_user_42"),
-    );
+    expect(plain.bucketScopeId).toBe(attributedUserBucketScopeId("vk_anchor", "end_user_42"));
     expect(plain.bucketScopeId).toBe("vk_anchor:end_user_42");
     expect(plain.endUserId).toBe("end_user_42");
 
@@ -61,7 +50,7 @@ describe("attributed-user template resolution", () => {
 
   /** @scenario A template resolves as itself when no end user is in context */
   it("resolves the bare template without an end user", async () => {
-    const resolved = await resolveApplicableBudgets({
+    const resolved = await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
       client: prismaStub({ budgets: [template()] }),
       target: {
         organizationId: "org_1",

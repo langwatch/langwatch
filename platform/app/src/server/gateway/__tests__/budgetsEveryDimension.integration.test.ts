@@ -26,7 +26,10 @@ import {
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { GatewayBudgetClickHouseRepository } from "@langwatch/gateway-server";
 import { GatewayService } from "@langwatch/gateway-server";
-import { budgetAppliesToProvider, resolveApplicableBudgets } from "@langwatch/gateway-server";
+import {
+  budgetAppliesToProvider,
+  PrismaGatewayBudgetResolutionRepository,
+} from "@langwatch/gateway-server";
 import { GatewayConfigMaterialiser } from "../config.materialiser";
 import { VirtualKeyRepository } from "@langwatch/gateway-server";
 import { VirtualKeyService } from "../virtualKey.service";
@@ -263,7 +266,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
   describe("given a GROUP budget on a group with members", () => {
     /** @scenario "A group budget gives each member their own allowance" */
     it("resolves a GROUP budget into that member's own bucket", async () => {
-      const resolved = await resolveApplicableBudgets({
+      const resolved = await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
         client: prisma,
         target: {
           organizationId: ORG_ID,
@@ -282,7 +285,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
 
     /** @scenario "A group budget does not apply to a key with no person behind it" */
     it("skips GROUP budgets for a key with no principal", async () => {
-      const resolved = await resolveApplicableBudgets({
+      const resolved = await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
         client: prisma,
         target: {
           organizationId: ORG_ID,
@@ -300,7 +303,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       await prisma.groupMembership.create({
         data: { userId: OTHER_USER_ID, groupId: GROUP_ID },
       });
-      const joined = await resolveApplicableBudgets({
+      const joined = await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
         client: prisma,
         target: {
           organizationId: ORG_ID,
@@ -313,7 +316,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       await prisma.groupMembership.delete({
         where: { userId_groupId: { userId: OTHER_USER_ID, groupId: GROUP_ID } },
       });
-      const left = await resolveApplicableBudgets({
+      const left = await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
         client: prisma,
         target: {
           organizationId: ORG_ID,
@@ -373,7 +376,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
 
       // The created budget rides the per-member cascade like any other
       // group budget.
-      const resolved = await resolveApplicableBudgets({
+      const resolved = await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
         client: prisma,
         target: {
           organizationId: ORG_ID,
@@ -444,7 +447,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       expect(ch).not.toBeNull();
       const chRepo = new GatewayBudgetClickHouseRepository(async () => ch as ClickHouseClient);
 
-      const resolved = await resolveApplicableBudgets({
+      const resolved = await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
         client: prisma,
         target: {
           organizationId: ORG_ID,
@@ -980,7 +983,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
         },
       });
       expect(budget!.archivedAt).not.toBeNull();
-      const resolved = await resolveApplicableBudgets({
+      const resolved = await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
         client: prisma,
         target: {
           organizationId: ORG_ID,
@@ -1041,7 +1044,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
         // key is usually the governance team, never the team that owns the
         // key. Passing a different team here is the whole point: the budget
         // must still resolve, from the key's own scope.
-        const resolved = await resolveApplicableBudgets({
+        const resolved = await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
           client: prisma,
           target: {
             organizationId: ORG_ID,

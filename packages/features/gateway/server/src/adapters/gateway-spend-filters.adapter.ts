@@ -52,9 +52,7 @@ export const spendStatusFilter = z.enum(SPEND_STATUS_FILTERS);
  * confident zero, and a reconciliation that checksums against that zero
  * decides the books agree.
  */
-export const spendSummaryStatusFilter = spendStatusFilter.exclude([
-  SPEND_STATUS_IN_FLIGHT,
-]);
+export const spendSummaryStatusFilter = spendStatusFilter.exclude([SPEND_STATUS_IN_FLIGHT]);
 
 /** Why the rollups read publishes a narrower `status` than the events read. */
 export const SPEND_SUMMARY_STATUS_DESCRIPTION =
@@ -69,29 +67,6 @@ const LEGACY_STATUS_ALIASES = new Map<string, SpendEventStatus>([
   ["success", "confirmed"],
   ["error", "failed"],
 ]);
-
-/**
- * The lifecycle status a filter token names, DERIVED from
- * {@link SPEND_STATUS_FILTERS} rather than restated. Restating it would let
- * the boundary accept a status this rejects: a new entry in the tuple would
- * pass `spendStatusFilter` and then throw here, turning a validated request
- * into a 500.
- */
-export function normalizeStatusFilter(status: string): SpendEventStatus | undefined {
-  if (status === "") return undefined;
-  const alias = LEGACY_STATUS_ALIASES.get(status);
-  if (alias !== undefined) return alias;
-  if ((SPEND_STATUS_FILTERS as readonly string[]).includes(status)) {
-    // Everything in the tuple that is not an alias IS a lifecycle status, and
-    // the aliases are answered above.
-    return status as SpendEventStatus;
-  }
-  // An unknown non-empty token is a caller bug: throwing beats silently
-  // dropping the filter on a surface that feeds downstream billers.
-  throw new Error(
-    `Unknown spend status filter "${status}"; expected ${SPEND_STATUS_FILTERS.join(", ")}`,
-  );
-}
 
 /** A metadata predicate: the caller's own key, and the values that match. */
 export interface SpendMetadataFilter {
@@ -121,20 +96,6 @@ export interface SpendFilters {
  */
 export const MAX_FILTER_VALUES = 100;
 
-/**
- * A filter the caller may repeat. Hono hands a query parameter back as a
- * string when it appears once and an array when it appears more than once,
- * so a schema that accepted only one of those shapes would reject the
- * commoner half of the traffic.
- */
-function repeatable(
-  inner: z.ZodType<string, string>,
-): z.ZodType<string[], string | string[]> {
-  return z
-    .union([inner, z.array(inner).max(MAX_FILTER_VALUES)])
-    .transform((value): string[] => (Array.isArray(value) ? value : [value]));
-}
-
 const id = z.string().min(1).max(100);
 const longId = z.string().min(1).max(256);
 
@@ -162,100 +123,8 @@ const metadataPair = z
     },
   );
 
-/**
- * The query-parameter shape both spend reads mount. Spread into each route's
- * schema rather than extended from it, because the two carry different
- * windows, cursors and page sizes around this common core.
- */
-export const spendFilterQueryShape = {
-  project_id: repeatable(id).optional(),
-  team_id: repeatable(id).optional(),
-  external_id: repeatable(z.string().min(1).max(200)).optional(),
-  virtual_key_id: repeatable(id).optional(),
-  end_user_id: repeatable(longId).optional(),
-  principal_user_id: repeatable(id).optional(),
-  model: repeatable(z.string().min(1).max(200)).optional(),
-  provider_key: repeatable(id).optional(),
-  request_type: repeatable(z.string().min(1).max(50)).optional(),
-  label: repeatable(z.string().min(1).max(200)).optional(),
-  metadata: repeatable(metadataPair).optional(),
-  status: spendStatusFilter.optional(),
-} as const;
-
 /** The parsed shape of {@link spendFilterQueryShape}. */
 export type SpendFilterQuery = z.infer<z.ZodObject<typeof spendFilterQueryShape>>;
-
-/**
- * Group repeated pairs by key: repeating a key widens that key (any of the
- * values match), while naming two keys narrows (both must match). Treating
- * a repeated key as another AND would make `tier:gold` plus `tier:silver`
- * match nothing at all, which reads as "no such spend" rather than as the
- * caller having asked an impossible question.
- */
-export function parseMetadataFilters(raw: string[]): SpendMetadataFilter[] {
-  const byKey = new Map<string, string[]>();
-  for (const pair of raw) {
-    const separator = pair.indexOf(":");
-    // The same rule {@link metadataPair} enforces, restated for callers that
-    // reach this function without it. Slicing on an absent colon is silently
-    // wrong rather than empty: `"tier"` has `indexOf` -1, so the key becomes
-    // `"tie"` and the value the whole token, and the caller reads spend for a
-    // filter nobody wrote.
-    if (separator <= 0 || separator === pair.length - 1) {
-      throw new Error(
-        `metadata must be written key:value, with both sides non-empty: "${pair}"`,
-      );
-    }
-    const key = pair.slice(0, separator);
-    const value = pair.slice(separator + 1);
-    const existing = byKey.get(key);
-    if (existing) existing.push(value);
-    else byKey.set(key, [value]);
-  }
-  return [...byKey].map(([key, values]) => ({ key, values }));
-}
-
-/**
- * Both lists must hold for a row to match, so an absent list is "no opinion"
- * and two present lists intersect. Naming a key directly and naming it by the
- * customer's own external id is one narrowing expressed twice, and naming two
- * different keys that way is a question with no answer, not a wider one.
- */
-export function intersectIds(
-  a: string[] | undefined,
-  b: string[] | undefined,
-): string[] | undefined {
-  if (a === undefined) return b;
-  if (b === undefined) return a;
-  const inB = new Set(b);
-  return a.filter((value) => inB.has(value));
-}
-
-/**
- * The subset of a parsed query that ClickHouse can answer directly. The
- * Postgres-resolved filters (project, team, external id) are applied by the
- * caller before this runs.
- */
-export function spendFiltersFromQuery({
-  query,
-  overrides,
-}: {
-  query: SpendFilterQuery;
-  overrides?: { virtualKeyIds?: string[] };
-}): SpendFilters {
-  return {
-    virtualKeyIds: intersectIds(query.virtual_key_id, overrides?.virtualKeyIds),
-    endUserIds: query.end_user_id,
-    principalUserIds: query.principal_user_id,
-    models: query.model,
-    providerKeys: query.provider_key,
-    requestTypes: query.request_type,
-    labels: query.label,
-    metadata:
-      query.metadata === undefined ? undefined : parseMetadataFilters(query.metadata),
-    status: query.status,
-  };
-}
 
 /**
  * The same vocabulary for callers that already speak in structured values
@@ -306,50 +175,189 @@ const IN_COLUMNS: ReadonlyArray<readonly [keyof SpendFilters, string]> = [
 ];
 
 /**
- * Render the filters as bare ClickHouse predicates, binding a placeholder only
- * for the filters actually present so a query never references a parameter it
- * did not supply. Bare, because callers differ in how they join: one appends
- * to a fixed WHERE, another joins a condition list.
+ * The filters a spend read accepts, from the query string to the SQL clause.
  *
- * A filter that is PRESENT but empty still emits its predicate. That is the
- * whole point: a team filter naming a team with no projects, or an external
- * id matching no key, must answer nothing rather than collapse into an
- * absent predicate and hand back the organization's entire spend under a
- * narrowing the caller asked for.
+ * One vocabulary for two surfaces: every filter here is accepted by both the
+ * events read and the rollup read, so a caller that narrows one can narrow the
+ * other with the same parameters. Parsing them in one place is what keeps that
+ * promise true.
  */
-export function buildSpendFilterClauses({ filters }: { filters: SpendFilters }): {
-  clauses: string[];
-  params: Record<string, unknown>;
-} {
-  const clauses: string[] = [];
-  const params: Record<string, unknown> = {};
-
-  for (const [field, column] of IN_COLUMNS) {
-    const values = filters[field] as string[] | undefined;
-    if (values === undefined) continue;
-    clauses.push(`${column} IN {${field}:Array(String)}`);
-    params[field] = values;
+export class GatewaySpendFilters {
+  /**
+   * A filter the caller may repeat. Hono hands a query parameter back as a
+   * string when it appears once and an array when it appears more than once,
+   * so a schema that accepted only one of those shapes would reject the
+   * commoner half of the traffic.
+   */
+  static repeatable(inner: z.ZodType<string, string>): z.ZodType<string[], string | string[]> {
+    return z
+      .union([inner, z.array(inner).max(MAX_FILTER_VALUES)])
+      .transform((value): string[] => (Array.isArray(value) ? value : [value]));
   }
 
-  if (filters.labels !== undefined) {
-    clauses.push("hasAny(Labels, {labels:Array(String)})");
-    params.labels = filters.labels;
-  }
-
-  filters.metadata?.forEach((filter, index) => {
-    clauses.push(
-      `MetadataMap[{metadataKey${index}:String}] IN {metadataValues${index}:Array(String)}`,
+  /**
+   * The lifecycle status a filter token names, DERIVED from
+   * {@link SPEND_STATUS_FILTERS} rather than restated. Restating it would let
+   * the boundary accept a status this rejects: a new entry in the tuple would
+   * pass `spendStatusFilter` and then throw here, turning a validated request
+   * into a 500.
+   */
+  static normalizeStatusFilter(status: string): SpendEventStatus | undefined {
+    if (status === "") return undefined;
+    const alias = LEGACY_STATUS_ALIASES.get(status);
+    if (alias !== undefined) return alias;
+    if ((SPEND_STATUS_FILTERS as readonly string[]).includes(status)) {
+      // Everything in the tuple that is not an alias IS a lifecycle status, and
+      // the aliases are answered above.
+      return status as SpendEventStatus;
+    }
+    // An unknown non-empty token is a caller bug: throwing beats silently
+    // dropping the filter on a surface that feeds downstream billers.
+    throw new Error(
+      `Unknown spend status filter "${status}"; expected ${SPEND_STATUS_FILTERS.join(", ")}`,
     );
-    params[`metadataKey${index}`] = filter.key;
-    params[`metadataValues${index}`] = filter.values;
-  });
-
-  const status =
-    filters.status !== undefined ? normalizeStatusFilter(filters.status) : undefined;
-  if (status !== undefined) {
-    clauses.push("Status = {status:String}");
-    params.status = status;
   }
 
-  return { clauses, params };
+  /**
+   * Group repeated pairs by key: repeating a key widens that key (any of the
+   * values match), while naming two keys narrows (both must match). Treating
+   * a repeated key as another AND would make `tier:gold` plus `tier:silver`
+   * match nothing at all, which reads as "no such spend" rather than as the
+   * caller having asked an impossible question.
+   */
+  static parseMetadataFilters(raw: string[]): SpendMetadataFilter[] {
+    const byKey = new Map<string, string[]>();
+    for (const pair of raw) {
+      const separator = pair.indexOf(":");
+      // The same rule {@link metadataPair} enforces, restated for callers that
+      // reach this function without it. Slicing on an absent colon is silently
+      // wrong rather than empty: `"tier"` has `indexOf` -1, so the key becomes
+      // `"tie"` and the value the whole token, and the caller reads spend for a
+      // filter nobody wrote.
+      if (separator <= 0 || separator === pair.length - 1) {
+        throw new Error(`metadata must be written key:value, with both sides non-empty: "${pair}"`);
+      }
+      const key = pair.slice(0, separator);
+      const value = pair.slice(separator + 1);
+      const existing = byKey.get(key);
+      if (existing) existing.push(value);
+      else byKey.set(key, [value]);
+    }
+    return [...byKey].map(([key, values]) => ({ key, values }));
+  }
+
+  /**
+   * Both lists must hold for a row to match, so an absent list is "no opinion"
+   * and two present lists intersect. Naming a key directly and naming it by the
+   * customer's own external id is one narrowing expressed twice, and naming two
+   * different keys that way is a question with no answer, not a wider one.
+   */
+  static intersectIds(a: string[] | undefined, b: string[] | undefined): string[] | undefined {
+    if (a === undefined) return b;
+    if (b === undefined) return a;
+    const inB = new Set(b);
+    return a.filter((value) => inB.has(value));
+  }
+
+  /**
+   * The subset of a parsed query that ClickHouse can answer directly. The
+   * Postgres-resolved filters (project, team, external id) are applied by the
+   * caller before this runs.
+   */
+  static spendFiltersFromQuery({
+    query,
+    overrides,
+  }: {
+    query: SpendFilterQuery;
+    overrides?: { virtualKeyIds?: string[] };
+  }): SpendFilters {
+    return {
+      virtualKeyIds: GatewaySpendFilters.intersectIds(
+        query.virtual_key_id,
+        overrides?.virtualKeyIds,
+      ),
+      endUserIds: query.end_user_id,
+      principalUserIds: query.principal_user_id,
+      models: query.model,
+      providerKeys: query.provider_key,
+      requestTypes: query.request_type,
+      labels: query.label,
+      metadata:
+        query.metadata === undefined
+          ? undefined
+          : GatewaySpendFilters.parseMetadataFilters(query.metadata),
+      status: query.status,
+    };
+  }
+
+  /**
+   * Render the filters as bare ClickHouse predicates, binding a placeholder only
+   * for the filters actually present so a query never references a parameter it
+   * did not supply. Bare, because callers differ in how they join: one appends
+   * to a fixed WHERE, another joins a condition list.
+   *
+   * A filter that is PRESENT but empty still emits its predicate. That is the
+   * whole point: a team filter naming a team with no projects, or an external
+   * id matching no key, must answer nothing rather than collapse into an
+   * absent predicate and hand back the organization's entire spend under a
+   * narrowing the caller asked for.
+   */
+  static buildSpendFilterClauses({ filters }: { filters: SpendFilters }): {
+    clauses: string[];
+    params: Record<string, unknown>;
+  } {
+    const clauses: string[] = [];
+    const params: Record<string, unknown> = {};
+
+    for (const [field, column] of IN_COLUMNS) {
+      const values = filters[field] as string[] | undefined;
+      if (values === undefined) continue;
+      clauses.push(`${column} IN {${field}:Array(String)}`);
+      params[field] = values;
+    }
+
+    if (filters.labels !== undefined) {
+      clauses.push("hasAny(Labels, {labels:Array(String)})");
+      params.labels = filters.labels;
+    }
+
+    filters.metadata?.forEach((filter, index) => {
+      clauses.push(
+        `MetadataMap[{metadataKey${index}:String}] IN {metadataValues${index}:Array(String)}`,
+      );
+      params[`metadataKey${index}`] = filter.key;
+      params[`metadataValues${index}`] = filter.values;
+    });
+
+    const status =
+      filters.status !== undefined
+        ? GatewaySpendFilters.normalizeStatusFilter(filters.status)
+        : undefined;
+    if (status !== undefined) {
+      clauses.push("Status = {status:String}");
+      params.status = status;
+    }
+
+    return { clauses, params };
+  }
 }
+
+/**
+ * The query-parameter shape both spend reads mount. Spread into each route's
+ * schema rather than extended from it, because the two carry different
+ * windows, cursors and page sizes around this common core.
+ */
+export const spendFilterQueryShape = {
+  project_id: GatewaySpendFilters.repeatable(id).optional(),
+  team_id: GatewaySpendFilters.repeatable(id).optional(),
+  external_id: GatewaySpendFilters.repeatable(z.string().min(1).max(200)).optional(),
+  virtual_key_id: GatewaySpendFilters.repeatable(id).optional(),
+  end_user_id: GatewaySpendFilters.repeatable(longId).optional(),
+  principal_user_id: GatewaySpendFilters.repeatable(id).optional(),
+  model: GatewaySpendFilters.repeatable(z.string().min(1).max(200)).optional(),
+  provider_key: GatewaySpendFilters.repeatable(id).optional(),
+  request_type: GatewaySpendFilters.repeatable(z.string().min(1).max(50)).optional(),
+  label: GatewaySpendFilters.repeatable(z.string().min(1).max(200)).optional(),
+  metadata: GatewaySpendFilters.repeatable(metadataPair).optional(),
+  status: spendStatusFilter.optional(),
+} as const;

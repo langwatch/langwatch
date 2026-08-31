@@ -27,7 +27,7 @@ import {
   bucketScopeIdFor,
   budgetAppliesToProvider,
 } from "../../adapters/gateway-bucket-scope.adapter";
-import { resolveApplicableBudgets } from "./prisma.gateway-budget-resolution.repository";
+import { PrismaGatewayBudgetResolutionRepository } from "./prisma.gateway-budget-resolution.repository";
 import { PrismaGatewayBudgetScopeReachRepository } from "./prisma.gateway-budget-scope-reach.repository";
 import type { GatewayBudgetScopeReach } from "../gateway-budget.repository";
 import { PrismaGatewayChangeEventsRepository } from "./prisma.gateway-change-event.repository";
@@ -296,7 +296,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
   async resolveApplicableBudgets(
     input: GatewayBudgetResolutionTarget,
   ): Promise<GatewayResolvedBudget[]> {
-    const resolved = await resolveApplicableBudgets({
+    const resolved = await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
       client: this.prisma,
       target: input,
     });
@@ -1199,7 +1199,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     // Same resolver the bundle and the debits process use, so what
     // enforces here is exactly what the key was told applies to it.
     const resolved = (
-      await resolveApplicableBudgets({
+      await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
         client: this.prisma,
         target: {
           organizationId: input.organizationId,

@@ -26,17 +26,16 @@ import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import {
-  assertGroupingIsWalkable,
   decodeSpendEventsCursor,
   decodeSpendSummariesCursor,
   type GatewaySpendEventsService,
-  isIanaTimeZone,
+  GatewaySpendFilters,
+  GatewaySpendGrouping,
   MAX_GROUP_BY_KEYS,
   SPEND_BUCKETS,
   SPEND_GROUP_BY_KEYS,
   SPEND_SUMMARY_STATUS_DESCRIPTION,
   spendFilterQueryShape,
-  spendFiltersFromQuery,
   type SpendGroupByKey,
   spendSummaryStatusFilter,
 } from "@langwatch/gateway-server";
@@ -325,7 +324,7 @@ const spendSummariesQuerySchema = z
       .string()
       .min(1)
       .max(64)
-      .refine(isIanaTimeZone, {
+      .refine((zone) => GatewaySpendGrouping.isIanaTimeZone(zone), {
         message: "timezone must be an IANA zone name, e.g. Europe/Amsterdam",
       })
       .optional()
@@ -583,7 +582,7 @@ export function createGatewaySpendRestApp(options: {
           );
         }
       }
-      assertGroupingIsWalkable({
+      GatewaySpendGrouping.assertGroupingIsWalkable({
         keys: query.group_by,
         bucket: query.bucket,
         toMs: query.to,
@@ -606,7 +605,7 @@ export function createGatewaySpendRestApp(options: {
         toMs: query.to,
         cursor: query.cursor ?? null,
         limit: query.limit,
-        filters: spendFiltersFromQuery({
+        filters: GatewaySpendFilters.spendFiltersFromQuery({
           query,
           overrides: { virtualKeyIds: scope.virtualKeyIds },
         }),
@@ -669,7 +668,7 @@ export function createGatewaySpendRestApp(options: {
         toMs: query.to,
         cursor: query.cursor ?? null,
         limit: query.limit,
-        filters: spendFiltersFromQuery({
+        filters: GatewaySpendFilters.spendFiltersFromQuery({
           query,
           overrides: { virtualKeyIds: scope.virtualKeyIds },
         }),

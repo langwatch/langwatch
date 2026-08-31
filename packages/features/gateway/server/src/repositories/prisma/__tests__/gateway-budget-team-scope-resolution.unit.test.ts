@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { resolveApplicableBudgets } from "../prisma.gateway-budget-resolution.repository";
+import { PrismaGatewayBudgetResolutionRepository } from "../prisma.gateway-budget-resolution.repository";
 
 /**
  * The team a request belongs to used to be read only from where its traces
@@ -17,9 +17,7 @@ function prismaStub({ teamScopeIds }: { teamScopeIds: string[] }) {
   const findMany = vi.fn().mockResolvedValue([]);
   // Exposed so a test can assert the key was NOT read. Without it, "never
   // reads the key" was a claim nothing checked.
-  const scopeFindMany = vi
-    .fn()
-    .mockResolvedValue(teamScopeIds.map((scopeId) => ({ scopeId })));
+  const scopeFindMany = vi.fn().mockResolvedValue(teamScopeIds.map((scopeId) => ({ scopeId })));
   return {
     client: {
       gatewayBudget: { findMany },
@@ -61,7 +59,7 @@ describe("team-scope budget resolution", () => {
         teamScopeIds: ["team_platform"],
       });
 
-      await resolveApplicableBudgets({
+      await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
         client: client,
         target: {
           organizationId: "org_1",
@@ -80,7 +78,7 @@ describe("team-scope budget resolution", () => {
         teamScopeIds: ["team_platform"],
       });
 
-      await resolveApplicableBudgets({
+      await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
         client: client,
         target: {
           organizationId: "org_1",
@@ -100,7 +98,7 @@ describe("team-scope budget resolution", () => {
         teamScopeIds: ["team_from_database"],
       });
 
-      await resolveApplicableBudgets({
+      await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
         client: client,
         target: {
           organizationId: "org_1",
@@ -119,7 +117,7 @@ describe("team-scope budget resolution", () => {
     it("asks for no team at all rather than for an empty one", async () => {
       const { client, findMany } = prismaStub({ teamScopeIds: [] });
 
-      await resolveApplicableBudgets({
+      await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
         client: client,
         target: {
           organizationId: "org_1",

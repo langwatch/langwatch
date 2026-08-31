@@ -22,14 +22,13 @@ import { EMPTY_SPEND_USAGE, type SpendUsage } from "../../processes/gateway-spen
 import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "../../adapters/gateway-spend-constants.adapter";
 import type { SpendFilters } from "../../adapters/gateway-spend-filters.adapter";
 import {
-  buildSpendFilterClauses,
-  normalizeStatusFilter,
+  GatewaySpendFilters,
   SPEND_STATUS_IN_FLIGHT,
   type SpendEventStatus,
 } from "../../adapters/gateway-spend-filters.adapter";
 import { nanoUsdToDecimalString, parseSummedNanoUsd } from "@langwatch/gateway-contract";
 import type { SpendBucket, SpendGroupByKey } from "../../adapters/gateway-spend-grouping.adapter";
-import { bucketExpression, groupByColumn } from "../../adapters/gateway-spend-grouping.adapter";
+import { GatewaySpendGrouping } from "../../adapters/gateway-spend-grouping.adapter";
 import {
   decodeSpendEventsCursor,
   decodeSpendSummariesCursor,
@@ -295,7 +294,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
       "OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})",
     ];
     const params: Record<string, unknown> = { tenantId, fromMs, toMs, limit };
-    const filterSql = buildSpendFilterClauses({ filters });
+    const filterSql = GatewaySpendFilters.buildSpendFilterClauses({ filters });
     conditions.push(...filterSql.clauses);
     Object.assign(params, filterSql.params);
     if (cursor) {
@@ -478,7 +477,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
     // an empty page would be read as "no such spend".
     if (
       filters.status !== undefined &&
-      normalizeStatusFilter(filters.status) === SPEND_STATUS_IN_FLIGHT
+      GatewaySpendFilters.normalizeStatusFilter(filters.status) === SPEND_STATUS_IN_FLIGHT
     ) {
       throw new Error(
         `readSpendSummaries cannot narrow to "${SPEND_STATUS_IN_FLIGHT}": rollups exclude in-flight rows, so the read would always be empty`,
@@ -501,7 +500,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
       Object.assign(params, walk.params);
     }
 
-    const filterSql = buildSpendFilterClauses({ filters });
+    const filterSql = GatewaySpendFilters.buildSpendFilterClauses({ filters });
     clauses.push(...filterSql.clauses.map((clause) => `AND ${clause}`));
     Object.assign(params, filterSql.params);
 
@@ -705,7 +704,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
       clauses.push("AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})");
       params.toMs = toMs;
     }
-    const filterSql = buildSpendFilterClauses({ filters });
+    const filterSql = GatewaySpendFilters.buildSpendFilterClauses({ filters });
     clauses.push(...filterSql.clauses.map((clause) => `AND ${clause}`));
     Object.assign(params, filterSql.params);
     return { clauses, params };
@@ -726,13 +725,13 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
     if (bucket !== "none") {
       dimensions.push({
         alias: "GroupBucket",
-        expression: bucketExpression({ bucket, timezoneParam: "timezone" }),
+        expression: GatewaySpendGrouping.bucketExpression({ bucket, timezoneParam: "timezone" }),
       });
     }
     for (const [index, key] of groupBy.entries()) {
       dimensions.push({
         alias: `GroupKey${index}`,
-        expression: groupByColumn(key),
+        expression: GatewaySpendGrouping.groupByColumn(key),
       });
     }
     return dimensions;

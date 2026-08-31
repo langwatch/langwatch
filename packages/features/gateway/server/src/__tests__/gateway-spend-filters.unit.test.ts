@@ -5,11 +5,8 @@ import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 
 import {
-  buildSpendFilterClauses,
-  intersectIds,
+  GatewaySpendFilters,
   MAX_FILTER_VALUES,
-  normalizeStatusFilter,
-  parseMetadataFilters,
   SPEND_STATUS_FILTERS,
   spendFilterQueryShape,
   spendFiltersSchema,
@@ -41,7 +38,7 @@ describe("given the shared spend filter vocabulary", () => {
 
   describe("when a metadata pair is written", () => {
     it("splits on the first colon so a value may contain one", () => {
-      expect(parseMetadataFilters(["url:https://acme.test/x"])).toEqual([
+      expect(GatewaySpendFilters.parseMetadataFilters(["url:https://acme.test/x"])).toEqual([
         { key: "url", values: ["https://acme.test/x"] },
       ]);
     });
@@ -50,7 +47,9 @@ describe("given the shared spend filter vocabulary", () => {
       // Two values for one key must OR. ANDing them would make
       // tier:gold + tier:silver match nothing, which reads to the caller as
       // "no such spend" rather than as an impossible question.
-      expect(parseMetadataFilters(["tier:gold", "tier:silver", "region:eu"])).toEqual([
+      expect(
+        GatewaySpendFilters.parseMetadataFilters(["tier:gold", "tier:silver", "region:eu"]),
+      ).toEqual([
         { key: "tier", values: ["gold", "silver"] },
         { key: "region", values: ["eu"] },
       ]);
@@ -76,9 +75,9 @@ describe("given the shared spend filter vocabulary", () => {
       // Slicing on an absent colon is silently wrong rather than empty:
       // indexOf answers -1, so `tier` would become key `tie` with value
       // `tier`, and the caller would read spend for a filter nobody wrote.
-      expect(() => parseMetadataFilters(["tier"])).toThrow();
-      expect(() => parseMetadataFilters([":gold"])).toThrow();
-      expect(() => parseMetadataFilters(["tier:"])).toThrow();
+      expect(() => GatewaySpendFilters.parseMetadataFilters(["tier"])).toThrow();
+      expect(() => GatewaySpendFilters.parseMetadataFilters([":gold"])).toThrow();
+      expect(() => GatewaySpendFilters.parseMetadataFilters(["tier:"])).toThrow();
     });
 
     /** @scenario "One filter may not name unbounded values" */
@@ -86,14 +85,9 @@ describe("given the shared spend filter vocabulary", () => {
       // Each value becomes an element of a bound ClickHouse array and each
       // metadata entry a predicate of its own, so an unbounded repeat is an
       // unbounded query on a billing read.
-      const tooMany = Array.from(
-        { length: MAX_FILTER_VALUES + 1 },
-        (_, index) => `m${index}`,
-      );
+      const tooMany = Array.from({ length: MAX_FILTER_VALUES + 1 }, (_, index) => `m${index}`);
       expect(() => spendFilterQueryShape.model.parse(tooMany)).toThrow();
-      expect(issuePaths(spendFiltersSchema.safeParse({ models: tooMany }))).toEqual([
-        "models",
-      ]);
+      expect(issuePaths(spendFiltersSchema.safeParse({ models: tooMany }))).toEqual(["models"]);
     });
   });
 
@@ -103,9 +97,7 @@ describe("given the shared spend filter vocabulary", () => {
         models: ["gpt-5-mini"],
         metadata: [{ key: "customer_tier", values: ["gold", "silver"] }],
       });
-      expect(parsed.metadata).toEqual([
-        { key: "customer_tier", values: ["gold", "silver"] },
-      ]);
+      expect(parsed.metadata).toEqual([{ key: "customer_tier", values: ["gold", "silver"] }]);
     });
 
     it("refuses a metadata key the query spelling could not express", () => {
@@ -138,7 +130,7 @@ describe("given the shared spend filter vocabulary", () => {
 
   describe("when filters are rendered to SQL", () => {
     it("binds a placeholder only for the filters present", () => {
-      const { clauses, params } = buildSpendFilterClauses({
+      const { clauses, params } = GatewaySpendFilters.buildSpendFilterClauses({
         filters: { models: ["gpt-5-mini"] },
       });
       expect(clauses).toEqual(["Model IN {models:Array(String)}"]);
@@ -149,7 +141,7 @@ describe("given the shared spend filter vocabulary", () => {
       // The whole point: a team with no projects or an external id nobody
       // minted must answer nothing, not collapse into an absent predicate and
       // hand back the organization's entire spend.
-      const { clauses, params } = buildSpendFilterClauses({
+      const { clauses, params } = GatewaySpendFilters.buildSpendFilterClauses({
         filters: { virtualKeyIds: [] },
       });
       expect(clauses).toEqual(["VirtualKeyId IN {virtualKeyIds:Array(String)}"]);
@@ -157,14 +149,14 @@ describe("given the shared spend filter vocabulary", () => {
     });
 
     it("matches a label against any of the values named", () => {
-      const { clauses } = buildSpendFilterClauses({
+      const { clauses } = GatewaySpendFilters.buildSpendFilterClauses({
         filters: { labels: ["tier:gold"] },
       });
       expect(clauses).toEqual(["hasAny(Labels, {labels:Array(String)})"]);
     });
 
     it("gives each metadata pair its own numbered placeholders", () => {
-      const { clauses, params } = buildSpendFilterClauses({
+      const { clauses, params } = GatewaySpendFilters.buildSpendFilterClauses({
         filters: {
           metadata: [
             { key: "tier", values: ["gold"] },
@@ -185,7 +177,7 @@ describe("given the shared spend filter vocabulary", () => {
     });
 
     it("maps the legacy status vocabulary onto lifecycle statuses", () => {
-      const { params } = buildSpendFilterClauses({
+      const { params } = GatewaySpendFilters.buildSpendFilterClauses({
         filters: { status: "success" },
       });
       expect(params.status).toBe("confirmed");
@@ -198,28 +190,30 @@ describe("given the shared spend filter vocabulary", () => {
       // separately, a status added to the published list would pass the door
       // and then throw inside, turning a validated request into a 500.
       for (const status of SPEND_STATUS_FILTERS) {
-        expect(() => normalizeStatusFilter(status), status).not.toThrow();
-        expect(normalizeStatusFilter(status), status).toBeDefined();
+        expect(() => GatewaySpendFilters.normalizeStatusFilter(status), status).not.toThrow();
+        expect(GatewaySpendFilters.normalizeStatusFilter(status), status).toBeDefined();
       }
-      expect(() => normalizeStatusFilter("pending")).toThrow();
+      expect(() => GatewaySpendFilters.normalizeStatusFilter("pending")).toThrow();
       // An object lookup would answer this with a function off the prototype
       // and hand it back as if it were a status.
-      expect(() => normalizeStatusFilter("constructor")).toThrow();
+      expect(() => GatewaySpendFilters.normalizeStatusFilter("constructor")).toThrow();
     });
   });
 
   describe("when a key is named directly and by external id", () => {
     it("intersects rather than widening", () => {
-      expect(intersectIds(["vk_1", "vk_2"], ["vk_2", "vk_3"])).toEqual(["vk_2"]);
+      expect(GatewaySpendFilters.intersectIds(["vk_1", "vk_2"], ["vk_2", "vk_3"])).toEqual([
+        "vk_2",
+      ]);
     });
 
     it("treats an absent list as no opinion", () => {
-      expect(intersectIds(undefined, ["vk_1"])).toEqual(["vk_1"]);
-      expect(intersectIds(["vk_1"], undefined)).toEqual(["vk_1"]);
+      expect(GatewaySpendFilters.intersectIds(undefined, ["vk_1"])).toEqual(["vk_1"]);
+      expect(GatewaySpendFilters.intersectIds(["vk_1"], undefined)).toEqual(["vk_1"]);
     });
 
     it("answers nothing when the two name different keys", () => {
-      expect(intersectIds(["vk_1"], ["vk_2"])).toEqual([]);
+      expect(GatewaySpendFilters.intersectIds(["vk_1"], ["vk_2"])).toEqual([]);
     });
   });
 });
