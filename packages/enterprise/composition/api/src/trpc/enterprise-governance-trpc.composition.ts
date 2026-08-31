@@ -2,13 +2,14 @@
  * The governance vertical's Enterprise tRPC surfaces, composed for the legacy
  * web application's router root.
  *
- * Two transports live here: the CLI/device sessions surface every user reaches
- * on their own devices (`personalSessions`), and the org-scoped session policy
- * an admin turns from `/governance` (`sessionPolicy`). Each router's behaviour —
- * procedure names, input and output shapes, refusals — belongs to the
- * governance feature package. What this composition owns is the wiring: which
- * policy wraps which declaration, and which process capability answers each
- * port.
+ * Three transports live here: the CLI/device sessions surface every user
+ * reaches on their own devices (`personalSessions`), the org-scoped session
+ * policy an admin turns from `/governance` (`sessionPolicy`), and the
+ * ingestion-keys mint/rotate/list surface that powers the /me Trace Ingest
+ * grid (`ingestionKey`). Each router's behaviour — procedure names, input and
+ * output shapes, refusals — belongs to the governance feature package. What
+ * this composition owns is the wiring: which policy wraps which declaration,
+ * and which process capability answers each port.
  *
  * It sits in the Enterprise API composition rather than in `apps/api` for the
  * same reason its siblings do: a core package may not depend on an Enterprise
@@ -21,16 +22,19 @@
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
+  IngestionKeyTrpcApi,
   PersonalSessionsTrpcApi,
   SessionPolicyTrpcApi,
+  type IngestionKeyTrpcContext,
   type PersonalSessionsTrpcContext,
   type SessionPolicyTrpcContext,
 } from "@langwatch/enterprise-governance-server";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 
-/** Every context requirement the two surfaces place on the process. */
+/** Every context requirement the surfaces place on the process. */
 export type EnterpriseGovernanceTrpcContext = PersonalSessionsTrpcContext &
-  SessionPolicyTrpcContext;
+  SessionPolicyTrpcContext &
+  IngestionKeyTrpcContext;
 
 /** One already-composed process policy, applied after a feature's input parser. */
 type EnterpriseTrpcPolicy = <TProcedure>(procedure: TProcedure) => TProcedure;
@@ -57,6 +61,10 @@ export class EnterpriseGovernanceTrpcComposition {
         policy,
       }),
       sessionPolicy: SessionPolicyTrpcApi.create(root, {
+        protected: protectedProcedure,
+        policy,
+      }),
+      ingestionKey: IngestionKeyTrpcApi.create(root, {
         protected: protectedProcedure,
         policy,
       }),

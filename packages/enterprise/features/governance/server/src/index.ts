@@ -143,6 +143,10 @@ export {
   SessionPolicyTrpcApi,
   type SessionPolicyTrpcContext,
 } from "./transport/api-trpc/session-policy.api";
+export {
+  IngestionKeyTrpcApi,
+  type IngestionKeyTrpcContext,
+} from "./transport/api-trpc/ingestion-key.api";
 
 /**
  * The public REST family this feature owns. The process supplies the bound

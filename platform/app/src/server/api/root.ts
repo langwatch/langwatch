@@ -3,7 +3,6 @@ import { aiToolsRouter } from "./routers/governance/aiTools";
 import { anomalyRulesRouter } from "./routers/governance/anomalyRules";
 import { departmentsRouter } from "./routers/governance/departments";
 import { governanceRouter } from "./routers/governance/governance";
-import { ingestionKeyRouter } from "./routers/governance/ingestionKey";
 import { ingestionSourcesRouter } from "./routers/governance/ingestionSources";
 import { ingestionTemplatesRouter } from "./routers/governance/ingestionTemplates";
 import { createTRPCRouter } from "~/server/api/trpc";
@@ -878,7 +877,7 @@ const coreRouters = {
   aiTools: aiToolsRouter,
   departments: departmentsRouter,
   ingestionTemplates: ingestionTemplatesRouter,
-  ingestionKey: ingestionKeyRouter,
+  ingestionKey: enterpriseGovernanceRouters.ingestionKey,
   governance: governanceRouter,
   personalSessions: enterpriseGovernanceRouters.personalSessions,
   sessionPolicy: enterpriseGovernanceRouters.sessionPolicy,

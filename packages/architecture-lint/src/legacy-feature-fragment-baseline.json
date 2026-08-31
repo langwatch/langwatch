@@ -196,7 +196,6 @@
     {"feature":"governance","file":"platform/app/src/server/api/routers/governance/anomalyRules.ts","kind":"transport"},
     {"feature":"governance","file":"platform/app/src/server/api/routers/governance/departments.ts","kind":"transport"},
     {"feature":"governance","file":"platform/app/src/server/api/routers/governance/governance.ts","kind":"transport"},
-    {"feature":"governance","file":"platform/app/src/server/api/routers/governance/ingestionKey.ts","kind":"transport"},
     {"feature":"governance","file":"platform/app/src/server/api/routers/governance/ingestionSources.ts","kind":"transport"},
     {"feature":"governance","file":"platform/app/src/server/api/routers/governance/ingestionTemplates.ts","kind":"transport"},
     {"feature":"langy","file":"platform/app/src/components/ui/messages/AddMessageButton.tsx","kind":"page-shell"},
