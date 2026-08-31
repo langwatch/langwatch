@@ -113,6 +113,16 @@ function callerFor(session: { user: { id: string; email: string } } | null) {
     res: undefined,
     permissionChecked: true,
     publiclyShared: false,
+    // No permission applies to these operations, but the base policy chain
+    // still runs the scope-lineage guard ahead of them, and that guard reads
+    // the authorization service off the request application. Naming it here
+    // keeps the suite off the process-wide App singleton, which a unit test
+    // has no business booting.
+    app: {
+      permissions: {
+        checkScopeLineage: vi.fn().mockResolvedValue({ kind: "consistent" }),
+      },
+    } as never,
   });
   return appRouter.createCaller(ctx).identity;
 }

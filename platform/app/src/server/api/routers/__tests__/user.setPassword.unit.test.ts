@@ -54,8 +54,10 @@ describe("userRouter.setPassword", () => {
         expires: "2099-01-01",
       },
       app: {
-        users: { setFirstPassword },
-        auth: { revokeOtherBrowserSessions },
+        // Session revocation is the user application's own operation — it
+        // delegates to the auth service behind `UserApp`, so the transport
+        // reaches it through `users`, never through a second `auth` facade.
+        users: { setFirstPassword, revokeOtherBrowserSessions },
         permissions: {
           checkScopeLineage: vi.fn().mockResolvedValue({ kind: "consistent" }),
         },

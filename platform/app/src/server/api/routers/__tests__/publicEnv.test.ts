@@ -33,9 +33,14 @@ import { createInnerTRPCContext } from "../../trpc";
 const callPublicEnv = () => {
   const ctx = createInnerTRPCContext({
     session: null,
-    app: { config: { opsSidebarEmails: [] } } as unknown as Parameters<
-      typeof createInnerTRPCContext
-    >[0]["app"],
+    // `permissions` is here because the base policy chain runs the
+    // scope-lineage guard ahead of every procedure, signed-out ones included.
+    app: {
+      config: { opsSidebarEmails: [] },
+      permissions: {
+        checkScopeLineage: vi.fn().mockResolvedValue({ kind: "consistent" }),
+      },
+    } as unknown as Parameters<typeof createInnerTRPCContext>[0]["app"],
   });
   return appRouter.createCaller(ctx).publicEnv({});
 };

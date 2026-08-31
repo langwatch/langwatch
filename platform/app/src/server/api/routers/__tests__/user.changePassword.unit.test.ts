@@ -51,7 +51,14 @@ describe("userRouter.changePassword", () => {
         sessionId: "sess-1",
         expires: "2099-01-01",
       },
-      app: {} as never,
+      // The base policy chain runs the scope-lineage guard on every
+      // procedure, so even a mutation that names no scope needs the
+      // authorization service the process composes.
+      app: {
+        permissions: {
+          checkScopeLineage: vi.fn().mockResolvedValue({ kind: "consistent" }),
+        },
+      } as never,
     });
     (ctx as any).prisma = { account: { findFirst: accountFindFirst } };
     return appRouter.createCaller(ctx).user;
