@@ -11,8 +11,8 @@
     },
     {
       "file": "packages/enterprise/features/billing/server/src/services/seat-event-subscription.service.ts",
-      "moduleLines": 632,
-      "methodLines": 415,
+      "moduleLines": 605,
+      "methodLines": 144,
       "statements": 24,
       "complexity": 24,
       "lineLength": 160
