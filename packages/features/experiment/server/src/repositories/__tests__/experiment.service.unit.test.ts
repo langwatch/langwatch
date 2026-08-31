@@ -9,10 +9,7 @@ import {
   type PersistedEvaluationsV3State,
   persistedEvaluationsV3StateSchema,
 } from "@langwatch/experiment-contract";
-import type {
-  ExperimentRepository,
-  ExperimentRowState,
-} from "../experiment.repository";
+import type { ExperimentRepository, ExperimentRowState } from "../experiment.repository";
 import { ExperimentRunRepository } from "../experiment-run.repository";
 import { ExperimentDspyRepository } from "../experiment-dspy.repository";
 import { ExperimentService } from "../../services/experiment.service";
@@ -451,6 +448,42 @@ describe("ExperimentService", () => {
       code: "experiment_stale_workbench_state",
       meta: { currentVersion: 2 },
     });
+  });
+
+  it("keeps run results out of the version history", async () => {
+    // The stored version is a SNAPSHOT of the setup, and results belong to a
+    // run rather than to the setup that produced them. Keeping them would
+    // make every version carry a copy of its outputs, and restoring one would
+    // resurrect a run's results alongside its configuration.
+    const { repository, service } = build();
+    const created = await service.createEvaluationsV3({
+      projectId: "project_1",
+      state: workbenchState("Original"),
+      actor: { label: "user" },
+    });
+    const results = {
+      runId: "run_1",
+      targetOutputs: {},
+      targetMetadata: {},
+      evaluatorResults: {},
+      errors: {},
+    };
+
+    await service.saveWorkbenchState({
+      projectId: "project_1",
+      id: created.experimentId,
+      state: { ...workbenchState("Changed"), results },
+      expectedVersion: created.version,
+      actor: { label: "user" },
+    });
+
+    const live = await service.getWorkbenchState({
+      projectId: "project_1",
+      id: created.experimentId,
+    });
+    const stored = [...repository.workbenches.values()][0]?.versions.at(-1);
+    expect(live.state?.results?.runId).toBe("run_1");
+    expect((stored?.state as { results?: unknown } | undefined)?.results).toBeUndefined();
   });
 
   it("restores setup without discarding current run results", async () => {

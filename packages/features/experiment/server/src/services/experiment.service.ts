@@ -6,8 +6,6 @@ import {
   experimentDspyStepsLookupSchema,
   ExperimentDspyStepNotFoundError,
   ExperimentNotFoundError,
-  InvalidExperimentConfigurationError,
-  StaleWorkbenchStateError,
   ExperimentService as ExperimentServiceContract,
   experimentLookupSchema,
   experimentPageInputSchema,
@@ -45,18 +43,6 @@ import {
   type RecordEvaluatorResultInput,
   type RecordTargetResultInput,
   type StartExperimentRunInput,
-  createEvaluationsV3InputSchema,
-  getWorkbenchStateInputSchema,
-  saveWorkbenchStateInputSchema,
-  commitWorkbenchVersionInputSchema,
-  listWorkbenchVersionsInputSchema,
-  restoreWorkbenchVersionInputSchema,
-  recordWorkbenchRunResultsInputSchema,
-  collectWorkbenchReferences,
-  WorkbenchMissingReferenceError,
-  parseWorkbenchState,
-  repairWorkbenchState,
-  stripWorkbenchResults,
   type CommitWorkbenchVersionInput,
   type CreateEvaluationsV3Input,
   type GetWorkbenchStateInput,
@@ -67,14 +53,7 @@ import {
   type WorkbenchSaveResult,
   type WorkbenchStateView,
   type WorkbenchVersionsPage,
-  type WorkbenchActor,
 } from "@langwatch/experiment-contract";
-import type { AgentService } from "@langwatch/agent-contract";
-import type { DatasetService } from "@langwatch/dataset-contract";
-import { EvaluatorNotFoundError, type EvaluatorService } from "@langwatch/evaluator-contract";
-import type { PromptService } from "@langwatch/prompt-contract";
-import { WorkflowNotFoundError, type WorkflowService } from "@langwatch/workflow-contract";
-import { z } from "zod";
 import {
   ArchivedExperimentWriteError,
   type ExperimentRepository,
@@ -85,6 +64,13 @@ import type { ExperimentExecutionPort } from "../ports/experiment-execution.port
 import type { ExperimentWorkbenchUpdatesPort } from "../ports/experiment-workbench-updates.port";
 import { UnavailableExperimentExecutionAdapter } from "../adapters/unavailable-experiment-execution.adapter";
 import { NoopExperimentWorkbenchUpdatesAdapter } from "../adapters/noop-experiment-workbench-updates.adapter";
+import { PostgresUniqueConflict } from "../adapters/postgres.unique-conflict.adapter";
+import { ExperimentSlugService } from "./experiment-slug.service";
+import { ExperimentWorkbenchService } from "./experiment-workbench.service";
+import {
+  ExperimentWorkbenchReferencesService,
+  type ExperimentWorkbenchReferenceServices,
+} from "./experiment-workbench-references.service";
 
 export type ExperimentServiceOptions = {
   repository: ExperimentRepository;
@@ -94,61 +80,8 @@ export type ExperimentServiceOptions = {
   slugify: (value: string) => string;
   newId: () => string;
   now?: () => Date;
-  references: {
-    prompts: PromptService;
-    agents: AgentService;
-    evaluators: EvaluatorService;
-    workflows: WorkflowService;
-    dataset: DatasetService;
-  };
+  references: ExperimentWorkbenchReferenceServices;
   updates?: ExperimentWorkbenchUpdatesPort;
-};
-
-const uniqueConflictSchema = z.object({
-  code: z.literal("P2002"),
-  meta: z
-    .object({
-      target: z.union([z.string(), z.array(z.string())]).optional(),
-      driverAdapterError: z
-        .object({
-          cause: z
-            .object({
-              constraint: z
-                .object({
-                  fields: z.array(z.string()).optional(),
-                  index: z.string().optional(),
-                })
-                .optional(),
-            })
-            .optional(),
-        })
-        .optional(),
-    })
-    .optional(),
-});
-
-const isUniqueConflict = (error: unknown): boolean => uniqueConflictSchema.safeParse(error).success;
-
-const uniqueConflictTargets = (error: unknown): string[] => {
-  const parsed = uniqueConflictSchema.safeParse(error);
-  if (!parsed.success) return [];
-
-  const target = parsed.data.meta?.target;
-  if (Array.isArray(target)) {
-    return target.map(String);
-  }
-
-  if (typeof target === "string") {
-    return [target];
-  }
-
-  const constraint = parsed.data.meta?.driverAdapterError?.cause?.constraint;
-  if (!constraint) return [];
-  if (constraint.fields) {
-    return constraint.fields.map(String);
-  }
-
-  return constraint.index ? [constraint.index] : [];
 };
 
 export class ExperimentService extends ExperimentServiceContract {
@@ -158,11 +91,24 @@ export class ExperimentService extends ExperimentServiceContract {
 
   private readonly execution: ExperimentExecutionPort;
   private readonly updates: ExperimentWorkbenchUpdatesPort;
+  private readonly slugs: ExperimentSlugService;
+  private readonly workbenchReferences: ExperimentWorkbenchReferencesService;
+  private readonly workbench: ExperimentWorkbenchService;
 
   private constructor(private readonly options: ExperimentServiceOptions) {
     super();
     this.execution = options.execution ?? new UnavailableExperimentExecutionAdapter();
     this.updates = options.updates ?? new NoopExperimentWorkbenchUpdatesAdapter();
+    this.slugs = new ExperimentSlugService(options.repository, options.newId);
+    this.workbenchReferences = new ExperimentWorkbenchReferencesService(options.references);
+    this.workbench = new ExperimentWorkbenchService({
+      repository: options.repository,
+      newId: options.newId,
+      updates: this.updates,
+      slugs: this.slugs,
+      references: this.workbenchReferences,
+      draftNames: { findNextDraftName: (input) => this.findNextDraftName(input) },
+    });
   }
 
   async getById(input: ExperimentLookup): Promise<Experiment> {
@@ -239,7 +185,7 @@ export class ExperimentService extends ExperimentServiceContract {
     const slug =
       command.slugMode === "preserve-existing" && state
         ? state.slug
-        : await this.generateUniqueSlug({
+        : await this.slugs.generateUnique({
             baseSlug: command.requestedSlug,
             projectId: command.projectId,
             excludeExperimentId: state ? command.id : undefined,
@@ -251,8 +197,8 @@ export class ExperimentService extends ExperimentServiceContract {
       if (error instanceof ArchivedExperimentWriteError) {
         throw new ExperimentNotFoundError(command.id, { reasons: [error] });
       }
-      if (!isUniqueConflict(error)) throw error;
-      const retrySlug = await this.generateUniqueSlug({
+      if (!PostgresUniqueConflict.matches(error)) throw error;
+      const retrySlug = await this.slugs.generateUnique({
         baseSlug: command.requestedSlug,
         projectId: command.projectId,
         excludeExperimentId: command.id,
@@ -401,206 +347,32 @@ export class ExperimentService extends ExperimentServiceContract {
     return experimentDspyStepSchema.parse(value);
   }
 
-  async getWorkbenchState(input: GetWorkbenchStateInput): Promise<WorkbenchStateView> {
-    const query = getWorkbenchStateInputSchema.parse(input);
-    const state = await this.options.repository.getWorkbenchState(query);
-
-    return { ...state, state: repairWorkbenchState(state.state) };
+  getWorkbenchState(input: GetWorkbenchStateInput): Promise<WorkbenchStateView> {
+    return this.workbench.getWorkbenchState(input);
   }
 
-  async saveWorkbenchState(input: SaveWorkbenchStateInput): Promise<WorkbenchSaveResult> {
-    const command = saveWorkbenchStateInputSchema.parse(input);
-    const state = parseWorkbenchState(command.state);
-    const target = await this.options.repository.resolveWorkbenchSaveTarget(command);
-    if (target.kind === "create") {
-      return await this.createEvaluationsV3({
-        ...command,
-        ...(target.id ? { id: target.id } : {}),
-      });
-    }
-    const current = target.state;
-    await this.assertWorkbenchReferencesExist({ projectId: command.projectId, state });
-
-    const written = await this.options.repository.writeWorkbenchState({
-      projectId: command.projectId,
-      id: current.experimentId,
-      name: state.name || (await this.findNextDraftName({ projectId: command.projectId })),
-      state,
-      snapshot: stripWorkbenchResults(state),
-      expectedVersion: command.expectedVersion,
-      actor: command.actor,
-      commitMessage: command.commitMessage,
-    });
-    if (written.kind === "stale") {
-      throw new StaleWorkbenchStateError(written);
-    }
-
-    await this.publishWorkbenchUpdate({
-      projectId: command.projectId,
-      saved: written,
-      actor: command.actor,
-    });
-    return written;
+  saveWorkbenchState(input: SaveWorkbenchStateInput): Promise<WorkbenchSaveResult> {
+    return this.workbench.saveWorkbenchState(input);
   }
 
-  async createEvaluationsV3(input: CreateEvaluationsV3Input): Promise<WorkbenchSaveResult> {
-    const command = createEvaluationsV3InputSchema.parse(input);
-    const state = parseWorkbenchState(command.state);
-    await this.assertWorkbenchReferencesExist({ projectId: command.projectId, state });
-    const id = command.id ?? this.options.newId();
-    const name =
-      state.name ||
-      command.name ||
-      (await this.findNextDraftName({ projectId: command.projectId }));
-    const baseSlug = state.experimentSlug ?? id.slice(-8);
-    const slug = await this.generateUniqueSlug({ baseSlug, projectId: command.projectId });
-    const created = await this.createWorkbenchState({
-      projectId: command.projectId,
-      id,
-      requestedId: command.id,
-      slug,
-      baseSlug,
-      name,
-      state,
-      actor: command.actor,
-      commitMessage: command.commitMessage,
-    });
-    const result = { experimentId: created.id, slug: created.slug, version: 1 };
-    await this.publishWorkbenchUpdate({
-      projectId: command.projectId,
-      saved: result,
-      actor: command.actor,
-    });
-    return result;
+  createEvaluationsV3(input: CreateEvaluationsV3Input): Promise<WorkbenchSaveResult> {
+    return this.workbench.createEvaluationsV3(input);
   }
 
-  async commitWorkbenchVersion(input: CommitWorkbenchVersionInput): Promise<WorkbenchSaveResult> {
-    const command = commitWorkbenchVersionInputSchema.parse(input);
-    const current = await this.getWorkbenchState(command);
-    if (!current.state) {
-      throw new InvalidExperimentConfigurationError(current.slug);
-    }
-
-    return await this.saveWorkbenchState({
-      ...command,
-      state: current.state,
-      expectedVersion: current.version,
-    });
+  commitWorkbenchVersion(input: CommitWorkbenchVersionInput): Promise<WorkbenchSaveResult> {
+    return this.workbench.commitWorkbenchVersion(input);
   }
 
-  async listWorkbenchVersions(input: ListWorkbenchVersionsInput): Promise<WorkbenchVersionsPage> {
-    const query = listWorkbenchVersionsInputSchema.parse(input);
-    const current = await this.getWorkbenchState({ projectId: query.projectId, id: query.id });
-    const take = Math.min(Math.max(query.limit ?? 50, 1), 100);
-    const versions = await this.options.repository.listWorkbenchVersions({
-      projectId: query.projectId,
-      experimentId: current.experimentId,
-      take,
-      ...(query.cursor === undefined ? {} : { beforeCounterVersion: query.cursor }),
-    });
-    const last = versions.at(-1);
-
-    return { versions, nextCursor: versions.length === take && last ? last.counterVersion : null };
+  listWorkbenchVersions(input: ListWorkbenchVersionsInput): Promise<WorkbenchVersionsPage> {
+    return this.workbench.listWorkbenchVersions(input);
   }
 
-  async restoreWorkbenchVersion(input: RestoreWorkbenchVersionInput): Promise<WorkbenchSaveResult> {
-    const command = restoreWorkbenchVersionInputSchema.parse(input);
-    const current = await this.getWorkbenchState(command);
-    const version = await this.options.repository.getWorkbenchVersion({
-      projectId: command.projectId,
-      experimentId: current.experimentId,
-      version: command.version,
-    });
-    const restored = parseWorkbenchState(version.state);
-
-    return await this.saveWorkbenchState({
-      projectId: command.projectId,
-      id: current.experimentId,
-      state: current.state?.results ? { ...restored, results: current.state.results } : restored,
-      expectedVersion: current.version,
-      actor: command.actor,
-      commitMessage: version.autoSaved
-        ? "Restored from the autosave"
-        : `Restored from v${command.version}`,
-    });
+  restoreWorkbenchVersion(input: RestoreWorkbenchVersionInput): Promise<WorkbenchSaveResult> {
+    return this.workbench.restoreWorkbenchVersion(input);
   }
 
-  async recordWorkbenchRunResults(
-    input: RecordWorkbenchRunResultsInput,
-  ): Promise<WorkbenchSaveResult> {
-    const command = recordWorkbenchRunResultsInputSchema.parse(input);
-    const current = await this.getWorkbenchState({
-      projectId: command.projectId,
-      id: command.id,
-    });
-    if (!current.state) {
-      throw new InvalidExperimentConfigurationError(current.slug);
-    }
-
-    return await this.saveWorkbenchState({
-      projectId: command.projectId,
-      id: current.experimentId,
-      state: { ...current.state, results: command.results },
-      expectedVersion: command.expectedVersion,
-      actor: command.actor,
-      commitMessage: command.commitMessage,
-    });
-  }
-
-  private async createWorkbenchState(input: {
-    projectId: string;
-    id: string;
-    requestedId?: string;
-    slug: string;
-    baseSlug: string;
-    name: string;
-    state: ReturnType<typeof parseWorkbenchState>;
-    actor: CreateEvaluationsV3Input["actor"];
-    commitMessage?: string;
-  }): Promise<{ id: string; slug: string }> {
-    try {
-      return await this.options.repository.createWorkbenchState({
-        projectId: input.projectId,
-        id: input.id,
-        slug: input.slug,
-        name: input.name,
-        state: input.state,
-        snapshot: stripWorkbenchResults(input.state),
-        actor: input.actor,
-        commitMessage: input.commitMessage,
-      });
-    } catch (error) {
-      if (!isUniqueConflict(error)) {
-        throw error;
-      }
-
-      const retrySlug = await this.generateUniqueSlug({
-        baseSlug: input.baseSlug,
-        projectId: input.projectId,
-      });
-      try {
-        return await this.options.repository.createWorkbenchState({
-          projectId: input.projectId,
-          id: input.id,
-          slug: retrySlug,
-          name: input.name,
-          state: input.state,
-          snapshot: stripWorkbenchResults(input.state),
-          actor: input.actor,
-          commitMessage: input.commitMessage,
-        });
-      } catch (retryError) {
-        const targets = uniqueConflictTargets(retryError).map((target) => target.toLowerCase());
-        const slugConflict = targets.some((target) => target.includes("slug"));
-        if (input.requestedId && isUniqueConflict(retryError) && !slugConflict) {
-          const reasons = retryError instanceof Error ? [retryError] : [];
-
-          throw new ExperimentNotFoundError(input.requestedId, { reasons });
-        }
-
-        throw retryError;
-      }
-    }
+  recordWorkbenchRunResults(input: RecordWorkbenchRunResultsInput): Promise<WorkbenchSaveResult> {
+    return this.workbench.recordWorkbenchRunResults(input);
   }
 
   listRuns(input: ExperimentRunListInput): Promise<Record<string, ExperimentRun[]>> {
@@ -639,111 +411,5 @@ export class ExperimentService extends ExperimentServiceContract {
       pageSize: query.pageSize,
     });
     return { experiment, ...page };
-  }
-
-  private async publishWorkbenchUpdate({
-    projectId,
-    saved,
-    actor,
-  }: {
-    projectId: string;
-    saved: WorkbenchSaveResult;
-    actor: WorkbenchActor;
-  }): Promise<void> {
-    await this.updates.publish({
-      projectId,
-      experimentId: saved.experimentId,
-      slug: saved.slug,
-      version: saved.version,
-      actorLabel: actor.label,
-      ...(actor.runId ? { runId: actor.runId } : {}),
-    });
-  }
-
-  private async assertWorkbenchReferencesExist({
-    projectId,
-    state,
-  }: {
-    projectId: string;
-    state: ReturnType<typeof parseWorkbenchState>;
-  }): Promise<void> {
-    const references = collectWorkbenchReferences(state);
-    const prompts = references.has("prompt")
-      ? await this.options.references.prompts.getAllPrompts({ projectId, version: "latest" })
-      : [];
-
-    for (const [type, ids] of references) {
-      for (const id of ids) {
-        const exists = await this.workbenchReferenceExists({ projectId, type, id, prompts });
-        if (!exists) throw new WorkbenchMissingReferenceError({ refType: type, refId: id });
-      }
-    }
-  }
-
-  private async workbenchReferenceExists({
-    projectId,
-    type,
-    id,
-    prompts,
-  }: {
-    projectId: string;
-    type: "prompt" | "agent" | "evaluator" | "workflow" | "dataset";
-    id: string;
-    prompts: Awaited<ReturnType<PromptService["getAllPrompts"]>>;
-  }): Promise<boolean> {
-    switch (type) {
-      case "prompt":
-        return prompts.some((prompt) => prompt.id === id || prompt.handle === id);
-      case "agent":
-        return await this.options.references.agents.exists({ id, projectId });
-      case "dataset":
-        return (
-          (await this.options.references.dataset.getByIds({ projectId, datasetIds: [id] }))
-            .length === 1
-        );
-      case "evaluator":
-        return await this.options.references.evaluators
-          .getById({ id, projectId })
-          .then(() => true)
-          .catch((error: unknown) => {
-            if (error instanceof EvaluatorNotFoundError) return false;
-            throw error;
-          });
-      case "workflow":
-        return await this.options.references.workflows
-          .getById({ id, projectId })
-          .then(() => true)
-          .catch((error: unknown) => {
-            if (error instanceof WorkflowNotFoundError) return false;
-            throw error;
-          });
-    }
-  }
-
-  private async generateUniqueSlug(input: {
-    baseSlug: string;
-    projectId: string;
-    excludeExperimentId?: string;
-  }): Promise<string> {
-    const suffixPattern = new RegExp(`^${ExperimentService.escapeRegExp(input.baseSlug)}(-\\d+)?$`);
-    const existing = new Set(
-      (
-        await this.options.repository.findSlugsByPrefix({
-          projectId: input.projectId,
-          slugPrefix: input.baseSlug,
-          excludeId: input.excludeExperimentId,
-        })
-      ).filter((slug) => suffixPattern.test(slug)),
-    );
-    if (!existing.has(input.baseSlug)) return input.baseSlug;
-    for (let index = 2; index <= 102; index += 1) {
-      const candidate = `${input.baseSlug}-${index}`;
-      if (!existing.has(candidate)) return candidate;
-    }
-    return `${input.baseSlug}-${this.options.newId()}`;
-  }
-
-  private static escapeRegExp(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 }
