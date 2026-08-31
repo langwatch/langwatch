@@ -25,7 +25,16 @@ import type { TraceListQuery } from "../trace-list.repository";
 /** The full-window version dedup, identified by its GROUP BY. */
 const DEDUP_AGGREGATE = "GROUP BY TenantId, TraceId";
 
-function occurrences(haystack: string, needle: string): number {
+/** Where the outer page stage hands the chosen row identities to the inner one. */
+const IDENTITY_HANDOVER = "(TenantId, TraceId, UpdatedAt) IN (";
+
+function occurrences({
+  haystack,
+  needle,
+}: {
+  haystack: string;
+  needle: string;
+}): number {
   return haystack.split(needle).length - 1;
 }
 
@@ -69,7 +78,9 @@ describe("TraceListClickHouseRepository.findAll (unit)", () => {
 
       const pageQuery = queries.find(isPageQuery);
       expect(pageQuery).toBeDefined();
-      expect(occurrences(pageQuery!, DEDUP_AGGREGATE)).toBe(1);
+      expect(
+        occurrences({ haystack: pageQuery!, needle: DEDUP_AGGREGATE }),
+      ).toBe(1);
     });
 
     it("carries the winning row's identity from the inner page stage to the outer read", async () => {
@@ -91,7 +102,9 @@ describe("TraceListClickHouseRepository.findAll (unit)", () => {
 
       const countQuery = queries.find(isCountQuery);
       expect(countQuery).toBeDefined();
-      expect(occurrences(countQuery!, DEDUP_AGGREGATE)).toBe(1);
+      expect(
+        occurrences({ haystack: countQuery!, needle: DEDUP_AGGREGATE }),
+      ).toBe(1);
     });
   });
 
@@ -129,9 +142,22 @@ describe("TraceListClickHouseRepository.findAll (unit)", () => {
 
       // Identity alone cannot separate two unmerged rows that share one
       // (TenantId, TraceId, UpdatedAt), so the outer stage has to re-state the
-      // filter — once for the inner stage, once for the outer.
+      // filter. Assert WHERE the two copies sit, not just how many there are:
+      // a count alone would also pass with both copies stuck in the inner
+      // stage, which is the arrangement this test exists to rule out.
       const pageQuery = queries.find(isPageQuery)!;
-      expect(occurrences(pageQuery, USER_FILTER)).toBe(2);
+      const handover = pageQuery.indexOf(IDENTITY_HANDOVER);
+      expect(handover).toBeGreaterThan(-1);
+
+      // The outer WHERE is written before the handover, the inner one inside it.
+      const outerStage = pageQuery.slice(0, handover);
+      const innerStage = pageQuery.slice(handover);
+      expect(occurrences({ haystack: outerStage, needle: USER_FILTER })).toBe(
+        1,
+      );
+      expect(occurrences({ haystack: innerStage, needle: USER_FILTER })).toBe(
+        1,
+      );
     });
   });
 });
