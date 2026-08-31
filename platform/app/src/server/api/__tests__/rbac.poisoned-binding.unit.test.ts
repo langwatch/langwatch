@@ -5,6 +5,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 import { batchProjectPermissions, resolveTeamPermission } from "../rbac";
 
 const ORG_ID = "org_a";
@@ -19,6 +20,8 @@ type StoredCustomRole = {
   kind: string;
   permissions: string[];
 };
+
+type MockPrisma = Parameters<typeof resolveTeamPermission>[0]["prisma"];
 
 type StoredBinding = {
   role: TeamUserRole;
@@ -54,13 +57,7 @@ const fieldMatches = ({
   whereValue: unknown;
 }): boolean => whereValue === undefined || roleValue === whereValue;
 
-const idMatches = ({
-  roleId,
-  whereId,
-}: {
-  roleId: string;
-  whereId: unknown;
-}): boolean => {
+const idMatches = ({ roleId, whereId }: { roleId: string; whereId: unknown }): boolean => {
   if (whereId === undefined) return true;
   if (typeof whereId === "string") return roleId === whereId;
   const inList = (whereId as { in?: string[] }).in;
@@ -96,7 +93,12 @@ function makePrisma({
       findUnique: vi.fn().mockResolvedValue({ organizationId: ORG_ID }),
     },
     organizationUser: {
-      findFirst: vi.fn().mockResolvedValue({ role: OrganizationUserRole.MEMBER }),
+      // `disabledAt` is load-bearing: since #7476 a row arriving without the
+      // column reads as a disabled seat, and a disabled seat is refused ahead
+      // of every binding. Omitting it denied all five cases on membership —
+      // which is also why the three that expect a refusal were passing without
+      // the poisoned binding being consulted at all.
+      findFirst: vi.fn().mockResolvedValue({ role: OrganizationUserRole.MEMBER, disabledAt: null }),
     },
     groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
     roleBinding: { findMany: vi.fn().mockResolvedValue(bindings) },
@@ -104,6 +106,9 @@ function makePrisma({
       findFirst: vi.fn().mockResolvedValue(null),
       findMany: vi.fn().mockResolvedValue([]),
     },
+    // No migration row: this organization has not cut over, so the legacy
+    // binding walk these cases are about is the one that answers.
+    systemMigrationTenantState: { findUnique: vi.fn().mockResolvedValue(null) },
     customRole: {
       findUnique: vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
         const found = customRoles.find((role) => matches({ role, where }));
@@ -119,10 +124,23 @@ function makePrisma({
           .map((role) => ({ id: role.id, permissions: role.permissions })),
       ),
     },
-  } as unknown as Parameters<typeof resolveTeamPermission>[0]["prisma"];
+  } as unknown as MockPrisma;
 }
 
 const session = { user: { id: USER_ID } } as unknown as Session;
+
+/**
+ * The context the resolvers take. `permissionsFor` reads the ADR-110 fork gate
+ * off `ctx.app.permissions` and falls back to `getApp()` when the context
+ * carries none — in a unit worker, where no app is initialized, that fallback
+ * throws before the binding walk. Built per call so the gate's
+ * per-organization cache cannot carry one case's answer into the next.
+ */
+const context = (prisma: MockPrisma) => ({
+  prisma,
+  session,
+  app: { permissions: appPermissionsService(prisma) },
+});
 
 const customBinding = ({
   customRoleId,
@@ -160,11 +178,7 @@ describe("session-user permission paths, given a poisoned custom-role binding", 
         ],
       });
 
-      const result = await resolveTeamPermission(
-        { prisma, session },
-        TEAM_ID,
-        "project:manage",
-      );
+      const result = await resolveTeamPermission(context(prisma), TEAM_ID, "project:manage");
       expect(result.permitted).toBe(false);
     });
   });
@@ -183,11 +197,7 @@ describe("session-user permission paths, given a poisoned custom-role binding", 
         ],
       });
 
-      const result = await resolveTeamPermission(
-        { prisma, session },
-        TEAM_ID,
-        "project:manage",
-      );
+      const result = await resolveTeamPermission(context(prisma), TEAM_ID, "project:manage");
       expect(result.permitted).toBe(false);
     });
   });
@@ -206,11 +216,7 @@ describe("session-user permission paths, given a poisoned custom-role binding", 
         ],
       });
 
-      const result = await resolveTeamPermission(
-        { prisma, session },
-        TEAM_ID,
-        "project:manage",
-      );
+      const result = await resolveTeamPermission(context(prisma), TEAM_ID, "project:manage");
       expect(result.permitted).toBe(true);
     });
   });
@@ -229,15 +235,12 @@ describe("session-user permission paths, given a poisoned custom-role binding", 
         ],
       });
 
-      const held = await batchProjectPermissions(
-        { prisma, session },
-        {
-          organizationId: ORG_ID,
-          projectId: PROJECT_ID,
-          teamId: TEAM_ID,
-          permissions: ["project:manage"],
-        },
-      );
+      const held = await batchProjectPermissions(context(prisma), {
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        teamId: TEAM_ID,
+        permissions: ["project:manage"],
+      });
       expect(held).toEqual([]);
     });
   });
@@ -256,15 +259,12 @@ describe("session-user permission paths, given a poisoned custom-role binding", 
         ],
       });
 
-      const held = await batchProjectPermissions(
-        { prisma, session },
-        {
-          organizationId: ORG_ID,
-          projectId: PROJECT_ID,
-          teamId: TEAM_ID,
-          permissions: ["project:manage"],
-        },
-      );
+      const held = await batchProjectPermissions(context(prisma), {
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        teamId: TEAM_ID,
+        permissions: ["project:manage"],
+      });
       expect(held).toEqual(["project:manage"]);
     });
   });

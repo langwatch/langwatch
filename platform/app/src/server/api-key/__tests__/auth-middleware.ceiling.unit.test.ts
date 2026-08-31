@@ -35,10 +35,22 @@ vi.mock("~/server/app-layer/app", async () => {
 
 const resolveMock = vi.mocked(resolveApiKeyPermission);
 
-const project = {
+/**
+ * A real `ProjectIdentity`, and typed rather than cast: the ceiling reads
+ * `resolved.project.teamId`, and the nested `team: { id }` shape this fixture
+ * used to carry has been flat since the identity was narrowed to its five
+ * indexed columns. Behind the cast that mismatch was silent, and the ceiling
+ * was asked to decide a project scope with no team on it.
+ */
+const project: ResolvedToken["project"] = {
   id: "proj1",
-  team: { id: "team1", organizationId: "org1" },
-} as unknown as ResolvedToken["project"];
+  name: "Proj One",
+  slug: "proj-one",
+  teamId: "team1",
+  organizationId: "org1",
+  isPersonal: false,
+  ownerUserId: null,
+};
 
 const apiKeyToken: ResolvedToken = {
   type: "apiKey",
@@ -70,10 +82,7 @@ const legacyProjectKeyToken: ResolvedToken = {
  * Mounts the middleware behind a stub that seeds `resolvedToken`, so the test
  * drives it through a real Hono request rather than a hand-built context.
  */
-function appWith(
-  resolved: ResolvedToken | undefined,
-  permission: Permission = "project:update",
-) {
+function appWith(resolved: ResolvedToken | undefined, permission: Permission = "project:update") {
   const handler = vi.fn((c: { text: (body: string) => Response }) => c.text("reached"));
   const app = new Hono();
   app.use("*", appContextMiddlewareFor(getApp()));
@@ -341,9 +350,7 @@ describe("apiKeyCeilingDenialResponse()", () => {
     });
 
     it("carries the remediation channel the hand-built body dropped", () => {
-      const denial = apiKeyCeilingDenialResponse(
-        new ApiKeyPermissionDeniedError("traces:create"),
-      );
+      const denial = apiKeyCeilingDenialResponse(new ApiKeyPermissionDeniedError("traces:create"));
 
       const body = denial.body as Record<string, unknown>;
       expect(body.fault).toBe("customer");

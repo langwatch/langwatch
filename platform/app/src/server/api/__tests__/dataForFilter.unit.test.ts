@@ -1,7 +1,8 @@
+import { AnalyticsApp } from "@langwatch/analytics-server";
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getApp } from "~/server/app-layer/app";
-import { appPermissionsService } from "~/test-utils/appPermissionsMock";
+import { appPermissionsMock } from "~/test-utils/appPermissionsMock";
 import { appRouter } from "../root";
 import { createInnerTRPCContext } from "../trpc";
 
@@ -19,13 +20,24 @@ vi.mock("../rbac", async (importOriginal) => {
 // hands out. Mocking `getApp` is therefore what standing in for the store
 // looks like from here.
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsService } = await import("~/test-utils/appPermissionsMock");
+  const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
+  const { getApp, tryGetApp } = appPermissionsMock();
   return {
     // Consumers that degrade without Redis read through this one.
-    tryGetApp: () => null,
-    getApp: vi.fn(() => ({ permissions: appPermissionsService() })),
+    tryGetApp,
+    getApp: vi.fn(getApp),
   };
 });
+
+/**
+ * The declared `.permission()` check resolves through
+ * `ctx.app.permissions.getDecision`, so the service standing in for it has to
+ * be the one that routes back to the `../rbac` resolver this suite stubs
+ * above. The engine-backed double answers from a database instead, and with
+ * none behind it refuses every scope — which is a FORBIDDEN raised ahead of
+ * the input validation these cases are about.
+ */
+const resolverBackedPermissions = () => appPermissionsMock().getApp().permissions;
 
 vi.mock("~/runtime/app/features/audit-log", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
@@ -56,8 +68,14 @@ describe("dataForFilter", () => {
     vi.clearAllMocks();
     getFilterOptions.mockResolvedValue([{ field: "opt", label: "Opt", count: 1 }]);
     mockedGetApp.mockReturnValue({
-      permissions: appPermissionsService(),
-      filters: { options: { getFilterOptions } },
+      permissions: resolverBackedPermissions(),
+      // The scope-filter exclusion this suite is about is `AnalyticsApp`'s own
+      // — the transport asks `ctx.app.analytics.filterOptions` and the app
+      // decides what the catalogue is asked. So the real app stands over the
+      // stubbed catalogue, and the assertions stay on the catalogue call.
+      analytics: AnalyticsApp.create({
+        filterOptions: { getFilterOptions },
+      } as unknown as Parameters<typeof AnalyticsApp.create>[0]),
     } as any);
   });
 

@@ -1408,6 +1408,46 @@ describe("ModelProviderService", () => {
       deployment: "azure-deployment",
     });
   });
+  it("strips Anthropic's version suffix written without a trailing slash", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        provider: "anthropic",
+        customKeys: {
+          ANTHROPIC_API_KEY: "anthropic-key",
+          ANTHROPIC_BASE_URL: "https://api.anthropic.com/v1",
+        },
+        customModels: [{ id: "claude-opus-4.5", label: "Claude Opus", type: "chat" }],
+      }),
+    ];
+
+    await expect(
+      service(providers, new ExecutionCatalog()).prepareExecution({
+        projectId: "project_1",
+        model: "anthropic/claude-opus-4.5",
+      }),
+    ).resolves.toMatchObject({ api_base: "https://api.anthropic.com" });
+  });
+  it("leaves an Anthropic base URL that carries no version suffix alone", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        provider: "anthropic",
+        customKeys: {
+          ANTHROPIC_API_KEY: "anthropic-key",
+          ANTHROPIC_BASE_URL: "https://custom-anthropic.example.com",
+        },
+        customModels: [{ id: "claude-opus-4.5", label: "Claude Opus", type: "chat" }],
+      }),
+    ];
+
+    await expect(
+      service(providers, new ExecutionCatalog()).prepareExecution({
+        projectId: "project_1",
+        model: "anthropic/claude-opus-4.5",
+      }),
+    ).resolves.toMatchObject({ api_base: "https://custom-anthropic.example.com" });
+  });
   it("normalizes Anthropic's versioned model and base URL", async () => {
     const providers = new Providers();
     providers.rows = [

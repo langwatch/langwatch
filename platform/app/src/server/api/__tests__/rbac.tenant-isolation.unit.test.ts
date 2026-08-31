@@ -6,6 +6,7 @@ import {
 } from "~/generated/prisma/client";
 
 import type { Session } from "~/server/auth";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 
 import { batchScopePermissions, hasProjectPermission, hasTeamPermission } from "../rbac";
 
@@ -22,6 +23,28 @@ const USER_B = "user_b";
 const sessionForUserB = {
   user: { id: USER_B },
 } as unknown as Session;
+
+type MockPrisma = Parameters<typeof hasProjectPermission>[0]["prisma"];
+
+/**
+ * The context the resolvers take. `permissionsFor` reads the ADR-110 fork gate
+ * off `ctx.app.permissions` and falls back to `getApp()` when the context
+ * carries none — in a unit worker, where no app is initialized, that fallback
+ * throws. The two per-scope cases below never reach it, because the membership
+ * gate refuses first; the batched resolver reads the gate BEFORE its own
+ * membership check, so it does. Each call gets its own service so the gate's
+ * per-organization cache cannot carry one test's answer into the next, and
+ * every stub leaves `systemMigrationTenantState` empty — the "not on the
+ * engine" answer that keeps the legacy walk the one under test.
+ */
+const context = (prisma: MockPrisma) => ({
+  prisma,
+  session: sessionForUserB,
+  app: { permissions: appPermissionsService(prisma) },
+});
+
+/** No migration row: this organization has not cut over. */
+const notOnEngine = () => ({ findUnique: vi.fn().mockResolvedValue(null) });
 
 const grantingProjectBinding = {
   role: TeamUserRole.ADMIN,
@@ -45,13 +68,10 @@ describe("read-path tenant isolation", () => {
         groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
         roleBinding: { findMany: roleBindingFindMany },
         teamUser: { findFirst: vi.fn().mockResolvedValue(null) },
-      } as unknown as Parameters<typeof hasProjectPermission>[0]["prisma"];
+        systemMigrationTenantState: notOnEngine(),
+      } as unknown as MockPrisma;
 
-      const permitted = await hasProjectPermission(
-        { prisma, session: sessionForUserB },
-        PROJECT_A,
-        "project:view",
-      );
+      const permitted = await hasProjectPermission(context(prisma), PROJECT_A, "project:view");
 
       expect(permitted).toBe(false);
       // Fail-closed happens on membership, before any binding lookup runs.
@@ -78,13 +98,10 @@ describe("read-path tenant isolation", () => {
         groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
         roleBinding: { findMany: roleBindingFindMany },
         teamUser: { findFirst: vi.fn().mockResolvedValue(null) },
-      } as unknown as Parameters<typeof hasTeamPermission>[0]["prisma"];
+        systemMigrationTenantState: notOnEngine(),
+      } as unknown as MockPrisma;
 
-      const permitted = await hasTeamPermission(
-        { prisma, session: sessionForUserB },
-        TEAM_A,
-        "team:view",
-      );
+      const permitted = await hasTeamPermission(context(prisma), TEAM_A, "team:view");
 
       expect(permitted).toBe(false);
       expect(roleBindingFindMany).not.toHaveBeenCalled();
@@ -100,20 +117,23 @@ describe("read-path tenant isolation", () => {
           }),
         },
         organizationUser: {
-          findFirst: vi.fn().mockResolvedValue({ role: OrganizationUserRole.MEMBER }),
+          // `disabledAt` is load-bearing: since #7476 a row arriving without
+          // the column reads as a disabled seat, and a disabled seat is not a
+          // membership. Omitting it made this "genuine member" a locked-out
+          // one, which denies before any binding is read.
+          findFirst: vi
+            .fn()
+            .mockResolvedValue({ role: OrganizationUserRole.MEMBER, disabledAt: null }),
         },
         groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
         roleBinding: {
           findMany: vi.fn().mockResolvedValue([grantingProjectBinding]),
         },
         teamUser: { findFirst: vi.fn().mockResolvedValue(null) },
-      } as unknown as Parameters<typeof hasProjectPermission>[0]["prisma"];
+        systemMigrationTenantState: notOnEngine(),
+      } as unknown as MockPrisma;
 
-      const permitted = await hasProjectPermission(
-        { prisma, session: sessionForUserB },
-        PROJECT_A,
-        "project:view",
-      );
+      const permitted = await hasProjectPermission(context(prisma), PROJECT_A, "project:view");
 
       expect(permitted).toBe(true);
     });
@@ -141,18 +161,16 @@ describe("read-path tenant isolation", () => {
         roleBinding: { findMany: roleBindingFindMany },
         customRole: { findMany: vi.fn().mockResolvedValue([]) },
         teamUser: { findMany: vi.fn().mockResolvedValue([]) },
-      } as unknown as Parameters<typeof batchScopePermissions>[0]["prisma"];
+        systemMigrationTenantState: notOnEngine(),
+      } as unknown as MockPrisma;
 
-      const { teams, projects } = await batchScopePermissions(
-        { prisma, session: sessionForUserB },
-        {
-          organizationId: ORG_A,
-          teamIds: [TEAM_A],
-          projectIds: [PROJECT_A],
-          projectTeamId: { [PROJECT_A]: TEAM_A },
-          permission: "project:view",
-        },
-      );
+      const { teams, projects } = await batchScopePermissions(context(prisma), {
+        organizationId: ORG_A,
+        teamIds: [TEAM_A],
+        projectIds: [PROJECT_A],
+        projectTeamId: { [PROJECT_A]: TEAM_A },
+        permission: "project:view",
+      });
 
       expect(projects.get(PROJECT_A)).toBe(false);
       expect(teams.get(TEAM_A)).toBe(false);
@@ -163,7 +181,13 @@ describe("read-path tenant isolation", () => {
     it("still grants a genuine member", async () => {
       const prisma = {
         organizationUser: {
-          findFirst: vi.fn().mockResolvedValue({ role: OrganizationUserRole.MEMBER }),
+          // `disabledAt` is load-bearing: since #7476 a row arriving without
+          // the column reads as a disabled seat, and a disabled seat is not a
+          // membership. Omitting it made this "genuine member" a locked-out
+          // one, which denies before any binding is read.
+          findFirst: vi
+            .fn()
+            .mockResolvedValue({ role: OrganizationUserRole.MEMBER, disabledAt: null }),
         },
         groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
         roleBinding: {
@@ -171,18 +195,16 @@ describe("read-path tenant isolation", () => {
         },
         customRole: { findMany: vi.fn().mockResolvedValue([]) },
         teamUser: { findMany: vi.fn().mockResolvedValue([]) },
-      } as unknown as Parameters<typeof batchScopePermissions>[0]["prisma"];
+        systemMigrationTenantState: notOnEngine(),
+      } as unknown as MockPrisma;
 
-      const { projects } = await batchScopePermissions(
-        { prisma, session: sessionForUserB },
-        {
-          organizationId: ORG_A,
-          teamIds: [],
-          projectIds: [PROJECT_A],
-          projectTeamId: { [PROJECT_A]: TEAM_A },
-          permission: "project:view",
-        },
-      );
+      const { projects } = await batchScopePermissions(context(prisma), {
+        organizationId: ORG_A,
+        teamIds: [],
+        projectIds: [PROJECT_A],
+        projectTeamId: { [PROJECT_A]: TEAM_A },
+        permission: "project:view",
+      });
 
       expect(projects.get(PROJECT_A)).toBe(true);
     });

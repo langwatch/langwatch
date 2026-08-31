@@ -13,9 +13,24 @@ import {
   publicEndpoint,
 } from "@langwatch/api";
 import { getRoutePolicy } from "@langwatch/api/rest";
+import { appContextBindingsFor } from "~/app/api/middleware/app-context";
+import type { App } from "~/server/app-layer/app";
 import { createProjectApp, createServiceApp } from "../index";
 
 const noopSecret: MiddlewareHandler = async (_c, next) => next();
+
+/**
+ * Every family `SecuredApp` builds mounts the app-context middleware at
+ * construction, and that middleware refuses a request whose transport root
+ * installed no App — `api-router.ts` is the root in production. A suite that
+ * drives `app.hono` directly IS the root, so it supplies the App the way an
+ * internal re-dispatch does, through the request's bindings.
+ *
+ * Empty on purpose: what these cases assert is the strategy chain's ORDER and
+ * the envelope a refusal is rendered in, and neither reads a facet off the
+ * App. A double with facets would suggest they do.
+ */
+const bindings = () => appContextBindingsFor({} as App);
 
 describe("SecuredApp", () => {
   describe("when a route is registered through access()", () => {
@@ -54,7 +69,7 @@ describe("SecuredApp", () => {
         return c.text("ok");
       });
 
-      const res = await app.hono.request("/api/__test_chain/x");
+      const res = await app.hono.request("/api/__test_chain/x", void 0, bindings());
       expect(res.status).toBe(200);
       expect(calls).toEqual(["secret", "handler"]);
     });
@@ -74,7 +89,7 @@ describe("SecuredApp", () => {
         return c.text("ok");
       });
 
-      const res = await app.hono.request("/api/__test_public/health");
+      const res = await app.hono.request("/api/__test_public/health", void 0, bindings());
       expect(res.status).toBe(200);
       expect(calls).toEqual(["handler"]); // secret middleware NOT run
     });
@@ -121,9 +136,7 @@ describe("SecuredApp", () => {
 
       for (const method of ["GET", "POST", "DELETE"] as const) {
         calls.length = 0;
-        const res = await app.hono.request("/api/__test_all/everything", {
-          method,
-        });
+        const res = await app.hono.request("/api/__test_all/everything", { method }, bindings());
         expect(res.status).toBe(200);
         expect(calls).toEqual(["secret", "handler"]);
       }
@@ -139,7 +152,7 @@ describe("SecuredApp", () => {
       });
       app.access(apiKeyPermission("virtualKeys:view")).get("/x", (c) => c.text("ok"));
 
-      const res = await app.hono.request("/api/__test_canonical/x");
+      const res = await app.hono.request("/api/__test_canonical/x", void 0, bindings());
       expect(res.status).toBe(401);
       // The refusal comes from the auth middleware, BENEATH the family's own
       // error handler, so this is the case that silently stayed flat when only
@@ -149,6 +162,11 @@ describe("SecuredApp", () => {
           type: "unauthenticated",
           code: "missing_credentials",
           message: expect.stringContaining("Authentication required"),
+          // Part of the canonical envelope since retryability was made
+          // explicit, and pinned as such by the public secret family's own
+          // suite. Kept in an exhaustive `toEqual` so a field appearing on
+          // this envelope still has to be decided rather than absorbed.
+          retryable: false,
         },
       });
     });
@@ -158,7 +176,7 @@ describe("SecuredApp", () => {
       const app = createProjectApp({ basePath: "/api/__test_legacy" });
       app.access(apiKeyPermission("virtualKeys:view")).get("/x", (c) => c.text("ok"));
 
-      const res = await app.hono.request("/api/__test_legacy/x");
+      const res = await app.hono.request("/api/__test_legacy/x", void 0, bindings());
       expect(res.status).toBe(401);
       expect(await res.json()).toMatchObject({ error: "Unauthorized" });
     });

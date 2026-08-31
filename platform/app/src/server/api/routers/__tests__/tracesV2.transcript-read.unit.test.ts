@@ -31,7 +31,7 @@ vi.mock("~/server/api/utils", async (importOriginal) => ({
   getVisibilityCutoffMsForProject: vi.fn(async () => 0),
 }));
 
-import { TracesV2TrpcApi } from "@langwatch/trace-server";
+import { TraceApp, TracesV2TrpcApi } from "@langwatch/trace-server";
 import { createTraceViewReadPorts } from "~/runtime/app/features/trace";
 
 const PROJECT_ID = "project_test";
@@ -42,15 +42,20 @@ const codingAgents = TestCodingAgentService.create();
  * The reader now takes the application it reads through, and the ports the
  * package does not own. The stores below are the mocked boundaries; the log
  * visibility gate and the transcript derivation still run for real.
+ *
+ * A real `TraceApp` stands over those stores rather than an object shaped like
+ * the reader's own calls: `readSpans` is where the tenant key and the
+ * visibility cutoff are decided, so a double of it would assert nothing about
+ * the mapping the production read depends on.
  */
-const app = {
+const app = TraceApp.create({
   traces: {
     spans: { getSpansByTraceId: mockGetSpansByTraceId },
     logRecords: { getLogsByTraceId: mockGetLogsByTraceId },
     canonicalisation: undefined,
   },
   codingAgents,
-} as never;
+} as unknown as Parameters<typeof TraceApp.create>[0]);
 const ports = createTraceViewReadPorts();
 
 function claudeLogRow(attributes: Record<string, string>, timeUnixMs: number) {

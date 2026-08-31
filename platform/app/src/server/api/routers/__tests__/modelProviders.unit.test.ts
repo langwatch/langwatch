@@ -1,18 +1,15 @@
-import type { CustomModelEntry, ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
+import type {
+  CustomModelEntry,
+  ModelProviderEditorValue as MaybeStoredModelProvider,
+} from "@langwatch/model-provider-contract";
 import { customModelUpdateInputSchema } from "@langwatch/model-provider-contract";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
 import { isSecretCredentialField } from "../../../../utils/modelProviderHelpers";
-import {
-  testManagedProviders,
-  testModelProviders,
-} from "../../../modelProviders/__tests__/model-provider-services.test-support";
 import type { ModelMetadataForFrontend } from "@langwatch/model-provider-contract";
 import {
   getModelMetadataForFrontend,
-  type LegacyModelProviderExecution,
   mergeCustomModelMetadata,
-  prepareLitellmParams as prepareLitellmParamsWithServices,
 } from "@langwatch/model-provider-server";
 
 /**
@@ -220,164 +217,6 @@ describe("getModelMetadataForFrontend", () => {
   });
 });
 
-describe("prepareLitellmParams", () => {
-  beforeEach(() => {
-    vi.unstubAllEnvs();
-  });
-
-  type TestLitellmProvider = {
-    provider: string;
-    enabled: boolean;
-    customKeys: Record<string, unknown> | null;
-    models: string[] | null;
-    embeddingsModels: string[] | null;
-    deploymentMapping: Record<string, string> | null;
-    extraHeaders: Array<{ key: string; value: string }> | null;
-  };
-
-  const createMockProvider = (
-    provider: string,
-    customKeys: Record<string, string> | null = null,
-  ): TestLitellmProvider => ({
-    provider,
-    enabled: true,
-    customKeys,
-    models: null,
-    embeddingsModels: null,
-    deploymentMapping: null,
-    extraHeaders: null,
-  });
-
-  const toExecutionProvider = (
-    provider: TestLitellmProvider,
-  ): LegacyModelProviderExecution => ({
-    id: "mp_test",
-    organizationId: "org_test",
-    provider: provider.provider,
-    name: provider.provider,
-    enabled: provider.enabled,
-    routingHandle: null,
-    scopes: [{ scopeType: "PROJECT", scopeId: "test-project" }],
-    scopeType: "PROJECT",
-    scopeId: "test-project",
-    customKeys: provider.customKeys,
-    customModels: [],
-    customEmbeddingsModels: [],
-    extraHeaders: provider.extraHeaders ?? [],
-    rateLimitRpm: null,
-    rateLimitTpm: null,
-    rateLimitRpd: null,
-    fallbackPriorityGlobal: null,
-    providerConfig: null,
-    deploymentMapping: provider.deploymentMapping,
-    createdAt: new Date("2026-01-01T00:00:00.000Z"),
-    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
-    models: provider.models,
-    embeddingsModels: provider.embeddingsModels,
-    isSystem: false,
-    embeddingsUnsupported: false,
-  });
-
-  const prepareLitellmParams = (input: {
-    model: string;
-    modelProvider: TestLitellmProvider;
-    projectId: string;
-  }) =>
-    prepareLitellmParamsWithServices(testModelProviders, testManagedProviders, {
-      ...input,
-      modelProvider: toExecutionProvider(input.modelProvider),
-    });
-
-  describe("Anthropic URL normalization", () => {
-    it("strips /v1 suffix from Anthropic api_base", async () => {
-      vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
-      vi.stubEnv("ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1");
-
-      const modelProvider = createMockProvider("anthropic");
-      const result = await prepareLitellmParams({
-        model: "anthropic/claude-opus-4.5",
-        modelProvider,
-        projectId: "test-project",
-      });
-
-      expect(result.api_base).toBe("https://api.anthropic.com");
-    });
-
-    it("strips /v1/ suffix (with trailing slash) from Anthropic api_base", async () => {
-      vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
-      vi.stubEnv("ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1/");
-
-      const modelProvider = createMockProvider("anthropic");
-      const result = await prepareLitellmParams({
-        model: "anthropic/claude-opus-4.5",
-        modelProvider,
-        projectId: "test-project",
-      });
-
-      expect(result.api_base).toBe("https://api.anthropic.com");
-    });
-
-    it("preserves custom Anthropic base URL without /v1", async () => {
-      vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
-      vi.stubEnv("ANTHROPIC_BASE_URL", "https://custom-anthropic.example.com");
-
-      const modelProvider = createMockProvider("anthropic");
-      const result = await prepareLitellmParams({
-        model: "anthropic/claude-opus-4.5",
-        modelProvider,
-        projectId: "test-project",
-      });
-
-      expect(result.api_base).toBe("https://custom-anthropic.example.com");
-    });
-
-    it("uses custom keys api_base for Anthropic with /v1 stripped", async () => {
-      const modelProvider = createMockProvider("anthropic", {
-        ANTHROPIC_API_KEY: "custom-key",
-        ANTHROPIC_BASE_URL: "https://api.anthropic.com/v1",
-      });
-
-      const result = await prepareLitellmParams({
-        model: "anthropic/claude-opus-4.5",
-        modelProvider,
-        projectId: "test-project",
-      });
-
-      expect(result.api_base).toBe("https://api.anthropic.com");
-    });
-  });
-
-  describe("non-Anthropic providers", () => {
-    it("preserves /v1 suffix for OpenAI", async () => {
-      vi.stubEnv("OPENAI_API_KEY", "test-key");
-      vi.stubEnv("OPENAI_BASE_URL", "https://api.openai.com/v1");
-
-      const modelProvider = createMockProvider("openai");
-      const result = await prepareLitellmParams({
-        model: "openai/gpt-4o",
-        modelProvider,
-        projectId: "test-project",
-      });
-
-      expect(result.api_base).toBe("https://api.openai.com/v1");
-    });
-
-    it("preserves /v1 suffix for custom provider", async () => {
-      vi.stubEnv("CUSTOM_API_KEY", "test-key");
-      vi.stubEnv("CUSTOM_BASE_URL", "https://custom-llm.example.com/v1");
-
-      const modelProvider = createMockProvider("custom");
-      const result = await prepareLitellmParams({
-        model: "custom/my-model",
-        modelProvider,
-        projectId: "test-project",
-      });
-
-      expect(result.api_base).toBe("https://custom-llm.example.com/v1");
-    });
-  });
-});
-
 describe("customModelUpdateInputSchema", () => {
   describe("when given new CustomModelEntry[] format", () => {
     it("accepts an array of CustomModelEntry objects", () => {
@@ -482,10 +321,7 @@ describe("mergeCustomModelMetadata", () => {
       expect(result["openai/gpt-5-custom"]?.name).toBe("GPT-5 Custom");
       expect(result["openai/gpt-5-custom"]?.provider).toBe("openai");
       expect(result["openai/gpt-5-custom"]?.maxCompletionTokens).toBe(4096);
-      expect(result["openai/gpt-5-custom"]?.supportedParameters).toEqual([
-        "temperature",
-        "top_p",
-      ]);
+      expect(result["openai/gpt-5-custom"]?.supportedParameters).toEqual(["temperature", "top_p"]);
       expect(result["openai/gpt-5-custom"]?.supportsImageInput).toBe(true);
 
       expect(result["openai/custom-embed"]).toBeDefined();

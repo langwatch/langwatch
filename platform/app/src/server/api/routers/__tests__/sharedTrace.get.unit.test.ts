@@ -18,6 +18,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
 import { appRouter } from "../../root";
 import { SHARE_MAX_FULL_SPANS } from "@langwatch/trace-contract";
+import { TraceApp } from "@langwatch/trace-server";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -48,10 +49,18 @@ const {
   mockRateLimit: vi.fn(),
 }));
 
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({
+/**
+ * The share read is one application now. The packaged transport calls
+ * `ctx.app.traces.resolveShareForViewer`, `readTraceSummary`, `readSpans` and
+ * the rest, and it is `TraceApp` that maps each of those onto the share,
+ * project and trace services stubbed here — deciding the tenant key, the
+ * occurredAt hint and the visibility cutoff every store read carries. A double
+ * shaped like the transport's own calls would leave that mapping untested, so
+ * the real app stands over the stubs and the assertions stay on the stubs
+ * underneath it.
+ */
+const traceAppOverStubs = () =>
+  TraceApp.create({
     share: {
       resolveForViewer: mockResolveForViewer,
       // No cache in unit tests: every call assembles, so the assertions below
@@ -70,6 +79,21 @@ vi.mock("~/server/app-layer/app", () => ({
         getSpanResourcesByTraceId: mockGetSpanResourcesByTraceId,
         getTraceEventsByTraceId: mockGetTraceEventsByTraceId,
       },
+    },
+  } as unknown as Parameters<typeof TraceApp.create>[0]);
+
+vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
+  getApp: () => ({
+    traces: traceAppOverStubs(),
+    // The base policy chain runs the scope-lineage guard ahead of every
+    // procedure, anonymous ones included, and it reads
+    // `ctx.app.permissions`. A share token names no scope, so "consistent" is
+    // what the real guard answers here — without the facet the guard died on
+    // an undefined service before `sharedTrace.get` was ever entered.
+    permissions: {
+      checkScopeLineage: vi.fn().mockResolvedValue({ kind: "consistent" }),
     },
   }),
 }));

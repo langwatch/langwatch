@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
+import type { Session } from "~/server/auth";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 import { hasProjectPermission, type Permission } from "../rbac";
 
 // Helper function to test permission hierarchy logic
-function hasPermissionWithHierarchy(
-  permissions: string[],
-  requestedPermission: string,
-): boolean {
+function hasPermissionWithHierarchy(permissions: string[], requestedPermission: string): boolean {
   // Handle undefined or null permissions
   if (!permissions || !Array.isArray(permissions)) {
     return false;
@@ -67,6 +66,9 @@ const mockPrisma = {
   roleBinding: {
     findMany: vi.fn(),
   },
+  systemMigrationTenantState: {
+    findUnique: vi.fn(),
+  },
 } as any;
 
 // Mock session
@@ -76,6 +78,20 @@ const mockSession = {
     email: "test@example.com",
   },
 } as any;
+
+/**
+ * The context the resolver actually takes. `permissionsFor` reads the ADR-110
+ * fork gate off `ctx.app.permissions` and falls back to `getApp()` when the
+ * context carries none — and in a unit worker, where no app is initialized,
+ * that fallback throws before the custom-role walk this suite is about ever
+ * runs. Built per call so the gate's per-organization cache cannot carry one
+ * test's migration answer into the next.
+ */
+const context = (session: Session | null = mockSession) => ({
+  prisma: mockPrisma,
+  session,
+  app: { permissions: appPermissionsService(mockPrisma) },
+});
 
 describe("Custom Role Functionality Tests", () => {
   beforeEach(() => {
@@ -89,6 +105,9 @@ describe("Custom Role Functionality Tests", () => {
       disabledAt: null,
     });
     mockPrisma.groupMembership.findMany.mockResolvedValue([]);
+    // A cold, explicit "not on the engine" answer, so the custom-role
+    // resolution these tests pin stays on the legacy walk.
+    mockPrisma.systemMigrationTenantState.findUnique.mockResolvedValue(null);
   });
 
   describe("Custom Role Permission Inheritance", () => {
@@ -102,7 +121,7 @@ describe("Custom Role Functionality Tests", () => {
       });
 
       const result = await hasProjectPermission(
-        { prisma: mockPrisma, session: mockSession },
+        context(),
         "project-123",
         "workflows:view" as Permission,
       );
@@ -120,7 +139,7 @@ describe("Custom Role Functionality Tests", () => {
       });
 
       const result = await hasProjectPermission(
-        { prisma: mockPrisma, session: mockSession },
+        context(),
         "project-123",
         "workflows:create" as Permission,
       );
@@ -138,7 +157,7 @@ describe("Custom Role Functionality Tests", () => {
       });
 
       const result = await hasProjectPermission(
-        { prisma: mockPrisma, session: mockSession },
+        context(),
         "project-123",
         "workflows:update" as Permission,
       );
@@ -156,7 +175,7 @@ describe("Custom Role Functionality Tests", () => {
       });
 
       const result = await hasProjectPermission(
-        { prisma: mockPrisma, session: mockSession },
+        context(),
         "project-123",
         "workflows:delete" as Permission,
       );
@@ -174,7 +193,7 @@ describe("Custom Role Functionality Tests", () => {
       });
 
       const result = await hasProjectPermission(
-        { prisma: mockPrisma, session: mockSession },
+        context(),
         "project-123",
         "workflows:manage" as Permission,
       );
@@ -201,103 +220,55 @@ describe("Custom Role Functionality Tests", () => {
 
       // Should have workflows:manage -> can access all workflows permissions
       expect(
-        await hasProjectPermission(
-          { prisma: mockPrisma, session: mockSession },
-          "project-123",
-          "workflows:view" as Permission,
-        ),
+        await hasProjectPermission(context(), "project-123", "workflows:view" as Permission),
       ).toBe(true);
 
       expect(
-        await hasProjectPermission(
-          { prisma: mockPrisma, session: mockSession },
-          "project-123",
-          "workflows:create" as Permission,
-        ),
+        await hasProjectPermission(context(), "project-123", "workflows:create" as Permission),
       ).toBe(true);
 
       expect(
-        await hasProjectPermission(
-          { prisma: mockPrisma, session: mockSession },
-          "project-123",
-          "workflows:update" as Permission,
-        ),
+        await hasProjectPermission(context(), "project-123", "workflows:update" as Permission),
       ).toBe(true);
 
       expect(
-        await hasProjectPermission(
-          { prisma: mockPrisma, session: mockSession },
-          "project-123",
-          "workflows:delete" as Permission,
-        ),
+        await hasProjectPermission(context(), "project-123", "workflows:delete" as Permission),
       ).toBe(true);
 
       expect(
-        await hasProjectPermission(
-          { prisma: mockPrisma, session: mockSession },
-          "project-123",
-          "workflows:manage" as Permission,
-        ),
+        await hasProjectPermission(context(), "project-123", "workflows:manage" as Permission),
       ).toBe(true);
 
       // Should have datasets:view -> can only access view
       expect(
-        await hasProjectPermission(
-          { prisma: mockPrisma, session: mockSession },
-          "project-123",
-          "datasets:view" as Permission,
-        ),
+        await hasProjectPermission(context(), "project-123", "datasets:view" as Permission),
       ).toBe(true);
 
       expect(
-        await hasProjectPermission(
-          { prisma: mockPrisma, session: mockSession },
-          "project-123",
-          "datasets:create" as Permission,
-        ),
+        await hasProjectPermission(context(), "project-123", "datasets:create" as Permission),
       ).toBe(false);
 
       expect(
-        await hasProjectPermission(
-          { prisma: mockPrisma, session: mockSession },
-          "project-123",
-          "datasets:manage" as Permission,
-        ),
+        await hasProjectPermission(context(), "project-123", "datasets:manage" as Permission),
       ).toBe(false);
 
       // Should have analytics:manage -> can access all analytics permissions
       expect(
-        await hasProjectPermission(
-          { prisma: mockPrisma, session: mockSession },
-          "project-123",
-          "analytics:view" as Permission,
-        ),
+        await hasProjectPermission(context(), "project-123", "analytics:view" as Permission),
       ).toBe(true);
 
       expect(
-        await hasProjectPermission(
-          { prisma: mockPrisma, session: mockSession },
-          "project-123",
-          "analytics:manage" as Permission,
-        ),
+        await hasProjectPermission(context(), "project-123", "analytics:manage" as Permission),
       ).toBe(true);
 
       // Should have messages:share -> can access share but not view
       expect(
-        await hasProjectPermission(
-          { prisma: mockPrisma, session: mockSession },
-          "project-123",
-          "traces:share" as Permission,
-        ),
+        await hasProjectPermission(context(), "project-123", "traces:share" as Permission),
       ).toBe(true);
 
       // User has traces:view permission in custom role
       expect(
-        await hasProjectPermission(
-          { prisma: mockPrisma, session: mockSession },
-          "project-123",
-          "traces:view" as Permission,
-        ),
+        await hasProjectPermission(context(), "project-123", "traces:view" as Permission),
       ).toBe(true);
     });
 
@@ -311,7 +282,7 @@ describe("Custom Role Functionality Tests", () => {
       });
 
       const result = await hasProjectPermission(
-        { prisma: mockPrisma, session: mockSession },
+        context(),
         "project-123",
         "workflows:view" as Permission,
       );
@@ -331,7 +302,7 @@ describe("Custom Role Functionality Tests", () => {
 
       // Should still work with valid permissions
       const result = await hasProjectPermission(
-        { prisma: mockPrisma, session: mockSession },
+        context(),
         "project-123",
         "workflows:view" as Permission,
       );
@@ -348,7 +319,7 @@ describe("Custom Role Functionality Tests", () => {
       mockPrisma.customRole.findFirst.mockResolvedValue(null);
 
       const result = await hasProjectPermission(
-        { prisma: mockPrisma, session: mockSession },
+        context(),
         "project-123",
         "workflows:view" as Permission,
       );
@@ -366,7 +337,7 @@ describe("Custom Role Functionality Tests", () => {
       });
 
       const result = await hasProjectPermission(
-        { prisma: mockPrisma, session: mockSession },
+        context(),
         "project-123",
         "workflows:view" as Permission,
       );
@@ -381,7 +352,7 @@ describe("Custom Role Functionality Tests", () => {
       mockPrisma.customRole.findFirst.mockResolvedValue(null);
 
       const result = await hasProjectPermission(
-        { prisma: mockPrisma, session: mockSession },
+        context(),
         "project-123",
         "workflows:view" as Permission,
       );
@@ -471,9 +442,7 @@ describe("Custom Role Functionality Tests", () => {
 
       testCases.forEach(({ permission, expected, reason }) => {
         it(`${expected ? "allows" : "denies"} ${permission} (${reason})`, () => {
-          expect(hasPermissionWithHierarchy(customPermissions, permission)).toBe(
-            expected,
-          );
+          expect(hasPermissionWithHierarchy(customPermissions, permission)).toBe(expected);
         });
       });
     });
@@ -510,9 +479,7 @@ describe("Custom Role Functionality Tests", () => {
 
       testCases.forEach(({ permission, expected, reason }) => {
         it(`${expected ? "allows" : "denies"} ${permission} (${reason})`, () => {
-          expect(hasPermissionWithHierarchy(customPermissions, permission)).toBe(
-            expected,
-          );
+          expect(hasPermissionWithHierarchy(customPermissions, permission)).toBe(expected);
         });
       });
     });
@@ -565,9 +532,7 @@ describe("Custom Role Functionality Tests", () => {
 
       testCases.forEach(({ permission, expected, reason }) => {
         it(`${expected ? "allows" : "denies"} ${permission} (${reason})`, () => {
-          expect(hasPermissionWithHierarchy(customPermissions, permission)).toBe(
-            expected,
-          );
+          expect(hasPermissionWithHierarchy(customPermissions, permission)).toBe(expected);
         });
       });
     });
@@ -605,20 +570,14 @@ describe("Custom Role Functionality Tests", () => {
       const emptyPermissions: string[] = [];
 
       expect(hasPermissionWithHierarchy(emptyPermissions, "workflows:view")).toBe(false);
-      expect(hasPermissionWithHierarchy(emptyPermissions, "workflows:manage")).toBe(
-        false,
-      );
+      expect(hasPermissionWithHierarchy(emptyPermissions, "workflows:manage")).toBe(false);
     });
 
     it("handles undefined permission arrays", () => {
       const undefinedPermissions = undefined as any;
 
-      expect(hasPermissionWithHierarchy(undefinedPermissions, "workflows:view")).toBe(
-        false,
-      );
-      expect(hasPermissionWithHierarchy(undefinedPermissions, "workflows:manage")).toBe(
-        false,
-      );
+      expect(hasPermissionWithHierarchy(undefinedPermissions, "workflows:view")).toBe(false);
+      expect(hasPermissionWithHierarchy(undefinedPermissions, "workflows:manage")).toBe(false);
     });
   });
 });
