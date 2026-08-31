@@ -19,6 +19,13 @@ Use the latest feature inventory. If none exists or ownership is unclear, run
    - contract: portable Zod 4 values/errors and the canonical abstract service;
    - server: one concrete service with private repositories/ports/adapters;
    - web: reusable controlled presentation and browser behaviour.
+
+   For the four server layers (port, repository, service, adapter) and the
+   typed-Prisma seam every Postgres-backed feature keeps, follow
+   `dev/docs/best_practices/service-repository-adapter-port.md`. The
+   `typed-prisma-seam` lint rejects any new file that reintroduces
+   `database: object` + `as PrismaClient` — the shape that was the old
+   convention.
 4. Compose one concrete graph at the process root. Inject complete cross-feature
    services, typed configuration, clocks/IDs, and technical ports. Do not use a
    callback bag or service locator.

@@ -90,7 +90,11 @@ only durable content was the rules and the hazards, and they are here.
 ## The shape being applied
 
 A feature module is **one class**, not a bag of functions with a class beside
-it.
+it. For the four server layers — port, repository, service, adapter — and
+the typed-Prisma seam, read
+[`service-repository-adapter-port.md`](../../best_practices/service-repository-adapter-port.md)
+once. The `typed-prisma-seam` lint rejects any new file that reintroduces the
+old `database: object` + `as PrismaClient` seam.
 
 - **One class per file**, named for what it is (`GatewaySpendFilters`,
   `TrackedEventSync`), never for being a utility. `IdUtils` became

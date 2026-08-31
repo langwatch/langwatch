@@ -19,7 +19,11 @@ proof that the migration is complete.
    implementation, private repositories, and no duplicate caller-local service.
 4. Reject callback/capability bags, service locators, `Pick`/`Omit`, inferred
    `Parameters`/`ReturnType` contracts, casts, suppressions, global App/Prisma,
-   request-time construction, or package env access.
+   request-time construction, or package env access. In particular reject the
+   `database: object` + `as PrismaClient` seam — the composition root already
+   holds a typed `PrismaClient`, and the adapter/repository take it typed.
+   `typed-prisma-seam` is the lint; see
+   `dev/docs/best_practices/service-repository-adapter-port.md` for the shape.
 5. Verify UI packages are controlled and portable. App hooks and tRPC clients
    stay in app composition; package context is not a concealed dependency bag.
 6. Search the whole repository for displaced implementation, stale imports,
