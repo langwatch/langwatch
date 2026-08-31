@@ -73,7 +73,7 @@ export class DashboardService extends DashboardServiceContract {
     projectId: string;
     graphCountScope: DashboardGraphCountScope;
   }): Promise<DashboardSummary[]> {
-    const parsed = zProjectId(input.projectId);
+    const parsed = DashboardService.parseProjectId(input.projectId);
 
     const graphKinds =
       input.graphCountScope === "builder"
@@ -87,7 +87,7 @@ export class DashboardService extends DashboardServiceContract {
     projectId: string;
     dashboardId: string;
   }): Promise<Dashboard & { graphs: Graph[] }> {
-    const parsed = zDashboardRef(input);
+    const parsed = DashboardService.dashboardRef(input);
 
     const dashboard = await this.repository.tryFindDashboard(parsed);
     if (!dashboard) {
@@ -129,7 +129,7 @@ export class DashboardService extends DashboardServiceContract {
   }
 
   async delete(input: { projectId: string; dashboardId: string }): Promise<Dashboard> {
-    const parsed = zDashboardRef(input);
+    const parsed = DashboardService.dashboardRef(input);
 
     await this.getById(parsed);
 
@@ -152,7 +152,7 @@ export class DashboardService extends DashboardServiceContract {
   }
 
   async getOrCreateFirst(input: { projectId: string }): Promise<Dashboard> {
-    const projectId = zProjectId(input.projectId);
+    const projectId = DashboardService.parseProjectId(input.projectId);
 
     const first = await this.repository.tryFindFirstDashboard({ projectId });
     if (first) {
@@ -168,7 +168,7 @@ export class DashboardService extends DashboardServiceContract {
   }
 
   async listGraphs(input: { projectId: string; dashboardId?: string }): Promise<Graph[]> {
-    const projectId = zProjectId(input.projectId);
+    const projectId = DashboardService.parseProjectId(input.projectId);
 
     const dashboardId =
       input.dashboardId === undefined ? undefined : dashboardIdSchema.parse(input.dashboardId);
@@ -177,7 +177,7 @@ export class DashboardService extends DashboardServiceContract {
   }
 
   async getGraph(input: { projectId: string; graphId: string }): Promise<Graph> {
-    const parsed = zGraphRef(input);
+    const parsed = DashboardService.graphRef(input);
 
     const graph = await this.repository.tryFindGraph(parsed);
     if (!graph) {
@@ -257,7 +257,7 @@ export class DashboardService extends DashboardServiceContract {
   }
 
   async deleteGraph(input: { projectId: string; graphId: string }): Promise<Graph> {
-    const parsed = zGraphRef(input);
+    const parsed = DashboardService.graphRef(input);
 
     await this.getGraph(parsed);
 
@@ -271,7 +271,7 @@ export class DashboardService extends DashboardServiceContract {
   }): Promise<Graph> {
     const parsed = graphLayoutSchema.parse(input.layout);
 
-    const ref = zGraphRef(input);
+    const ref = DashboardService.graphRef(input);
 
     await this.getGraph(ref);
 
@@ -282,7 +282,7 @@ export class DashboardService extends DashboardServiceContract {
     projectId: string;
     layouts: Array<{ graphId: string; layout: GraphLayout }>;
   }): Promise<{ success: true }> {
-    const projectId = zProjectId(input.projectId);
+    const projectId = DashboardService.parseProjectId(input.projectId);
 
     const layouts = input.layouts.map((item) => ({
       graphId: graphIdSchema.parse(item.graphId),
@@ -358,16 +358,22 @@ export class DashboardService extends DashboardServiceContract {
   }): Promise<LangWatchQLQueryResult> {
     return this.savedWorkbenchCharts.run(input);
   }
+
+  private static parseProjectId(projectId: string): string {
+    return projectIdSchema.parse(projectId);
+  }
+
+  private static dashboardRef(input: { projectId: string; dashboardId: string }) {
+    return {
+      projectId: DashboardService.parseProjectId(input.projectId),
+      dashboardId: dashboardIdSchema.parse(input.dashboardId),
+    };
+  }
+
+  private static graphRef(input: { projectId: string; graphId: string }) {
+    return {
+      projectId: DashboardService.parseProjectId(input.projectId),
+      graphId: graphIdSchema.parse(input.graphId),
+    };
+  }
 }
-
-const zProjectId = (projectId: string): string => projectIdSchema.parse(projectId);
-
-const zDashboardRef = (input: { projectId: string; dashboardId: string }) => ({
-  projectId: zProjectId(input.projectId),
-  dashboardId: dashboardIdSchema.parse(input.dashboardId),
-});
-
-const zGraphRef = (input: { projectId: string; graphId: string }) => ({
-  projectId: zProjectId(input.projectId),
-  graphId: graphIdSchema.parse(input.graphId),
-});

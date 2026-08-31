@@ -16,19 +16,6 @@ import {
 
 const logger = createLogger("langwatch:suite-run:service");
 
-function withParameters(parameters: Record<string, string | number | boolean> | undefined) {
-  return parameters && Object.keys(parameters).length > 0 ? { parameters } : {};
-}
-
-function withSecretParameterNames(secretParameters: RunSecretCiphertext | undefined) {
-  const names = Object.keys(secretParameters ?? {});
-  return names.length > 0 ? { secretParameterNames: names } : {};
-}
-
-function withSecretParameters(secretParameters: RunSecretCiphertext | undefined) {
-  return secretParameters && Object.keys(secretParameters).length > 0 ? { secretParameters } : {};
-}
-
 /** Turns a validated Suite request into durable Suite-run and Simulation commands. */
 /** Everything one suite run needs, resolved by the caller before it starts. */
 export type SuiteExecutionRequest = {
@@ -195,14 +182,27 @@ export class SuiteExecutionService extends SuiteExecutionPort {
               scenarioVersion: input.scenarioVersions.get(item.scenarioId),
             },
             ...withNote(input.note),
-            ...withParameters(parameters.get(item.scenarioId)),
-            ...withSecretParameterNames(secretParameters),
+            ...SuiteExecutionService.withParameters(parameters.get(item.scenarioId)),
+            ...SuiteExecutionService.withSecretParameterNames(secretParameters),
           },
-          ...withSecretParameters(secretParameters),
+          ...SuiteExecutionService.withSecretParameters(secretParameters),
           target: { type: item.target.type, referenceId: item.target.referenceId },
           occurredAt: now,
         });
       }),
     );
+  }
+
+  private static withParameters(parameters: Record<string, string | number | boolean> | undefined) {
+    return parameters && Object.keys(parameters).length > 0 ? { parameters } : {};
+  }
+
+  private static withSecretParameterNames(secretParameters: RunSecretCiphertext | undefined) {
+    const names = Object.keys(secretParameters ?? {});
+    return names.length > 0 ? { secretParameterNames: names } : {};
+  }
+
+  private static withSecretParameters(secretParameters: RunSecretCiphertext | undefined) {
+    return secretParameters && Object.keys(secretParameters).length > 0 ? { secretParameters } : {};
   }
 }

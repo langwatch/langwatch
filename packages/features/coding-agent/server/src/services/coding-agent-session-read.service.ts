@@ -60,7 +60,7 @@ export class CodingAgentSessionReadService {
     nextCursor: CodingAgentSessionCursor | null;
   }> {
     const parsed = codingAgentSessionEventsInputSchema.parse(input);
-    const limit = clampSessionEventsLimit(parsed.limit);
+    const limit = CodingAgentSessionReadService.clampSessionEventsLimit(parsed.limit);
     const window =
       parsed.occurredAt ??
       (await this.resolveEventsWindow({
@@ -104,7 +104,9 @@ export class CodingAgentSessionReadService {
   }): Promise<CodingAgentSession | null> {
     const parsed = codingAgentSessionLookupInputSchema.parse(input);
     const window =
-      parsed.startedAtMs === undefined ? undefined : readWindowAround(parsed.startedAtMs);
+      parsed.startedAtMs === undefined
+        ? undefined
+        : CodingAgentSessionReadService.readWindowAround(parsed.startedAtMs);
     const row =
       (await this.dependencies.sessions.tryFindBySessionId({
         tenantId: parsed.projectId,
@@ -193,7 +195,9 @@ export class CodingAgentSessionReadService {
       tenantId: input.projectId,
       sessionId: input.sessionId,
     });
-    return row === null ? undefined : readWindowAround(row.startedAtMs);
+    return row === null
+      ? undefined
+      : CodingAgentSessionReadService.readWindowAround(row.startedAtMs);
   }
 
   private async withMetricTotals(
@@ -235,7 +239,7 @@ export class CodingAgentSessionReadService {
     return rows.map((row) => {
       const sessionTotals = bySession.get(row.sessionId);
       if (sessionTotals === undefined) return row;
-      const filled = foldTokenAndCostTotals(sessionTotals);
+      const filled = CodingAgentSessionReadService.foldTokenAndCostTotals(sessionTotals);
       return {
         ...row,
         costUsd: row.costUsd || filled.costUsd,
@@ -246,49 +250,49 @@ export class CodingAgentSessionReadService {
       };
     });
   }
-}
 
-function readWindowAround(anchorMs: number): { fromMs: number; toMs: number } {
-  return {
-    fromMs: anchorMs - CODING_AGENT_SESSION_READ_WINDOW_MS,
-    toMs: anchorMs + CODING_AGENT_SESSION_READ_WINDOW_MS,
-  };
-}
-
-function clampSessionEventsLimit(limit: number): number {
-  if (!Number.isFinite(limit)) return MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE;
-  return Math.min(Math.max(Math.trunc(limit), 1), MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE);
-}
-
-function foldTokenAndCostTotals(totals: SessionMetricTotal[]) {
-  const folded = {
-    costUsd: 0,
-    inputTokens: 0,
-    outputTokens: 0,
-    cacheReadTokens: 0,
-    cacheCreationTokens: 0,
-  };
-  for (const total of totals) {
-    const metric = normalizeMetricName(total.metricName);
-    if (metric === "cost_usage") {
-      folded.costUsd += total.total;
-      continue;
-    }
-    if (metric !== "token_usage") continue;
-    switch (normalizeTokenType(total.bucket)) {
-      case "input":
-        folded.inputTokens += total.total;
-        break;
-      case "output":
-        folded.outputTokens += total.total;
-        break;
-      case "cache_read":
-        folded.cacheReadTokens += total.total;
-        break;
-      case "cache_creation":
-        folded.cacheCreationTokens += total.total;
-        break;
-    }
+  private static readWindowAround(anchorMs: number): { fromMs: number; toMs: number } {
+    return {
+      fromMs: anchorMs - CODING_AGENT_SESSION_READ_WINDOW_MS,
+      toMs: anchorMs + CODING_AGENT_SESSION_READ_WINDOW_MS,
+    };
   }
-  return folded;
+
+  private static clampSessionEventsLimit(limit: number): number {
+    if (!Number.isFinite(limit)) return MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE;
+    return Math.min(Math.max(Math.trunc(limit), 1), MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE);
+  }
+
+  private static foldTokenAndCostTotals(totals: SessionMetricTotal[]) {
+    const folded = {
+      costUsd: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      cacheCreationTokens: 0,
+    };
+    for (const total of totals) {
+      const metric = normalizeMetricName(total.metricName);
+      if (metric === "cost_usage") {
+        folded.costUsd += total.total;
+        continue;
+      }
+      if (metric !== "token_usage") continue;
+      switch (normalizeTokenType(total.bucket)) {
+        case "input":
+          folded.inputTokens += total.total;
+          break;
+        case "output":
+          folded.outputTokens += total.total;
+          break;
+        case "cache_read":
+          folded.cacheReadTokens += total.total;
+          break;
+        case "cache_creation":
+          folded.cacheCreationTokens += total.total;
+          break;
+      }
+    }
+    return folded;
+  }
 }

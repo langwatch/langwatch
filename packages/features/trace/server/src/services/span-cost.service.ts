@@ -9,12 +9,6 @@ const numericValueSchema = z.union([
   z.string().trim().min(1).transform(Number).pipe(z.number().finite()),
 ]);
 
-function coerceToNumber(value: unknown): number | null {
-  const parsed = numericValueSchema.safeParse(value);
-
-  return parsed.success ? parsed.data : null;
-}
-
 export const FIRST_TOKEN_EVENTS = new Set([
   "gen_ai.content.chunk",
   "llm.content.completion.chunk",
@@ -31,46 +25,6 @@ export const LAST_TOKEN_EVENTS = new Set([
   "llm.last_token",
   "ai.stream.finish",
 ]);
-
-/**
- * Marker stamped by the receiver (resource-level) on traces whose LLM usage
- * is covered by a flat subscription rather than billed per token, or set
- * directly on a span by an extractor or instrumentation that knows a single
- * call is bundled (the codex account provider's spans, for example). A
- * span-level value overrides the resource-level default, so a trace can mix
- * billed and bundled spans.
- */
-function markerIsTrue(value: unknown): boolean {
-  return value === true || value === "true";
-}
-
-/**
- * LangWatch SDKs export span timing via the `langwatch.timestamps`
- * attribute — { started_at, first_token_at, finished_at } in unix epoch
- * milliseconds — rather than stream events or semconv attributes. The
- * receiver parses JSON-string attribute values into objects, but a raw
- * string can still reach us (e.g. oversized blobs skip parsing), so
- * accept both shapes.
- */
-function firstTokenAtFromLangWatchTimestamps(value: unknown): number | null {
-  let parsed: unknown = value;
-  if (typeof value === "string") {
-    try {
-      parsed = JSON.parse(value);
-    } catch {
-      return null;
-    }
-  }
-
-  const object = z.object({ first_token_at: z.unknown() }).safeParse(parsed);
-  if (!object.success) {
-    return null;
-  }
-
-  const firstTokenAt = coerceToNumber(object.data.first_token_at);
-
-  return firstTokenAt !== null && firstTokenAt > 0 ? firstTokenAt : null;
-}
 
 /**
  * Computes per-span cost, token metrics, and token timing, then
@@ -99,8 +53,8 @@ export class SpanCostService {
     const attrs = span.spanAttributes;
     const inputTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS];
     const outputTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS];
-    const promptTokens = Math.max(0, coerceToNumber(inputTokens) ?? 0);
-    const completionTokens = Math.max(0, coerceToNumber(outputTokens) ?? 0);
+    const promptTokens = Math.max(0, SpanCostService.coerceToNumber(inputTokens) ?? 0);
+    const completionTokens = Math.max(0, SpanCostService.coerceToNumber(outputTokens) ?? 0);
 
     // If both gen_ai semconv token counts are present, treat the values as
     // authoritative — we surface them as exact numbers so the UI shouldn't
@@ -108,7 +62,8 @@ export class SpanCostService {
     // `langwatch.tokens.estimated` flag when one or both counts were missing
     // from the semconv attrs (and so were derived elsewhere).
     const hasFullSemconv =
-      coerceToNumber(inputTokens) !== null && coerceToNumber(outputTokens) !== null;
+      SpanCostService.coerceToNumber(inputTokens) !== null &&
+      SpanCostService.coerceToNumber(outputTokens) !== null;
 
     return {
       promptTokens,
@@ -141,7 +96,7 @@ export class SpanCostService {
     const attrs = span.spanAttributes;
     const firstPositive = (...keys: string[]): number => {
       for (const key of keys) {
-        const n = coerceToNumber(attrs[key]);
+        const n = SpanCostService.coerceToNumber(attrs[key]);
         if (n !== null && n > 0) {
           return n;
         }
@@ -168,10 +123,10 @@ export class SpanCostService {
   isSpanCostNonBillable(span: NormalizedSpan): boolean {
     const spanLevel = span.spanAttributes[NON_BILLABLE_ATTR];
     if (spanLevel !== undefined) {
-      return markerIsTrue(spanLevel);
+      return SpanCostService.markerIsTrue(spanLevel);
     }
 
-    return markerIsTrue(span.resourceAttributes[NON_BILLABLE_ATTR]);
+    return SpanCostService.markerIsTrue(span.resourceAttributes[NON_BILLABLE_ATTR]);
   }
 
   deriveStorageCost(span: NormalizedSpan): {
@@ -198,7 +153,9 @@ export class SpanCostService {
    * accumulation skips it, so the trace total counts the usage once.
    */
   isTokenAccumulationSkipped(span: NormalizedSpan): boolean {
-    return markerIsTrue(span.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION]);
+    return SpanCostService.markerIsTrue(
+      span.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION],
+    );
   }
 
   extractTokenTiming(span: NormalizedSpan): {
@@ -230,7 +187,7 @@ export class SpanCostService {
     }
 
     if (timeToFirstToken === null) {
-      const attrTtft = coerceToNumber(
+      const attrTtft = SpanCostService.coerceToNumber(
         span.spanAttributes[ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN],
       );
       if (attrTtft !== null && attrTtft >= 0) {
@@ -241,7 +198,7 @@ export class SpanCostService {
     if (timeToFirstToken === null) {
       // Vercel AI SDK reports TTFT as a duration attribute and emits no
       // stream event, so it needs its own fallback.
-      const msToFirstChunk = coerceToNumber(
+      const msToFirstChunk = SpanCostService.coerceToNumber(
         span.spanAttributes[ATTR_KEYS.AI_RESPONSE_MS_TO_FIRST_CHUNK],
       );
       if (msToFirstChunk !== null && msToFirstChunk >= 0) {
@@ -250,7 +207,7 @@ export class SpanCostService {
     }
 
     if (timeToFirstToken === null) {
-      const firstTokenAt = firstTokenAtFromLangWatchTimestamps(
+      const firstTokenAt = SpanCostService.firstTokenAtFromLangWatchTimestamps(
         span.spanAttributes[ATTR_KEYS.LANGWATCH_TIMESTAMPS],
       );
       if (firstTokenAt !== null) {
@@ -328,5 +285,51 @@ export class SpanCostService {
       timeToLastTokenMs,
       tokensPerSecond,
     };
+  }
+
+  private static coerceToNumber(value: unknown): number | null {
+    const parsed = numericValueSchema.safeParse(value);
+
+    return parsed.success ? parsed.data : null;
+  }
+
+  /**
+   * Marker stamped by the receiver (resource-level) on traces whose LLM usage
+   * is covered by a flat subscription rather than billed per token, or set
+   * directly on a span by an extractor or instrumentation that knows a single
+   * call is bundled (the codex account provider's spans, for example). A
+   * span-level value overrides the resource-level default, so a trace can mix
+   * billed and bundled spans.
+   */
+  private static markerIsTrue(value: unknown): boolean {
+    return value === true || value === "true";
+  }
+
+  /**
+   * LangWatch SDKs export span timing via the `langwatch.timestamps`
+   * attribute — { started_at, first_token_at, finished_at } in unix epoch
+   * milliseconds — rather than stream events or semconv attributes. The
+   * receiver parses JSON-string attribute values into objects, but a raw
+   * string can still reach us (e.g. oversized blobs skip parsing), so
+   * accept both shapes.
+   */
+  private static firstTokenAtFromLangWatchTimestamps(value: unknown): number | null {
+    let parsed: unknown = value;
+    if (typeof value === "string") {
+      try {
+        parsed = JSON.parse(value);
+      } catch {
+        return null;
+      }
+    }
+
+    const object = z.object({ first_token_at: z.unknown() }).safeParse(parsed);
+    if (!object.success) {
+      return null;
+    }
+
+    const firstTokenAt = SpanCostService.coerceToNumber(object.data.first_token_at);
+
+    return firstTokenAt !== null && firstTokenAt > 0 ? firstTokenAt : null;
   }
 }

@@ -55,7 +55,7 @@ export class ModelProviderExecutionService {
   private async resolveProvider(
     input: ModelProviderExecutionPrepareInput,
   ): Promise<ModelProvider | ModelProviderExecution> {
-    const reference = parseModelReference(input.model);
+    const reference = ModelProviderExecutionService.parseModelReference(input.model);
     if (!reference) {
       throw new ModelProviderInvalidError(
         "Model references must include both a provider and model name.",
@@ -100,11 +100,8 @@ export class ModelProviderExecutionService {
     }
   }
 
-  private baseParameters(
-    model: string,
-    provider: string,
-  ): ModelProviderExecutionParameters {
-    const modelName = modelNameForProvider(model, provider);
+  private baseParameters(model: string, provider: string): ModelProviderExecutionParameters {
+    const modelName = ModelProviderExecutionService.modelNameForProvider(model, provider);
     return {
       model: translateModelIdForLitellm(modelName).replace("custom/", "openai/"),
     };
@@ -140,12 +137,9 @@ export class ModelProviderExecutionService {
       return;
     }
 
-    parameters.vertex_credentials =
-      this.executionValue(provider, "VERTEXAI_API_KEY") ?? "invalid";
-    parameters.vertex_project =
-      this.executionValue(provider, "VERTEXAI_PROJECT") ?? "invalid";
-    parameters.vertex_location =
-      this.executionValue(provider, "VERTEXAI_LOCATION") ?? "invalid";
+    parameters.vertex_credentials = this.executionValue(provider, "VERTEXAI_API_KEY") ?? "invalid";
+    parameters.vertex_project = this.executionValue(provider, "VERTEXAI_PROJECT") ?? "invalid";
+    parameters.vertex_location = this.executionValue(provider, "VERTEXAI_LOCATION") ?? "invalid";
   }
 
   private addGeminiParameters(
@@ -186,12 +180,10 @@ export class ModelProviderExecutionService {
     }
 
     delete parameters.api_key;
-    parameters.aws_access_key_id =
-      this.executionValue(provider, "AWS_ACCESS_KEY_ID") ?? "invalid";
+    parameters.aws_access_key_id = this.executionValue(provider, "AWS_ACCESS_KEY_ID") ?? "invalid";
     parameters.aws_secret_access_key =
       this.executionValue(provider, "AWS_SECRET_ACCESS_KEY") ?? "invalid";
-    parameters.aws_region_name =
-      this.executionValue(provider, "AWS_REGION_NAME") ?? "invalid";
+    parameters.aws_region_name = this.executionValue(provider, "AWS_REGION_NAME") ?? "invalid";
   }
 
   private addAzureParameters(
@@ -207,19 +199,20 @@ export class ModelProviderExecutionService {
       parameters.api_base = gatewayBaseUrl;
       parameters.use_azure_gateway = "true";
       parameters.api_version =
-        this.executionValue(provider, "AZURE_API_GATEWAY_VERSION") ??
-        "2024-05-01-preview";
+        this.executionValue(provider, "AZURE_API_GATEWAY_VERSION") ?? "2024-05-01-preview";
     } else {
       parameters.api_version =
-        this.executionValue(provider, "AZURE_OPENAI_API_VERSION") ??
-        DEFAULT_AZURE_API_VERSION;
+        this.executionValue(provider, "AZURE_OPENAI_API_VERSION") ?? DEFAULT_AZURE_API_VERSION;
     }
 
     const model = parameters.model;
     if (!model) {
       throw new ModelProviderInvalidError("Execution parameters are missing a model.");
     }
-    const deployment = deploymentForModel(provider.deploymentMapping, model);
+    const deployment = ModelProviderExecutionService.deploymentForModel(
+      provider.deploymentMapping,
+      model,
+    );
     if (deployment) {
       parameters.deployment = deployment;
     }
@@ -261,44 +254,41 @@ export class ModelProviderExecutionService {
       provider.customEmbeddingsModels.some((candidate) => candidate.id === model)
     );
   }
-}
 
-function parseModelReference(
-  value: string,
-):
-  | { kind: "provider"; provider: string; model: string }
-  | { kind: "row"; id: string }
-  | null {
-  const separator = value.indexOf("/");
-  if (separator <= 0 || separator === value.length - 1) {
-    return null;
+  private static parseModelReference(
+    value: string,
+  ): { kind: "provider"; provider: string; model: string } | { kind: "row"; id: string } | null {
+    const separator = value.indexOf("/");
+    if (separator <= 0 || separator === value.length - 1) {
+      return null;
+    }
+
+    const prefix = value.slice(0, separator);
+    const model = value.slice(separator + 1);
+    if (prefix.startsWith("mp_")) {
+      return { kind: "row", id: prefix };
+    }
+    return { kind: "provider", provider: prefix, model };
   }
 
-  const prefix = value.slice(0, separator);
-  const model = value.slice(separator + 1);
-  if (prefix.startsWith("mp_")) {
-    return { kind: "row", id: prefix };
-  }
-  return { kind: "provider", provider: prefix, model };
-}
-
-function modelNameForProvider(model: string, provider: string): string {
-  const reference = parseModelReference(model);
-  if (!reference || reference.kind === "row") {
-    const modelName = model.slice(model.indexOf("/") + 1);
-    return `${provider}/${modelName}`;
-  }
-  return `${provider}/${reference.model}`;
-}
-
-function deploymentForModel(
-  deploymentMapping: Record<string, string> | null | undefined,
-  model: string,
-): string | null {
-  if (!deploymentMapping) {
-    return null;
+  private static modelNameForProvider(model: string, provider: string): string {
+    const reference = ModelProviderExecutionService.parseModelReference(model);
+    if (!reference || reference.kind === "row") {
+      const modelName = model.slice(model.indexOf("/") + 1);
+      return `${provider}/${modelName}`;
+    }
+    return `${provider}/${reference.model}`;
   }
 
-  const modelName = model.split("/").slice(1).join("/");
-  return deploymentMapping[modelName] ?? deploymentMapping[model] ?? null;
+  private static deploymentForModel(
+    deploymentMapping: Record<string, string> | null | undefined,
+    model: string,
+  ): string | null {
+    if (!deploymentMapping) {
+      return null;
+    }
+
+    const modelName = model.split("/").slice(1).join("/");
+    return deploymentMapping[modelName] ?? deploymentMapping[model] ?? null;
+  }
 }

@@ -72,10 +72,7 @@ export class SpendSpikeAnomalyEvaluatorService {
     return { rulesEvaluated: rules.length, alertsFired, skipped };
   }
 
-  private async evaluateRule(
-    rule: AnomalyRule,
-    now: Date,
-  ): Promise<SpendSpikeEvaluationResult> {
+  private async evaluateRule(rule: AnomalyRule, now: Date): Promise<SpendSpikeEvaluationResult> {
     const parsed = safeParseSpendSpikeThresholdConfig(rule.thresholdConfig);
     if (!parsed.ok) {
       this.diagnostics.warn("Spend spike rule has invalid threshold configuration", {
@@ -86,7 +83,7 @@ export class SpendSpikeAnomalyEvaluatorService {
           message: issue.message,
         })),
       });
-      return noDataResult(
+      return SpendSpikeAnomalyEvaluatorService.noDataResult(
         rule,
         now,
         "skip_invalid_config",
@@ -98,11 +95,9 @@ export class SpendSpikeAnomalyEvaluatorService {
     const windowEnd = now;
     const windowStart = new Date(now.getTime() - windowMs);
     const baselineStart = new Date(windowStart.getTime() - BASELINE_WINDOWS * windowMs);
-    const tenantId = await this.repository.tryResolveGovernanceTenantId(
-      rule.organizationId,
-    );
+    const tenantId = await this.repository.tryResolveGovernanceTenantId(rule.organizationId);
     if (!tenantId) {
-      return noDataResult(
+      return SpendSpikeAnomalyEvaluatorService.noDataResult(
         rule,
         now,
         "skip_no_data",
@@ -111,7 +106,7 @@ export class SpendSpikeAnomalyEvaluatorService {
       );
     }
     if (!this.spend) {
-      return noDataResult(
+      return SpendSpikeAnomalyEvaluatorService.noDataResult(
         rule,
         now,
         "skip_no_data",
@@ -125,7 +120,7 @@ export class SpendSpikeAnomalyEvaluatorService {
       windowStart,
       windowEnd,
       baselineStart,
-      sourceFilter: sourceFilterFor(rule),
+      sourceFilter: SpendSpikeAnomalyEvaluatorService.sourceFilterFor(rule),
     });
     const hasOpenAlertInWindow = await this.repository.hasOpenAlert({
       ruleId: rule.id,
@@ -177,43 +172,43 @@ export class SpendSpikeAnomalyEvaluatorService {
     await this.repository.recordDispatch({
       alertId: alert.id,
       detail: {
-        ...asRecord(alert.detail),
+        ...SpendSpikeAnomalyEvaluatorService.asRecord(alert.detail),
         dispatch: dispatchTag,
         dispatchOutcomes,
       },
     });
   }
-}
 
-function sourceFilterFor(rule: AnomalyRule): AnomalySpendSourceFilter {
-  if (rule.scope === "source") return { type: "source", id: rule.scopeId };
-  if (rule.scope === "source_type") {
-    return { type: "source_type", id: rule.scopeId };
+  private static sourceFilterFor(rule: AnomalyRule): AnomalySpendSourceFilter {
+    if (rule.scope === "source") return { type: "source", id: rule.scopeId };
+    if (rule.scope === "source_type") {
+      return { type: "source_type", id: rule.scopeId };
+    }
+    return { type: "all" };
   }
-  return { type: "all" };
-}
 
-function noDataResult(
-  rule: AnomalyRule,
-  windowEnd: Date,
-  decision: "skip_no_data" | "skip_invalid_config",
-  reason: string,
-  windowStart: Date = windowEnd,
-): SpendSpikeEvaluationResult {
-  return {
-    ruleId: rule.id,
-    organizationId: rule.organizationId,
-    decision,
-    reason,
-    currentSpendUsd: 0,
-    baselineSpendUsd: 0,
-    windowStart,
-    windowEnd,
-  };
-}
+  private static noDataResult(
+    rule: AnomalyRule,
+    windowEnd: Date,
+    decision: "skip_no_data" | "skip_invalid_config",
+    reason: string,
+    windowStart: Date = windowEnd,
+  ): SpendSpikeEvaluationResult {
+    return {
+      ruleId: rule.id,
+      organizationId: rule.organizationId,
+      decision,
+      reason,
+      currentSpendUsd: 0,
+      baselineSpendUsd: 0,
+      windowStart,
+      windowEnd,
+    };
+  }
 
-function asRecord(value: unknown): Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
+  private static asRecord(value: unknown): Record<string, unknown> {
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  }
 }
