@@ -57,6 +57,47 @@ function hasOrganizationLogin(): boolean {
   }
 }
 
+/** Runs the CLI on the organization login, away from any project key. */
+function runOnOrganizationLogin(args: string[]): string {
+  const cliPath = path.resolve(
+    __dirname,
+    "../../sdks/typescript/dist/cli/index.js",
+  );
+  const env = { ...process.env };
+  delete env.LANGWATCH_API_KEY;
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-org-cli-"));
+  try {
+    const run = spawnSync(process.execPath, [cliPath, ...args], {
+      cwd: workDir,
+      env,
+      encoding: "utf-8",
+      timeout: 30_000,
+    });
+    return run.stdout ?? "";
+  } finally {
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Archives the project the scenario asked the agent to create.
+ *
+ * Every run of this scenario adds a real project to the organization, so
+ * without this the dogfood suite fills the account with them.
+ */
+function archiveProjectsNamed(name: string): void {
+  let projects: Array<{ id: string; name: string }> = [];
+  try {
+    const listed = JSON.parse(runOnOrganizationLogin(["projects", "list"]));
+    projects = Array.isArray(listed) ? listed : (listed.data ?? []);
+  } catch {
+    return;
+  }
+  for (const project of projects.filter((row) => row.name === name)) {
+    runOnOrganizationLogin(["projects", "delete", project.id]);
+  }
+}
+
 describe("LangWatch CLI Projects & API Keys — Agent Usability", () => {
   it.skipIf(isCI || !hasOrganizationLogin())(
     "agent uses CLI to list and create projects",
@@ -64,6 +105,7 @@ describe("LangWatch CLI Projects & API Keys — Agent Usability", () => {
       const tempFolder = fs.mkdtempSync(
         path.join(os.tmpdir(), "langwatch-cli-projects-"),
       );
+      const projectName = `CLI Test Project ${Date.now()}`;
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
@@ -92,10 +134,11 @@ ${process.env.LANGWATCH_ENDPOINT ? `export $(grep LANGWATCH_ENDPOINT .env)` : ""
 
 Then run CLI commands directly:
 - \`langwatch projects list\`
-- \`langwatch projects create --name "Test" --language python --framework langchain --new-team-name "Team"\`
+- \`langwatch projects create --name "${projectName}" --language python --framework langchain --new-team-name "CLI Team"\`
 `,
       );
 
+      try {
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
         name: "CLI projects lifecycle",
@@ -118,7 +161,7 @@ Then run CLI commands directly:
         ],
         script: [
           scenario.user(
-            'Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export PATH="./bin:$PATH"`\n2. `langwatch projects list`\n3. `langwatch projects create --name "CLI Test Project" --language python --framework langchain --new-team-name "CLI Team"`\n\nDo NOT use MCP tools. Use ONLY the Bash tool. Do NOT set LANGWATCH_API_KEY.',
+            `Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. \`export PATH="./bin:$PATH"\`\n2. \`langwatch projects list\`\n3. \`langwatch projects create --name "${projectName}" --language python --framework langchain --new-team-name "CLI Team"\`\n\nDo NOT use MCP tools. Use ONLY the Bash tool. Do NOT set LANGWATCH_API_KEY.`,
           ),
           scenario.agent(),
           (state) => {
@@ -139,6 +182,9 @@ Then run CLI commands directly:
       });
 
       expect(result.success).toBe(true);
+      } finally {
+        archiveProjectsNamed(projectName);
+      }
     },
     900_000,
   );
