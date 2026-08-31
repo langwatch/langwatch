@@ -1,8 +1,19 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaOrganizationPricingRepository } from "../repositories/prisma/prisma.organization-pricing.repository";
-import { PrismaSubscriptionRepository } from "../repositories/prisma/prisma.subscription.repository";
-import { PrismaBillingOrganizationRepository } from "../repositories/prisma/prisma.organization.repository";
-import { PrismaBillingCheckpointRepository } from "../repositories/prisma/prisma.billing-checkpoint.repository";
+import {
+  PrismaOrganizationPricingRepository,
+  type BillingOrganizationPricingDatabase,
+} from "../repositories/prisma/prisma.organization-pricing.repository";
+import {
+  PrismaSubscriptionRepository,
+  type BillingSubscriptionDatabase,
+} from "../repositories/prisma/prisma.subscription.repository";
+import {
+  PrismaBillingOrganizationRepository,
+  type BillingOrganizationDatabase,
+} from "../repositories/prisma/prisma.organization.repository";
+import {
+  PrismaBillingCheckpointRepository,
+  type BillingCheckpointDatabase,
+} from "../repositories/prisma/prisma.billing-checkpoint.repository";
 import type { OrganizationPricingRepository } from "../ports/organization-pricing.port";
 import type { BillingSubscriptionRepository } from "../ports/subscription.port";
 import type { BillingOrganizationPort } from "../ports/organization.port";
@@ -26,9 +37,19 @@ export type PostgresBillingPersistence = {
  * so the process does it.
  */
 export class PostgresBillingAdapter {
-  private constructor(private readonly database: PrismaClient) {}
+  private constructor(
+    private readonly database: BillingOrganizationPricingDatabase &
+      BillingSubscriptionDatabase &
+      BillingOrganizationDatabase &
+      BillingCheckpointDatabase,
+  ) {}
 
-  static create(database: PrismaClient): PostgresBillingAdapter {
+  static create(
+    database: BillingOrganizationPricingDatabase &
+      BillingSubscriptionDatabase &
+      BillingOrganizationDatabase &
+      BillingCheckpointDatabase,
+  ): PostgresBillingAdapter {
     return new PostgresBillingAdapter(database);
   }
 

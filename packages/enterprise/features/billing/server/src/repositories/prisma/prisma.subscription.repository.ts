@@ -15,8 +15,17 @@ import {
  * Prisma-backed implementation of SubscriptionRepository.
  * Handles only subscription-table CRUD -- no organization or team queries.
  */
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type BillingSubscriptionDatabase = Pick<
+  PrismaClient,
+  "organization" | "subscription" | "$transaction"
+>;
+
 export class PrismaSubscriptionRepository extends BillingSubscriptionRepository {
-  private constructor(private readonly prisma: PrismaClient) {
+  private constructor(private readonly prisma: BillingSubscriptionDatabase) {
     super();
   }
 
@@ -31,9 +40,7 @@ export class PrismaSubscriptionRepository extends BillingSubscriptionRepository 
     });
   }
 
-  async tryFindLastNonCancelled(
-    organizationId: string,
-  ): Promise<BillingSubscriptionRecord | null> {
+  async tryFindLastNonCancelled(organizationId: string): Promise<BillingSubscriptionRecord | null> {
     return await this.prisma.subscription.findFirst({
       where: {
         organizationId,
@@ -58,20 +65,14 @@ export class PrismaSubscriptionRepository extends BillingSubscriptionRepository 
     });
   }
 
-  async updateStatus(input: {
-    id: string;
-    status: string;
-  }): Promise<BillingSubscriptionRecord> {
+  async updateStatus(input: { id: string; status: string }): Promise<BillingSubscriptionRecord> {
     return await this.prisma.subscription.update({
       where: { id: input.id },
       data: { status: input.status as PrismaSubscriptionStatus },
     });
   }
 
-  async updatePlan(input: {
-    id: string;
-    plan: string;
-  }): Promise<BillingSubscriptionRecord> {
+  async updatePlan(input: { id: string; plan: string }): Promise<BillingSubscriptionRecord> {
     return await this.prisma.subscription.update({
       where: { id: input.id },
       data: { plan: input.plan as PrismaPlanTypes },
@@ -80,9 +81,7 @@ export class PrismaSubscriptionRepository extends BillingSubscriptionRepository 
 
   // --- Webhook handler methods ---
 
-  async tryFindByStripeId(
-    stripeSubscriptionId: string,
-  ): Promise<BillingSubscriptionRecord | null> {
+  async tryFindByStripeId(stripeSubscriptionId: string): Promise<BillingSubscriptionRecord | null> {
     return await this.prisma.subscription.findUnique({
       where: { stripeSubscriptionId },
     });
@@ -120,10 +119,7 @@ export class PrismaSubscriptionRepository extends BillingSubscriptionRepository 
     });
   }
 
-  async recordPaymentFailure(input: {
-    id: string;
-    currentStatus: string;
-  }): Promise<void> {
+  async recordPaymentFailure(input: { id: string; currentStatus: string }): Promise<void> {
     await this.prisma.subscription.update({
       where: { id: input.id },
       data: {

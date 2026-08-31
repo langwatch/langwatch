@@ -2,12 +2,18 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { BillingCheckpointPort, type BillingCheckpoint } from "../../ports/billing-checkpoint.port";
 
 /** Prisma implementation of the two-phase billing meter checkpoint. */
+/**
+ * Only what this repository touches, so composition names the slice it needs
+ * rather than the whole generated client.
+ */
+export type BillingCheckpointDatabase = Pick<PrismaClient, "billingMeterCheckpoint">;
+
 export class PrismaBillingCheckpointRepository extends BillingCheckpointPort {
-  private constructor(private readonly prisma: PrismaClient) {
+  private constructor(private readonly prisma: BillingCheckpointDatabase) {
     super();
   }
 
-  static create(prisma: PrismaClient): PrismaBillingCheckpointRepository {
+  static create(prisma: BillingCheckpointDatabase): PrismaBillingCheckpointRepository {
     return new PrismaBillingCheckpointRepository(prisma);
   }
 
