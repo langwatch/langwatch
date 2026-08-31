@@ -230,6 +230,72 @@ Feature: Internal feature flag system for system-level kill switches
           which badge it carries, and moving one out of PRODUCT also drops the
           fleet-reach warning, even though scope no longer decides resolution
 
+  Rule: A rollout can name the age of an organization instead of its id
+
+    # An operator rolling a feature out to "new users only" cannot write the
+    # ids of organizations that do not exist yet, and re-editing the rule list
+    # on every signup is not a rollout strategy. A New users rule names one
+    # date instead, and every organization created on or after it matches,
+    # while every organization that predates it keeps exactly the value it
+    # had.
+
+    @unit
+    Scenario: a new-users rule enables the flag for an organization created after its date
+      Given a flag that is off by default
+      And a rule naming the date the rollout starts, with enabled true
+      When the flag is read for an organization created after that date
+      Then the flag resolves enabled from the rule
+
+    @unit
+    Scenario: an organization that predates the rollout date sees no change
+      Given the same flag and rule
+      When the flag is read for an organization created before that date
+      Then the rule does not match
+      And the read falls through to the row-level default, so an existing
+          customer keeps the value it already had
+
+    @unit
+    Scenario: an organization created on the rollout date itself is included
+      Given a rule naming a date
+      When the flag is read for an organization created at the very start of
+           that date
+      Then the rule matches, because the boundary is inclusive and an operator
+           reads the date as "from this day on"
+
+    @unit
+    Scenario: a read with no organization creation date matches no age rule
+      Given a flag whose only rule names a date
+      When the flag is read from a surface that opts the organization scope out
+      Then the rule does not match, because an age rule fails closed rather
+           than reaching every caller whose age is unknown
+
+    @unit
+    Scenario: a stored rule whose date cannot be read never matches
+      Given a stored rule whose date is not a date at all
+      When the flag is read for any organization
+      Then the rule does not match, and the read falls through to the
+           row-level default
+
+    @unit
+    Scenario: the creation date is fetched only for a flag that has an age rule
+      Given a flag whose rules name only organizations and projects
+      When the flag is read
+      Then no organization record is read, because no rule asks for a date
+
+    @unit
+    Scenario: the creation date is fetched once and reused across reads
+      Given a flag carrying an age rule
+      When the flag is read repeatedly for the same organization
+      Then the organization's creation date is read once and served from cache
+           afterwards, because a creation date never changes
+
+    @unit
+    Scenario: an operator cannot save an age rule without a readable date
+      Given an operator writes a New users rule from the Ops UI
+      When the date is blank or is not a date
+      Then the write is rejected, because a rule that can never match is a
+           rule the operator believes is live
+
   Rule: Operators manage flags from the Ops Feature Flags page
 
     Scenario: Ops Feature Flags page lists every registered flag with its current resolved value
@@ -290,6 +356,54 @@ Feature: Internal feature flag system for system-level kill switches
       And that explanation is rendered into the page rather than living only in
           hover-only tooltip content, so an operator who never hovers — or who
           reads the page with a screen reader — is warned too
+
+    @integration
+    Scenario: The page leads with the flags operators actually roll out
+      Given an operator opens /ops/feature-flags
+      Then the Product section comes before the System section, because a
+           product rollout is the daily reason to open this page and a kill
+           switch is the exception
+
+  Rule: The targeting rules dialog keeps the catch-all rule last
+
+    # Rules are first-match-wins, so a rule placed below one that matches
+    # everyone can never fire. Appending to the end of a list that ends in
+    # "Everyone" therefore produces a rule that looks live and is dead.
+
+    @unit
+    Scenario: a new rule lands above a trailing everyone rule
+      Given the rules for a flag end with a rule that applies to everyone
+      When the operator adds a rule
+      Then the new rule is placed directly above the everyone rule
+
+    @unit
+    Scenario: a new rule is appended when the list does not end in everyone
+      Given the rules for a flag end with an organization rule
+      When the operator adds a rule
+      Then the new rule is placed at the end of the list
+
+    @integration
+    Scenario: an operator reorders rules by dragging them
+      Given a flag with more than one targeting rule
+      Then every rule carries a drag handle
+      And moving a rule changes the order the rules are saved in, which is the
+          order they are evaluated in
+
+  Rule: The rules dialog offers New users as a scope of its own
+
+    @integration
+    Scenario: picking New users asks for a date instead of an id
+      Given an operator opens the targeting rules for a flag
+      When the operator picks the New users scope for a rule
+      Then the field beside it asks for the organization creation date rather
+           than an organization id
+      And the field takes a date
+
+    @integration
+    Scenario: a saved New users rule reopens as a New users rule
+      Given a flag whose stored rule names an organization creation date
+      When the operator opens the targeting rules
+      Then the rule shows the New users scope with that date filled in
 
   Rule: Self-hosted parity
 
