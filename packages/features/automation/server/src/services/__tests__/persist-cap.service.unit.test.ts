@@ -127,6 +127,40 @@ describe("given a project on a plan", () => {
     });
   });
 
+  describe("when the same project is resolved twice", () => {
+    it("answers the second time without asking the plan provider again", async () => {
+      plan({ type: "ENTERPRISE" });
+      await persistCaps.resolvePersistDailyCap(PROJECT_ID);
+      await persistCaps.resolvePersistDailyCap(PROJECT_ID);
+
+      expect(planMock.getActivePlan).toHaveBeenCalledTimes(1);
+    });
+
+    it("asks again once the cached ceiling has aged out", async () => {
+      // Ten minutes, and the reason it is not longer: a customer who upgrades
+      // waits that long for their new allowance, and one who downgrades keeps
+      // the old one for that long. A cache that never expired would hold
+      // either answer until the process restarted.
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date("2026-08-09T12:00:00.000Z"));
+        plan({ type: "FREE", free: true });
+        expect(await persistCaps.resolvePersistDailyCap(PROJECT_ID)).toBe(
+          persistCapDependencies.config.free,
+        );
+
+        vi.setSystemTime(new Date("2026-08-09T12:10:01.000Z"));
+        plan({ type: "ENTERPRISE" });
+
+        expect(await persistCaps.resolvePersistDailyCap(PROJECT_ID)).toBe(
+          persistCapDependencies.config.enterprise,
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe("when the plan cannot be resolved", () => {
     it("falls back to the paid ceiling rather than throttling to nothing", async () => {
       // The fallback is open against the free tier, which is the common case.
