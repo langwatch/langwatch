@@ -32,10 +32,13 @@ provider slots. Before ANY family moves:
    subpath exports on its web package; all four destination packages are
    ADR-004-non-compliant today (root-export-only, flat or `src/components`).
 
-Items 1–3 dispatched 2026-09-01 as the "apps/ui host capability layer"
-slice. Design-system promotions dispatched the same day: ConfirmDialog,
-PageLayout, FieldInfoTooltip, SmallLabel, HoverableBigText, ListTable,
-Pagination, IconGlyph, MeterBar, rotatingColors, GitHub + provider icons.
+Status 2026-09-01: items 1–3 landed as `b3ae7e8489` (loader merge
+own-wins, behavior/ transport with verified module identity, capability
+ports; session/activeScope harvest in flight as its own slice).
+Design-system promotions landed as `4ffabc1735` (nine groups;
+HoverableBigText refused — needs a render-prop seam). Destination
+relayouts landed: ops-web `0958e06039`, gateway-web + governance-web
+`0559f563df`, automation-web `648ed49987`.
 
 ## Family facts (keys = legacy-page-loaders.ts entries to DELETE)
 
@@ -97,9 +100,16 @@ Pagination, IconGlyph, MeterBar, rotatingColors, GitHub + provider icons.
   closure (both banned — contract types first); `AutomationDrawer`/`ViewAutomationDrawer`
   are registered in platform's drawerRegistry (copies, not deletions);
   13 openDrawer call sites; `QueryFilterInput` reaches traces-v2 SearchBar.
-- Destination `@langwatch/automation-web` is the best-prepared (~78 files)
-  but ALREADY NEAR-DUPLICATES files being moved (`logic/draft-reducer`,
-  `providers/registry`) — reconcile, never re-add.
+- Destination `@langwatch/automation-web` relaid out in `648ed49987`; the
+  near-duplicate premise was FALSE — platform's `features/automations/`
+  subtree holds no stale copies; every same-named platform file is a shim
+  or app adapter importing the package (draftReducer binds the package's
+  draft model to app provider clients; the slack registry is a documented
+  re-export). The family move is therefore adapters+page, cheaper than
+  surveyed. Four package modules have their only tests in platform
+  (report-schedule, daily-cap-advice, firing-rate,
+  liquid-json-substitution) — those tests move into the package with the
+  family.
 - The loader-parity unit test pins all five keys to one module via a
   `sharing` table — those rows delete with the keys.
 
