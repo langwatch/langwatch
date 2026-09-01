@@ -438,11 +438,16 @@ func TestRenderAll_LangWatchQLAccessPrerequisites(t *testing.T) {
 		"access_management: 1",
 		"named_collection_control: 1",
 		"show_named_collections: 1",
-		"show_named_collections_secrets: 1",
 	} {
 		if !strings.Contains(accessContent, want) {
 			t.Errorf("zz-access-management.yaml should contain %q", want)
 		}
+	}
+	// show_named_collections_secrets is deliberately withheld (SaaS parity): it
+	// would expose the lwql_postgres plaintext PG password via SHOW CREATE NAMED
+	// COLLECTION.
+	if strings.Contains(accessContent, "show_named_collections_secrets") {
+		t.Error("zz-access-management.yaml must NOT grant show_named_collections_secrets (exposes lwql_postgres plaintext password)")
 	}
 }
 

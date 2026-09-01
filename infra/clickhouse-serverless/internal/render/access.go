@@ -22,6 +22,12 @@ func renderCustomSettingsPrefixes(configD string) error {
 // named collections through SQL — what the app's LangWatchQL self-provisioning
 // runs at boot. Nothing here widens what any *other* user can do.
 //
+// show_named_collections_secrets is deliberately NOT granted, for parity with
+// the SaaS renderer: the lwql_postgres named collection holds a plaintext
+// PostgreSQL password (ClickHouse must dial PG with the real value), and that
+// grant would expose it through SHOW CREATE NAMED COLLECTION. show_named_collections
+// (existence, secrets redacted) is enough for administration.
+//
 // The `zz-` prefix is load-bearing: users.d files merge in lexicographic
 // order and the later file wins, so this must sort after any file declaring
 // `access_management: 0` for the same user.
@@ -29,10 +35,9 @@ func renderAccessManagement(usersD string) error {
 	return writeYAML(filepath.Join(usersD, "zz-access-management.yaml"), map[string]any{
 		"users": map[string]any{
 			"default": map[string]any{
-				"access_management":              1,
-				"named_collection_control":       1,
-				"show_named_collections":         1,
-				"show_named_collections_secrets": 1,
+				"access_management":        1,
+				"named_collection_control": 1,
+				"show_named_collections":   1,
 			},
 		},
 	})
