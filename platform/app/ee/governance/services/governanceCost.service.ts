@@ -15,12 +15,18 @@
  * it charts as a real free day. So every absence in this file is `null` and the
  * DTO says which kind of absence it is.
  *
- * Exactly one `?? 0` survives, in `totalFor`, and it is there to narrow a type
- * rather than to supply a figure: the rows it runs over have already been
+ * Exactly one `?? 0` survives, in `figureFor`, and it is there to narrow a
+ * type rather than to supply a figure: the rows it runs over have already been
  * filtered to those whose `amountNanoUsd !== null`, so the branch cannot be
  * taken and no absent amount can reach it. Any OTHER `?? 0` — one that could
  * actually fire on missing data — is the defect
  * `specs/governance/governance-cost-screen.feature` exists to prevent.
+ *
+ * A partial sum is the same lie in a subtler shape, and `figureFor` is the one
+ * place it is refused: a figure is offered only when EVERY cell behind it
+ * carries a USD amount. Adding up the priced part of a mixed lane produces a
+ * number that reads as the whole and is short by an amount nothing on the
+ * screen discloses.
  *
  * Spec: specs/governance/governance-cost-screen.feature
  */
@@ -49,12 +55,29 @@ export type GovernanceCostUnavailableReason =
 /** One lane's figure. `amountUsd` is null whenever no figure is held. */
 export interface GovernanceCostLaneDto {
   /**
-   * The lane's total, or null when we hold no figure for it. NEVER 0 as a
-   * stand-in for absence — 0 is a real amount and charts as free usage.
+   * The lane's total, or null when we hold no figure we can stand behind.
+   * NEVER 0 as a stand-in for absence — 0 is a real amount and charts as free
+   * usage.
+   *
+   * Null covers two different situations and `cellsWithoutAmount` tells them
+   * apart: zero means the lane reported nothing at all, and anything above
+   * zero means the lane DID report but part of it has no USD figure, so the
+   * total is withheld rather than partial.
    */
   amountUsd: number | null;
-  /** Cells the producer summarized without stating a USD figure. */
+  /**
+   * Cells the producer summarized without stating a USD figure. Above zero,
+   * `amountUsd` is null by construction: totalling the rest would understate
+   * the lane by however much was left out, under a label that reads as the
+   * whole figure.
+   */
   cellsWithoutAmount: number;
+  /**
+   * Which currencies those cells were billed in, sorted, USD excluded. Empty
+   * when nothing names one — the screen then says a total is withheld without
+   * claiming a currency it cannot support.
+   */
+  currenciesWithoutUsdAmount: string[];
 }
 
 /**
@@ -70,12 +93,23 @@ export interface GovernanceSeatLaneDto {
   status: "awaiting_data";
 }
 
-/** One day of the per-lane series. Either lane may hold no figure that day. */
+/**
+ * One day of the per-lane series. Either lane may hold no figure that day.
+ *
+ * The per-lane unpriced counts ride along so a reader can tell a day nothing
+ * was reported for from a day whose figure is withheld. Both plot as a gap —
+ * the counts are what let the chart explain the gap rather than leave it
+ * looking like lost data.
+ */
 export interface GovernanceCostDayDto {
   /** `YYYY-MM-DD`, the provider's business day in UTC. */
   day: string;
   billedUsd: number | null;
   gatewayUsd: number | null;
+  /** Billed-lane cells that day holding no USD figure. */
+  billedCellsWithoutAmount: number;
+  /** Gateway-lane cells that day holding no USD figure. */
+  gatewayCellsWithoutAmount: number;
 }
 
 export interface GovernanceCostSummaryDto {
@@ -97,7 +131,11 @@ export interface GovernanceCostSummaryDto {
 
 /** A lane nobody has a figure for. Null, never zero — see the file header. */
 function laneWithoutFigure(): GovernanceCostLaneDto {
-  return { amountUsd: null, cellsWithoutAmount: 0 };
+  return {
+    amountUsd: null,
+    cellsWithoutAmount: 0,
+    currenciesWithoutUsdAmount: [],
+  };
 }
 
 function unavailable({
@@ -203,30 +241,52 @@ type LaneRow = {
   costSource: string;
   amountNanoUsd: number | null;
   cellsWithoutAmount: number;
+  currenciesWithoutUsdAmount: string[];
 };
+
+/**
+ * The figure for a set of rows, withheld unless every cell behind it is priced
+ * in USD.
+ *
+ * This is the rule the whole read side turns on. Summing the priced cells and
+ * ignoring the rest produces a smaller number that still reads as the complete
+ * one, and the difference is invisible: the screen would understate what an
+ * organization spent by exactly the part it could not state, under a label
+ * claiming to be the total. There is no honest way to render that, so it is
+ * not rendered — a figure we cannot vouch for is no figure.
+ */
+function figureFor(rows: readonly LaneRow[]): number | null {
+  const withoutAmount = rows.reduce(
+    (count, row) => count + row.cellsWithoutAmount,
+    0,
+  );
+  const priced = rows.filter((row) => row.amountNanoUsd !== null);
+  if (withoutAmount > 0 || priced.length === 0) return null;
+  return toUsd(priced.reduce((sum, row) => sum + (row.amountNanoUsd ?? 0), 0));
+}
 
 /**
  * One lane's window total.
  *
- * A lane with no rows at all, and a lane whose every row holds no figure, both
- * come back null. Only rows that actually carry an amount contribute, so the
- * total is never a partial sum dressed up as a complete one without
- * `cellsWithoutAmount` saying so.
+ * A lane with no rows at all, a lane whose every row holds no figure, and a
+ * lane holding a mix all come back null; `cellsWithoutAmount` is what tells
+ * the three apart, and the currencies say what the unpriced part was billed
+ * in.
  */
 function totalFor(
   rows: readonly LaneRow[],
   costSource: string,
 ): GovernanceCostLaneDto {
   const lane = rows.filter((row) => row.costSource === costSource);
-  const priced = lane.filter((row) => row.amountNanoUsd !== null);
   return {
-    amountUsd: priced.length
-      ? toUsd(priced.reduce((sum, row) => sum + (row.amountNanoUsd ?? 0), 0))
-      : null,
+    amountUsd: figureFor(lane),
     cellsWithoutAmount: lane.reduce(
       (count, row) => count + row.cellsWithoutAmount,
       0,
     ),
+    currenciesWithoutUsdAmount: [
+      ...new Set(lane.flatMap((row) => row.currenciesWithoutUsdAmount)),
+    ].sort(),
   };
 }
 
@@ -236,6 +296,11 @@ function totalFor(
  * A day only appears if some lane reported it. A day one lane reported and the
  * other did not carries null for the silent lane — not 0, which would draw a
  * line down to the axis and read as a day of free usage.
+ *
+ * A day whose lane holds a mix of priced and unpriced cells carries null too,
+ * for the same reason the window total does: a point plotted at the priced
+ * part sits lower than the day actually cost, and a reader has no way to see
+ * that it is short. A gap is the one shape that cannot be misread.
  */
 function seriesFrom(rows: readonly LaneRow[]): GovernanceCostDayDto[] {
   const byDay = new Map<string, GovernanceCostDayDto>();
@@ -244,11 +309,15 @@ function seriesFrom(rows: readonly LaneRow[]): GovernanceCostDayDto[] {
       day: row.day,
       billedUsd: null,
       gatewayUsd: null,
+      billedCellsWithoutAmount: 0,
+      gatewayCellsWithoutAmount: 0,
     };
     if (row.costSource === GOVERNANCE_COST_SOURCE.PULLED) {
-      entry.billedUsd = toUsd(row.amountNanoUsd);
+      entry.billedUsd = figureFor([row]);
+      entry.billedCellsWithoutAmount = row.cellsWithoutAmount;
     } else if (row.costSource === GOVERNANCE_COST_SOURCE.GATEWAY) {
-      entry.gatewayUsd = toUsd(row.amountNanoUsd);
+      entry.gatewayUsd = figureFor([row]);
+      entry.gatewayCellsWithoutAmount = row.cellsWithoutAmount;
     }
     byDay.set(row.day, entry);
   }
