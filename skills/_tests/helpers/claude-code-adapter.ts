@@ -286,6 +286,11 @@ export function createClaudeCodeAgent({
 				console.log(chalk.blue("Starting claude in:"), workingDirectory);
 
 				const omittedKeys = new Set(omitEnvKeys);
+				// The batch of the harness is not the batch of the agent. Several
+				// skills tell the agent to write scenario tests and run them, and
+				// those runs would otherwise join the batch this suite reports
+				// under and read as results of the suite itself.
+				omittedKeys.add("SCENARIO_BATCH_RUN_ID");
 				if (cleanEnv) {
 					omittedKeys.add("LANGWATCH_API_KEY");
 					omittedKeys.add("OPENAI_API_KEY");
