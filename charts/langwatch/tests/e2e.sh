@@ -463,9 +463,12 @@ test_lwql() {
 
   # The restricted identity: authenticates, reads zero key-map rows without a
   # tenant capability (row policy default-deny), and has no admin surface.
+  # Design C: for chart-managed ClickHouse the owning pod creates langwatch_lwql
+  # from the ClickHouse credentials Secret (key lwql_password), which is also
+  # where the app/workers read the query password from — one source, no divergence.
   local lwql_pw
-  lwql_pw=$(kc get secret langwatch-app-secrets \
-    -o jsonpath='{.data.LWQL_CLICKHOUSE_PASSWORD}' | base64 -d)
+  lwql_pw=$(kc get secret "${RELEASE}-clickhouse" \
+    -o jsonpath='{.data.lwql_password}' | base64 -d)
   assert_eq "restricted identity authenticates" \
     "$(kc exec "$pod" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" -q 'SELECT 1')" "1"
   assert_eq "key map reads empty without a tenant capability" \
