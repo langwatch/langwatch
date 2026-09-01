@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/notification-contract-build.tsbuildinfo",
     "noEmit": false,
     "rootDir": "src",
     "declaration": true,

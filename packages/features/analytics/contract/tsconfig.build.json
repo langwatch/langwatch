@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/analytics-contract-build.tsbuildinfo",
     "rootDir": "src",
     "noEmit": false,
     "declaration": true,

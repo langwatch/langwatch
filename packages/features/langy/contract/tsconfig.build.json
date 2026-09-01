@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/langy-contract-build.tsbuildinfo",
     "noEmit": false,
     "rootDir": "src",
     "outDir": "dist",

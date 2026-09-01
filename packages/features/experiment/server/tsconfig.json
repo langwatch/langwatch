@@ -1,5 +1,7 @@
 {
   "compilerOptions": {
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/experiment-server.tsbuildinfo",
     "target": "ES2022",
     "module": "Preserve",
     "moduleResolution": "Bundler",

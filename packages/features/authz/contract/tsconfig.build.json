@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/authz-contract-build.tsbuildinfo",
     "declaration": true,
     "emitDeclarationOnly": true,
     "noEmit": false,

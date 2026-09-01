@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/annotation-contract-build.tsbuildinfo",
     "rootDir": "src",
     "noEmit": false,
     "outDir": "dist",

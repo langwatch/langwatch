@@ -17,7 +17,7 @@
     "jsx": "preserve",
     "incremental": true,
     "noUncheckedIndexedAccess": true,
-    "tsBuildInfoFile": "./tsconfig.tsbuildinfo",
+    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/langwatch-sdk.tsbuildinfo",
     "allowSyntheticDefaultImports": true,
     // tsup's dts worker sets `baseUrl` itself, and TypeScript 6 makes that
     // a hard error rather than a warning — this package cannot build

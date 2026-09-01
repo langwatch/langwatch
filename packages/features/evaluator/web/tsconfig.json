@@ -1,5 +1,7 @@
 {
   "compilerOptions": {
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/evaluator-web.tsbuildinfo",
     "target": "es2022",
     "module": "preserve",
     "moduleResolution": "bundler",

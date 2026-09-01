@@ -9,7 +9,7 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
     "incremental": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/api.tsbuildinfo",
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/platform-api.tsbuildinfo",
     "noEmit": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,

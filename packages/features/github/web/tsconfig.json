@@ -1,5 +1,7 @@
 {
   "compilerOptions": {
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/github-web.tsbuildinfo",
     "target": "es2023",
     "lib": ["es2023", "dom"],
     "noEmit": true,

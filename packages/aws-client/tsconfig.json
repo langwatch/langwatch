@@ -1,5 +1,7 @@
 {
   "compilerOptions": {
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/aws-client.tsbuildinfo",
     "target": "es2022",
     "module": "preserve",
     "moduleResolution": "bundler",
