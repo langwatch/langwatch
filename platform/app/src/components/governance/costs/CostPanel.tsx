@@ -24,6 +24,7 @@ export function CostPanel({
 }) {
   return (
     <VStack
+      data-testid="cost-panel"
       align="stretch"
       gap={3}
       borderWidth="1px"

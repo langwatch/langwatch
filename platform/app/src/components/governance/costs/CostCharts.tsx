@@ -274,7 +274,10 @@ export function CostStackedBars({
   );
 
   if (buckets === null) return <EmptyPanel height={height} unanswered />;
-  if (rows.length === 0)
+  // A window can come back full of days and empty of series — every day
+  // present, nothing spent on any of them. That has rows but nothing to draw,
+  // and drawing it anyway leaves bare axes that read as a broken chart.
+  if (rows.length === 0 || keys.length === 0)
     return <EmptyPanel height={height} unanswered={false} />;
 
   return (
@@ -338,7 +341,7 @@ export function CostForecastArea({
   const rows = useMemo(() => widenBuckets(buckets, keys), [buckets, keys]);
   const lastDay = rows[rows.length - 1]?.day;
 
-  if (rows.length === 0)
+  if (rows.length === 0 || keys.length === 0)
     return <EmptyPanel height={height} unanswered={false} />;
 
   return (

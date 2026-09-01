@@ -15,7 +15,7 @@
  * Spec: specs/governance/governance-cost-screen.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -202,6 +202,50 @@ describe("the cost breakdown panels", () => {
       expect(
         screen.getAllByText("Nothing in this window yet.").length,
       ).toBeGreaterThan(0);
+    });
+  });
+
+  describe("given the window answers with days but nothing spent on any of them", () => {
+    it("says the window is empty rather than drawing bare axes", () => {
+      // The read answered, and it answered with a full window — one bucket per
+      // day, no spend on any. There is a row per day and no series to plot, so
+      // a length check on the rows alone lets this through and the panel draws
+      // an axis with nothing above it, which reads as a chart that broke.
+      harness.activity.summary = {
+        activeUsersThisWindow: 4,
+        newUsersThisWindow: 1,
+        spentThisWindowUsd: "0",
+      };
+      harness.activity.spendByDepartment = [
+        {
+          departmentId: "dep-1",
+          departmentName: "Engineering",
+          spendUsd: "410.00",
+        },
+      ];
+      harness.activity.spendByUser = [
+        { actor: "ada@acme.test", spendUsd: "200.00", requests: 90 },
+      ];
+      harness.activity.spendOverTime = {
+        buckets: [
+          { bucketIso: "2026-08-01", points: [] },
+          { bucketIso: "2026-08-02", points: [] },
+        ],
+      };
+
+      renderScreen();
+
+      // Scoped to this panel on purpose. Other panels are empty for their own
+      // reasons and print the same sentence, so a page-wide search for it
+      // passes whether or not this panel drew bare axes.
+      const panel = screen
+        .getByText("Cost evolution by team")
+        .closest('[data-testid="cost-panel"]');
+
+      expect(panel).not.toBeNull();
+      expect(
+        within(panel as HTMLElement).getByText("Nothing in this window yet."),
+      ).toBeInTheDocument();
     });
   });
 });
