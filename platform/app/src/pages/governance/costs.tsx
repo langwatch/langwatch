@@ -142,7 +142,7 @@ function CostsBody({
           amountUsd={data.gateway.amountUsd}
           cellsWithoutAmount={data.gateway.cellsWithoutAmount}
         />
-        <SeatLanePanel testId="cost-lane-seats" />
+        <SeatLanePanel testId="cost-lane-seats" seats={data.seats} />
       </HStack>
       <CostLanesChart series={data.series} />
     </VStack>

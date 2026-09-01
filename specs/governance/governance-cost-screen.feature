@@ -1,10 +1,13 @@
 @governance @cost
 Feature: One cost screen, three honest lanes
-  Wave 1 shows what the provider billed, what the gateway metered, and a
-  seat lane — side by side, each labeled for what it is, never summed
-  into one figure. Seat DATA is out of this wave: seat licence ingestion
-  and the dated price list ship in a separate PR (owner: Sergio). Until
-  that lands, the seat lane renders as an honest empty state — labeled,
+  The screen shows what the provider billed, what the gateway metered,
+  and the seats a tenant holds — side by side, each labeled for what it
+  is, never summed into one figure. The seat lane shows COUNTS, not
+  money: how many seats are bought and how many somebody is sitting in.
+  What those seats cost is already on the invoice the billed lane
+  reports, so a price on the seat lane would put the same spend on the
+  screen twice; the dated price list stays out. Until a licence list has
+  been read, the seat lane renders as an honest empty state — labeled,
   visibly awaiting data, never a fabricated zero. LangWatch's own
   subscription seats are a different product concept and must never be
   shown in this lane. The screen is visible only to organization members
@@ -30,19 +33,12 @@ Feature: One cost screen, three honest lanes
     # covered by the rollup spec, not this component test.
 
   @integration
-  Scenario: The seat lane is an honest hole until seat data ships
-    # Seat ingestion and pricing arrive in a separate PR. The lane still
-    # renders so the screen's shape is complete, but it must say it has
-    # no data — a silent zero here would be a lie about money.
-    # LangWatch subscription seats (Subscription.maxMembers) are NOT this
-    # lane's data and must not be wired in as a stand-in.
-    # The Given is stated at the seam the test controls — the cost read's
-    # response — because no seat ingestion exists yet anywhere, so "not
-    # ingested" would be a constant no test could distinguish from its
-    # absence. A mock CAN return a seat amount, so this state and its
-    # opposite are both constructible today; the seats PR flips it with a
-    # data-present scenario instead of deleting this one.
-    Given the cost read returns no seat amount for this organization
+  Scenario: The seat lane is an honest hole until a licence list is read
+    # The lane still renders so the screen's shape is complete, but it
+    # must say it has no data — a silent zero here would be a lie about
+    # money. LangWatch subscription seats (Subscription.maxMembers) are
+    # NOT this lane's data and must not be wired in as a stand-in.
+    Given the cost read returns no seat counts for this organization
     When a permitted viewer opens the cost screen
     Then the seat lane is present and labeled
     And the seat lane states that seat data is not yet available
@@ -51,8 +47,48 @@ Feature: One cost screen, three honest lanes
     # money value" has no generic DOM check and each author would invent a
     # different one. It catches "$0.00", "0", "0,00 €" and zeros hiding in
     # accessible names (the assertion must read those too). Consequence:
-    # the lane's copy must stay digit-free — no "(0 sources)", no dates,
-    # no "wave 2" — or the test breaks, and that break is the point.
+    # the WAITING copy must stay digit-free — no "(0 sources)", no dates —
+    # or the test breaks, and that break is the point. It binds the
+    # waiting state only; the reported state below is all counts.
+
+  @integration
+  Scenario: The seat lane shows how many seats are bought and how many are assigned
+    # Bought minus assigned is the whole money conversation — seats paid
+    # for that nobody sits in — and neither number alone can say it, so
+    # both are shown together on the pool they belong to.
+    Given the tenant's licence list reports a pool with seats bought and some assigned
+    When a permitted viewer opens the cost screen
+    Then the seat lane names the pool and shows both counts
+    And the seat lane shows no currency figure
+    # The currency assertion is the point of the lane, not decoration:
+    # the invoice the billed lane already shows is what the seats cost.
+    # A price derived here from a unit count would be the same spend
+    # reported twice, on one screen, under two labels.
+
+  @unit
+  Scenario: Only pools somebody is paying to seat people in reach the screen
+    # Learned from a live tenant: the naive count said 27 unused seats
+    # when the true answer was 2. A company-wide pool can never be
+    # assigned to anyone and so reports zero assigned forever; a free
+    # pool arrives with ten thousand units because the number caps how
+    # far it may spread, not what anyone bought. Each is a loud,
+    # plausible, wrong finding that buries the real one.
+    Given a licence list holding a paid agent pool beside company-wide, free, suspended and non-agent pools
+    When the cost summary is read
+    Then only the paid agent pool appears on the seat lane
+    # The uncounted pools are not lost — the licence read keeps every
+    # pool it saw with the facts that classify it, so a later question
+    # can still ask about them.
+
+  @unit
+  Scenario: A licence list with nothing countable in it reads as awaiting
+    Given a licence list whose only pool is free
+    When the cost summary is read
+    Then the seat lane says it is awaiting data
+    # Rather than reporting an empty list of pools. "We have read no
+    # licences for you" and "your licences hold no seats" are different
+    # sentences, and a screen that showed a count of zero pools would be
+    # making a claim about a list nobody could count.
 
   @integration
   Scenario: Viewing requires the organization-scoped governance cost permission

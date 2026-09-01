@@ -42,6 +42,7 @@ export const governanceCostRouter = createTRPCRouter({
       const service = GovernanceCostService.create({
         prisma: ctx.prisma,
         costRollup: getApp().governance.costRollup,
+        ocsfEvents: getApp().governance.ocsfEvents,
       });
       return await service.summary({
         organizationId: input.organizationId,

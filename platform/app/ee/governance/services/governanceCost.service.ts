@@ -26,6 +26,10 @@
  */
 
 import type { GovernanceCostRollupClickHouseRepository } from "@ee/governance/services/governanceCostRollup.clickhouse.repository";
+import type {
+  GovernanceOcsfEventsClickHouseRepository,
+  GovernanceSeatReportRow,
+} from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { resolveGovProjectId } from "@ee/governance/services/govProject";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { GOVERNANCE_COST_SOURCE } from "../projections/governanceCostRollup.constants";
@@ -58,17 +62,36 @@ export interface GovernanceCostLaneDto {
 }
 
 /**
- * The seat lane, which has no producer in wave 1.
+ * One licence pool on the seat lane.
  *
- * It carries no amount FIELD at all, rather than an amount that happens to be
- * null. A renderer cannot print a fabricated zero from a value that does not
- * exist, so the guarantee is enforced by the type rather than by a convention
- * every future caller has to remember. The seats PR replaces this shape with a
- * real lane; until then the absence is structural.
+ * Counts only, and there is no amount FIELD anywhere on this lane — not even a
+ * null one. A renderer cannot print a fabricated price from a value that does
+ * not exist, so the guarantee is enforced by the type rather than by a
+ * convention every future caller has to remember. What the seats cost is
+ * already on the invoice the billed lane reads; a figure derived from a unit
+ * count here would show the customer the same spend twice.
  */
-export interface GovernanceSeatLaneDto {
-  status: "awaiting_data";
+export interface GovernanceSeatPoolDto {
+  /** The provider's own part number for the licence, e.g. `VIRTUAL_AGENT_USL`. */
+  skuPartNumber: string;
+  /** `YYYY-MM-DD`, the day the count belongs to. */
+  day: string;
+  seatsBought: number;
+  seatsAssigned: number;
 }
+
+/**
+ * The seat lane: either nothing countable has been read, or the pools that
+ * were.
+ *
+ * A union rather than a list that may be empty, because the two states read
+ * differently to a customer. "No licence list has been read for you" and "your
+ * licence list holds no seats" are different sentences, and only one of them
+ * is true at a time.
+ */
+export type GovernanceSeatLaneDto =
+  | { status: "awaiting_data" }
+  | { status: "reported"; pools: GovernanceSeatPoolDto[] };
 
 /** One day of the per-lane series. Either lane may hold no figure that day. */
 export interface GovernanceCostDayDto {
@@ -136,17 +159,26 @@ export class GovernanceCostService {
        * no ClickHouse — which makes the screen UNAVAILABLE, not free.
        */
       costRollup: GovernanceCostRollupClickHouseRepository | undefined;
+      /**
+       * Where the licence reads land. `undefined` on the same deployment the
+       * rollup is absent from, and the seat lane then reports awaiting rather
+       * than none — an absent store has read no licences, which is exactly
+       * what awaiting says.
+       */
+      ocsfEvents: GovernanceOcsfEventsClickHouseRepository | undefined;
     },
   ) {}
 
   static create({
     prisma,
     costRollup,
+    ocsfEvents,
   }: {
     prisma: PrismaClient;
     costRollup: GovernanceCostRollupClickHouseRepository | undefined;
+    ocsfEvents: GovernanceOcsfEventsClickHouseRepository | undefined;
   }): GovernanceCostService {
-    return new GovernanceCostService({ prisma, costRollup });
+    return new GovernanceCostService({ prisma, costRollup, ocsfEvents });
   }
 
   /**
@@ -164,7 +196,7 @@ export class GovernanceCostService {
     windowDays: number;
     now?: Date;
   }): Promise<GovernanceCostSummaryDto> {
-    const { costRollup, prisma } = this.deps;
+    const { costRollup, ocsfEvents, prisma } = this.deps;
     if (!costRollup) {
       return unavailable({ reason: "no_cost_store", windowDays });
     }
@@ -181,21 +213,70 @@ export class GovernanceCostService {
       new Date(now.getTime() - (windowDays - 1) * 86_400_000),
     );
 
-    const rows = await costRollup.sumDaysByLane({
-      tenantId,
-      fromDay,
-      toDay,
-    });
+    // The seat read is NOT wrapped in a catch. A failure there fails the whole
+    // summary, and the screen says so — degrading it to "awaiting data" would
+    // tell a customer their licences have not been read when what actually
+    // happened is that we could not read them.
+    const [rows, seatReports] = await Promise.all([
+      costRollup.sumDaysByLane({ tenantId, fromDay, toDay }),
+      ocsfEvents?.findLatestSeatReports({ tenantId }) ?? [],
+    ]);
 
     return {
       unavailableReason: null,
       billed: totalFor(rows, GOVERNANCE_COST_SOURCE.PULLED),
       gateway: totalFor(rows, GOVERNANCE_COST_SOURCE.GATEWAY),
-      seats: { status: "awaiting_data" },
+      seats: seatsFrom(seatReports),
       series: seriesFrom(rows),
       windowDays,
     };
   }
+}
+
+/**
+ * Whether a licence pool is a seat somebody is paying for.
+ *
+ * All four facts, and the reason is a live tenant: the naive count said 27
+ * unused seats when the true answer was 2. A company-wide pool can never be
+ * assigned to anyone, so it reports zero assigned forever; a free pool arrives
+ * with ten thousand units because the number caps how far it may spread rather
+ * than saying what anyone bought; a suspended pool stopped being paid for; and
+ * a pool that is none of the agent products is somebody's mailbox, not their
+ * agent. Each of those produces a loud, plausible, wrong finding on its own,
+ * and it buries the handful of paid agent seats that really are sitting empty.
+ *
+ * The uncounted pools are still on the record — the licence read keeps every
+ * pool it saw, with the facts that classify it — so nothing is lost here that
+ * a later question cannot ask.
+ */
+function isCountableSeatPool(pool: GovernanceSeatReportRow): boolean {
+  return pool.perPerson && pool.live && !pool.free && pool.seatStem;
+}
+
+/**
+ * The seat lane from the licence pools that were read.
+ *
+ * Pools sorted by part number so the lane does not reshuffle between reads,
+ * and a lane with nothing countable says awaiting rather than reporting an
+ * empty list — a screen showing "0 pools" would be a claim about a licence
+ * list nobody could count.
+ */
+function seatsFrom(
+  reports: readonly GovernanceSeatReportRow[],
+): GovernanceSeatLaneDto {
+  const pools = reports
+    .filter(isCountableSeatPool)
+    .map((pool) => ({
+      skuPartNumber: pool.skuPartNumber,
+      day: pool.day,
+      seatsBought: pool.seatsBought,
+      seatsAssigned: pool.seatsAssigned,
+    }))
+    .sort((a, b) => a.skuPartNumber.localeCompare(b.skuPartNumber));
+
+  return pools.length
+    ? { status: "reported", pools }
+    : { status: "awaiting_data" };
 }
 
 type LaneRow = {
