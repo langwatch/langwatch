@@ -1,16 +1,20 @@
 /**
- * The widget editor: a wide drawer with two full-height tabs — Code (the
- * React/TSX file) and Queries (every declared query: SQL, params, last
- * result, standalone Run). Cards are presentation-only; this drawer is the
- * only place a widget's code or queries are edited.
+ * The widget editor: a wide drawer with a live chart preview pinned at the
+ * top, above two full-height tabs — Code (the React/TSX file) and Queries
+ * (every declared query: SQL, params, last result, standalone Run). Cards
+ * are presentation-only; this drawer is the only place a widget's code or
+ * queries are edited.
  *
  * Holds no draft state of its own — every value and every change handler
- * comes from the card that opened it, which is what makes the card's chart
- * preview live-update as this drawer edits: both read and write the exact
- * same state.
+ * comes from the card that opened it, which is what makes the preview
+ * live-update as this drawer edits: both read and write the exact same
+ * state. The preview element itself is built by the card too (`chart`) —
+ * this file only decides where it sits, not what it is, since the card is
+ * also where the executor and the debounce that feeds it live.
  */
 
 import { Box, Button, Tabs } from "@chakra-ui/react";
+import type { ReactNode } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
 import type { PlaygroundQuery } from "~/server/analytics/playgroundWidgetDefinition";
@@ -24,6 +28,8 @@ import type { QueryLastRun } from "./usePlaygroundWidgetExecutor";
 
 interface PlaygroundWidgetEditDrawerProps {
   open: boolean;
+  /** The live chart preview, already built by the card — null while closed. */
+  chart: ReactNode;
   code: string;
   queries: PlaygroundQuery[];
   onCodeChange: (code: string) => void;
@@ -38,6 +44,7 @@ interface PlaygroundWidgetEditDrawerProps {
 
 export function PlaygroundWidgetEditDrawer({
   open,
+  chart,
   code,
   queries,
   onCodeChange,
@@ -70,6 +77,11 @@ export function PlaygroundWidgetEditDrawer({
           minHeight={0}
           flex={1}
         >
+          {chart && (
+            <Box flexShrink={0} marginBottom={3}>
+              {chart}
+            </Box>
+          )}
           <Tabs.Root
             defaultValue="code"
             variant="line"
