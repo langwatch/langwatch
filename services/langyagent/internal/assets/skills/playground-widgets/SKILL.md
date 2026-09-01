@@ -8,8 +8,6 @@ metadata:
   category: recipe
 ---
 
-import CliSetup from '../../_shared/cli-setup.mdx'
-
 # Author a Custom Chart Playground Widget
 
 Turn a question ("show cost per model as a bar chart") into a saved playground widget: one React file rendering data pulled through named LangWatchQL queries. The loop is: **discover the schema → write the queries → write the widget → save it → prove it runs**.
@@ -17,8 +15,6 @@ Turn a question ("show cost per model as a bar chart") into a saved playground w
 Reach for this instead of `lwql-charts` when the visualization is not a plain Vega-Lite spec over one query result — custom layout, multiple queries in one widget, conditional rendering, or anything a component can do that a declarative spec cannot.
 
 ## Prerequisites
-
-<CliSetup />
 
 LangWatchQL analytics is switched per project. If any command answers with error code `lwql_not_enabled`, the feature is off for this project — tell the user, do not retry.
 
@@ -163,5 +159,5 @@ langwatch playground-widget create \
 - A save that succeeds but a blank or errored widget when opened — the SQL names a column that does not exist, or the component threw at render; re-read the schema (Step 1) and the error panel shown in the widget frame, then update.
 - `playground_query_undeclared_param` (shows up in the hook's `error`) — the widget code passed a param the query's `parameters` array doesn't declare; add the declaration or stop passing it.
 - `playground_query_reserved_param` (shows up in the hook's `error`) — the widget code passed `period_start`, `period_end`, or `period_granularity_seconds` directly as a param; these are bound by the executor from the page window, never by the caller.
-- "Cannot import '\<specifier\>'" — the widget imported something other than `react`, `react-dom`, `react-dom/client`, or `recharts`; use only those, or the corresponding global.
+- "Cannot import '\<specifier>'" — the widget imported something other than `react`, `react-dom`, `react-dom/client`, or `recharts`; use only those, or the corresponding global.
 - A query returning 0 rows against seed data — the seed's newest trace is 2026-08-04; widen the time window before assuming the query is wrong.

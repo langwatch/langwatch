@@ -37,9 +37,9 @@ const LANGY_PAGE_CONTEXT = [
     id: "dashboard:custom-chart-playground-fetch-api",
     kind: "dashboard" as const,
     label:
-      "Fetch data with LW.useChartQuery(name, params) -> {data, loading, " +
-      "error}. Never throws; refetches on time-window changes. LW.query() " +
-      "is the low-level promise it wraps — prefer the hook.",
+      "Fetch data with LW.useChartQuery(name, params) -> TanStack useQuery " +
+      "shape (data, isLoading, isFetching, isError, error, status, " +
+      "refetch). Never throws. LW.query() is the low-level promise it wraps.",
   },
 ];
 

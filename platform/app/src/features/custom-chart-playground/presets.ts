@@ -38,11 +38,11 @@ export const STARTER_WIDGET_QUERIES: PlaygroundQuery[] = [
 export const STARTER_WIDGET_CODE = `import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export default function Widget() {
-  const { data, loading, error } = LW.useChartQuery("main", {});
+  const { data, isLoading, isError, error } = LW.useChartQuery("main", {});
 
-  const status = error
-    ? error
-    : loading
+  const status = isError
+    ? error.message
+    : isLoading
       ? "Loading..."
       : data.length + " rows";
 

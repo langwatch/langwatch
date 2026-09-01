@@ -121,13 +121,29 @@ export function buildShimScript(): string {
     return messageOf(err);
   }
 
+  // Wraps whatever LW.query rejects with (a {code,title,message} payload, or
+  // anything else) into a real Error, carrying 'code'/'title' through as
+  // extra properties when present — the hook's contract promises an Error
+  // object, matching TanStack's own 'error' field, not a bare string.
+  function toChartQueryError(err) {
+    var wrapped = new Error(chartQueryErrorMessage(err));
+    if (err && typeof err === "object") {
+      if (typeof err.code === "string") wrapped.code = err.code;
+      if (typeof err.title === "string") wrapped.title = err.title;
+    }
+    return wrapped;
+  }
+
   /**
    * The recommended way for widget code to fetch: wraps LW.query so authors
-   * never hand-roll the promise/useEffect/useState dance. Three footguns it
-   * closes that a naive Promise.all/.then would not:
-   *  - a rejection (undeclared param, SQL error, timeout) lands in 'error' as
-   *    a string, never as an uncaught rejection that would white-screen the
-   *    frame;
+   * never hand-roll the promise/useEffect/useState dance, returning the same
+   * shape/naming as TanStack Query's useQuery (data, isLoading, isFetching,
+   * isError, error, status, refetch) — an LLM writing widget code already
+   * knows this contract, which is the point. Footguns it closes that a naive
+   * Promise.all/.then would not:
+   *  - a rejection (undeclared param, SQL error, timeout) lands in 'error'
+   *    as an Error, never as an uncaught rejection that would white-screen
+   *    the frame;
    *  - a resolution arriving after the calling component unmounted (or after
    *    'name'/'params' changed again) is dropped, so there is no
    *    setState-on-unmounted race;
@@ -136,34 +152,51 @@ export function buildShimScript(): string {
    * It also refetches on its own whenever the page-level time window or
    * granularity changes, via the same onParamsChange feed LW.onParamsChange
    * exposes directly - a widget using this hook stays live without its
-   * author ever touching that lower-level API.
+   * author ever touching that lower-level API. 'refetch' triggers the same
+   * run manually.
    */
   LW.useChartQuery = function (name, params) {
     var React = window.React;
     var effectiveParams = params || {};
     var paramsKey = stringify(effectiveParams);
-    var stateHook = React.useState({ data: null, loading: true, error: null });
+    var stateHook = React.useState({
+      status: "pending",
+      data: null,
+      error: null,
+      isFetching: true
+    });
     var state = stateHook[0];
     var setState = stateHook[1];
+    var runRef = React.useRef(null);
 
     React.useEffect(function () {
       var cancelled = false;
 
       function run() {
         if (cancelled) return;
-        setState({ data: null, loading: true, error: null });
+        // Keeps whatever data/error/status is already there while a
+        // refetch is in flight (window change, manual refetch()) — only
+        // isFetching flips, so a widget's chart doesn't flash back to its
+        // loading state on every background refresh.
+        setState(function (prev) {
+          return { status: prev.status, data: prev.data, error: prev.error, isFetching: true };
+        });
         LW.query(name, effectiveParams).then(
           function (result) {
             if (cancelled) return;
-            setState({ data: result.rows, loading: false, error: null });
+            setState({ status: "success", data: result.rows, error: null, isFetching: false });
           },
           function (err) {
             if (cancelled) return;
-            setState({ data: null, loading: false, error: chartQueryErrorMessage(err) });
+            setState({ status: "error", data: null, error: toChartQueryError(err), isFetching: false });
           }
         );
       }
 
+      runRef.current = run;
+      // A genuine identity change (new name/params) starts over from
+      // scratch rather than keeping the previous query's stale data/error.
+      setState({ status: "pending", data: null, error: null, isFetching: true });
       run();
       var unsubscribe = LW.onParamsChange(run);
 
@@ -176,7 +209,17 @@ export function buildShimScript(): string {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [name, paramsKey]);
 
-    return state;
+    return {
+      data: state.data,
+      isLoading: state.status === "pending" && state.isFetching,
+      isFetching: state.isFetching,
+      isError: state.status === "error",
+      error: state.error,
+      status: state.status,
+      refetch: function () {
+        if (runRef.current) runRef.current();
+      }
+    };
   };
 
   // Console + uncaught-error forwarding, installed before the author's code
