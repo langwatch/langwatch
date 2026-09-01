@@ -64,12 +64,14 @@ describe("given the pull-cadence cron mapping", () => {
      * a source that looks configured, reports no error, and returns nothing.
      */
     it("recommends a schedule for every pull-mode source the catalog offers", () => {
-      const missing = SOURCE_TYPE_OPTIONS.filter(
-        (option) =>
-          option.mode === "pull" &&
-          !option.deprecated &&
-          recommendedPullSchedule(option.value) === null,
-      ).map((option) => option.value);
+      const pullOptions = SOURCE_TYPE_OPTIONS.filter(
+        (option) => option.mode === "pull" && !option.deprecated,
+      );
+      expect(pullOptions.length).toBeGreaterThan(0);
+
+      const missing = pullOptions
+        .filter((option) => recommendedPullSchedule(option.value) === null)
+        .map((option) => option.value);
       expect(missing).toEqual([]);
     });
   });
