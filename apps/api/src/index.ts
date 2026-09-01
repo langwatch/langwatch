@@ -10,7 +10,12 @@ export {
   type ApiRestSecurityObservability,
 } from "./api-rest.security";
 export { ApiRestObservabilityComposition } from "./app/api-rest-observability.composition";
-export { ApiProductionComposition, LoggedApiQueueAbsence } from "./app/api-production.composition";
+export {
+  ApiProductionComposition,
+  LoggedApiQueueAbsence,
+  type ApiOwnedRestFeaturePorts,
+} from "./app/api-production.composition";
+export { ApiInstanceAdminKeyAdapter } from "./app/api-instance-admin-key.adapter";
 export {
   API_UNAVAILABLE_PRODUCT_ADAPTERS,
   ApiStandaloneComposition,
@@ -211,6 +216,12 @@ export {
   ApiQueueInfrastructure,
   type ApiQueueInfrastructureOptions,
 } from "./platform/infrastructure/api-queue.infrastructure";
+export {
+  ApiRateLimitInfrastructure,
+  type ApiRateLimitConnectionPort,
+  type ApiRateLimitRequest,
+  type ApiRateLimitResult,
+} from "./platform/infrastructure/api-rate-limit.infrastructure";
 export {
   ApiApplicationPort,
   ApiLifecyclePort,

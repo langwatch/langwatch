@@ -27,12 +27,34 @@ vi.mock("../../api.process", async (importOriginal) => {
   return { ...actual, ApiProcess: { create: processMocks.create } };
 });
 
+// The queue infrastructure owns the process's Redis client, and composing a
+// real one opens a socket. Only its composition decision is mocked: absent by
+// default, which is the deployment shape every other test here describes.
+const queueMocks = vi.hoisted(() => {
+  const redis = {
+    incr: vi.fn(async () => 1),
+    expire: vi.fn(async () => 1),
+    ttl: vi.fn(async () => 30),
+  };
+  const composed: { value: { redis: typeof redis } | undefined } = { value: undefined };
+  return { redis, composed, tryCreate: vi.fn(() => composed.value) };
+});
+
+vi.mock("../../platform/infrastructure/api-queue.infrastructure", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../platform/infrastructure/api-queue.infrastructure")>();
+  return { ...actual, ApiQueueInfrastructure: { tryCreate: queueMocks.tryCreate } };
+});
+
 import { ApiProcessGraphPort } from "../../api.process";
 import {
   ApiAuthSessionCompositionPort,
   ApiBrowserSessionTransportPort,
 } from "../api-auth.composition";
-import { ApiProductionComposition } from "../api-production.composition";
+import {
+  ApiProductionComposition,
+  type ApiOwnedRestFeaturePorts,
+} from "../api-production.composition";
 import { ApiAuditPort } from "../../api-request.policy";
 import { resolveApiConfig } from "../../platform/config/api.config";
 
@@ -203,7 +225,102 @@ describe("ApiProductionComposition", () => {
       });
     });
   });
+
+  describe("given the REST feature ports the API process now owns itself", () => {
+    describe("when the process has not been composed", () => {
+      it("offers no ports, because the limiter's Redis does not exist yet", () => {
+        expect(productionComposition().restFeaturePorts()).toBeUndefined();
+      });
+    });
+
+    describe("when the deployment configured an instance administrator credential", () => {
+      it("answers with it, without any host supplying a PAT adapter", async () => {
+        const ports = await composedFeaturePorts({
+          LANGWATCH_INSTANCE_ADMIN_API_KEY: " instance-admin-secret ",
+        });
+
+        expect(ports.instanceAdminKey()).toBe("instance-admin-secret");
+      });
+    });
+
+    describe("when the deployment configured no instance administrator credential", () => {
+      it("answers with nothing, which is what makes the family answer 404", async () => {
+        const unset = await composedFeaturePorts({});
+        const blank = await composedFeaturePorts({ LANGWATCH_INSTANCE_ADMIN_API_KEY: "" });
+
+        expect([unset.instanceAdminKey(), blank.instanceAdminKey()]).toEqual([
+          undefined,
+          undefined,
+        ]);
+      });
+    });
+
+    describe("when the process composed a Redis connection", () => {
+      it("counts in the same Redis the queue infrastructure composed", async () => {
+        queueMocks.composed.value = { redis: queueMocks.redis };
+        try {
+          const ports = await composedFeaturePorts({});
+
+          expect(
+            await ports.rateLimit({ key: "project-1", windowSeconds: 60, max: 5 }),
+          ).toHaveProperty("allowed", true);
+          expect(queueMocks.redis.incr).toHaveBeenCalledWith("langwatch:ratelimit:project-1");
+        } finally {
+          queueMocks.composed.value = undefined;
+        }
+      });
+    });
+
+    describe("when the process composed no Redis", () => {
+      it("still counts a caller's window, and refuses the hit past the maximum", async () => {
+        const ports = await composedFeaturePorts({});
+        const request = { key: "project-1", windowSeconds: 60, max: 1 };
+
+        expect(await ports.rateLimit(request)).toHaveProperty("allowed", true);
+        expect(await ports.rateLimit(request)).toHaveProperty("allowed", false);
+      });
+
+      it("counts each caller against its own window", async () => {
+        const ports = await composedFeaturePorts({});
+
+        await ports.rateLimit({ key: "project-1", windowSeconds: 60, max: 1 });
+
+        expect(
+          await ports.rateLimit({ key: "project-2", windowSeconds: 60, max: 1 }),
+        ).toHaveProperty("allowed", true);
+      });
+    });
+  });
 });
+
+function productionComposition(): ApiProductionComposition {
+  return ApiProductionComposition.create({
+    agents: new Proxy(AgentService.prototype, {}),
+    secrets: secretService().service,
+    apiKeys: apiKeyService(resolvedKey).service,
+    authz: authzService(true).service,
+    organizations: organizationService(),
+    auth: new TestAuthComposition(),
+  });
+}
+
+async function composedFeaturePorts(
+  source: Readonly<Record<string, unknown>>,
+): Promise<ApiOwnedRestFeaturePorts> {
+  const composition = productionComposition();
+  await composition.compose({
+    config: resolveApiConfig({ NODE_ENV: "test", API_PORT: "5560", ...source }),
+    graph: new TestGraph(),
+    observability: { serviceName: "langwatch-api-test" },
+    resources: new ResourceScope(),
+  });
+
+  const ports = composition.restFeaturePorts();
+  if (!ports) {
+    throw new Error("API production composition did not compose its own REST feature ports.");
+  }
+  return ports;
+}
 
 class TestGraph extends ApiProcessGraphPort {
   async close(): Promise<void> {}

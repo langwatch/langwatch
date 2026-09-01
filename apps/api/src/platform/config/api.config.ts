@@ -71,6 +71,20 @@ export const apiConfigDefinition = RuntimeConfig.define({
       env: "LANGWATCH_PROCESSOR_TYPE",
     }),
   },
+  /**
+   * The instance administrator credential the self-hosted provisioning family
+   * authenticates with.
+   *
+   * Read here rather than where it is used, because this module is the
+   * process's only environment reader: everything below receives the value.
+   * It stays an unvalidated optional string on purpose — an operator who
+   * exports a blank variable has NOT configured a credential, and
+   * `Config.secret` would refuse the whole boot over it. What blank means is
+   * the credential's own rule, and it lives with the adapter that reads it.
+   */
+  instanceAdminApiKey: Config.value(optionalEnvironmentString, {
+    env: "LANGWATCH_INSTANCE_ADMIN_API_KEY",
+  }),
   infrastructure: {
     redis: {
       url: Config.value(optionalEnvironmentString, { env: "REDIS_URL" }),

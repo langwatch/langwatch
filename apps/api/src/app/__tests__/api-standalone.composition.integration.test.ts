@@ -52,8 +52,14 @@ describe("ApiStandaloneComposition", () => {
         "PrismaQueryGuard: the multitenancy, organization and mass-delete query guards",
       );
       expect(API_UNAVAILABLE_PRODUCT_ADAPTERS).toContain(
-        "PAT/admin authentication and the public REST rate limiter",
+        "ApiKeyBindingIdPort, ApiKeyDiagnosticsPort and the organization identity ports",
       );
+    });
+
+    it("stops naming the instance administrator credential and the rate limiter it now owns", () => {
+      const named = API_UNAVAILABLE_PRODUCT_ADAPTERS.join("\n");
+
+      expect(named).not.toMatch(/PAT\/admin|instance admin|rate limiter/i);
     });
 
     it("serves the metrics route only once a metrics port is composed", async () => {

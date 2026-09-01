@@ -51,6 +51,14 @@ export type ApiProductAdapters = Readonly<{
  * This list is the executable's honest boot statement rather than a plan: the
  * process announces it at start so a deployment reads the gap from its own
  * logs instead of from a document.
+ *
+ * The instance administrator credential and the public REST rate limiter used
+ * to be on it and are not any more: {@link ApiProductionComposition} builds
+ * both from its own validated configuration and its own Redis
+ * ({@link ApiProductionComposition.restFeaturePorts}), so no host supplies
+ * them. What still keeps the two families that READ them off this process is
+ * named by the entries that remain — the organization identity ports and the
+ * stored-object application — not by the credential or the counter.
  */
 export const API_UNAVAILABLE_PRODUCT_ADAPTERS = [
   "PrismaQueryGuard: the multitenancy, organization and mass-delete query guards",
@@ -60,7 +68,6 @@ export const API_UNAVAILABLE_PRODUCT_ADAPTERS = [
   "ApiKeyBindingIdPort, ApiKeyDiagnosticsPort and the organization identity ports",
   "IdentityEmailService and the Better Auth browser-session transport",
   "ApiMetricsPort: no process-owned metric registry exists yet",
-  "PAT/admin authentication and the public REST rate limiter",
 ] as const;
 
 export type ApiStandaloneCompositionOptions = {

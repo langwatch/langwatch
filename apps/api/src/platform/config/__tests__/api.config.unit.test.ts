@@ -35,6 +35,7 @@ describe("API process configuration", () => {
         endpoint: undefined,
         processorType: "batch",
       },
+      instanceAdminApiKey: undefined,
       infrastructure: {
         redis: { configured: false, reason: "unconfigured", warnings: [] },
         groupQueue: {
@@ -46,6 +47,18 @@ describe("API process configuration", () => {
         },
       },
     });
+  });
+
+  it("carries the instance administrator credential through the process's one environment read", () => {
+    expect(
+      resolveApiConfig({ LANGWATCH_INSTANCE_ADMIN_API_KEY: "  instance-admin-secret  " })
+        .instanceAdminApiKey,
+    ).toBe("  instance-admin-secret  ");
+    expect(resolveApiConfig({}).instanceAdminApiKey).toBeUndefined();
+  });
+
+  it("boots with a blank instance administrator credential rather than refusing the process", () => {
+    expect(resolveApiConfig({ LANGWATCH_INSTANCE_ADMIN_API_KEY: "" }).instanceAdminApiKey).toBe("");
   });
 
   it("gives the whole shutdown sequence more budget than the listener drain alone", () => {

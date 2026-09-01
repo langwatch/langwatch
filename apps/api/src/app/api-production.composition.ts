@@ -26,11 +26,26 @@ import {
 import { ApiSecretRestFeature } from "../api-secret-rest.feature";
 import { ApiRestSecurity, type ApiRestProjectPolicy } from "../api-rest.security";
 import type { AppRestManagementAuditPort, AppRestSecurity } from "@langwatch/api/rest";
+import type { AppRestFeaturePorts } from "../app-rest/app-rest.features";
+import { ApiRateLimitInfrastructure } from "../platform/infrastructure/api-rate-limit.infrastructure";
 import {
   ApiAuthSessionCompositionPort,
   AuthSessionApiAuthenticationAdapter,
 } from "./api-auth.composition";
+import { ApiInstanceAdminKeyAdapter } from "./api-instance-admin-key.adapter";
 import { ApiRestObservabilityComposition } from "./api-rest-observability.composition";
+
+/**
+ * The `AppRestFeaturePorts` entries the API process supplies out of its own
+ * configuration and its own infrastructure, rather than receiving from a host.
+ *
+ * Two today: the instance administrator credential, which is a value in the
+ * process's validated config, and the public REST rate limiter, which is a
+ * counter over the process's own Redis. Neither needed anything from the
+ * legacy application to begin with — they were only there because that is
+ * where the environment and the Redis client used to live.
+ */
+export type ApiOwnedRestFeaturePorts = Pick<AppRestFeaturePorts, "instanceAdminKey" | "rateLimit">;
 
 /** The concrete composition port for the migrated API transports. */
 export class ApiProductionComposition extends ApiRuntimeCompositionPort {
@@ -83,6 +98,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     );
   }
 
+  private composedFeaturePorts: ApiOwnedRestFeaturePorts | undefined;
+
   private constructor(
     private readonly agents: AgentService,
     private readonly secrets: SecretService,
@@ -102,6 +119,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
 
   compose(options: ApiRuntimeCompositionOptions): Promise<ApiRuntimeProcessPort> {
     const queueInfrastructure = this.composeQueue(options);
+    this.composedFeaturePorts = this.composeFeaturePorts(options, queueInfrastructure);
     const process = ApiProcess.create({
       agents: this.agents,
       secrets: this.secrets,
@@ -120,6 +138,26 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     });
 
     return Promise.resolve(ApiProductionProcess.create(process));
+  }
+
+  /**
+   * The feature ports this process owns, once it has been composed.
+   *
+   * `undefined` before `compose`, and deliberately so: the rate limiter counts
+   * in the SAME Redis the queue infrastructure composed, and that connection
+   * does not exist until the process does. Reading them from the composition
+   * rather than binding them again is what keeps one deployment on one
+   * counter and one credential.
+   *
+   * They are exposed rather than mounted because the two families that read
+   * them still need services this package cannot construct — the organization
+   * provisioning port behind `/api/organizations`, the stored-object
+   * application behind `/api/files` — which is what the remaining entries of
+   * `API_UNAVAILABLE_PRODUCT_ADAPTERS` name. The host that mounts those
+   * families spreads these in instead of binding its own.
+   */
+  restFeaturePorts(): ApiOwnedRestFeaturePorts | undefined {
+    return this.composedFeaturePorts;
   }
 
   /**
@@ -171,6 +209,28 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         .catch((error) => {
           logger.error({ error, action: entry.action }, "Management audit failed");
         });
+    };
+  }
+
+  /**
+   * Binds the two API-owned ports to this process's parsed config and its
+   * queue's Redis.
+   *
+   * The connection is read per call rather than captured: an absent queue
+   * means an absent Redis, and the limiter's documented degradation is to
+   * count in memory instead of refusing to count at all.
+   */
+  private composeFeaturePorts(
+    options: ApiRuntimeCompositionOptions,
+    queueInfrastructure: ApiQueueInfrastructure | undefined,
+  ): ApiOwnedRestFeaturePorts {
+    const instanceAdminKey = ApiInstanceAdminKeyAdapter.create({ config: options.config });
+    const rateLimit = ApiRateLimitInfrastructure.create({
+      connection: () => queueInfrastructure?.redis,
+    });
+    return {
+      instanceAdminKey: () => instanceAdminKey.read(),
+      rateLimit: (request) => rateLimit.consume(request),
     };
   }
 
