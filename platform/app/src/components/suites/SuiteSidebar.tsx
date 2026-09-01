@@ -43,7 +43,6 @@ import type {
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { SearchInput } from "../ui/SearchInput";
 import { ALL_RUNS_ID, toExternalSetSelection } from "./useSuiteRouting";
-import { VoiceAgentsCallout } from "./VoiceAgentsCallout";
 
 export const SUITE_SIDEBAR_COLLAPSED_KEY = "suite-sidebar-collapsed" as const;
 
@@ -355,14 +354,6 @@ export function SuiteSidebar({
           </>
         )}
       </VStack>
-
-      {/*
-       * Voice agents announcement card — pinned just above the collapse
-       * toggle so it sits at the bottom of the sets/runs sidebar without
-       * stealing space from the list itself. Hidden when the sidebar is
-       * collapsed (no room for the copy at icon-rail width).
-       */}
-      {!isCollapsed && <VoiceAgentsCallout />}
 
       {/* Toggle button — always the same DOM node */}
       <ShadowDivider />

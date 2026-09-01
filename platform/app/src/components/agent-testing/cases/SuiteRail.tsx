@@ -17,8 +17,8 @@ import type {
   PeriodMode,
   RelativePresetKey,
 } from "~/components/PeriodSelector";
+import { NewSimulationsCallout } from "~/components/suites/NewSimulationsCallout";
 import { SuiteArchiveDialog } from "~/components/suites/SuiteArchiveDialog";
-import { VoiceAgentsCallout } from "~/components/suites/VoiceAgentsCallout";
 import type { AgentTestingSelection } from "../useAgentTestingRouting";
 import { SuiteRailFooter } from "./SuiteRailFooter";
 import { SuiteRailSections } from "./SuiteRailSections";
@@ -90,7 +90,7 @@ export function SuiteRail(props: SuiteRailProps) {
     >
       <SuiteRailSections {...props} onRequestArchive={setSuiteToArchive} />
 
-      {!collapsed && <VoiceAgentsCallout />}
+      {!collapsed && <NewSimulationsCallout target="scenarios" />}
 
       <SuiteRailFooter {...props} />
 

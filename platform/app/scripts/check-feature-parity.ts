@@ -574,7 +574,6 @@ const LEGACY_INERT: string[] = [
   "specs/skills/prompt-compiler.feature",
   "specs/studio/nlpgo-true-root-span-without-traceparent.feature",
   "specs/suites/simulations-performance.feature",
-  "specs/suites/voice-agents-callout.feature",
   "specs/topic-clustering/run-history.feature",
   "specs/topic-clustering/topics-source-of-truth.feature",
   "specs/trace-drawer/attribute-table.feature",

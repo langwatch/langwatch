@@ -16,16 +16,6 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SimulationSuite } from "~/generated/prisma/client";
 
-// VoiceAgentsCallout pulls project context via useOrganizationTeamProject,
-// which in turn fires tRPC queries the bare SuiteSidebar test rig doesn't
-// provide. Stub it here so the sidebar tests keep their narrow scope; the
-// callout itself has dedicated coverage in VoiceAgentsCallout.unit.test.tsx.
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: vi.fn(() => ({
-    project: { id: "project_1" },
-  })),
-}));
-
 vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
 }));
