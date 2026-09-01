@@ -13,18 +13,11 @@ import {
   ApiRuntimeProcessPort,
   type ApiRuntimeCompositionOptions,
 } from "../api.main";
-import { ApiQueueInfrastructure } from "../platform/infrastructure/api-queue.infrastructure";
 import type {
   ApiAuthSessionCompositionPort,
   ApiBrowserSessionTransportPort,
 } from "./api-auth.composition";
-import {
-  ApiProductionComposition,
-  composeApiDatabase,
-  composeApiLifecycleProcess,
-  LoggedApiQueueAbsence,
-  resolveApiMetrics,
-} from "./api-production.composition";
+import { ApiProductionComposition } from "./api-production.composition";
 
 /**
  * The product services an API host hands over.
@@ -262,11 +255,27 @@ export type ApiStandaloneCompositionOptions = {
 /**
  * The composition the physical API executable boots.
  *
- * With product adapters it composes the full transport graph through
- * ApiProductionComposition. Without them it still composes a real process —
- * listener, readiness gate, health route, optional metrics route and bounded
- * drain — and says which adapters it is missing, so the executable is
- * exercisable before the product graph has a home outside the legacy app.
+ * It is {@link ApiProductionComposition} over this process's own validated
+ * configuration, plus the one thing a composition cannot say for itself: the
+ * executable's boot statement about what a deployment still has to hand it.
+ *
+ * It used to be two graphs. When the production composition could only be
+ * HANDED a host's product services, a process with none of them had nothing to
+ * compose, so this class built a second, smaller graph — a database, a queue
+ * and the lifecycle surface — and the executable booted that one. Every seam
+ * that has closed since (the stored-secret cipher, AuthZ over the process's
+ * own producer-only Eventing, the organization/project/API-key trio, the agent
+ * service, the Auth service) is composed by the production composition and by
+ * nothing else, so the graph the executable actually booted could never reach
+ * any of it. A deployment with a database, a Redis and a Better Auth transport
+ * would still have served a health route and no product traffic.
+ *
+ * So there is one graph now, and a host's services are an OVERRIDE of what
+ * this process would compose rather than the gate deciding which graph exists.
+ * Degrading is the production composition's own job and it already does it:
+ * each collaborator it cannot build is named at boot and it falls back to the
+ * lifecycle surface — listener, readiness gate, health route, optional metrics
+ * route and bounded drain.
  */
 export class ApiStandaloneComposition extends ApiRuntimeCompositionPort {
   static create(options: ApiStandaloneCompositionOptions = {}): ApiStandaloneComposition {
@@ -278,38 +287,36 @@ export class ApiStandaloneComposition extends ApiRuntimeCompositionPort {
   }
 
   compose(options: ApiRuntimeCompositionOptions): Promise<ApiRuntimeProcessPort> {
-    const products = this.options.products;
-    if (products) {
-      return ApiProductionComposition.create({
-        ...products,
-        ...(this.options.readiness ? { readiness: this.options.readiness } : {}),
-        ...(this.options.metrics ? { metrics: this.options.metrics } : {}),
-        ...(this.options.featureDrain ? { featureDrain: this.options.featureDrain } : {}),
-      }).compose(options);
-    }
-    return Promise.resolve(this.composeProcessSurface(options));
+    const products = this.options.products ?? {};
+    this.announceUnsuppliedAdapters(options, products);
+    return ApiProductionComposition.create({
+      ...products,
+      ...(this.options.readiness ? { readiness: this.options.readiness } : {}),
+      ...(this.options.metrics ? { metrics: this.options.metrics } : {}),
+      ...(this.options.featureDrain ? { featureDrain: this.options.featureDrain } : {}),
+    }).compose(options);
   }
 
-  private composeProcessSurface(options: ApiRuntimeCompositionOptions): ApiRuntimeProcessPort {
-    const logger = createLogger(options.config.serviceName);
-    composeApiDatabase(options);
-    const queue = ApiQueueInfrastructure.tryCreate({
-      resources: options.resources,
-      redis: options.config.infrastructure.redis,
-      redisLogger: logger,
-      queuePolicy: options.config.infrastructure.groupQueue,
-      report: LoggedApiQueueAbsence.create(logger),
-    });
-    logger.warn(
-      { adapters: API_UNAVAILABLE_PRODUCT_ADAPTERS },
-      "API process started without product transports: no host supplied its service adapters",
-    );
+  /**
+   * States what this deployment still has to supply, every time it boots.
+   *
+   * Said here rather than left to the composition below, because the two
+   * statements answer different questions. The production composition reports
+   * the collaborator it could not BUILD, and it only gets as far as the Auth
+   * graph when it already has a database, a Redis and a credential pair — so a
+   * deployment missing all four would never read the one line that names what
+   * it must actually hand over. This one is the executable's own, and it does
+   * not depend on how far composition got.
+   */
+  private announceUnsuppliedAdapters(
+    options: ApiRuntimeCompositionOptions,
+    products: ApiProductAdapters,
+  ): void {
+    if (products.auth !== undefined || products.browserSessions !== undefined) return;
 
-    return composeApiLifecycleProcess({
-      options,
-      metrics: resolveApiMetrics({ options, injected: this.options.metrics }),
-      readiness: this.options.readiness ?? queue?.readiness,
-      featureDrain: this.options.featureDrain,
-    });
+    createLogger(options.config.serviceName).warn(
+      { adapters: API_UNAVAILABLE_PRODUCT_ADAPTERS },
+      "API process started without an adapter no package implements: it mounts no product transports until a host supplies it",
+    );
   }
 }

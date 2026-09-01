@@ -1,3 +1,4 @@
+import { createServer } from "node:http";
 import { AgentService } from "@langwatch/agent-contract";
 import { ApiKeyService } from "@langwatch/api-key-contract";
 import { AuthService } from "@langwatch/auth-contract";
@@ -203,10 +204,35 @@ describe("ApiStandaloneComposition", () => {
       await process.close();
     });
 
-    it("gates the listener behind readiness and reports a failed dependency as a boot failure", async () => {
-      const readiness = new FailingReadiness();
+    /** @scenario "The listener stays closed until readiness has passed" */
+    it("accepts no connection until the readiness gate has answered", async () => {
+      const readiness = new LatchedReadiness();
+      const port = await reservePort();
       const process = await ApiStandaloneComposition.create({ readiness }).compose({
-        config: ephemeralConfig(),
+        config: { ...ephemeralConfig(), port },
+        graph: new TestGraph(),
+        observability: { serviceName: "langwatch-api-test" },
+        resources: new ResourceScope(),
+      });
+
+      const starting = process.start();
+      await readiness.entered;
+      await expect(fetch(`http://127.0.0.1:${port}/api/health`)).rejects.toThrow();
+
+      readiness.pass();
+      await starting;
+
+      expect(await fetch(`http://127.0.0.1:${port}/api/health`)).toHaveProperty("status", 204);
+
+      await process.close();
+    });
+
+    /** @scenario "A failed readiness gate is a boot failure rather than a serving process" */
+    it("reports a failed dependency as a boot failure and leaves its port free", async () => {
+      const readiness = new FailingReadiness();
+      const port = await reservePort();
+      const process = await ApiStandaloneComposition.create({ readiness }).compose({
+        config: { ...ephemeralConfig(), port },
         graph: new TestGraph(),
         observability: { serviceName: "langwatch-api-test" },
         resources: new ResourceScope(),
@@ -214,9 +240,14 @@ describe("ApiStandaloneComposition", () => {
 
       await expect(process.start()).rejects.toThrow("Redis is unreachable");
 
+      // Bindable, not merely unanswered: a port still held would mean the
+      // listener opened before the gate and only failed to serve.
+      await expect(bindPort(port)).resolves.toBeUndefined();
+
       await process.close();
     });
 
+    /** @scenario "Shutdown drains intake, then feature work, then infrastructure" */
     it("drains intake, then feature work, then telemetry, then infrastructure", async () => {
       const phases: string[] = [];
       const graph = new RecordingGraph(phases);
@@ -377,4 +408,60 @@ class FailingReadiness extends ApiReadinessPort {
   assertReady(): Promise<void> {
     return Promise.reject(new Error("Redis is unreachable"));
   }
+}
+
+/**
+ * A readiness gate that answers only when the test says so.
+ *
+ * `entered` is what makes the ordering assertion sound rather than a race: it
+ * resolves once the process has actually reached the gate, so a refused
+ * connection afterwards means the listener is closed BEHIND the gate rather
+ * than that the test simply got there first.
+ */
+class LatchedReadiness extends ApiReadinessPort {
+  private release: (() => void) | undefined;
+  private arrive: (() => void) | undefined;
+
+  readonly entered = new Promise<void>((resolve) => {
+    this.arrive = resolve;
+  });
+
+  private readonly ready = new Promise<void>((resolve) => {
+    this.release = resolve;
+  });
+
+  assertReady(): Promise<void> {
+    this.arrive?.();
+    return this.ready;
+  }
+
+  pass(): void {
+    this.release?.();
+  }
+}
+
+/** A port nothing else on this machine holds, released before it is handed back. */
+async function reservePort(): Promise<number> {
+  const server = createServer();
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  const port = address && typeof address !== "string" ? address.port : 0;
+  await new Promise<void>((resolve) => {
+    server.close(() => resolve());
+  });
+  return port;
+}
+
+/** Resolves when the port is bindable, so a leaked listener fails the test. */
+async function bindPort(port: number): Promise<void> {
+  const server = createServer();
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, "127.0.0.1", resolve);
+  });
+  await new Promise<void>((resolve) => {
+    server.close(() => resolve());
+  });
 }

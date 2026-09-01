@@ -63,6 +63,7 @@ export {
   startStandaloneApi,
   WrittenApiBootFailure,
   type ApiExecutableHost,
+  type ApiExecutableHostEvent,
   type ApiStandaloneExecutableOptions,
 } from "./app/api-standalone.executable";
 export {

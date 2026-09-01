@@ -685,9 +685,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
 /**
  * Composes the process's guarded Prisma connection from its validated config.
  *
- * Shared by both compositions so the standalone process and the production one
- * build the client the same way — through the packaged construction path, with
- * the packaged tenancy guard — instead of two roots drifting apart.
+ * A named step rather than an inline one because the client is the seam every
+ * packaged `Postgres*Adapter` below takes, and there is exactly one way to
+ * build it: through the packaged construction path, with the packaged tenancy
+ * guard. Nothing in this process can ask for a client without them.
  */
 export function composeApiDatabase(
   options: ApiRuntimeCompositionOptions,
@@ -734,8 +735,8 @@ export function composeApiSecretEncryption(
  *     answered "no such route" rather than by a door that refuses every caller
  *     it will ever have.
  *
- * Shared by both compositions so the standalone process and the production one
- * decide this the same way rather than drifting into two rules.
+ * Decided once, here, so a process serving product transports and one serving
+ * only its lifecycle surface answer a scrape by the same rule.
  */
 export function resolveApiMetrics(input: {
   options: ApiRuntimeCompositionOptions;
@@ -934,10 +935,10 @@ export class LoggedApiQueueAbsence extends ApiQueueAbsenceReportPort {
 /**
  * Composes the process with only its own lifecycle surface mounted.
  *
- * Shared by the two compositions that can arrive here — a host that supplied
- * no product adapters at all, and a production composition that could resolve
- * no AuthZ — so a deployment's health route, metrics gate, readiness order and
- * drain behaviour do not depend on WHICH of those two happened.
+ * The one destination for every way this process can end up with no product
+ * transports — no AuthZ, no credential pair, no way to authenticate a browser
+ * caller — so a deployment's health route, metrics gate, readiness order and
+ * drain behaviour do not depend on WHICH of those gaps it has.
  */
 export function composeApiLifecycleProcess(input: {
   options: ApiRuntimeCompositionOptions;

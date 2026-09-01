@@ -1,12 +1,29 @@
 import process from "node:process";
 import { ApiBootFailurePort, startApiExecutable } from "../api.executable";
 import type { ApiRuntimeBootstrap } from "../api.main";
+import type { ApiShutdownSignal, ApiSignalHost } from "../api.signal-handlers";
 import { ApiStandaloneComposition, type ApiProductAdapters } from "./api-standalone.composition";
 
-/** The Node process surface the standalone executable needs, injectable for tests. */
+/**
+ * Everything the standalone executable subscribes to on the process it runs
+ * in: the two ways a crash arrives, and the two ways an orchestrator asks it
+ * to stop.
+ */
+export type ApiExecutableHostEvent = "uncaughtException" | "unhandledRejection" | ApiShutdownSignal;
+
+/**
+ * The Node process surface the standalone executable needs, injectable for
+ * tests.
+ *
+ * It is the executable's ONE seam onto the process. Signal subscription used
+ * to reach past it for the real `process`, which left the executable owning
+ * the exit status of a crash but not of a SIGTERM, and left a host embedding
+ * it with handlers it could not remove.
+ */
 export type ApiExecutableHost = Readonly<{
   env: Readonly<Record<string, unknown>>;
-  on(event: "uncaughtException" | "unhandledRejection", listener: (value: unknown) => void): void;
+  on(event: ApiExecutableHostEvent, listener: (value: unknown) => void): void;
+  off(event: ApiExecutableHostEvent, listener: (value: unknown) => void): void;
   exit(code: number): void;
   write(line: string): void;
 }>;
@@ -18,13 +35,19 @@ export type ApiStandaloneExecutableOptions = Readonly<{
 }>;
 
 /**
- * The physical API executable.
+ * The physical API executable: one table of what this process is made of.
  *
- * It selects the configuration source, hands one complete composition to the
- * boot boundary, and owns the two concerns nothing below it can own: how a
- * fatal boot failure is reported, and what exit status a crash produces.
- * Configuration parsing, signal policy and the shutdown deadline belong to
- * ApiRuntimeBootstrap, which startApiExecutable drives.
+ *   source      the process's environment, read once and validated once
+ *   composition {@link ApiStandaloneComposition} — the production graph, which
+ *               composes its own database, cipher, AuthZ, tenancy, agents and
+ *               Auth, and names whatever it could not build
+ *   failures    a boot failure written where an operator reads it
+ *   signals     SIGTERM and SIGINT, and the exit status each one produces
+ *
+ * Everything below the table belongs to something else: configuration
+ * parsing, signal policy and the shutdown deadline are ApiRuntimeBootstrap's,
+ * which startApiExecutable drives, and every product decision is the
+ * composition's.
  *
  * It imports no legacy application graph, so it cannot start a partial second
  * copy of the platform process.
@@ -40,6 +63,7 @@ export async function startStandaloneApi(
       options.products ? { products: options.products } : {},
     ),
     failures: WrittenApiBootFailure.create(host),
+    signals: { host: signalHostOf(host), exit: (code) => host.exit(code) },
   });
 }
 
@@ -81,11 +105,31 @@ function installFatalHandlers(host: ApiExecutableHost): void {
   });
 }
 
+/**
+ * The shutdown-signal projection of the executable's host.
+ *
+ * A projection rather than the host itself, so the signal boundary keeps its
+ * own two-method contract and cannot subscribe to a crash event by accident.
+ */
+function signalHostOf(host: ApiExecutableHost): ApiSignalHost {
+  return {
+    on: (signal, listener) => {
+      host.on(signal, listener);
+    },
+    off: (signal, listener) => {
+      host.off(signal, listener);
+    },
+  };
+}
+
 function nodeApiExecutableHost(): ApiExecutableHost {
   return {
     env: process.env,
     on: (event, listener) => {
       process.on(event, listener);
+    },
+    off: (event, listener) => {
+      process.off(event, listener);
     },
     exit: (code) => process.exit(code),
     write: (line) => {
