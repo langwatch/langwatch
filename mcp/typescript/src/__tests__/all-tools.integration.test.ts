@@ -36,6 +36,25 @@ const CANNED_TRACES_SEARCH = {
   pagination: { totalHits: 1 },
 };
 
+/**
+ * Traces addressable by exact id, for the `traceIds` path. The ids are the
+ * bare-hex form the platform's own fixtures and prefix resolver use.
+ */
+const CANNED_TRACES_BY_ID = [
+  {
+    trace_id: "63dc535cea6335c506bc81ef3543a07d",
+    formatted_trace: "Root [server] 900ms",
+    input: { value: "First by id" },
+    output: { value: "First out" },
+  },
+  {
+    trace_id: "a3c6656cf433e97549f654034be02955",
+    formatted_trace: "Root [server] 300ms",
+    input: { value: "Second by id" },
+    output: { value: "Second out" },
+  },
+];
+
 const CANNED_TRACES_SEARCH_WITH_SCROLL = {
   traces: [
     {
@@ -392,10 +411,35 @@ function createMockServer(): Server {
       // --- Trace endpoints ---
       if (url === "/api/traces/search" && method === "POST") {
         const parsed = JSON.parse(body);
-        // Return empty results when a special query is used
-        if (parsed.query === "__empty__") {
+        // Exact-id fetches answer from the addressable pool, mirroring the
+        // engine's `TraceId IN (...)` predicate.
+        if (Array.isArray(parsed.traceIds) && parsed.traceIds.length > 0) {
+          const wanted = new Set<string>(parsed.traceIds);
+          const found = CANNED_TRACES_BY_ID.filter((t) =>
+            wanted.has(t.trace_id)
+          );
           res.writeHead(200);
-          res.end(JSON.stringify(CANNED_TRACES_EMPTY));
+          res.end(
+            JSON.stringify({
+              traces: found,
+              pagination: { totalHits: found.length },
+            })
+          );
+        } else if (
+          typeof parsed.query === "string" &&
+          parsed.query.length > 0
+        ) {
+          // Free text matches captured content only — the same reason a trace
+          // id never matches in production. A query that appears nowhere in the
+          // canned content comes back empty, "__empty__" included.
+          const haystack = JSON.stringify(
+            CANNED_TRACES_SEARCH.traces
+          ).toLowerCase();
+          const hit = haystack.includes(parsed.query.toLowerCase());
+          res.writeHead(200);
+          res.end(
+            JSON.stringify(hit ? CANNED_TRACES_SEARCH : CANNED_TRACES_EMPTY)
+          );
         } else if (parsed.pageSize === 5) {
           res.writeHead(200);
           res.end(JSON.stringify(CANNED_TRACES_SEARCH_WITH_SCROLL));
@@ -869,7 +913,8 @@ describe("All MCP tools integration", () => {
     });
 
     describe("when no traces match", () => {
-      it("returns a no-results message", async () => {
+      /** @scenario A search that matches nothing says which window it searched */
+      it("states the window it searched and names get_trace", async () => {
         const { handleSearchTraces } = await import(
           "../tools/search-traces.js"
         );
@@ -877,7 +922,126 @@ describe("All MCP tools integration", () => {
           query: "__empty__",
         });
 
-        expect(result).toBe("No traces found matching your query.");
+        expect(result).toContain("No traces found matching your query.");
+        expect(result).toContain("Searched the last 24 hours");
+        expect(result).toContain("get_trace");
+      });
+
+      /** @scenario An empty search offers a wider window */
+      it("offers a wider startDate and the units it accepts", async () => {
+        const { handleSearchTraces } = await import(
+          "../tools/search-traces.js"
+        );
+        const result = await handleSearchTraces({
+          query: "__empty__",
+        });
+
+        expect(result).toContain('startDate: "7d"');
+        expect(result).toContain("w (weeks)");
+      });
+
+      /** @scenario A trace id in a format the shape check cannot recognise still gets guidance */
+      it("still names get_trace for a customer-assigned id it cannot recognise", async () => {
+        const { handleSearchTraces } = await import(
+          "../tools/search-traces.js"
+        );
+        const result = await handleSearchTraces({ query: "order-12345" });
+
+        expect(result).toContain("No traces found matching your query.");
+        expect(result).toContain("get_trace");
+        // The shape check does not claim this one; the unconditional guidance
+        // is what carries it.
+        expect(result).not.toContain("looks like a trace id");
+      });
+    });
+
+    describe("when the query looks like a trace id", () => {
+      /** @scenario Agent pastes a trace id into the search query */
+      it("says it looks like a trace id and points at get_trace", async () => {
+        const { handleSearchTraces } = await import(
+          "../tools/search-traces.js"
+        );
+        const result = await handleSearchTraces({
+          query: "63dc535cea6335c506bc81ef3543a07d",
+        });
+
+        expect(result).toContain("No traces found matching your query.");
+        expect(result).toContain("looks like a trace id");
+        expect(result).toContain(
+          'get_trace` with traceId: "63dc535cea6335c506bc81ef3543a07d"'
+        );
+      });
+
+      /** @scenario A trace id truncated by the CLI is still recognised as an id */
+      it("recognises a 20-character truncation the CLI prints", async () => {
+        const { handleSearchTraces } = await import(
+          "../tools/search-traces.js"
+        );
+        const result = await handleSearchTraces({
+          query: "63dc535cea6335c506bc",
+        });
+
+        expect(result).toContain("looks like a trace id");
+      });
+
+      /** @scenario An id-shaped query is still executed as a search */
+      it("still executes a search and never a single-trace lookup", async () => {
+        const { handleSearchTraces } = await import(
+          "../tools/search-traces.js"
+        );
+        delete lastRequests["GET /api/traces/63dc535cea6335c506bc81ef3543a07d"];
+
+        await handleSearchTraces({
+          query: "63dc535cea6335c506bc81ef3543a07d",
+        });
+
+        const search = lastRequests["POST /api/traces/search"];
+        expect(search).toBeDefined();
+        expect(JSON.parse(search!.body).query).toBe(
+          "63dc535cea6335c506bc81ef3543a07d"
+        );
+        expect(
+          lastRequests["GET /api/traces/63dc535cea6335c506bc81ef3543a07d"]
+        ).toBeUndefined();
+      });
+    });
+
+    describe("when trace ids are named", () => {
+      /** @scenario Agent looks up several traces by id in one call */
+      it("fetches exactly those traces in one call", async () => {
+        const { handleSearchTraces } = await import(
+          "../tools/search-traces.js"
+        );
+        const result = await handleSearchTraces({
+          traceIds: [
+            "63dc535cea6335c506bc81ef3543a07d",
+            "a3c6656cf433e97549f654034be02955",
+          ],
+        });
+
+        expect(result).toContain("63dc535cea6335c506bc81ef3543a07d");
+        expect(result).toContain("a3c6656cf433e97549f654034be02955");
+        expect(result).toContain("Found 2 traces");
+      });
+
+      /** @scenario Naming trace ids widens the default window past 24 hours */
+      it("defaults the window to 90 days instead of 24 hours", async () => {
+        const { handleSearchTraces } = await import(
+          "../tools/search-traces.js"
+        );
+        await handleSearchTraces({
+          traceIds: ["63dc535cea6335c506bc81ef3543a07d"],
+        });
+
+        const req = lastRequests["POST /api/traces/search"];
+        const parsed = JSON.parse(req!.body);
+        const spanDays =
+          (parsed.endDate - parsed.startDate) / (24 * 60 * 60 * 1000);
+
+        expect(parsed.traceIds).toEqual([
+          "63dc535cea6335c506bc81ef3543a07d",
+        ]);
+        expect(spanDays).toBeCloseTo(90, 0);
       });
     });
 

@@ -315,6 +315,13 @@ export async function makeRequest(
  */
 export async function searchTraces(params: {
   query?: string;
+  /**
+   * Exact trace ids. Lands on `trace_summaries`' `(TenantId, TraceId)` sort key
+   * as an `IN` predicate, so it is a primary-key seek rather than a scan — the
+   * cheapest shape the table supports. The REST boundary already accepted this
+   * field; only the tool never forwarded it (ADR-132).
+   */
+  traceIds?: string[];
   filters?: Record<string, string[]>;
   startDate: number;
   endDate: number;

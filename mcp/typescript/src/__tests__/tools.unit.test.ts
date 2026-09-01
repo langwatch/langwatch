@@ -193,12 +193,14 @@ describe("handleSearchTraces()", () => {
   });
 
   describe("when no traces are found", () => {
-    it("returns a no-results message", async () => {
+    it("returns a no-results message that names the window and get_trace", async () => {
       mockSearchTraces.mockResolvedValue({ traces: [] });
 
       const result = await handleSearchTraces({});
 
-      expect(result).toBe("No traces found matching your query.");
+      expect(result).toContain("No traces found matching your query.");
+      expect(result).toContain("Searched the last 24 hours");
+      expect(result).toContain("get_trace");
     });
   });
 
