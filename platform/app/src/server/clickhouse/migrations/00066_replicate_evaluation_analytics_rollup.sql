@@ -62,7 +62,7 @@ CREATE TABLE ${CLICKHOUSE_DATABASE}.evaluation_analytics_rollup_rebuild
     CostSum SimpleAggregateFunction(sum, Float64),
     NonBilledCostSum SimpleAggregateFunction(sum, Float64),
 
-    `_retention_days` SimpleAggregateFunction(max, UInt16) DEFAULT 308 CODEC(Delta(2), ZSTD(1))
+    `_retention_days` UInt16 DEFAULT 308 CODEC(Delta(2), ZSTD(1))
 )
 ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}
 PARTITION BY toYearWeek(toDate(BucketStart))

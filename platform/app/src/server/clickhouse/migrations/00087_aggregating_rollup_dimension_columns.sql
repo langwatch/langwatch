@@ -24,13 +24,22 @@
 --
 -- ClickHouse 26.0 turned this schema into a create-time error (BAD_ARGUMENTS,
 -- "Column(s) X of the AggregatingMergeTree table are neither part of the
--- sorting key nor aggregate measures"), so the same fix is applied to the
--- CREATE TABLE statements in 00017/00038/00040/00058/00064/00065/00066/00069
--- and 00081. Those are the statements a fresh install replays, and without
--- the fix a fresh install against ClickHouse 26 or newer stops at 00017. This
--- migration is what brings an install created on an older ClickHouse to the
--- same schema; on a fresh install every statement below is already true and
--- the ALTER is accepted as a no-op.
+-- sorting key nor aggregate measures"). The statements that create these
+-- tables are merged history (00017/00038/00040/00058/00064/00065/00066/00069
+-- and 00081) and cannot be edited, so a new install replays them exactly as
+-- they are. runMigrations in goose.ts therefore runs everything up to 00086
+-- with allow_dimensions_outside_sorting_key relaxed, but only on a server
+-- that has that setting, and this migration converts the tables immediately
+-- after. Both paths end here, so an install created on ClickHouse 25 and one
+-- created on ClickHouse 26 carry the same schema.
+--
+-- Migrations after this one run with the check in force.
+--
+-- A table created during that relaxed phase keeps the setting in its own
+-- SETTINGS clause. It is left there: it cannot be reset by a statement that
+-- also has to run on ClickHouse 25, where the setting does not exist, and it
+-- relaxes a check that has nothing left to relax once the ALTERs below have
+-- run. The columns are what the guards assert on, not the setting.
 --
 -- SETTINGS alter_sync = 1, mutations_sync = 0 — wait for the local replica
 -- only, never queue behind unrelated mutations (same as 00032).

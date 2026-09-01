@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.simulation_run_metrics_rollup
 
     -- Plain partition anchor (toYYYYMM of the trace's OccurredAt); see the
     -- header for why this is not derived from the state column.
-    PartitionMonth SimpleAggregateFunction(max, UInt32)
+    PartitionMonth UInt32
 )
 ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}
 PARTITION BY PartitionMonth

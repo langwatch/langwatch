@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.gateway_budget_scope_totals_re
     TokensCacheWrite AggregateFunction(sum, UInt64),
     RequestCount AggregateFunction(count, UInt64),
 
-    UpdatedAt SimpleAggregateFunction(max, DateTime64(3)) DEFAULT now64(3) CODEC(Delta(8), ZSTD(1))
+    UpdatedAt DateTime64(3) DEFAULT now64(3) CODEC(Delta(8), ZSTD(1))
 )
 ENGINE = AggregatingMergeTree()
 PARTITION BY toYYYYMM(PeriodStart)

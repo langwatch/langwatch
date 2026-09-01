@@ -90,7 +90,7 @@ CREATE TABLE ${CLICKHOUSE_DATABASE}.trace_analytics_rollup_rebuild
     CacheWriteTokensSum SimpleAggregateFunction(sum, UInt64),
     ReasoningTokensSum SimpleAggregateFunction(sum, UInt64),
 
-    `_retention_days` SimpleAggregateFunction(max, UInt16) DEFAULT 308 CODEC(Delta(2), ZSTD(1))
+    `_retention_days` UInt16 DEFAULT 308 CODEC(Delta(2), ZSTD(1))
 )
 ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}
 PARTITION BY toYearWeek(toDate(BucketStart))
