@@ -117,7 +117,7 @@ function ParamRow({ param, onChange, onRemove }: ParamRowProps) {
         variant="ghost"
         onClick={onRemove}
       >
-        <Trash2 />
+        <Trash2 size={14} />
       </IconButton>
     </HStack>
   );
@@ -169,7 +169,7 @@ export function PlaygroundQueryParamsEditor({
           ])
         }
       >
-        <Plus /> Add parameter
+        <Plus size={14} /> Add parameter
       </Button>
     </Box>
   );

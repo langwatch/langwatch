@@ -18,8 +18,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ChevronDown, Play, Trash2 } from "lucide-react";
-
 import type { PlaygroundQuery } from "~/server/analytics/playgroundWidgetDefinition";
+import { formatNumber } from "~/utils/formatNumber";
 
 import { PlaygroundCodeEditor } from "./PlaygroundCodeEditor";
 import { PlaygroundQueryParamsEditor } from "./PlaygroundQueryParamsEditor";
@@ -32,7 +32,7 @@ function runSummary(run: QueryLastRun | undefined): string | null {
   if (run.error) return `${run.error.title}`;
   if (!run.result) return null;
   const elapsedMs = run.result.statistics.elapsedMs;
-  const rows = `${run.result.rows.length} row${run.result.rows.length === 1 ? "" : "s"}`;
+  const rows = `${formatNumber(run.result.rows.length)} row${run.result.rows.length === 1 ? "" : "s"}`;
   return typeof elapsedMs === "number" ? `${rows} · ${elapsedMs}ms` : rows;
 }
 
@@ -61,13 +61,13 @@ export function PlaygroundQueryRow({
   const summary = runSummary(lastRun);
 
   return (
-    <Card.Root size="sm" marginBottom={3}>
+    <Card.Root size="sm" width="full" marginBottom={3}>
       <Accordion.Item value={query.name || "(unnamed)"} border="none">
         <Card.Body gap={2}>
           <HStack>
             <Accordion.ItemTrigger flex={1} minWidth={0}>
               <Accordion.ItemIndicator>
-                <ChevronDown />
+                <ChevronDown size={14} />
               </Accordion.ItemIndicator>
               <Span fontFamily="mono" fontSize="13px" truncate>
                 {query.name || "(unnamed query)"}
@@ -91,7 +91,7 @@ export function PlaygroundQueryRow({
                 onRun();
               }}
             >
-              <Play /> Run
+              <Play size={14} /> Run
             </Button>
             <IconButton
               aria-label={`Delete query ${query.name}`}
@@ -103,7 +103,7 @@ export function PlaygroundQueryRow({
                 onRemove();
               }}
             >
-              <Trash2 />
+              <Trash2 size={14} />
             </IconButton>
           </HStack>
           <Accordion.ItemContent>

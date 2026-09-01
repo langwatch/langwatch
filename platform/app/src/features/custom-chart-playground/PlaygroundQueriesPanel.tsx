@@ -76,7 +76,7 @@ export function PlaygroundQueriesPanel({
   };
 
   return (
-    <VStack align="stretch" gap={2} height="full" minHeight={0}>
+    <VStack align="stretch" gap={2} width="full" height="full" minHeight={0}>
       <Accordion.Root
         variant="plain"
         multiple
@@ -120,7 +120,7 @@ export function PlaygroundQueriesPanel({
           onChange([...queries, { name: nextQueryName(queries), sql: "" }])
         }
       >
-        <Plus /> Add query
+        <Plus size={14} /> Add query
       </Button>
     </VStack>
   );

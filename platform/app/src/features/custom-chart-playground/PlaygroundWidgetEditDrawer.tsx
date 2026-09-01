@@ -92,6 +92,7 @@ export function PlaygroundWidgetEditDrawer({
               flex={1}
               minHeight={0}
               display="flex"
+              flexDirection="column"
               paddingTop={3}
             >
               <Box
@@ -115,6 +116,7 @@ export function PlaygroundWidgetEditDrawer({
               flex={1}
               minHeight={0}
               display="flex"
+              flexDirection="column"
               paddingTop={3}
             >
               <PlaygroundQueriesPanel
