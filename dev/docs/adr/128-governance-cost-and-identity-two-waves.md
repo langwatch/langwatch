@@ -228,7 +228,7 @@ is lossy forever); floats anywhere in stored money (the display-only
 `AmountUSD Decimal` rule stands).
 
 Interop note (checked against the FinOps FOCUS standard, v1.x): the
-model exports cleanly if ever needed — `BilledAmountNano` →
+model exports cleanly if ever needed — `AmountNanoMinor` →
 `BilledCost`, `CurrencyCode` → `BillingCurrency`, `Day` →
 `ChargePeriodStart/End`, `Provider` → `ProviderName`; actor, model and
 our metered amounts as custom `x_` columns. Our metered amount is
