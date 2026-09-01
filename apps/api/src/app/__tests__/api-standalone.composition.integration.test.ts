@@ -49,7 +49,7 @@ describe("ApiStandaloneComposition", () => {
 
     it("names every adapter it is still waiting on rather than leaving the gap implicit", () => {
       expect(API_UNAVAILABLE_PRODUCT_ADAPTERS).toContain(
-        "PrismaQueryGuard: the multitenancy, organization and mass-delete query guards",
+        "SecretEncryptionPort and OrganizationSettingsSecretPort: the stored-secret encryption key",
       );
       expect(API_UNAVAILABLE_PRODUCT_ADAPTERS).toContain(
         "ApiKeyBindingIdPort, ApiKeyDiagnosticsPort and the organization identity ports",
@@ -60,6 +60,12 @@ describe("ApiStandaloneComposition", () => {
       const named = API_UNAVAILABLE_PRODUCT_ADAPTERS.join("\n");
 
       expect(named).not.toMatch(/PAT\/admin|instance admin|rate limiter/i);
+    });
+
+    it("stops naming the query guards, now that it composes its own guarded client", () => {
+      const named = API_UNAVAILABLE_PRODUCT_ADAPTERS.join("\n");
+
+      expect(named).not.toMatch(/PrismaQueryGuard|multitenancy|mass-delete/i);
     });
 
     it("serves the metrics route only once a metrics port is composed", async () => {

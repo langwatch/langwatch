@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { parsePrismaDatamodel } from "~/test-utils/prismaDatamodel";
-import type { GuardParams } from "../dbGuardMiddleware";
+import { parsePrismaDatamodel } from "./datamodel";
+import type { GuardParams } from "./guard-middleware";
 import {
   guardProjectId,
   PROJECT_TENANCY_REGIMES,
   SCOPED_MODEL_NAMES,
-} from "../dbMultiTenancyProtection";
-import { ORG_BEARING_MODEL_NAMES } from "../dbOrganizationIdProtection";
+} from "./multi-tenancy-guard";
+import { ORG_BEARING_MODEL_NAMES } from "./organization-guard";
 
 /**
  * Regression tests for the multitenancy guard — specifically its exempt

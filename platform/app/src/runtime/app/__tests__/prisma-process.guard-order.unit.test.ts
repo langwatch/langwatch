@@ -1,15 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-
-type GuardParams = {
-  action: string;
-  args: unknown;
-  model?: string;
-};
-
-type GuardNext = (params: GuardParams) => Promise<unknown>;
+import type { PrismaQueryContext, PrismaQueryExecutor } from "@langwatch/prisma-client";
 
 const calls = vi.hoisted(() => ({
   order: [] as string[],
+  contexts: [] as PrismaQueryContext[],
 }));
 
 vi.mock("~/server/dbSlowQueryWarning", () => ({
@@ -19,48 +13,61 @@ vi.mock("~/server/dbSlowQueryWarning", () => ({
   },
 }));
 
-vi.mock("~/utils/dbMassDeleteProtection", () => ({
-  guardEnMasse: (params: GuardParams, next: GuardNext): Promise<unknown> => {
-    calls.order.push("mass-delete");
-    return next({ ...params, args: { stage: "mass-delete" } });
-  },
-}));
+// The tenancy policy itself is packaged, and its own suite pins the order the
+// three guards run in. What is left for this process to get right is the one
+// thing it adds: the timing has to be OUTSIDE the guards, or a query the
+// tenancy guard refuses would be reported as a fast success.
+vi.mock("@langwatch/prisma-client", () => {
+  class PrismaQueryGuard {}
 
-vi.mock("~/utils/dbMultiTenancyProtection", () => ({
-  guardProjectId: (params: GuardParams, next: GuardNext): Promise<unknown> => {
-    calls.order.push("project");
-    return next({ ...params, args: { stage: "project" } });
-  },
-}));
-
-vi.mock("~/utils/dbOrganizationIdProtection", () => ({
-  guardOrganizationId: (params: GuardParams, next: GuardNext): Promise<unknown> => {
-    calls.order.push("organization");
-    return next({ ...params, args: { stage: "organization" } });
-  },
-}));
+  return {
+    PrismaQueryGuard,
+    PrismaTenancyGuardService: {
+      create: () => ({
+        execute: (context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> => {
+          calls.order.push("tenancy");
+          calls.contexts.push(context);
+          return next({ stage: "tenancy" });
+        },
+      }),
+    },
+  };
+});
 
 import { AppPrismaQueryGuard } from "../prisma-process.composition";
 
 describe("AppPrismaQueryGuard", () => {
-  it("times and applies the legacy guards in registration order before delegation", async () => {
+  it("times the packaged tenancy guard from outside it, then delegates", async () => {
     calls.order.length = 0;
+    calls.contexts.length = 0;
     const next = vi.fn(async (args: unknown) => {
       calls.order.push("delegate");
       return args;
     });
+    const context = {
+      model: "Project",
+      action: "deleteMany",
+      args: { where: { id: "FORCE_DELETE_ALL" } },
+    };
 
-    const result = await new AppPrismaQueryGuard().execute(
-      {
-        model: "Project",
-        action: "deleteMany",
-        args: { where: { id: "FORCE_DELETE_ALL" } },
-      },
-      next,
+    const result = await new AppPrismaQueryGuard().execute(context, next);
+
+    expect(calls.order).toEqual(["timing", "tenancy", "delegate"]);
+    expect(calls.contexts).toEqual([context]);
+    expect(next).toHaveBeenCalledWith({ stage: "tenancy" });
+    expect(result).toEqual({ stage: "tenancy" });
+  });
+
+  it("reports a model-less raw operation without inventing a model", async () => {
+    calls.order.length = 0;
+    calls.contexts.length = 0;
+
+    await new AppPrismaQueryGuard().execute(
+      { action: "queryRaw", args: { query: "SELECT 1" } },
+      async (args) => args,
     );
 
-    expect(calls.order).toEqual(["timing", "mass-delete", "project", "organization", "delegate"]);
-    expect(next).toHaveBeenCalledWith({ stage: "organization" });
-    expect(result).toEqual({ stage: "organization" });
+    expect(calls.order).toEqual(["timing", "tenancy"]);
+    expect(Object.hasOwn(calls.contexts[0]!, "model")).toBe(false);
   });
 });

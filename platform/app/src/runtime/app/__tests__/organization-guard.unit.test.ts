@@ -2,22 +2,33 @@ import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 
 import { LANGY_SESSION_API_KEY_NAME } from "@langwatch/api-key-contract";
-import { PrismaLangySessionKeyRepository } from "../../../../../packages/features/langy/server/src/repositories/prisma/prisma.langy-session-key.repository";
-import type { LangyDatabase } from "../../../../../packages/features/langy/server/src/repositories/prisma/langy-database.port";
-import { PrismaSystemMigrationEnrollmentRepository } from "~/server/app-layer/system-migrations/repositories/system-migration-enrollment.prisma.repository";
-import { parsePrismaDatamodel } from "~/test-utils/prismaDatamodel";
-import type { GuardParams } from "../dbGuardMiddleware";
 import {
   guardOrganizationId,
+  type GuardParams,
   ORG_SCOPED_MODEL_NAMES,
   ORG_TENANCY_EXEMPT,
-} from "../dbOrganizationIdProtection";
+  parsePrismaDatamodel,
+} from "@langwatch/prisma-client";
+import { PrismaLangySessionKeyRepository } from "../../../../../../packages/features/langy/server/src/repositories/prisma/prisma.langy-session-key.repository";
+import type { LangyDatabase } from "../../../../../../packages/features/langy/server/src/repositories/prisma/langy-database.port";
+import { PrismaSystemMigrationEnrollmentRepository } from "~/server/app-layer/system-migrations/repositories/system-migration-enrollment.prisma.repository";
 
 /**
  * Tests for the organization-tenancy guard (ADR-021): the org-level mirror of
  * guardProjectId. Every org-scoped model must carry a single-organization
  * predicate on every query, no query may span two organizations, and a
  * partition test keeps the regime classification honest as the schema grows.
+ *
+ * The guard itself lives in `@langwatch/prisma-client` now, and this suite
+ * did NOT follow it there, deliberately. What makes these scenarios worth
+ * more than hand-built params is that several of them drive the guard with a
+ * real repository's real arguments — the langy session-key repository from
+ * `@langwatch/langy-server`, and the platform's own system-migration
+ * enrollment repository. Both of those depend on `@langwatch/prisma-client`,
+ * so importing either from inside it would invert the dependency, and the
+ * second is app-layer code that has no business being reachable from an
+ * infrastructure package at all. It runs from the composition root that
+ * installs the guard instead.
  */
 
 async function runGuard(params: GuardParams): Promise<unknown> {

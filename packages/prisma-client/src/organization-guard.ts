@@ -1,5 +1,5 @@
 import { HIDDEN_SYSTEM_KEY_NAMES } from "@langwatch/api-key-contract";
-import type { GuardMiddleware, GuardParams } from "./dbGuardMiddleware";
+import type { GuardMiddleware, GuardParams } from "./guard-middleware";
 
 /**
  * Organization-tenancy guard: the org-level mirror of guardProjectId.
@@ -509,10 +509,12 @@ const validateRecursive = (where: any, passes: (clause: any) => boolean): boolea
   }
   // OR semantics: every alternative branch must independently carry a
   // single-org predicate, otherwise the unbounded branch leaks rows.
-  if (Array.isArray(where.OR) && where.OR.length > 0) {
-    if (where.OR.every((clause: any) => validateRecursive(clause, passes))) {
-      return true;
-    }
+  if (
+    Array.isArray(where.OR) &&
+    where.OR.length > 0 &&
+    where.OR.every((clause: any) => validateRecursive(clause, passes))
+  ) {
+    return true;
   }
   return false;
 };

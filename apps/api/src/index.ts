@@ -12,6 +12,8 @@ export {
 export { ApiRestObservabilityComposition } from "./app/api-rest-observability.composition";
 export {
   ApiProductionComposition,
+  composeApiDatabase,
+  LoggedApiDatabaseAbsence,
   LoggedApiQueueAbsence,
   type ApiOwnedRestFeaturePorts,
 } from "./app/api-production.composition";
@@ -207,9 +209,15 @@ export {
   resolveApiConfig,
   API_PORT_ENV_PRECEDENCE,
   type ApiConfig,
+  type ApiDatabaseConfigResolution,
   type ApiInfrastructureConfig,
   type ApiShutdownConfig,
 } from "./platform/config/api.config";
+export {
+  ApiDatabaseAbsenceReportPort,
+  ApiDatabaseInfrastructure,
+  type ApiDatabaseInfrastructureOptions,
+} from "./platform/infrastructure/api-database.infrastructure";
 export { ApiGroupQueueContextAdapter } from "./platform/infrastructure/api-group-queue-context.adapter";
 export {
   ApiQueueAbsenceReportPort,

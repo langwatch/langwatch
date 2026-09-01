@@ -11,6 +11,12 @@ vi.mock("@langwatch/prisma-client", () => {
 
   return {
     PrismaQueryGuard,
+    PrismaTenancyGuardService: {
+      create: () => ({
+        execute: async (_context: unknown, next: (args: unknown) => Promise<unknown>) =>
+          next(void 0),
+      }),
+    },
     PrismaConfigService: {
       create: () => ({ resolve: composed.resolve }),
     },

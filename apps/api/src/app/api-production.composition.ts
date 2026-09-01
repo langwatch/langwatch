@@ -1,4 +1,5 @@
 import type { AgentService } from "@langwatch/agent-contract";
+import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { GroupQueueStoragePort } from "@langwatch/group-queue";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
@@ -14,6 +15,10 @@ import {
 } from "../api-request.policy";
 import { ApiFeatureDrainPort, ApiProcess } from "../api.process";
 import { ApiMetricsPort, ApiReadinessPort } from "../api-process.lifecycle";
+import {
+  ApiDatabaseAbsenceReportPort,
+  ApiDatabaseInfrastructure,
+} from "../platform/infrastructure/api-database.infrastructure";
 import {
   ApiQueueAbsenceReportPort,
   ApiQueueInfrastructure,
@@ -99,6 +104,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   private composedFeaturePorts: ApiOwnedRestFeaturePorts | undefined;
+  private composedDatabase: ApiDatabaseInfrastructure | undefined;
 
   private constructor(
     private readonly agents: AgentService,
@@ -119,6 +125,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
 
   compose(options: ApiRuntimeCompositionOptions): Promise<ApiRuntimeProcessPort> {
     const queueInfrastructure = this.composeQueue(options);
+    this.composedDatabase = composeApiDatabase(options);
     this.composedFeaturePorts = this.composeFeaturePorts(options, queueInfrastructure);
     const process = ApiProcess.create({
       agents: this.agents,
@@ -158,6 +165,24 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    */
   restFeaturePorts(): ApiOwnedRestFeaturePorts | undefined {
     return this.composedFeaturePorts;
+  }
+
+  /**
+   * The process's one guarded Prisma connection, once it has been composed.
+   *
+   * `undefined` before `compose`, and `undefined` after it when the deployment
+   * configured no `DATABASE_URL` — the same degradation Redis has. Nothing
+   * below the composition root constructs a client, so this accessor is the
+   * only place a typed `PrismaClient` enters the process.
+   *
+   * It is exposed rather than consumed because a client is not a service: the
+   * packaged `Postgres*Adapter`s that would take it still need ports this
+   * package cannot construct, which is what the remaining entries of
+   * `API_UNAVAILABLE_PRODUCT_ADAPTERS` name. What has changed is that the
+   * guard is no longer one of them.
+   */
+  database(): PrismaConnection | undefined {
+    return this.composedDatabase?.connection;
   }
 
   /**
@@ -244,6 +269,43 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       storage: this.queueStorage,
       report: LoggedApiQueueAbsence.create(logger),
     });
+  }
+}
+
+/**
+ * Composes the process's guarded Prisma connection from its validated config.
+ *
+ * Shared by both compositions so the standalone process and the production one
+ * build the client the same way — through the packaged construction path, with
+ * the packaged tenancy guard — instead of two roots drifting apart.
+ */
+export function composeApiDatabase(
+  options: ApiRuntimeCompositionOptions,
+): ApiDatabaseInfrastructure | undefined {
+  const logger = createLogger(options.config.serviceName);
+  return ApiDatabaseInfrastructure.tryCreate({
+    resources: options.resources,
+    database: options.config.infrastructure.database,
+    nodeEnvironment: options.config.nodeEnvironment,
+    report: LoggedApiDatabaseAbsence.create(logger),
+  });
+}
+
+/** Names the absent database once, at boot, rather than leaving it to be inferred. */
+export class LoggedApiDatabaseAbsence extends ApiDatabaseAbsenceReportPort {
+  static create(logger: Pick<Logger, "info">): LoggedApiDatabaseAbsence {
+    return new LoggedApiDatabaseAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "info">) {
+    super();
+  }
+
+  absent(): void {
+    this.logger.info(
+      { reason: "unconfigured" },
+      "API composed without Postgres: no guarded Prisma client exists in this process",
+    );
   }
 }
 

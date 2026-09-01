@@ -2,7 +2,7 @@
 
 import isEmpty from "lodash-es/isEmpty";
 
-import type { GuardMiddleware, GuardParams } from "./dbGuardMiddleware";
+import type { GuardMiddleware, GuardParams } from "./guard-middleware";
 
 /**
  * Middleware featured below
@@ -45,13 +45,11 @@ const _guardEnMasse = ({
   safeWord: string;
 }) => {
   // Check if empty, if not and safeWord is provided, then set where = {} and proceed to execute
-  if (actions.includes(params.action)) {
-    // Don't allow delete all queries
-    if (isEmpty(params.args.where)) {
-      throw new Error(
-        `It looks like you just tried to perform a ${params.action} on all of the ${params.model}s. If this was intentional, pass 'where: ${safeWord}'`,
-      );
-    }
+  // Don't allow delete all queries
+  if (actions.includes(params.action) && isEmpty(params.args.where)) {
+    throw new Error(
+      `It looks like you just tried to perform a ${params.action} on all of the ${params.model}s. If this was intentional, pass 'where: ${safeWord}'`,
+    );
   }
 
   if (params.args?.where?.id === safeWord) {

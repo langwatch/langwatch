@@ -86,6 +86,19 @@ export const apiConfigDefinition = RuntimeConfig.define({
     env: "LANGWATCH_INSTANCE_ADMIN_API_KEY",
   }),
   infrastructure: {
+    /**
+     * The Postgres connection the process composes its one guarded Prisma
+     * client from.
+     *
+     * Optional for the same reason Redis is: a process that was given no
+     * database composes without one and says so at boot, rather than refusing
+     * to start. What it cannot do is compose an UNCONFIGURED client — a blank
+     * export is not a connection string, and a client built over one would
+     * fail on its first query instead of at boot.
+     */
+    database: {
+      url: Config.value(optionalEnvironmentString, { env: "DATABASE_URL" }),
+    },
     redis: {
       url: Config.value(optionalEnvironmentString, { env: "REDIS_URL" }),
       clusterEndpoints: Config.value(optionalEnvironmentString, {
@@ -115,7 +128,13 @@ export const apiConfigDefinition = RuntimeConfig.define({
 
 type ApiConfigProjection = ConfigValue<typeof apiConfigDefinition>;
 
+/** The Postgres connection a process was configured with, if it was given one. */
+export type ApiDatabaseConfigResolution = Readonly<{
+  url: string | undefined;
+}>;
+
 export type ApiInfrastructureConfig = Readonly<{
+  database: ApiDatabaseConfigResolution;
   redis: RedisConfigResolution;
   groupQueue: GroupQueuePolicy;
 }>;
@@ -149,6 +168,7 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
         value.shutdown.deadlineMs ?? value.httpDrainGraceMs + PROCESS_CLOSE_SLACK_MS,
     },
     infrastructure: {
+      database: { url: value.infrastructure.database.url },
       redis: new RedisConfigService().resolve(value.infrastructure.redis),
       groupQueue: resolveGroupQueuePolicyFromEnv(value.infrastructure.groupQueue),
     },

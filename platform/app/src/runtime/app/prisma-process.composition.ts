@@ -5,33 +5,36 @@ import {
   PrismaQueryGuard,
   type PrismaQueryContext,
   type PrismaQueryExecutor,
+  PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import { withQueryTiming } from "~/server/dbSlowQueryWarning";
-import { guardEnMasse } from "~/utils/dbMassDeleteProtection";
-import type { GuardNext, GuardParams } from "~/utils/dbGuardMiddleware";
-import { guardProjectId } from "~/utils/dbMultiTenancyProtection";
-import { guardOrganizationId } from "~/utils/dbOrganizationIdProtection";
 
 export interface PrismaProcessConfiguration {
   databaseUrl: string;
   nodeEnv: string;
 }
 
-/** Preserves the legacy Prisma middleware sequence at the composed client. */
+/**
+ * The packaged tenancy guard with this process's slow-query reporting around
+ * it, which is the whole of what the app adds to the shared policy.
+ *
+ * The timing stays here because the budget it reports against is read from the
+ * environment per call (`POSTGRES_SLOW_QUERY_MS`), and nothing below a
+ * composition root reads the environment. The order the client sees is
+ * unchanged: timing, then mass-delete, then project, then organization.
+ */
 export class AppPrismaQueryGuard extends PrismaQueryGuard {
+  private readonly tenancy = PrismaTenancyGuardService.create();
+
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
-    const params: GuardParams = {
-      ...(context.model === void 0 ? {} : { model: context.model }),
-      action: context.action,
-      args: context.args,
-    };
-    const run: GuardNext = (current) =>
-      guardProjectId(current, (projectGuarded) =>
-        guardOrganizationId(projectGuarded, (organizationGuarded) =>
-          next(organizationGuarded.args),
-        ),
-      );
-    return withQueryTiming({ params, run: () => guardEnMasse(params, run) });
+    return withQueryTiming({
+      params: {
+        ...(context.model === void 0 ? {} : { model: context.model }),
+        action: context.action,
+        args: context.args,
+      },
+      run: () => this.tenancy.execute(context, next),
+    });
   }
 }
 

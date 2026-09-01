@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { guardOrganizationId } from "~/utils/dbOrganizationIdProtection";
+import { guardOrganizationId } from "@langwatch/prisma-client";
 import { PrismaMfaEnrollmentRepository } from "../mfa-enrollment.prisma.repository";
 
 /**

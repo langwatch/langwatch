@@ -24,7 +24,11 @@ import {
 } from "../api.main";
 import { ApiQueueInfrastructure } from "../platform/infrastructure/api-queue.infrastructure";
 import type { ApiAuthSessionCompositionPort } from "./api-auth.composition";
-import { ApiProductionComposition, LoggedApiQueueAbsence } from "./api-production.composition";
+import {
+  ApiProductionComposition,
+  composeApiDatabase,
+  LoggedApiQueueAbsence,
+} from "./api-production.composition";
 
 /**
  * The already-composed product services an API host hands over.
@@ -59,9 +63,18 @@ export type ApiProductAdapters = Readonly<{
  * them. What still keeps the two families that READ them off this process is
  * named by the entries that remain — the organization identity ports and the
  * stored-object application — not by the credential or the counter.
+ *
+ * The query guards left the list for a narrower reason, and the difference
+ * matters. The multitenancy, organization and mass-delete guards now live in
+ * `@langwatch/prisma-client` beside the schema they classify, so this process
+ * composes its own guarded client from `DATABASE_URL`
+ * ({@link ApiProductionComposition.database}) and no host supplies one. That
+ * unlocks the seam a packaged `Postgres*Adapter` takes — a typed
+ * `PrismaClient` from a composition root — and nothing beyond it: every
+ * adapter still needs the ports the remaining entries name, so composing the
+ * client is not composing the services, and none of those families moved.
  */
 export const API_UNAVAILABLE_PRODUCT_ADAPTERS = [
-  "PrismaQueryGuard: the multitenancy, organization and mass-delete query guards",
   "SecretEncryptionPort and OrganizationSettingsSecretPort: the stored-secret encryption key",
   "AgentsWorkflowPort and AgentsAuditLogPort: agent workflow copies and agent audit history",
   "AuthzGrantsCommandDispatcher and AuthzRevocationTelemetry: the grant command pipeline",
@@ -111,6 +124,7 @@ export class ApiStandaloneComposition extends ApiRuntimeCompositionPort {
 
   private composeProcessSurface(options: ApiRuntimeCompositionOptions): ApiRuntimeProcessPort {
     const logger = createLogger(options.config.serviceName);
+    composeApiDatabase(options);
     const queue = ApiQueueInfrastructure.tryCreate({
       resources: options.resources,
       redis: options.config.infrastructure.redis,

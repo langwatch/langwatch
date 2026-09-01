@@ -16,10 +16,17 @@ export interface PrismaQueryContext {
 export type PrismaQueryExecutor = (args: unknown) => Promise<unknown>;
 
 /**
- * The product-owned tenancy policy injected into infrastructure construction.
- * Requiring this port prevents construction of an accidentally unguarded
- * client while keeping model classification and authorization rules outside
- * this infrastructure package.
+ * The tenancy policy injected into infrastructure construction. Requiring this
+ * port is what prevents construction of an accidentally unguarded client:
+ * there is no overload of {@link PrismaConnectionService.create} that omits it.
+ *
+ * The policy itself is {@link PrismaTenancyGuardService}, and it now lives in
+ * this package rather than with a process. It used to sit in `platform/app` on
+ * the reasoning that model classification is product knowledge — but the
+ * classification is a projection of `prisma/schema.prisma`, which is this
+ * package's file, and every process that opens this connection needs the same
+ * one. Keeping it out meant the second process to want a client had to bring
+ * its own copy of the rules, which is how a guard stops being a guard.
  */
 export abstract class PrismaQueryGuard {
   abstract execute(

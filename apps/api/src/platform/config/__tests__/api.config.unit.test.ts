@@ -37,6 +37,7 @@ describe("API process configuration", () => {
       },
       instanceAdminApiKey: undefined,
       infrastructure: {
+        database: { url: undefined },
         redis: { configured: false, reason: "unconfigured", warnings: [] },
         groupQueue: {
           globalConcurrency: undefined,
@@ -137,6 +138,17 @@ describe("API process configuration", () => {
     });
   });
 
+  it("carries the Postgres connection the process composes its guarded client from", () => {
+    expect(
+      resolveApiConfig({ DATABASE_URL: "postgresql://localhost/langwatch" }).infrastructure
+        .database,
+    ).toEqual({ url: "postgresql://localhost/langwatch" });
+  });
+
+  it("leaves the database unconfigured rather than refusing a process that needs none", () => {
+    expect(resolveApiConfig({}).infrastructure.database).toEqual({ url: undefined });
+  });
+
   it("resolves Redis and Group Queue settings before API composition", () => {
     const config = resolveApiConfig({
       REDIS_URL: "redis://redis.example.test:6379",
@@ -149,6 +161,7 @@ describe("API process configuration", () => {
     });
 
     expect(config.infrastructure).toEqual({
+      database: { url: undefined },
       redis: {
         configured: true,
         mode: "standalone",
