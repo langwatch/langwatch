@@ -13,14 +13,37 @@ export { ApiRestObservabilityComposition } from "./app/api-rest-observability.co
 export {
   ApiProductionComposition,
   composeApiDatabase,
+  composeApiLifecycleProcess,
   composeApiSecretEncryption,
+  LoggedApiAuthzAbsence,
   LoggedApiDatabaseAbsence,
+  LoggedApiEventingAbsence,
   LoggedApiMetricsAbsence,
   LoggedApiQueueAbsence,
   LoggedApiSecretEncryptionAbsence,
+  LoggedApiTenancyAbsence,
   resolveApiMetrics,
   type ApiOwnedRestFeaturePorts,
+  type ApiProductionCompositionOptions,
 } from "./app/api-production.composition";
+export {
+  ApiAuthzAbsenceReportPort,
+  ApiAuthzComposition,
+  type ApiAuthzCompositionOptions,
+  type ApiAuthzEpochRedis,
+} from "./app/api-authz.composition";
+export {
+  ApiTenancyAbsenceReportPort,
+  ApiTenancyComposition,
+  type ApiTenancyCompositionOptions,
+} from "./app/api-tenancy.composition";
+export { ApiOrganizationSettingsSecretAdapter } from "./app/api-organization-settings-secret.adapter";
+export {
+  ApiEventingAbsenceReportPort,
+  ApiEventingInfrastructure,
+  type ApiEventingInfrastructureOptions,
+  type ApiEventingQueue,
+} from "./platform/infrastructure/api-eventing.infrastructure";
 export { ApiInstanceAdminKeyAdapter } from "./app/api-instance-admin-key.adapter";
 export {
   API_UNAVAILABLE_PRODUCT_ADAPTERS,

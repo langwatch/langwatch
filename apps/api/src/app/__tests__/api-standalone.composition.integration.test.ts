@@ -54,7 +54,7 @@ describe("ApiStandaloneComposition", () => {
         "IdentityEmailService and the Better Auth browser-session transport",
       );
       expect(API_UNAVAILABLE_PRODUCT_ADAPTERS).toContain(
-        "ApiKeyBindingIdPort, ApiKeyDiagnosticsPort and the organization identity ports",
+        "AgentsWorkflowPort and AgentsAuditLogPort: agent workflow copies and agent audit history",
       );
     });
 
@@ -74,6 +74,24 @@ describe("ApiStandaloneComposition", () => {
       const named = API_UNAVAILABLE_PRODUCT_ADAPTERS.join("\n");
 
       expect(named).not.toMatch(/ApiMetricsPort|metric registry/i);
+    });
+
+    /** @scenario "The API process composes its own AuthZ service" */
+    it("stops naming the grant command pipeline, now that it registers one itself", () => {
+      const named = API_UNAVAILABLE_PRODUCT_ADAPTERS.join("\n");
+
+      expect(named).not.toMatch(
+        /AuthzGrantsCommandDispatcher|AuthzRevocationTelemetry|grant command pipeline/i,
+      );
+    });
+
+    /** @scenario "The API process composes its own organization and API-key services" */
+    it("stops naming the identity ports, now that it composes the services that take them", () => {
+      const named = API_UNAVAILABLE_PRODUCT_ADAPTERS.join("\n");
+
+      expect(named).not.toMatch(
+        /ApiKeyBindingIdPort|ApiKeyDiagnosticsPort|organization identity ports/i,
+      );
     });
 
     it("stops naming the stored-secret key, now that it reads and uses its own", () => {

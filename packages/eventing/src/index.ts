@@ -158,6 +158,7 @@ export * from "./replay/types";
 export * from "./services/errorHandling";
 export * from "./stores/eventStoreUtils";
 export * from "./stores/abstractEventStore";
+export * from "./stores/eventStoreProducerOnly";
 export * from "./stores/baseMemoryProjectionStore";
 export * from "./stores/rehydrationWindow";
 export * from "./stores/repositories/eventRepository.types";

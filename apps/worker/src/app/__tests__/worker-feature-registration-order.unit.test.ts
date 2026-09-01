@@ -156,6 +156,15 @@ function createEventing(registered: string[]) {
       "computeRunMetrics",
       "computeExperimentRunMetrics",
       "reportUsageForMonth",
+      // AuthZ's six. They were absent while its installer asserted over the
+      // command map instead of checking it, so the double claimed a
+      // registration that produced nothing.
+      "attachGrant",
+      "changeGrantRole",
+      "revokeGrant",
+      "defineRole",
+      "changeRolePermissions",
+      "deleteRole",
     ].map((name) => [name, { send: async () => undefined }]),
   );
   vi.spyOn(eventing.eventSourcing, "register").mockImplementation((definition) => {

@@ -15,8 +15,16 @@ export {
   LEDGER_APP_HANDLE_WAIT_MS,
   type AuthzGrantsCommandSenders,
 } from "./ports/authz-grants-command-dispatcher.port";
+export { EventingAuthzCommandDispatcherAdapter } from "./adapters/eventing.authz-command-dispatcher.adapter";
+export { KsuidAuthzBindingIdAdapter } from "./adapters/ksuid.authz-binding-id.adapter";
 export { AuthzRevocationTelemetry } from "./ports/authz-revocation-telemetry.port";
 export type { AuthzRevocationReason } from "./ports/authz-revocation-telemetry.port";
+export {
+  ObservabilityAuthzRevocationAdapter,
+  type AuthzRevocationCounter,
+  type ObservabilityAuthzRevocationAdapterOptions,
+} from "./adapters/observability.authz-revocation.adapter";
+export { ObservabilityAuthzMetricsAdapter } from "./adapters/observability.authz-metrics.adapter";
 export type { PostgresAuthzDatabase } from "./ports/postgres-authz-database.port";
 export {
   ObservabilityAuthzCutoverAdapter,

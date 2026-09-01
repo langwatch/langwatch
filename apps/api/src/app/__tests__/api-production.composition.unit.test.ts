@@ -46,8 +46,16 @@ const queueMocks = vi.hoisted(() => {
     incr: vi.fn(async () => 1),
     expire: vi.fn(async () => 1),
     ttl: vi.fn(async () => 30),
+    // Registering a Group Queue producer stages the queue's own key set. It
+    // enqueues nothing here; no test in this file sends a job.
+    sadd: vi.fn(async () => 1),
   };
-  const composed: { value: { redis: typeof redis } | undefined } = { value: undefined };
+  // `dependencies` is what the process's producer-only Eventing runtime is
+  // built from; `redis` is what the rate limiter counts in. One mock carries
+  // both because one Redis carries both in the composed process.
+  const composed: {
+    value: { redis: typeof redis; dependencies: { redis: unknown } } | undefined;
+  } = { value: undefined };
   return { redis, composed, tryCreate: vi.fn(() => composed.value) };
 });
 
@@ -76,7 +84,27 @@ const databaseMocks = vi.hoisted(() => {
           updatedBy: { name: "Alex" },
         })),
   );
-  const client = { projectSecret: { findMany } };
+  // Every model this file does not describe answers empty rather than being
+  // absent. The secret rows below are what these scenarios are about; the AuthZ
+  // reads a mounted route makes on its way past are not, and a client missing
+  // their delegates would fail those routes for the wrong reason.
+  const emptyDelegate = new Proxy(
+    {},
+    {
+      get: (_target, method) => async (): Promise<unknown> => {
+        if (method === "findMany") return [];
+        if (method === "count") return 0;
+        return null;
+      },
+    },
+  );
+  const client = new Proxy(
+    { projectSecret: { findMany } },
+    {
+      get: (target: Record<string, unknown>, key: string) =>
+        key in target ? target[key] : emptyDelegate,
+    },
+  );
   const configured: { value: boolean } = { value: false };
   return {
     rows,
@@ -309,7 +337,10 @@ describe("ApiProductionComposition", () => {
 
     describe("when the process composed a Redis connection", () => {
       it("counts in the same Redis the queue infrastructure composed", async () => {
-        queueMocks.composed.value = { redis: queueMocks.redis };
+        queueMocks.composed.value = {
+          redis: queueMocks.redis,
+          dependencies: { redis: queueMocks.redis },
+        };
         try {
           const ports = await composedFeaturePorts({});
 
@@ -500,6 +531,213 @@ describe("ApiProductionComposition", () => {
     });
   });
 
+  describe("given the AuthZ service this process can now compose itself", () => {
+    const dispatchingDeployment = {
+      DATABASE_URL: "postgresql://localhost/langwatch",
+    } as const;
+
+    beforeEach(() => {
+      databaseMocks.configured.value = false;
+      queueMocks.composed.value = undefined;
+      processMocks.create.mockClear();
+    });
+
+    describe("when a host supplied one", () => {
+      /** @scenario "An injected AuthZ service is the one the process authorizes with" */
+      it("authorizes with the host's service and composes none of its own", async () => {
+        databaseMocks.configured.value = true;
+        queueMocks.composed.value = {
+          redis: queueMocks.redis,
+          dependencies: { redis: queueMocks.redis },
+        };
+
+        const composition = await composeWithout(dispatchingDeployment);
+
+        expect(composition.authz()).toBeUndefined();
+        expect(composition.policy()).toBeDefined();
+      });
+    });
+
+    describe("when the deployment configured a database and a Redis", () => {
+      /** @scenario "The API process composes its own AuthZ service" */
+      it("composes its own pair of services, with no host supplying either", async () => {
+        databaseMocks.configured.value = true;
+        queueMocks.composed.value = {
+          redis: queueMocks.redis,
+          dependencies: { redis: queueMocks.redis },
+        };
+
+        const composition = await composeSelfComposedAuthz(dispatchingDeployment);
+
+        expect(composition.authz()?.permissions).toBeDefined();
+        expect(composition.authz()?.grants).toBeDefined();
+      });
+
+      /** @scenario "The API process composes its own AuthZ service" */
+      it("mounts the product transports over the service it composed", async () => {
+        databaseMocks.configured.value = true;
+        queueMocks.composed.value = {
+          redis: queueMocks.redis,
+          dependencies: { redis: queueMocks.redis },
+        };
+
+        await composeSelfComposedAuthz(dispatchingDeployment);
+
+        const rest = processMocks.rest();
+        if (!rest) throw new Error("The production composition mounted no REST door at all.");
+        expect(
+          await rest.request("/api/api-keys", { headers: { "X-Auth-Token": "token" } }),
+        ).not.toHaveProperty("status", 404);
+      });
+    });
+
+    describe("when neither a host nor the deployment supplies one", () => {
+      /** @scenario "A process that can compose no AuthZ mounts no product transports" */
+      it("mounts no product transports rather than routes that cannot refuse", async () => {
+        const composition = await composeSelfComposedAuthz({});
+
+        expect(composition.authz()).toBeUndefined();
+        expect(composition.policy()).toBeUndefined();
+        expect(processMocks.create).not.toHaveBeenCalled();
+      });
+
+      /** @scenario "A process that can compose no AuthZ mounts no product transports" */
+      it("composes none with a database but no dispatch, because a write path needs both", async () => {
+        databaseMocks.configured.value = true;
+
+        const composition = await composeSelfComposedAuthz(dispatchingDeployment);
+
+        expect(composition.authz()).toBeUndefined();
+        expect(processMocks.create).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given the organization and API-key services this process can now compose", () => {
+    const credentialDeployment = {
+      DATABASE_URL: "postgresql://localhost/langwatch",
+      CREDENTIALS_SECRET: ENCRYPTION_KEY,
+    } as const;
+
+    beforeEach(() => {
+      databaseMocks.configured.value = false;
+      queueMocks.composed.value = undefined;
+      processMocks.create.mockClear();
+    });
+
+    describe("when a host supplied the pair", () => {
+      // The deployment here is one that COULD compose its own — a database, a
+      // Redis, a key and a pepper — so the assertion is about precedence
+      // rather than about a process that had no other option.
+      /** @scenario "An injected pair is the one the process serves" */
+      it("serves the host's services and composes none of its own", async () => {
+        databaseMocks.configured.value = true;
+        queueMocks.composed.value = {
+          redis: queueMocks.redis,
+          dependencies: { redis: queueMocks.redis },
+        };
+
+        const composition = ApiProductionComposition.create({
+          agents: new Proxy(AgentService.prototype, {}),
+          secrets: secretService().service,
+          apiKeys: apiKeyService(resolvedKey).service,
+          organizations: organizationService(),
+          auth: new TestAuthComposition(),
+        });
+        await composition.compose({
+          config: resolveApiConfig({
+            NODE_ENV: "test",
+            API_PORT: "5560",
+            ...credentialDeployment,
+          }),
+          graph: new TestGraph(),
+          observability: { serviceName: "langwatch-api-test" },
+          resources: new ResourceScope(),
+        });
+
+        expect(composition.authz()).toBeDefined();
+        expect(composition.tenancy()).toBeUndefined();
+        expect(composition.policy()).toBeDefined();
+      });
+    });
+
+    describe("when a host supplied one of the pair without the other", () => {
+      // Refused before a socket is opened, because it is a fact about the
+      // options rather than about the deployment.
+      /** @scenario "Half a credential graph is refused at boot" */
+      it("refuses rather than composing the missing half over a different graph", () => {
+        expect(() =>
+          ApiProductionComposition.create({
+            agents: new Proxy(AgentService.prototype, {}),
+            apiKeys: apiKeyService(resolvedKey).service,
+            auth: new TestAuthComposition(),
+          }),
+        ).toThrow(/one graph/);
+
+        expect(() =>
+          ApiProductionComposition.create({
+            agents: new Proxy(AgentService.prototype, {}),
+            organizations: organizationService(),
+            auth: new TestAuthComposition(),
+          }),
+        ).toThrow(/one graph/);
+      });
+    });
+
+    describe("when the deployment configured everything they need", () => {
+      /** @scenario "The API process composes its own organization and API-key services" */
+      it("composes its own graph, with no host supplying either", async () => {
+        databaseMocks.configured.value = true;
+        queueMocks.composed.value = {
+          redis: queueMocks.redis,
+          dependencies: { redis: queueMocks.redis },
+        };
+
+        const composition = await composeSelfComposedAuthz(credentialDeployment);
+
+        expect(composition.tenancy()?.organizations).toBeDefined();
+        expect(composition.tenancy()?.projects).toBeDefined();
+        expect(composition.tenancy()?.apiKeys).toBeDefined();
+      });
+
+      /** @scenario "The API process composes its own organization and API-key services" */
+      it("mounts the API-key family over the services it composed", async () => {
+        databaseMocks.configured.value = true;
+        queueMocks.composed.value = {
+          redis: queueMocks.redis,
+          dependencies: { redis: queueMocks.redis },
+        };
+
+        await composeSelfComposedAuthz(credentialDeployment);
+
+        const rest = processMocks.rest();
+        if (!rest) throw new Error("The production composition mounted no REST door at all.");
+        expect(
+          await rest.request("/api/api-keys", { headers: { "X-Auth-Token": "token" } }),
+        ).not.toHaveProperty("status", 404);
+      });
+    });
+
+    describe("when the deployment configured no pepper", () => {
+      /** @scenario "A process that can compose no credential services mounts no product transports" */
+      it("mounts no product transports rather than a door that authenticates nothing", async () => {
+        databaseMocks.configured.value = true;
+        queueMocks.composed.value = {
+          redis: queueMocks.redis,
+          dependencies: { redis: queueMocks.redis },
+        };
+
+        const composition = await composeSelfComposedAuthz({
+          DATABASE_URL: "postgresql://localhost/langwatch",
+        });
+
+        expect(composition.authz()).toBeDefined();
+        expect(composition.tenancy()).toBeUndefined();
+        expect(processMocks.create).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   describe("given the metrics transport this process can now compose itself", () => {
     describe("when a host supplied one", () => {
       /** @scenario "An injected metrics transport answers every scrape" */
@@ -576,6 +814,24 @@ async function composeWithout(
   overrides: { metrics?: ApiMetricsPort } = {},
 ): Promise<ApiProductionComposition> {
   const composition = productionComposition(overrides);
+  await composition.compose({
+    config: resolveApiConfig({ NODE_ENV: "test", API_PORT: "5560", ...source }),
+    graph: new TestGraph(),
+    observability: { serviceName: "langwatch-api-test" },
+    resources: new ResourceScope(),
+  });
+  return composition;
+}
+
+/** Composes with no host-supplied AuthZ, so the process resolves its own. */
+async function composeSelfComposedAuthz(
+  source: Readonly<Record<string, unknown>>,
+): Promise<ApiProductionComposition> {
+  const composition = ApiProductionComposition.create({
+    agents: new Proxy(AgentService.prototype, {}),
+    secrets: secretService().service,
+    auth: new TestAuthComposition(),
+  });
   await composition.compose({
     config: resolveApiConfig({ NODE_ENV: "test", API_PORT: "5560", ...source }),
     graph: new TestGraph(),

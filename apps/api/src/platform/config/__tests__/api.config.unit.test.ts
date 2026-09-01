@@ -36,6 +36,8 @@ describe("API process configuration", () => {
         processorType: "batch",
       },
       instanceAdminApiKey: undefined,
+      apiKeyPepper: undefined,
+      authz: { epochCacheEnabled: false, demoProjectId: undefined },
       infrastructure: {
         database: { url: undefined },
         redis: { configured: false, reason: "unconfigured", warnings: [] },
@@ -47,6 +49,48 @@ describe("API process configuration", () => {
           payloadCodec: "json",
         },
       },
+    });
+  });
+
+  describe("when the API-key pepper is configured", () => {
+    it("reads it from the same two variables, in the same order, as the cipher key", () => {
+      expect(resolveApiConfig({ CREDENTIALS_SECRET: "from-credentials" }).apiKeyPepper).toBe(
+        "from-credentials",
+      );
+      expect(resolveApiConfig({ NEXTAUTH_SECRET: "from-nextauth" }).apiKeyPepper).toBe(
+        "from-nextauth",
+      );
+      expect(
+        resolveApiConfig({ CREDENTIALS_SECRET: "wins", NEXTAUTH_SECRET: "loses" }).apiKeyPepper,
+      ).toBe("wins");
+      expect(resolveApiConfig({}).apiKeyPepper).toBeUndefined();
+    });
+
+    it("carries the value through verbatim, because it is used as an HMAC key", () => {
+      const raw = "  0f0f  ";
+
+      expect(resolveApiConfig({ CREDENTIALS_SECRET: raw }).apiKeyPepper).toBe(raw);
+    });
+  });
+
+  describe("when the AuthZ switches are set", () => {
+    it("reads the epoch cache the way every other tier reads it", () => {
+      expect(resolveApiConfig({ AUTHZ_EPOCH_CACHE: "1" }).authz.epochCacheEnabled).toBe(true);
+      expect(resolveApiConfig({ AUTHZ_EPOCH_CACHE: "true" }).authz.epochCacheEnabled).toBe(true);
+      expect(resolveApiConfig({ AUTHZ_EPOCH_CACHE: "0" }).authz.epochCacheEnabled).toBe(false);
+      expect(resolveApiConfig({}).authz.epochCacheEnabled).toBe(false);
+    });
+
+    it("ignores a value neither tier treats as on, rather than refusing the boot", () => {
+      expect(resolveApiConfig({ AUTHZ_EPOCH_CACHE: "yes" }).authz.epochCacheEnabled).toBe(false);
+    });
+
+    it("reads a blank demo project as no demo project rather than as the empty id", () => {
+      expect(resolveApiConfig({ DEMO_PROJECT_ID: "project-1" }).authz.demoProjectId).toBe(
+        "project-1",
+      );
+      expect(resolveApiConfig({ DEMO_PROJECT_ID: "   " }).authz.demoProjectId).toBeUndefined();
+      expect(resolveApiConfig({}).authz.demoProjectId).toBeUndefined();
     });
   });
 

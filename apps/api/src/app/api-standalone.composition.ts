@@ -3,20 +3,11 @@ import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { GroupQueueStoragePort } from "@langwatch/group-queue";
 import { createLogger } from "@langwatch/observability";
-import {
-  createProcessObservability,
-  type ProcessObservability,
-} from "@langwatch/observability/node";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { SecretService } from "@langwatch/secret-contract";
-import { ApiHttpListener } from "../api-http.listener";
-import {
-  ApiMetricsPort,
-  ApiProcessLifecycleRoutes,
-  ApiReadinessPort,
-} from "../api-process.lifecycle";
+import { ApiMetricsPort, ApiReadinessPort } from "../api-process.lifecycle";
 import { ApiAuditPort } from "../api-request.policy";
-import { ApiFeatureDrainPort, ApiProcessGraphPort, closeApiProcessResources } from "../api.process";
+import { ApiFeatureDrainPort } from "../api.process";
 import {
   ApiRuntimeCompositionPort,
   ApiRuntimeProcessPort,
@@ -27,6 +18,7 @@ import type { ApiAuthSessionCompositionPort } from "./api-auth.composition";
 import {
   ApiProductionComposition,
   composeApiDatabase,
+  composeApiLifecycleProcess,
   LoggedApiQueueAbsence,
   resolveApiMetrics,
 } from "./api-production.composition";
@@ -51,9 +43,31 @@ export type ApiProductAdapters = Readonly<{
    * door if it has neither.
    */
   secrets?: SecretService;
-  apiKeys: ApiKeyService;
-  authz: AuthzService;
-  organizations: OrganizationService;
+  /**
+   * The third and fourth product services this package CAN build, and the one
+   * pair on this list a host must supply together or not at all.
+   *
+   * Left out, the process composes both — with the project service they reach
+   * through — over its guarded client, its own AuthZ and its own cipher
+   * ({@link ApiProductionComposition.resolveTenancy}). Supplying one without
+   * the other is refused at boot: they are one graph, and half of it composed
+   * elsewhere is two.
+   */
+  apiKeys?: ApiKeyService;
+  /**
+   * The second product service this package CAN build.
+   *
+   * A host supplies it to override what the process would compose — a test
+   * binding a double, or a deployment that already owns one instance of the
+   * service graph. Left out, the process composes its own over its guarded
+   * client and its own producer-only Eventing runtime
+   * ({@link ApiProductionComposition.resolveAuthz}); with neither, it mounts
+   * no product transports at all, because every route it would mount is
+   * authorized.
+   */
+  authz?: AuthzService;
+  /** The pair to `apiKeys`; see it for what supplying only one means. */
+  organizations?: OrganizationService;
   auth: ApiAuthSessionCompositionPort;
   audit?: ApiAuditPort;
   queueStorage?: GroupQueueStoragePort;
@@ -103,7 +117,22 @@ export type ApiProductAdapters = Readonly<{
  * builds. Nothing here composes one today, because nothing here composes the
  * organization service that would take it.
  *
- * `ApiMetricsPort` left the list last, and it left for a different reason from
+ * The grant command pipeline left next, and it is the first entry to close by
+ * this process composing INFRASTRUCTURE rather than by a port moving into a
+ * package. Both collaborators the AuthZ adapter asked for were already the
+ * feature's shape and neither had a packaged implementation: the revocation
+ * telemetry needed a metric registry, which this process now owns, and the
+ * grant command dispatcher needed an Eventing runtime with the grants pipeline
+ * registered. This process registers it — the SAME packaged definition the
+ * worker installs, over a PRODUCER-only runtime on its own Group Queue. It
+ * consumes nothing and owns no event log: the worker claims
+ * `event-sourcing/jobs`, and a command's routing metadata is stamped from the
+ * pipeline and command names at send time, so where a command was produced is
+ * not a fact the consumer needs. Forking the definition would have been the
+ * one unacceptable way to do this, and nothing here does.
+ *
+ * `ApiMetricsPort` left the list last of the process-owned entries, and it
+ * left for a different reason from
  * everything above it: nothing it needed lived with the legacy application at
  * all. It was here because no LangWatch package exposed a scrape surface for a
  * standalone process to compose, so the Group Queue samples this process
@@ -111,13 +140,31 @@ export type ApiProductAdapters = Readonly<{
  * renders that registry itself, behind the credential every tier already
  * reads ({@link resolveApiMetrics}). It unlocks no product transport, and it
  * is worth saying so: what a process can be scraped for is not what it can
- * serve. The four entries that remain still name ports whose only
- * implementation is the legacy application's.
+ * serve.
+ *
+ * The organization and API-key entry closed last, and it closed for a reason
+ * worth separating from the others: its ports had ALREADY moved. The identity
+ * minters, the diagnostics shims, the API-key binding-id and the project
+ * credential format are the feature packages' own, and have been since they
+ * moved there with the formats they mint. What kept the entry open was the
+ * collaborator underneath them — an AuthZ service and its grants half — plus
+ * two values that resolve from this process's environment and could not have
+ * lived in a package at all: the settings cipher, which is the one the
+ * stored-secret family already runs under, and the API-key pepper, which is
+ * the HMAC key a stored credential hash is derived under. This process has all
+ * three now, so the three services compose here as one graph.
+ *
+ * Not everything the platform app gives that graph came with it, and the gap
+ * is named rather than hidden: a project deleted through this process leaves
+ * its ClickHouse key map and its stored objects to the tier that owns them,
+ * because the packaged adapter declares both ports optional and this process
+ * holds neither system.
+ *
+ * The two entries that remain still name ports whose only implementation is
+ * the legacy application's.
  */
 export const API_UNAVAILABLE_PRODUCT_ADAPTERS = [
   "AgentsWorkflowPort and AgentsAuditLogPort: agent workflow copies and agent audit history",
-  "AuthzGrantsCommandDispatcher and AuthzRevocationTelemetry: the grant command pipeline",
-  "ApiKeyBindingIdPort, ApiKeyDiagnosticsPort and the organization identity ports",
   "IdentityEmailService and the Better Auth browser-session transport",
 ] as const;
 
@@ -175,68 +222,11 @@ export class ApiStandaloneComposition extends ApiRuntimeCompositionPort {
       "API process started without product transports: no host supplied its service adapters",
     );
 
-    const metrics = resolveApiMetrics({ options, injected: this.options.metrics });
-    const routes = ApiProcessLifecycleRoutes.create(metrics ? { metrics } : {});
-    const observability = createProcessObservability(options.observability);
-    return ApiStandaloneProcess.create({
-      listener: ApiHttpListener.create({
-        application: routes,
-        host: options.config.host,
-        port: options.config.port,
-        drainGraceMs: options.config.httpDrainGraceMs,
-        logger: observability.logger,
-      }),
-      observability,
-      graph: options.graph,
+    return composeApiLifecycleProcess({
+      options,
+      metrics: resolveApiMetrics({ options, injected: this.options.metrics }),
       readiness: this.options.readiness ?? queue?.readiness,
       featureDrain: this.options.featureDrain,
     });
-  }
-}
-
-/**
- * The API process with only its own lifecycle surface mounted. It keeps the
- * readiness-before-listen order and the shared finalization order so a
- * deployment's shutdown behaviour does not change when the product transports
- * are added.
- */
-class ApiStandaloneProcess extends ApiRuntimeProcessPort {
-  static create(options: {
-    listener: ApiHttpListener;
-    observability: ProcessObservability;
-    graph: ApiProcessGraphPort;
-    readiness: ApiReadinessPort | undefined;
-    featureDrain: ApiFeatureDrainPort | undefined;
-  }): ApiStandaloneProcess {
-    return new ApiStandaloneProcess(options);
-  }
-
-  private closing: Promise<void> | undefined;
-
-  private constructor(
-    private readonly options: {
-      listener: ApiHttpListener;
-      observability: ProcessObservability;
-      graph: ApiProcessGraphPort;
-      readiness: ApiReadinessPort | undefined;
-      featureDrain: ApiFeatureDrainPort | undefined;
-    },
-  ) {
-    super();
-  }
-
-  async start(): Promise<{ host: string; port: number }> {
-    await this.options.readiness?.assertReady();
-    return this.options.listener.start();
-  }
-
-  close(): Promise<void> {
-    this.closing ??= closeApiProcessResources({
-      listener: this.options.listener,
-      featureDrain: this.options.featureDrain,
-      graph: this.options.graph,
-      observability: this.options.observability,
-    });
-    return this.closing;
   }
 }

@@ -1,3 +1,4 @@
+import { EventingAuthzCommandDispatcherAdapter } from "@langwatch/authz-server";
 import type { AuthzGrantsCommandSenders, AuthzPipeline } from "@langwatch/authz-server";
 import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
@@ -43,7 +44,7 @@ export class AuthzWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
   async install(): Promise<WorkerFeatureHandlePort> {
     if (!this.installed) {
       const pipeline = this.eventing.eventSourcing.register(this.installer.pipeline);
-      this.installer.connect(pipeline.commands as unknown as AuthzGrantsCommandSenders);
+      this.installer.connect(EventingAuthzCommandDispatcherAdapter.sendersFrom(pipeline.commands));
       this.installed = true;
     }
     return AuthzWorkerFeatureHandle.create();

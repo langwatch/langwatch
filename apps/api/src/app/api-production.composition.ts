@@ -2,21 +2,36 @@ import type { AgentService } from "@langwatch/agent-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { GroupQueueStoragePort } from "@langwatch/group-queue";
 import { createLogger, type Logger } from "@langwatch/observability";
+import {
+  createProcessObservability,
+  type ProcessObservability,
+} from "@langwatch/observability/node";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
-import type { AuthzService } from "@langwatch/authz-contract";
+import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { SecretService } from "@langwatch/secret-contract";
 import { createApiKeysRestApp } from "@langwatch/api-key-server";
-import { PostgresSecretAdapter } from "@langwatch/secret-server";
+import { PostgresSecretAdapter, type SecretEncryptionPort } from "@langwatch/secret-server";
 import { RESERVED_PROJECT_SECRET_NAMES } from "@langwatch/secret-contract";
 import { Hono } from "hono";
+import { register } from "prom-client";
 import {
   ApiAuditPort,
   ApiRequestPolicy,
   AuthzApiAuthorizationAdapter,
 } from "../api-request.policy";
-import { ApiFeatureDrainPort, ApiProcess } from "../api.process";
-import { ApiMetricsPort, ApiReadinessPort } from "../api-process.lifecycle";
+import {
+  ApiFeatureDrainPort,
+  ApiProcess,
+  ApiProcessGraphPort,
+  closeApiProcessResources,
+} from "../api.process";
+import { ApiHttpListener } from "../api-http.listener";
+import {
+  ApiMetricsPort,
+  ApiProcessLifecycleRoutes,
+  ApiReadinessPort,
+} from "../api-process.lifecycle";
 import {
   ApiDatabaseAbsenceReportPort,
   ApiDatabaseInfrastructure,
@@ -25,6 +40,12 @@ import {
   ApiQueueAbsenceReportPort,
   ApiQueueInfrastructure,
 } from "../platform/infrastructure/api-queue.infrastructure";
+import {
+  ApiEventingAbsenceReportPort,
+  ApiEventingInfrastructure,
+} from "../platform/infrastructure/api-eventing.infrastructure";
+import { ApiAuthzAbsenceReportPort, ApiAuthzComposition } from "./api-authz.composition";
+import { ApiTenancyAbsenceReportPort, ApiTenancyComposition } from "./api-tenancy.composition";
 import {
   ApiMetricsAbsenceReportPort,
   ApiMetricsInfrastructure,
@@ -62,105 +83,134 @@ import { ApiRestObservabilityComposition } from "./api-rest-observability.compos
  */
 export type ApiOwnedRestFeaturePorts = Pick<AppRestFeaturePorts, "instanceAdminKey" | "rateLimit">;
 
+/** What a host hands the production composition, and what it may leave out. */
+export type ApiProductionCompositionOptions = {
+  agents: AgentService;
+  /**
+   * A host's already-composed secret service, when it has one.
+   *
+   * Optional since this process can build its own: see
+   * {@link ApiProductionComposition.resolveSecrets} for which wins.
+   */
+  secrets?: SecretService;
+  /**
+   * A host's already-composed API-key service, when it has one.
+   *
+   * Optional since this process can build its own, but only as a PAIR with the
+   * organization service: see {@link ApiProductionComposition.resolveTenancy}
+   * for why supplying one without the other is refused.
+   */
+  apiKeys?: ApiKeyService;
+  /**
+   * A host's already-composed AuthZ service, when it has one.
+   *
+   * Optional since this process can build its own: see
+   * {@link ApiProductionComposition.resolveAuthz} for which wins and what an
+   * unresolvable AuthZ means for the doors that authorize through it.
+   */
+  authz?: AuthzService;
+  /** A host's already-composed organization service; the pair to `apiKeys`. */
+  organizations?: OrganizationService;
+  auth: ApiAuthSessionCompositionPort;
+  audit?: ApiAuditPort;
+  readiness?: ApiReadinessPort;
+  /**
+   * A host's already-composed metrics transport, when it has one.
+   *
+   * Optional since this process can build its own: see
+   * {@link resolveApiMetrics} for which wins.
+   */
+  metrics?: ApiMetricsPort;
+  featureDrain?: ApiFeatureDrainPort;
+  queueStorage?: GroupQueueStoragePort;
+};
+
+/** The credential pair every product transport on this process is built from. */
+type ApiResolvedTenancy = Readonly<{
+  apiKeys: ApiKeyService;
+  organizations: OrganizationService;
+}>;
+
 /** The concrete composition port for the migrated API transports. */
 export class ApiProductionComposition extends ApiRuntimeCompositionPort {
-  static create(options: {
-    agents: AgentService;
-    /**
-     * A host's already-composed secret service, when it has one.
-     *
-     * Optional since this process can build its own: see
-     * {@link ApiProductionComposition.resolveSecrets} for which wins.
-     */
-    secrets?: SecretService;
-    apiKeys: ApiKeyService;
-    authz: AuthzService;
-    organizations: OrganizationService;
-    auth: ApiAuthSessionCompositionPort;
-    audit?: ApiAuditPort;
-    readiness?: ApiReadinessPort;
-    /**
-     * A host's already-composed metrics transport, when it has one.
-     *
-     * Optional since this process can build its own: see
-     * {@link resolveApiMetrics} for which wins.
-     */
-    metrics?: ApiMetricsPort;
-    featureDrain?: ApiFeatureDrainPort;
-    queueStorage?: GroupQueueStoragePort;
-  }): ApiProductionComposition {
-    const policy = ApiRequestPolicy.create({
-      authentication: AuthSessionApiAuthenticationAdapter.create(options.auth.compose()),
-      authorization: AuthzApiAuthorizationAdapter.create(options.authz),
-      audit: options.audit,
-    });
-    // One credential resolution for both doors: the framework-shaped
-    // `AppRestSecurity` every packaged REST family is built from, and the
-    // four-callable projection the additive public-REST builder takes. Both
-    // wrap the same `ApiRestSecurity`, so they cannot enforce differently.
-    const credentials = {
-      apiKeys: options.apiKeys,
-      authz: options.authz,
-      organizations: options.organizations,
-      ...(options.audit ? { audit: options.audit } : {}),
-    };
-    const restSecurity = ApiRestSecurity.create({
-      ...credentials,
-      observability: ApiRestObservabilityComposition.create(),
-    });
-    const projectRestPolicy = ApiRestSecurity.projectPolicy(credentials);
-    return new ApiProductionComposition(
-      options.agents,
-      options.secrets,
-      options.apiKeys,
-      options.authz,
-      policy,
-      restSecurity,
-      projectRestPolicy,
-      options.audit,
-      options.readiness,
-      options.metrics,
-      options.featureDrain,
-      options.queueStorage,
-    );
+  static create(options: ApiProductionCompositionOptions): ApiProductionComposition {
+    // Checked here rather than at compose, because it is a fact about the
+    // options and not about the deployment: it can be answered before a socket
+    // is opened, and answering it later would open resources for a graph that
+    // was never going to be composed.
+    if (Boolean(options.apiKeys) !== Boolean(options.organizations)) {
+      throw new Error(
+        "API composition received one of the API-key and organization services without the other: they are one graph and must be supplied together, or neither.",
+      );
+    }
+    return new ApiProductionComposition(options);
   }
 
   private composedFeaturePorts: ApiOwnedRestFeaturePorts | undefined;
   private composedDatabase: ApiDatabaseInfrastructure | undefined;
+  private composedEventing: ApiEventingInfrastructure | undefined;
+  private composedAuthz: ApiAuthzComposition | undefined;
+  private composedTenancy: ApiTenancyComposition | undefined;
   private secrets: SecretService | undefined;
+  private requestPolicy: ApiRequestPolicy | undefined;
 
-  private constructor(
-    private readonly agents: AgentService,
-    private readonly injectedSecrets: SecretService | undefined,
-    private readonly apiKeys: ApiKeyService,
-    private readonly authz: AuthzService,
-    readonly policy: ApiRequestPolicy,
-    private readonly restSecurity: AppRestSecurity,
-    private readonly projectRestPolicy: ApiRestProjectPolicy,
-    private readonly audit: ApiAuditPort | undefined,
-    private readonly readiness: ApiReadinessPort | undefined,
-    private readonly injectedMetrics: ApiMetricsPort | undefined,
-    private readonly featureDrain: ApiFeatureDrainPort | undefined,
-    private readonly queueStorage: GroupQueueStoragePort | undefined,
-  ) {
+  private constructor(private readonly options: ApiProductionCompositionOptions) {
     super();
   }
 
+  /**
+   * Composes the process, in the one order its parts allow.
+   *
+   * Infrastructure first, because every product service below is built from
+   * it; then AuthZ, because both doors authorize through it and neither can be
+   * built before it exists; then the transports.
+   *
+   * With no AuthZ, or no organization and API-key pair, the process serves its
+   * lifecycle surface and no product transports at all. That is the same rule
+   * the secret family follows one level down — a door that cannot answer is
+   * absent rather than mounted — and it is the only safe reading at this level:
+   * every product route on this process is authorized and every one of them
+   * resolves a credential, so a route graph mounted over either gap would be a
+   * route graph that cannot say no.
+   */
   compose(options: ApiRuntimeCompositionOptions): Promise<ApiRuntimeProcessPort> {
     const queueInfrastructure = this.composeQueue(options);
     this.composedDatabase = composeApiDatabase(options);
-    this.secrets = this.resolveSecrets(options);
+    this.composedEventing = this.composeEventing(options, queueInfrastructure);
+    const authz = this.resolveAuthz(options, queueInfrastructure);
+    const readiness = this.options.readiness ?? queueInfrastructure?.readiness;
+    const metrics = resolveApiMetrics({ options, injected: this.options.metrics });
+    const encryption = composeApiSecretEncryption(options)?.encryption;
+    const tenancy = authz ? this.resolveTenancy(options, encryption) : undefined;
+
+    if (!authz || !tenancy) {
+      return Promise.resolve(
+        composeApiLifecycleProcess({
+          options,
+          metrics,
+          readiness,
+          featureDrain: this.options.featureDrain,
+        }),
+      );
+    }
+
+    this.secrets = this.resolveSecrets(encryption);
     this.composedFeaturePorts = this.composeFeaturePorts(options, queueInfrastructure);
+    this.requestPolicy = ApiRequestPolicy.create({
+      authentication: AuthSessionApiAuthenticationAdapter.create(this.options.auth.compose()),
+      authorization: AuthzApiAuthorizationAdapter.create(authz),
+      audit: this.options.audit,
+    });
     const process = ApiProcess.create({
-      agents: this.agents,
+      agents: this.options.agents,
       secrets: this.secrets,
-      requestPolicy: this.policy,
-      rest: this.composeRest(),
+      requestPolicy: this.requestPolicy,
+      rest: this.composeRest(authz, tenancy),
       observability: options.observability,
       graph: options.graph,
-      featureDrain: this.featureDrain,
-      readiness: this.readiness ?? queueInfrastructure?.readiness,
-      metrics: resolveApiMetrics({ options, injected: this.injectedMetrics }),
+      featureDrain: this.options.featureDrain,
+      readiness,
+      metrics,
       listener: {
         host: options.config.host,
         port: options.config.port,
@@ -169,6 +219,45 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     });
 
     return Promise.resolve(ApiProductionProcess.create(process));
+  }
+
+  /**
+   * The request policy this process enforces with, once it has been composed.
+   *
+   * `undefined` before `compose`, and after a `compose` that resolved no AuthZ
+   * — a policy whose authorization port is missing is not a weaker policy, it
+   * is one that cannot refuse, so there is no object to hand back.
+   */
+  policy(): ApiRequestPolicy | undefined {
+    return this.requestPolicy;
+  }
+
+  /**
+   * The two AuthZ contract services this process serves, once composed.
+   *
+   * Exposed as a pair because they are one graph: the grants service writes
+   * through the ledger whose commands the permission service's reads converge
+   * on, and a caller holding one from this process and the other from
+   * somewhere else would have two epochs for one organization.
+   */
+  authz(): { permissions: AuthzService; grants: AuthzGrantsService } | undefined {
+    if (this.composedAuthz) {
+      return { permissions: this.composedAuthz.permissions, grants: this.composedAuthz.grants };
+    }
+    return undefined;
+  }
+
+  /**
+   * The organization, project and API-key services this process composed for
+   * itself, once it has.
+   *
+   * `undefined` when a host supplied the pair instead, and `undefined` before
+   * `compose`. Exposed as one object because they are one graph: the API-key
+   * service reads the project service, which resolves through the organization
+   * service, and three separately-held services could be three graphs.
+   */
+  tenancy(): ApiTenancyComposition | undefined {
+    return this.composedTenancy;
   }
 
   /**
@@ -220,7 +309,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    *  2. Otherwise the process composes its own, over the guarded client
    *     {@link composeApiDatabase} opened and the cipher its configured key
    *     built. This is the first product service the API package builds for
-   *     itself rather than receiving.
+   *     itself rather than receiving. The cipher is composed ONCE by `compose`
+   *     and handed here, because the organization service's settings port runs
+   *     under the same one — two ciphers over one key is a way for two
+   *     descriptions of one at-rest format to drift.
    *  3. With neither — no host service, and no database or no key — there is
    *     no secret service, and the transports that would call one are not
    *     mounted. A door that answered every call with a 500 would be worse
@@ -230,16 +322,15 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * a product-owned secret is hidden by this process on the same terms the
    * platform app hides it.
    */
-  private resolveSecrets(options: ApiRuntimeCompositionOptions): SecretService | undefined {
-    if (this.injectedSecrets) return this.injectedSecrets;
+  private resolveSecrets(encryption: SecretEncryptionPort | undefined): SecretService | undefined {
+    if (this.options.secrets) return this.options.secrets;
 
     const database = this.composedDatabase;
-    const encryption = composeApiSecretEncryption(options);
     if (!database || !encryption) return undefined;
 
     return PostgresSecretAdapter.create({
       database: database.connection.client,
-      encryption: encryption.encryption,
+      encryption,
       reservedNames: RESERVED_PROJECT_SECRET_NAMES,
     }).build();
   }
@@ -253,24 +344,154 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * The secret family is mounted only when a service was resolved, for the
    * reason {@link ApiProductionComposition.resolveSecrets} gives.
    */
-  private composeRest(): Hono {
+  private composeRest(authz: AuthzService, tenancy: ApiResolvedTenancy): Hono {
     const secrets = this.secrets;
+    // One credential resolution for both doors: the framework-shaped
+    // `AppRestSecurity` every packaged REST family is built from, and the
+    // four-callable projection the additive public-REST builder takes. Both
+    // wrap the same `ApiRestSecurity`, so they cannot enforce differently.
+    const credentials = {
+      apiKeys: tenancy.apiKeys,
+      authz,
+      organizations: tenancy.organizations,
+      ...(this.options.audit ? { audit: this.options.audit } : {}),
+    };
+    const restSecurity: AppRestSecurity = ApiRestSecurity.create({
+      ...credentials,
+      observability: ApiRestObservabilityComposition.create(),
+    });
+    const projectRestPolicy: ApiRestProjectPolicy = ApiRestSecurity.projectPolicy(credentials);
     return new Hono()
       .route(
         "/",
         secrets
-          ? ApiSecretRestFeature.create({ secrets, security: this.projectRestPolicy })
+          ? ApiSecretRestFeature.create({ secrets, security: projectRestPolicy })
           : new Hono(),
       )
       .route(
         "/",
         createApiKeysRestApp({
-          security: this.restSecurity,
-          apiKeys: () => this.apiKeys,
-          permissions: () => this.authz,
+          security: restSecurity,
+          apiKeys: () => tenancy.apiKeys,
+          permissions: () => authz,
           audit: this.composeManagementAudit(),
         }).hono,
       );
+  }
+
+  /**
+   * The AuthZ service this process authorizes with, and where it came from.
+   *
+   * Precedence, and the reason for it:
+   *
+   *  1. An injected service wins. A host that already owns the product graph
+   *     has one AuthZ graph per process, and a second one here would give the
+   *     same organization two permission caches and two epochs.
+   *  2. Otherwise the process composes its own, over the guarded client
+   *     {@link composeApiDatabase} opened and the producer-only Eventing
+   *     runtime this process built on its own Group Queue. The two ports that
+   *     used to make this impossible — the grant command dispatcher and the
+   *     revocation telemetry — are what {@link ApiAuthzComposition} builds.
+   *  3. With neither there is no AuthZ service, and no product transport is
+   *     mounted. Every route on this process is authorized, so mounting them
+   *     over a missing AuthZ would mount routes that cannot refuse.
+   */
+  private resolveAuthz(
+    options: ApiRuntimeCompositionOptions,
+    queueInfrastructure: ApiQueueInfrastructure | undefined,
+  ): AuthzService | undefined {
+    if (this.options.authz) return this.options.authz;
+
+    const logger = createLogger(options.config.serviceName);
+    this.composedAuthz = ApiAuthzComposition.tryCompose({
+      database: this.composedDatabase?.connection,
+      eventing: this.composedEventing,
+      epoch: queueInfrastructure?.redis ?? null,
+      config: options.config.authz,
+      // The registry this process renders through `/metrics`, so the AuthZ
+      // series it records are the ones a scrape returns rather than samples
+      // written into a registry nothing reads.
+      registry: register,
+      report: LoggedApiAuthzAbsence.create(logger),
+    });
+    return this.composedAuthz?.permissions;
+  }
+
+  /**
+   * The organization and API-key services this process serves, and where they
+   * came from.
+   *
+   * Precedence, and the reason for it:
+   *
+   *  1. A host's PAIR wins. A host that already owns the product graph has one
+   *     of each per process.
+   *  2. Otherwise the process composes its own, together with the project
+   *     service they both reach through ({@link ApiTenancyComposition}).
+   *  3. With neither there is no pair, and no product transport is mounted.
+   *     Every route on this process resolves a credential and authorizes it.
+   *
+   * A host supplying exactly ONE of them is refused by `create`, before any
+   * resource is opened. The API-key service reads the project service, which
+   * resolves through the organization service, so filling the gap by composing
+   * the other half would hand this process an API-key service whose
+   * organizations are not the organizations its own routes resolve.
+   *
+   * A host that injected an AuthZ service and NEITHER of these falls to (3),
+   * and that is not an oversight. Both services are built from the two AuthZ
+   * services as a pair, and a host hands over only the permission half — there
+   * is no grants service to write their bindings through, so composing them
+   * over it would produce services that can read an organization's access and
+   * not change it.
+   */
+  private resolveTenancy(
+    options: ApiRuntimeCompositionOptions,
+    encryption: SecretEncryptionPort | undefined,
+  ): ApiResolvedTenancy | undefined {
+    const { apiKeys, organizations } = this.options;
+    // `create` has already refused a half-supplied pair, so one present means
+    // both are.
+    if (apiKeys && organizations) return { apiKeys, organizations };
+
+    const logger = createLogger(options.config.serviceName);
+    this.composedTenancy = ApiTenancyComposition.tryCompose({
+      database: this.composedDatabase?.connection,
+      // The pair this process composed, never a host's single service: an
+      // injected AuthZ is already reflected in `authz`, and reading it back
+      // here would be reading a service whose grants half we do not hold.
+      authz: this.composedAuthz
+        ? { permissions: this.composedAuthz.permissions, grants: this.composedAuthz.grants }
+        : undefined,
+      encryption,
+      pepper: options.config.apiKeyPepper,
+      report: LoggedApiTenancyAbsence.create(logger),
+    });
+    if (!this.composedTenancy) return undefined;
+
+    return {
+      apiKeys: this.composedTenancy.apiKeys,
+      organizations: this.composedTenancy.organizations,
+    };
+  }
+
+  /**
+   * Composes the process's producer-only Eventing runtime over its own queue.
+   *
+   * Separate from the queue itself because the two absences are different
+   * facts: a deployment with no Redis has no queue AND no dispatch, and a
+   * reader of the boot log should see the consequence named rather than have
+   * to derive it.
+   */
+  private composeEventing(
+    options: ApiRuntimeCompositionOptions,
+    queueInfrastructure: ApiQueueInfrastructure | undefined,
+  ): ApiEventingInfrastructure | undefined {
+    const logger = createLogger(options.config.serviceName);
+    return ApiEventingInfrastructure.tryCreate({
+      resources: options.resources,
+      queue: queueInfrastructure,
+      processName: options.config.serviceName,
+      report: LoggedApiEventingAbsence.create(logger),
+    });
   }
 
   /**
@@ -279,7 +500,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * lands in `path` — it is the stable identifier of what was done.
    */
   private composeManagementAudit(): AppRestManagementAuditPort {
-    const audit = this.audit;
+    const audit = this.options.audit;
     if (!audit) {
       return () => {};
     }
@@ -331,7 +552,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       redis: options.config.infrastructure.redis,
       redisLogger: logger,
       queuePolicy: options.config.infrastructure.groupQueue,
-      storage: this.queueStorage,
+      storage: this.options.queueStorage,
       report: LoggedApiQueueAbsence.create(logger),
     });
   }
@@ -460,6 +681,60 @@ export class LoggedApiDatabaseAbsence extends ApiDatabaseAbsenceReportPort {
   }
 }
 
+/** Names the absent dispatch once, at boot, rather than leaving it to be inferred. */
+export class LoggedApiEventingAbsence extends ApiEventingAbsenceReportPort {
+  static create(logger: Pick<Logger, "info">): LoggedApiEventingAbsence {
+    return new LoggedApiEventingAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "info">) {
+    super();
+  }
+
+  absent(): void {
+    this.logger.info(
+      { reason: "no-queue" },
+      "API composed without a Group Queue: it can produce no commands, so it composes no service whose writes are commands",
+    );
+  }
+}
+
+/** Names the absent AuthZ once, at boot, rather than leaving it to be inferred. */
+export class LoggedApiAuthzAbsence extends ApiAuthzAbsenceReportPort {
+  static create(logger: Pick<Logger, "warn">): LoggedApiAuthzAbsence {
+    return new LoggedApiAuthzAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "warn">) {
+    super();
+  }
+
+  absent(reason: "no-database" | "no-eventing"): void {
+    this.logger.warn(
+      { reason },
+      "API composed no AuthZ service and no host supplied one: it mounts no product transports, because every route it would mount is authorized",
+    );
+  }
+}
+
+/** Names the absent credential services once, at boot, rather than leaving them inferred. */
+export class LoggedApiTenancyAbsence extends ApiTenancyAbsenceReportPort {
+  static create(logger: Pick<Logger, "warn">): LoggedApiTenancyAbsence {
+    return new LoggedApiTenancyAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "warn">) {
+    super();
+  }
+
+  absent(reason: "no-database" | "no-authz" | "no-pepper"): void {
+    this.logger.warn(
+      { reason },
+      "API composed no organization or API-key service and no host supplied them: it mounts no product transports, because every route it would mount resolves a credential",
+    );
+  }
+}
+
 /** Names the absent Redis once, at boot, rather than leaving it to be inferred. */
 export class LoggedApiQueueAbsence extends ApiQueueAbsenceReportPort {
   static create(logger: Pick<Logger, "info">): LoggedApiQueueAbsence {
@@ -475,6 +750,84 @@ export class LoggedApiQueueAbsence extends ApiQueueAbsenceReportPort {
       { reason },
       "API composed without Redis: Group Queue dispatch and the Redis readiness gate are absent",
     );
+  }
+}
+
+/**
+ * Composes the process with only its own lifecycle surface mounted.
+ *
+ * Shared by the two compositions that can arrive here — a host that supplied
+ * no product adapters at all, and a production composition that could resolve
+ * no AuthZ — so a deployment's health route, metrics gate, readiness order and
+ * drain behaviour do not depend on WHICH of those two happened.
+ */
+export function composeApiLifecycleProcess(input: {
+  options: ApiRuntimeCompositionOptions;
+  metrics: ApiMetricsPort | undefined;
+  readiness: ApiReadinessPort | undefined;
+  featureDrain: ApiFeatureDrainPort | undefined;
+}): ApiRuntimeProcessPort {
+  const routes = ApiProcessLifecycleRoutes.create(input.metrics ? { metrics: input.metrics } : {});
+  const observability = createProcessObservability(input.options.observability);
+  return ApiLifecycleOnlyProcess.create({
+    listener: ApiHttpListener.create({
+      application: routes,
+      host: input.options.config.host,
+      port: input.options.config.port,
+      drainGraceMs: input.options.config.httpDrainGraceMs,
+      logger: observability.logger,
+    }),
+    observability,
+    graph: input.options.graph,
+    readiness: input.readiness,
+    featureDrain: input.featureDrain,
+  });
+}
+
+/**
+ * The API process with only its own lifecycle surface mounted. It keeps the
+ * readiness-before-listen order and the shared finalization order so a
+ * deployment's shutdown behaviour does not change when the product transports
+ * are added.
+ */
+class ApiLifecycleOnlyProcess extends ApiRuntimeProcessPort {
+  static create(options: {
+    listener: ApiHttpListener;
+    observability: ProcessObservability;
+    graph: ApiProcessGraphPort;
+    readiness: ApiReadinessPort | undefined;
+    featureDrain: ApiFeatureDrainPort | undefined;
+  }): ApiLifecycleOnlyProcess {
+    return new ApiLifecycleOnlyProcess(options);
+  }
+
+  private closing: Promise<void> | undefined;
+
+  private constructor(
+    private readonly options: {
+      listener: ApiHttpListener;
+      observability: ProcessObservability;
+      graph: ApiProcessGraphPort;
+      readiness: ApiReadinessPort | undefined;
+      featureDrain: ApiFeatureDrainPort | undefined;
+    },
+  ) {
+    super();
+  }
+
+  async start(): Promise<{ host: string; port: number }> {
+    await this.options.readiness?.assertReady();
+    return this.options.listener.start();
+  }
+
+  close(): Promise<void> {
+    this.closing ??= closeApiProcessResources({
+      listener: this.options.listener,
+      featureDrain: this.options.featureDrain,
+      graph: this.options.graph,
+      observability: this.options.observability,
+    });
+    return this.closing;
   }
 }
 

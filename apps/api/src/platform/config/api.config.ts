@@ -5,15 +5,9 @@ import {
   portSchema,
   type ConfigValue,
 } from "@langwatch/config";
-import {
-  loggerConfigurationFrom,
-  type LoggerConfiguration,
-} from "@langwatch/observability";
+import { loggerConfigurationFrom, type LoggerConfiguration } from "@langwatch/observability";
 import type { ProcessObservabilityOptions } from "@langwatch/observability/node";
-import {
-  resolveGroupQueuePolicyFromEnv,
-  type GroupQueuePolicy,
-} from "@langwatch/group-queue";
+import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
 import { z } from "zod";
 
@@ -45,6 +39,18 @@ export const STORED_SECRET_ENCRYPTION_KEY_ENV_PRECEDENCE = [
   "CREDENTIALS_SECRET",
   "NEXTAUTH_SECRET",
 ] as const;
+
+/**
+ * The API-key pepper, under the same two names in the same order the platform
+ * app reads them.
+ *
+ * Not a convenience: a key hashed by one process is authenticated by the
+ * other, so a deployment that set only `NEXTAUTH_SECRET` must give both
+ * processes the same pepper or every credential issued by one is unusable at
+ * the other. It reads the same variables as the cipher key deliberately —
+ * that is what the platform app does, and one of the two has to move first.
+ */
+export const API_KEY_PEPPER_ENV_PRECEDENCE = ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"] as const;
 
 export const apiConfigDefinition = RuntimeConfig.define({
   /** A standalone API owns dispatch-only web behaviour. */
@@ -119,6 +125,25 @@ export const apiConfigDefinition = RuntimeConfig.define({
     env: "CREDENTIALS_SECRET",
   }),
   /**
+   * The pepper an API key's stored hash is derived under, from the same two
+   * variables in the same order as the cipher key above.
+   *
+   * It is a SEPARATE leaf on purpose, even though both resolve the same value
+   * today. The two uses are different: the cipher decodes 32 bytes of hex, and
+   * this one is the HMAC key VERBATIM — the raw string, never the decoded
+   * bytes. A process that peppered with the decoded key would hash every
+   * credential differently from the platform app and authenticate none of the
+   * keys already issued.
+   *
+   * Naming them apart is also what makes them separable: a deployment that
+   * ever wants to rotate one without the other changes this line, not a call
+   * site that had reached for the cipher's key because it happened to be
+   * nearby.
+   */
+  apiKeyPepper: Config.value(optionalEnvironmentString, {
+    env: "API_KEY_PEPPER",
+  }),
+  /**
    * The bearer credential a caller must present to scrape this process's
    * metrics, under the name every other LangWatch tier reads it by.
    *
@@ -131,6 +156,23 @@ export const apiConfigDefinition = RuntimeConfig.define({
   metricsApiKey: Config.value(optionalEnvironmentString, {
     env: "METRICS_API_KEY",
   }),
+  /**
+   * The two AuthZ switches, read raw and interpreted below.
+   *
+   * `AUTHZ_EPOCH_CACHE` is a legacy opt-in the platform app reads as "1 or
+   * true, anything else off". A stricter schema here would refuse a boot over
+   * a value that tier merely ignores, and two processes disagreeing about
+   * whether a cache is on is worse than either answer.
+   *
+   * `DEMO_PROJECT_ID` names the one project whose read access is granted to
+   * everybody. Blank is not a project id, so a blank export means no demo
+   * project rather than a project whose id is the empty string — a filter on
+   * `""` widens rather than narrows.
+   */
+  authz: {
+    epochCache: Config.value(optionalEnvironmentString, { env: "AUTHZ_EPOCH_CACHE" }),
+    demoProjectId: Config.value(optionalEnvironmentString, { env: "DEMO_PROJECT_ID" }),
+  },
   infrastructure: {
     /**
      * The Postgres connection the process composes its one guarded Prisma
@@ -185,13 +227,22 @@ export type ApiInfrastructureConfig = Readonly<{
   groupQueue: GroupQueuePolicy;
 }>;
 
+/** The AuthZ decisions this process was configured with, already interpreted. */
+export type ApiAuthzConfig = Readonly<{
+  /** Whether an organization's permission reads may be served from the epoch cache. */
+  epochCacheEnabled: boolean;
+  /** The project every caller may read, where a deployment names one. */
+  demoProjectId: string | undefined;
+}>;
+
 export type ApiShutdownConfig = Readonly<{
   /** The whole shutdown sequence's budget, listener drain included. */
   processDeadlineMs: number;
 }>;
 
 export type ApiConfig = Readonly<
-  Omit<ApiConfigProjection, "infrastructure" | "shutdown"> & {
+  Omit<ApiConfigProjection, "authz" | "infrastructure" | "shutdown"> & {
+    authz: ApiAuthzConfig;
     infrastructure: ApiInfrastructureConfig;
     shutdown: ApiShutdownConfig;
   }
@@ -206,10 +257,17 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
       ...source,
       API_PORT: firstDefined(source, API_PORT_ENV_PRECEDENCE),
       CREDENTIALS_SECRET: firstDefined(source, STORED_SECRET_ENCRYPTION_KEY_ENV_PRECEDENCE),
+      API_KEY_PEPPER: firstDefined(source, API_KEY_PEPPER_ENV_PRECEDENCE),
     },
   }).value;
   return {
     ...value,
+    authz: {
+      // The platform app's exact rule, so one variable means one thing across
+      // the deployment rather than one thing per tier.
+      epochCacheEnabled: value.authz.epochCache === "1" || value.authz.epochCache === "true",
+      demoProjectId: value.authz.demoProjectId?.trim() || undefined,
+    },
     shutdown: {
       processDeadlineMs:
         value.shutdown.deadlineMs ?? value.httpDrainGraceMs + PROCESS_CLOSE_SLACK_MS,
@@ -267,4 +325,3 @@ function firstDefined(
   }
   return undefined;
 }
-

@@ -1,0 +1,57 @@
+Feature: The standalone API process dispatches commands and consumes none
+  As an operator running a LangWatch API deployment
+  I want the API process to send Eventing commands over its own queue without
+  claiming the shared job queue
+  So that a service whose writes are commands can be composed in the API tier
+  without a second process racing the worker for its jobs
+
+  # WHY THIS EXISTS
+  #
+  # `event-sourcing/jobs` is ONE queue holding every pipeline's jobs, and
+  # exactly one process may claim it: a claimant that has not registered every
+  # pipeline rejects and redelivers the rest, forever. That is why the API
+  # process cannot simply build the runtime the worker builds.
+  #
+  # It does not need to. Producing and consuming are separable — a command's
+  # routing key is stamped from the pipeline and command names at send time —
+  # so this tier can register the same packaged definitions as a producer and
+  # leave every handler, append and fold to the worker.
+  #
+  # What makes that safe is that the producer-only shape is structural rather
+  # than a rule someone has to keep: the seat where a durable event store would
+  # go refuses every operation, and there is no process store at all.
+
+  Rule: The runtime exists only where the queue does
+
+    @unit
+    Scenario: A process with no queue composes no dispatch
+      Given the deployment configured no Redis
+      When the process composes its Eventing runtime
+      Then it composes none, and names the consequence at boot
+      # The queue infrastructure has already named the cause. A reader of the
+      # boot log should not have to derive "no dispatch" from "no Redis".
+
+  Rule: A producer owns neither an event log nor a process store
+
+    @unit
+    Scenario: The API process's Eventing runtime owns no event log
+      Given the API process composed its Eventing runtime
+      When something in that process tries to append events
+      Then the append is refused and names the process
+      # An in-memory store in that seat would accept the append and lose it.
+
+    @unit
+    Scenario: The API process's Eventing runtime runs no process managers
+      Given the API process composed its Eventing runtime
+      When a pipeline declaring a process manager is registered on it
+      Then the registration is refused
+      # An inbox, an outbox and a wake are the consuming process's work. Half
+      # of that is a graph that claims work it never drains.
+
+  Rule: Dispatch is released before the connection under it
+
+    @unit
+    Scenario: The runtime is released before the connection under it
+      Given the API process composed its Eventing runtime over its Group Queue
+      When the process shuts down
+      Then the runtime is closed once, before its Redis connection is released
