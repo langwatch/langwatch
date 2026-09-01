@@ -105,6 +105,20 @@ refusal decides for every operator that no Langy is better than Langy without
 the UID wall. For a single-tenant install whose users are all colleagues in one
 GitHub org, that trade is not obviously right, and it is not ours to make.
 
+The corpus already agrees about what the wall is worth. ADR-053:725-729 weighed
+this exact mechanism and ruled on it:
+
+> **Per-user Unix accounts inside one Langy gVisor pod.** Rejected as the tenant
+> boundary. It remains useful defense in depth, but gVisor isolates a sandbox
+> from the host; it does not make sibling processes inside one sandbox separate
+> tenants.
+
+That is the settled position: the UID wall is defence in depth, not a tenant
+boundary, and nothing in the shipped architecture ever claimed otherwise. An
+operator trading defence in depth for an install they can actually run is making
+a smaller decision than the double barricade implies — and one this corpus had
+already declined to treat as the thing standing between tenants.
+
 ### The precedent this follows exactly
 
 We have made this call before, one rung up.
@@ -156,18 +170,20 @@ Under `none` the chart emits `runAsNonRoot: true`, `runAsUser: 1000`, and
 `capabilities.drop: ["ALL"]` with no `add` — a pod spec that satisfies PSA
 `restricted` and the common Gatekeeper/Kyverno rules without an exemption.
 
-### 3. Opencode is removed, and that is load-bearing
+### 3. This posture depends on ADR-131 (opencode harness removal)
 
-Opencode cannot run two instances under one identity: they collide on
-`~/.config/opencode/`. Shared identity is therefore only *coherent* once
-opencode is gone — with it present, `workerIsolation: none` would have to also
-pin the pod to a single worker, which is a different and much worse product.
+`workerIsolation: none` is only coherent on a pi-only worker pool, and that
+removal is a decision of its own with its own blast radius. It is **ADR-131**,
+and this ADR does not restate it — it depends on it.
 
-Pi has no equivalent constraint. Its session store is already per-conversation
-and lives outside the worker home (`specs/langy/langy-pi-harness.feature:120-128`).
-So this ADR removes `HarnessOpenCode` entirely: `domain/credentials.go:116-132`
-collapses to pi, the harness switch at `app/workerpool/pool.go:826` goes away,
-and the `adapters/opencode/` package is deleted.
+The dependency is hard, not stylistic. Opencode cannot run two instances under
+one identity: they collide on `~/.config/opencode/`. With the opencode harness
+still present, `none` would additionally have to pin the pod to a single worker,
+which is a different and much worse product. Pi has no equivalent constraint —
+its session store is per-conversation and lives outside the worker home
+(`specs/langy/langy-pi-harness.feature:120-128`).
+
+So ADR-131 lands first. Until it does, `workerIsolation: none` must not ship.
 
 ### 4. The pool stops allocating UIDs it cannot apply
 
@@ -178,9 +194,10 @@ nothing enforces is a lie in the code that a future reader will believe.
 
 ### 5. The pod says so, loudly, at boot
 
-Starting with isolation off logs a `WARN` naming the consequence — sibling
-workers can read each other's on-disk credentials — so it appears in the first
-support bundle rather than being reconstructed from a values file later.
+Starting with isolation off logs a `WARN` naming the consequence — one
+conversation's worker can read another's live credentials and conversation
+content — so it appears in the first support bundle rather than being
+reconstructed from a values file later.
 
 ## What the operator trades
 
@@ -193,7 +210,8 @@ support bundle rather than being reconstructed from a values file later.
 | Sibling reads sibling's `/proc/<pid>/environ` | Kernel refuses | **Possible** |
 | Sibling reads sibling's session directory | Kernel refuses | **Possible** |
 | Pod→host escape surface | `runtimeClassName` governs it, unchanged | same |
-| Egress bounds (ADR-076, NetworkPolicy) | unchanged | same |
+| Egress: NetworkPolicy + the L7 adapter (ADR-076, shipped) | unchanged | same |
+| Egress: ADR-076's per-worker netns end state | reachable | **foreclosed** |
 
 The two rows that change should be read at full strength. Under `none`, a
 prompt injection in one conversation can read another conversation's live
@@ -209,6 +227,19 @@ because a pipe has no name to dial. Shared identity does not reopen it. And ther
 is no credential file to steal, because pi writes none. An operator weighing this
 should be told what they are trading, not a worst case assembled from the
 opencode era.
+
+The last row is the one this ADR came closest to getting wrong. It is tempting
+to write "egress is unchanged", and for everything ADR-076 actually **shipped**
+— the NetworkPolicy, the L7 adapter, the allow-list, the SNI cross-check — that
+is true. But ADR-076's own decided end state is per-worker network namespaces
+(`076:338-348`, "the **true hard block for F1**"), and `076:365` records its
+cost: "Adds **`CAP_SYS_ADMIN`** to the manager (for `unshare(CLONE_NEWNET)` +
+veth setup)". A pod running `drop: ["ALL"]` as UID 1000 cannot ever climb that
+rung. So `none` does not merely trade sibling identity — it **forecloses
+ADR-076's mandatory-enforcement upgrade path** for as long as it is selected.
+An operator who expects to need bypass-proof egress should stay on `per-uid`
+and take the Cilium route ADR-076 names as its other option, which does not
+depend on any capability in this pod.
 
 ## Honest limits
 
@@ -230,6 +261,29 @@ than continue to claim a property the posture removes.
 
 **`sharedidentity` is not a sandbox.** It is the absence of one boundary, with
 every other boundary intact. It should never be described as "still isolated."
+
+**An Accepted ADR calls this exact pod shape known-unsafe, and it was right to.**
+ADR-047:36-41 lists among the problems it was written to fix:
+
+> The e2e pod manifest ships the **known-unsafe** `runAsUser: 1000` +
+> all-caps-dropped config — the exact shape ADR-033 says re-opens cross-worker
+> credential theft (and which also breaks per-worker UID isolation outright).
+
+`none` emits that shape byte for byte, so the disagreement has to be met rather
+than stepped around. What ADR-047 was fixing is named in its own sentence
+before that one: "The chart's `values.yaml` *claims* it 'refuses to deploy'
+without a sandboxed runtime, but **nothing enforces it**." The defect was a
+manifest that drifted into the unsafe posture while the documentation said it
+could not — the posture arrived by accident and no mechanism noticed. That is a
+real bug and it stays fixed: the render-time `fail` in §2 is precisely the
+enforcement ADR-047 found missing.
+
+What this ADR adds is a second, guarded door to the same room, which ADR-047
+never considered because in 2026-07 there was no customer who could not open the
+first one. The shape is identical; the provenance is not, and provenance is what
+the guard, the acknowledgement value and the boot `WARN` exist to establish. If
+that distinction does not hold, this ADR is wrong — so it should be the first
+thing a reviewer attacks.
 
 **The exposure is the process environment, and that is not fixable by moving
 files around.** Because pi keeps every secret in the worker's environment and
@@ -296,11 +350,22 @@ ours.
 ## Consequences
 
 **Code.** `adapters/runner/localunsafe` → `adapters/runner/sharedidentity`, with
-the environment allowlist removed from it and from `config.go:293`.
-`LANGY_UNSAFE_DEV_DISABLE_ISOLATION` → `LANGY_WORKER_ISOLATION`. UID allocation
-in `app/workerpool/uid.go` becomes conditional. `adapters/opencode/` is deleted;
-`domain/credentials.go` and `app/workerpool/pool.go:826` lose the harness
-branch. A boot `WARN` is added.
+the environment allowlist removed from it and from `config.go:293`. UID
+allocation in `app/workerpool/uid.go` becomes conditional. A boot `WARN` is
+added. The opencode harness itself is ADR-131's change, not this one.
+
+**The env-var rename reaches outside the service.**
+`LANGY_UNSAFE_DEV_DISABLE_ISOLATION` → `LANGY_WORKER_ISOLATION` has two
+independent producers and a tooling abstraction built on it, none of which is
+optional: `tools/thuishaven/domain/langytier.go:7,25,60` models the dev tiers in
+terms of this variable, `tools/thuishaven/app/plan_langy.go:147,166,231` sets it
+(with `plan_langy_test.go:41,70` and `domain/overlay_langy_test.go:22-23`
+asserting on the literal string), and
+`packages/server/src/services/langyagent.ts:98` sets it independently when the
+environment is local-like. `charts/langyagent/README.md:96` and
+`templates/configmap.yaml:2` document the old refusal. A rename that misses any
+of these leaves local development silently running the posture it did not ask
+for, which is the one failure mode this ADR is least able to tolerate.
 
 **Chart.** Two values in `charts/langyagent/values.yaml`, one `fail` guard and a
 conditional security context in `templates/deployment.yaml`, both documented in
@@ -309,19 +374,32 @@ the umbrella's `charts/langwatch/values.yaml`. The root rationale header at
 unconditional.
 
 **Specs.** `langy-deploy-hardening.feature` gains the guard and acknowledgement
-scenarios and updates its e2e-manifest scenario, which asserts flatly that "the
-manager runs as root" (:156-165). `langy-selfhost-install.feature:96-107` is
+scenarios and updates both its e2e-manifest scenario (:156-165, which asserts
+flatly that "the manager runs as root") and its Background (:14-26, which calls
+root one of "two invariants"). `langy-selfhost-install.feature:96-107` is
 corrected — the "no cost, every cluster" claim and the "any cluster" promise
 both need the policy-locked case named. `langy-worker-isolation.feature` is
-rewritten for pi: it is `@unimplemented` today and framed entirely around
-opencode's unauthenticated control port, a threat that stops existing.
-`langy-pi-harness.feature:158-163` records that the stash is listable under
-shared identity.
+rewritten for pi. `langy-pi-harness.feature:158-163` records that the stash is
+listable under shared identity.
+
+**One spec has to be argued with, not just edited.**
+`specs/security/helm-strict-admission.feature:118-127` is titled "The assistant
+is removed rather than de-privileged" and asserts "the chart never quietly
+relaxes the assistant to run as non-root", concluding "Removing the workload is
+the safe answer, weakening it is not." Its `quietly` survives this ADR intact —
+nothing here is quiet. Its conclusion does not. That scenario must be rewritten
+to say the strict-admission **overlay** removes the assistant, while the
+isolation trade exists as a separate posture an operator selects; and its
+rationale, which claims siblings "read each other's credentials off disk",
+is factually wrong for pi and should go.
 
 **Docs.** `docs/self-hosting/langy/setup` gains the posture beside the existing
-sandboxed-runtime hardening section. `docs/self-hosting/security.mdx:237`
-currently says "Don't force it non-root. Deploy it on a cluster that allows it,
-or run without the assistant" — which stops being true.
+sandboxed-runtime hardening section. Two published claims stop being true and
+both name the reasoning, not just the rule, so both need rewriting rather than
+deleting: `docs/self-hosting/security.mdx:237` ("Don't force it non-root. Deploy
+it on a cluster that allows it, or run without the assistant") and
+`docs/langy/security/sandbox.mdx:32` ("The manager process runs as root in the
+container").
 
 **A support burden we are choosing.** Some operators will set `none` because it
 makes an error go away, not because they weighed it. The acknowledgement value,
@@ -332,14 +410,23 @@ none of them is a guarantee. We accept that, on the same reasoning
 ## References
 
 - Related ADRs: ADR-033 (per-worker UID isolation and the gVisor constraint —
-  this ADR makes its central mechanism optional), ADR-047 (Langy foundations),
-  ADR-053 (tenant-aware egress and workload isolation; Track D is where this
-  bridge ends), ADR-076 (egress enforcement — unchanged by this decision).
+  its Fix A′ is deleted by ADR-131, not made optional by this one; what this
+  ADR makes optional is the per-worker UID wall `033:115` keeps as
+  "load-bearing; guards `/proc/<pid>/environ`" — the same exposure this ADR
+  reaches independently), **ADR-131** (opencode harness removal — a hard
+  dependency; `workerIsolation: none` must not ship before it),
+  ADR-047 (Langy foundations — `047:36-41` calls this pod shape known-unsafe;
+  argued with under Honest limits), ADR-053 (tenant-aware egress and workload
+  isolation; `053:725-729` already rejects the UID wall as the tenant boundary,
+  and Track D is where this bridge ends), ADR-076 (egress enforcement — its
+  shipped rungs are unchanged, its per-worker-netns end state is foreclosed
+  under `none`; see the trade table).
 - Specs: `specs/langy/langy-deploy-hardening.feature`,
   `specs/langy/langy-selfhost-install.feature`,
   `specs/langy/langy-worker-isolation.feature`,
   `specs/langy/langy-pi-harness.feature`,
-  `specs/security/helm-strict-admission.feature`.
+  `specs/security/helm-strict-admission.feature`,
+  `specs/langy/langy-opencode-harness-removal.feature` (ADR-131's contract).
 - Code: `services/langyagent/app/runner.go` (the interface),
   `adapters/runner/sandboxed/sandboxed.go`,
   `adapters/runner/localunsafe/localunsafe.go`, `cmd/root.go:53-59`,

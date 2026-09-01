@@ -116,15 +116,37 @@ Feature: The Helm chart installs on a cluster that enforces strict admission con
     And the bundled metrics stack is not deployed
 
   @e2e @unimplemented
-  Scenario: The assistant is removed rather than de-privileged
+  Scenario: The overlay removes the assistant rather than quietly weakening it
     Given the assistant's manager requires root and a narrow capability set so
       it can give each of its workers a distinct user id
-    When an operator installs onto a cluster that forbids running as root
+    When an operator applies the strict-admission overlay
     Then the overlay opts the assistant out of the install entirely
     And the chart never quietly relaxes the assistant to run as non-root
-    # Running that manager as an unprivileged user does not make it safe; it
-    # makes sibling workers share a uid and read each other's credentials off
-    # disk. Removing the workload is the safe answer, weakening it is not.
+    # What this scenario has always been about is the word "quietly". An
+    # install that arrives at the weaker posture by drift — a field left blank,
+    # an override that replaced more than it named — has been given something
+    # nobody chose. This overlay's answer to that is to remove the workload,
+    # and that stays its answer.
+
+  # A second answer exists for operators the overlay's answer does not serve.
+  # A cluster enforcing non-root admits no assistant at all, so "remove it" is
+  # not advice there, it is the outcome either way; the only question is
+  # whether the operator gets to decide. ADR-130 makes the trade selectable,
+  # refused unless acknowledged in their own values file, and announced by the
+  # manager at startup. That is the opposite of quiet, which is why it does not
+  # contradict the scenario above.
+  @e2e @unimplemented
+  Scenario: An operator on a non-root cluster can choose the assistant anyway
+    Given a cluster that forbids running as root
+    And an operator who has accepted the reduced isolation on the record
+    When they install with the assistant kept on
+    Then the assistant is admitted and runs
+    And the install states which isolation this posture has given up
+    # Named precisely, because the old wording here was wrong: workers keep no
+    # credentials on disk. What a shared identity exposes is one worker's
+    # process environment and its conversation's session directory.
+    # See specs/langy/langy-deploy-hardening.feature for the guard and the
+    # acknowledgement, and langy-worker-isolation.feature for the boundary.
 
   @e2e @unimplemented
   Scenario: An exempt component must be one the overlay actually disables
