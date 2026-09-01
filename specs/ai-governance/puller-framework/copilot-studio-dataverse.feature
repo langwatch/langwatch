@@ -41,13 +41,17 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
     # seeing 96% dropped should see it is deliberate, not a parsing failure.
 
   @integration
-  Scenario: The puller never reaches beyond the customer's environment
+  Scenario: The conversation read never reaches beyond the environment
     Given the puller is configured and running
+    And the source is not reading seat licences
     When a full pull completes
     Then every request went to the customer's Power Platform environment
     And no request went to Microsoft's directory service
-    # The customer therefore consents to Dataverse access only. No directory
-    # permission is requested, and none is needed.
+    # Reading conversations needs Dataverse access and nothing else. The one
+    # request that leaves the environment is the seat licence read, which is
+    # separately consented on the tenant and can be switched off — see
+    # specs/governance/pulled-seats.feature. A customer who declines the
+    # directory permission still gets every conversation.
 
   @unit
   Scenario: A next page cannot move the token to another tenant

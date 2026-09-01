@@ -151,15 +151,20 @@ export const copilotStudioDataversePullConfigSchema = z.object({
   /**
    * Whether to read the tenant's seat licences beside the conversations.
    *
-   * Off unless asked for, the same rule the subscription id above is written
-   * under: `/subscribedSkus` needs its own admin consent on the tenant
-   * (`Organization.Read.All`), and a customer who only wants transcripts must
-   * not have a second permission grant forced on them to get them. Default-on
-   * would be worse than merely presumptuous — every source already configured
-   * without that consent would spend a refused Graph call on every run,
-   * forever, for a reading nobody asked for.
+   * On unless switched off. Seats are the half of the money the conversations
+   * cannot show — a seat nobody sits in produces no usage at all — so a source
+   * that reads one and not the other answers "what is this costing us" wrong
+   * by default, and an admin who wanted the answer would have had to know the
+   * setting existed to get it.
+   *
+   * The consent is the reason this is a setting rather than a constant:
+   * `/subscribedSkus` needs `Organization.Read.All` granted on the tenant, and
+   * a tenant that never granted it refuses the call. That refusal is held and
+   * given up on rather than retried forever, and it never fails the run — so
+   * the cost of being on for a customer who does not want it is a setting they
+   * switch off, not a source that breaks.
    */
-  readSeats: z.boolean().default(false),
+  readSeats: z.boolean().default(true),
 });
 
 export type CopilotStudioDataverseConfig = z.infer<
