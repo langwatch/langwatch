@@ -254,7 +254,15 @@ Then confirm from the CLI, in another terminal:
 langwatch agent list
 ```
 
-The row for the agent reads `Online` with the environment and the instance count. `Offline` means the process is not connected: check that `LANGWATCH_API_KEY` is set in the process environment, that the process is running, and that outbound WSS to the LangWatch endpoint is allowed.
+The row for the agent reads `Online` with the environment and the instance count. `Offline` means the process is not connected: check that `LANGWATCH_API_KEY` is set in the process environment, that the process is running, and that outbound WSS to the LangWatch endpoint is allowed. When the network refuses the WebSocket upgrade, the SDK falls back to HTTP long polling on its own; `LANGWATCH_AGENT_TRANSPORT=http` forces that transport from the start.
+
+Then read back what the platform registered:
+
+```bash
+langwatch agent get <agent-id> --format json
+```
+
+The answer carries `environment`, `status`, `instances` (hostname, pid, SDK and version per process) and `parameters`: one entry per run parameter with `name`, `type`, `options` (the closed list from `Literal`, `Enum` or `z.enum`), `defaultValue` and `description`. Compare it with the signature. A parameter that is missing was read as a turn field; one with no default is still registered, as a required parameter every run has to supply. An option list that is missing means the annotation was not a `Literal`, an `Enum` or a `z.enum`. Fix the code and restart the process; the row updates on the next registration.
 
 ## Step 5: Run the first test suite
 
@@ -279,6 +287,17 @@ langwatch test-suite run 'Smoke' --target connected:support-agent@development --
 - `--wait` blocks until the run finishes and exits non-zero when it fails. Use it here: the report in Step 6 needs the result.
 - Keep the agent process running for the whole run. A run against an agent with no connected instance is refused with `agent_offline`.
 
+When the first run is green and the agent declares a parameter with an option list, offer one comparison run across the options. It reuses the same test suite, and the results page shows one column per value:
+
+```bash
+langwatch run-plan run --test-suite 'Smoke' \
+  --target 'connected:support-agent@development?model=gpt-5' \
+  --target 'connected:support-agent@development?model=gpt-5-mini' \
+  --name 'Smoke: model comparison' --format json
+```
+
+`--param plan=pro` on the same command sets a value every target shares. The platform refuses a value outside the option list before anything is scheduled, and a name that neither the scenario nor the target agent declares is refused the same way, so read the names from `langwatch scenario get` and `langwatch agent get` rather than from memory.
+
 ## Step 6: Report the result
 
 Report to the user:
@@ -286,6 +305,7 @@ Report to the user:
 - The Agent Testing page URL of their LangWatch project (`https://app.langwatch.ai/<project-slug>/agent-testing`, or the same path on their own instance when self-hosted).
 - What changed in the codebase: the decorated function, the parameters it declares, the environment it registers under.
 - The result of the first run.
+- The parameters the platform registered, as `langwatch agent get` lists them, so the user knows which levers the run dialog offers. The `scenarios` skill reads the same list when it proposes scenarios; its prompt is "Add scenario tests for my agent".
 
 Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and what the failure means for the user, and stop there. Do not paste the raw error text, stack trace or debug URL: those can contain secrets and tell the user nothing they can act on. Do NOT claim a scenario or a test suite ran when it did not.
 
@@ -402,7 +422,9 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 | Symptom | Cause | Fix |
 |---|---|---|
 | `langwatch agent list` shows no row for the agent | The process started without an API key, so the SDK opened no connection. | Set `LANGWATCH_API_KEY` in the process environment and restart the process. |
-| The row reads `Offline` | The process stopped, or its outbound WSS connection is blocked. | Restart the process. On a network that blocks WebSockets, use the HTTP fallback. |
+| The row reads `Offline` | The process stopped, or its outbound connection is blocked. | Restart the process. On a network that blocks WebSockets, set `LANGWATCH_AGENT_TRANSPORT=http`; the SDK then registers over HTTP long polling. |
+| The process logs `timed out during opening handshake` on every attempt while `curl` reaches the endpoint | The host resolves the endpoint to an IPv6 address it cannot reach, most often behind a VPN tunnel that drops IPv6, and an older SDK waited on that address alone. | Update the `langwatch` package to the latest release: it moves on to the next address after 0.25 s (`LANGWATCH_AGENT_HAPPY_EYEBALLS_DELAY` tunes it). Disconnecting the VPN also clears it. |
+| `langwatch agent get` lists a parameter without `options`, or does not list it at all | The annotation is not a `Literal`, an `Enum` or a `z.enum`, or the parameter has no default and the platform reads it as required. | Change the annotation or add the default, then restart the process. |
 | The run is refused with `agent_offline` | No instance was connected when the run started. | Start the agent process and run again. |
 | The run is refused with `agent_owner_only` | The agent registered under `development` with a personal key, so only its owner can run it. | Run it as the owner, or register it under a shared environment name such as `dev-shared`. |
 | The run is refused with `scenario_parameter_option_invalid` | A value is outside the closed option list the agent declares. | Use one of the listed options, or widen the `Literal` (Python) or `z.enum` (TypeScript) list in the code. |

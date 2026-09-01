@@ -57,10 +57,10 @@ Feature: Running one scenario keeps the person in place
     And the duration and the cost of the run read in the drawer
 
   @integration
-  Scenario: The drawer offers Open Scenario for that scenario
+  Scenario: The drawer offers Edit Scenario for that scenario
     Given the run detail drawer is open on a finished single-scenario run
     When its header is read
-    Then a single "Open Scenario" button is offered
+    Then a single "Edit Scenario" button is offered
     And it opens the editor for that scenario
     And a rerun is started from the scenario editor through its "Save & Run" control
 

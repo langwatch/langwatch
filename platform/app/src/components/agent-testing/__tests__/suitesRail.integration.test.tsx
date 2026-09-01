@@ -710,10 +710,12 @@ describe("the test suites rail", () => {
     expect(props.setRelativePeriod).toHaveBeenCalledWith("7d");
   });
 
-  /** @scenario "The rail keeps the voice agents note" */
-  it("keeps the voice agents note", () => {
+  /** @scenario "The rail carries the new-simulations announcement" */
+  it("carries the new-simulations announcement", () => {
     renderRail();
 
-    expect(screen.getByText("Try voice agent simulations")).toBeInTheDocument();
+    expect(
+      screen.getByText("Welcome to the new simulations screen"),
+    ).toBeInTheDocument();
   });
 });

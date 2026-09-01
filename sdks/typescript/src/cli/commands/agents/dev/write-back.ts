@@ -147,9 +147,16 @@ export function restoreDevTunnel({
 }
 
 /**
- * The project simulations page, derived from the agent's `platformUrl`
+ * The project testing page, derived from the agent's `platformUrl`
  * (`https://…/<project-slug>/agents?…`): same origin, same project slug,
  * `/simulations` path.
+ *
+ * Two interfaces show the same runs, and which one a project reads is decided
+ * by a release rule the CLI cannot read. `/simulations` is the address that
+ * opens in both: a project on Agent Testing is sent to
+ * `/agent-testing/results`, and a project kept on the Simulations pages
+ * renders them. Naming `/agent-testing` here would answer "this page does not
+ * exist" to everyone kept on the older interface.
  */
 export function deriveSimulationsUrl(
   platformUrl: string | undefined,

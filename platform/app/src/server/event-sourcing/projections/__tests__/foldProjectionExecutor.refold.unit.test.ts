@@ -102,21 +102,14 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
     describe("when the projection declares no re-fold policy", () => {
       /** @scenario "An out-of-order batch re-folds from the event log by default" */
       it("loads the aggregate's full history and replays it from init state", async () => {
-        const history = [
-          eventAt(1_000),
-          eventAt(2_000),
-          eventAt(CHECKPOINT_MS),
-        ];
+        const delivered = [eventAt(1_000), eventAt(2_000)];
+        const history = [...delivered, eventAt(CHECKPOINT_MS)];
         const { fold, store, eventLoader } = makeFold({
           storedState: { count: 99, LastEventOccurredAt: CHECKPOINT_MS },
           loadedEvents: history,
         });
 
-        const result = await executor.executeBatch(
-          fold,
-          [eventAt(1_000), eventAt(2_000)],
-          context,
-        );
+        const result = await executor.executeBatch(fold, delivered, context);
 
         expect(eventLoader).toHaveBeenCalledWith({
           tenantId,
@@ -136,7 +129,8 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
           LastEventOccurredAt: number;
         }
 
-        const history = [eventAt(1_000), eventAt(2_000), eventAt(3_000)];
+        const late = eventAt(1_000);
+        const history = [late, eventAt(2_000), eventAt(3_000)];
         const store = createMockFoldProjectionStore<OrderState>();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
           sequence: [5_000],
@@ -152,11 +146,160 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
         }) as FoldProjectionDefinition<OrderState, Event>;
         fold.eventLoader = vi.fn().mockResolvedValue(history);
 
-        const result = await executor.execute(fold, eventAt(1_000), context);
+        const result = await executor.execute(fold, late, context);
 
         expect(result.sequence).toEqual([1_000, 2_000, 3_000]);
         expect(fold.eventLoader).toHaveBeenCalledOnce();
         expect(refoldMetric).toHaveBeenCalledWith("evaluation", "performed");
+      });
+    });
+
+    describe("when the event log read does not return the delivered event yet", () => {
+      interface OrderState {
+        sequence: number[];
+        LastEventOccurredAt: number;
+      }
+
+      function makeOrderFold(history: Event[]) {
+        const store = createMockFoldProjectionStore<OrderState>();
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+          sequence: [1_000, 2_000, CHECKPOINT_MS],
+          LastEventOccurredAt: CHECKPOINT_MS,
+        });
+        const fold = createMockFoldProjectionDefinition("run", {
+          store,
+          init: () => ({ sequence: [], LastEventOccurredAt: 0 }),
+          apply: (state: OrderState, event: Event): OrderState => ({
+            sequence: [...state.sequence, event.occurredAt ?? 0],
+            LastEventOccurredAt: Math.max(
+              state.LastEventOccurredAt,
+              event.occurredAt ?? 0,
+            ),
+          }),
+        }) as FoldProjectionDefinition<OrderState, Event>;
+        fold.eventLoader = vi.fn().mockResolvedValue(history);
+        return { fold, store };
+      }
+
+      /** @scenario "A re-fold folds in a delivered event the event log has not returned yet" */
+      it("merges the delivered event into the replayed history in occurred-at order", async () => {
+        // The log read runs right after the append and comes back without it.
+        const history = [
+          eventAt(1_000),
+          eventAt(2_000),
+          eventAt(CHECKPOINT_MS),
+        ];
+        const { fold, store } = makeOrderFold(history);
+        const late = eventAt(3_000);
+
+        const result = await executor.execute(fold, late, context);
+
+        expect(result.sequence).toEqual([1_000, 2_000, 3_000, CHECKPOINT_MS]);
+        expect(store.store).toHaveBeenCalledOnce();
+      });
+
+      /** @scenario "A re-fold folds in a delivered batch the event log has not returned yet" */
+      it("merges every delivered event of an out-of-order batch the history misses", async () => {
+        const known = eventAt(2_000);
+        const history = [eventAt(1_000), known, eventAt(CHECKPOINT_MS)];
+        const { fold } = makeOrderFold(history);
+
+        const result = await executor.executeBatch(
+          fold,
+          [eventAt(3_000), known, eventAt(4_000)],
+          context,
+        );
+
+        // `known` was returned by the read, so it is folded exactly once.
+        expect(result.sequence).toEqual([
+          1_000,
+          2_000,
+          3_000,
+          4_000,
+          CHECKPOINT_MS,
+        ]);
+      });
+    });
+
+    describe("when a delivered event shares its occurred-at with a returned one", () => {
+      interface IdState {
+        ids: string[];
+        LastEventOccurredAt: number;
+      }
+
+      /** Records the ids in fold order, which is what a tie decides. */
+      function makeIdFold(history: Event[]) {
+        const store = createMockFoldProjectionStore<IdState>();
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+          ids: [],
+          LastEventOccurredAt: CHECKPOINT_MS,
+        });
+        const fold = createMockFoldProjectionDefinition("run", {
+          store,
+          init: () => ({ ids: [], LastEventOccurredAt: 0 }),
+          apply: (state: IdState, event: Event): IdState => ({
+            ids: [...state.ids, event.id],
+            LastEventOccurredAt: Math.max(
+              state.LastEventOccurredAt,
+              event.occurredAt ?? 0,
+            ),
+          }),
+        }) as FoldProjectionDefinition<IdState, Event>;
+        fold.eventLoader = vi.fn().mockResolvedValue(history);
+        return { fold, store };
+      }
+
+      /** One business time, two arrival times: the earlier arrival folds first. */
+      const tiedEvent = ({
+        id,
+        createdAt,
+      }: {
+        id: string;
+        createdAt: number;
+      }): Event => ({
+        ...eventAt(3_000),
+        id,
+        createdAt,
+        occurredAt: 3_000,
+      });
+
+      /** @scenario "Two events of the same business time replay in the order they arrived" */
+      it("folds the event that arrived first before the one that arrived later", async () => {
+        // The delivered event arrived BEFORE the one the read returned, so
+        // appending it to the history is the order the merge has to correct.
+        const returned = tiedEvent({ id: "evt-returned", createdAt: 2_000 });
+        const delivered = tiedEvent({ id: "evt-delivered", createdAt: 1_000 });
+        const { fold } = makeIdFold([returned, eventAt(CHECKPOINT_MS)]);
+
+        const result = await executor.execute(fold, delivered, context);
+
+        expect(result.ids.slice(0, 2)).toEqual([
+          "evt-delivered",
+          "evt-returned",
+        ]);
+      });
+
+      /** @scenario "Two events of the same business time replay in the order they arrived" */
+      it("reaches the same state whichever side of the merge an event came from", async () => {
+        const first = tiedEvent({ id: "evt-a", createdAt: 1_000 });
+        const second = tiedEvent({ id: "evt-b", createdAt: 1_000 });
+        const tail = eventAt(CHECKPOINT_MS);
+
+        const readReturnedFirst = await executor.execute(
+          makeIdFold([first, tail]).fold,
+          second,
+          context,
+        );
+        const readReturnedSecond = await executor.execute(
+          makeIdFold([second, tail]).fold,
+          first,
+          context,
+        );
+
+        // Equal occurred-at AND equal created-at: the id is what keeps the
+        // two replays from disagreeing.
+        expect(readReturnedFirst.ids).toEqual(readReturnedSecond.ids);
+        expect(readReturnedFirst.ids.slice(0, 2)).toEqual(["evt-a", "evt-b"]);
       });
     });
 

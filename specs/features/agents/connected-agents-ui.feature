@@ -92,13 +92,39 @@ Feature: Connected agents in the product
     Then it offers to open the agent and to delete it
     And the menu is drawn above the cards, never cut by the card
 
+  # Connecting from code is the way in, so it leads the new agent flow
+  # instead of standing as a block on the page. The drawer leads with the
+  # agent-first setup: a prompt for the reader's own coding agent, Langy,
+  # or the guide; the snippets below are for the reader who pastes it in
+  # themselves.
+
   @integration
-  Scenario: The page offers the connect snippets when no agent is connected
-    Given the project has no connected agent
-    When the agents page is drawn
-    Then it reads "Connect an agent from code"
-    And it offers a Python snippet and a TypeScript snippet
-    And it shows that the page is listening for the agent
+  Scenario: Connect from code is the first choice of the new agent flow
+    Given the new agent flow is open
+    When the choices are drawn
+    Then "Connect from Code" stands first, before the other agent kinds
+    And a green dot stands before the words, the one an online agent wears
+
+  @integration
+  Scenario: Connect from code opens the connect drawer
+    Given the new agent flow is open
+    When "Connect from Code" is chosen
+    Then the connect drawer opens
+    And no stored agent kind is selected
+
+  @integration
+  Scenario: The connect drawer leads with the agent setup
+    Given the connect drawer is open
+    When it is drawn
+    Then the agent setup control comes first
+    And it carries the connect-agent surface
+
+  @integration
+  Scenario: The connect drawer offers the snippets and listens
+    Given the connect drawer is open
+    When it is drawn
+    Then it offers a Python snippet and a TypeScript snippet
+    And it shows that it is listening for the agent
 
   # An agent name is any text of up to 64 characters. Written into the snippet
   # as it stands, a quote or a line break would end the literal early, and the
@@ -116,10 +142,10 @@ Feature: Connected agents in the product
     Then the snippet declares the example name instead
 
   @integration
-  Scenario: The connect empty state keeps the way to the other agent kinds
-    Given the project has no connected agent
+  Scenario: An empty agents page still opens the new agent flow
+    Given the project has no agent of any kind
     When the agents page is drawn
-    Then a control still opens the new agent flow
+    Then a control opens the new agent flow
 
   # ---------------------------------------------------------------------------
   # The agent drawer

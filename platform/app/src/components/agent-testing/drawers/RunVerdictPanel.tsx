@@ -394,19 +394,20 @@ export function RunVerdictPanel({
       <VerdictStatusLine status={status} />
       <VStack align="stretch" gap={SPACE_BETWEEN_SECTIONS}>
         {error ? <RunFailurePanel raw={error} /> : null}
-        <CriteriaSection
-          heading="Passed criteria"
-          headingColor={PASSED_COLOR}
-          criteria={orderedMet}
-          passed={true}
-          testId="run-verdict-passed-criteria"
-        />
+        {/* Failed first: they are what the reader opened the run for. */}
         <CriteriaSection
           heading="Failed criteria"
           headingColor={FAILED_COLOR}
           criteria={orderedUnmet}
           passed={false}
           testId="run-verdict-failed-criteria"
+        />
+        <CriteriaSection
+          heading="Passed criteria"
+          headingColor={PASSED_COLOR}
+          criteria={orderedMet}
+          passed={true}
+          testId="run-verdict-passed-criteria"
         />
         {!hasAnyCriteria && !error ? (
           <Text fontSize="12px" color={FG_MUTED}>

@@ -364,9 +364,9 @@ describe("the wide run detail drawer", () => {
   });
 
   /** @scenario "The drawer header opens the scenario editor from one labelled button" */
-  /** @scenario "The drawer header offers Open Scenario for the scenario that ran" */
-  /** @scenario "The drawer offers Open Scenario for that scenario" */
-  it("offers one Open Scenario button that opens the scenario editor", async () => {
+  /** @scenario "The drawer header offers Edit Scenario for the scenario that ran" */
+  /** @scenario "The drawer offers Edit Scenario for that scenario" */
+  it("offers one Edit Scenario button that opens the scenario editor", async () => {
     const user = userEvent.setup();
     renderWide();
 
@@ -377,7 +377,7 @@ describe("the wide run detail drawer", () => {
       screen.queryByRole("button", { name: "Edit scenario" }),
     ).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Open Scenario" }));
+    await user.click(screen.getByRole("button", { name: "Edit Scenario" }));
 
     expect(mockOpenDrawer).toHaveBeenCalledWith("agentTestingCaseEditor", {
       scenarioId: "case_1",
@@ -740,10 +740,10 @@ describe("the wide run detail drawer", () => {
       within(failed).getByText("names the refund window"),
     ).toBeInTheDocument();
     expect(within(failed).queryByText("stays polite")).not.toBeInTheDocument();
-    // Passed sits above failed.
+    // Failed sits above passed: it is what the reader opened the run for.
     const text = panel.textContent ?? "";
-    expect(text.indexOf("Passed criteria")).toBeLessThan(
-      text.indexOf("Failed criteria"),
+    expect(text.indexOf("Failed criteria")).toBeLessThan(
+      text.indexOf("Passed criteria"),
     );
     // Icons match: two green checks, one red cross.
     expect(panel.querySelectorAll("svg.lucide-circle-check")).toHaveLength(2);

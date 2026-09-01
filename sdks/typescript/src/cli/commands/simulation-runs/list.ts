@@ -2,13 +2,45 @@ import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
+import { readFetchFailure } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatRelativeTime } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+
+type SimulationRunListItem = {
+  scenarioRunId: string;
+  scenarioId: string;
+  batchRunId: string;
+  name: string | null;
+  status: string;
+  durationInMs: number;
+  totalCost?: number;
+  timestamp?: number;
+  updatedAt?: number;
+  note?: string | null;
+  scenarioVersion?: number | null;
+  results?: {
+    verdict?: string | null;
+  } | null;
+};
+
+type SimulationRunListPage = {
+  runs: SimulationRunListItem[];
+  hasMore?: boolean;
+  nextCursor?: string;
+};
+
+/**
+ * The listing pages by batch, so one page can hold no run that matches a
+ * status or name filter while later pages do. The scan keeps following the
+ * cursor until it finds matches, up to this many runs, so `--status FAILED`
+ * answers with the failed runs it can reach instead of an empty first page.
+ */
+const FILTER_SCAN_RUN_CEILING = 500;
+
 export const listSimulationRunsCommand = async (options: {
   scenarioSetId?: string;
   batchRunId?: string;
@@ -24,65 +56,114 @@ export const listSimulationRunsCommand = async (options: {
   const spinner = createSpinner("Fetching simulation runs...").start();
 
   try {
-    const params = new URLSearchParams();
-    if (options.scenarioSetId) params.set("scenarioSetId", options.scenarioSetId);
-    if (options.batchRunId) params.set("batchRunId", options.batchRunId);
-    if (options.limit) params.set("limit", options.limit);
+    const fetchPage = async (
+      cursor?: string,
+      limitOverride?: number,
+    ): Promise<SimulationRunListPage> => {
+      const params = new URLSearchParams();
+      if (options.scenarioSetId)
+        params.set("scenarioSetId", options.scenarioSetId);
+      if (options.batchRunId) params.set("batchRunId", options.batchRunId);
+      const limit =
+        limitOverride === undefined ? options.limit : String(limitOverride);
+      if (limit) params.set("limit", limit);
+      if (cursor) params.set("cursor", cursor);
 
-    const response = await fetch(
-      `${endpoint}/api/simulation-runs?${params.toString()}`,
-      {
-        method: "GET",
-        headers: buildAuthHeaders({ apiKey }),
-      },
-    );
+      const response = await fetch(
+        `${endpoint}/api/simulation-runs?${params.toString()}`,
+        {
+          method: "GET",
+          headers: buildAuthHeaders({ apiKey }),
+        },
+      );
 
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "fetch simulation runs" });
-      process.exit(1);
-    }
+      if (!response.ok) {
+        // The status and the body go to the reader together, so a handled
+        // failure keeps its code — a 422 for `--limit 200` names
+        // validation_error and the ceiling, instead of degrading to
+        // network_error the moment it is flattened into a message string.
+        failSpinner({
+          spinner,
+          error: await readFetchFailure(response),
+          action: "fetch simulation runs",
+        });
+        process.exit(1);
+      }
 
-    const result = await response.json() as {
-      runs: Array<{
-        scenarioRunId: string;
-        scenarioId: string;
-        batchRunId: string;
-        name: string | null;
-        status: string;
-        durationInMs: number;
-        totalCost?: number;
-        timestamp?: number;
-        updatedAt?: number;
-        note?: string | null;
-        scenarioVersion?: number | null;
-        results?: {
-          verdict?: string | null;
-        } | null;
-      }>;
-      hasMore?: boolean;
+      return (await response.json()) as SimulationRunListPage;
     };
 
-    let runs = result.runs;
+    const matchesFilters = (run: SimulationRunListItem): boolean => {
+      if (options.status) {
+        if (run.status.toUpperCase() !== options.status.toUpperCase())
+          return false;
+      }
+      if (options.name) {
+        if (!(run.name ?? "").toLowerCase().includes(options.name.toLowerCase()))
+          return false;
+      }
+      return true;
+    };
 
-    // Client-side filters (status / name substring) so users can drill into
-    // a specific failure without paging through everything.
-    if (options.status) {
-      const wanted = options.status.toUpperCase();
-      runs = runs.filter((r) => r.status.toUpperCase() === wanted);
-    }
-    if (options.name) {
-      const needle = options.name.toLowerCase();
-      runs = runs.filter((r) => (r.name ?? "").toLowerCase().includes(needle));
+    const hasClientFilters = Boolean(options.status ?? options.name);
+
+    let page = await fetchPage();
+    let runs = page.runs.filter(matchesFilters);
+    let scanned = page.runs.length;
+    let scanStoppedEarly = false;
+
+    // Status / name narrow the listing client-side. The scan follows the
+    // cursor while it has found nothing, then stops at the first page with a
+    // match: the pages come newest first, so that page holds the most recent
+    // runs the filter reaches.
+    while (
+      hasClientFilters &&
+      runs.length === 0 &&
+      page.hasMore &&
+      page.nextCursor
+    ) {
+      if (scanned >= FILTER_SCAN_RUN_CEILING) {
+        scanStoppedEarly = true;
+        break;
+      }
+      // The last page is cut to what is left of the ceiling, so the scan
+      // stops AT it rather than up to one page past it. The cut only ever
+      // makes the page smaller than the one already in use: the API refuses
+      // a limit above its own ceiling, and a smaller one it always takes.
+      const remaining = FILTER_SCAN_RUN_CEILING - scanned;
+      const pageLimit = remaining < page.runs.length ? remaining : undefined;
+      page = await fetchPage(page.nextCursor, pageLimit);
+      runs = page.runs.filter(matchesFilters);
+      scanned += page.runs.length;
     }
 
-    spinner.succeed(`Found ${runs.length} simulation run${runs.length !== 1 ? "s" : ""}${result.hasMore ? " (more available)" : ""}`);
+    const scanNote =
+      hasClientFilters && scanned > 0
+        ? ` (scanned the newest ${scanned} run${scanned !== 1 ? "s" : ""})`
+        : "";
+    spinner.succeed(
+      `Found ${runs.length} simulation run${runs.length !== 1 ? "s" : ""}${page.hasMore ? " (more available)" : ""}${scanNote}`,
+    );
 
     return {
-      data: { ...result, runs },
+      data: { ...page, runs, ...(hasClientFilters ? { scanned } : {}) },
       table: () => {
         if (runs.length === 0) {
           console.log();
+          if (hasClientFilters) {
+            const filters = [
+              options.status ? `status ${options.status.toUpperCase()}` : undefined,
+              options.name ? `name containing "${options.name}"` : undefined,
+            ]
+              .filter(Boolean)
+              .join(" and ");
+            console.log(
+              chalk.gray(
+                `No run with ${filters} in the newest ${scanned} run${scanned !== 1 ? "s" : ""}${scanStoppedEarly || page.hasMore ? "; older runs were not scanned" : ""}.`,
+              ),
+            );
+            return;
+          }
           console.log(chalk.gray("No simulation runs found."));
           console.log(chalk.gray("Run a suite to create simulation runs:"));
           console.log(chalk.cyan("  langwatch test-suite run <suiteId>"));
@@ -116,7 +197,7 @@ export const listSimulationRunsCommand = async (options: {
           console.log();
         }
 
-        if (result.hasMore) {
+        if (page.hasMore) {
           console.log(chalk.gray("  More runs available. Use --limit to fetch more."));
         }
 

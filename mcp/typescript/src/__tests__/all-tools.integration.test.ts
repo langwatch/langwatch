@@ -307,19 +307,19 @@ const CANNED_AGENT_DETAIL = {
 };
 
 const CANNED_RUN_PLAN = {
-  id: "plan_abc", name: "Regression Plan", slug: "regression-plan", scope: { mode: "labels", labels: ["auth"] }, scenarioIds: ["scen_abc123"], targets: [{ type: "http", referenceId: "agent_abc" }], repeatCount: 2, simulatorModel: "openai/gpt-5-mini", judgeModel: null, labels: [], archivedAt: null, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z", platformUrl: "https://app.langwatch.ai/proj/simulations/run-plans/plan_abc",
+  id: "plan_abc", name: "Regression Plan", slug: "regression-plan", scope: { mode: "labels", labels: ["auth"] }, scenarioIds: ["scen_abc123"], targets: [{ type: "http", referenceId: "agent_abc" }], repeatCount: 2, simulatorModel: "openai/gpt-5-mini", judgeModel: null, labels: [], archivedAt: null, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z", platformUrl: "https://app.langwatch.ai/proj/agent-testing/results/regression-plan",
 };
 
 const CANNED_RUN_PLANS_LIST = [CANNED_RUN_PLAN];
 
 const CANNED_RUN_PLAN_RUN = {
-  scheduled: true, batchRunId: "batch_123", setId: "set_456", jobCount: 2, skippedArchived: { scenarios: [], targets: [] }, items: [{ scenarioRunId: "run_1", scenarioId: "scen_abc123", target: { type: "http", referenceId: "agent_abc" }, name: "Test" }], runPlanId: "plan_abc", planName: "Regression Plan", created: true, platformUrl: "https://app.langwatch.ai/proj/simulations/batches/batch_123",
+  scheduled: true, batchRunId: "batch_123", setId: "set_456", jobCount: 2, skippedArchived: { scenarios: [], targets: [] }, items: [{ scenarioRunId: "run_1", scenarioId: "scen_abc123", target: { type: "http", referenceId: "agent_abc" }, name: "Test" }], runPlanId: "plan_abc", planName: "Regression Plan", created: true, platformUrl: "https://app.langwatch.ai/proj/agent-testing/results/regression-plan",
 };
 
 const CANNED_RUN_PLAN_RERUN = { ...CANNED_RUN_PLAN_RUN, created: false };
 
 const CANNED_TEST_SUITE = {
-  id: "suite_abc", name: "Checkout", slug: "checkout", scenarioIds: ["scen_abc123"], scenarioCount: 1, archivedAt: null, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z", platformUrl: "https://app.langwatch.ai/proj/simulations/test-suites/suite_abc",
+  id: "suite_abc", name: "Checkout", slug: "checkout", scenarioIds: ["scen_abc123"], scenarioCount: 1, archivedAt: null, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z", platformUrl: "https://app.langwatch.ai/proj/agent-testing/suites/checkout",
 };
 
 const CANNED_TEST_SUITES_LIST = [CANNED_TEST_SUITE];

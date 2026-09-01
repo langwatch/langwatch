@@ -10,7 +10,7 @@ Feature: The wide run detail drawer
     stacked under the conversation, exactly as they are today.
 
     The results read as a labelled "Verdict:" line, then the criteria split
-    into a "Passed criteria" section over a "Failed criteria" section, then
+    into a "Failed criteria" section over a "Passed criteria" section, then
     what the judge said. Each section is drawn only when it has
     rows. Within a section the criteria keep the order the scenario declares them.
     Nothing there repeats the chips at the top of the drawer: no success rate,
@@ -66,7 +66,7 @@ Feature: The wide run detail drawer
   Scenario: The results split the criteria into passed and failed sections
     Given a finished run whose judge met two criteria and missed one
     When the results are read
-    Then a "Passed criteria" section reads over a "Failed criteria" section
+    Then a "Failed criteria" section reads over a "Passed criteria" section
     And each section keeps the criteria in the order the scenario declares them
     And a passed row carries a green check and a failed row a red cross
 
@@ -122,10 +122,10 @@ Feature: The wide run detail drawer
     And the line breaks the judge wrote are kept, and the text still wraps
 
   @integration
-  Scenario: The drawer header offers Open Scenario for the scenario that ran
+  Scenario: The drawer header offers Edit Scenario for the scenario that ran
     Given a run open in the drawer
     When its header is read
-    Then one labelled "Open Scenario" control for the scenario is offered
+    Then one labelled "Edit Scenario" control for the scenario is offered
     And using it opens the scenario editor
 
   @integration
@@ -133,7 +133,7 @@ Feature: The wide run detail drawer
     Given a run open in the drawer
     When its header is read
     Then no separate Play and Edit icon buttons are offered
-    And a single "Open Scenario" button is shown next to the overflow menu
+    And a single "Edit Scenario" button is shown next to the overflow menu
     And a run of that scenario is triggered from inside the scenario editor
       through its "Save & Run" control
 
