@@ -119,6 +119,52 @@ if command -v go >/dev/null 2>&1; then
 else
   bad "go not on PATH (langyagent and the gateway are Go services)"
 fi
+# resolve_symlink_chain canonicalizes by hand (no readlink -f / realpath):
+# BSD readlink on macOS has neither, and this doctor has to run there too.
+# `npm link`'s bin shim is itself a symlink into a symlinked package
+# directory (lib/node_modules/<pkg> -> the worktree), so a leaf-only resolve
+# is not enough — every hop re-resolves its DIRECTORY physically (`cd -P`,
+# which follows symlinked ancestors) before checking whether the leaf itself
+# is another symlink to follow.
+resolve_symlink_chain() {
+  local target="$1" dir base link
+  dir="$(cd -P "$(dirname "$target")" 2>/dev/null && pwd -P)" || { printf '%s' "$target"; return; }
+  base="$(basename "$target")"
+  target="$dir/$base"
+  while [ -L "$target" ]; do
+    link="$(readlink "$target")"
+    case "$link" in
+      /*) target="$link" ;;
+      *) target="$dir/$link" ;;
+    esac
+    dir="$(cd -P "$(dirname "$target")" 2>/dev/null && pwd -P)" || break
+    base="$(basename "$target")"
+    target="$dir/$base"
+  done
+  printf '%s' "$target"
+}
+# The local-unsafe runner hands a worker the manager's own PATH verbatim
+# (services/langyagent/internal/workerenv) — there is no per-worker image
+# rebuilding the CLI from this checkout the way the production Dockerfile
+# does. A stale globally- or npx-cached `langwatch` earlier on PATH silently
+# hides any CLI command added on this branch: it fails as
+# `error: unknown command`, which reads to Langy as "this doesn't exist" and
+# sends it toward a different, already-shipped command instead — a distant,
+# silent product regression rather than a loud one.
+if command -v langwatch >/dev/null 2>&1; then
+  LW_BIN="$(command -v langwatch)"
+  LW_REAL="$(resolve_symlink_chain "$LW_BIN")"
+  case "$LW_REAL" in
+    "$ROOT"/*) ok "langwatch CLI on PATH resolves inside this worktree ($LW_BIN)" ;;
+    *)
+      bad "langwatch CLI on PATH resolves outside this worktree ($LW_BIN -> $LW_REAL)"
+      hint "cd \"$ROOT/sdks/typescript\" && pnpm build && npm link   (relinks langwatch/lw on PATH to this worktree's build)"
+      ;;
+  esac
+else
+  bad "langwatch CLI not on PATH (langyagent's turns run it)"
+  hint "cd \"$ROOT/sdks/typescript\" && pnpm build && npm link"
+fi
 
 # --- services --------------------------------------------------------------
 echo "services:"
