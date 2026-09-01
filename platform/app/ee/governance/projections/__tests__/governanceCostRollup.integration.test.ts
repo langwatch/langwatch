@@ -502,6 +502,65 @@ describe("governance cost rollup", () => {
       });
       expect(lanes).toEqual([]);
     });
+
+    /** @scenario "Rows written by an older summary shape are not counted" */
+    it("counts the current version only, and drops the older stamp", async () => {
+      // Two DIFFERENT cells, so neither can replace the other: an older-shape
+      // row that shared a key would be beaten by the dedup anyway, which would
+      // let a read with no version filter at all pass this test.
+      const current = pricedCell({ amountNanoUsd: 9_000_000_000, at: 2_000 });
+      await repo.upsert(current);
+      await repo.upsert({
+        ...current,
+        Model: "claude-opus-4",
+        AmountNanoUsd: 4_000_000_000,
+        Version: "1999-01-01",
+        EventTimestamp: 3_000,
+      });
+
+      // Self-check: both rows really are on disk, so "the older one is not
+      // counted" is a statement about the read rather than about a seed that
+      // never landed. The newer EventTimestamp on the stale row is what would
+      // make a version-blind read prefer it.
+      expect(await rawRowCount()).toBe(2);
+
+      const lanes = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+
+      expect(lanes).toHaveLength(1);
+      expect(lanes[0]!.amountNanoUsd).toBe(9_000_000_000);
+      // Not 13_000_000_000: the older shape's money is not this build's money.
+      expect(lanes[0]!.cellsWithoutAmount).toBe(0);
+    });
+
+    it("names the currencies of the cells it holds no dollar figure for", async () => {
+      const priced = pricedCell({ amountNanoUsd: 9_000_000_000, at: 1_000 });
+      await repo.upsert(priced);
+      for (const currencyCode of ["EUR", "JPY"]) {
+        await repo.upsert({
+          ...priced,
+          CurrencyCode: currencyCode,
+          AmountNanoUsd: null,
+          AmountNanoMinor: 4_200_000_000,
+          EventTimestamp: 1_000,
+        });
+      }
+
+      const lanes = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+
+      expect(lanes).toHaveLength(1);
+      expect(lanes[0]!.cellsWithoutAmount).toBe(2);
+      // Sorted and USD-free: USD names no currency the screen could report,
+      // and an unstable order would make the rendered sentence flap.
+      expect(lanes[0]!.currenciesWithoutUsdAmount).toEqual(["EUR", "JPY"]);
+    });
   });
 
   describe("given the same event is redelivered after its state was stored", () => {
