@@ -132,10 +132,26 @@ function summaryFixture(overrides: Record<string, unknown> = {}) {
     // Deliberately DIFFERENT figures: with the two equal, an implementation
     // that swapped the lanes wholesale would still pass the placement checks
     // below.
-    billed: { amountUsd: 123.45, cellsWithoutAmount: 0 },
-    gateway: { amountUsd: 67.89, cellsWithoutAmount: 0 },
+    billed: {
+      amountUsd: 123.45,
+      cellsWithoutAmount: 0,
+      currenciesWithoutUsdAmount: [],
+    },
+    gateway: {
+      amountUsd: 67.89,
+      cellsWithoutAmount: 0,
+      currenciesWithoutUsdAmount: [],
+    },
     seats: { status: "awaiting_data" },
-    series: [{ day: "2026-08-01", billedUsd: 123.45, gatewayUsd: 67.89 }],
+    series: [
+      {
+        day: "2026-08-01",
+        billedUsd: 123.45,
+        gatewayUsd: 67.89,
+        billedCellsWithoutAmount: 0,
+        gatewayCellsWithoutAmount: 0,
+      },
+    ],
     windowDays: 30,
     ...overrides,
   };
@@ -241,8 +257,16 @@ describe("the governance cost screen", () => {
       harness.query = {
         data: summaryFixture({
           unavailableReason: "no_cost_store",
-          billed: { amountUsd: null, cellsWithoutAmount: 0 },
-          gateway: { amountUsd: null, cellsWithoutAmount: 0 },
+          billed: {
+            amountUsd: null,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+          },
+          gateway: {
+            amountUsd: null,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+          },
           series: [],
         }),
         isLoading: false,
@@ -261,8 +285,20 @@ describe("the governance cost screen", () => {
     it("shows the negative amount on the mounted billed lane", () => {
       harness.query = {
         data: summaryFixture({
-          billed: { amountUsd: -42.5, cellsWithoutAmount: 0 },
-          series: [{ day: "2026-08-01", billedUsd: -42.5, gatewayUsd: 67.89 }],
+          billed: {
+            amountUsd: -42.5,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+          },
+          series: [
+            {
+              day: "2026-08-01",
+              billedUsd: -42.5,
+              gatewayUsd: 67.89,
+              billedCellsWithoutAmount: 0,
+              gatewayCellsWithoutAmount: 0,
+            },
+          ],
         }),
         isLoading: false,
         isError: false,
@@ -273,6 +309,55 @@ describe("the governance cost screen", () => {
       // this to say anything about the screen.
       const billed = screen.getByTestId("cost-lane-billed");
       expect(within(billed).getByText("-$42.50")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a lane whose total was withheld over a foreign currency", () => {
+    /** @scenario "A lane with no total says why instead of showing a figure" */
+    it("shows no amount and names the currency behind the missing total", () => {
+      harness.query = {
+        data: summaryFixture({
+          billed: {
+            amountUsd: null,
+            cellsWithoutAmount: 4,
+            currenciesWithoutUsdAmount: ["EUR"],
+          },
+          series: [
+            {
+              day: "2026-08-01",
+              billedUsd: null,
+              gatewayUsd: 67.89,
+              billedCellsWithoutAmount: 4,
+              gatewayCellsWithoutAmount: 0,
+            },
+          ],
+        }),
+        isLoading: false,
+        isError: false,
+      };
+      renderScreen();
+
+      const billed = screen.getByTestId("cost-lane-billed");
+      // No figure at all — and specifically not a zero, which would be a claim
+      // that nothing was spent in a lane that plainly was.
+      expect(within(billed).queryByText(/\$\d/)).not.toBeInTheDocument();
+      expect(within(billed).getByText("—")).toBeInTheDocument();
+
+      const note = within(billed).getByTestId("cost-lane-billed-note");
+      expect(note).toHaveTextContent(/billed in EUR rather than US dollars/i);
+      expect(note).toHaveTextContent(/No total is shown/i);
+      // The old copy said the usage "arrived without a stated amount", which
+      // is not what happened: the provider stated it, in euros.
+      expect(note).not.toHaveTextContent(/without a stated amount/i);
+
+      // The lane that IS complete keeps its figure, so this cannot pass
+      // against an implementation that blanks the screen whenever any lane is
+      // withheld.
+      const gateway = screen.getByTestId("cost-lane-gateway");
+      expect(within(gateway).getByText("$67.89")).toBeInTheDocument();
+      expect(
+        within(gateway).queryByTestId("cost-lane-gateway-note"),
+      ).not.toBeInTheDocument();
     });
   });
 
