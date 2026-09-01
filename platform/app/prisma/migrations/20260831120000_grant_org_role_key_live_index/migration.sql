@@ -22,14 +22,37 @@
 -- never satisfy the `IN` list, so keeping revoked and share-link rows out
 -- holds the index to the rows the authorization path can actually return.
 --
--- LOCKING NOTE: plain `CREATE INDEX` takes a write lock on "Grant" for the
--- length of the build, so grant writes wait — on the authorization hot path.
--- `CREATE INDEX CONCURRENTLY` would avoid it but cannot run inside a
--- transaction, which the Prisma migration runner requires. This follows the
--- precedent of the four sibling "Grant" indexes deliberately, not by default:
--- the build is seconds on this table, it runs during deploy, and the fold is
--- the only writer and is idempotent, so a paused write retries rather than
--- fails.
+-- LOCKING NOTE: plain `CREATE INDEX` takes a lock on "Grant" that conflicts
+-- with row writes for the length of the build. "Grant" has several writers on
+-- live paths — the authz-grants fold
+-- (`authz-grants-write.prisma.repository.ts`), revocation
+-- (`authz-revocation.prisma.repository.ts`) and organization cleanup
+-- (`organization.prisma.repository.ts`) — so a long build would make access
+-- changes and offboarding wait, on the authorization hot path.
+--
+-- `CREATE INDEX CONCURRENTLY` is the usual answer but cannot run inside a
+-- transaction, which the Prisma migration runner requires, so it is not
+-- available here. Instead the build is fenced with a short `lock_timeout`:
+-- if the lock is not free almost immediately, or the build cannot start
+-- promptly, the statement aborts, the transaction rolls back and the deploy
+-- fails loudly rather than queueing writes behind a held lock. Nothing is
+-- half-applied — an index either exists or it does not.
+--
+-- ROLLBACK / RETRY: a timeout is not a data problem. Re-run the migration;
+-- it takes the lock when the table is quiet. If it keeps timing out under
+-- sustained write traffic, build the index out-of-band in a maintenance
+-- window with the concurrent form and mark the migration applied:
+--
+--   CREATE INDEX CONCURRENTLY "Grant_organizationId_roleKey_live_idx"
+--     ON "Grant" ("organizationId", "roleKey") WHERE "revokedAt" IS NULL;
+--   -- then: prisma migrate resolve --applied 20260831120000_grant_org_role_key_live_index
+--
+-- Verify a concurrent build did not leave an invalid index:
+--   SELECT indisvalid FROM pg_index
+--    WHERE indexrelid = '"Grant_organizationId_roleKey_live_idx"'::regclass;
+-- If it is false, `DROP INDEX` and retry.
+
+SET LOCAL lock_timeout = '3s';
 
 -- CreateIndex
 CREATE INDEX "Grant_organizationId_roleKey_live_idx"
