@@ -20,6 +20,38 @@ export {
 } from "./behavior/chunk-reload";
 export { lazyRoute, type LazyRouteModule } from "./behavior/lazy-route";
 export {
+  BrowserUiDocumentTitle,
+  resolveUiCapabilities,
+  UiCapabilityContextProvider,
+  UiCapabilityUnavailableError,
+  UiDocumentTitlePort,
+  UiFeedbackPort,
+  UiNavigationPort,
+  UiSessionPort,
+  useUiCapabilities,
+  type UiActiveScope,
+  type UiActor,
+  type UiCapabilities,
+  type UiCapabilityInstall,
+  type UiFailureNotice,
+  type UiSuccessNotice,
+} from "./behavior/ui-capabilities";
+export {
+  mergeUiPageLoaders,
+  uiFeatureLoaders,
+  type UiPageLoaderMerge,
+} from "./behavior/ui-feature-loaders";
+export {
+  createUiFeatureApiClient,
+  UI_TRPC_ENDPOINT,
+  uiFeatureApi,
+  type UiFeatureApiBinding,
+  type UiFeatureApiClientOptions,
+  type UiFeatureApiProvider,
+  type UiFeatureApiTransport,
+} from "./behavior/ui-feature-transport";
+export { createRouterUiNavigation, useRouterUiNavigation } from "./behavior/ui-router-navigation";
+export {
   resolveUiPageLoader,
   uiRoutePageKeys,
   type UiPageLoader,
@@ -39,7 +71,9 @@ export {
   createUiApplication,
   type UiApplication,
   type UiApplicationInstall,
+  type UiFeatureInstall,
 } from "./ui/sections/ui-application";
+export { createUiFeatureShell, type UiFeatureShellInstall } from "./ui/sections/ui-feature-shell";
 export {
   createUiInnerProvider,
   type UiInnerProviderInstall,

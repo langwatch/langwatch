@@ -15,12 +15,19 @@ import type { UiProviderShell } from "./ui-outer-providers";
 export type UiRootLayoutInstall = {
   /** The providers that need router context. */
   innerProvider: UiProviderShell;
+  /**
+   * What this package mounts around the page: the browser transport its
+   * feature packages run on, and the capability ports a screen asks. Inside
+   * the error boundary, so a fault in either shows the page fallback.
+   */
+  featureShell: UiProviderShell;
   /** Rendered when a page throws, reset when the pathname changes. */
   pageErrorFallback: ComponentType<FallbackProps>;
 };
 
 export function createUiRootLayout({
   innerProvider: InnerProviders,
+  featureShell: FeatureShell,
   pageErrorFallback,
 }: UiRootLayoutInstall): ComponentType {
   return function UiRootLayout() {
@@ -43,9 +50,11 @@ export function createUiRootLayout({
     return (
       <InnerProviders>
         <ErrorBoundary FallbackComponent={pageErrorFallback} resetKeys={[location.pathname]}>
-          <Suspense>
-            <Outlet />
-          </Suspense>
+          <FeatureShell>
+            <Suspense>
+              <Outlet />
+            </Suspense>
+          </FeatureShell>
         </ErrorBoundary>
       </InnerProviders>
     );

@@ -66,7 +66,11 @@
     "@langwatch/agent-web": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/react-rum": "workspace:*",
+    "@tanstack/react-query": "5.101.4",
+    "@trpc/client": "11.18.0",
+    "@trpc/react-query": "11.18.0",
     "nprogress": "^0.2.0",
     "posthog-js": "^1.396.9",
     "react": "^19.2.7",
@@ -74,6 +78,7 @@
     "react-dom": "^19.2.7",
     "react-error-boundary": "^6.1.2",
     "react-router": "^8.0.1",
+    "superjson": "^2.2.6",
     "zod": "^4.4.3"
   },
   "devDependencies": {
