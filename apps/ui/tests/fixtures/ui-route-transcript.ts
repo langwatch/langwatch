@@ -9,6 +9,20 @@
  * path, reorders a family, drops a redirect or changes what a page key points
  * at. Update it only when a URL is deliberately changed, and say so in the
  * change that does it.
+ *
+ * Amended once, deliberately: thirteen addresses whose page component did
+ * nothing but forward now carry the forward as a redirect row instead of a
+ * page key. Every path, its position in match order and its destination are
+ * unchanged; the line changes from `route ... -> <page>` to
+ * `redirect ... -> <destination>` because the table now says where the reader
+ * goes rather than which module says it.
+ *
+ * One behavioural difference comes with it, uniformly: a redirect row carries
+ * the incoming query string and hash to the destination, and eleven of the
+ * thirteen pages dropped both by rebuilding their target from a literal
+ * (`/admin` and the legacy `/messages` index already forwarded them). A
+ * pinned param still overrides the key it names. Nothing about which address
+ * a reader ends on changes.
  */
 
 export const expectedUiRouteTranscript: readonly string[] = [
@@ -21,7 +35,7 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "route /auth/join -> pages/auth/join",
   "route / -> pages/index",
   "route /authorize -> pages/authorize",
-  "route /admin/* -> pages/admin/index",
+  "redirect /admin/* -> /ops/backoffice (from /admin) [map user=users users=users organization=organizations organizations=organizations project=projects projects=projects subscription=subscriptions subscriptions=subscriptions]",
   "route /invite/accept -> pages/invite/accept",
   "route /mcp/authorize -> pages/mcp/authorize",
   "route /share/:id -> pages/share/[id]",
@@ -69,7 +83,7 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "  route /governance/users/:id -> pages/governance/users/[id]",
   "  route /me -> pages/me/index",
   "  route /me/configure -> pages/me/configure",
-  "  route /me/devices -> pages/me/devices",
+  "  redirect /me/devices -> /me/configure (from /me/devices) [pin tab=devices]",
   "  route /me/pull-requests -> pages/me/pull-requests",
   "  route /me/sessions -> pages/me/sessions",
   "  route /me/budget/request -> pages/me/budget/request",
@@ -112,18 +126,18 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "  route /:project/evaluators -> pages/[project]/evaluators",
   "  route /:project/evaluations -> pages/[project]/evaluations",
   "  route /:project/online-evaluations -> pages/[project]/online-evaluations",
-  "  route /:project/evaluations/new -> pages/[project]/evaluations/new",
-  "  route /:project/evaluations/new/choose -> pages/[project]/evaluations/new/choose",
+  "  redirect /:project/evaluations/new -> /:project/online-evaluations (from /:project/evaluations/new) [pin drawer.open=evaluatorCategorySelector]",
+  "  redirect /:project/evaluations/new/choose -> /:project/online-evaluations (from /:project/evaluations/new/choose) [pin drawer.open=evaluatorCategorySelector]",
   "  route /:project/evaluations/wizard -> pages/[project]/evaluations/wizard",
   "  route /:project/evaluations/wizard/:slug -> pages/[project]/evaluations/wizard/[slug]",
   "  route /:project/evaluations/:id/edit -> pages/[project]/evaluations/[id]/edit",
   "  route /:project/evaluations/:id/edit/choose -> pages/[project]/evaluations/[id]/edit/choose",
   "  route /:project/traces -> pages/[project]/traces",
-  "  route /:project/traces/:trace -> pages/[project]/traces/[trace]",
-  "  route /:project/messages -> pages/[project]/messages/index",
-  "  route /:project/messages/:trace -> pages/[project]/messages/[trace]/index",
-  "  route /:project/messages/:trace/:openTab -> pages/[project]/messages/[trace]/[openTab]/index",
-  "  route /:project/messages/:trace/:openTab/:span -> pages/[project]/messages/[trace]/[openTab]/[span]",
+  "  redirect /:project/traces/:trace -> /:project/traces (from /:project/traces/:trace) [pin drawer.open=traceV2Details drawer.traceId=:trace]",
+  "  redirect /:project/messages -> /:project/traces (from /:project/messages)",
+  "  redirect /:project/messages/:trace -> /:project/traces (from /:project/messages/:trace) [pin drawer.open=traceV2Details drawer.traceId=:trace]",
+  "  redirect /:project/messages/:trace/:openTab -> /:project/traces (from /:project/messages/:trace/:openTab) [pin drawer.open=traceV2Details drawer.traceId=:trace]",
+  "  redirect /:project/messages/:trace/:openTab/:span -> /:project/traces (from /:project/messages/:trace/:openTab/:span) [pin drawer.open=traceV2Details drawer.traceId=:trace drawer.span=:span]",
   "  route /:project/prompts -> pages/[project]/prompts",
   "  route /:project/setup -> pages/[project]/setup",
   "  route /:project/workflows -> pages/[project]/workflows",
@@ -153,9 +167,9 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "  route /:project/simulations/* -> pages/[project]/simulations/[[...path]]",
   "  route /:project/simulations -> pages/[project]/simulations/[[...path]]",
   "route /ops -> pages/ops/index",
-  "route /ops/queues -> pages/ops/queues",
+  "redirect /ops/queues -> /ops (from /ops/queues)",
   "route /ops/dejaview -> pages/ops/dejaview",
-  "route /ops/scheduler -> pages/ops/scheduler",
+  "redirect /ops/scheduler -> /ops/event-sourcing/schedules (from /ops/scheduler)",
   "route /ops/event-sourcing -> pages/ops/event-sourcing/index",
   "route /ops/event-sourcing/dead-letters -> pages/ops/event-sourcing/dead-letters",
   "route /ops/event-sourcing/processes -> pages/ops/event-sourcing/processes",
@@ -166,9 +180,9 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "route /ops/feature-flags -> pages/ops/feature-flags",
   "route /ops/foundry -> pages/ops/foundry",
   "route /ops/migrations -> pages/ops/migrations",
-  "route /ops/projections -> pages/ops/projections",
+  "redirect /ops/projections -> /ops/event-sourcing/projections (from /ops/projections) [pin drawer.open=opsReplay]",
   "route /ops/projections/:runId -> pages/ops/projections/[runId]",
-  "route /ops/backoffice -> pages/ops/backoffice",
+  "redirect /ops/backoffice -> /ops/backoffice/users (from /ops/backoffice)",
   "route /ops/backoffice/bug-reports -> pages/ops/backoffice/bug-reports",
   "route /ops/backoffice/users -> pages/ops/backoffice/users",
   "route /ops/backoffice/organizations -> pages/ops/backoffice/organizations",

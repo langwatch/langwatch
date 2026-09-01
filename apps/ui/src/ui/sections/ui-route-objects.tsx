@@ -21,10 +21,12 @@ export type UiRouteObjectsOptions = {
 export function createUiRouteObjects({ table, loaders }: UiRouteObjectsOptions): RouteObject[] {
   return table.map((descriptor) => {
     if ("redirect" in descriptor) {
-      const { from, to, pinParams } = descriptor.redirect;
+      const { from, to, pinParams, mapSegment } = descriptor.redirect;
       return {
         path: descriptor.path,
-        element: <UiPrefixRedirect from={from} to={to} pinParams={pinParams} />,
+        element: (
+          <UiPrefixRedirect from={from} to={to} pinParams={pinParams} mapSegment={mapSegment} />
+        ),
       };
     }
 

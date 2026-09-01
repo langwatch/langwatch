@@ -7,6 +7,12 @@
  * moved out of this application yet, so each key resolves to a lazy import of
  * the module that has always served it.
  *
+ * Several addresses share one screen. Where they do, every key names the
+ * shared module — the file that used to sit at the extra address and re-export
+ * it is gone — and a key whose address is served by a named export rather than
+ * the default names that export. Which component each of those keys resolves
+ * is pinned in `legacy-page-loaders.unit.test.ts`.
+ *
  * As a page migrates into a feature-web `screens/` entry, only its line here
  * changes. The route table, the URL and the loader key stay exactly as they
  * are, which is what keeps the move invisible to a bookmark.
@@ -28,7 +34,6 @@ export const legacyPageLoaders: UiPageLoaderRegistry = {
   "pages/auth/join": () => import("~/pages/auth/join"),
   "pages/index": () => import("~/pages/index"),
   "pages/authorize": () => import("~/pages/authorize"),
-  "pages/admin/index": () => import("~/pages/admin/index"),
   "pages/invite/accept": () => import("~/pages/invite/accept"),
   "pages/mcp/authorize": () => import("~/pages/mcp/authorize"),
   "pages/share/[id]": () => import("~/pages/share/[id]"),
@@ -77,7 +82,6 @@ export const legacyPageLoaders: UiPageLoaderRegistry = {
   "pages/governance/users/[id]": () => import("~/pages/governance/users/[id]"),
   "pages/me/index": () => import("~/pages/me/index"),
   "pages/me/configure": () => import("~/pages/me/configure"),
-  "pages/me/devices": () => import("~/pages/me/devices"),
   "pages/me/pull-requests": () => import("~/pages/me/pull-requests"),
   "pages/me/sessions": () => import("~/pages/me/sessions"),
   "pages/me/budget/request": () => import("~/pages/me/budget/request"),
@@ -99,34 +103,24 @@ export const legacyPageLoaders: UiPageLoaderRegistry = {
   "pages/[project]/sessions": () => import("~/pages/[project]/sessions"),
   "pages/[project]/pull-requests": () => import("~/pages/[project]/pull-requests"),
   "pages/[project]/automations": () => import("~/pages/[project]/automations"),
-  "pages/[project]/automations/automations": () =>
-    import("~/pages/[project]/automations/automations"),
-  "pages/[project]/automations/alerts": () => import("~/pages/[project]/automations/alerts"),
-  "pages/[project]/automations/schedules": () => import("~/pages/[project]/automations/schedules"),
-  "pages/[project]/automations/activity": () => import("~/pages/[project]/automations/activity"),
+  // Four tabs of one screen. Each address kept a file whose whole body was
+  // `export { default } from "../automations"`; the key names the shared
+  // module directly instead.
+  "pages/[project]/automations/automations": () => import("~/pages/[project]/automations"),
+  "pages/[project]/automations/alerts": () => import("~/pages/[project]/automations"),
+  "pages/[project]/automations/schedules": () => import("~/pages/[project]/automations"),
+  "pages/[project]/automations/activity": () => import("~/pages/[project]/automations"),
   "pages/[project]/datasets": () => import("~/pages/[project]/datasets"),
   "pages/[project]/datasets/[id]": () => import("~/pages/[project]/datasets/[id]"),
   "pages/[project]/evaluators": () => import("~/pages/[project]/evaluators"),
   "pages/[project]/evaluations": () => import("~/pages/[project]/evaluations"),
   "pages/[project]/online-evaluations": () => import("~/pages/[project]/online-evaluations"),
-  "pages/[project]/evaluations/new": () => import("~/pages/[project]/evaluations/new"),
-  "pages/[project]/evaluations/new/choose": () =>
-    import("~/pages/[project]/evaluations/new/choose"),
   "pages/[project]/evaluations/wizard": () => import("~/pages/[project]/evaluations/wizard"),
-  "pages/[project]/evaluations/wizard/[slug]": () =>
-    import("~/pages/[project]/evaluations/wizard/[slug]"),
+  "pages/[project]/evaluations/wizard/[slug]": () => import("~/pages/[project]/evaluations/wizard"),
   "pages/[project]/evaluations/[id]/edit": () => import("~/pages/[project]/evaluations/[id]/edit"),
   "pages/[project]/evaluations/[id]/edit/choose": () =>
-    import("~/pages/[project]/evaluations/[id]/edit/choose"),
+    import("~/pages/[project]/evaluations/[id]/edit"),
   "pages/[project]/traces": () => import("~/pages/[project]/traces"),
-  "pages/[project]/traces/[trace]": () => import("~/pages/[project]/traces/[trace]"),
-  "pages/[project]/messages/index": () => import("~/pages/[project]/messages/index"),
-  "pages/[project]/messages/[trace]/index": () =>
-    import("~/pages/[project]/messages/[trace]/index"),
-  "pages/[project]/messages/[trace]/[openTab]/index": () =>
-    import("~/pages/[project]/messages/[trace]/[openTab]/index"),
-  "pages/[project]/messages/[trace]/[openTab]/[span]": () =>
-    import("~/pages/[project]/messages/[trace]/[openTab]/[span]"),
   "pages/[project]/prompts": () => import("~/pages/[project]/prompts"),
   "pages/[project]/setup": () => import("~/pages/[project]/setup"),
   "pages/[project]/workflows": () => import("~/pages/[project]/workflows"),
@@ -147,7 +141,14 @@ export const legacyPageLoaders: UiPageLoaderRegistry = {
   "pages/[project]/analytics/custom/index": () =>
     import("~/pages/[project]/analytics/custom/index"),
   "pages/[project]/analytics/custom/[id]": () => import("~/pages/[project]/analytics/custom/[id]"),
-  "pages/[project]/experiments/index": () => import("~/pages/[project]/experiments/index"),
+  // /experiments and /evaluations are one module: the experiments address
+  // serves its guarded named export, the evaluations address its default.
+  // The alias file that re-exported the one as the other is gone, so the key
+  // names the export itself.
+  "pages/[project]/experiments/index": () =>
+    import("~/pages/[project]/evaluations").then((module) => ({
+      default: module.GuardedExperimentsPage,
+    })),
   "pages/[project]/experiments/workbench/index": () =>
     import("~/pages/[project]/experiments/workbench/index"),
   "pages/[project]/experiments/workbench/[slug]": () =>
@@ -161,9 +162,7 @@ export const legacyPageLoaders: UiPageLoaderRegistry = {
   "pages/[project]/simulations/[[...path]]": () =>
     import("~/pages/[project]/simulations/[[...path]]"),
   "pages/ops/index": () => import("~/pages/ops/index"),
-  "pages/ops/queues": () => import("~/pages/ops/queues"),
   "pages/ops/dejaview": () => import("~/pages/ops/dejaview"),
-  "pages/ops/scheduler": () => import("~/pages/ops/scheduler"),
   "pages/ops/event-sourcing/index": () => import("~/pages/ops/event-sourcing/index"),
   "pages/ops/event-sourcing/dead-letters": () => import("~/pages/ops/event-sourcing/dead-letters"),
   "pages/ops/event-sourcing/processes": () => import("~/pages/ops/event-sourcing/processes"),
@@ -174,9 +173,7 @@ export const legacyPageLoaders: UiPageLoaderRegistry = {
   "pages/ops/feature-flags": () => import("~/pages/ops/feature-flags"),
   "pages/ops/foundry": () => import("~/pages/ops/foundry"),
   "pages/ops/migrations": () => import("~/pages/ops/migrations"),
-  "pages/ops/projections": () => import("~/pages/ops/projections"),
   "pages/ops/projections/[runId]": () => import("~/pages/ops/projections/[runId]"),
-  "pages/ops/backoffice": () => import("~/pages/ops/backoffice"),
   "pages/ops/backoffice/bug-reports": () => import("~/pages/ops/backoffice/bug-reports"),
   "pages/ops/backoffice/users": () => import("~/pages/ops/backoffice/users"),
   "pages/ops/backoffice/organizations": () => import("~/pages/ops/backoffice/organizations"),

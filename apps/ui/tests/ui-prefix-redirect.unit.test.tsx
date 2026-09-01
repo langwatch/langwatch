@@ -59,3 +59,91 @@ describe("given a prefix that moved", () => {
     });
   });
 });
+
+describe("given a retired address inside a parameterised family", () => {
+  function renderParameterised(initialEntry: string) {
+    const routes: RouteObject[] = [
+      {
+        path: "/:project/messages/:trace",
+        element: (
+          <UiPrefixRedirect
+            from="/:project/messages/:trace"
+            to="/:project/traces"
+            pinParams={{ "drawer.open": "traceV2Details", "drawer.traceId": ":trace" }}
+          />
+        ),
+      },
+      { path: "/:project/traces", element: <div>traces</div> },
+    ];
+    const router = createMemoryRouter(routes, { initialEntries: [initialEntry] });
+    const view = render(<RouterProvider router={router} />);
+    dispose = () => {
+      view.unmount();
+      router.dispose();
+    };
+    return router;
+  }
+
+  describe("when the deep link is loaded", () => {
+    it("fills the destination and the pinned params from the matched route", () => {
+      const router = renderParameterised("/acme/messages/trace-1");
+
+      expect(router.state.location.pathname).toBe("/acme/traces");
+      const params = new URLSearchParams(router.state.location.search);
+      expect(params.get("drawer.open")).toBe("traceV2Details");
+      expect(params.get("drawer.traceId")).toBe("trace-1");
+    });
+
+    it("encodes a param value that carries a reserved character", () => {
+      const router = renderParameterised("/acme/messages/trace%2F1");
+
+      expect(router.state.location.search).toContain("drawer.traceId=trace%2F1");
+    });
+  });
+});
+
+describe("given retired resource names that were renamed on the way over", () => {
+  const mapSegment = { user: "users", subscription: "subscriptions" };
+
+  function renderMapped(initialEntry: string) {
+    const routes: RouteObject[] = [
+      {
+        path: "/admin/*",
+        element: <UiPrefixRedirect from="/admin" to="/ops/backoffice" mapSegment={mapSegment} />,
+      },
+      { path: "/ops/backoffice/*", element: <div>backoffice</div> },
+      { path: "/ops/backoffice", element: <div>backoffice</div> },
+    ];
+    const router = createMemoryRouter(routes, { initialEntries: [initialEntry] });
+    const view = render(<RouterProvider router={router} />);
+    dispose = () => {
+      view.unmount();
+      router.dispose();
+    };
+    return router;
+  }
+
+  describe("when a renamed resource is deep-linked", () => {
+    it("renames the first segment and keeps everything under it", () => {
+      expect(renderMapped("/admin/user/u_1").state.location.pathname).toBe(
+        "/ops/backoffice/users/u_1",
+      );
+    });
+
+    it("matches the resource name whatever its case", () => {
+      expect(renderMapped("/admin/Subscription").state.location.pathname).toBe(
+        "/ops/backoffice/subscriptions",
+      );
+    });
+  });
+
+  describe("when the address names no resource the table knows", () => {
+    it("lands on the destination itself rather than a fabricated address", () => {
+      expect(renderMapped("/admin/coupons/c_1").state.location.pathname).toBe("/ops/backoffice");
+    });
+
+    it("lands on the destination for the bare retired address", () => {
+      expect(renderMapped("/admin").state.location.pathname).toBe("/ops/backoffice");
+    });
+  });
+});

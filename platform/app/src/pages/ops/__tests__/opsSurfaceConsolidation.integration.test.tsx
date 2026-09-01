@@ -5,7 +5,6 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import OpsProjectionsPage from "../event-sourcing/projections";
 import OpsSchedulesPage from "../event-sourcing/schedules";
-import OpsQueuesPage from "../queues";
 
 /**
  * Where each ops surface lives after the consolidation.
@@ -17,6 +16,10 @@ import OpsQueuesPage from "../queues";
  * on the page whose question it answers, because that is exactly what drifted
  * — upcoming work sat on the landing page previewing a calendar two clicks
  * away, and replay history sat a floor below the button that starts a replay.
+ *
+ * The retired /ops/queues address forwards from the packaged route table
+ * rather than from a page, so its scenario is bound in
+ * `src/__tests__/retiredPageRedirects.integration.test.tsx`.
  */
 
 const mockReplace = vi.fn();
@@ -30,9 +33,7 @@ vi.mock("~/hooks/useDrawer", () => ({
 }));
 
 vi.mock("~/components/ops/event-sourcing/EventSourcingLayout", () => ({
-  EventSourcingLayout: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
+  EventSourcingLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock("~/components/ops/scheduler/UpcomingWorkCard", () => ({
@@ -69,17 +70,6 @@ afterEach(() => {
 });
 
 describe("ops surface consolidation", () => {
-  describe("given an operator follows a saved link to the queues page", () => {
-    describe("when the page loads", () => {
-      /** @scenario A retired queues link lands on the dashboard */
-      it("sends them to the ops dashboard", () => {
-        render(<OpsQueuesPage />);
-
-        expect(mockReplace).toHaveBeenCalledWith("/ops");
-      });
-    });
-  });
-
   describe("given schedules and process wakes are due", () => {
     describe("when the operator opens the schedules page", () => {
       /** @scenario Upcoming timed work sits with the schedules it previews */

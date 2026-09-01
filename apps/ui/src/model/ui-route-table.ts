@@ -14,6 +14,15 @@
  */
 
 export type UiRedirectDescriptor = {
+  /**
+   * The retired address. Whatever the matched path carries BEYOND this is a
+   * sub-path and travels to the destination.
+   *
+   * A `:name` in `from`, in `to`, or in a `pinParams` value is filled from the
+   * matched route params, which is what lets a retired address inside a
+   * parameterised family — `/:project/messages/:trace` — name its destination
+   * without a page of its own to read `useParams` for it.
+   */
   readonly from: string;
   readonly to: string;
   /**
@@ -22,6 +31,14 @@ export type UiRedirectDescriptor = {
    * renders this.
    */
   readonly pinParams?: Readonly<Record<string, string>>;
+  /**
+   * A rename table for the first sub-path segment, applied before the
+   * sub-path joins the destination — `/admin/user/u_1` reaches
+   * `/ops/backoffice/users/u_1`. Lookup is case-insensitive, and a segment
+   * the table does not name lands on the destination's own home. See
+   * `UiPrefixRedirect`, which is what applies it.
+   */
+  readonly mapSegment?: Readonly<Record<string, string>>;
 };
 
 /** A route that renders a page, or a pathless layout route that wraps others. */
@@ -161,7 +178,28 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
   // Top-level pages
   { path: "/", page: "pages/index" },
   { path: "/authorize", page: "pages/authorize" },
-  { path: "/admin/*", page: "pages/admin/index" },
+  {
+    // The admin CRUD UI became the Backoffice module inside Ops (#3247,
+    // #3245). The singular resource names it served are the only thing that
+    // has to change on the way over, so they travel as a segment map rather
+    // than as a page: /admin/user/u_1 lands on /ops/backoffice/users/u_1, and
+    // an unrecognised resource lands on the Backoffice home.
+    path: "/admin/*",
+    redirect: {
+      from: "/admin",
+      to: "/ops/backoffice",
+      mapSegment: {
+        user: "users",
+        users: "users",
+        organization: "organizations",
+        organizations: "organizations",
+        project: "projects",
+        projects: "projects",
+        subscription: "subscriptions",
+        subscriptions: "subscriptions",
+      },
+    },
+  },
   { path: "/invite/accept", page: "pages/invite/accept" },
   { path: "/mcp/authorize", page: "pages/mcp/authorize" },
   { path: "/share/:id", page: "pages/share/[id]" },
@@ -362,11 +400,13 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
       },
       {
         // The devices inventory moved into a tab of /me/configure, and this
-        // path keeps resolving so old links do not dead-end. A page that
-        // renders <Navigate>, not a `loader` redirect: loaders do not run on a
-        // cold load of the SPA, which is exactly how a stale link arrives.
+        // path keeps resolving so old links do not dead-end.
         path: "/me/devices",
-        page: "pages/me/devices",
+        redirect: {
+          from: "/me/devices",
+          to: "/me/configure",
+          pinParams: { tab: "devices" },
+        },
       },
       {
         path: "/me/pull-requests",
@@ -515,12 +555,22 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         page: "pages/[project]/online-evaluations",
       },
       {
+        // Creating an evaluation is a drawer on the online-evaluations page;
+        // both retired addresses served the same forward, so both open it.
         path: "/:project/evaluations/new",
-        page: "pages/[project]/evaluations/new",
+        redirect: {
+          from: "/:project/evaluations/new",
+          to: "/:project/online-evaluations",
+          pinParams: { "drawer.open": "evaluatorCategorySelector" },
+        },
       },
       {
         path: "/:project/evaluations/new/choose",
-        page: "pages/[project]/evaluations/new/choose",
+        redirect: {
+          from: "/:project/evaluations/new/choose",
+          to: "/:project/online-evaluations",
+          pinParams: { "drawer.open": "evaluatorCategorySelector" },
+        },
       },
       {
         path: "/:project/evaluations/wizard",
@@ -543,27 +593,62 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         page: "pages/[project]/traces",
       },
       {
+        // The canonical short link to one trace — notification links, emails,
+        // webhooks and API responses all mint it. Trace Explorer shows a
+        // trace in a drawer, so the id travels as the drawer's parameter.
         path: "/:project/traces/:trace",
-        page: "pages/[project]/traces/[trace]",
+        redirect: {
+          from: "/:project/traces/:trace",
+          to: "/:project/traces",
+          pinParams: {
+            "drawer.open": "traceV2Details",
+            "drawer.traceId": ":trace",
+          },
+        },
       },
 
       // Legacy /messages paths. The legacy Traces page is gone; these are
       // redirects only, so old bookmarks and notification links keep working.
       {
+        // The bare legacy index keeps every filter and date range the saved
+        // link carried; the Trace Explorer ignores what it does not know.
         path: "/:project/messages",
-        page: "pages/[project]/messages/index",
+        redirect: { from: "/:project/messages", to: "/:project/traces" },
       },
       {
         path: "/:project/messages/:trace",
-        page: "pages/[project]/messages/[trace]/index",
+        redirect: {
+          from: "/:project/messages/:trace",
+          to: "/:project/traces",
+          pinParams: {
+            "drawer.open": "traceV2Details",
+            "drawer.traceId": ":trace",
+          },
+        },
       },
       {
+        // The legacy tab has no Trace Explorer equivalent, so it is dropped.
         path: "/:project/messages/:trace/:openTab",
-        page: "pages/[project]/messages/[trace]/[openTab]/index",
+        redirect: {
+          from: "/:project/messages/:trace/:openTab",
+          to: "/:project/traces",
+          pinParams: {
+            "drawer.open": "traceV2Details",
+            "drawer.traceId": ":trace",
+          },
+        },
       },
       {
         path: "/:project/messages/:trace/:openTab/:span",
-        page: "pages/[project]/messages/[trace]/[openTab]/[span]",
+        redirect: {
+          from: "/:project/messages/:trace/:openTab/:span",
+          to: "/:project/traces",
+          pinParams: {
+            "drawer.open": "traceV2Details",
+            "drawer.traceId": ":trace",
+            "drawer.span": ":span",
+          },
+        },
       },
       {
         path: "/:project/prompts",
@@ -692,9 +777,19 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
 
   // Ops
   { path: "/ops", page: "pages/ops/index" },
-  { path: "/ops/queues", page: "pages/ops/queues" },
+  {
+    // Queue health reads on the dashboard now; the retired page forwarded
+    // there and nothing else.
+    path: "/ops/queues",
+    redirect: { from: "/ops/queues", to: "/ops" },
+  },
   { path: "/ops/dejaview", page: "pages/ops/dejaview" },
-  { path: "/ops/scheduler", page: "pages/ops/scheduler" },
+  {
+    // Schedules are a section of the event-sourcing workspace; old links
+    // follow.
+    path: "/ops/scheduler",
+    redirect: { from: "/ops/scheduler", to: "/ops/event-sourcing/schedules" },
+  },
   {
     path: "/ops/event-sourcing",
     page: "pages/ops/event-sourcing/index",
@@ -730,16 +825,25 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
     page: "pages/ops/migrations",
   },
   {
+    // Projection replay is a drawer on the event-sourcing page now, so the
+    // old address has to open the drawer as well as land on the page. Per-run
+    // progress keeps its own page at /ops/projections/:runId below.
     path: "/ops/projections",
-    page: "pages/ops/projections",
+    redirect: {
+      from: "/ops/projections",
+      to: "/ops/event-sourcing/projections",
+      pinParams: { "drawer.open": "opsReplay" },
+    },
   },
   {
     path: "/ops/projections/:runId",
     page: "pages/ops/projections/[runId]",
   },
   {
+    // The Backoffice entry has no surface of its own: Users is the default
+    // resource, and the per-resource pages below are the real surfaces.
     path: "/ops/backoffice",
-    page: "pages/ops/backoffice",
+    redirect: { from: "/ops/backoffice", to: "/ops/backoffice/users" },
   },
   {
     path: "/ops/backoffice/bug-reports",
