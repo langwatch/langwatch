@@ -52,11 +52,15 @@ interface SeedKpiRow {
   lastEventOccurredAt?: Date;
 }
 
-async function insertGovernanceKpiRow(
-  ch: ClickHouseClient,
-  tenantId: string,
-  row: SeedKpiRow,
-): Promise<void> {
+async function insertGovernanceKpiRow({
+  ch,
+  tenantId,
+  row,
+}: {
+  ch: ClickHouseClient;
+  tenantId: string;
+  row: SeedKpiRow;
+}): Promise<void> {
   await ch.insert({
     table: "governance_kpis",
     values: [
@@ -117,13 +121,17 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
     // Current window: NOW - 1h .. NOW. One trace, $10 spend, well above
     // any 2x baseline threshold given the seeded baseline.
     const inCurrentWindow = new Date(NOW.getTime() - 30 * 60 * 1000); // T-30min
-    await insertGovernanceKpiRow(ch, govProject.id, {
-      sourceId: primarySourceId,
-      sourceType: "otel_generic",
-      hourBucket: inCurrentWindow,
-      spendUsd: 10.0,
-      promptTokens: 1000,
-      completionTokens: 500,
+    await insertGovernanceKpiRow({
+      ch,
+      tenantId: govProject.id,
+      row: {
+        sourceId: primarySourceId,
+        sourceType: "otel_generic",
+        hourBucket: inCurrentWindow,
+        spendUsd: 10.0,
+        promptTokens: 1000,
+        completionTokens: 500,
+      },
     });
 
     // Baseline windows: 6 hours of $1.00 spend each. Total $6, average
@@ -131,13 +139,17 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
     // = $2. Current ($10) ≥ $2 → fire.
     for (let i = 1; i <= 6; i++) {
       const baselineHour = new Date(NOW.getTime() - (60 + i * 60) * 60 * 1000); // T-2h, T-3h, … T-7h
-      await insertGovernanceKpiRow(ch, govProject.id, {
-        sourceId: primarySourceId,
-        sourceType: "otel_generic",
-        hourBucket: baselineHour,
-        spendUsd: 1.0,
-        promptTokens: 100,
-        completionTokens: 50,
+      await insertGovernanceKpiRow({
+        ch,
+        tenantId: govProject.id,
+        row: {
+          sourceId: primarySourceId,
+          sourceType: "otel_generic",
+          hourBucket: baselineHour,
+          spendUsd: 1.0,
+          promptTokens: 100,
+          completionTokens: 50,
+        },
       });
     }
   });
@@ -342,15 +354,23 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
           completionTokens: 5,
         };
         // The same trace, twice, as the throttled writer would leave it.
-        await insertGovernanceKpiRow(ch, govProject.id, {
-          ...seed,
-          spendUsd: 2,
-          lastEventOccurredAt: new Date(HOUR.getTime() + 1_000),
+        await insertGovernanceKpiRow({
+          ch,
+          tenantId: govProject.id,
+          row: {
+            ...seed,
+            spendUsd: 2,
+            lastEventOccurredAt: new Date(HOUR.getTime() + 1_000),
+          },
         });
-        await insertGovernanceKpiRow(ch, govProject.id, {
-          ...seed,
-          spendUsd: 9,
-          lastEventOccurredAt: new Date(HOUR.getTime() + 2_000),
+        await insertGovernanceKpiRow({
+          ch,
+          tenantId: govProject.id,
+          row: {
+            ...seed,
+            spendUsd: 9,
+            lastEventOccurredAt: new Date(HOUR.getTime() + 2_000),
+          },
         });
 
         const totals = await kpisRepository.findSpendTotals({
