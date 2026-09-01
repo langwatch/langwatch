@@ -82,6 +82,7 @@ func runTurn(t *testing.T, agent *Agent, turnID string) (*frameSink, error) {
 // binary that never emits the field) reads as false and keeps the seed path.
 //
 // @scenario "A respawned pi worker resumes the conversation's persisted session"
+// @scenario "A respawned worker resumes the session its home still holds"
 func TestAgent_OpenSession_RelaysWrapperSessionResume(t *testing.T) {
 	for _, tc := range []struct {
 		mode string

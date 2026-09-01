@@ -232,7 +232,7 @@ func LoadConfig(ctx context.Context) (Config, error) {
 		return Config{}, err
 	}
 	// Fail closed on the isolation posture: an unset value is the ISOLATED
-	// default, and an unrecognised one is refused outright rather than
+	// default, and an unrecognized one is refused outright rather than
 	// normalised. A typo must never be what selects the weaker posture, and
 	// there is no reading of "per-uidd" that should quietly run as "none".
 	if cfg.WorkerIsolation == "" {

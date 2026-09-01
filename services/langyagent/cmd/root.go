@@ -6,6 +6,8 @@ package cmd
 import (
 	"context"
 
+	"go.uber.org/zap"
+
 	"github.com/langwatch/langwatch/pkg/contexts"
 	langyagent "github.com/langwatch/langwatch/services/langyagent"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/controlplane"
@@ -13,7 +15,6 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/adapters/runner/sharedidentity"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/app/workerpool"
-	"go.uber.org/zap"
 )
 
 // Root is the service entrypoint called by cmd/service. Errors returned here

@@ -69,22 +69,22 @@ func TestLoadConfig_DefaultsWhenOnlySecretSet(t *testing.T) {
 	}
 }
 
-// An unrecognised posture is refused outright rather than normalised. There is
+// An unrecognized posture is refused outright rather than normalised. There is
 // no reading of a typo that should quietly run every worker under one identity,
 // so the weaker posture must never be what a mistake selects.
 //
-// @scenario "An unrecognised isolation setting fails closed"
+// @scenario "An unrecognized isolation setting fails closed"
 func TestLoadConfig_RefusesAnUnknownWorkerIsolation(t *testing.T) {
 	clearLangyEnv(t)
 	t.Setenv("LANGY_INTERNAL_SECRET", "secret")
 	t.Setenv("LANGY_WORKER_ISOLATION", "per-uidd")
 
 	if _, err := LoadConfig(context.Background()); err == nil {
-		t.Fatal("an unrecognised LANGY_WORKER_ISOLATION must refuse to boot, not fall back to a posture")
+		t.Fatal("an unrecognized LANGY_WORKER_ISOLATION must refuse to boot, not fall back to a posture")
 	}
 }
 
-// Both recognised postures load. The weaker one is a supported configuration,
+// Both recognized postures load. The weaker one is a supported configuration,
 // not an escape hatch, so it must not depend on ENVIRONMENT the way the flag it
 // replaced did.
 //

@@ -29,6 +29,13 @@ Feature: Langy minimal worker
     And the operator's skills stay out of Langy's system prompt and out of the
       capabilities it offers the user
 
+  @unit @unimplemented
+  Scenario: The worker offers no tool for editing its own configuration
+    Given editing the agent's own configuration is work Langy does not do for a customer
+    When a worker is provisioned
+    Then no such tool is offered
+    And every skill we ship stays available
+
   @unit
   Scenario: The prompt fits its size budget
     When the prompt asset is checked

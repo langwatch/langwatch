@@ -49,7 +49,7 @@ func TestChownLchown_NoOp(t *testing.T) {
 // which telemetry and logging read too.
 //
 // What replaces it is asserted where it now lives: config rejects an
-// unrecognised LANGY_WORKER_ISOLATION rather than defaulting (config_test.go),
+// unrecognized LANGY_WORKER_ISOLATION rather than defaulting (config_test.go),
 // and the chart refuses `none` without the acknowledgement
 // (charts/langwatch/tests/e2e-overlays.sh).
 
