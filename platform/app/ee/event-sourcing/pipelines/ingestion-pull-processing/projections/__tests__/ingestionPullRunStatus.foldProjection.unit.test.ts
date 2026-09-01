@@ -428,6 +428,109 @@ describe("IngestionPullRunStatusFoldProjection", () => {
       });
     });
 
+    const succeedPartially = ({
+      state,
+      scheduledFor,
+      occurredAt,
+      errorCount,
+    }: {
+      state: IngestionPullRunStatusData;
+      scheduledFor: number;
+      occurredAt: number;
+      errorCount: number;
+    }) =>
+      projection.apply(
+        state,
+        event(
+          "lw.obs.ingestion_pull.run_completed",
+          {
+            sourceId: "source-1",
+            runId: String(scheduledFor),
+            scheduledFor,
+            nextCursor: `cursor-${scheduledFor}`,
+            eventCount: 3,
+            errorCount,
+          },
+          occurredAt,
+        ),
+      );
+
+    describe("when a run completes but reports errors alongside its progress", () => {
+      /** @scenario "A run that partly succeeded does not reset the failure count" */
+      it("leaves the failure count where it was and stamps no success", () => {
+        const failedTwice = fail({
+          state: fail({
+            state: configured,
+            scheduledFor: 1_000,
+            occurredAt: 1_100,
+          }),
+          scheduledFor: 2_000,
+          occurredAt: 2_100,
+        });
+
+        const partial = succeedPartially({
+          state: failedTwice,
+          scheduledFor: 3_000,
+          occurredAt: 3_100,
+          errorCount: 2,
+        });
+
+        expect(partial.ConsecutiveErrors).toBe(2);
+        expect(partial.LastSuccessAt).toBeNull();
+        // The progress it DID make still lands: a run only reaches here having
+        // advanced its cursor past input it could not read, so dropping the
+        // advance would leave the next run re-reading that same input forever.
+        expect(partial.Cursor).toBe("cursor-3000");
+        expect(partial.LastRunAt).toBe(3_100);
+        expect(partial.LastRunOutcome).toBe("completed");
+        expect(partial.LastRunEventCount).toBe(3);
+        expect(partial.LastRunError).toBeNull();
+      });
+    });
+
+    describe("when a partly-succeeded run follows a clean one", () => {
+      it("does not raise the failure count either", () => {
+        const succeeded = succeed({
+          state: configured,
+          scheduledFor: 1_000,
+          occurredAt: 1_100,
+        });
+
+        const partial = succeedPartially({
+          state: succeeded,
+          scheduledFor: 2_000,
+          occurredAt: 2_100,
+          errorCount: 1,
+        });
+
+        expect(partial.ConsecutiveErrors).toBe(0);
+        // The earlier clean run's success time stands: this run neither proved
+        // the source works nor proved it is broken, so it moves neither field.
+        expect(partial.LastSuccessAt).toBe(1_100);
+      });
+    });
+
+    describe("when a completion predates runs reporting an error count", () => {
+      it("folds as the clean run it was", () => {
+        // succeed() writes the pre-change event shape -- no errorCount key at
+        // all -- which is every completion already on the append-only log.
+        const failedOnce = fail({
+          state: configured,
+          scheduledFor: 1_000,
+          occurredAt: 1_100,
+        });
+
+        const legacy = succeed({
+          state: failedOnce,
+          scheduledFor: 2_000,
+          occurredAt: 2_100,
+        });
+
+        expect(legacy.ConsecutiveErrors).toBe(0);
+        expect(legacy.LastSuccessAt).toBe(2_100);
+      });
+    });
+
     describe("when a run completes with no new usage for the period", () => {
       /** @scenario "A run that finds nothing new still counts as a success" */
       it("counts as a success and leaves the last-event time alone", () => {

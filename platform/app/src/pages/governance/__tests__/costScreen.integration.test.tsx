@@ -178,7 +178,7 @@ describe("the governance cost screen", () => {
   });
 
   describe("given seat data has not shipped yet", () => {
-    /** @scenario "The seat lane is an honest hole until seat data ships" */
+    /** @scenario "The seat lane is an honest hole until a licence list is read" */
     it("labels the seat lane, says it is waiting, and renders no digits", () => {
       renderScreen();
 
@@ -191,6 +191,81 @@ describe("the governance cost screen", () => {
       for (const readable of readableStrings(seats)) {
         expect(readable).not.toMatch(/\d/);
       }
+    });
+  });
+
+  describe("given the tenant's seat licences have been read", () => {
+    /** @scenario "The seat lane shows how many seats are bought and how many are assigned" */
+    it("shows each pool's bought and assigned counts, and no money", () => {
+      harness.query = {
+        data: summaryFixture({
+          seats: {
+            status: "reported",
+            pools: [
+              {
+                skuPartNumber: "AGENT_SEAT_USL",
+                day: "2026-08-01",
+                seatsBought: 4,
+                seatsAssigned: 2,
+              },
+            ],
+          },
+        }),
+        isLoading: false,
+        isError: false,
+      };
+      renderScreen();
+
+      const seats = screen.getByTestId("cost-lane-seats");
+      expect(within(seats).getByText("Seats")).toBeInTheDocument();
+      expect(within(seats).getByText("AGENT_SEAT_USL")).toBeInTheDocument();
+      expect(within(seats).getByText(/4/)).toBeInTheDocument();
+      expect(within(seats).getByText(/2/)).toBeInTheDocument();
+      expect(
+        within(seats).queryByText(/not yet available/i),
+      ).not.toBeInTheDocument();
+
+      // Seat events carry counts, not prices. A currency figure in this lane
+      // would be money nobody billed, sitting beside the invoice that already
+      // says what the seats cost.
+      for (const readable of readableStrings(seats)) {
+        expect(readable).not.toMatch(/[$€£]/);
+      }
+    });
+  });
+
+  describe("given the seat read failed while the cost lanes answered", () => {
+    /** @scenario "A failed seat read reads differently from one not yet taken" */
+    it("says the seat data could not be read, and leaves the money lanes alone", () => {
+      harness.query = {
+        data: summaryFixture({ seats: { status: "read_failed" } }),
+        isLoading: false,
+        isError: false,
+      };
+      renderScreen();
+
+      const seats = screen.getByTestId("cost-lane-seats");
+      expect(within(seats).getByText(/could not be read/i)).toBeInTheDocument();
+      // "Not read yet" and "could not be read" are different sentences, and
+      // the lane saying the wrong one sends an admin looking for a licence
+      // collection that already ran.
+      expect(
+        within(seats).queryByText(/not yet available/i),
+      ).not.toBeInTheDocument();
+
+      for (const readable of readableStrings(seats)) {
+        expect(readable).not.toMatch(/\d/);
+      }
+
+      // The point of the state: one broken read no longer takes the money
+      // lanes down with it.
+      expect(
+        within(screen.getByTestId("cost-lane-billed")).getByText("$123.45"),
+      ).toBeInTheDocument();
+      expect(
+        within(screen.getByTestId("cost-lane-gateway")).getByText("$67.89"),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId("cost-lanes-error")).not.toBeInTheDocument();
     });
   });
 

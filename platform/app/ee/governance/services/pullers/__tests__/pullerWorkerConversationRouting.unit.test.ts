@@ -96,7 +96,7 @@ function copilotEvent(): NormalizedPullEvent {
     tokens_output: 0,
     raw_payload: JSON.stringify({
       conversationtranscriptid: "row-1",
-      name: "b957a08c-0000-4000-8000-000000000001_dacfd251-bot",
+      name: "cccccccc-0000-4000-8000-000000000003_agent-one",
       conversationstarttime: "2026-08-25T19:14:34Z",
       metadata: JSON.stringify({ BatchId: 0 }),
       content: JSON.stringify({

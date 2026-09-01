@@ -73,7 +73,7 @@ describe("building one pulled usage record", () => {
       expect(record?.model).toBe("anthropic/claude-sonnet-5");
       expect(record?.costBasis).toBe("computed");
       expect(record?.costStatus).toBe("estimate");
-      expect(record?.costNanoUsd).toBeGreaterThan(0);
+      expect(record?.costNanoMinor).toBeGreaterThan(0);
       expect(record?.rateVersion).toBeTruthy();
       // The bucket is the provider's; the observation is ours.
       expect(record?.occurredAtMs).toBe(Date.parse("2026-08-01T00:00:00.000Z"));
@@ -146,7 +146,7 @@ describe("building one pulled usage record", () => {
 
       expect(record?.costBasis).toBe("provider_reported");
       expect(record?.costStatus).toBe("exact");
-      expect(record?.costNanoUsd).toBe(42_500_000_000);
+      expect(record?.costNanoMinor).toBe(42_500_000_000);
       expect(record?.rateVersion).toBeNull();
     });
 
@@ -167,7 +167,7 @@ describe("building one pulled usage record", () => {
         observedAt: OBSERVED_AT,
       });
 
-      expect(record?.costNanoUsd).toBe(1_100_000_001);
+      expect(record?.costNanoMinor).toBe(1_100_000_001);
     });
   });
 
@@ -196,7 +196,7 @@ describe("building one pulled usage record", () => {
       // cannot move when the money moves, or the correction would be added
       // beside the figure it corrects instead of replacing it.
       expect(corrected?.restatementKey).toBe(first?.restatementKey);
-      expect(corrected?.costNanoUsd).not.toBe(first?.costNanoUsd);
+      expect(corrected?.costNanoMinor).not.toBe(first?.costNanoMinor);
       expect(corrected?.observedAtMs).toBeGreaterThan(first!.observedAtMs);
     });
 
