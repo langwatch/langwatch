@@ -85,6 +85,10 @@ function spawnAgentProcess({
 			cwd: workingDirectory,
 			env: { ...env, AGENT_NAME: name },
 			stdio: ["ignore", "pipe", "pipe"],
+			// Its own process group, so teardown can kill the whole tree:
+			// `uv run` execs a python child, and a SIGTERM to `uv` alone can
+			// leave that child serving for hours after the test file ends.
+			detached: true,
 		},
 	);
 
@@ -99,6 +103,7 @@ function spawnAgentProcess({
 	child.on("exit", () => {
 		exited = true;
 	});
+	child.unref();
 	// A spawn that never starts, `uv` missing from PATH above all, emits
 	// "error" and no "exit". Without this the error is unhandled and the wait
 	// below runs its full timeout before saying anything useful.
@@ -145,22 +150,46 @@ async function waitForAgentOnline({
 		if (row) return row;
 		await sleep(3_000);
 	}
-	agent.child.kill("SIGTERM");
+	killAgentTree(agent, "SIGTERM");
 	throw new Error(
 		`the connected agent "${name}" did not come online within ${timeoutMs}ms:\n${agent.output()}`,
 	);
 }
 
-/** Asks the process to stop, and kills it when it does not. */
+/** Signals the fixture's whole process group, falling back to the child. */
+function killAgentTree(agent: AgentProcess, signal: NodeJS.Signals): void {
+	const pid = agent.child.pid;
+	try {
+		if (pid) process.kill(-pid, signal);
+		else agent.child.kill(signal);
+	} catch {
+		agent.child.kill(signal);
+	}
+}
+
+/** Asks the process tree to stop, and kills it when it does not. */
 async function stopAgentProcess(agent: AgentProcess): Promise<void> {
+	liveAgents.delete(agent);
 	if (agent.hasExited()) return;
-	agent.child.kill("SIGTERM");
+	killAgentTree(agent, "SIGTERM");
 	await Promise.race([
 		new Promise((resolve) => agent.child.once("exit", resolve)),
 		sleep(10_000),
 	]);
-	if (!agent.hasExited()) agent.child.kill("SIGKILL");
+	if (!agent.hasExited()) killAgentTree(agent, "SIGKILL");
 }
+
+/**
+ * Every fixture the file started and did not stop yet. A test that fails
+ * before its own teardown, or a killed run, must not leave the agent
+ * serving: the exit hook sweeps whatever is left.
+ */
+const liveAgents = new Set<AgentProcess>();
+process.once("exit", () => {
+	for (const agent of liveAgents) {
+		if (!agent.hasExited()) killAgentTree(agent, "SIGKILL");
+	}
+});
 
 /** Removes the row the run created, so a project never collects fixtures. */
 function deleteAgentRow({
@@ -200,6 +229,7 @@ export async function startConnectedAgentFixture({
 	timeoutMs?: number;
 }): Promise<RunningConnectedAgent> {
 	const agent = spawnAgentProcess({ workingDirectory, name, env });
+	liveAgents.add(agent);
 	const row = await waitForAgentOnline({
 		workingDirectory,
 		name,
