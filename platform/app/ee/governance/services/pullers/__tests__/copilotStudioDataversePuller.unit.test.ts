@@ -1327,6 +1327,15 @@ describe("given an Azure bill that does not fit in one reply", () => {
       "https://management.azure.com%2eevil.example/next",
       // ARM's name, reached without TLS, where the token would go in clear.
       "http://management.azure.com/next",
+      // ARM's own name, but a port ARM does not answer on. The host resolves;
+      // whatever is listening there is not the service that issued the token.
+      "https://management.azure.com:8443/next",
+      // Credentials smuggled in front of a host that does match, which a
+      // request would then send along with the bearer.
+      "https://someone@management.azure.com/next",
+      // A password with no user beside it, which clears the user field and
+      // would slip past a check that only looked there.
+      "https://:a-password@management.azure.com/next",
       // Not a link at all.
       "management.azure.com/next",
     ])("holds the window rather than send the token to %s", async (link) => {
