@@ -93,6 +93,8 @@ function BannerWithFlag({
   };
 
   return (
+    // The banner carries its own page spacing. A wrapper on the page would
+    // hold that space open on every browser that never sees the banner.
     <Link
       href={href}
       onClick={handleClick}
@@ -100,6 +102,8 @@ function BannerWithFlag({
       textDecoration="none"
       display="block"
       width="full"
+      paddingX={6}
+      paddingBottom={2}
       _hover={{ textDecoration: "none" }}
     >
       <HStack

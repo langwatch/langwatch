@@ -18,7 +18,11 @@ import type {
   PeriodMode,
   RelativePresetKey,
 } from "~/components/PeriodSelector";
-import { PeriodSelector } from "~/components/PeriodSelector";
+import {
+  describePeriod,
+  matchPeriodPreset,
+  PeriodSelector,
+} from "~/components/PeriodSelector";
 import { FG_MUTED } from "./design";
 
 /**
@@ -30,16 +34,16 @@ export function periodDays(period: Period): number {
   return differenceInCalendarDays(period.endDate, period.startDate) + 1;
 }
 
-/** The window on the trigger, including one the page widened on its own. */
-export function periodLabel(period: Period): string {
-  const days = periodDays(period);
-  if (days >= 360) return "Last 1 year";
-  if (days >= 175 && days <= 185) return "Last 6 months";
-  return `Last ${days} days`;
-}
+/**
+ * The window on the compact trigger: "30d", or the preset's own key for a
+ * window shorter than a day ("15m"), which a day count cannot name.
+ */
+export function compactPeriodLabel(period: Period, mode: PeriodMode): string {
+  const preset = matchPeriodPreset({ period, mode });
+  if (preset?.minutes !== null && preset?.minutes !== undefined) {
+    return preset.key;
+  }
 
-/** The window on the compact trigger: "30d". */
-export function compactPeriodLabel(period: Period): string {
   const days = periodDays(period);
   return days >= 360 ? "1y" : `${days}d`;
 }
@@ -70,15 +74,19 @@ export function AgentTestingPeriodPicker({
       size={compact ? "xs" : "sm"}
       triggerVariant={compact ? "ghost" : "outline"}
       placement={compact ? "top-start" : "bottom-end"}
-      label={compact ? compactPeriodLabel(period) : undefined}
+      label={compact ? compactPeriodLabel(period, periodMode) : undefined}
       triggerProps={{
         "data-testid": "results-period-picker",
         // The trigger sits among controls that share one height and one type
         // size, so it takes theirs rather than the size scale's.
         ...(compact
           ? {
-              "aria-label": periodLabel(period),
-              title: periodLabel(period),
+              // The compact trigger shows "15m" or "30d", so its accessible
+              // name has to be the selector's own name for the window. A day
+              // count would announce "Last 1 days" for a 15-minute range, or
+              // "Last 2 days" for one that crosses midnight.
+              "aria-label": describePeriod({ period, mode: periodMode }),
+              title: describePeriod({ period, mode: periodMode }),
               height: "auto",
               paddingX: 1.5,
               paddingY: 1,

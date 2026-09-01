@@ -145,58 +145,68 @@ describe("<NewSimulationsCallout />", () => {
   });
 
   describe("given the previous-screens preference is already recorded", () => {
-    /** @scenario "A person who already went back does not see the offer again" */
-    it("renders nothing", () => {
-      localStorage.setItem(PREFERENCE_KEY, "1");
+    describe("when the sidebar renders", () => {
+      /** @scenario "A person who already went back does not see the offer again" */
+      it("renders nothing", () => {
+        localStorage.setItem(PREFERENCE_KEY, "1");
 
-      renderWithProviders(<NewSimulationsCallout target="scenarios" />);
+        renderWithProviders(<NewSimulationsCallout target="scenarios" />);
 
-      expect(
-        screen.queryByText("Welcome to the new simulations screen"),
-      ).toBeNull();
+        expect(
+          screen.queryByText("Welcome to the new simulations screen"),
+        ).toBeNull();
+      });
     });
   });
 
   describe("given three weeks passed since the new screens shipped", () => {
-    /** @scenario "The callout retires three weeks after the new screens shipped" */
-    it("renders nothing past the retirement date", () => {
-      vi.setSystemTime(new Date("2026-09-23T12:00:00Z"));
+    describe("when the sidebar renders", () => {
+      /** @scenario "The callout retires three weeks after the new screens shipped" */
+      it("renders nothing past the retirement date", () => {
+        vi.setSystemTime(new Date("2026-09-23T12:00:00Z"));
 
-      renderWithProviders(<NewSimulationsCallout target="scenarios" />);
+        renderWithProviders(<NewSimulationsCallout target="scenarios" />);
 
-      expect(
-        screen.queryByText("Welcome to the new simulations screen"),
-      ).toBeNull();
+        expect(
+          screen.queryByText("Welcome to the new simulations screen"),
+        ).toBeNull();
+      });
     });
   });
 
-  describe("when the address carries simulations-welcome=1", () => {
-    /** @scenario "The simulations-welcome address parameter brings the callout back" */
-    it("shows past the retirement date", () => {
-      vi.setSystemTime(new Date("2026-09-23T12:00:00Z"));
+  describe("given the address carries simulations-welcome=1", () => {
+    beforeEach(() => {
       routerQuery["simulations-welcome"] = "1";
-
-      renderWithProviders(<NewSimulationsCallout target="scenarios" />);
-
-      expect(
-        screen.getByText("Welcome to the new simulations screen"),
-      ).toBeDefined();
     });
 
-    /** @scenario "The simulations-welcome address parameter brings the callout back" */
-    it("shows past a dismissal and a recorded preference", () => {
-      localStorage.setItem(
-        SNOOZE_KEY,
-        String(Date.now() + 14 * 24 * 60 * 60 * 1000),
-      );
-      localStorage.setItem(PREFERENCE_KEY, "1");
-      routerQuery["simulations-welcome"] = "1";
+    describe("when the sidebar renders past the retirement date", () => {
+      /** @scenario "The simulations-welcome address parameter brings the callout back" */
+      it("shows the callout", () => {
+        vi.setSystemTime(new Date("2026-09-23T12:00:00Z"));
 
-      renderWithProviders(<NewSimulationsCallout target="scenarios" />);
+        renderWithProviders(<NewSimulationsCallout target="scenarios" />);
 
-      expect(
-        screen.getByText("Welcome to the new simulations screen"),
-      ).toBeDefined();
+        expect(
+          screen.getByText("Welcome to the new simulations screen"),
+        ).toBeDefined();
+      });
+    });
+
+    describe("when the sidebar renders after a dismissal and a recorded preference", () => {
+      /** @scenario "The simulations-welcome address parameter brings the callout back" */
+      it("shows the callout", () => {
+        localStorage.setItem(
+          SNOOZE_KEY,
+          String(Date.now() + 14 * 24 * 60 * 60 * 1000),
+        );
+        localStorage.setItem(PREFERENCE_KEY, "1");
+
+        renderWithProviders(<NewSimulationsCallout target="scenarios" />);
+
+        expect(
+          screen.getByText("Welcome to the new simulations screen"),
+        ).toBeDefined();
+      });
     });
   });
 });

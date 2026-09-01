@@ -24,7 +24,8 @@ import { Link } from "../ui/link";
  * project; the key carries a `:v1:` version segment so a future announcement
  * can recycle the card by bumping the version.
  *
- * The card retires on {@link SUNSET} and never shows after it. The
+ * The card retires on {@link SUNSET}: the retirement is read per render, so
+ * a sidebar already on screen keeps the card until it next renders. The
  * `?simulations-welcome=1` address parameter brings it back past the
  * dismissal, the retirement and the recorded preference, so a person who
  * wants the way back to the previous screens can still reach it.

@@ -384,9 +384,7 @@ export default function SimulationsPage() {
             </HStack>
           </PageLayout.Header>
 
-          <Box paddingX={6} paddingBottom={2} width="full">
-            <ReturnToNewSimulationsBanner target="runs" />
-          </Box>
+          <ReturnToNewSimulationsBanner target="runs" />
 
           {/* Second row: sidebar + content box */}
           <HStack flex={1} width="full" gap={0} overflow="hidden" minHeight={0}>

@@ -8,7 +8,13 @@
  * @see specs/suites/test-suites.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -697,6 +703,27 @@ describe("the test suites rail", () => {
     expect(screen.getByLabelText("Start Date")).toBeInTheDocument();
     expect(screen.getByLabelText("End Date")).toBeInTheDocument();
     expect(screen.queryByText(/cold storage/i)).not.toBeInTheDocument();
+  });
+
+  /** @scenario "The period picker opens upward at the foot of the rail" */
+  it("hands a freely typed start date back as the new window", async () => {
+    const user = userEvent.setup();
+    const { props } = renderRail();
+
+    await user.click(screen.getByTestId("results-period-picker"));
+    fireEvent.change(await screen.findByLabelText("Start Date"), {
+      target: { value: "2026-01-15T09:30" },
+    });
+
+    // The free dates are the reason the rail took the shared control, so the
+    // window has to travel, not only render.
+    expect(props.setPeriod).toHaveBeenCalledTimes(1);
+    const [startDate] = vi.mocked(props.setPeriod).mock.calls[0] as [
+      Date,
+      Date,
+    ];
+    expect(startDate.getFullYear()).toBe(2026);
+    expect(startDate.getMonth()).toBe(0);
   });
 
   /** @scenario "Changing the period reloads the last results and the runs" */
