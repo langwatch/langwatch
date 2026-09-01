@@ -18,6 +18,11 @@
  * because the claim is about where the drawers mount these fields, and a
  * harness that mounted them itself would keep passing after the drawers
  * stopped.
+ *
+ * The last describes are the other side of the same claim: what a closed
+ * group owes the outside. An admin who never opens it never reads what the
+ * destination picker says inside, so the create drawer states the outcome of
+ * leaving it closed where they cannot miss it.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen, waitFor, within } from "@testing-library/react";
@@ -353,6 +358,53 @@ describe("given the create drawer for a push source, which offers neither settin
       renderComposer("otel_generic");
 
       expect(screen.queryByText("Advanced")).toBeNull();
+    });
+  });
+});
+
+describe("given the create drawer for a source that routes conversations", () => {
+  describe("when it opens with Advanced still closed", () => {
+    /** @scenario "The drawer says where conversations will go without opening Advanced" */
+    it("says in plain sight that the conversations will land nowhere yet", () => {
+      renderComposer();
+
+      // The picker itself is still folded away — which is the whole reason
+      // the line has to exist outside the group.
+      expect(screen.queryByTestId("ingestion-trace-destination")).toBeNull();
+      const hint = screen.getByTestId("composer-destination-hint");
+      expect(hint.textContent).toMatch(/will not land anywhere/i);
+      expect(hint.textContent).toMatch(/audit events/i);
+    });
+  });
+
+  describe("when a destination has been picked", () => {
+    /** @scenario "The drawer says where conversations will go without opening Advanced" */
+    it("names the project the conversations will land in", async () => {
+      const user = userEvent.setup();
+      renderComposer();
+
+      await openAdvanced({ user, awaiting: "destination" });
+      await user.click(within(destinationPicker()).getByRole("combobox"));
+      await user.click(
+        within(screen.getByRole("listbox")).getByText("Analytics · Data"),
+      );
+
+      const hint = await screen.findByTestId("composer-destination-hint");
+      expect(hint.textContent).toContain("Analytics · Data");
+      expect(hint.textContent).not.toMatch(/will not land anywhere/i);
+    });
+  });
+});
+
+describe("given the create drawer for a source that pulls counts", () => {
+  describe("when it opens", () => {
+    /** @scenario "The drawer says where conversations will go without opening Advanced" */
+    it("offers no destination line, because it routes no conversations", () => {
+      // A line about where conversations land, on a source that produces
+      // none, describes a routing decision the adapter never makes.
+      renderComposer("anthropic_admin");
+
+      expect(screen.queryByTestId("composer-destination-hint")).toBeNull();
     });
   });
 });

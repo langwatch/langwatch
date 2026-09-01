@@ -370,6 +370,61 @@ describe("GovernanceCostService.summary", () => {
     });
   });
 
+  describe("given the licence read fails while the cost lanes answer", () => {
+    describe("when requesting the summary", () => {
+      /** @scenario "A seat read that fails degrades only the seat lane" */
+      it("says the seat read failed and still returns the cost lanes", async () => {
+        const service = createService({
+          prisma: prismaWithGovProject("gov-1"),
+          costRollup: rollupReturning([
+            {
+              day: "2026-08-01",
+              costSource: "pulled",
+              amountNanoUsd: 12 * NANO,
+              cellsWithoutAmount: 0,
+            },
+          ]),
+          ocsfEvents: {
+            findLatestSeatReports: vi
+              .fn()
+              .mockRejectedValue(new Error("seat read is down")),
+          } as unknown as GovernanceOcsfEventsClickHouseRepository,
+        });
+
+        const result = await service.summary({
+          organizationId: "org-1",
+          windowDays: 30,
+          now: new Date("2026-08-01T12:00:00.000Z"),
+        });
+
+        // Not `awaiting_data`: that would tell a customer their licences have
+        // not been read when what happened is that we could not read them.
+        expect(result.seats).toEqual({ status: "read_failed" });
+        expect(result.unavailableReason).toBeNull();
+        expect(result.billed.amountUsd).toBe(12);
+      });
+
+      /** @scenario "A seat read that fails degrades only the seat lane" */
+      it("still fails the whole summary when the cost rollup is what failed", async () => {
+        // Only the seat lane degrades. A money lane that swallowed its own
+        // failure would render an absence as if it were a measurement.
+        const service = createService({
+          prisma: prismaWithGovProject("gov-1"),
+          costRollup: {
+            sumDaysByLane: vi
+              .fn()
+              .mockRejectedValue(new Error("cost rollup is down")),
+          } as unknown as GovernanceCostRollupClickHouseRepository,
+          ocsfEvents: ocsfReturning([seatPool()]),
+        });
+
+        await expect(
+          service.summary({ organizationId: "org-1", windowDays: 30 }),
+        ).rejects.toThrow("cost rollup is down");
+      });
+    });
+  });
+
   describe("given a deployment with no event store to read licences from", () => {
     describe("when requesting the summary", () => {
       it("says the seat lane is awaiting data rather than reporting none", async () => {

@@ -31,8 +31,11 @@ import type {
   GovernanceSeatReportRow,
 } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { resolveGovProjectId } from "@ee/governance/services/govProject";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { GOVERNANCE_COST_SOURCE } from "../projections/governanceCostRollup.constants";
+
+const logger = createLogger("langwatch:governance:cost");
 
 /** Nano-USD per USD. The rollup stores integer nano units, never floats. */
 const NANO_PER_USD = 1_000_000_000;
@@ -81,16 +84,17 @@ export interface GovernanceSeatPoolDto {
 }
 
 /**
- * The seat lane: either nothing countable has been read, or the pools that
- * were.
+ * The seat lane: nothing countable has been read, the read itself failed, or
+ * the pools that were read.
  *
- * A union rather than a list that may be empty, because the two states read
- * differently to a customer. "No licence list has been read for you" and "your
- * licence list holds no seats" are different sentences, and only one of them
- * is true at a time.
+ * A union rather than a list that may be empty, because the three states read
+ * differently to a customer. "No licence list has been read for you", "we
+ * tried to read it and could not", and "your licence list holds these seats"
+ * are three different sentences, and only one of them is true at a time.
  */
 export type GovernanceSeatLaneDto =
   | { status: "awaiting_data" }
+  | { status: "read_failed" }
   | { status: "reported"; pools: GovernanceSeatPoolDto[] };
 
 /** One day of the per-lane series. Either lane may hold no figure that day. */
@@ -196,7 +200,7 @@ export class GovernanceCostService {
     windowDays: number;
     now?: Date;
   }): Promise<GovernanceCostSummaryDto> {
-    const { costRollup, ocsfEvents, prisma } = this.deps;
+    const { costRollup, prisma } = this.deps;
     if (!costRollup) {
       return unavailable({ reason: "no_cost_store", windowDays });
     }
@@ -213,23 +217,51 @@ export class GovernanceCostService {
       new Date(now.getTime() - (windowDays - 1) * 86_400_000),
     );
 
-    // The seat read is NOT wrapped in a catch. A failure there fails the whole
-    // summary, and the screen says so — degrading it to "awaiting data" would
-    // tell a customer their licences have not been read when what actually
-    // happened is that we could not read them.
-    const [rows, seatReports] = await Promise.all([
+    // The seat read carries its own failure; the cost read does not. A broken
+    // licence read costs the screen one lane, so it degrades to `read_failed`
+    // and the money lanes still render — never to "awaiting data", which
+    // would tell a customer their licences have not been read when what
+    // actually happened is that we could not read them. A broken COST read
+    // still fails the whole summary: this screen is about money, and a money
+    // lane that swallowed its own failure would render an absence as a
+    // measurement.
+    const [rows, seats] = await Promise.all([
       costRollup.sumDaysByLane({ tenantId, fromDay, toDay }),
-      ocsfEvents?.findLatestSeatReports({ tenantId }) ?? [],
+      this.readSeats({ tenantId }),
     ]);
 
     return {
       unavailableReason: null,
       billed: totalFor(rows, GOVERNANCE_COST_SOURCE.PULLED),
       gateway: totalFor(rows, GOVERNANCE_COST_SOURCE.GATEWAY),
-      seats: seatsFrom(seatReports),
+      seats,
       series: seriesFrom(rows),
       windowDays,
     };
+  }
+
+  /**
+   * The seat lane, or the fact that it could not be read.
+   *
+   * Logged at error, because a lane that says "could not be read" to a
+   * customer forever, and to nobody else ever, is a lane nobody is fixing.
+   */
+  private async readSeats({
+    tenantId,
+  }: {
+    tenantId: string;
+  }): Promise<GovernanceSeatLaneDto> {
+    const { ocsfEvents } = this.deps;
+    if (!ocsfEvents) return { status: "awaiting_data" };
+    try {
+      return seatsFrom(await ocsfEvents.findLatestSeatReports({ tenantId }));
+    } catch (error) {
+      logger.error(
+        { error, tenantId },
+        "Governance seat read failed; the seat lane reports the failure while the cost lanes render",
+      );
+      return { status: "read_failed" };
+    }
   }
 }
 

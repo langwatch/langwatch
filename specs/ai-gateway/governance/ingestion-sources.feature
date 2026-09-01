@@ -216,6 +216,22 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
         not be readable in the explorer until a destination is set
 
     @integration
+    Scenario: The drawer says where conversations will go without opening Advanced
+      An admin who never opens the group never reads what the picker
+      says inside it, so the drawer states the outcome in plain sight
+      rather than leaving the silent default silent.
+
+      Given the admin is composing a "Databricks AI/BI Genie" source and
+        has not expanded "Advanced"
+      Then the drawer says that its conversations will not land anywhere
+        until a destination is picked, and that its audit events are
+        recorded either way
+      When they expand "Advanced" and pick a destination
+      Then that same line names the project the conversations will land in
+      And a source type that pulls counts rather than conversations shows
+        no such line, because it routes none
+
+    @integration
     Scenario: The edit drawer changes a destination and says history stays
       Given a "Databricks AI/BI Genie" source already lands in "Analytics"
       When the admin opens the source for editing and expands "Advanced"

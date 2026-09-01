@@ -8,7 +8,10 @@ Feature: One cost screen, three honest lanes
   reports, so a price on the seat lane would put the same spend on the
   screen twice; the dated price list stays out. Until a licence list has
   been read, the seat lane renders as an honest empty state — labeled,
-  visibly awaiting data, never a fabricated zero. LangWatch's own
+  visibly awaiting data, never a fabricated zero. A licence read that
+  fails says that instead: "not read yet" and "could not be read" are
+  different sentences, and only the seat lane degrades on one, while the
+  money lanes carry on. LangWatch's own
   subscription seats are a different product concept and must never be
   shown in this lane. The screen is visible only to organization members
   with the governance cost permission, and stays behind release flags
@@ -89,6 +92,36 @@ Feature: One cost screen, three honest lanes
     # licences for you" and "your licences hold no seats" are different
     # sentences, and a screen that showed a count of zero pools would be
     # making a claim about a list nobody could count.
+
+  @unit
+  Scenario: A seat read that fails degrades only the seat lane
+    # Three different sentences, and the lane could only say two of them:
+    # "we have read no licences for you", "your licences hold no seats",
+    # and "we tried to read them and could not". The third used to fail
+    # the whole summary, so a licence read that broke took the billed and
+    # gateway lanes down with it — honest, and out of proportion to what
+    # actually broke.
+    Given the licence read fails while the cost lanes answer normally
+    When the cost summary is read
+    Then the seat lane says the read failed
+    And the billed and gateway lanes still carry their own figures
+    And the failure is logged, because a lane that quietly says "could
+      not be read" forever is a lane nobody is fixing
+    # Only the seat read degrades. A cost rollup that fails still fails
+    # the whole summary — the screen is about money, and a money lane
+    # that swallowed its own failure is the defect this feature exists
+    # to prevent.
+
+  @integration
+  Scenario: A failed seat read reads differently from one not yet taken
+    Given the cost read reports that seat data could not be read
+    When a permitted viewer opens the cost screen
+    Then the seat lane says seat data could not be read
+    And it does not say seat data is not yet available
+    And the seat lane renders no digit characters
+    And the billed and gateway lanes render their amounts as usual
+    # Same digit-free rule as the waiting state, for the same reason: any
+    # number in this lane is a number about money nobody measured.
 
   @integration
   Scenario: Viewing requires the organization-scoped governance cost permission

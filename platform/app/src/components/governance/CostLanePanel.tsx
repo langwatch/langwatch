@@ -73,10 +73,12 @@ export function CostLanePanel({
  * say it. What the seats cost is already on the invoice the billed lane shows,
  * so a currency figure here would put the same spend on the screen twice.
  *
- * With nothing read yet the lane says so rather than showing a zero, and that
- * copy must stay free of digits — no counts, no dates, no wave numbers — or
- * the digit-free assertion on the waiting state breaks, and that break is the
- * point.
+ * With nothing read yet the lane says so rather than showing a zero, and a
+ * read that failed says THAT instead — the two are different sentences, and a
+ * lane that offered only the first would send an admin looking for a licence
+ * collection that already ran. Both copies must stay free of digits — no
+ * counts, no dates, no wave numbers — or the digit-free assertion on the
+ * non-reported states breaks, and that break is the point.
  *
  * LangWatch's own subscription seats are a different product concept and must
  * never be shown here.
@@ -88,14 +90,14 @@ export function SeatLanePanel({
   seats: GovernanceSeatLaneDto;
   testId: string;
 }) {
-  const awaiting = seats.status === "awaiting_data";
+  const reported = seats.status === "reported";
   return (
     <Box
       data-testid={testId}
       borderWidth="1px"
       borderColor="border.muted"
       borderRadius="md"
-      borderStyle={awaiting ? "dashed" : "solid"}
+      borderStyle={reported ? "solid" : "dashed"}
       padding={5}
       flex="1"
       minWidth="200px"
@@ -107,18 +109,49 @@ export function SeatLanePanel({
         {seats.status === "reported" ? (
           <SeatPools pools={seats.pools} />
         ) : (
-          <>
-            <Text fontSize="sm" color="fg.muted">
-              Seat data is not yet available.
-            </Text>
-            <Text fontSize="sm" color="fg.muted">
-              How many seats are bought, and how many are assigned to someone,
-              will appear here once seat licences are collected.
-            </Text>
-          </>
+          <SeatLaneWithoutCounts status={seats.status} />
         )}
       </VStack>
     </Box>
+  );
+}
+
+/**
+ * The two ways the lane can hold no counts, each in its own words.
+ *
+ * Waiting and failing look identical on a screen that only knows how to say
+ * one of them, and they ask the reader for opposite things: waiting asks for
+ * patience, a failed read asks someone to look at it. Neither copy may carry
+ * a digit — see the panel above.
+ */
+function SeatLaneWithoutCounts({
+  status,
+}: {
+  status: "awaiting_data" | "read_failed";
+}) {
+  if (status === "read_failed") {
+    return (
+      <>
+        <Text fontSize="sm" color="fg.muted">
+          Seat data could not be read.
+        </Text>
+        <Text fontSize="sm" color="fg.muted">
+          The read of your seat licences failed, so the counts are missing
+          rather than empty. They appear here as soon as a read succeeds.
+        </Text>
+      </>
+    );
+  }
+  return (
+    <>
+      <Text fontSize="sm" color="fg.muted">
+        Seat data is not yet available.
+      </Text>
+      <Text fontSize="sm" color="fg.muted">
+        How many seats are bought, and how many are assigned to someone, will
+        appear here once seat licences are collected.
+      </Text>
+    </>
   );
 }
 
