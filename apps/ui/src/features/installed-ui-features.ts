@@ -16,11 +16,12 @@
 import { BrowserUiFeedback } from "../behavior/ui-feedback";
 import { useBrowserUiSession } from "../behavior/ui-session";
 import type { UiFeatureInstall } from "../ui/sections/ui-application";
+import { gatewayApiBinding, gatewayPageLoaders } from "./gateway";
 import { governanceApiBinding, governancePageLoaders } from "./governance";
 
 export const installedUiFeatures: UiFeatureInstall = {
-  loaders: { ...governancePageLoaders },
-  apis: [governanceApiBinding],
+  loaders: { ...gatewayPageLoaders, ...governancePageLoaders },
+  apis: [gatewayApiBinding, governanceApiBinding],
   capabilities: { feedback: BrowserUiFeedback.create() },
   session: useBrowserUiSession,
 };

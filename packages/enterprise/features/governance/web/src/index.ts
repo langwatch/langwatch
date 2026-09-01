@@ -9,7 +9,6 @@ export * from "./features/ottl/model/governance-ottl-validation-client";
 export * from "./features/ottl/ui/elements/ottl-editor";
 export * from "./features/overview/ui/elements/quarantine-fill-alert";
 export * from "./features/overview/ui/elements/spend-by-team-bar";
-export * from "./features/routing-policies/ui/elements/routing-policy-row-actions";
 export * from "./features/source-events/behavior/use-source-events-pager";
 export * from "./features/source-events/model/governance-events-pager";
 export * from "./features/source-events/ui/sections/source-events-table";

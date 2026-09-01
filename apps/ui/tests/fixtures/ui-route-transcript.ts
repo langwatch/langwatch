@@ -88,7 +88,7 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "  route /me/sessions -> pages/me/sessions",
   "  route /me/budget/request -> pages/me/budget/request",
   "  route /cli/auth -> pages/cli/auth",
-  "  route /gateway -> pages/gateway/index",
+  "  redirect /gateway -> /gateway/virtual-keys (from /gateway)",
   "  route /gateway/virtual-keys -> pages/gateway/virtual-keys",
   "  route /gateway/virtual-keys/:id -> pages/gateway/virtual-keys/[id]",
   "  route /gateway/budgets -> pages/gateway/budgets",

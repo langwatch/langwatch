@@ -13,6 +13,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./screens/gateway": {
+      "types": "./src/screens/gateway/index.ts",
+      "default": "./src/screens/gateway/index.ts"
     }
   },
   "scripts": {
@@ -21,17 +25,35 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/authz-web": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-billing-web": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
-    "lucide-react": "^1.22.0"
+    "date-fns": "^4.4.0",
+    "lucide-react": "^1.22.0",
+    "papaparse": "^5.5.3",
+    "react-hook-form": "^7.66.0",
+    "recharts": "^3.9.1",
+    "shiki": "^3.15.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@chakra-ui/react": "^3.36.0",
     "@emotion/react": "^11.14.0",
     "@langwatch/trace-server": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/papaparse": "^5.3.16",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "typescript": "^7.0.2",
@@ -39,6 +61,7 @@
   },
   "peerDependencies": {
     "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   }

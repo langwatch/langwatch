@@ -439,8 +439,14 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
       // The static /gateway segment always wins over the /:project catch-all,
       // and project slug minting refuses reserved top-level names.
       {
+        // The bare address is a redirect and never a page. `platform/app`
+        // said the same thing with a component whose whole body was a
+        // `router.replace`, which meant a chunk load, a mount and a render
+        // before the browser moved; the table can say it without any of that.
+        // Spec: specs/navigation/gateway-url-move.feature
+        // (The bare gateway address lands on the virtual keys list).
         path: "/gateway",
-        page: "pages/gateway/index",
+        redirect: { from: "/gateway", to: "/gateway/virtual-keys" },
       },
       {
         path: "/gateway/virtual-keys",

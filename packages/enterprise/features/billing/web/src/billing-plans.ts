@@ -29,8 +29,20 @@ export {
 };
 export type { BillingInterval, CurrencyType as Currency };
 
+/**
+ * Which Stripe catalogue this build is priced against.
+ *
+ * Read through a structural type rather than the ambient `ImportMeta` this
+ * package used to declare beside its source: the module is compiled by every
+ * tsconfig that reaches it, an ambient declaration reaches only the program
+ * that names the file it lives in, and a consumer that did not name it failed
+ * on this line. `import.meta.env` is a bundler construct and is absent outside
+ * one, which the optional chain answers for.
+ */
+const buildMode = (import.meta as unknown as { env?: { MODE?: string } }).env?.MODE;
+
 const pricingService = BillingPricingService.create(
-  import.meta.env.MODE === "production" ? "live" : "test",
+  buildMode === "production" ? "live" : "test",
 );
 
 export const getGrowthSeatPriceCents = () => pricingService.getGrowthSeatPriceCents();

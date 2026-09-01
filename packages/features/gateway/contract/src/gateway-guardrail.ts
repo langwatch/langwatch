@@ -4,6 +4,18 @@ import { z } from "zod";
 export const gatewayGuardrailDirectionSchema = z.enum(["PRE", "POST", "STREAM_CHUNK"]);
 export const gatewayGuardrailFailureModeSchema = z.enum(["FAIL_OPEN", "FAIL_CLOSED"]);
 
+/**
+ * When a guardrail runs, and what happens when it cannot answer.
+ *
+ * Named types over the two enums, because a browser rendering the guardrails
+ * table needs a key type for its label maps and had been reaching into the
+ * generated Prisma client for one. Prisma is a server implementation detail
+ * that a browser package may not name; the contract is where the wire spelling
+ * of an enum belongs.
+ */
+export type GatewayGuardrailDirection = z.infer<typeof gatewayGuardrailDirectionSchema>;
+export type GatewayGuardrailFailureMode = z.infer<typeof gatewayGuardrailFailureModeSchema>;
+
 export const gatewayGuardrailResourceSchema = z.object({
   id: z.string(),
   projectId: z.string(),

@@ -3,6 +3,7 @@
   "governedWebPackages": [
     "@langwatch/agent-web",
     "@langwatch/enterprise-governance-web",
+    "@langwatch/gateway-web",
     "@langwatch/prompt-web"
   ],
   "features": [
@@ -10,15 +11,31 @@
       "id": "agent-management",
       "root": "agent",
       "uses": {
-        "screens": ["@langwatch/agent-web/screens/agent-management"],
-        "surfaces": ["@langwatch/agent-web/surfaces/browser-port"]
+        "screens": [
+          "@langwatch/agent-web/screens/agent-management"
+        ],
+        "surfaces": [
+          "@langwatch/agent-web/surfaces/browser-port"
+        ]
+      }
+    },
+    {
+      "id": "gateway",
+      "root": "gateway",
+      "uses": {
+        "screens": [
+          "@langwatch/gateway-web/screens/gateway"
+        ],
+        "surfaces": []
       }
     },
     {
       "id": "governance",
       "root": "governance",
       "uses": {
-        "screens": ["@langwatch/enterprise-governance-web/screens/governance"],
+        "screens": [
+          "@langwatch/enterprise-governance-web/screens/governance"
+        ],
         "surfaces": []
       }
     }

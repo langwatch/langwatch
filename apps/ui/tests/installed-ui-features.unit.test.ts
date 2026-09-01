@@ -11,6 +11,19 @@ import { describe, expect, it } from "vitest";
 import { UiFeedbackPort, UiSessionPort } from "../src/behavior/ui-capabilities";
 import { installedUiFeatures, mergeUiFeatureInstalls } from "../src/features/installed-ui-features";
 
+const GATEWAY_PAGE_KEYS = [
+  "pages/gateway/virtual-keys",
+  "pages/gateway/virtual-keys/[id]",
+  "pages/gateway/budgets",
+  "pages/gateway/budgets/[id]",
+  "pages/gateway/routing-policies",
+  "pages/gateway/usage",
+  "pages/gateway/cache-rules",
+  "pages/gateway/guardrails",
+  "pages/gateway/billing-events",
+  "pages/gateway/webhooks",
+];
+
 const GOVERNANCE_PAGE_KEYS = [
   "pages/governance/index",
   "pages/governance/inventory.enterprise",
@@ -50,14 +63,15 @@ class RecordingSession extends UiSessionPort {
 
 describe("given what apps/ui serves itself", () => {
   describe("when the standing declaration is read", () => {
-    it("registers a loader for every governance page key the route table names", () => {
+    it("registers a loader for every page key the families it serves name", () => {
       expect(Object.keys(installedUiFeatures.loaders ?? {}).sort()).toEqual(
-        [...GOVERNANCE_PAGE_KEYS].sort(),
+        [...GATEWAY_PAGE_KEYS, ...GOVERNANCE_PAGE_KEYS].sort(),
       );
     });
 
-    it("mounts the governance feature's own transport Provider", () => {
+    it("mounts each feature's own transport Provider", () => {
       expect(installedUiFeatures.apis?.map((api) => api.name)).toEqual([
+        "@langwatch/gateway-web",
         "@langwatch/enterprise-governance-web",
       ]);
     });
@@ -102,8 +116,10 @@ describe("given what apps/ui serves itself", () => {
     it("keeps this package's install whole when the host brings nothing", () => {
       const merged = mergeUiFeatureInstalls(installedUiFeatures);
 
-      expect(Object.keys(merged.loaders ?? {}).sort()).toEqual([...GOVERNANCE_PAGE_KEYS].sort());
-      expect(merged.apis).toHaveLength(1);
+      expect(Object.keys(merged.loaders ?? {}).sort()).toEqual(
+        [...GATEWAY_PAGE_KEYS, ...GOVERNANCE_PAGE_KEYS].sort(),
+      );
+      expect(merged.apis).toHaveLength(2);
       expect(merged.session).toBe(installedUiFeatures.session);
     });
   });

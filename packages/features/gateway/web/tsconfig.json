@@ -13,7 +13,17 @@
     "noEmit": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "@langwatch/authz-contract": ["../../authz/contract/src/index.ts"],
+      "@langwatch/gateway-contract": ["../contract/src/index.ts"],
+      "@langwatch/model-provider-contract": ["../../model-provider/contract/src/index.ts"],
+      "@langwatch/authz-web/surfaces/scope-picker": [
+        "../../authz/web/src/surfaces/scope-picker/index.ts"
+      ],
+      "@langwatch/enterprise-billing-web": ["../../../enterprise/features/billing/web/src/index.ts"],
+      "@langwatch/platform-api-client": ["../../../platform-api-client/src/index.ts"]
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

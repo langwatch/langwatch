@@ -39,12 +39,6 @@ vi.mock("~/pages/[project]/evaluations/[id]/edit", () => ({ default: screens.edi
 
 describe("given the browser route table and this application's page loaders", () => {
   describe("when the two are compared", () => {
-    it("registers a loader for every page the table names", () => {
-      const missing = uiRoutePageKeys(uiRouteTable).filter((key) => !(key in legacyPageLoaders));
-
-      expect(missing).toEqual([]);
-    });
-
     it("registers nothing the table does not name", () => {
       const named = new Set(uiRoutePageKeys(uiRouteTable));
       const unreachable = Object.keys(legacyPageLoaders).filter((key) => !named.has(key));

@@ -63,6 +63,20 @@ copies. What it added on top of the four gates, all of it reusable:
   feature. That is what lets eight thousand lines of screen move with
   their `api.x.y.useQuery` call sites unchanged.
 
+Gateway moved second and changed none of it, which is the point: the second
+family cost a host port, a procedure map, a routes section and a `testing.tsx`,
+and nothing in `apps/ui`'s global layer. Two shapes it added that a third family
+should copy rather than reinvent:
+
+- The package owns its own `vitest.setup.ts` — jest-dom plus the two browser
+  APIs jsdom lacks — so a suite of thirty-five files that mounts Chakra overlays
+  states them once. Governance patched them inside its render helper, which
+  only reaches the tests that use it.
+- A screen that used to open an application drawer keeps its OWN query key and
+  renders the editor inline (`?policy=<id>`), rather than carrying a copy of the
+  drawer registry. The registry is composition; a screen only ever needed the
+  address.
+
 Known costs, all reported rather than suppressed: the governed screen
 closure rejects `@langwatch/platform-api-client` (one import, in
 `behavior/governance-api.ts`, which is what buys the content-faithful
@@ -92,20 +106,69 @@ serves the server side.
   ADR-004 restructure. Route rows: `/governance/*` + 8 redirect rows already
   in the apps/ui table.
 
-### gateway — 11 keys, ~38 prod files + 27 tests, ~5.7k page LOC
+### gateway — MOVED. 11 keys (10 screens + one redirect row), 38 prod files + 27 tests
 
-- Exclusive: all of `components/gateway/` except ConfirmDialog; all of
-  `components/webhooks/`; `components/settings/governance/routingPolicies/`
-  (misfiled — gateway owns it; baseline lines file it under governance);
-  `hooks/useRollingWindow`.
-- Hard blockers: `guardrails.tsx` imports the generated prisma client
-  (banned in apps/ui — needs contract types first); `routing-policies.tsx`
-  opens the `routingPolicy` drawer via platform's drawerRegistry (platform
-  copy undeletable — family carries a package copy).
-- `/gateway` index page is a pure client-side redirect — becomes a route-table
-  redirect row, not a screen.
-- Destination `@langwatch/gateway-web` exists, flat, needs restructure.
-  `VirtualKeyUsageSnippet` drags shiki + openai deps.
+Moved second, copying the governance shape file for file: one host port
+(`model/gateway-host.ts`), one hand-written procedure map
+(`behavior/gateway-api.ts`), the same `withUiPageGuard` in front of the same
+loader registry, and the same `testing.tsx` harness underneath the suites.
+
+What actually happened, against what was surveyed:
+
+- The exclusive closure held. `components/gateway/*` except ConfirmDialog (8
+  non-gateway platform files import it, so it stays and the family takes the
+  Design System's), all of `components/webhooks/`,
+  `components/settings/governance/routingPolicies/` and `hooks/useRollingWindow`
+  all moved. The 14 baseline lines they held — nine filed under `governance`,
+  five under `webhook` — are gone; `legacy-feature-fragment` drops 429 → 387.
+- `/gateway` is a redirect row in the route table, not a screen. The loader
+  registry serves ten keys; the eleventh was a component whose whole body was a
+  `router.replace`.
+- The prisma blocker resolved in the contract:
+  `@langwatch/gateway-contract` now exports `GatewayGuardrailDirection` and
+  `GatewayGuardrailFailureMode` off the schemas it already had, and the
+  guardrails screen names those instead of the generated client.
+- The drawer-registry blocker resolved by NOT carrying a package copy of the
+  registry. `RoutingPolicyDrawer` takes an `onClose` prop, the screen keeps the
+  policy in its own query string (`?policy=<id>`) and renders the editor inline;
+  platform's registered copy is deleted, its registry entry with it. The spec
+  asks that the address carry the policy, which it still does.
+- `VirtualKeyUsageSnippet` drags shiki. It does NOT drag openai: the survey's
+  `openai` import was the word inside the Python and TypeScript snippets the
+  component prints.
+- `RoutingPolicyRowActions` moved OUT of `@langwatch/enterprise-governance-web`
+  and into gateway-web with the rest of routing policies — its only consumer.
+
+Known costs, all reported rather than suppressed:
+
+- Three manifest-level findings from one import. `gateway-webhooks.screen`
+  renders `ContactSalesBlock` from `@langwatch/enterprise-billing-web`, so a
+  core package now names an enterprise one: `enterprise-direction` +
+  `cross-feature` + `ui-screen-closure`. The alternative was copying
+  `ENTERPRISE_PLAN_FEATURES` — the commercial plan catalogue — into a core
+  package, where it would drift. This is the enterprise UI composition the gate
+  section already names as missing.
+- 16 `ui-screen-closure` findings: 14 for `@langwatch/authz-web/surfaces/scope-picker`
+  (the same finding governance carries), one for `@langwatch/platform-api-client`
+  in the procedure map, one for billing-web above.
+- One `ui-web-public-entry` for the package's root `.` export, which six
+  `platform/app` files under `components/me` and `pages/me` still import for
+  `formatBudgetUsd`; deletes-only forbids repointing them.
+- ONE TEST DELETED RATHER THAN MOVED, and it is the only coverage this move
+  loses: `server/gateway/__tests__/eligibleModelProviders.parity.integration.test.ts`
+  drove the browser's `resolveEligible` and the server's
+  `scopeReachableModelProvidersForVk` off the same Postgres rows. The browser
+  half is now in a package that may not import Prisma, and the server half is
+  still `platform/app`, which may not gain a file. Four of its six scenarios are
+  bound elsewhere; two are now unbound — "The drawer and the gateway agree on
+  which providers are routable" and "A scope-reachable provider can be allowed
+  on a key even when the routing policy omits it". The parity test returns when
+  `scopeResolver` moves into `@langwatch/gateway-server`, which may import
+  `@langwatch/gateway-web`.
+- `runtime/ui/__tests__/legacy-page-loaders.unit.test.ts` was already red from
+  the governance move (11 keys the platform registry no longer serves); this
+  move takes it to 21. Teaching it that `apps/ui` serves some keys itself is an
+  insertion in a `platform/app` file.
 
 ### me — 5 keys, ~44 prod files + 13 tests (widen by 2 keys recommended)
 
@@ -154,14 +217,14 @@ serves the server side.
 
 ## Cross-family collisions (settle before dispatching pairs)
 
-| Component                                       | Families           | Resolution                                                                                                               |
-| ----------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| `gateway/ConfirmDialog`                         | gateway+governance | design-system `./confirm-dialog` (dispatched)                                                                            |
-| `me/InstallCliCard`                             | me+governance      | each takes own copy (governance's is `ui/elements/install-cli-card`)                                                     |
-| `modelProviders/iconsMap`                       | me+gateway         | copy or model-provider-web promotion                                                                                     |
-| `ui/{ListTable,Pagination}`                     | me+governance      | design-system (dispatched)                                                                                               |
-| `settings/{ScopeChipPicker,ProviderScopeChips}` | gateway+governance | `@langwatch/authz-web/surfaces/scope-picker` (landed with governance; one surface, because the picker renders the chips) |
-| traces-v2 deep imports                          | me+automations     | trace-web surface or placeholder — undecided                                                                             |
+| Component                                       | Families           | Resolution                                                                                                           |
+| ----------------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `gateway/ConfirmDialog`                         | gateway+governance | design-system `./confirm-dialog` (LANDED; the platform copy stays for its eight non-gateway consumers)               |
+| `me/InstallCliCard`                             | me+governance      | each takes own copy (governance's is `ui/elements/install-cli-card`)                                                 |
+| `modelProviders/iconsMap`                       | me+gateway         | gateway took the MAP only, into `ui/elements/model-provider-icons`: four marks from design-system, ten drawn locally |
+| `ui/{ListTable,Pagination}`                     | me+governance      | design-system (dispatched)                                                                                           |
+| `settings/{ScopeChipPicker,ProviderScopeChips}` | gateway+governance | `@langwatch/authz-web/surfaces/scope-picker` (landed with governance; gateway consumed it unchanged, 14 findings)    |
+| traces-v2 deep imports                          | me+automations     | trace-web surface or placeholder — undecided                                                                         |
 
 ## Single-owner files (serialize)
 
@@ -170,6 +233,6 @@ serves the server side.
 - `packages/architecture-lint/src/frontend-ui-boundaries.ts` — only if a
   new source root is ever added; prefer not.
 - `apps/ui/src/features/catalogue.json`, `legacy-page-loaders.ts` (+ its
-  unit test), `legacy-feature-fragment-baseline.json` (gateway owns lines
-  filed under governance for routingPolicies), `pnpm-lock.yaml` —
+  unit test), `legacy-feature-fragment-baseline.json` (gateway owned the lines
+  filed under governance for routingPolicies and took them), `pnpm-lock.yaml` —
   coordinator split-stages; one family commit at a time.
