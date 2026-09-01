@@ -7,7 +7,7 @@ import { LLM_PARAMETER_MAP } from "@langwatch/prompt-contract";
 import {
   formSchema,
   type PromptConfigFormValues,
-} from "@langwatch/prompt-web/forms";
+} from "@langwatch/prompt-web/surfaces/prompt-form";
 import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
 import type { ChatMessage } from "@langwatch/trace-contract";
 import { api, type RouterOutputs } from "~/utils/api";

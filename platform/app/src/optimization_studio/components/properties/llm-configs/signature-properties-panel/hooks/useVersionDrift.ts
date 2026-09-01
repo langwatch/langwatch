@@ -2,7 +2,7 @@ import type { Node } from "@xyflow/react";
 import { useFormContext } from "react-hook-form";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { LlmPromptConfigComponent } from "@langwatch/workflow-contract";
-import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
 import { api } from "~/utils/api";
 
 export function useVersionDrift(node: Node<LlmPromptConfigComponent>) {

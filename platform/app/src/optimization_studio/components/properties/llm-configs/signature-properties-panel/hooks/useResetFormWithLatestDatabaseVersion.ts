@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { useCallback } from "react";
 import { useFormContext } from "react-hook-form";
 import { toaster } from "~/components/ui/toaster";
-import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
 import { usePrompts } from "~/prompts/hooks/usePrompts";
 import { versionedPromptToPromptConfigFormValues } from "~/prompts/utils/llmPromptConfigUtils";
 

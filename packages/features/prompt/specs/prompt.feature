@@ -37,3 +37,10 @@ Feature: Prompt service
     When a new version is written for an author the database does not hold
     Then the write is rejected
     And the prompt still reads back at the version and text it already had
+
+  @unit
+  Scenario: Prompt Studio persists its open tabs through the storage it is handed
+    Given the application hands Prompt Studio a key-value store of its own
+    When a person opens a prompt tab, edits it and closes it
+    Then every read and write goes to the store the application handed it
+    And Prompt Studio touches no browser storage of its own

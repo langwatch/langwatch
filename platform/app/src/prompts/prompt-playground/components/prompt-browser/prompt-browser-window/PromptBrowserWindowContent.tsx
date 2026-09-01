@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type DeepPartial, FormProvider } from "react-hook-form";
 import { usePromptConfigForm } from "~/prompts/hooks";
 import { useDraggableTabsBrowserStore } from "~/prompts/prompt-playground/prompt-playground-store/DraggableTabsBrowserStore";
-import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
 import { PromptBrowserHeader } from "./PromptBrowserHeader";
 import { PromptMessagesEditor } from "./PromptMessagesEditor";
 import { PromptTabbedSection } from "./PromptTabbedSection";

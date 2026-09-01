@@ -3,6 +3,11 @@ export { TabIdProvider, useTabId } from "./prompt-tab-context";
 export { PromptTabSwitcher } from "./prompt-tab-switcher";
 export { shouldShowVersionBadge } from "./should-show-version-badge";
 export { useIsOverflowing } from "./use-is-overflowing";
+export type {
+  PromptBrowserLogger,
+  PromptBrowserStorage,
+  PromptTabsCapabilities,
+} from "../../model/browser-capabilities";
 export {
   clearPromptTabsStore,
   clearStoreInstances,

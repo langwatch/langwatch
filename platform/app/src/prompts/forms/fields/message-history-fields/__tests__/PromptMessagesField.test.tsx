@@ -8,7 +8,7 @@ import userEvent from "@testing-library/user-event";
 import React from "react";
 import { FormProvider, useFieldArray, useForm } from "react-hook-form";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
 import { PromptMessagesField } from "../PromptMessagesField";
 
 // Mock complex dependencies

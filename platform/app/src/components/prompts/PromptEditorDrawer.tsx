@@ -36,7 +36,7 @@ import {
   getSaveBlockerMessage,
   hasNonEmptySystemMessage,
   type PromptConfigFormValues,
-} from "@langwatch/prompt-web/forms";
+} from "@langwatch/prompt-web/surfaces/prompt-form";
 import {
   formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,

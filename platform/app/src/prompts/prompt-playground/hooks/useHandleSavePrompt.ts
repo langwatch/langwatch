@@ -6,7 +6,7 @@ import { showErrorToast } from "~/features/errors";
 import {
   getSaveBlockerMessage,
   type PromptConfigFormValues,
-} from "@langwatch/prompt-web/forms";
+} from "@langwatch/prompt-web/surfaces/prompt-form";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
 import {

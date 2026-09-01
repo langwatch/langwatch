@@ -8,10 +8,6 @@
   ],
   "type": "module",
   "exports": {
-    "./forms": {
-      "types": "./src/forms/index.ts",
-      "default": "./src/forms/index.ts"
-    },
     "./surfaces/api-snippet": {
       "types": "./src/surfaces/api-snippet/index.ts",
       "default": "./src/surfaces/api-snippet/index.ts"
@@ -31,6 +27,10 @@
     "./surfaces/prompt-version": {
       "types": "./src/surfaces/prompt-version/index.ts",
       "default": "./src/surfaces/prompt-version/index.ts"
+    },
+    "./surfaces/prompt-form": {
+      "types": "./src/surfaces/prompt-form/index.ts",
+      "default": "./src/surfaces/prompt-form/index.ts"
     },
     "./surfaces/prompt-reference": {
       "types": "./src/surfaces/prompt-reference/index.ts",

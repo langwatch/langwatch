@@ -2,7 +2,7 @@ import type { LocalPromptConfig } from "~/experiments-v3/types";
 import {
   buildDefaultFormValues,
   type PromptConfigFormValues,
-} from "@langwatch/prompt-web/forms";
+} from "@langwatch/prompt-web/surfaces/prompt-form";
 
 type ConfigData = PromptConfigFormValues["version"]["configData"];
 

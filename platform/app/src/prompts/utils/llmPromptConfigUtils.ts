@@ -16,7 +16,7 @@ import {
   type PromptConfigFormValues,
   versionMetadataToFormFormat,
   versionMetadataToNodeFormat,
-} from "@langwatch/prompt-web/forms";
+} from "@langwatch/prompt-web/surfaces/prompt-form";
 import type { SaveVersionParams } from "~/prompts/providers/types";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import { handleSchema, type VersionedPrompt } from "@langwatch/prompt-contract";

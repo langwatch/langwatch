@@ -9,7 +9,7 @@ import {
   formSchemaForSave,
   type PromptConfigFormValues,
   refinedFormSchemaWithModelLimits,
-} from "@langwatch/prompt-web/forms";
+} from "@langwatch/prompt-web/surfaces/prompt-form";
 import { salvageValidData } from "~/utils/zodSalvage";
 import { inputsAndOutputsToDemostrationColumns } from "../utils/llmPromptConfigUtils";
 

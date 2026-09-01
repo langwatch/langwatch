@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { PromptTabsCapabilities } from "../../../model/browser-capabilities";
 import {
   clearStoreInstances,
   getStoreForTesting,
@@ -26,7 +27,21 @@ const localStorageMock = (() => {
   };
 })();
 
-vi.stubGlobal("localStorage", localStorageMock);
+/**
+ * Bound as a local rather than stubbed onto `globalThis`: the store is supposed
+ * to write only through the storage it is handed, so if it ever reaches for the
+ * global again these assertions read an empty store and fail.
+ */
+const localStorage = localStorageMock;
+
+const capabilities: PromptTabsCapabilities = {
+  storage: localStorageMock,
+  logger: {
+    info: () => undefined,
+    warn: () => undefined,
+    error: () => undefined,
+  },
+};
 
 /** Builds a large-ish string so per-tab payload size differences are obvious. */
 function buildLargeContent(label: string): string {
@@ -62,7 +77,7 @@ describe("DraggableTabsBrowserStore", () => {
     // Clear localStorage to prevent state bleeding between tests
     localStorage.clear();
     clearStoreInstances();
-    store = getStoreForTesting(TEST_PROJECT_ID);
+    store = getStoreForTesting({ projectId: TEST_PROJECT_ID, capabilities });
   });
 
   afterEach(() => {
@@ -831,5 +846,61 @@ describe("DraggableTabsBrowserStore", () => {
       expect(originalTab?.data.variableValues).toEqual({ name: "Modified" });
       expect(clonedTab?.data.variableValues).toEqual({ name: "Original" });
     });
+  });
+});
+
+describe("given the application supplies the store Prompt Studio writes to", () => {
+  const SUPPLIED_PROJECT_ID = "supplied-storage-project";
+
+  /**
+   * A second, independent store stood up as the browser global. Nothing may
+   * reach it: the point of the capability is that the screen writes only where
+   * the application told it to.
+   */
+  function createSpyingStorage() {
+    return {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+      key: vi.fn(() => null),
+      length: 0,
+    };
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    clearStoreInstances();
+  });
+
+  /** @scenario Prompt Studio persists its open tabs through the storage it is handed */
+  it("writes every tab through the supplied store and never the browser global", () => {
+    const browserGlobal = createSpyingStorage();
+    vi.stubGlobal("localStorage", browserGlobal);
+    clearStoreInstances();
+
+    const store = getStoreForTesting({
+      projectId: SUPPLIED_PROJECT_ID,
+      capabilities,
+    });
+
+    store.getState().addTab({ data: createTabData() });
+    const tabId = store.getState().windows[0]?.tabs[0]?.id;
+    expect(tabId).toBeDefined();
+    store.getState().updateTabData({
+      tabId: tabId!,
+      updater: (data) => ({ ...data, variableValues: { name: "Ada" } }),
+    });
+
+    expect(
+      localStorageMock.getItem(`${SUPPLIED_PROJECT_ID}:tab:${tabId!}`),
+    ).toContain("Ada");
+
+    store.getState().removeTab({ tabId: tabId! });
+    store.getState().reset();
+
+    expect(browserGlobal.getItem).not.toHaveBeenCalled();
+    expect(browserGlobal.setItem).not.toHaveBeenCalled();
+    expect(browserGlobal.removeItem).not.toHaveBeenCalled();
+    expect(browserGlobal.key).not.toHaveBeenCalled();
   });
 });

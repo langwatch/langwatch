@@ -9,7 +9,7 @@ import {
 import {
   FALLBACK_MAX_TOKENS,
   MIN_MAX_TOKENS,
-} from "../surfaces/llm-parameters/token-limits";
+} from "../token-limits";
 import { versionMetadataSchema } from "./version-metadata.schemas";
 
 const latestConfigVersionSchema = getLatestConfigVersionSchema();

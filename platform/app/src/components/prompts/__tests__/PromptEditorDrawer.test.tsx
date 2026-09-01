@@ -279,9 +279,9 @@ vi.mock("~/components/outputs", () => ({
 // `buildDefaultFormValues` and `areFormValuesEqual` now ship from the same
 // package entry, so both stubs live in one factory — a second `vi.mock` on
 // the same specifier would silently replace this one.
-vi.mock("@langwatch/prompt-web/forms", async (importOriginal) => {
+vi.mock("@langwatch/prompt-web/surfaces/prompt-form", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("@langwatch/prompt-web/forms")>();
+    await importOriginal<typeof import("@langwatch/prompt-web/surfaces/prompt-form")>();
   return {
     ...actual,
     buildDefaultFormValues: (overrides?: Record<string, unknown>) => {
@@ -322,7 +322,7 @@ vi.mock("~/prompts/utils/llmPromptConfigUtils", () => ({
 }));
 
 // Mock areFormValuesEqual - start with default implementation.
-// The stub itself is wired in the `@langwatch/prompt-web/forms` factory above.
+// The stub itself is wired in the `@langwatch/prompt-web/surfaces/prompt-form` factory above.
 const mockAreFormValuesEqual = vi.fn(() => true);
 
 // Mock usePromptHandleCheck for ChangeHandleDialog validation

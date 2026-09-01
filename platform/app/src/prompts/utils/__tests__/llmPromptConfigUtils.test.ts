@@ -2,7 +2,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { PromptScope } from "~/generated/prisma/client";
-import { buildDefaultFormValues, formSchema } from "@langwatch/prompt-web/forms";
+import { buildDefaultFormValues, formSchema } from "@langwatch/prompt-web/surfaces/prompt-form";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import {
   formValuesToTriggerSaveVersionParams,

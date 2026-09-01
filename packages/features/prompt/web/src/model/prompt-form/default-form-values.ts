@@ -2,7 +2,7 @@ import { merge } from "lodash-es";
 
 import { getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
 
-import { FALLBACK_MAX_TOKENS } from "../surfaces/llm-parameters/token-limits";
+import { FALLBACK_MAX_TOKENS } from "../token-limits";
 import type { PromptConfigFormValues } from "./prompt-form.schemas";
 
 type DeepPartial<T> = T extends object ? { [P in keyof T]?: DeepPartial<T[P]> } : T;

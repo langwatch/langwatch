@@ -2,7 +2,7 @@ import { Box, Button, Heading } from "@chakra-ui/react";
 import { useRef } from "react";
 import { DatasetEditorTable } from "~/components/datasets/editor/DatasetEditorTable";
 import { Dialog } from "~/components/ui/dialog";
-import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
 import {
   transposeColumnsFirstToRowsFirstWithId,
   transpostRowsFirstToColumnsFirstWithoutId,

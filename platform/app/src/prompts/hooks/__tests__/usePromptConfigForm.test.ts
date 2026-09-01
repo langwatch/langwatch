@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 import { describe, expect, it, vi } from "vitest";
-import { formSchema } from "@langwatch/prompt-web/forms";
-import { buildDefaultFormValues } from "@langwatch/prompt-web/forms";
+import { formSchema } from "@langwatch/prompt-web/surfaces/prompt-form";
+import { buildDefaultFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
 import { salvageValidData } from "~/utils/zodSalvage";
 
 /**

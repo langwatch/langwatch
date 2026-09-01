@@ -28,7 +28,7 @@ vi.mock("~/hooks/useModelLimits", () => ({
 import {
   buildDefaultFormValues,
   hasNonEmptySystemMessage,
-} from "@langwatch/prompt-web/forms";
+} from "@langwatch/prompt-web/surfaces/prompt-form";
 import { usePromptConfigForm } from "../usePromptConfigForm";
 
 interface MutationCall {

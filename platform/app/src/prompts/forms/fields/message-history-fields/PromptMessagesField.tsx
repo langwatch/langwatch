@@ -17,7 +17,7 @@ import {
   PromptTextAreaWithVariables,
 } from "@langwatch/prompt-web/surfaces/prompt-textarea";
 import type { AvailableSource, Variable } from "@langwatch/prompt-web/surfaces/variables";
-import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
 import { useLayoutMode } from "@langwatch/prompt-web/surfaces/prompt-layout";
 import {
   EditingModeTitle,

@@ -3,7 +3,7 @@ import { Plus, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
 import { displayValue, serializeValue } from "@langwatch/design-system/json-value-text";
 
 type ParameterEntry = { id: string; key: string; value: string };

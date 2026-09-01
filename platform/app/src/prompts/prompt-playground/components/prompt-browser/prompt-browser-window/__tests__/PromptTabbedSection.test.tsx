@@ -13,10 +13,11 @@ import userEvent from "@testing-library/user-event";
 import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type Variable, VariablesSection } from "@langwatch/prompt-web/surfaces/variables";
-import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
 import {
   clearStoreInstances,
   getStoreForTesting,
+  type PromptTabsCapabilities,
   type TabData,
 } from "@langwatch/prompt-web/screens/prompt-studio";
 import { PromptTabbedSection } from "../PromptTabbedSection";
@@ -35,10 +36,24 @@ const localStorageMock = (() => {
     clear: () => {
       store = {};
     },
+    key: (index: number) => Object.keys(store)[index] ?? null,
+    get length() {
+      return Object.keys(store).length;
+    },
   };
 })();
 
 vi.stubGlobal("localStorage", localStorageMock);
+
+/** The browser services the packaged tab store runs on inside this test. */
+const capabilities: PromptTabsCapabilities = {
+  storage: localStorageMock,
+  logger: {
+    info: () => undefined,
+    warn: () => undefined,
+    error: () => undefined,
+  },
+};
 
 const TEST_PROJECT_ID = "test-project";
 
@@ -254,7 +269,7 @@ describe("PromptTabbedSection Store Integration", () => {
   beforeEach(() => {
     localStorage.clear();
     clearStoreInstances();
-    store = getStoreForTesting(TEST_PROJECT_ID);
+    store = getStoreForTesting({ projectId: TEST_PROJECT_ID, capabilities });
   });
 
   afterEach(() => {
@@ -462,7 +477,7 @@ describe("PromptTabbedSection Layout Modes", () => {
     localStorage.clear();
     clearStoreInstances();
     // Initialize store with a tab
-    const store = getStoreForTesting(TEST_PROJECT_ID);
+    const store = getStoreForTesting({ projectId: TEST_PROJECT_ID, capabilities });
     store.getState().addTab({ data: createTabData() });
   });
 
@@ -585,7 +600,7 @@ describe("PromptTabbedSection Layout Modes", () => {
   describe("when a variable value is edited and the tab unmounts immediately", () => {
     it("flushes the pending write so the edit is not lost", async () => {
       const user = userEvent.setup();
-      const store = getStoreForTesting(TEST_PROJECT_ID);
+      const store = getStoreForTesting({ projectId: TEST_PROJECT_ID, capabilities });
       const tabId = store.getState().windows[0]?.tabs[0]?.id;
       // Point the component's useTabId() at the real store tab so its writes land.
       tabIdRef.current = tabId!;
@@ -622,7 +637,7 @@ describe("PromptTabbedSection Layout Modes", () => {
   describe("when a tab is switched away from and reopened", () => {
     it("restores the variable value the user had typed", async () => {
       const user = userEvent.setup();
-      const store = getStoreForTesting(TEST_PROJECT_ID);
+      const store = getStoreForTesting({ projectId: TEST_PROJECT_ID, capabilities });
       const tabId = store.getState().windows[0]?.tabs[0]?.id;
       tabIdRef.current = tabId!;
 

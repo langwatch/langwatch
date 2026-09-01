@@ -4,7 +4,7 @@ import { Controller, useFormContext } from "react-hook-form";
 import { DatasetPreview } from "~/components/datasets/DatasetPreview";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
-import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-web";
 import { DemonstrationsModal } from "../../modals/DemonstrationsModal";
 

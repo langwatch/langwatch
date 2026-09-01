@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearStoreInstances,
   getStoreForTesting,
+  type PromptTabsCapabilities,
   type TabData,
 } from "@langwatch/prompt-web/screens/prompt-studio";
 
@@ -24,10 +25,24 @@ const localStorageMock = (() => {
     clear: () => {
       store = {};
     },
+    key: (index: number) => Object.keys(store)[index] ?? null,
+    get length() {
+      return Object.keys(store).length;
+    },
   };
 })();
 
 vi.stubGlobal("localStorage", localStorageMock);
+
+/** The browser services the packaged tab store runs on inside this test. */
+const capabilities: PromptTabsCapabilities = {
+  storage: localStorageMock,
+  logger: {
+    info: () => undefined,
+    warn: () => undefined,
+    error: () => undefined,
+  },
+};
 
 const TEST_PROJECT_ID = "test-project";
 
@@ -64,7 +79,7 @@ describe("PromptBrowserWindowContent Layout Mode Detection", () => {
   beforeEach(() => {
     localStorage.clear();
     clearStoreInstances();
-    store = getStoreForTesting(TEST_PROJECT_ID);
+    store = getStoreForTesting({ projectId: TEST_PROJECT_ID, capabilities });
   });
 
   afterEach(() => {

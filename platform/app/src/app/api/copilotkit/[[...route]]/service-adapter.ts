@@ -23,7 +23,7 @@ import type { runtimeInputsSchema } from "@langwatch/prompt-contract";
 import {
   type PromptConfigFormValues,
   versionMetadataToNodeFormat,
-} from "@langwatch/prompt-web/forms";
+} from "@langwatch/prompt-web/surfaces/prompt-form";
 import { parseLLMError } from "~/utils/formatLLMError";
 import { generateOtelTraceId } from "~/utils/trace";
 import { studioBackendPostEvent } from "../../workflows/post_event/post-event";

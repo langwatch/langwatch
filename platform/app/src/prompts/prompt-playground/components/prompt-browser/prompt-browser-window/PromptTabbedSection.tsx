@@ -11,7 +11,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type Variable, VariablesSection } from "@langwatch/prompt-web/surfaces/variables";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-web";
 import { RuntimeParametersField } from "~/prompts/forms/fields/RuntimeParametersField";
-import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
 import type { LlmConfigInputType } from "~/types";
 import { useDraggableTabsBrowserStore } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
 import {

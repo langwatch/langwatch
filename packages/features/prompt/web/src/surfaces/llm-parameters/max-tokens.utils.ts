@@ -6,7 +6,7 @@
 
 import type { ModelMetadataForFrontend } from "@langwatch/model-provider-contract";
 import { parameterRegistry as defaultRegistry } from "./parameter-registry";
-import { FALLBACK_MAX_TOKENS } from "./token-limits";
+import { FALLBACK_MAX_TOKENS } from "../../model/token-limits";
 import type { LLMConfigValues } from "./llm-config-values.types";
 
 /**
