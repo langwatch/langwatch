@@ -130,7 +130,11 @@ export function CostLanesChart({
         <LaneAreas series={series} />
       </Box>
       {hasWithheldDay ? (
-        <Text fontSize="xs" color="fg.subtle" data-testid="cost-lanes-chart-note">
+        <Text
+          fontSize="xs"
+          color="fg.subtle"
+          data-testid="cost-lanes-chart-note"
+        >
           Days with usage billed in a currency other than US dollars are left
           blank rather than drawn at part of what they cost.
         </Text>
