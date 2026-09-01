@@ -134,6 +134,7 @@ function CostsBody({
           description="What your providers report they will invoice."
           amountUsd={data.billed.amountUsd}
           cellsWithoutAmount={data.billed.cellsWithoutAmount}
+          currenciesWithoutUsdAmount={data.billed.currenciesWithoutUsdAmount}
         />
         <CostLanePanel
           testId="cost-lane-gateway"
@@ -141,6 +142,7 @@ function CostsBody({
           description="What the gateway measured as it served your traffic."
           amountUsd={data.gateway.amountUsd}
           cellsWithoutAmount={data.gateway.cellsWithoutAmount}
+          currenciesWithoutUsdAmount={data.gateway.currenciesWithoutUsdAmount}
         />
         <SeatLanePanel testId="cost-lane-seats" />
       </HStack>
