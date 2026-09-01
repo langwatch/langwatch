@@ -881,6 +881,13 @@ export class FoldProjectionExecutor {
    * applied ids of the previous commit that neither the read nor the delivery
    * accounts for, and the state's occurred-at checkpoint when nothing in
    * either reaches it. Null when the read is complete enough to replay.
+   *
+   * These are fences against read lag, not a proof that the read holds every
+   * event. The applied set is the recent commits (reset per fresh delivery,
+   * capped at MAX_APPLIED_EVENT_IDS), so an event folded earlier is not in it,
+   * and a later event sharing its occurred-at satisfies the checkpoint on its
+   * behalf. Proving completeness needs a checkpoint event id or log cursor
+   * persisted next to the fold row; see issue #7726.
    */
   private historyReadGap<E extends Event>({
     history,
