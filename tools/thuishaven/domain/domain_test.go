@@ -1,6 +1,10 @@
 package domain
 
-import "testing"
+import (
+	"fmt"
+	"strings"
+	"testing"
+)
 
 func TestDeriveSlugIsTheWorktreeName(t *testing.T) {
 	if got := DeriveSlug("/work/trees/portless", nil); got != "portless" {
@@ -145,6 +149,61 @@ func TestOverlayEmitsClickHouseURLOnlyWhenManaged(t *testing.T) {
 	want := "http://default:langwatch@127.0.0.1:18123/lw_brave_otter"
 	if got := valueOf(managed.OverlayEnv(), "CLICKHOUSE_URL"); got != want {
 		t.Errorf("CLICKHOUSE_URL = %q, want %q", got, want)
+	}
+}
+
+// The app's pool sizing clamps its fallback to the server's stated cap, but
+// only if something states it. Haven is the thing that knows — it renders
+// <max_concurrent_queries> into the container's config — so it must hand the
+// same number to the app, or a 64-connection pool meets a 32-query server.
+func TestOverlayExportsClickHouseServerCapWhenManaged(t *testing.T) {
+	base := Stack{Slug: "brave-otter", APIPort: 1, Services: []Service{
+		{Name: "app", URL: "https://app.brave-otter.langwatch.localhost"},
+	}}
+	if hasKey(base.OverlayEnv(), "CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES") {
+		t.Fatalf("unmanaged stack must not claim to know the server's cap")
+	}
+	managed := base
+	managed.ClickHouseHTTPPort = 18123
+	managed.ClickHouseDatabase = "lw_brave_otter"
+	want := fmt.Sprintf("%d", ClickHouseMaxConcurrentQueries)
+	if got := valueOf(managed.OverlayEnv(), "CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES"); got != want {
+		t.Errorf("CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES = %q, want %q", got, want)
+	}
+}
+
+// Stating the cap without the fleet size leaves the app on its fallback
+// clamp, which warns on every boot that the fleet might exceed the budget.
+// Haven does know the fleet: one process, or two when the workers run as
+// their own lane. Handing over the replica count moves the app onto the
+// real derivation, sized right and silent.
+func TestOverlayExportsClientReplicasWhenManaged(t *testing.T) {
+	base := Stack{Slug: "brave-otter", APIPort: 1, Services: []Service{
+		{Name: "app", URL: "https://app.brave-otter.langwatch.localhost"},
+	}}
+	if hasKey(base.OverlayEnv(), "CLICKHOUSE_CLIENT_REPLICAS") {
+		t.Fatalf("unmanaged stack must not claim to know the fleet size")
+	}
+	managed := base
+	managed.ClickHouseHTTPPort = 18123
+	managed.ClickHouseDatabase = "lw_brave_otter"
+	if got := valueOf(managed.OverlayEnv(), "CLICKHOUSE_CLIENT_REPLICAS"); got != "1" {
+		t.Errorf("CLICKHOUSE_CLIENT_REPLICAS = %q, want %q (app lane only)", got, "1")
+	}
+	withWorkers := managed
+	withWorkers.HasStandaloneWorkers = true
+	if got := valueOf(withWorkers.OverlayEnv(), "CLICKHOUSE_CLIENT_REPLICAS"); got != "2" {
+		t.Errorf("CLICKHOUSE_CLIENT_REPLICAS = %q, want %q (app + worker lanes)", got, "2")
+	}
+}
+
+// One number, two sides: the cap the container is configured with and the cap
+// the app is told must be the same constant, or they drift apart silently.
+func TestClickHouseConfigRendersTheExportedCap(t *testing.T) {
+	config := RenderClickHouseConfig(DefaultClickHouseLimits())
+	want := fmt.Sprintf("<max_concurrent_queries>%d</max_concurrent_queries>", ClickHouseMaxConcurrentQueries)
+	if !strings.Contains(config, want) {
+		t.Errorf("rendered config missing %q", want)
 	}
 }
 
