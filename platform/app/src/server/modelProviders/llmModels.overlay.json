@@ -1,5 +1,5 @@
 {
-	"_comment": "Hand-curated model entries for direct-API providers that the upstream model-catalog source does not carry (Voyage AI's direct API today, others later). Merged into llmModels at module load — see loadModelCatalog.ts. The base llmModels.json is regenerated periodically and overwriting hand-added entries would silently drop these providers; the overlay file is never touched by the regen task. Add entries here when integrating a provider whose models aren't reachable via the upstream catalog. Audio entries here are the ones litellm's price registry cannot serve correctly: models it lacks (ElevenLabs flash/turbo, gpt-transcribe), models it prices without audio units (gpt-4o-mini-tts, the gpt-4o transcribe pair), and models where its rate lags a provider price change (eleven_multilingual_v2 still carries the pre-cut rate upstream). An overlay entry only takes effect when the base catalog has no key of the same name, because the merge lets the base win on collision. Entries litellm carries correctly (tts-1, tts-1-hd, whisper-1, scribe_v1) were retired from the overlay and flow in via the weekly sync.",
+	"_comment": "Hand-curated model entries for direct-API providers that the upstream model-catalog source does not carry (Voyage AI's direct API today, others later). Merged into llmModels at module load — see loadModelCatalog.ts. The base llmModels.json is regenerated periodically and overwriting hand-added entries would silently drop these providers; the overlay file is never touched by the regen task. Add entries here when integrating a provider whose models aren't reachable via the upstream catalog. Audio entries here are the ones litellm's price registry cannot serve correctly: models it lacks (ElevenLabs flash/turbo, gpt-transcribe), models it prices without audio units (gpt-4o-mini-tts, the gpt-4o transcribe pair), and models where its rate lags a provider price change (eleven_multilingual_v2 still carries the pre-cut rate upstream). An overlay entry also takes effect when the base catalog carries a key of the same name, because the merge lets the overlay win on collision — that is the correction lane for a generated entry whose values are wrong, and such an entry replaces the generated one whole rather than field by field. Entries litellm carries correctly (tts-1, tts-1-hd, whisper-1, scribe_v1) were retired from the overlay and flow in via the weekly sync.",
 	"models": {
 		"voyage/voyage-3.5": {
 			"id": "voyage/voyage-3.5",
@@ -526,6 +526,51 @@
 			"mode": "chat",
 			"description": "Delisted from the model catalog source on 2026-08-16 and absent from the second source, so these are the rates this catalog itself carried on 2026-07-27, kept so the model bills something rather than zero. No source can confirm them now. Retire this entry once the model is known to be gone, or correct it once a source carries it again.",
 			"supportsImageInput": false,
+			"supportsAudioInput": false,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": false
+		},
+		"minimax/minimax-m3": {
+			"id": "minimax/minimax-m3",
+			"name": "MiniMax: MiniMax M3",
+			"provider": "minimax",
+			"pricing": {
+				"inputCostPerToken": 6e-7,
+				"outputCostPerToken": 0.0000024,
+				"inputCacheReadPerToken": 1.2e-7
+			},
+			"contextLength": 1000000,
+			"maxCompletionTokens": 512000,
+			"supportedParameters": [
+				"frequency_penalty",
+				"include_reasoning",
+				"logit_bias",
+				"logprobs",
+				"max_tokens",
+				"min_p",
+				"presence_penalty",
+				"reasoning",
+				"repetition_penalty",
+				"response_format",
+				"seed",
+				"stop",
+				"structured_outputs",
+				"temperature",
+				"tool_choice",
+				"tools",
+				"top_k",
+				"top_logprobs",
+				"top_p"
+			],
+			"defaultParameters": {
+				"temperature": 1,
+				"topP": 0.95,
+				"frequencyPenalty": null
+			},
+			"modality": "text+image+video->text",
+			"mode": "chat",
+			"description": "A multimodal foundation model taking text, image and video input with text output, suited for long-horizon agentic work, coding and long-context tasks. This entry exists for the context window and the token rates. The generated catalog carries a 1,048,576-token window with $0.30 input, $1.20 output and $0.06 cached input per million tokens, while the provider documents a 1,000,000-token window (https://platform.minimax.io/docs/api-reference/api-overview, verified 2026-08-17, which also notes the limit spans input and output together) and charges $0.60 input, $2.40 output and $0.12 cached input per million tokens, so the generated rates bill this model at half of what it costs. Every other field here matches the generated entry, including the parameter lists, which are carried through because an overlay entry replaces the generated one whole. Retire this entry once the sync carries these values; the weekly price audit reports the disagreement until then.",
+			"supportsImageInput": true,
 			"supportsAudioInput": false,
 			"supportsImageOutput": false,
 			"supportsAudioOutput": false
