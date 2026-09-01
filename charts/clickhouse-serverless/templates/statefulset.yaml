@@ -318,6 +318,7 @@ spec:
           secret:
             secretName: {{ include "clickhouse-serverless.lwqlSecretName" . }}
             optional: true
+            defaultMode: 0400
             items:
               - key: {{ .Values.lwql.passwordSecretKey }}
                 path: lwql_password

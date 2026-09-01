@@ -142,6 +142,9 @@ func renderLwql(input *config.Input, usersD, configD string) error {
 	// value, so unlike every other rendered credential this one is NOT hashed —
 	// the first plaintext secret on the pod's config disk, by necessity).
 	if input.LwqlPgHost != "" && input.LwqlPgPassword != "" {
+		// The SaaS render-config.sh hardcodes the reader role as lwql_ro; this
+		// path parameterizes it via CLICKHOUSE_LWQL_PG_USER (input.LwqlPgUser) so
+		// a BYO PostgreSQL can name the role whatever its own conventions require.
 		serverConfig["named_collections"] = map[string]any{
 			"lwql_postgres": map[string]any{
 				"host":     input.LwqlPgHost,
@@ -168,11 +171,11 @@ func lwqlRestrictedProfile() map[string]any {
 		"readonly":                        1,
 		"custom_api_key_hash":             "''",
 		"max_execution_time":              10,
-		"max_memory_usage":                1000000000,
+		"max_memory_usage":                1_000_000_000,
 		"max_threads":                     4,
 		"max_concurrent_queries_for_user": 10,
-		"max_rows_to_read":                1000000000,
-		"max_bytes_to_read":               10000000000,
+		"max_rows_to_read":                1_000_000_000,
+		"max_bytes_to_read":               10_000_000_000,
 		"read_overflow_mode":              "throw",
 		"constraints": map[string]any{
 			"custom_api_key_hash":             map[string]any{"changeable_in_readonly": empty},

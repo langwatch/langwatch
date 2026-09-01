@@ -32,8 +32,14 @@ a silent override:
   error code 495 (`ACCESS_DENIED`) — because the entity is not in the SQL
   store the DDL is allowed to touch.
 
-See `/tmp/q5-xml-pattern.md` for the underlying ClickHouse mechanics
-(`NamedCollectionsFactory::add()`, `getMutable()`).
+The underlying mechanic: `NamedCollectionsFactory` loads config-defined
+collections at startup and a subsequent `CREATE NAMED COLLECTION` of the same
+name is an `add()` of an existing key, which raises `NAMED_COLLECTION_ALREADY_EXISTS`
+and aborts boot. The reverse order does not save it either — a collection first
+created via SQL is written to the access store on the data PVC and survives a
+restart, so once the config-defined collection also appears the two collide on
+the next boot regardless of which was written first. One owner per name is the
+only stable state.
 
 ## Decision
 
