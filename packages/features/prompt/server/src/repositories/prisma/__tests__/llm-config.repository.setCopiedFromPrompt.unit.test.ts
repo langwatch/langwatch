@@ -1,10 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-
-import { LlmConfigRepository } from "../prisma.prompt.repository";
+import { LlmConfigRepository, type PromptConfigDatabase } from "../prisma.prompt.repository";
 
 describe("LlmConfigRepository", () => {
-  let prisma: PrismaClient;
+  let prisma: PromptConfigDatabase;
   let repository: LlmConfigRepository;
 
   beforeEach(() => {
@@ -12,7 +10,7 @@ describe("LlmConfigRepository", () => {
       llmPromptConfig: {
         update: vi.fn().mockResolvedValue(undefined),
       },
-    } as unknown as PrismaClient;
+    } as unknown as PromptConfigDatabase;
     repository = new LlmConfigRepository(prisma);
   });
 

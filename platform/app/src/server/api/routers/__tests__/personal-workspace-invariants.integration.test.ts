@@ -853,7 +853,7 @@ function movingAMemberWithAPersonalWorkspaceToALiteSeat() {
       }),
       organizations: new OrganizationService(
         new PrismaOrganizationRepository(prisma),
-        createTestApp().prompts,
+        createTestApp().prompts.promptService,
       ),
       usageLimits: {
         notifyResourceLimitReached: vi.fn().mockResolvedValue(undefined),

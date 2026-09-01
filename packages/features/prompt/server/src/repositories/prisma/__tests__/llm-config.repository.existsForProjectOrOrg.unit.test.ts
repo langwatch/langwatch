@@ -1,13 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { LlmConfigRepository } from "../prisma.prompt.repository";
+import { LlmConfigRepository, type PromptConfigDatabase } from "../prisma.prompt.repository";
 
 function makeMockPrisma(findFirstResult: unknown = null) {
   return {
     llmPromptConfig: {
       findFirst: vi.fn(() => Promise.resolve(findFirstResult)),
     },
-  } as unknown as PrismaClient;
+  } as unknown as PromptConfigDatabase;
 }
 
 describe("LlmConfigRepository", () => {

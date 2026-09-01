@@ -74,7 +74,7 @@ describe("Feature: Prompt version tags", () => {
       skipDuplicates: true,
     });
 
-    service = getApp().prompts;
+    service = getApp().prompts.promptService;
   });
 
   afterEach(async () => {

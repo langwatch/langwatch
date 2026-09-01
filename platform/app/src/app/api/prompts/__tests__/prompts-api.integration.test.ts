@@ -305,6 +305,7 @@ describe("Prompts API", () => {
             ]);
           });
 
+          /** @scenario prompt versions remain part of one Prompt service */
           it("gets all versions for a prompt", async () => {
             const res = await app.request(`/api/prompts/${config.id}/versions`, {
               headers: { "X-Auth-Token": testApiKey },
@@ -358,6 +359,7 @@ describe("Prompts API", () => {
     });
 
     describe("when the project has no default model configured", () => {
+      /** @scenario existing transports preserve their public surface */
       it("creates a prompt that ships its own model", async () => {
         // Remove the seeded default: a prompt that specifies its model,
         // like every prompt pushed by `langwatch prompt sync`, must not
@@ -788,8 +790,21 @@ describe("Prompts API", () => {
 
   // Validation/unhappy path tests
   describe("Prompt persistence transaction", () => {
-    it("rolls metadata back when the immutable version write is rejected", async () => {
-      const promptService = globalForApp.__langwatch_app!.prompts;
+    /**
+     * An update writes the config row and the new version row inside one
+     * transaction. An author id that names no user makes the version insert
+     * fail on its foreign key, which is the cheapest way to reject the second
+     * write after the first has already been issued — so what this pins is
+     * that the prompt is still readable at the version it had, with the text
+     * it had, rather than left pointing at a version that was never written.
+     *
+     * The service is read off the application's raw seam rather than the
+     * caller-stamped door, because the door supplies a real author for every
+     * write and there would be no foreign key left to break.
+     */
+    /** @scenario A rejected version write leaves the prompt on its last good version */
+    it("leaves the prompt on its last good version when the version write is rejected", async () => {
+      const promptService = globalForApp.__langwatch_app!.prompts.promptService;
       const created = await promptService.createPrompt({
         projectId: testProjectId,
         handle: `rollback-${nanoid(8)}`,
@@ -803,7 +818,7 @@ describe("Prompts API", () => {
           projectId: testProjectId,
           data: {
             authorId: `missing_author_${nanoid(8)}`,
-            handle: `should-not-persist-${nanoid(8)}`,
+            commitMessage: "should not persist",
             prompt: "after rollback",
           },
         }),

@@ -28,6 +28,19 @@ export type CreateLlmConfigVersionParams = Omit<
 };
 
 /**
+ * The client slice version persistence binds to, transaction included: a
+ * version row and the config row whose pointer it moves land together.
+ *
+ * `project` is here because two reads below re-enter the config repository to
+ * confirm the config exists before writing a version, and that lookup resolves
+ * an organization-scoped handle through the project's team.
+ */
+export type PromptVersionDatabase = Pick<
+  PrismaClient,
+  "llmPromptConfig" | "llmPromptConfigVersion" | "project" | "$transaction"
+>;
+
+/**
  * Repository for managing LLM Configuration Versions
  * Follows Single Responsibility Principle by focusing only on LLM config versions data access
  *
@@ -35,7 +48,7 @@ export type CreateLlmConfigVersionParams = Omit<
  * instead of this repository.
  */
 export class LlmConfigVersionsRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PromptVersionDatabase) {}
 
   /**
    * Get all versions for a specific config

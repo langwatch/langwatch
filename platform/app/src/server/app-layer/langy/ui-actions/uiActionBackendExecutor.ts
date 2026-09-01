@@ -7,6 +7,7 @@ import { isTransformError } from "~/experiments-v3/actions/transforms/types";
 import type { EvaluationResults } from "~/experiments-v3/types";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { PromptService } from "@langwatch/prompt-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { NlpLambdaRuntime } from "~/runtime/api/nlp-lambda";
 import { StaleWorkbenchStateError, type ExperimentService } from "@langwatch/experiment-contract";
@@ -39,14 +40,19 @@ export interface BackendActionContext {
 }
 
 /**
- * What a `run` action needs beyond the workbench itself. The browser path gets
- * these from the request's App; the away path is handed them by its route, so
- * nothing here reaches for a process global.
+ * What a backend action needs beyond the workbench itself. The browser path
+ * gets these from the request's App; the away path is handed them by its
+ * route, so nothing here reaches for a process global.
+ *
+ * `prompts` is the read path's, not the run path's: naming a workbench column
+ * means resolving a prompt handle, and it has to be the process's own Prompt
+ * service so the name a reader sees is the name the run resolved.
  */
 export interface BackendRunServices {
   evaluators: EvaluatorService;
   modelProviders: ModelProviderService;
   nlpLambda: NlpLambdaRuntime;
+  prompts: PromptService;
   workflows: WorkflowService;
 }
 
@@ -70,7 +76,7 @@ export async function executeBackendAction({
 
   switch (definition.backend) {
     case "read":
-      return await readSavedState({ experiments, context, slug, payload });
+      return await readSavedState({ experiments, runServices, context, slug, payload });
     case "transform":
       return await applyTransform({
         experiments,
@@ -94,11 +100,13 @@ export async function executeBackendAction({
 
 async function readSavedState({
   experiments,
+  runServices,
   context,
   slug,
   payload,
 }: {
   experiments: ExperimentService;
+  runServices: BackendRunServices;
   context: BackendActionContext;
   slug: string;
   payload: unknown;
@@ -118,6 +126,7 @@ async function readSavedState({
   const targetNames = await resolveWorkbenchTargetNames({
     projectId: context.projectId,
     targets: state.targets,
+    prompts: runServices.prompts,
   });
   const projection = projectWorkbenchState({
     state,

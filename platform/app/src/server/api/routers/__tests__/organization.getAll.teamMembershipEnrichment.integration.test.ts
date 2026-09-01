@@ -113,7 +113,7 @@ describe("organization.getAll — team membership enrichment via RoleBinding", (
       organizations: traced(
         new OrganizationService(
           new PrismaOrganizationRepository(prisma),
-          createTestApp().prompts,
+          createTestApp().prompts.promptService,
         ),
         "OrganizationService",
       ),

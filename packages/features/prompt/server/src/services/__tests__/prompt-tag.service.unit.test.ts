@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PromptTag } from "@langwatch/prisma-client/generated";
 import {
   PromptTagConflictError,
   PromptTagNotFoundError,
@@ -12,7 +11,14 @@ import {
   type PromptTagRepository,
 } from "../../repositories/prisma/prisma.prompt-tag.repository";
 
-function makeTag(overrides: Partial<PromptTag> = {}): PromptTag {
+/**
+ * A stored tag as the catalogue itself hands one back, read off the repository
+ * rather than off the generated client — a test double is only honest while it
+ * is shaped by the seam it stands in for.
+ */
+type StoredPromptTag = Awaited<ReturnType<PromptTagRepository["create"]>>;
+
+function makeTag(overrides: Partial<StoredPromptTag> = {}): StoredPromptTag {
   return {
     id: "ptag_test",
     organizationId: "org_1",
@@ -161,6 +167,7 @@ describe("PromptTagService", () => {
 
   describe("create()", () => {
     describe("when input is valid", () => {
+      /** @scenario prompt tags remain subordinate behaviour */
       it("delegates to repo.create with all parameters", async () => {
         const tag = makeTag({ name: "canary" });
         const repo = makeRepo({ create: vi.fn().mockResolvedValue(tag) });

@@ -103,7 +103,7 @@ describe("organization.getAll — admin-via-binding promotion of legacy role", (
       organizations: traced(
         new OrganizationService(
           new PrismaOrganizationRepository(prisma),
-          createTestApp().prompts,
+          createTestApp().prompts.promptService,
         ),
         "OrganizationService",
       ),

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { LlmConfigRepository } from "../prisma.prompt.repository";
+import { LlmConfigRepository, type PromptConfigDatabase } from "../prisma.prompt.repository";
+
+/**
+ * Comparing two configs reads no row, so the repository is composed over a
+ * persistence double that answers nothing. Naming the feature's own slice
+ * rather than the generated client is what keeps this test honest: if the
+ * comparison ever grows a query, the double stops compiling.
+ */
+const noPersistence = {} as PromptConfigDatabase;
 
 /**
  * Tests for compareConfigContent covering:
@@ -9,7 +17,7 @@ import { LlmConfigRepository } from "../prisma.prompt.repository";
  */
 describe("LlmConfigRepository", () => {
   describe("compareConfigContent()", () => {
-    const repository = new LlmConfigRepository(null as any);
+    const repository = new LlmConfigRepository(noPersistence);
 
     const baseConfig = {
       model: "gpt-4",

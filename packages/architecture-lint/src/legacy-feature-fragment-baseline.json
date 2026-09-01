@@ -601,7 +601,6 @@
     {"feature":"prompt","file":"platform/app/src/prompts/utils/invokeLLM.ts","kind":"legacy-implementation"},
     {"feature":"prompt","file":"platform/app/src/prompts/utils/llmPromptConfigUtils.ts","kind":"legacy-implementation"},
     {"feature":"prompt","file":"platform/app/src/prompts/VersionHistoryListPopover.tsx","kind":"legacy-implementation"},
-    {"feature":"prompt","file":"platform/app/src/runtime/app/features/prompt.ts","kind":"composition"},
     {"feature":"scim","file":"platform/app/src/pages/settings/scim.tsx","kind":"page-shell"},
     {"feature":"scim","file":"platform/app/src/server/enterprise/scim/routes.ts","kind":"legacy-implementation"},
     {"feature":"scim","file":"platform/app/src/server/enterprise/scim/webhooks.ts","kind":"legacy-implementation"},

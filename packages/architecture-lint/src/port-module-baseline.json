@@ -27,7 +27,6 @@
     "packages/features/prompt/server/src/ports/prompt-handle-slug.port.ts",
     "packages/features/prompt/server/src/ports/prompt-merge-auto-detected-inputs.port.ts",
     "packages/features/prompt/server/src/ports/prompt-transform-db.port.ts",
-    "packages/features/prompt/server/src/ports/prompt-update-llm-config.port.ts",
     "packages/features/suite/server/src/ports/suite-clickhouse.port.ts",
     "packages/features/trace/server/src/ports/trace.port.ts"
   ]

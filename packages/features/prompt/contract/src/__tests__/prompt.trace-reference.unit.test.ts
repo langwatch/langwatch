@@ -3,6 +3,7 @@ import { parsePromptTraceReference as parsePromptReference } from "../index";
 
 describe("parsePromptReference()", () => {
   describe("when new combined format is present", () => {
+    /** @scenario trace metadata uses the Prompt contract */
     it("parses handle:version from langwatch.prompt.id", () => {
       const attrs = { "langwatch.prompt.id": "team/sample-prompt:3" };
       expect(parsePromptReference(attrs)).toEqual({

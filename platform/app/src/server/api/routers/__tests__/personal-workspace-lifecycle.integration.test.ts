@@ -135,7 +135,7 @@ describe("given a member with a personal workspace in an organization", () => {
     globalForApp.__langwatch_app = createTestApp({
       organizations: new OrganizationService(
         new PrismaOrganizationRepository(prisma),
-        createTestApp().prompts,
+        createTestApp().prompts.promptService,
         workspaceService,
       ),
     });

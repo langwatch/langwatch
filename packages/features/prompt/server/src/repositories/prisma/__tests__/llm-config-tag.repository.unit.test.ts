@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PromptTagAssignmentRepository } from "../prisma.prompt-tag-assignment.repository";
+import {
+  PromptTagAssignmentRepository,
+  type PromptTagAssignmentDatabase,
+} from "../prisma.prompt-tag-assignment.repository";
 
 function makeMockPrisma(overrides: Record<string, unknown> = {}) {
   return {
@@ -13,7 +15,7 @@ function makeMockPrisma(overrides: Record<string, unknown> = {}) {
       findFirst: vi.fn(),
     },
     ...overrides,
-  } as unknown as PrismaClient;
+  } as unknown as PromptTagAssignmentDatabase;
 }
 
 describe("PromptTagAssignmentRepository", () => {

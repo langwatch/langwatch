@@ -64,7 +64,7 @@ describe("Feature: The prompt list reports live copy counts", () => {
       },
     });
 
-    service = getApp().prompts;
+    service = getApp().prompts.promptService;
   });
 
   afterEach(async () => {

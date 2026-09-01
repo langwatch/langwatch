@@ -18,6 +18,7 @@ describe("Prompt contract", () => {
     ).toBe("openai/gpt-4o");
   });
 
+  /** @scenario invalid handles are rejected at the contract boundary */
   it("rejects invalid handles before persistence", () => {
     expect(promptHandleSchema.safeParse("Invalid Handle").success).toBe(false);
     expect(promptHandleSchema.safeParse("support-bot/v1").success).toBe(true);

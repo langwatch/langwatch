@@ -3,7 +3,7 @@ import type { TargetConfig } from "~/experiments-v3/types";
 import { pickTargetName } from "~/experiments-v3/utils/targetDisplayName";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { prisma as defaultPrisma } from "~/server/db";
-import { AppPromptRuntime } from "~/runtime/app/features/prompt";
+import type { PromptService } from "@langwatch/prompt-contract";
 
 const logger = createLogger("langwatch:experiments-v3:target-names");
 
@@ -23,15 +23,24 @@ const logger = createLogger("langwatch:experiments-v3:target-names");
 export const resolveWorkbenchTargetNames = async ({
   projectId,
   targets,
+  prompts: promptService,
   prisma = defaultPrisma,
 }: {
   projectId: string;
   targets: TargetConfig[];
+  /**
+   * The process's own Prompt service, injected rather than built here.
+   *
+   * This module used to compose a second Prompt service out of the module
+   * global client every time a saved workbench was read, so a handle resolved
+   * here went through a different graph than the one the run itself used.
+   */
+  prompts: PromptService;
   prisma?: PrismaClient;
 }): Promise<Record<string, string>> => {
   try {
     const [prompts, agents, evaluators] = await Promise.all([
-      loadPrompts({ projectId, targets, prisma }),
+      loadPrompts({ projectId, targets, promptService }),
       loadNamedRows({
         ids: idsOf(targets, "agent", (target) => target.dbAgentId),
         find: (ids) =>
@@ -99,20 +108,19 @@ const loadNamedRows = async ({
 const loadPrompts = async ({
   projectId,
   targets,
-  prisma,
+  promptService,
 }: {
   projectId: string;
   targets: TargetConfig[];
-  prisma: PrismaClient;
+  promptService: PromptService;
 }): Promise<Map<string, { handle?: string | null }>> => {
-  const service = AppPromptRuntime.create({ database: prisma }).build();
   // One lookup per distinct prompt, all in flight at once: the agent branch and
   // the evaluator branch beside this one batch their rows, so a serial loop
   // here sets the latency floor for the whole resolution.
   const found = await Promise.all(
     idsOf(targets, "prompt", (t) => t.promptId).map(async (promptId) => ({
       promptId,
-      prompt: await service.tryGetPromptByIdOrHandle({
+      prompt: await promptService.tryGetPromptByIdOrHandle({
         idOrHandle: promptId,
         projectId,
       }),

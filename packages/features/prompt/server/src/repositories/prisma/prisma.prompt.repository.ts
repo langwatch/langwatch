@@ -7,13 +7,6 @@ import type {
   Prisma,
   PrismaClient,
 } from "@langwatch/prisma-client/generated";
-export type {
-  LlmPromptConfigVersion,
-  Prisma,
-  PrismaClient,
-  PromptScope,
-  PromptTag,
-} from "@langwatch/prisma-client/generated";
 import {
   SchemaVersion,
   NotFoundError,
@@ -68,6 +61,17 @@ export interface LlmConfigWithLatestVersion extends LlmPromptConfig {
 }
 
 /**
+ * The client slice prompt persistence binds to, transaction included: a
+ * config row, its versions, the project row an organization is resolved
+ * through, and the transaction that keeps a config and its first version from
+ * ever existing apart.
+ */
+export type PromptConfigDatabase = Pick<
+  PrismaClient,
+  "llmPromptConfig" | "llmPromptConfigVersion" | "project" | "$transaction"
+>;
+
+/**
  * Repository for managing LLM Configurations
  * Follows Single Responsibility Principle by focusing only on LLM config data access
  */
@@ -75,7 +79,7 @@ export class LlmConfigRepository {
   public readonly versions: LlmConfigVersionsRepository;
 
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly prisma: PromptConfigDatabase,
     versions = new LlmConfigVersionsRepository(prisma),
     private readonly modelProvider?: ModelProviderService,
   ) {

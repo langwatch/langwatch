@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { LlmConfigRepository } from "../prisma.prompt.repository";
+import {
+  LlmConfigRepository,
+  type LlmConfigWithLatestVersion,
+  type PromptConfigDatabase,
+} from "../prisma.prompt.repository";
 
 function makeMockPrisma(overrides: Record<string, unknown> = {}) {
   return {
@@ -19,7 +22,7 @@ function makeMockPrisma(overrides: Record<string, unknown> = {}) {
         }),
       ),
     },
-  } as unknown as PrismaClient;
+  } as unknown as PromptConfigDatabase;
 }
 
 describe("LlmConfigRepository", () => {
@@ -43,7 +46,7 @@ describe("LlmConfigRepository", () => {
           createdAt: new Date(),
           updatedAt: new Date(),
           deletedAt: null,
-          latestVersion: {} as any,
+          latestVersion: {} as LlmConfigWithLatestVersion["latestVersion"],
         });
 
         await repo.deleteConfig({
@@ -81,7 +84,7 @@ describe("LlmConfigRepository", () => {
           createdAt: new Date(),
           updatedAt: new Date(),
           deletedAt: null,
-          latestVersion: {} as any,
+          latestVersion: {} as LlmConfigWithLatestVersion["latestVersion"],
         });
 
         await repo.deleteConfig({
@@ -120,7 +123,7 @@ describe("LlmConfigRepository", () => {
           createdAt: new Date(),
           updatedAt: new Date(),
           deletedAt: null,
-          latestVersion: {} as any,
+          latestVersion: {} as LlmConfigWithLatestVersion["latestVersion"],
         });
 
         await repo.deleteConfig({

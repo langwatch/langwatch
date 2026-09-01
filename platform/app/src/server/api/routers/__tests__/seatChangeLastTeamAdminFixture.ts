@@ -276,7 +276,7 @@ async function installTestApp({ prisma }: { prisma: PrismaClient }) {
     }),
     organizations: new OrganizationService(
       new PrismaOrganizationRepository(prisma),
-      createTestApp().prompts,
+      createTestApp().prompts.promptService,
       canonicalOrganizations,
     ),
     usageLimits: {

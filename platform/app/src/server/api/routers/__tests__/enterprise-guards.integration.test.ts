@@ -149,7 +149,7 @@ describe("enterprise feature guards", () => {
       // repository and refuses those operations.
       organizations: new OrganizationService(
         new PrismaOrganizationRepository(prisma, base.authzGrants),
-        base.prompts,
+        base.prompts.promptService,
         canonicalOrganizations,
         createLicenseEnforcementService(prisma, planProvider),
       ),

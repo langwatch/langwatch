@@ -46,7 +46,7 @@ describe("Feature: Prompt runtime parameters", () => {
       skipDuplicates: true,
     });
 
-    service = getApp().prompts;
+    service = getApp().prompts.promptService;
   });
 
   afterEach(async () => {

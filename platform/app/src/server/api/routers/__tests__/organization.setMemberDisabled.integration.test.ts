@@ -112,7 +112,7 @@ describe("organization.setMemberDisabled", () => {
 
     globalForApp.__langwatch_app = createTestApp({
       organizations: traced(
-        new OrganizationService(repo, createTestApp().prompts),
+        new OrganizationService(repo, createTestApp().prompts.promptService),
         "OrganizationService",
       ),
       // `createTestApp` otherwise pins FREE_PLAN, whose single seat is not the

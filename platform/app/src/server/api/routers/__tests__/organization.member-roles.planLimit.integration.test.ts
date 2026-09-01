@@ -160,7 +160,7 @@ describe("organization member role plan limit enforcement", () => {
       // landed is what distinguishes "allowed" from "quietly dropped".
       organizations: new OrganizationService(
         new PrismaOrganizationRepository(prisma),
-        base.prompts,
+        base.prompts.promptService,
       ),
     });
 

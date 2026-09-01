@@ -104,6 +104,7 @@ describe("prompts.copy", () => {
 
   describe("given the target project holds no prompt under that handle", () => {
     describe("when the prompt is replicated", () => {
+      /** @scenario existing transports preserve their public surface */
       it("keeps the source handle and lands in the target project", async () => {
         const source = await givenASupportBotPrompt();
 

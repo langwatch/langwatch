@@ -10,11 +10,17 @@ export const PROTECTED_TAGS = ["latest"] as const;
 export type ProtectedTag = (typeof PROTECTED_TAGS)[number];
 
 /**
+ * The client slice the tag catalogue binds to, transaction included: seeding
+ * an organization's tags is one write or none.
+ */
+export type PromptTagDatabase = Pick<PrismaClient, "promptTag" | "$transaction">;
+
+/**
  * Repository for managing prompt tag definitions.
  * Production and staging are seeded as custom tags per org.
  */
 export class PromptTagRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PromptTagDatabase) {}
 
   /**
    * Creates a custom tag definition for an org.

@@ -17,12 +17,24 @@ export class TagValidationError extends Error {
 }
 
 /**
+ * The client slice tag assignments bind to.
+ *
+ * An assignment row plus the version row it is checked against — nothing
+ * else. Declared here so the adapter above, and every layer above that, name
+ * no generated client at all.
+ */
+export type PromptTagAssignmentDatabase = Pick<
+  PrismaClient,
+  "promptTagAssignment" | "llmPromptConfigVersion"
+>;
+
+/**
  * Repository for managing prompt version tag assignments.
  * Assignments link a prompt config to a PromptTag definition via FK.
  * Tag validation is the service layer's responsibility.
  */
 export class PromptTagAssignmentRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PromptTagAssignmentDatabase) {}
 
   /**
    * Validates that a version belongs to the specified prompt config.

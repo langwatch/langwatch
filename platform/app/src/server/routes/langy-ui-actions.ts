@@ -138,6 +138,7 @@ function createService({
           evaluators: app.evaluators,
           modelProviders: app.modelProviders.providerService,
           nlpLambda: app.nlpLambda,
+          prompts: app.prompts.promptService,
           workflows: app.workflows.workflowService,
         },
         context: {

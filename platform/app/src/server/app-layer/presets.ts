@@ -442,7 +442,7 @@ import {
 } from "~/runtime/app/features/coding-agent";
 import { AppDatasetRuntime } from "~/runtime/app/features/dataset";
 import { AppAutomationTestFireAdapter } from "~/runtime/app/features/automation-test-fire.adapter";
-import { AppPromptRuntime } from "~/runtime/app/features/prompt";
+import { PostgresPromptAdapter } from "@langwatch/prompt-server";
 import { createLangyConversationTitleGenerator } from "~/runtime/app/features/langy-title-generation.adapter";
 import { AppLangyAnalyticsEventClickHouseAdapter } from "~/runtime/app/features/langy-analytics-event.clickhouse.adapter";
 import { PostgresMonitorAdapter } from "@langwatch/monitor-server";
@@ -1275,7 +1275,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     }),
     metrics: new AppTopicClusteringMetricsAdapter(),
   });
-  const prompts = AppPromptRuntime.create({
+  const prompts = PostgresPromptAdapter.create({
     database: prisma,
     modelProvider: modelProviders,
   }).build();
@@ -3191,7 +3191,7 @@ export function createTestApp(
     isSaas: false,
     permissions: testAuthz.permissions,
   }).build();
-  const prompts = AppPromptRuntime.create({
+  const prompts = PostgresPromptAdapter.create({
     database: testPrisma,
     modelProvider: modelProviders,
   }).build();

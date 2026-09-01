@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { LlmConfigRepository } from "../../repositories/prisma/prisma.prompt.repository";
+import {
+  LlmConfigRepository,
+  type PromptConfigDatabase,
+} from "../../repositories/prisma/prisma.prompt.repository";
 import { transformCamelToSnake } from "../prompt-transform-db.port";
 
 /**
@@ -15,7 +18,14 @@ import { transformCamelToSnake } from "../prompt-transform-db.port";
  * because it's always derivable from outputs and not a real difference.
  */
 describe("compareConfigContent()", () => {
-  const repository = new LlmConfigRepository(null as any);
+  /**
+   * Comparing two configs reads no row, so the repository is composed over a
+   * persistence double that answers nothing. Naming the feature's own slice
+   * rather than the generated client is what keeps this test honest: if the
+   * comparison ever grows a query, the double stops compiling.
+   */
+  const noPersistence = {} as PromptConfigDatabase;
+  const repository = new LlmConfigRepository(noPersistence);
 
   const jsonSchemaOutputs = [
     {
