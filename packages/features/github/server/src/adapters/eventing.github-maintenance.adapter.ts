@@ -5,7 +5,6 @@ import {
   type Event,
   type ProcessStore,
 } from "@langwatch/eventing";
-import type { GithubService } from "@langwatch/github-contract";
 import {
   GITHUB_BRANCH_RECHECK_INITIAL_STATE,
   GITHUB_BRANCH_RECHECK_INTERVAL_MS,
@@ -18,9 +17,19 @@ import {
   runGithubBranchRecheck,
   runGithubRetentionPrune,
 } from "../intents/github-branch-recheck.intent";
+import type { GithubBranchMaintenancePort } from "../ports/github-branch-maintenance.port";
 
 export interface GithubMaintenancePipelineDeps {
-  github: GithubService;
+  /**
+   * The sweep, named by the two operations the schedule calls.
+   *
+   * It used to be the whole `GithubService`, which is what made this pipeline
+   * unmountable by any graph that had not composed the App: the facade carries
+   * an organization service and a project service the sweep never reaches. The
+   * published service still satisfies this, so the registration in platform's
+   * legacy registry is unchanged.
+   */
+  github: GithubBranchMaintenancePort;
   processStore: ProcessStore;
 }
 

@@ -7,15 +7,9 @@ import {
   type GithubBranchCheckRow,
   NullGithubPullRequestsRepository,
 } from "../../repositories/github-pull-requests.repository";
-import { GithubInstallationsService } from "../github-installations.service";
 import { GithubInstallationAccessService } from "../github-installation-access.service";
 import { GithubBranchMappingService } from "../github-branch-mapping.service";
 import { GithubBranchMaintenanceService } from "../github-branch-maintenance.service";
-import { GithubPullRequestMappingService } from "../github-pull-request-mapping.service";
-import {
-  TestOrganizationService,
-  TestProjectService,
-} from "./fixtures/github-services.fixture";
 
 const NOW = Date.UTC(2026, 5, 1);
 const DAY = 24 * 60 * 60 * 1000;
@@ -45,43 +39,33 @@ class MaintenanceRepository extends NullGithubPullRequestsRepository {
   }
 }
 
+/**
+ * The sweep's own graph: pull-request rows, installation reads, an App token
+ * and a host. No organization service and no project service appear here, and
+ * that is the point — the sweep spans every tenant and has neither in hand.
+ */
 function service(repository: MaintenanceRepository) {
   const appTokens = GithubAppTokenAdapter.create("app", "test-key", null);
-  const organizations = new TestOrganizationService();
-  const installationRepository = new NullGithubInstallationsRepository();
   const access = GithubInstallationAccessService.create(
-    installationRepository,
+    new NullGithubInstallationsRepository(),
     appTokens,
   );
-  const installations = GithubInstallationsService.create(
-    installationRepository,
-    appTokens,
-    organizations,
-    access,
-  );
 
-  const branches = GithubBranchMappingService.create({
+  return GithubBranchMaintenanceService.create({
     repository,
-    installations,
-    appTokens,
-    project: new TestProjectService("org-1"),
-    host: GithubHostAdapter.create(),
+    mapping: GithubBranchMappingService.create({
+      repository,
+      installations: access,
+      appTokens,
+      host: GithubHostAdapter.create(),
+      now: () => NOW,
+    }),
     now: () => NOW,
-  });
-  const maintenance = GithubBranchMaintenanceService.create({
-    repository,
-    mapping: branches,
-    now: () => NOW,
-  });
-
-  return GithubPullRequestMappingService.create({
-    repository,
-    branches,
-    maintenance,
   });
 }
 
 describe("GitHub branch maintenance", () => {
+  /** @scenario "The sweep reads a bounded page of branches demanded recently" */
   it("asks only for fifty due branches demanded within the last week", async () => {
     const repository = new MaintenanceRepository();
 
@@ -94,6 +78,7 @@ describe("GitHub branch maintenance", () => {
     });
   });
 
+  /** @scenario "Branch bookkeeping is dropped past the activity horizon" */
   it("prunes bookkeeping at the same one-week activity horizon", async () => {
     const repository = new MaintenanceRepository();
     repository.deleted = { branchChecks: 7 };

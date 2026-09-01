@@ -2,10 +2,17 @@ import type { GithubService } from "@langwatch/github-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 
-import { PrismaGithubInstallationsRepository } from "../repositories/prisma/github-installations.repository";
-import { PrismaGithubPullRequestsRepository } from "../repositories/prisma/github-pull-requests.repository";
+import {
+  PrismaGithubInstallationsRepository,
+  type PrismaGithubInstallationsDatabase,
+} from "../repositories/prisma/github-installations.repository";
+import {
+  PrismaGithubPullRequestsRepository,
+  type PrismaGithubPullRequestsDatabase,
+} from "../repositories/prisma/github-pull-requests.repository";
 import { GithubInstallationsService } from "../services/github-installations.service";
 import { GithubInstallationAccessService } from "../services/github-installation-access.service";
+import { GithubBranchDemandService } from "../services/github-branch-demand.service";
 import { GithubBranchMaintenanceService } from "../services/github-branch-maintenance.service";
 import { GithubBranchMappingService } from "../services/github-branch-mapping.service";
 import { GithubPullRequestMappingService } from "../services/github-pull-request-mapping.service";
@@ -19,8 +26,11 @@ import { GithubInstallStateAdapter } from "./github-install-state.adapter";
 import { GithubPullRequestEventAdapter } from "./github-pull-request-event.adapter";
 import { RedisGithubAdapter } from "./redis.github.adapter";
 
+/** Everything the whole GitHub capability reads through, in one client. */
+export type GithubDatabase = PrismaGithubInstallationsDatabase & PrismaGithubPullRequestsDatabase;
+
 type PostgresGithubAdapterOptions = {
-  database: object;
+  database: GithubDatabase;
   config: {
     appId: string;
     privateKey: string;
@@ -61,8 +71,12 @@ export class PostgresGithubAdapter {
     );
     const branchMapping = GithubBranchMappingService.create({
       repository: pullRequestsRepository,
-      installations,
+      installations: installationAccess,
       appTokens,
+      host,
+    });
+    const branchDemand = GithubBranchDemandService.create({
+      mapping: branchMapping,
       project: options.project,
       host,
     });
@@ -73,6 +87,7 @@ export class PostgresGithubAdapter {
     const mapping = GithubPullRequestMappingService.create({
       repository: pullRequestsRepository,
       branches: branchMapping,
+      demand: branchDemand,
       maintenance: branchMaintenance,
     });
     const statusCache = GithubPullRequestStatusCacheService.create(redis);

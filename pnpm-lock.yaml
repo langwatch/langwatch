@@ -451,6 +451,12 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@langwatch/data-privacy-web':
+        specifier: workspace:*
+        version: link:../../packages/features/data-privacy/web
+      '@langwatch/data-retention-web':
+        specifier: workspace:*
+        version: link:../../packages/features/data-retention/web
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../packages/design-system
@@ -575,6 +581,9 @@ importers:
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../packages/eventing
+      '@langwatch/github-server':
+        specifier: workspace:*
+        version: link:../../packages/features/github/server
       '@langwatch/group-queue':
         specifier: workspace:*
         version: link:../../packages/group-queue
@@ -3000,10 +3009,58 @@ importers:
 
   packages/features/data-privacy/web:
     dependencies:
+      '@langwatch/authz-web':
+        specifier: workspace:*
+        version: link:../../authz/web
       '@langwatch/data-privacy-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/design-system':
+        specifier: workspace:*
+        version: link:../../../design-system
+      '@langwatch/platform-api-client':
+        specifier: workspace:*
+        version: link:../../../platform-api-client
+      '@langwatch/redaction':
+        specifier: workspace:*
+        version: link:../../../redaction
+      lucide-react:
+        specifier: ^1.22.0
+        version: 1.22.0(react@19.2.8)
+      safe-regex2:
+        specifier: ^5.1.1
+        version: 5.1.1
     devDependencies:
+      '@chakra-ui/react':
+        specifier: ^3.36.0
+        version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@emotion/react':
+        specifier: ^11.14.0
+        version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
+      '@testing-library/jest-dom':
+        specifier: ^7.0.1
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@4.1.10)
+      '@testing-library/react':
+        specifier: ^16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@testing-library/user-event':
+        specifier: 14.6.1
+        version: 14.6.1(@testing-library/dom@10.4.1)
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.4(@types/react@19.2.18)
+      jsdom:
+        specifier: ^30.0.1
+        version: 30.0.1(@noble/hashes@2.2.0)
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.8(react@19.2.8)
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -3063,28 +3120,37 @@ importers:
 
   packages/features/data-retention/web:
     dependencies:
-      '@chakra-ui/react':
-        specifier: ^3.36.0
-        version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@langwatch/authz-web':
+        specifier: workspace:*
+        version: link:../../authz/web
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../contract
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../design-system
+      '@langwatch/platform-api-client':
+        specifier: workspace:*
+        version: link:../../../platform-api-client
       lucide-react:
         specifier: ^1.22.0
         version: 1.22.0(react@19.2.8)
-      react:
-        specifier: ^19.2.7
-        version: 19.2.8
     devDependencies:
+      '@chakra-ui/react':
+        specifier: ^3.36.0
+        version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@emotion/react':
+        specifier: ^11.14.0
+        version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
       '@testing-library/jest-dom':
         specifier: ^7.0.1
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@4.1.10)
       '@testing-library/react':
         specifier: ^16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@testing-library/user-event':
+        specifier: 14.6.1
+        version: 14.6.1(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.18
@@ -3094,6 +3160,9 @@ importers:
       jsdom:
         specifier: ^30.0.1
         version: 30.0.1(@noble/hashes@2.2.0)
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
       react-dom:
         specifier: ^19.2.7
         version: 19.2.8(react@19.2.8)
@@ -3186,9 +3255,15 @@ importers:
       '@chakra-ui/react':
         specifier: ^3.36.0
         version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@dnd-kit/core':
+        specifier: ^6.3.1
+        version: 6.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@dnd-kit/sortable':
         specifier: ^10.0.0
         version: 10.0.0(@dnd-kit/core@6.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
+      '@dnd-kit/utilities':
+        specifier: 3.2.2
+        version: 3.2.2(react@19.2.8)
       '@emotion/react':
         specifier: ^11.14.0
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
@@ -3198,6 +3273,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../design-system
+      '@langwatch/platform-api-client':
+        specifier: workspace:*
+        version: link:../../../platform-api-client
       '@tanstack/react-table':
         specifier: ^8.21.3
         version: 8.21.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -28799,7 +28877,7 @@ snapshots:
       isstream: 0.1.2
       jsonwebtoken: 9.0.3
       mime-types: 2.1.35
-      retry-axios: 2.6.0(axios@1.19.0(debug@4.4.3))
+      retry-axios: 2.6.0(axios@1.19.0)
       tough-cookie: 4.1.4
     transitivePeerDependencies:
       - supports-color
@@ -31980,7 +32058,7 @@ snapshots:
 
   ret@0.5.0: {}
 
-  retry-axios@2.6.0(axios@1.19.0(debug@4.4.3)):
+  retry-axios@2.6.0(axios@1.19.0):
     dependencies:
       axios: 1.19.0(debug@4.4.3)
 

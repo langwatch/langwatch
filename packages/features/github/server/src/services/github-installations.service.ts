@@ -44,10 +44,7 @@ export class GithubInstallationsService {
     return this.appTokens.configured;
   }
 
-  isOrganizationMember(input: {
-    userId: string;
-    organizationId: string;
-  }): Promise<boolean> {
+  isOrganizationMember(input: { userId: string; organizationId: string }): Promise<boolean> {
     return this.organization.isMember(input);
   }
 
@@ -55,9 +52,11 @@ export class GithubInstallationsService {
     return this.repository.findAllForOrganization(organizationId);
   }
 
-  // This read attributes a verified webhook and remains valid without credentials.
+  // This read attributes a verified webhook and remains valid without
+  // credentials. It goes through the access service because branch mapping
+  // reads it there too, and one row should have one reader.
   tryGetByInstallationId(installationId: string): Promise<GithubInstallationRow | null> {
-    return this.repository.tryFindByInstallationId(installationId);
+    return this.access.tryGetByInstallationId(installationId);
   }
 
   async recordInstallation(input: {
@@ -121,9 +120,7 @@ export class GithubInstallationsService {
     }
   }
 
-  listRepositoriesForOrganization(
-    organizationId: string,
-  ): Promise<GithubRepositoryRef[]> {
+  listRepositoriesForOrganization(organizationId: string): Promise<GithubRepositoryRef[]> {
     return this.access.listRepositoriesForOrganization(organizationId);
   }
 
@@ -185,10 +182,7 @@ export class GithubInstallationsService {
         repositories,
       });
     } catch (error) {
-      logger.warn(
-        { error, installationId, action },
-        "failed to refresh webhook repositories",
-      );
+      logger.warn({ error, installationId, action }, "failed to refresh webhook repositories");
     }
   }
 }

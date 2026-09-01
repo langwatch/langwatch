@@ -3,18 +3,17 @@ import {
   type GithubPullRequestEvent,
 } from "@langwatch/github-contract";
 import { createLogger } from "@langwatch/observability";
-import type { ProjectService } from "@langwatch/project-contract";
 import {
   type GithubAppTokenPort,
   type GithubPullRequestSummary,
   GithubRateLimitedError,
 } from "../ports/github-app-token.port";
+import type { GithubBranchInstallationsPort } from "../ports/github-branch-installations.port";
 import type { GithubHostPort } from "../ports/github-host.port";
 import type {
   GithubPullRequestsRepository,
   UpsertGithubPullRequestInput,
 } from "../repositories/github-pull-requests.repository";
-import type { GithubInstallationsService } from "./github-installations.service";
 
 const logger = createLogger("langwatch:github:branch-mapping");
 const FRESH_MAPPING_MS = 15 * 60 * 1000;
@@ -38,14 +37,6 @@ type BranchAddress = {
 };
 export type BranchMappingTarget = BranchAddress & {
   origin: BranchMappingOrigin;
-  originProjectId?: string;
-};
-export type BranchMappingRequest = {
-  tenantId: string;
-  repositoryHost: string;
-  repositoryOwner: string;
-  repositoryName: string;
-  headBranch: string;
 };
 type BranchScope = {
   organizationId: string;
@@ -55,9 +46,8 @@ type BranchScope = {
 };
 type BranchMappingDeps = {
   repository: GithubPullRequestsRepository;
-  installations: GithubInstallationsService;
+  installations: GithubBranchInstallationsPort;
   appTokens: GithubAppTokenPort;
-  project: ProjectService;
   host: GithubHostPort;
   now?: () => number;
 };
@@ -71,6 +61,16 @@ function backoffMsFor(attempts: number): number {
   return EMPTY_BACKOFF_MS[index]!;
 }
 
+/**
+ * Asking GitHub which pull requests a branch has, and writing down the answer.
+ *
+ * This is the half the fleet-wide sweep runs, so its collaborators are the ones
+ * the sweep can actually supply: the pull-request rows, the installation that
+ * covers a repository, an App token, and the host. A project is deliberately
+ * absent — the sweep walks branch bookkeeping that spans every tenant and has
+ * no project in hand, and the one write that needed one (recording that a
+ * customer's project saw a pull request) belongs to the demand side that asked.
+ */
 export class GithubBranchMappingService {
   static create(deps: BranchMappingDeps): GithubBranchMappingService {
     return new GithubBranchMappingService(deps);
@@ -78,42 +78,13 @@ export class GithubBranchMappingService {
 
   private constructor(private readonly deps: BranchMappingDeps) {}
 
-  async request(request: BranchMappingRequest): Promise<void> {
-    if (!this.deps.host.isMappable(request.repositoryHost)) {
-      return;
-    }
-
-    let organizationId: string;
-    try {
-      organizationId = await this.deps.project.getOrganizationId(request.tenantId);
-    } catch {
-      return;
-    }
-
-    const target: BranchMappingTarget = {
-      organizationId,
-      repositoryHost: request.repositoryHost,
-      repositoryOwner: request.repositoryOwner,
-      repositoryName: request.repositoryName,
-      headBranch: request.headBranch,
-      origin: "demand",
-      originProjectId: request.tenantId,
-    };
-    await this.bringRecheckForward(target);
-    await this.map(target);
-  }
-
   async applyPullRequestEvent(event: GithubPullRequestEvent): Promise<boolean> {
-    const links = GITHUB_LINKING_PULL_REQUEST_ACTIONS.some(
-      (action) => action === event.action,
-    );
+    const links = GITHUB_LINKING_PULL_REQUEST_ACTIONS.some((action) => action === event.action);
     if (!links) {
       return false;
     }
 
-    const installation = await this.deps.installations.tryGetByInstallationId(
-      event.installationId,
-    );
+    const installation = await this.deps.installations.tryGetByInstallationId(event.installationId);
     if (!installation) {
       logger.info(
         { installationId: event.installationId, action: event.action },
@@ -142,10 +113,18 @@ export class GithubBranchMappingService {
     return true;
   }
 
-  async map(target: BranchMappingTarget): Promise<void> {
+  /**
+   * Maps one branch, answering how many pull requests it recorded.
+   *
+   * The count is what the demand side reads: a project has seen a pull request
+   * when a mapping it asked for found one, and every other outcome here — an
+   * unmappable address, no installation covering the repository, a mapping
+   * another worker already holds the claim on, a rate limit — is a zero.
+   */
+  async map(target: BranchMappingTarget): Promise<number> {
     const scope = this.tryScope(target);
     if (!scope) {
-      return;
+      return 0;
     }
 
     const covering = await this.deps.installations.tryResolveInstallationForRepository({
@@ -153,7 +132,7 @@ export class GithubBranchMappingService {
       repositoryFullName: scope.repositoryFullName,
     });
     if (!covering || !(await this.claim(scope, target.origin))) {
-      return;
+      return 0;
     }
 
     try {
@@ -169,14 +148,22 @@ export class GithubBranchMappingService {
         pullRequests,
         isExhaustive: true,
         origin: target.origin,
-        originProjectId: target.originProjectId,
       });
+      return pullRequests.length;
     } catch (error) {
       await this.recordFailure(scope, error, target.origin);
+      return 0;
     }
   }
 
-  private async bringRecheckForward(target: BranchMappingTarget): Promise<void> {
+  /**
+   * Pulls a branch's next sweep into the active window.
+   *
+   * Demand is what this records: a branch somebody just asked about is worth
+   * re-asking GitHub about soon, whatever backoff an earlier empty answer had
+   * pushed it out to.
+   */
+  async bringRecheckForward(target: BranchMappingTarget): Promise<void> {
     const scope = this.tryScope(target);
     if (!scope) {
       return;
@@ -186,6 +173,24 @@ export class GithubBranchMappingService {
       ...scope,
       dueAt: new Date(nowMs(this.deps) + ACTIVE_BRANCH_MAX_BACKOFF_MS),
     });
+  }
+
+  private tryScope(address: BranchAddress): BranchScope | null {
+    if (
+      !this.deps.host.isMappable(address.repositoryHost) ||
+      !address.headBranch ||
+      !address.repositoryOwner ||
+      !address.repositoryName
+    ) {
+      return null;
+    }
+
+    return {
+      organizationId: address.organizationId,
+      repositoryHost: this.deps.host.normalize(address.repositoryHost),
+      repositoryFullName: `${address.repositoryOwner}/${address.repositoryName}`,
+      headBranch: address.headBranch,
+    };
   }
 
   private async claim(scope: BranchScope, origin: BranchMappingOrigin): Promise<boolean> {
@@ -214,16 +219,12 @@ export class GithubBranchMappingService {
     pullRequests: readonly GithubPullRequestSummary[];
     isExhaustive: boolean;
     origin: BranchMappingOrigin;
-    originProjectId?: string;
   }): Promise<void> {
     const now = new Date(nowMs(this.deps));
     if (input.pullRequests.length > 0) {
       await this.deps.repository.upsertPullRequests({
-        pullRequests: input.pullRequests.map((pull) =>
-          this.toUpsertInput(input.scope, pull),
-        ),
+        pullRequests: input.pullRequests.map((pull) => this.toUpsertInput(input.scope, pull)),
       });
-      await this.tryRecordProjectActivity(input.originProjectId, now);
     }
 
     const existing = await this.deps.repository.tryFindBranchCheck(input.scope);
@@ -236,27 +237,10 @@ export class GithubBranchMappingService {
         ? input.pullRequests.length
         : Math.max(existing?.prCount ?? 0, input.pullRequests.length),
       notFoundAt: hasPullRequests ? null : (existing?.notFoundAt ?? now),
-      recheckAfter: hasPullRequests
-        ? null
-        : new Date(now.getTime() + backoffMsFor(attempts)),
+      recheckAfter: hasPullRequests ? null : new Date(now.getTime() + backoffMsFor(attempts)),
       attempts,
       lastRequestedAt: input.origin === "demand" ? now : null,
     });
-  }
-
-  private async tryRecordProjectActivity(
-    projectId: string | undefined,
-    at: Date,
-  ): Promise<void> {
-    if (!projectId) {
-      return;
-    }
-
-    try {
-      await this.deps.project.touchCodingAgentPullRequestSeen({ projectId, at });
-    } catch (error) {
-      logger.warn({ error, projectId }, "failed to record PR project activity");
-    }
   }
 
   private async recordFailure(
@@ -281,24 +265,6 @@ export class GithubBranchMappingService {
       attempts,
       lastRequestedAt: origin === "demand" ? now : null,
     });
-  }
-
-  private tryScope(address: BranchAddress): BranchScope | null {
-    if (
-      !this.deps.host.isMappable(address.repositoryHost) ||
-      !address.headBranch ||
-      !address.repositoryOwner ||
-      !address.repositoryName
-    ) {
-      return null;
-    }
-
-    return {
-      organizationId: address.organizationId,
-      repositoryHost: this.deps.host.normalize(address.repositoryHost),
-      repositoryFullName: `${address.repositoryOwner}/${address.repositoryName}`,
-      headBranch: address.headBranch,
-    };
   }
 
   private toUpsertInput(

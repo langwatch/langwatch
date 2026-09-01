@@ -62,20 +62,20 @@ function reposToJson(
   }));
 }
 
-function isGithubInstallationsDatabase(database: object): database is PrismaClient {
-  return "githubInstallation" in database;
-}
+/**
+ * The client this repository reads through, named by the one delegate it uses.
+ *
+ * The composition root already holds a typed `PrismaClient`; naming the model
+ * here is what lets it hand that client straight down with no cast at the seam.
+ */
+export type PrismaGithubInstallationsDatabase = Pick<PrismaClient, "githubInstallation">;
 
 export class PrismaGithubInstallationsRepository extends GithubInstallationsRepository {
-  static create(database: object): PrismaGithubInstallationsRepository {
-    if (!isGithubInstallationsDatabase(database)) {
-      throw new Error("GitHub installation persistence requires Prisma");
-    }
-
+  static create(database: PrismaGithubInstallationsDatabase): PrismaGithubInstallationsRepository {
     return new PrismaGithubInstallationsRepository(database);
   }
 
-  private constructor(private readonly prisma: PrismaClient) {
+  private constructor(private readonly prisma: PrismaGithubInstallationsDatabase) {
     super();
   }
 
@@ -87,9 +87,7 @@ export class PrismaGithubInstallationsRepository extends GithubInstallationsRepo
     return records.map(toRow);
   }
 
-  async tryFindByInstallationId(
-    installationId: string,
-  ): Promise<GithubInstallationRow | null> {
+  async tryFindByInstallationId(installationId: string): Promise<GithubInstallationRow | null> {
     const record = await this.prisma.githubInstallation.findUnique({
       where: { installationId },
     });
@@ -139,10 +137,7 @@ export class PrismaGithubInstallationsRepository extends GithubInstallationsRepo
       });
       return { wasInserted: true, row: toRow(created) };
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         // Another request already committed this installationId first — the
         // unique index is the atomicity guarantee, not a check we ran
         // ourselves, so this read always sees the winner's committed row.

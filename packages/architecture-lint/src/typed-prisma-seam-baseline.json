@@ -44,8 +44,6 @@
     "packages/features/automation/server/src/repositories/prisma/prisma.webhook-delivery.repository.ts",
     "packages/features/dataset/server/src/repositories/prisma/prisma.dataset-record.repository.ts",
     "packages/features/dataset/server/src/repositories/prisma/prisma.dataset.repository.ts",
-    "packages/features/github/server/src/repositories/prisma/github-installations.repository.ts",
-    "packages/features/github/server/src/repositories/prisma/github-pull-requests.repository.ts",
     "packages/features/model-provider/server/src/repositories/prisma/prisma.model-cost.repository.ts",
     "packages/features/model-provider/server/src/repositories/prisma/prisma.model-default.repository.ts",
     "packages/features/model-provider/server/src/repositories/prisma/prisma.model-provider.repository.ts",

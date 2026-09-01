@@ -542,4 +542,107 @@ describe("WorkerProductionComposition", () => {
       expect(updateMany).toHaveBeenCalledTimes(1);
     });
   });
+
+  /**
+   * The GitHub branch sweep, composed here rather than handed over built.
+   *
+   * It mounts whether or not this deployment is a GitHub App, because its
+   * retention half is a DELETE over rows this process wrote and needs no
+   * credentials at all. What credentials decide is whether the recheck half can
+   * ask GitHub anything — and a deployment that expected pull-request linkage
+   * to keep working has to be able to read that in its own logs at boot, not
+   * infer it from a sweep that quietly answers zero forever.
+   */
+  describe("when the GitHub branch sweep is composed", () => {
+    function compositionWith(input: {
+      source?: Record<string, unknown>;
+      database?: object;
+      observability?: object;
+    }) {
+      return WorkerProductionComposition.create({
+        config: resolveWorkerConfig({ NODE_ENV: "test", ...input.source }),
+        eventing: {
+          database: createProcessPersistenceDatabase(),
+          resolveClickHouseClient: async () => ({
+            insert: async () => undefined,
+            query: async () => ({ json: async () => [] }),
+          }),
+          groupQueue: { redis: {} as never },
+          retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
+        },
+        lifecycle: new Lifecycle(),
+        transport: new Transport(),
+        trace: { installer: new TraceInstaller(new TraceAssignments()) },
+        topic: {
+          database: (input.database ?? {}) as never,
+          redis: null,
+          execution: {} as never,
+          metrics: {} as never,
+        },
+        ...(input.observability ? { observability: input.observability as never } : {}),
+      });
+    }
+
+    async function recheckThrough(composition: WorkerProductionComposition) {
+      const installer = composition.featureInstallers.find(
+        (candidate) => candidate.name === "github",
+      );
+      expect(installer, "the composition mounted no GitHub feature").toBeDefined();
+      const registered: { name: string; run: (...args: never[]) => Promise<void> }[] = [];
+      const eventSourcing = composition.eventing.eventSourcing;
+      vi.spyOn(eventSourcing, "register").mockImplementation((definition) => {
+        registered.push({
+          name: definition.metadata.name,
+          run: definition.processManagers.get("githubBranchRecheck")!.config.intents!.recheck!
+            .run as never,
+        });
+        return {} as never;
+      });
+      await installer!.install();
+      expect(registered.map((entry) => entry.name)).toEqual(["github_maintenance"]);
+      await registered[0]!.run(...([{ scheduledFor: 0 }, {}] as never[]));
+    }
+
+    it("re-checks through the client the root was given", async () => {
+      const findMany = vi.fn(async () => []);
+
+      await recheckThrough(
+        compositionWith({ database: { githubBranchPullRequestCheck: { findMany } } }),
+      );
+
+      expect(findMany).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A worker without GitHub App credentials names the missing capability" */
+    it("names the absent App credentials, and mounts the sweep anyway", async () => {
+      const warn = vi.fn();
+      const findMany = vi.fn(async () => []);
+
+      await recheckThrough(
+        compositionWith({
+          database: { githubBranchPullRequestCheck: { findMany } },
+          observability: { logger: { info: vi.fn(), warn } },
+        }),
+      );
+
+      expect(warn).toHaveBeenCalledWith(
+        { reason: "no-github-app-credentials" },
+        expect.stringContaining("without App credentials"),
+      );
+    });
+
+    it("says nothing when the process is a GitHub App", async () => {
+      const warn = vi.fn();
+
+      await recheckThrough(
+        compositionWith({
+          source: { GITHUB_LANGY_APP_ID: "1234", GITHUB_LANGY_PRIVATE_KEY: "-----BEGIN-----" },
+          database: { githubBranchPullRequestCheck: { findMany: vi.fn(async () => []) } },
+          observability: { logger: { info: vi.fn(), warn } },
+        }),
+      );
+
+      expect(warn).not.toHaveBeenCalled();
+    });
+  });
 });

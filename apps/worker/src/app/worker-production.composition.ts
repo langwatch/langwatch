@@ -6,12 +6,17 @@ import {
   EnterpriseWorkerComposition,
   type EnterpriseWorkerCompositionOptions,
 } from "@langwatch/enterprise-worker";
+import type { Logger } from "@langwatch/observability";
 import type { ProcessObservability } from "@langwatch/observability/node";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import {
   type AgentSandboxKeyReapDatabase,
   PostgresAgentSandboxKeyReapAdapter,
 } from "@langwatch/api-key-server";
+import {
+  type GithubBranchMaintenanceDatabase,
+  PostgresGithubBranchMaintenanceAdapter,
+} from "@langwatch/github-server";
 import {
   TopicServerInstaller,
   type TopicServerInstallerDependencies,
@@ -58,10 +63,7 @@ import {
   LangyMaintenanceWorkerFeatureInstaller,
   type LangyMaintenanceWorkerCapability,
 } from "../features/langy/langy-maintenance-worker-feature.installer";
-import {
-  GithubWorkerFeatureInstaller,
-  type GithubWorkerCapability,
-} from "../features/github/github-worker-feature.installer";
+import { GithubWorkerFeatureInstaller } from "../features/github/github-worker-feature.installer";
 import {
   GovernanceEventsWorkerFeatureInstaller,
   type GovernanceEventsWorkerCapability,
@@ -168,7 +170,8 @@ export type WorkerLangyMaintenanceCompositionOptions = {
  * feature that is not Topic compose its own Postgres adapter without reading
  * another feature's option, and the fallback goes when the platform root does.
  */
-export type WorkerDatabaseCompositionOptions = AgentSandboxKeyReapDatabase;
+export type WorkerDatabaseCompositionOptions = AgentSandboxKeyReapDatabase &
+  GithubBranchMaintenanceDatabase;
 
 /**
  * The four identity pipelines (ADR-101), which mount as one group.
@@ -186,10 +189,18 @@ export type WorkerIdentityCompositionOptions = {
   joinRequest: JoinRequestWorkerCapability;
 };
 
-/** GitHub pull-request linkage maintenance, fleet-wide rather than per replica. */
-export type WorkerGithubCompositionOptions = {
-  installer: GithubWorkerCapability;
-};
+/**
+ * Reports the composition decision an absent GitHub App would otherwise hide.
+ *
+ * The sweep mounts either way: its retention half is a DELETE over rows this
+ * process wrote and needs no App at all. What changes without credentials is
+ * that the recheck half asks GitHub nothing, and a deployment should read that
+ * in its own logs at boot rather than infer it from a sweep that quietly
+ * answers zero forever.
+ */
+export abstract class WorkerGithubAbsenceReportPort {
+  abstract withoutAppCredentials(): void;
+}
 
 /** Evaluation's durable processing pipeline, mounted before its dispatchers. */
 export type WorkerEvaluationCompositionOptions = {
@@ -306,7 +317,6 @@ type WorkerProductionCompositionBaseOptions = {
   eventingMaintenance?: WorkerEventingMaintenanceCompositionOptions;
   langyConversation?: WorkerLangyConversationCompositionOptions;
   langyMaintenance?: WorkerLangyMaintenanceCompositionOptions;
-  github?: WorkerGithubCompositionOptions;
   evaluation?: WorkerEvaluationCompositionOptions;
   codingAgent?: WorkerCodingAgentCompositionOptions;
   gatewaySpend?: WorkerGatewaySpendCompositionOptions;
@@ -404,12 +414,28 @@ export class WorkerProductionComposition {
         database: options.database ?? options.topic.database,
       }).build(),
     });
-    const github = options.github
-      ? GithubWorkerFeatureInstaller.create({
-          installer: options.github.installer,
-          eventing,
-        })
-      : undefined;
+    // Unconditional, on the same footing as the API-key sweep: the sweep is
+    // composed from this package and the feature's own service, so there is no
+    // graph in which it is present but unbuildable. Credentials are a different
+    // question from composition — without them the recheck half asks GitHub
+    // nothing and the retention half keeps working — so their absence is
+    // reported by name rather than silently mounting a half-sweep.
+    const githubConfig = options.config.github;
+    if (!githubConfig.appId || !githubConfig.privateKey) {
+      WorkerProductionComposition.githubAbsence(options)?.withoutAppCredentials();
+    }
+    const github = GithubWorkerFeatureInstaller.create({
+      eventing,
+      branchMaintenance: PostgresGithubBranchMaintenanceAdapter.create({
+        database: options.database ?? options.topic.database,
+        config: {
+          appId: githubConfig.appId ?? "",
+          privateKey: githubConfig.privateKey ?? "",
+        },
+        redis: infrastructure?.redis ?? options.topic.redis,
+        ...(githubConfig.host ? { hostConfig: { host: githubConfig.host } } : {}),
+      }).build(),
+    });
     const evaluation = options.evaluation
       ? EvaluationWorkerFeatureInstaller.create({
           installer: options.evaluation.installer,
@@ -562,6 +588,15 @@ export class WorkerProductionComposition {
       resources: options.resources,
       infrastructure,
     });
+  }
+
+  /** The boot logger, as the one place a composition absence is declared. */
+  private static githubAbsence(
+    options: WorkerProductionCompositionOptions,
+  ): WorkerGithubAbsenceReportPort | undefined {
+    return options.observability
+      ? LoggedWorkerGithubAbsence.create(options.observability.logger)
+      : undefined;
   }
 
   /**
@@ -862,4 +897,22 @@ function withoutConsumers<Options extends WorkerEventingConsumerCompositionOptio
 ): Omit<Options, "consumers"> {
   const { consumers: _consumers, ...persistence } = options;
   return persistence;
+}
+
+/** Names the missing GitHub App once, at boot, rather than leaving it inferred. */
+export class LoggedWorkerGithubAbsence extends WorkerGithubAbsenceReportPort {
+  static create(logger: Pick<Logger, "warn">): LoggedWorkerGithubAbsence {
+    return new LoggedWorkerGithubAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "warn">) {
+    super();
+  }
+
+  withoutAppCredentials(): void {
+    this.logger.warn(
+      { reason: "no-github-app-credentials" },
+      "worker composed GitHub branch maintenance without App credentials: pull-request linkage is not re-checked, and only its retention half runs",
+    );
+  }
 }

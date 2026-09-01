@@ -24,6 +24,7 @@ describe("resolveWorkerConfig", () => {
         processorType: "batch",
       },
       shutdown: { processDeadlineMs: 25_000 },
+      github: { appId: undefined, privateKey: undefined, host: undefined },
       infrastructure: {
         redis: { configured: false, reason: "unconfigured", warnings: [] },
         groupQueue: {

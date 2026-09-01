@@ -218,8 +218,11 @@ function createComposition(registered: string[]) {
       sandboxKeyReap: { reap: async () => 0 },
     }),
     github: GithubWorkerFeatureInstaller.create({
-      installer: { buildMaintenance: () => namedDefinition("github_maintenance") },
       eventing,
+      branchMaintenance: {
+        recheckDueBranches: async () => 0,
+        pruneStaleBranchLinkage: async () => ({ branchChecks: 0 }),
+      },
     }),
     evaluation: EvaluationWorkerFeatureInstaller.create({
       installer: { buildProcessing: () => namedDefinition("evaluation_processing") },

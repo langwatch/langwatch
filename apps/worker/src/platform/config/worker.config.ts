@@ -4,10 +4,7 @@ import {
   RuntimeConfig,
   type ConfigValue,
 } from "@langwatch/config";
-import {
-  resolveGroupQueuePolicyFromEnv,
-  type GroupQueuePolicy,
-} from "@langwatch/group-queue";
+import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
 import { z } from "zod";
 
@@ -64,6 +61,18 @@ export const workerConfigDefinition = RuntimeConfig.define({
     queueDrainTimeoutMs: Config.value(optionalEnvironmentString, {
       env: "SHUTDOWN_DRAIN_TIMEOUT_MS",
     }),
+  },
+  /**
+   * The GitHub App this instance is, if it is one.
+   *
+   * Optional in exactly the way the application's own environment schema has
+   * it: a deployment without a GitHub App still runs pull-request linkage
+   * retention, and a standalone worker has to be able to boot without one.
+   */
+  github: {
+    appId: Config.value(optionalEnvironmentString, { env: "GITHUB_LANGY_APP_ID" }),
+    privateKey: Config.secret({ optional: true, env: "GITHUB_LANGY_PRIVATE_KEY" }),
+    host: Config.value(optionalEnvironmentString, { env: "GITHUB_LANGY_HOST" }),
   },
   infrastructure: {
     redis: {
@@ -148,6 +157,13 @@ export type WorkerShutdownConfig = Readonly<{
   processDeadlineMs: number;
 }>;
 
+/** The GitHub App credentials the branch sweep mints installation tokens with. */
+export type WorkerGithubConfig = Readonly<{
+  appId?: string;
+  privateKey?: string;
+  host?: string;
+}>;
+
 export type WorkerConfig = Readonly<{
   processRole: "worker";
   environment: string;
@@ -157,6 +173,7 @@ export type WorkerConfig = Readonly<{
   logger: WorkerConfigProjection["logger"];
   observability: WorkerConfigProjection["observability"];
   shutdown: WorkerShutdownConfig;
+  github: WorkerGithubConfig;
   infrastructure: WorkerInfrastructureConfig;
 }>;
 
@@ -180,6 +197,7 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
       environment: value.environment,
       queueDrainTimeoutMs: value.shutdown.queueDrainTimeoutMs,
     }),
+    github: value.github,
     infrastructure: {
       redis: new RedisConfigService().resolve(value.infrastructure.redis),
       groupQueue: resolveGroupQueuePolicyFromEnv(value.infrastructure.groupQueue),

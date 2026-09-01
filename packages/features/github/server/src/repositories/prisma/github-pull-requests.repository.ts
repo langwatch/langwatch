@@ -42,16 +42,25 @@ type BranchCheckRecord = {
   lastRequestedAt: Date;
 };
 
-export class PrismaGithubPullRequestsRepository extends GithubPullRequestsRepository {
-  static create(database: object): PrismaGithubPullRequestsRepository {
-    if (!PrismaGithubPullRequestsRepository.isGithubPullRequestsDatabase(database)) {
-      throw new Error("GitHub pull-request persistence requires Prisma");
-    }
+/**
+ * The client this repository reads through, named by the delegates it uses.
+ *
+ * The composition root already holds a typed `PrismaClient`; this states which
+ * part of it pull-request linkage touches, so a caller that hands over
+ * something else is a type error at the composition rather than a `TypeError`
+ * on the first query.
+ */
+export type PrismaGithubPullRequestsDatabase = Pick<
+  PrismaClient,
+  "githubPullRequest" | "githubBranchPullRequestCheck" | "$executeRaw"
+>;
 
+export class PrismaGithubPullRequestsRepository extends GithubPullRequestsRepository {
+  static create(database: PrismaGithubPullRequestsDatabase): PrismaGithubPullRequestsRepository {
     return new PrismaGithubPullRequestsRepository(database);
   }
 
-  private constructor(private readonly prisma: PrismaClient) {
+  private constructor(private readonly prisma: PrismaGithubPullRequestsDatabase) {
     super();
   }
 
@@ -585,13 +594,5 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
       attempts: record.attempts,
       lastRequestedAt: record.lastRequestedAt,
     };
-  }
-
-  private static isGithubPullRequestsDatabase(database: object): database is PrismaClient {
-    return (
-      "githubPullRequest" in database &&
-      "githubBranchPullRequestCheck" in database &&
-      "$executeRaw" in database
-    );
   }
 }

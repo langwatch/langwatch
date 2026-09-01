@@ -19,7 +19,10 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { PrismaGithubPullRequestsRepository } from "../github-pull-requests.repository";
+import {
+  PrismaGithubPullRequestsRepository,
+  type PrismaGithubPullRequestsDatabase,
+} from "../github-pull-requests.repository";
 
 type Call = { method: string; args: Record<string, unknown> };
 
@@ -50,7 +53,12 @@ function recordingDatabase(over: { updatedCount?: number } = {}) {
     $executeRaw: async () => 0,
   };
 
-  return { calls, repository: PrismaGithubPullRequestsRepository.create(database) };
+  return {
+    calls,
+    repository: PrismaGithubPullRequestsRepository.create(
+      database as unknown as PrismaGithubPullRequestsDatabase,
+    ),
+  };
 }
 
 const pullRequest = (over: Record<string, unknown> = {}) => ({
@@ -150,6 +158,35 @@ describe("PrismaGithubPullRequestsRepository", () => {
     });
   });
 
+  /**
+   * The sweep's read, whose three predicates are matched literally by the
+   * org-tenancy guard's bound for this model: it is the one read here allowed
+   * to span tenants, and it earns that by asking for branches that mapped to
+   * nothing, are due now, and were demanded inside the activity window. Widen
+   * any of the three and a cross-tenant scan starts returning rows nobody
+   * asked about.
+   */
+  describe("the cross-organization sweep read", () => {
+    /** @scenario "The sweep reads a bounded page of branches demanded recently" */
+    it("asks only for unmapped branches that are due and recently demanded", async () => {
+      const { calls, repository } = recordingDatabase();
+      const now = new Date("2026-08-08T00:00:00.000Z");
+
+      await repository.findRecheckDue({ now, activeWithinMs: 7 * 24 * 60 * 60 * 1000, limit: 50 });
+
+      const call = calls.find((entry) => entry.method === "githubBranchPullRequestCheck.findMany");
+      expect(call?.args).toEqual({
+        where: {
+          notFoundAt: { not: null },
+          recheckAfter: { lte: now },
+          lastRequestedAt: { gt: new Date("2026-08-01T00:00:00.000Z") },
+        },
+        orderBy: { recheckAfter: "asc" },
+        take: 50,
+      });
+    });
+  });
+
   describe("given the guarded update matched nothing", () => {
     it("creates the row instead, under the folded key", async () => {
       const { calls, repository } = recordingDatabase({ updatedCount: 0 });
@@ -162,15 +199,6 @@ describe("PrismaGithubPullRequestsRepository", () => {
         repositoryFullName: "acme/refunds",
         prNumber: 7,
       });
-    });
-  });
-
-  describe("given something that is not a Prisma client", () => {
-    it("refuses to build, rather than failing at the first query", () => {
-      expect(() => PrismaGithubPullRequestsRepository.create({})).toThrow(/requires Prisma/i);
-      expect(() => PrismaGithubPullRequestsRepository.create({ githubPullRequest: {} })).toThrow(
-        /requires Prisma/i,
-      );
     });
   });
 });

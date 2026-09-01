@@ -1,7 +1,16 @@
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { describe, expect, it, vi } from "vitest";
 
+/**
+ * The process Redis connection, reduced to what the composition does with it:
+ * hand it to Eventing, Topic and the GitHub token cache, then disconnect it.
+ * The three commands are here because the GitHub adapter refuses a connection
+ * that cannot answer them rather than caching into a shape it cannot read.
+ */
 const redis = {
+  get: vi.fn(async () => null),
+  set: vi.fn(async () => "OK"),
+  del: vi.fn(async () => 0),
   disconnect: vi.fn(() => undefined),
 };
 

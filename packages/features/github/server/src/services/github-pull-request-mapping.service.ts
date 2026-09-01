@@ -1,26 +1,26 @@
-import type {
-  GithubPullRequest,
-  GithubPullRequestEvent,
-} from "@langwatch/github-contract";
+import type { GithubPullRequest, GithubPullRequestEvent } from "@langwatch/github-contract";
 
 import type { GithubPullRequestsRepository } from "../repositories/github-pull-requests.repository";
-import type { GithubBranchMaintenanceService } from "./github-branch-maintenance.service";
 import type {
   BranchMappingRequest,
-  GithubBranchMappingService,
-} from "./github-branch-mapping.service";
+  GithubBranchDemandService,
+} from "./github-branch-demand.service";
+import type { GithubBranchMaintenanceService } from "./github-branch-maintenance.service";
+import type { GithubBranchMappingService } from "./github-branch-mapping.service";
 
-export type { BranchMappingRequest } from "./github-branch-mapping.service";
+export type { BranchMappingRequest } from "./github-branch-demand.service";
 
 export class GithubPullRequestMappingService {
   static create(deps: {
     repository: GithubPullRequestsRepository;
     branches: GithubBranchMappingService;
+    demand: GithubBranchDemandService;
     maintenance: GithubBranchMaintenanceService;
   }): GithubPullRequestMappingService {
     return new GithubPullRequestMappingService(
       deps.repository,
       deps.branches,
+      deps.demand,
       deps.maintenance,
     );
   }
@@ -28,6 +28,7 @@ export class GithubPullRequestMappingService {
   private constructor(
     private readonly repository: GithubPullRequestsRepository,
     private readonly branches: GithubBranchMappingService,
+    private readonly demand: GithubBranchDemandService,
     private readonly maintenance: GithubBranchMaintenanceService,
   ) {}
 
@@ -61,7 +62,7 @@ export class GithubPullRequestMappingService {
   }
 
   requestBranchMapping(request: BranchMappingRequest): Promise<void> {
-    return this.branches.request(request);
+    return this.demand.request(request);
   }
 
   applyPullRequestEvent(event: GithubPullRequestEvent): Promise<boolean> {

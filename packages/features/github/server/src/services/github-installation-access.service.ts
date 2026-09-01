@@ -41,9 +41,14 @@ export class GithubInstallationAccessService {
     private readonly appTokens: GithubAppTokenPort,
   ) {}
 
-  async listRepositoriesForOrganization(
-    organizationId: string,
-  ): Promise<GithubRepositoryRef[]> {
+  // This read attributes a verified webhook and remains valid without
+  // credentials: the pull-request event carries the installation id, and the
+  // row it names is what says which organization the delivery belongs to.
+  tryGetByInstallationId(installationId: string): Promise<GithubInstallationRow | null> {
+    return this.repository.tryFindByInstallationId(installationId);
+  }
+
+  async listRepositoriesForOrganization(organizationId: string): Promise<GithubRepositoryRef[]> {
     const installations = await this.repository.findAllForOrganization(organizationId);
     const usable = installations.filter((installation) => !installation.suspendedAt);
     if (installations.length > 0 && usable.length === 0) {
@@ -79,10 +84,7 @@ export class GithubInstallationAccessService {
 
     const installations = await this.usableInstallations(input.organizationId);
     for (const installation of installations) {
-      const resolved = await this.resolveRepositoryIdOrHeal(
-        installation,
-        input.repositoryFullName,
-      );
+      const resolved = await this.resolveRepositoryIdOrHeal(installation, input.repositoryFullName);
       if (resolved.repoId) {
         return {
           installationId: installation.installationId,
@@ -135,16 +137,12 @@ export class GithubInstallationAccessService {
       : this.mintForAnyInstallation(usable);
   }
 
-  private async usableInstallations(
-    organizationId: string,
-  ): Promise<GithubInstallationRow[]> {
+  private async usableInstallations(organizationId: string): Promise<GithubInstallationRow[]> {
     const installations = await this.repository.findAllForOrganization(organizationId);
     return installations.filter((installation) => !installation.suspendedAt);
   }
 
-  private async tryListRepositories(
-    installationId: string,
-  ): Promise<GithubRepositoryRef[]> {
+  private async tryListRepositories(installationId: string): Promise<GithubRepositoryRef[]> {
     try {
       return await this.appTokens.listInstallationRepositories(installationId);
     } catch (error) {
@@ -165,10 +163,7 @@ export class GithubInstallationAccessService {
     repositoryFullName: string,
   ): Promise<GithubTurnToken | null> {
     for (const installation of installations) {
-      const resolved = await this.resolveRepositoryIdOrHeal(
-        installation,
-        repositoryFullName,
-      );
+      const resolved = await this.resolveRepositoryIdOrHeal(installation, repositoryFullName);
       if (!resolved.repoId) {
         continue;
       }
@@ -274,8 +269,7 @@ export class GithubInstallationAccessService {
         installation.installationId,
       );
       return (
-        repositories.find((repository) => repository.fullName.toLowerCase() === wanted)
-          ?.id ?? null
+        repositories.find((repository) => repository.fullName.toLowerCase() === wanted)?.id ?? null
       );
     } catch (error) {
       if (error instanceof GithubInstallationNotFoundError) {

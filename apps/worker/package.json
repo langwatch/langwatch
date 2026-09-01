@@ -42,6 +42,7 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/enterprise-worker": "workspace:*",
     "@langwatch/eventing": "workspace:*",
+    "@langwatch/github-server": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/log-contract": "workspace:*",
     "@langwatch/metric-contract": "workspace:*",
