@@ -167,3 +167,47 @@ Feature: One cost screen, three honest lanes
     Given a billed day whose total is negative
     When a permitted viewer opens the cost screen
     Then the billed lane shows the negative amount as reported
+
+  Rule: The seat lane reads the newest report of each pool, and nobody else's
+
+    A licence count is a standing fact, not a running total. Each read of a
+    tenant's licences writes another report of the same pools, so the store
+    must hand back the newest report of each pool and nothing else — summing a
+    pool's reports would multiply the tenant's seats by however many times the
+    list happened to be read. These scenarios run against a real ClickHouse
+    because that is the only place the answer is decided.
+
+    @integration
+    Scenario: A pool that was read on several days reports its newest day only
+      Given a licence pool recorded on an earlier day and again on a later day
+      When the tenant's seat reports are read
+      Then the pool appears once, dated the later day
+      And its counts are the ones the later day reported
+      # The earlier day is still on the record and can still be asked about.
+      # What it must never do is arrive beside the later one as a second pool.
+
+    @integration
+    Scenario: A day read twice answers the same before and after a compaction
+      Given a day recorded once and then recorded again with different counts
+      When the tenant's seat reports are read before and after the store compacts
+      Then both reads report the counts the second recording carried
+      # The two recordings share one identity, so the store collapses them when
+      # it compacts. A read that let the compaction decide the winner would
+      # answer differently depending on when it happened to run, and nothing
+      # about a licence count is supposed to depend on that.
+
+    @integration
+    Scenario: A read carries no pool belonging to another tenant or another kind of record
+      Given another tenant holding a pool of the same name
+      And this tenant holding records that are not licence reports
+      When the tenant's seat reports are read
+      Then only this tenants licence pools are returned
+
+    @integration
+    Scenario: A pool whose recorded payload cannot be read costs only that pool
+      Given a tenant whose licence list holds one unreadable pool beside readable ones
+      When the tenant's seat reports are read
+      Then the readable pools are returned with their counts
+      And the unreadable pool is absent rather than reported as zero seats
+      # Zero is a number a summary would faithfully honour. Absent is the
+      # honest answer for a pool nobody could read.
