@@ -178,7 +178,7 @@ describe("the governance cost screen", () => {
   });
 
   describe("given seat data has not shipped yet", () => {
-    /** @scenario "The seat lane is an honest hole until seat data ships" */
+    /** @scenario "The seat lane is an honest hole until a licence list is read" */
     it("labels the seat lane, says it is waiting, and renders no digits", () => {
       renderScreen();
 
@@ -190,6 +190,46 @@ describe("the governance cost screen", () => {
       // name — would be a number about money nobody has measured.
       for (const readable of readableStrings(seats)) {
         expect(readable).not.toMatch(/\d/);
+      }
+    });
+  });
+
+  describe("given the tenant's seat licences have been read", () => {
+    /** @scenario "The seat lane shows how many seats are bought and how many are assigned" */
+    it("shows each pool's bought and assigned counts, and no money", () => {
+      harness.query = {
+        data: summaryFixture({
+          seats: {
+            status: "reported",
+            pools: [
+              {
+                skuPartNumber: "AGENT_SEAT_USL",
+                day: "2026-08-01",
+                seatsBought: 4,
+                seatsAssigned: 2,
+              },
+            ],
+          },
+        }),
+        isLoading: false,
+        isError: false,
+      };
+      renderScreen();
+
+      const seats = screen.getByTestId("cost-lane-seats");
+      expect(within(seats).getByText("Seats")).toBeInTheDocument();
+      expect(within(seats).getByText("AGENT_SEAT_USL")).toBeInTheDocument();
+      expect(within(seats).getByText(/4/)).toBeInTheDocument();
+      expect(within(seats).getByText(/2/)).toBeInTheDocument();
+      expect(
+        within(seats).queryByText(/not yet available/i),
+      ).not.toBeInTheDocument();
+
+      // Seat events carry counts, not prices. A currency figure in this lane
+      // would be money nobody billed, sitting beside the invoice that already
+      // says what the seats cost.
+      for (const readable of readableStrings(seats)) {
+        expect(readable).not.toMatch(/[$€£]/);
       }
     });
   });
