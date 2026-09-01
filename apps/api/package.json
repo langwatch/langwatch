@@ -74,6 +74,7 @@
     "@langwatch/github-contract": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/identity-server": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/model-provider-server": "workspace:*",

@@ -16,6 +16,7 @@ export {
   composeApiLifecycleProcess,
   composeApiSecretEncryption,
   LoggedApiAgentsAbsence,
+  LoggedApiAuthAbsence,
   LoggedApiAuthzAbsence,
   LoggedApiDatabaseAbsence,
   LoggedApiEventingAbsence,
@@ -65,13 +66,17 @@ export {
   type ApiStandaloneExecutableOptions,
 } from "./app/api-standalone.executable";
 export {
+  ApiAuthAbsenceReportPort,
+  ApiAuthComposition,
   ApiAuthSessionCompositionPort,
   ApiBrowserSessionTransportPort,
   AuthSessionApiAuthenticationAdapter,
   BetterAuthBrowserSessionTransportAdapter,
+  type ApiAuthCompositionOptions,
   type ApiAuthSessionDependencies,
   type BetterAuthSessionLookup,
 } from "./app/api-auth.composition";
+export { UnavailableApiUserAvatarStorageAdapter } from "./app/api-user-avatar-storage.adapter";
 export {
   ApiHttpListener,
   type ApiHttpListenerOptions,

@@ -14,7 +14,10 @@ import {
   type ApiRuntimeCompositionOptions,
 } from "../api.main";
 import { ApiQueueInfrastructure } from "../platform/infrastructure/api-queue.infrastructure";
-import type { ApiAuthSessionCompositionPort } from "./api-auth.composition";
+import type {
+  ApiAuthSessionCompositionPort,
+  ApiBrowserSessionTransportPort,
+} from "./api-auth.composition";
 import {
   ApiProductionComposition,
   composeApiDatabase,
@@ -26,11 +29,13 @@ import {
 /**
  * The product services an API host hands over.
  *
- * One of them is still mandatory, and it is the one whose ports have no
- * packaged implementation at all (see API_UNAVAILABLE_PRODUCT_ADAPTERS). The
- * rest are optional: a host supplies them to override what this process would
- * compose for itself, and leaving one out is a supported shape rather than a
- * gap.
+ * None of them is mandatory any more, and one of them is not a service at all:
+ * `browserSessions` is the deployment's own Better Auth instance, the last
+ * thing on this list no package implements
+ * (see API_UNAVAILABLE_PRODUCT_ADAPTERS). Everything else a host supplies
+ * overrides what this process would compose for itself, and leaving any of
+ * them out is a supported shape rather than a gap — with the consequences each
+ * one names.
  */
 export type ApiProductAdapters = Readonly<{
   /**
@@ -79,7 +84,24 @@ export type ApiProductAdapters = Readonly<{
   authz?: AuthzService;
   /** The pair to `apiKeys`; see it for what supplying only one means. */
   organizations?: OrganizationService;
-  auth: ApiAuthSessionCompositionPort;
+  /**
+   * A host's already-composed Auth service and Better Auth transport.
+   *
+   * Optional since this process composes the Auth half itself, over its
+   * guarded client, the organization service it already serves from and its
+   * own Redis ({@link ApiProductionComposition.resolveAuth}). Supply it to
+   * override that, or supply `browserSessions` alone and let the process build
+   * the rest.
+   */
+  auth?: ApiAuthSessionCompositionPort;
+  /**
+   * The deployment's Better Auth request boundary — the one entry on
+   * {@link API_UNAVAILABLE_PRODUCT_ADAPTERS}.
+   *
+   * Without it, and without `auth`, this process can authenticate no browser
+   * caller and mounts no product transports at all.
+   */
+  browserSessions?: ApiBrowserSessionTransportPort;
   audit?: ApiAuditPort;
   queueStorage?: GroupQueueStoragePort;
 }>;
@@ -193,11 +215,40 @@ export type ApiProductAdapters = Readonly<{
  * copied without its graph is an agent pointing at the source project's
  * workflow, which reads to every caller as a copy that succeeded.
  *
- * The one entry that remains still names ports whose only implementation is
- * the legacy application's.
+ * The identity entry closed last, and it closed by SPLITTING rather than by
+ * one port finding a home. It named `IdentityEmailService` and the Better Auth
+ * browser-session transport together because they arrive through one option —
+ * `ApiAuthSessionCompositionPort` hands over the Auth service and the
+ * transport as a pair — and they were never one gap.
+ *
+ * `IdentityEmailService` was not process-bound at all. It answers which
+ * address is a person's from the `Identifier` projection, for a user whose
+ * backfill has finalized, and both halves of that are reads over this
+ * process's own client: the projection, and the one migration-state row that
+ * says whether the projection may answer. `PostgresIdentityEmailAdapter` is
+ * both, latch cache included, and with it this process composes the whole Auth
+ * service — the packaged user service under it too, its avatar storage
+ * declared absent the way project deletion's two reach-outs are, because
+ * reading a profile needs no object store and writing one does
+ * ({@link ApiProductionComposition.resolveAuth}).
+ *
+ * The transport genuinely is process-bound, and the entry that remains says
+ * only that. It is not a table this package could query: it is one configured
+ * Better Auth server instance, and every option that decides whether a cookie
+ * verifies belongs to the deployment rather than to a package — the signing
+ * secret, the base URL and trusted origins, the cookie prefix, the session
+ * model mapping, the secondary-storage prefix, the mounted social and
+ * generic-OIDC providers whose ids a stored account row is keyed by, the
+ * identity storage adapter, and the request hooks. A second instance composed
+ * here from a different option set would not fail — it would verify nothing
+ * and answer `null`, which every caller reads as "signed out". That failure
+ * has already taken sign-in down once, and it was expensive precisely because
+ * nothing recorded the refusal; the transport adapter this process wraps a
+ * host's instance in now logs a presented-and-rejected session token rather
+ * than treating it as an anonymous request.
  */
 export const API_UNAVAILABLE_PRODUCT_ADAPTERS = [
-  "IdentityEmailService and the Better Auth browser-session transport",
+  "The deployment's Better Auth browser-session transport",
 ] as const;
 
 export type ApiStandaloneCompositionOptions = {

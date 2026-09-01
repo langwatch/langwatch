@@ -5,7 +5,7 @@ import {
   primaryEmailOf,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
-import type { IdentityHeadsRepository } from "./identity-heads.repository";
+import type { IdentityHeadsReader } from "./identity-heads.repository";
 import type { IdentityUserGate } from "./identity-user-gate";
 
 const logger = createLogger("langwatch:identity:email");
@@ -32,7 +32,7 @@ const logger = createLogger("langwatch:identity:email");
  */
 export class IdentityEmailService extends IdentityEmailCapability {
   constructor(
-    private readonly heads: IdentityHeadsRepository,
+    private readonly heads: IdentityHeadsReader,
     private readonly isOnIdentity: IdentityUserGate,
   ) {
     super();

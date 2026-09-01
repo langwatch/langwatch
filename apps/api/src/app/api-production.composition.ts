@@ -66,7 +66,10 @@ import type { AppRestManagementAuditPort, AppRestSecurity } from "@langwatch/api
 import type { AppRestFeaturePorts } from "../app-rest/app-rest.features";
 import { ApiRateLimitInfrastructure } from "../platform/infrastructure/api-rate-limit.infrastructure";
 import {
+  ApiAuthAbsenceReportPort,
+  ApiAuthComposition,
   ApiAuthSessionCompositionPort,
+  ApiBrowserSessionTransportPort,
   AuthSessionApiAuthenticationAdapter,
 } from "./api-auth.composition";
 import { ApiInstanceAdminKeyAdapter } from "./api-instance-admin-key.adapter";
@@ -119,7 +122,24 @@ export type ApiProductionCompositionOptions = {
   authz?: AuthzService;
   /** A host's already-composed organization service; the pair to `apiKeys`. */
   organizations?: OrganizationService;
-  auth: ApiAuthSessionCompositionPort;
+  /**
+   * A host's already-composed Auth service and Better Auth transport, when it
+   * has them as a pair.
+   *
+   * Optional since this process can build the Auth half itself: see
+   * {@link ApiProductionComposition.resolveAuth} for which wins and what
+   * neither means for the doors that authenticate a browser caller.
+   */
+  auth?: ApiAuthSessionCompositionPort;
+  /**
+   * The deployment's Better Auth request boundary, for a host that supplies
+   * only that.
+   *
+   * This is the collaborator the API package cannot build — see
+   * {@link ApiAuthComposition}. Ignored when `auth` is supplied, because that
+   * pair already carries its own transport.
+   */
+  browserSessions?: ApiBrowserSessionTransportPort;
   audit?: ApiAuditPort;
   readiness?: ApiReadinessPort;
   /**
@@ -160,6 +180,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedAuthz: ApiAuthzComposition | undefined;
   private composedTenancy: ApiTenancyComposition | undefined;
   private composedAgents: ApiAgentsComposition | undefined;
+  private composedAuth: ApiAuthComposition | undefined;
   private secrets: SecretService | undefined;
   private requestPolicy: ApiRequestPolicy | undefined;
 
@@ -174,13 +195,17 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * it; then AuthZ, because both doors authorize through it and neither can be
    * built before it exists; then the transports.
    *
-   * With no AuthZ, or no organization and API-key pair, the process serves its
-   * lifecycle surface and no product transports at all. That is the same rule
-   * the secret family follows one level down — a door that cannot answer is
-   * absent rather than mounted — and it is the only safe reading at this level:
-   * every product route on this process is authorized and every one of them
-   * resolves a credential, so a route graph mounted over either gap would be a
-   * route graph that cannot say no.
+   * With no AuthZ, no organization and API-key pair, or no way to authenticate
+   * a browser caller, the process serves its lifecycle surface and no product
+   * transports at all. That is the same rule the secret family follows one
+   * level down — a door that cannot answer is absent rather than mounted — and
+   * it is the only safe reading at this level: every product route on this
+   * process is authorized, every one of them resolves a credential, and the
+   * ones a person reaches resolve a session, so a route graph mounted over any
+   * of those gaps would be a route graph that cannot say no. The session gap is
+   * the sharpest of the three, because its degradation is silent: a policy
+   * built over a transport that verifies nothing does not fail, it answers
+   * "signed out" to everybody.
    */
   compose(options: ApiRuntimeCompositionOptions): Promise<ApiRuntimeProcessPort> {
     const queueInfrastructure = this.composeQueue(options);
@@ -191,8 +216,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const metrics = resolveApiMetrics({ options, injected: this.options.metrics });
     const encryption = composeApiSecretEncryption(options)?.encryption;
     const tenancy = authz ? this.resolveTenancy(options, encryption) : undefined;
+    const auth = tenancy ? this.resolveAuth(options, tenancy, queueInfrastructure) : undefined;
 
-    if (!authz || !tenancy) {
+    if (!authz || !tenancy || !auth) {
       return Promise.resolve(
         composeApiLifecycleProcess({
           options,
@@ -206,7 +232,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     this.secrets = this.resolveSecrets(encryption);
     this.composedFeaturePorts = this.composeFeaturePorts(options, queueInfrastructure);
     this.requestPolicy = ApiRequestPolicy.create({
-      authentication: AuthSessionApiAuthenticationAdapter.create(this.options.auth.compose()),
+      authentication: AuthSessionApiAuthenticationAdapter.create(auth.compose()),
       authorization: AuthzApiAuthorizationAdapter.create(authz),
       audit: this.options.audit,
     });
@@ -521,6 +547,57 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
+   * The Auth graph this process authenticates browser callers with, and where
+   * it came from.
+   *
+   * Precedence, and the reason for it:
+   *
+   *  1. An injected composition wins. A host that already owns the product
+   *     graph has one Auth service per process, and a test binding a double is
+   *     asking for that double rather than for Postgres.
+   *  2. Otherwise the process composes the Auth service itself, over the
+   *     guarded client {@link composeApiDatabase} opened, the organization
+   *     service this process already serves from, and its own Redis — pairing
+   *     it with the Better Auth transport the deployment supplied
+   *     ({@link ApiAuthComposition}). The port that used to make this
+   *     impossible, `IdentityEmailService`, is a packaged adapter now and is
+   *     Postgres end to end.
+   *  3. With neither — no host composition, and no supplied transport — there
+   *     is no Auth graph, and the process mounts no transports at all. Every
+   *     product route a person reaches resolves their session, and a process
+   *     that cannot verify one has nothing to serve them.
+   *
+   * The transport is deliberately still received. It is one configured Better
+   * Auth server instance whose options decide whether a cookie verifies at
+   * all, and a second instance composed here from a different option set would
+   * answer `null` for every caller rather than fail — see
+   * {@link ApiAuthComposition} for the full statement.
+   */
+  private resolveAuth(
+    options: ApiRuntimeCompositionOptions,
+    tenancy: ApiResolvedTenancy,
+    queueInfrastructure: ApiQueueInfrastructure | undefined,
+  ): ApiAuthSessionCompositionPort | undefined {
+    if (this.options.auth) return this.options.auth;
+
+    const logger = createLogger(options.config.serviceName);
+    this.composedAuth = ApiAuthComposition.tryCompose({
+      database: this.composedDatabase?.connection,
+      // The organization service this process actually serves from, injected
+      // or composed. A second one here would resolve a person's workspaces
+      // through a graph none of this process's other doors read.
+      organizations: tenancy.organizations,
+      browserSessions: this.options.browserSessions,
+      // The SAME Redis Better Auth's own session cache lives in, so revoking a
+      // session through this process clears the entry the other tier reads.
+      redis: queueInfrastructure?.redis ?? null,
+      processName: options.config.serviceName,
+      report: LoggedApiAuthAbsence.create(logger),
+    });
+    return this.composedAuth;
+  }
+
+  /**
    * Composes the process's producer-only Eventing runtime over its own queue.
    *
    * Separate from the queue itself because the two absences are different
@@ -794,6 +871,26 @@ export class LoggedApiAgentsAbsence extends ApiAgentsAbsenceReportPort {
     this.logger.info(
       { reason: "no-workflow-application" },
       "API composed its agent service without a workflow-copy capability: every agent operation is served except copying a workflow agent, which needs the Studio graph this process does not compose",
+    );
+  }
+}
+
+/** Names the absent Auth graph once, at boot, rather than leaving it inferred. */
+export class LoggedApiAuthAbsence extends ApiAuthAbsenceReportPort {
+  static create(logger: Pick<Logger, "warn">): LoggedApiAuthAbsence {
+    return new LoggedApiAuthAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "warn">) {
+    super();
+  }
+
+  absent(reason: "no-database" | "no-tenancy" | "no-browser-session-transport"): void {
+    this.logger.warn(
+      { reason },
+      reason === "no-browser-session-transport"
+        ? "API composed no browser-session transport and no host supplied an Auth composition: it can authenticate no browser caller, so it mounts no transports that authenticate one. Supply the deployment's Better Auth instance — this process cannot compose a second one that verifies the same cookies"
+        : "API composed no Auth service and no host supplied one: it can authenticate no browser caller, so it mounts no transports that authenticate one",
     );
   }
 }

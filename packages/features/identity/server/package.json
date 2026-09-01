@@ -29,6 +29,7 @@
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
     "nanoid": "^6.0.0",
     "zod": "^4.4.3"
   },

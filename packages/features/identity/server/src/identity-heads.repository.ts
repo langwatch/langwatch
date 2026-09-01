@@ -52,3 +52,14 @@ export interface IdentityHeadsRepository {
     providerId: string;
   }): Promise<string | null>;
 }
+
+/**
+ * The one read the `User.email` fork makes.
+ *
+ * Named apart from the full repository because it is a genuinely smaller
+ * capability: the guards and the ceremonies need the uniqueness lookups and
+ * the account mirror, and the read fork needs a user's heads and nothing
+ * else. A process that composes only the fork implements only this, and a
+ * full `IdentityHeadsRepository` still satisfies it.
+ */
+export type IdentityHeadsReader = Pick<IdentityHeadsRepository, "findHeads">;

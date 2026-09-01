@@ -5,6 +5,6 @@
     "types": ["node"],
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/identity-server-tests.tsbuildinfo"
   },
-  "include": ["src/**/*.ts", "src/__tests__/**/*.ts"],
+  "include": ["src/**/*.ts"],
   "exclude": []
 }

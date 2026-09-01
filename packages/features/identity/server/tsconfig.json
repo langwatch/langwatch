@@ -18,6 +18,7 @@
   },
   "include": ["src/**/*.ts"],
   // Tests are checked by tsconfig.test.json, which adds the vitest globals
-  // this project does not need.
-  "exclude": ["src/__tests__/**"]
+  // this project does not need. Any `__tests__` directory, at any depth: a
+  // test colocated with the module it covers is still a test.
+  "exclude": ["src/**/__tests__/**"]
 }

@@ -132,6 +132,7 @@ import { ApiMetricsPort } from "../../api-process.lifecycle";
 import { ApiProcessGraphPort } from "../../api.process";
 import { ApiAgentsComposition } from "../api-agents.composition";
 import {
+  ApiAuthComposition,
   ApiAuthSessionCompositionPort,
   ApiBrowserSessionTransportPort,
 } from "../api-auth.composition";
@@ -791,6 +792,75 @@ describe("ApiProductionComposition", () => {
     });
   });
 
+  describe("given the Auth service this process can now compose itself", () => {
+    beforeEach(() => {
+      databaseMocks.configured.value = false;
+      processMocks.create.mockClear();
+    });
+
+    describe("when a host supplied the composed pair", () => {
+      /** @scenario "An injected Auth composition is the one the process authenticates with" */
+      it("authenticates through the host's composition and composes none of its own", async () => {
+        databaseMocks.configured.value = true;
+        const compose = vi.spyOn(ApiAuthComposition, "tryCompose");
+
+        const composition = await composeWithout({
+          DATABASE_URL: "postgresql://localhost/langwatch",
+        });
+
+        expect(composition.policy()).toBeDefined();
+        expect(compose).not.toHaveBeenCalled();
+        compose.mockRestore();
+      });
+    });
+
+    describe("when the deployment supplied only its Better Auth transport", () => {
+      /** @scenario "The API process composes its own Auth service" */
+      it("composes the Auth service itself and authenticates through the supplied transport", async () => {
+        databaseMocks.configured.value = true;
+        const browserSessions = new RecordingSessionTransport();
+
+        const composition = await composeSelfComposedAuth(
+          { DATABASE_URL: "postgresql://localhost/langwatch" },
+          { browserSessions },
+        );
+
+        const policy = composition.policy();
+        expect(policy).toBeDefined();
+        expect(processMocks.create).toHaveBeenCalled();
+        await policy?.createContext(new Request("https://api.example.test/api/trpc"));
+        expect(browserSessions.calls).toBe(1);
+      });
+    });
+
+    describe("when the deployment supplied no transport at all", () => {
+      /** @scenario "A process with no browser-session transport mounts no product transports" */
+      it("mounts no product transports rather than a door that answers signed out", async () => {
+        databaseMocks.configured.value = true;
+
+        const composition = await composeSelfComposedAuth({
+          DATABASE_URL: "postgresql://localhost/langwatch",
+        });
+
+        expect(composition.policy()).toBeUndefined();
+        expect(processMocks.create).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the deployment configured no database", () => {
+      /** @scenario "A process with no database composes no Auth service" */
+      it("composes no Auth service, so the process mounts no product transports", async () => {
+        const composition = await composeSelfComposedAuth(
+          {},
+          { browserSessions: new RecordingSessionTransport() },
+        );
+
+        expect(composition.policy()).toBeUndefined();
+        expect(processMocks.create).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   describe("given the metrics transport this process can now compose itself", () => {
     describe("when a host supplied one", () => {
       /** @scenario "An injected metrics transport answers every scrape" */
@@ -918,6 +988,28 @@ async function composeSelfComposedAuthz(
   return composition;
 }
 
+/** Composes with no host-supplied Auth composition, so the process resolves its own. */
+async function composeSelfComposedAuth(
+  source: Readonly<Record<string, unknown>>,
+  overrides: { browserSessions?: ApiBrowserSessionTransportPort } = {},
+): Promise<ApiProductionComposition> {
+  const composition = ApiProductionComposition.create({
+    agents: new Proxy(AgentService.prototype, {}),
+    secrets: secretService().service,
+    apiKeys: apiKeyService(resolvedKey).service,
+    authz: authzService(true).service,
+    organizations: organizationService(),
+    ...(overrides.browserSessions ? { browserSessions: overrides.browserSessions } : {}),
+  });
+  await composition.compose({
+    config: resolveApiConfig({ NODE_ENV: "test", API_PORT: "5560", ...source }),
+    graph: new TestGraph(),
+    observability: { serviceName: "langwatch-api-test" },
+    resources: new ResourceScope(),
+  });
+  return composition;
+}
+
 async function composedFeaturePorts(
   source: Readonly<Record<string, unknown>>,
 ): Promise<ApiOwnedRestFeaturePorts> {
@@ -954,6 +1046,16 @@ class TestAuthService extends AuthService {
   async revokeAllBrowserSessions(): Promise<void> {}
   async revokeBrowserSession(): Promise<void> {}
   async revokeOtherBrowserSessions(): Promise<void> {}
+}
+
+/** Counts the requests the composed policy actually authenticates through. */
+class RecordingSessionTransport extends ApiBrowserSessionTransportPort {
+  calls = 0;
+
+  async tryResolveVerifiedSession() {
+    this.calls += 1;
+    return null;
+  }
 }
 
 class TestSessionTransport extends ApiBrowserSessionTransportPort {

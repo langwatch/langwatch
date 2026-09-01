@@ -49,10 +49,18 @@ describe("ApiStandaloneComposition", () => {
       await expect(fetch(`http://127.0.0.1:${address.port}/api/health`)).rejects.toThrow();
     });
 
+    /** @scenario "The unavailable-adapter list names only the Better Auth transport" */
     it("names every adapter it is still waiting on rather than leaving the gap implicit", () => {
       expect(API_UNAVAILABLE_PRODUCT_ADAPTERS).toEqual([
-        "IdentityEmailService and the Better Auth browser-session transport",
+        "The deployment's Better Auth browser-session transport",
       ]);
+    });
+
+    /** @scenario "The unavailable-adapter list names only the Better Auth transport" */
+    it("stops naming IdentityEmailService, now that it composes one over its own client", () => {
+      const named = API_UNAVAILABLE_PRODUCT_ADAPTERS.join("\n");
+
+      expect(named).not.toMatch(/IdentityEmailService|identifier email|read fork/i);
     });
 
     it("stops naming the instance administrator credential and the rate limiter it now owns", () => {

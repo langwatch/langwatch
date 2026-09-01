@@ -58,6 +58,22 @@ export {
   type IdentityBackfillServiceDeps,
 } from "./identity-backfill.service";
 export { IdentityEmailService } from "./identity-email.service";
+/**
+ * The synthetic issuer better-auth 1.7 expects on an account row, exported
+ * from the root as well as from `./better-auth` because it is a PERSISTED
+ * format rather than a better-auth shape: a process that writes a credential
+ * account row has to write the issuer this mints, and every one of those
+ * processes should reach the same function rather than restate the prefix.
+ * Reaching it through `./better-auth` would put better-auth's own types on
+ * the import graph of a composition root that never touches the library.
+ */
+export { issuerForProviderId } from "./better-auth/account-queries";
+export {
+  IDENTITY_LATCH_CACHE_MAX_USERS,
+  IDENTITY_LATCH_CACHE_TTL_MS,
+  PostgresIdentityEmailAdapter,
+  type PostgresIdentityEmailAdapterOptions,
+} from "./adapters/postgres.identity-email.adapter";
 export {
   type AccountSecretPair,
   IdentitySecretCarryService,
@@ -71,7 +87,10 @@ export {
   establishUserEmailCommandId,
   newIdentityCommandId,
 } from "./identity-command-id";
-export type { IdentityHeadsRepository } from "./identity-heads.repository";
+export type {
+  IdentityHeadsReader,
+  IdentityHeadsRepository,
+} from "./identity-heads.repository";
 export type {
   IdentifierReservationHolder,
   IdentityReservationRepository,
