@@ -10,7 +10,13 @@
  * that the "Add rule" button never calls fixes nothing.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FeatureFlagRules } from "~/server/featureFlag";
@@ -174,9 +180,7 @@ function stubVerticalLayout(): () => void {
   const original = Element.prototype.getBoundingClientRect;
   Element.prototype.getBoundingClientRect = function (this: Element): DOMRect {
     const siblings = this.parentElement?.children;
-    const index = siblings
-      ? Array.prototype.indexOf.call(siblings, this)
-      : 0;
+    const index = siblings ? Array.prototype.indexOf.call(siblings, this) : 0;
     const top = index * 60;
     return {
       x: 0,
@@ -195,17 +199,21 @@ function stubVerticalLayout(): () => void {
   };
 }
 
+/** One keystroke, delivered where dnd-kit's keyboard sensor listens for it. */
+function press(element: HTMLElement, code: string): void {
+  fireEvent.keyDown(element, { code, key: code === "Space" ? " " : code });
+}
+
 /**
- * One keystroke, delivered where dnd-kit's keyboard sensor listens for it,
- * then a frame to let it measure. Its droppable rects are read on an
- * animation frame, so keys dispatched back to back arrive before there is
- * any geometry to move through.
+ * What dnd-kit is telling screen readers right now.
+ *
+ * The sensor measures its droppable rects off the main flow, so a keypress
+ * sent before that lands finds no geometry and moves nothing. Waiting on the
+ * announcement waits on the sensor's own account of what it did, rather than
+ * on a frame count that happens to be enough on one machine.
  */
-async function press(element: HTMLElement, code: string): Promise<void> {
-  await act(async () => {
-    fireEvent.keyDown(element, { code, key: code === "Space" ? " " : code });
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-  });
+function announcement(): string {
+  return document.querySelector("[aria-live]")?.textContent ?? "";
 }
 
 describe("given a flag with more than one targeting rule", () => {
@@ -226,11 +234,17 @@ describe("given a flag with more than one targeting rule", () => {
         // Keys are dispatched at the handle rather than typed at whatever
         // holds focus: the dialog's focus trap moves focus around between
         // tests, and what is under test is the sensor, not the trap.
-        await press(firstGrip, "Space");
-        await press(firstGrip, "ArrowDown");
-        await press(firstGrip, "Space");
+        press(firstGrip, "Space");
+        await waitFor(() => expect(announcement()).not.toBe(""));
+        const pickedUp = announcement();
 
-        expect(ruleFieldLabels()).toEqual(["Project id", "Organization id"]);
+        press(firstGrip, "ArrowDown");
+        await waitFor(() => expect(announcement()).not.toBe(pickedUp));
+
+        press(firstGrip, "Space");
+        await waitFor(() =>
+          expect(ruleFieldLabels()).toEqual(["Project id", "Organization id"]),
+        );
       } finally {
         restoreLayout();
       }

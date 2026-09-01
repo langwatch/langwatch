@@ -44,7 +44,10 @@ export function summarizeTargeting(rules: FeatureFlagRules): TargetingSummary {
 
   return {
     enabledForEveryone: catchAllEnabled === true,
-    enabledOrganizationCount: count({ decisions: organizations, enabled: true }),
+    enabledOrganizationCount: count({
+      decisions: organizations,
+      enabled: true,
+    }),
     enabledProjectCount: count({ decisions: projects, enabled: true }),
     enabledNewUsersSince: firstUnshadowedEnabledDate(reachable),
     excludedOrganizationCount: count({
@@ -63,7 +66,10 @@ export function summarizeTargeting(rules: FeatureFlagRules): TargetingSummary {
 export function targetingLabel(summary: TargetingSummary): string | null {
   if (summary.enabledForEveryone) {
     const exceptions = join([
-      pluralize({ count: summary.excludedOrganizationCount, noun: "organization" }),
+      pluralize({
+        count: summary.excludedOrganizationCount,
+        noun: "organization",
+      }),
       pluralize({ count: summary.excludedProjectCount, noun: "project" }),
     ]);
     return exceptions
@@ -71,7 +77,10 @@ export function targetingLabel(summary: TargetingSummary): string | null {
       : "Enabled for everyone via rule";
   }
   const targets = join([
-    pluralize({ count: summary.enabledOrganizationCount, noun: "organization" }),
+    pluralize({
+      count: summary.enabledOrganizationCount,
+      noun: "organization",
+    }),
     pluralize({ count: summary.enabledProjectCount, noun: "project" }),
     summary.enabledNewUsersSince
       ? `organizations created on or after ${formatDate(summary.enabledNewUsersSince)}`
@@ -170,7 +179,8 @@ function count({
   enabled: boolean;
 }): number {
   let total = 0;
-  for (const decision of decisions.values()) if (decision === enabled) total += 1;
+  for (const decision of decisions.values())
+    if (decision === enabled) total += 1;
   return total;
 }
 

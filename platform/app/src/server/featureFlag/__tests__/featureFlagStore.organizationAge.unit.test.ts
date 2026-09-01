@@ -189,9 +189,9 @@ describe("given a flag whose rules put an everyone rule above a New users rule",
         "operator-1",
       );
 
-      expect(
-        await store.get(FLAG, { organizationId: NEW_ORGANIZATION }),
-      ).toBe(true);
+      expect(await store.get(FLAG, { organizationId: NEW_ORGANIZATION })).toBe(
+        true,
+      );
       expect(findOrganization).not.toHaveBeenCalled();
     });
   });
