@@ -457,12 +457,19 @@ function createMockServer(): Server {
           commitMessage: parsed.commitMessage ?? promptDetailState.commitMessage,
           model: parsed.model ?? promptDetailState.model,
           messages: parsed.messages ?? promptDetailState.messages,
-          tags: [
-            { name: "latest", versionId: newVersionId },
-            ...(parsed.tags ?? [])
-              .filter((name) => name !== "latest")
-              .map((name) => ({ name, versionId: newVersionId })),
-          ],
+          tags:
+            parsed.tags === undefined
+              ? promptDetailState.tags.map((tag) =>
+                  tag.name === "latest"
+                    ? { name: "latest", versionId: newVersionId }
+                    : tag,
+                )
+              : [
+                  { name: "latest", versionId: newVersionId },
+                  ...parsed.tags
+                    .filter((name) => name !== "latest")
+                    .map((name) => ({ name, versionId: newVersionId })),
+                ],
         };
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPT_UPDATED));
