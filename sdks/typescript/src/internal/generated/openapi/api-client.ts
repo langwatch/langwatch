@@ -908,6 +908,205 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/analytics/playground-widgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List custom-chart-playground widgets
+         * @description Lists every custom-chart-playground widget in this project, each with the React source file it renders and the named LangWatchQL queries it may run. Saved workbench charts and builder charts are different kinds and are not listed here.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The project's playground widgets */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["PlaygroundWidget"][];
+                        };
+                    };
+                };
+                400: components["responses"]["CanonicalError"];
+                401: components["responses"]["CanonicalError"];
+                403: components["responses"]["CanonicalError"];
+                500: components["responses"]["CanonicalError"];
+            };
+        };
+        put?: never;
+        /**
+         * Create a custom-chart-playground widget
+         * @description Saves a React source file and the named LangWatchQL queries it runs as one playground widget. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        code: string;
+                        queries: components["schemas"]["PlaygroundWidgetQuery"][];
+                    };
+                };
+            };
+            responses: {
+                /** @description The widget was saved */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PlaygroundWidget"];
+                    };
+                };
+                400: components["responses"]["CanonicalError"];
+                401: components["responses"]["CanonicalError"];
+                403: components["responses"]["CanonicalError"];
+                500: components["responses"]["CanonicalError"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/analytics/playground-widgets/{widgetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a custom-chart-playground widget
+         * @description Returns one playground widget with its React source and named queries. A widget saved in another project is reported as not found.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    widgetId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The playground widget */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PlaygroundWidget"];
+                    };
+                };
+                400: components["responses"]["CanonicalError"];
+                401: components["responses"]["CanonicalError"];
+                403: components["responses"]["CanonicalError"];
+                404: components["responses"]["CanonicalError"];
+                500: components["responses"]["CanonicalError"];
+            };
+        };
+        put?: never;
+        post?: never;
+        /**
+         * Delete a custom-chart-playground widget
+         * @description Deletes one playground widget. Answers 204 with no body; deleting a widget that is not in this project is reported as not found.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    widgetId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The widget was deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                400: components["responses"]["CanonicalError"];
+                401: components["responses"]["CanonicalError"];
+                403: components["responses"]["CanonicalError"];
+                404: components["responses"]["CanonicalError"];
+                500: components["responses"]["CanonicalError"];
+            };
+        };
+        options?: never;
+        head?: never;
+        /**
+         * Update a custom-chart-playground widget
+         * @description Replaces a playground widget's name, its { code, queries } definition, or both. code and queries are rewritten together, so a request offering one without the other, or neither field, is refused.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    widgetId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name?: string;
+                        code?: string;
+                        queries?: components["schemas"]["PlaygroundWidgetQuery"][];
+                    };
+                };
+            };
+            responses: {
+                /** @description The updated widget */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PlaygroundWidget"];
+                    };
+                };
+                400: components["responses"]["CanonicalError"];
+                401: components["responses"]["CanonicalError"];
+                403: components["responses"]["CanonicalError"];
+                404: components["responses"]["CanonicalError"];
+                500: components["responses"]["CanonicalError"];
+            };
+        };
+        trace?: never;
+    };
     "/api/coding-agent/sessions/{sessionId}/events": {
         parameters: {
             query?: never;
@@ -4116,7 +4315,61 @@ export interface paths {
 }
 export type webhooks = Record<string, never>;
 export interface components {
+    responses: {
+        /**
+         * Canonical error
+         * @description A canonical LangWatch API error envelope, hand-added alongside the playground-widgets routes.
+         */
+        CanonicalError: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    error: {
+                        type: string;
+                        code: string;
+                        message: string;
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                        trace_id?: string;
+                        span_id?: string;
+                    };
+                };
+            };
+        };
+    };
     schemas: {
+        /** @description One named LangWatchQL query a playground widget may run via LW.query. */
+        PlaygroundWidgetQuery: {
+            name: string;
+            sql: string;
+            parameters?: {
+                name: string;
+                /** @enum {string} */
+                type: "string" | "number" | "boolean";
+                default?: string | number | boolean;
+            }[];
+        };
+        /** @description A custom-chart-playground widget as the API publishes it. */
+        PlaygroundWidget: {
+            id: string;
+            name: string;
+            definition: {
+                version: number;
+                code: string;
+                queries: components["schemas"]["PlaygroundWidgetQuery"][];
+            };
+            createdAt: string;
+            updatedAt: string;
+            platformUrl: string;
+            dashboardId: string | null;
+            gridColumn: number;
+            gridRow: number;
+            colSpan: number;
+            rowSpan: number;
+        };
         Annotation: {
             /** @description The ID of the annotation */
             id?: string;

@@ -3297,6 +3297,106 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
+  // Add playground-widget command group — custom-chart-playground widgets
+  const playgroundWidgetCmd = program
+    .command("playground-widget")
+    .description("Manage custom-chart-playground widgets");
+
+  emitsResult(
+    playgroundWidgetCmd
+      .command("schema")
+      .description("Discover the LangWatchQL analytics datasets and columns to write a widget's queries against")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { playgroundWidgetSchemaCommand: impl } = await import("./commands/playground-widgets/schema.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    playgroundWidgetCmd
+      .command("list")
+      .description("List the project's playground widgets")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { listPlaygroundWidgetsCommand: impl } = await import("./commands/playground-widgets/list.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    playgroundWidgetCmd
+      .command("get <id>")
+      .description("Get a playground widget by ID — its React source and named queries")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { project?: string }) => {
+      const { getPlaygroundWidgetCommand: impl } = await import("./commands/playground-widgets/get.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    playgroundWidgetCmd
+      .command("create")
+      .description("Save a custom-chart-playground widget from a React source file and its named LangWatchQL queries")
+      .requiredOption("--name <name>", "Widget name")
+      .option("--code <code>", "The widget's React source")
+      .option("--code-file <path>", "Read the widget's React source from a file")
+      .option("--queries-file <path>", "JSON file: an array of { name, sql, parameters? }")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: {
+      name?: string;
+      code?: string;
+      codeFile?: string;
+      queriesFile?: string;
+      project?: string;
+    }) => {
+      const { createPlaygroundWidgetCommand: impl } = await import("./commands/playground-widgets/create.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    playgroundWidgetCmd
+      .command("update <id>")
+      .description("Update a playground widget's name or definition")
+      .option("--name <name>", "New widget name")
+      .option("--code <code>", "New React source")
+      .option("--code-file <path>", "Read the new React source from a file")
+      .option("--queries-file <path>", "JSON file: an array of { name, sql, parameters? }")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      id: string,
+      options: {
+        name?: string;
+        code?: string;
+        codeFile?: string;
+        queriesFile?: string;
+        project?: string;
+      },
+    ) => {
+      const { updatePlaygroundWidgetCommand: impl } = await import("./commands/playground-widgets/update.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    playgroundWidgetCmd
+      .command("delete <id>")
+      .description("Delete a playground widget")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { project?: string }) => {
+      const { deletePlaygroundWidgetCommand: impl } = await import("./commands/playground-widgets/delete.js");
+      return impl(id, options);
+    },
+  );
+
   // Add trigger (automation) command group
   const triggerCmd = program
     .command("trigger")
