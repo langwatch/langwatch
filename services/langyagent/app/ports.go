@@ -51,14 +51,15 @@ type WorkerPool interface {
 	HasLiveWorker(conversationID string, sig domain.CredentialSignature) bool
 	// Status returns the live worker count and the configured cap.
 	Status() (active, capacity int)
-	// KillSessionVanished recycles a worker whose opencode session disappeared.
+	// KillSessionVanished recycles a worker whose agent session disappeared —
+	// the worker is structurally unable to serve another turn, so leaving it in
+	// the pool would hand the next turn the same dead worker.
 	KillSessionVanished(conversationID string)
 	// CancelTurn asks the conversation's live worker to abort the named
 	// in-flight turn, the token-burn half of the user's Stop (ADR-078). A
 	// lookup, never a spawn, and every miss (no worker, a different turn in
-	// flight, an agent that cannot abort) is a silent no-op: the durable
-	// stopped terminal is already recorded upstream, so a cancel is
-	// fire-and-forget by contract.
+	// flight) is a silent no-op: the durable stopped terminal is already
+	// recorded upstream, so a cancel is fire-and-forget by contract.
 	CancelTurn(conversationID, turnID string)
 	// StartReaper begins the idle-worker sweep.
 	StartReaper()
@@ -70,35 +71,6 @@ type WorkerPool interface {
 	ShutdownHandoff(ctx context.Context, deadline time.Time)
 	// Shutdown tears down every worker.
 	Shutdown()
-}
-
-// TurnAborter is the OPTIONAL capability a CodingAgent (agent.go) implements
-// when it can abort an in-flight turn mid-generation. The worker type-asserts
-// its agent against this at cancel time: an agent without it (opencode today)
-// is a silent no-op, fail-open, so a cancel can never change behavior for a
-// harness that has no abort. Same drive shape as the CodingAgent methods: the
-// endpoint and session route the call, and turnID names the one turn allowed
-// to die.
-type TurnAborter interface {
-	AbortTurn(ctx context.Context, ep Endpoint, sessionID, turnID string) error
-}
-
-// TurnBoundary is the OPTIONAL capability a CodingAgent implements when it
-// carries per-turn state that must not survive into the next turn. The worker
-// calls TurnEnded from Release, which runs after Post and Stream have both
-// finished, so the agent gets a point where no turn is in flight.
-//
-// It exists because Post and Stream are NOT ordered against each other: app.go
-// starts the Stream goroutine before PostMessage. An agent that hands the turn
-// from Post to Stream can therefore be left holding a handle nobody consumed
-// (a turn abandoned between the two), and the NEXT turn's Stream could pick
-// that stale handle up instead of its own. Clearing at the boundary is what
-// makes the handoff unambiguous: turns are serialized by ClaimTurn, so nothing
-// left behind can reach the turn after it. An agent without the capability
-// (opencode, which drives turns over HTTP and keeps no such handle) is a
-// silent no-op.
-type TurnBoundary interface {
-	TurnEnded()
 }
 
 // ClaimOutcome is the result of Worker.ClaimTurn — a turnId-idempotent claim.

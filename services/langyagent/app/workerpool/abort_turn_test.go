@@ -10,9 +10,10 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/app"
 )
 
-// abortRecordingAgent is a seedRecordingAgent that ALSO implements the optional
-// app.TurnAborter capability, recording every abort so tests can prove which
-// turn (if any) was told to die.
+// abortRecordingAgent is a seedRecordingAgent that records every abort, so
+// tests can prove which turn (if any) was told to die. Abort was an optional
+// capability the worker type-asserted for until ADR-131; it is now part of
+// app.CodingAgent, so the base fake carries a no-op and this one overrides it.
 type abortRecordingAgent struct {
 	seedRecordingAgent
 	aborts   []string // turnIDs, in order
@@ -20,24 +21,20 @@ type abortRecordingAgent struct {
 	abortErr error
 }
 
-func (a *abortRecordingAgent) AbortTurn(_ context.Context, _ app.Endpoint, sessionID, turnID string) error {
+func (a *abortRecordingAgent) AbortTurn(_ context.Context, sessionID, turnID string) error {
 	a.aborts = append(a.aborts, turnID)
 	a.sessions = append(a.sessions, sessionID)
 	return a.abortErr
 }
-
-// compile-time proof the fake exercises the real capability interface.
-var _ app.TurnAborter = (*abortRecordingAgent)(nil)
 
 // claimedWorker registers a worker for conversationID whose agent is `agent`,
 // with turnID claimed in flight, and returns it.
 func claimedWorker(t *testing.T, p *Pool, conversationID, turnID string, agent app.CodingAgent) *Worker {
 	t.Helper()
 	w := &Worker{
-		conversationID:    conversationID,
-		agent:             agent,
-		endpoint:          app.Endpoint{BaseURL: "http://127.0.0.1:0", BearerToken: "b"},
-		openCodeSessionID: "sess",
+		conversationID: conversationID,
+		agent:          agent,
+		agentSessionID: "sess",
 	}
 	require.Equal(t, app.ClaimGranted, w.ClaimTurn(turnID))
 	p.mu.Lock()
@@ -104,19 +101,10 @@ func TestPoolCancelTurn_IdleWorkerIsANoOp(t *testing.T) {
 	}
 }
 
-// An agent WITHOUT the abort capability — opencode today — is fail-open: the
-// cancel is a silent no-op and nothing about the running turn changes.
-func TestWorkerAbortTurn_NonAbortingAgentIsANoOp(t *testing.T) {
-	p := newTestPool(4)
-	agent := &seedRecordingAgent{} // no AbortTurn method
-	w := claimedWorker(t, p, "conv-1", "turn-1", agent)
-
-	p.CancelTurn("conv-1", "turn-1")
-
-	if !w.isInFlight() {
-		t.Fatal("a no-op cancel must leave the claimed turn in flight")
-	}
-}
+// An agent without the abort capability was fail-open until ADR-131: the
+// cancel was a silent no-op, because the removed harness could not abort. Every
+// agent aborts now, so the case has no subject — and a test kept here would
+// pass by exercising a fake's no-op rather than any product behaviour.
 
 // A failing abort is best-effort: logged, never propagated — the durable
 // stopped terminal upstream already made the stop truthful.

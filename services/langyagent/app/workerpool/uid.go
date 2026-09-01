@@ -3,7 +3,7 @@
 // per-worker UID, 0700 chown-before-secrets home, per-worker
 // OPENCODE_SERVER_PASSWORD, the authProxy bearer→Basic swap, the sensitive-env
 // denylist, Setpgid process-group kill, the orphan reaper, and the fail-closed
-// opencode auth guard all live here, unchanged in behavior and wrapped in
+// worker auth guard all live here, unchanged in behavior and wrapped in
 // herr + OpenTelemetry.
 package workerpool
 

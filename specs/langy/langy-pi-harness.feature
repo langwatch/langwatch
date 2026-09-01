@@ -1,43 +1,23 @@
-Feature: Langy can run a conversation on the pi harness
-  Langy's worker runs on one of two coding-agent harnesses, selected per
-  project. The harness rides the same credential envelope as every other
-  worker-shaping input, so a change replaces the worker instead of quietly
-  reusing one built for the other harness, and a deploy that introduces
-  harness selection does not touch any worker that was running before it.
+Feature: Langy runs a conversation on the pi harness
+  Langy's worker runs on the pi harness — the langy-worker wrapper, driven over
+  stdio pipes. This spec is what that worker owes a conversation: its session,
+  its model registry, its cancel, its telemetry.
 
   # Companion specs:
   #   - specs/langy/langy-minimal-harness.feature  (what the worker's prompt and
   #     tool surface look like, harness-independent)
   #   - specs/langy/langy-stop-and-resume.feature  (the user-facing stop this
   #     feature's cancel path completes)
-
-  @unit
-  Scenario: A conversation that names no harness keeps its running worker
-    Given a worker is running for a conversation that never named a harness
-    When the next turn arrives naming the default harness explicitly
-    Then the running worker is reused
-    And no worker is replaced just because harness selection was deployed
-
-  @unit
-  Scenario: Selecting the pi harness replaces the conversation's worker
-    Given a worker is running for a conversation on the default harness
-    When the next turn arrives selecting the pi harness
-    Then the running worker does not match and is replaced
-    And the conversation continues on a worker built for the pi harness
-
-  @unit
-  Scenario: An unrecognized harness value falls back to the default harness
-    Given a turn arrives naming a harness this manager does not know
-    When the manager resolves the harness
-    Then the turn runs on the default harness
-    And the unknown value never selects an unfinished or absent harness
-
-  @unit
-  Scenario: The pre-turn probe answers for the harness the turn will use
-    Given the control plane asks whether a matching worker is already running
-    When the probe names the harness the turn would run on
-    Then the answer compares the running worker's harness too
-    And a harness change is a miss, so the turn replaces the worker instead of reusing it
+  #   - specs/langy/langy-opencode-harness-removal.feature  (ADR-131; what
+  #     happens to a turn that still names the harness that was removed)
+  #
+  # Four scenarios here described SELECTING between two harnesses: a turn
+  # naming none, a turn flipping to pi, an unrecognized value, and a probe that
+  # compared harnesses. ADR-131 removed the second harness, so all four
+  # described a choice that no longer exists. What survived of them — that a
+  # turn naming no harness runs, and that a turn naming the removed one is
+  # served rather than refused — moved to the removal spec, where it is about
+  # tolerating an old envelope rather than about picking a worker.
 
   # The wrapper generates pi's model registry from the manager's config. That
   # entry must not LOSE what pi's own catalog knows about the model: Claude 5

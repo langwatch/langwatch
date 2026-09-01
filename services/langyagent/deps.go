@@ -32,7 +32,7 @@ type Deps struct {
 
 // NewDeps wires every adapter from the validated Config. It installs the
 // context-carried logger and the OTel provider (the manager's OWN operational
-// telemetry — distinct from the per-worker opencode plugin telemetry, which
+// telemetry — distinct from the per-worker plugin telemetry, which
 // exports into each customer's project). The provider is a no-op until
 // OTEL_OTLP_ENDPOINT is configured; the spans + metric call sites exist
 // regardless (ADR-047 telemetry seam).

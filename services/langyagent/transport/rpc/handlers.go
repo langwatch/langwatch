@@ -97,7 +97,7 @@ const (
 	workerIntentContinue = "continue"
 )
 
-// maxTurnDuration bounds a detached turn so a wedged opencode stream (one that
+// maxTurnDuration bounds a detached turn so a wedged worker stream (one that
 // never sends a terminal event) cannot leak the drive goroutine forever. It is a
 // generous ceiling well above any realistic turn — the turn normally ends on its
 // terminal frame long before this fires.
@@ -129,7 +129,7 @@ func chatHandler(application *app.App, maxBodyBytes int64, intent string) http.H
 		}
 
 		// Stamp the turn's identity + intent onto the context logger so every line
-		// the app, pool, worker, and opencode reader emit for this turn carries it —
+		// the app, pool, worker, and agent reader emit for this turn carries it —
 		// the thread to pull when reading logs for one conversation.
 		ctx = clog.With(ctx, turnLogFields(req.ConversationID, req.ProjectID, req.TurnID)...)
 		ctx = clog.With(ctx, zap.String("worker_intent", intent))

@@ -62,9 +62,9 @@ func runTurn(t *testing.T, agent *Agent, turnID string) (*frameSink, error) {
 	t.Cleanup(cancel)
 
 	errCh := make(chan error, 1)
-	go func() { errCh <- agent.Stream(ctx, app.Endpoint{}, "sess", sink) }()
+	go func() { errCh <- agent.Stream(ctx, "sess", sink) }()
 
-	if err := agent.Post(ctx, app.Endpoint{}, "sess", app.Turn{TurnID: turnID, Prompt: "hi"}); err != nil {
+	if err := agent.Post(ctx, "sess", app.Turn{TurnID: turnID, Prompt: "hi"}); err != nil {
 		t.Fatalf("Post: %v", err)
 	}
 	select {
@@ -91,10 +91,10 @@ func TestAgent_OpenSession_RelaysWrapperSessionResume(t *testing.T) {
 		{mode: "happy", want: false},
 	} {
 		agent := spawnFake(t, tc.mode, 20*time.Second)
-		if err := agent.WaitReady(context.Background(), app.Endpoint{}); err != nil {
+		if err := agent.WaitReady(context.Background()); err != nil {
 			t.Fatalf("WaitReady(%s): %v", tc.mode, err)
 		}
-		_, resumed, err := agent.OpenSession(context.Background(), app.Endpoint{})
+		_, resumed, err := agent.OpenSession(context.Background())
 		if err != nil {
 			t.Fatalf("OpenSession(%s): %v", tc.mode, err)
 		}
@@ -110,7 +110,7 @@ func TestAgent_OpenSession_RelaysWrapperSessionResume(t *testing.T) {
 // terminal.
 func TestAgent_HappyTurn_StreamsFramesAndSettlesClean(t *testing.T) {
 	agent := spawnFake(t, "happy", 20*time.Second)
-	if err := agent.WaitReady(context.Background(), app.Endpoint{}); err != nil {
+	if err := agent.WaitReady(context.Background()); err != nil {
 		t.Fatalf("WaitReady: %v", err)
 	}
 
@@ -149,20 +149,20 @@ func TestAgent_HappyTurn_StreamsFramesAndSettlesClean(t *testing.T) {
 // receive everything.
 func TestAgent_PostBeforeStream_NoFrameIsLost(t *testing.T) {
 	agent := spawnFake(t, "happy", 20*time.Second)
-	if err := agent.WaitReady(context.Background(), app.Endpoint{}); err != nil {
+	if err := agent.WaitReady(context.Background()); err != nil {
 		t.Fatalf("WaitReady: %v", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := agent.Post(ctx, app.Endpoint{}, "sess", app.Turn{TurnID: "turn-race", Prompt: "hi"}); err != nil {
+	if err := agent.Post(ctx, "sess", app.Turn{TurnID: "turn-race", Prompt: "hi"}); err != nil {
 		t.Fatalf("Post: %v", err)
 	}
 	// Give the wrapper time to emit the whole turn INTO the mailbox buffer.
 	time.Sleep(300 * time.Millisecond)
 
 	sink := &frameSink{}
-	if err := agent.Stream(ctx, app.Endpoint{}, "sess", sink); err != nil {
+	if err := agent.Stream(ctx, "sess", sink); err != nil {
 		t.Fatalf("Stream = %v, want nil", err)
 	}
 	joined := sink.joined()
@@ -175,7 +175,7 @@ func TestAgent_PostBeforeStream_NoFrameIsLost(t *testing.T) {
 // as a log-only reason, the exact code app.go dispatches on.
 func TestAgent_ErrorTerminal_MapsToAgentError(t *testing.T) {
 	agent := spawnFake(t, "error", 20*time.Second)
-	if err := agent.WaitReady(context.Background(), app.Endpoint{}); err != nil {
+	if err := agent.WaitReady(context.Background()); err != nil {
 		t.Fatalf("WaitReady: %v", err)
 	}
 
@@ -193,7 +193,7 @@ func TestAgent_ErrorTerminal_MapsToAgentError(t *testing.T) {
 // sentinel so the app skips its own terminal frame.
 func TestAgent_Handoff_EmitsResumeTokenAndSentinel(t *testing.T) {
 	agent := spawnFake(t, "handoff", 20*time.Second)
-	if err := agent.WaitReady(context.Background(), app.Endpoint{}); err != nil {
+	if err := agent.WaitReady(context.Background()); err != nil {
 		t.Fatalf("WaitReady: %v", err)
 	}
 
@@ -201,12 +201,12 @@ func TestAgent_Handoff_EmitsResumeTokenAndSentinel(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	errCh := make(chan error, 1)
-	go func() { errCh <- agent.Stream(ctx, app.Endpoint{}, "sess", sink) }()
-	if err := agent.Post(ctx, app.Endpoint{}, "sess", app.Turn{TurnID: "turn-h", Prompt: "hi"}); err != nil {
+	go func() { errCh <- agent.Stream(ctx, "sess", sink) }()
+	if err := agent.Post(ctx, "sess", app.Turn{TurnID: "turn-h", Prompt: "hi"}); err != nil {
 		t.Fatalf("Post: %v", err)
 	}
 	sink.waitFor(t, `"text":"partial"`) // the turn is running
-	if err := agent.NotifyShutdownImminent(ctx, app.Endpoint{}, "sess", time.Now().Add(time.Second)); err != nil {
+	if err := agent.NotifyShutdownImminent(ctx, "sess", time.Now().Add(time.Second)); err != nil {
 		t.Fatalf("NotifyShutdownImminent: %v", err)
 	}
 
@@ -229,7 +229,7 @@ func TestAgent_Handoff_EmitsResumeTokenAndSentinel(t *testing.T) {
 // (nil): the control plane's stopped terminal is first-writer-wins upstream.
 func TestAgent_AbortTurn_NamesTheTurnAndSettlesClean(t *testing.T) {
 	agent := spawnFake(t, "abort", 20*time.Second)
-	if err := agent.WaitReady(context.Background(), app.Endpoint{}); err != nil {
+	if err := agent.WaitReady(context.Background()); err != nil {
 		t.Fatalf("WaitReady: %v", err)
 	}
 
@@ -237,19 +237,19 @@ func TestAgent_AbortTurn_NamesTheTurnAndSettlesClean(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	errCh := make(chan error, 1)
-	go func() { errCh <- agent.Stream(ctx, app.Endpoint{}, "sess", sink) }()
-	if err := agent.Post(ctx, app.Endpoint{}, "sess", app.Turn{TurnID: "turn-a", Prompt: "hi"}); err != nil {
+	go func() { errCh <- agent.Stream(ctx, "sess", sink) }()
+	if err := agent.Post(ctx, "sess", app.Turn{TurnID: "turn-a", Prompt: "hi"}); err != nil {
 		t.Fatalf("Post: %v", err)
 	}
 	sink.waitFor(t, `"text":"partial"`)
 
 	// A stale cancel naming a different turn must not halt this generation.
-	if err := agent.AbortTurn(ctx, app.Endpoint{}, "sess", "turn-other"); err != nil {
+	if err := agent.AbortTurn(ctx, "sess", "turn-other"); err != nil {
 		t.Fatalf("AbortTurn (mismatched): %v", err)
 	}
 	sink.waitFor(t, "IGNORED-ABORT")
 
-	if err := agent.AbortTurn(ctx, app.Endpoint{}, "sess", "turn-a"); err != nil {
+	if err := agent.AbortTurn(ctx, "sess", "turn-a"); err != nil {
 		t.Fatalf("AbortTurn: %v", err)
 	}
 	select {
@@ -266,7 +266,7 @@ func TestAgent_AbortTurn_NamesTheTurnAndSettlesClean(t *testing.T) {
 // so app.go routes it to worker_stopped, never agent_error, never a clean nil.
 func TestAgent_ProcessDeathMidTurn_IsAPlainError(t *testing.T) {
 	agent := spawnFake(t, "die", 20*time.Second)
-	if err := agent.WaitReady(context.Background(), app.Endpoint{}); err != nil {
+	if err := agent.WaitReady(context.Background()); err != nil {
 		t.Fatalf("WaitReady: %v", err)
 	}
 
@@ -286,7 +286,7 @@ func TestAgent_ProcessDeathMidTurn_IsAPlainError(t *testing.T) {
 // line are skipped, and the events after them still stream.
 func TestAgent_JunkAndOversizedLines_AreSkippedNotFatal(t *testing.T) {
 	agent := spawnFake(t, "junk", 20*time.Second)
-	if err := agent.WaitReady(context.Background(), app.Endpoint{}); err != nil {
+	if err := agent.WaitReady(context.Background()); err != nil {
 		t.Fatalf("WaitReady: %v", err)
 	}
 
@@ -303,7 +303,7 @@ func TestAgent_JunkAndOversizedLines_AreSkippedNotFatal(t *testing.T) {
 // message copy the opencode readiness poll produces.
 func TestAgent_WaitReady_TimeoutMapsToWorkerNotReady(t *testing.T) {
 	agent := spawnFake(t, "noready", 300*time.Millisecond)
-	err := agent.WaitReady(context.Background(), app.Endpoint{})
+	err := agent.WaitReady(context.Background())
 	if !herr.IsCode(err, domain.ErrWorkerNotReady) {
 		t.Fatalf("WaitReady = %v, want herr(worker_not_ready)", err)
 	}
@@ -314,7 +314,7 @@ func TestAgent_WaitReady_TimeoutMapsToWorkerNotReady(t *testing.T) {
 func TestAgent_WaitReady_DeadProcessFailsFast(t *testing.T) {
 	agent := spawnFake(t, "deadfast", 10*time.Second)
 	start := time.Now()
-	err := agent.WaitReady(context.Background(), app.Endpoint{})
+	err := agent.WaitReady(context.Background())
 	if !herr.IsCode(err, domain.ErrWorkerSpawn) {
 		t.Fatalf("WaitReady = %v, want herr(worker_spawn_failed)", err)
 	}
@@ -329,7 +329,7 @@ func TestAgent_Stream_HeartbeatsThroughSilence(t *testing.T) {
 	agent := spawnFake(t, "abort", 20*time.Second) // holds the turn open silently
 	// The real cadence is 5s; the test only proves the ticker fires at all.
 	agent.progressInterval = 50 * time.Millisecond
-	if err := agent.WaitReady(context.Background(), app.Endpoint{}); err != nil {
+	if err := agent.WaitReady(context.Background()); err != nil {
 		t.Fatalf("WaitReady: %v", err)
 	}
 
@@ -337,12 +337,12 @@ func TestAgent_Stream_HeartbeatsThroughSilence(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	errCh := make(chan error, 1)
-	go func() { errCh <- agent.Stream(ctx, app.Endpoint{}, "sess", sink) }()
-	if err := agent.Post(ctx, app.Endpoint{}, "sess", app.Turn{TurnID: "turn-hb", Prompt: "hi"}); err != nil {
+	go func() { errCh <- agent.Stream(ctx, "sess", sink) }()
+	if err := agent.Post(ctx, "sess", app.Turn{TurnID: "turn-hb", Prompt: "hi"}); err != nil {
 		t.Fatalf("Post: %v", err)
 	}
 	sink.waitFor(t, `"type":"heartbeat"`)
-	if err := agent.AbortTurn(ctx, app.Endpoint{}, "sess", "turn-hb"); err != nil {
+	if err := agent.AbortTurn(ctx, "sess", "turn-hb"); err != nil {
 		t.Fatalf("AbortTurn: %v", err)
 	}
 	<-errCh
@@ -352,7 +352,7 @@ func TestAgent_Stream_HeartbeatsThroughSilence(t *testing.T) {
 // mints a private wire id, and the turn completes.
 func TestAgent_Post_EmptyTurnIDMintsAPrivateOne(t *testing.T) {
 	agent := spawnFake(t, "happy", 20*time.Second)
-	if err := agent.WaitReady(context.Background(), app.Endpoint{}); err != nil {
+	if err := agent.WaitReady(context.Background()); err != nil {
 		t.Fatalf("WaitReady: %v", err)
 	}
 	sink, err := runTurn(t, agent, "")
@@ -402,7 +402,7 @@ func TestCommandWireShape(t *testing.T) {
 // @scenario "An abandoned pi turn cannot capture the next turn's stream"
 func TestAgent_AbandonedTurn_DoesNotCaptureTheNextStream(t *testing.T) {
 	agent := spawnFake(t, "happy", 20*time.Second)
-	if err := agent.WaitReady(context.Background(), app.Endpoint{}); err != nil {
+	if err := agent.WaitReady(context.Background()); err != nil {
 		t.Fatalf("WaitReady: %v", err)
 	}
 
@@ -410,7 +410,7 @@ func TestAgent_AbandonedTurn_DoesNotCaptureTheNextStream(t *testing.T) {
 	// as when the customer's request context dies between the two calls.
 	postCtx, cancelPost := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancelPost()
-	if err := agent.Post(postCtx, app.Endpoint{}, "sess", app.Turn{TurnID: "turn-abandoned", Prompt: "hi"}); err != nil {
+	if err := agent.Post(postCtx, "sess", app.Turn{TurnID: "turn-abandoned", Prompt: "hi"}); err != nil {
 		t.Fatalf("Post(abandoned): %v", err)
 	}
 
@@ -450,7 +450,7 @@ func TestAgent_AbandonedTurn_DoesNotCaptureTheNextStream(t *testing.T) {
 // empty channel.
 func TestAgent_TurnEnded_IsANoOpWhenNothingWasOrphaned(t *testing.T) {
 	agent := spawnFake(t, "happy", 20*time.Second)
-	if err := agent.WaitReady(context.Background(), app.Endpoint{}); err != nil {
+	if err := agent.WaitReady(context.Background()); err != nil {
 		t.Fatalf("WaitReady: %v", err)
 	}
 	if _, err := runTurn(t, agent, "turn-clean"); err != nil {

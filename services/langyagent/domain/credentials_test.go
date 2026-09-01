@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -33,36 +34,36 @@ func TestIsValidConversationID(t *testing.T) {
 }
 
 func TestSignatureOf_DetectsModelAndCapabilityChanges(t *testing.T) {
-	sigBase := SignatureOf("project-1", "user-1", "openai/gpt-5-mini", nil, nil, "", "")
+	sigBase := SignatureOf("project-1", "user-1", "openai/gpt-5-mini", nil, nil, "")
 
 	// Same inputs → same signature.
-	if SignatureOf("project-1", "user-1", "openai/gpt-5-mini", nil, nil, "", "") != sigBase {
+	if SignatureOf("project-1", "user-1", "openai/gpt-5-mini", nil, nil, "") != sigBase {
 		t.Errorf("identical inputs should produce identical signatures")
 	}
 	// Model swap → different signature (worker must be recycled so the new model
 	// is honored).
-	if SignatureOf("project-1", "user-1", "anthropic/claude-opus", nil, nil, "", "") == sigBase {
+	if SignatureOf("project-1", "user-1", "anthropic/claude-opus", nil, nil, "") == sigBase {
 		t.Errorf("model change must alter the signature")
 	}
 	// A capability becoming active → different signature (else a worker keeps a
 	// stale capability's secret across a turn that no longer grants it). Capability
 	// presence (not the secret, not a display label like GitHub login) is what folds
 	// in — that mapping lives in each capability's SignatureKey, tested there.
-	if SignatureOf("project-1", "user-1", "openai/gpt-5-mini", nil, []string{"github"}, "", "") == sigBase {
+	if SignatureOf("project-1", "user-1", "openai/gpt-5-mini", nil, []string{"github"}, "") == sigBase {
 		t.Errorf("adding an active capability must alter the signature")
 	}
 	// The capability fingerprint is canonical — key order is irrelevant.
-	if SignatureOf("project-1", "user-1", "m", nil, []string{"a", "b"}, "", "") != SignatureOf("project-1", "user-1", "m", nil, []string{"b", "a"}, "", "") {
+	if SignatureOf("project-1", "user-1", "m", nil, []string{"a", "b"}, "") != SignatureOf("project-1", "user-1", "m", nil, []string{"b", "a"}, "") {
 		t.Errorf("capability key order must not affect the signature")
 	}
 }
 
 func TestSignatureOf_BindsWorkerToProjectAndActor(t *testing.T) {
-	base := SignatureOf("project-1", "user-a", "model", nil, nil, "", "")
-	if SignatureOf("project-2", "user-a", "model", nil, nil, "", "") == base {
+	base := SignatureOf("project-1", "user-a", "model", nil, nil, "")
+	if SignatureOf("project-2", "user-a", "model", nil, nil, "") == base {
 		t.Fatal("a worker must never be reusable by another project")
 	}
-	if SignatureOf("project-1", "user-b", "model", nil, nil, "", "") == base {
+	if SignatureOf("project-1", "user-b", "model", nil, nil, "") == base {
 		t.Fatal("a worker must never be reusable by another actor")
 	}
 }
@@ -71,22 +72,22 @@ func TestSignatureOf_BindsWorkerToProjectAndActor(t *testing.T) {
 // live worker never runs a stale egress policy; a semantically-equal list must
 // NOT, or a benign re-save would needlessly kill the conversation's worker.
 func TestSignatureOf_EgressAllowlistChangeRecyclesWorker(t *testing.T) {
-	a := SignatureOf("project-1", "user-1", "", []string{"a.example.com"}, nil, "", "")
-	b := SignatureOf("project-1", "user-1", "", []string{"b.example.com"}, nil, "", "")
+	a := SignatureOf("project-1", "user-1", "", []string{"a.example.com"}, nil, "")
+	b := SignatureOf("project-1", "user-1", "", []string{"b.example.com"}, nil, "")
 	if a == b {
 		t.Fatalf("changing the allow-list must change the signature (a=%+v b=%+v)", a, b)
 	}
 
 	// Reordering / case / trailing dot are the SAME policy — must NOT recycle.
-	x := SignatureOf("project-1", "user-1", "", []string{"a.example.com", "B.example.com"}, nil, "", "")
-	y := SignatureOf("project-1", "user-1", "", []string{"b.example.com.", "a.example.com"}, nil, "", "")
+	x := SignatureOf("project-1", "user-1", "", []string{"a.example.com", "B.example.com"}, nil, "")
+	y := SignatureOf("project-1", "user-1", "", []string{"b.example.com.", "a.example.com"}, nil, "")
 	if x != y {
 		t.Fatalf("semantically-equal lists must share a signature (x=%+v y=%+v)", x, y)
 	}
 
 	// Setting a list where there was none is a change.
-	none := SignatureOf("project-1", "user-1", "", nil, nil, "", "")
-	some := SignatureOf("project-1", "user-1", "", []string{"a.example.com"}, nil, "", "")
+	none := SignatureOf("project-1", "user-1", "", nil, nil, "")
+	some := SignatureOf("project-1", "user-1", "", []string{"a.example.com"}, nil, "")
 	if none == some {
 		t.Fatalf("adding an allow-list must change the signature")
 	}
@@ -96,7 +97,7 @@ func TestSignatureOf_EgressAllowlistChangeRecyclesWorker(t *testing.T) {
 // port/path/userinfo, or a "../../" traversal) into the egress fingerprint — it
 // is dropped, so the signature is computed as if the junk were absent.
 func TestSignatureOf_EgressAllowlistDropsMalformedEntries(t *testing.T) {
-	none := SignatureOf("project-1", "user-1", "", nil, nil, "", "")
+	none := SignatureOf("project-1", "user-1", "", nil, nil, "")
 
 	// A list of only junk fingerprints identically to no list at all.
 	junkOnly := SignatureOf("project-1", "user-1", "", []string{
@@ -108,21 +109,21 @@ func TestSignatureOf_EgressAllowlistDropsMalformedEntries(t *testing.T) {
 		"has space.example",
 		"under_score.example",
 		"..",
-	}, nil, "", "")
+	}, nil, "")
 	if junkOnly != none {
 		t.Fatalf("malformed-only allow-list must fingerprint as unset (got %+v want %+v)", junkOnly, none)
 	}
 
 	// A junk entry beside a valid one contributes nothing — same fingerprint as
 	// the valid one alone.
-	withJunk := SignatureOf("project-1", "user-1", "", []string{"../../etc", "registry.npmjs.org"}, nil, "", "")
-	clean := SignatureOf("project-1", "user-1", "", []string{"registry.npmjs.org"}, nil, "", "")
+	withJunk := SignatureOf("project-1", "user-1", "", []string{"../../etc", "registry.npmjs.org"}, nil, "")
+	clean := SignatureOf("project-1", "user-1", "", []string{"registry.npmjs.org"}, nil, "")
 	if withJunk != clean {
 		t.Fatalf("a dropped junk entry must not change the fingerprint (got %+v want %+v)", withJunk, clean)
 	}
 
 	// A legitimate wildcard pattern survives validation.
-	wild := SignatureOf("project-1", "user-1", "", []string{"*.internal.acme.com"}, nil, "", "")
+	wild := SignatureOf("project-1", "user-1", "", []string{"*.internal.acme.com"}, nil, "")
 	if wild == none {
 		t.Fatalf("a valid wildcard pattern must be kept in the fingerprint")
 	}
@@ -134,9 +135,9 @@ func TestSignatureOf_EgressAllowlistDropsMalformedEntries(t *testing.T) {
 // thing, no mirror — must share a signature so a version skew never needlessly
 // recycles a live worker.
 func TestSignatureOf_MirrorTierChangeRecyclesWorker(t *testing.T) {
-	content := SignatureOf("project-1", "user-1", "m", nil, nil, "content", "")
-	structural := SignatureOf("project-1", "user-1", "m", nil, nil, "structural", "")
-	skip := SignatureOf("project-1", "user-1", "m", nil, nil, "skip", "")
+	content := SignatureOf("project-1", "user-1", "m", nil, nil, "content")
+	structural := SignatureOf("project-1", "user-1", "m", nil, nil, "structural")
+	skip := SignatureOf("project-1", "user-1", "m", nil, nil, "skip")
 
 	if content == structural || content == skip || structural == skip {
 		t.Fatalf("each mirror tier must produce a distinct signature (content=%+v structural=%+v skip=%+v)",
@@ -146,66 +147,37 @@ func TestSignatureOf_MirrorTierChangeRecyclesWorker(t *testing.T) {
 	// Empty (no tier sent) and explicit "skip" both mean "no mirror" — same
 	// signature, so an old control plane that sends nothing does not recycle a
 	// worker a new one would have marked skip.
-	empty := SignatureOf("project-1", "user-1", "m", nil, nil, "", "")
+	empty := SignatureOf("project-1", "user-1", "m", nil, nil, "")
 	if empty != skip {
 		t.Fatalf("an empty tier must fingerprint as skip (empty=%+v skip=%+v)", empty, skip)
 	}
 
 	// An unrecognized tier is fail-safe: it normalises to skip, never to a
 	// content-bearing tier.
-	garbage := SignatureOf("project-1", "user-1", "m", nil, nil, "wide-open", "")
+	garbage := SignatureOf("project-1", "user-1", "m", nil, nil, "wide-open")
 	if garbage != skip {
 		t.Fatalf("an unrecognized tier must fingerprint as skip (garbage=%+v skip=%+v)", garbage, skip)
 	}
 }
 
-// The harness vocabulary is closed and fail-safe: only "pi" selects pi, and
-// everything else (including the empty value a pre-selection control plane
-// sends) runs the harness that always exists.
+// An envelope naming a harness must still decode. A control plane mid-rollout
+// sends `harness`, and ADR-131 left the field out of the struct rather than
+// keeping a value nothing selects — so the property that matters is that the
+// unknown key is ignored, not that it maps to something.
 //
-// @scenario "An unrecognized harness value falls back to the default harness"
-func TestNormalizeHarness(t *testing.T) {
-	cases := []struct {
-		in   string
-		want string
-	}{
-		{"", HarnessOpenCode},
-		{"opencode", HarnessOpenCode},
-		{"pi", HarnessPi},
-		{"PI", HarnessOpenCode},
-		{"codex", HarnessOpenCode},
-		{"garbage-value", HarnessOpenCode},
+// @scenario "A turn that names the removed harness still runs"
+func TestCredentials_IgnoreAHarnessTheEnvelopeStillNames(t *testing.T) {
+	var creds Credentials
+	raw := `{"model":"openai/gpt-5-mini","harness":"opencode"}`
+	if err := json.Unmarshal([]byte(raw), &creds); err != nil {
+		t.Fatalf("an envelope naming a harness must decode, got %v", err)
 	}
-	for _, c := range cases {
-		if got := NormalizeHarness(c.in); got != c.want {
-			t.Errorf("NormalizeHarness(%q) = %q, want %q", c.in, got, c.want)
-		}
+	if creds.Model != "openai/gpt-5-mini" {
+		t.Errorf("the rest of the envelope must survive, got model %q", creds.Model)
 	}
 }
 
-// The harness rides the signature: a worker is BUILT for its harness, so a
-// flip must replace it, while the empty envelope and an explicit "opencode"
-// mean the same worker, so the deploy that introduces harness selection must
-// not respawn anything.
-//
-// @scenario "A conversation that names no harness keeps its running worker"
-// @scenario "Selecting the pi harness replaces the conversation's worker"
-func TestSignatureOf_HarnessChangeRecyclesWorker(t *testing.T) {
-	empty := SignatureOf("project-1", "user-1", "m", nil, nil, "", "")
-	opencode := SignatureOf("project-1", "user-1", "m", nil, nil, "", "opencode")
-	pi := SignatureOf("project-1", "user-1", "m", nil, nil, "", "pi")
-
-	if empty != opencode {
-		t.Fatalf("an empty harness must fingerprint as opencode (empty=%+v opencode=%+v)", empty, opencode)
-	}
-	if pi == opencode {
-		t.Fatalf("the pi harness must produce a distinct signature (pi=%+v opencode=%+v)", pi, opencode)
-	}
-
-	// An unknown harness is fail-safe: it fingerprints as opencode, so it can
-	// never respawn a worker onto a harness that does not exist.
-	garbage := SignatureOf("project-1", "user-1", "m", nil, nil, "", "wide-open")
-	if garbage != opencode {
-		t.Fatalf("an unknown harness must fingerprint as opencode (garbage=%+v opencode=%+v)", garbage, opencode)
-	}
-}
+// A harness folded into the signature until ADR-131, so that flipping between
+// the two replaced the worker. With one harness every worker is built the same
+// way, so there is nothing left for the signature to distinguish and the test
+// that proved the distinction has no subject.

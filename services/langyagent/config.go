@@ -1,7 +1,7 @@
 // Package langyagent is the langyagent manager — process-pool model.
 //
 // One pod, one of THIS process. Per conversation, we spawn a dedicated
-// `opencode` subprocess and route all of that conversation's turns to it.
+// worker subprocess and route all of that conversation's turns to it.
 // Credentials are NEVER held by the manager process; they arrive in each
 // request body, get injected into the worker subprocess's env at spawn time,
 // and die with the subprocess. This is the only thing that makes per-session
@@ -131,23 +131,23 @@ type Config struct {
 	WorkspaceRoot string `env:"LANGY_WORKSPACE_ROOT" validate:"required"`
 
 	// UnsafeDevDisableIsolation disables the ADR-033 per-worker UID sandbox: no
-	// os.Chown of worker homes/config to a per-conversation UID, and no setuid
-	// Credential on the opencode subprocess (it runs as the manager's own user).
-	// This exists ONLY so the manager can spawn opencode on a LOCAL DEV box where
-	// it runs as an unprivileged user — there, the chown and the setuid Credential
-	// both fail with EPERM (they require root + CAP_SETUID/CAP_SETGID/CAP_CHOWN)
-	// and no worker can start at all. Enabling it DESTROYS sibling-worker
-	// isolation: every worker runs under one UID, so worker A can read worker B's
-	// plaintext credentials on the shared volume. It MUST only ever be used
-	// locally — LoadConfig hard-refuses it whenever ENVIRONMENT is not a
-	// local-like value (see environmentPermitsUnsafeDev), so it can never be
-	// switched on in production.
+	// os.Chown of worker homes to a per-conversation UID, and no setuid
+	// Credential on the worker subprocess (it runs as the manager's own user).
+	// This exists ONLY so the manager can spawn a worker on a LOCAL DEV box
+	// where it runs as an unprivileged user — there, the chown and the setuid
+	// Credential both fail with EPERM (they require root +
+	// CAP_SETUID/CAP_SETGID/CAP_CHOWN) and no worker can start at all.
+	//
+	// Enabling it removes sibling-worker isolation: every worker runs under one
+	// UID, so one conversation's worker can read another's live credentials out
+	// of /proc/<pid>/environ and its conversation content out of the session
+	// directory. LoadConfig hard-refuses it whenever ENVIRONMENT is not a
+	// local-like value (see environmentPermitsUnsafeDev).
+	//
+	// ADR-130 turns this into an operator-selectable posture with its own
+	// acknowledgement, at which point the environment allowlist stops being the
+	// gate and this field is replaced by LANGY_WORKER_ISOLATION.
 	UnsafeDevDisableIsolation bool `env:"LANGY_UNSAFE_DEV_DISABLE_ISOLATION"`
-
-	// OpenCodeBinaryPath is the opencode executable (resolved via PATH). Not
-	// env-configurable in the original; kept as a fixed default so behavior is
-	// unchanged, but overridable in tests.
-	OpenCodeBinaryPath string
 
 	// PiWorkerBinaryPath is the langy-worker executable the pi harness spawns
 	// (resolved via PATH when bare). Env-overridable so a host-tier dev manager
@@ -191,7 +191,6 @@ func defaultConfig() Config {
 		ReadinessTimeoutMS:        defaultReadinessTimeoutMS,
 		SessionsRoot:              defaultSessionsRoot,
 		WorkspaceRoot:             defaultWorkspaceRoot,
-		OpenCodeBinaryPath:        "opencode",
 		PiWorkerBinaryPath:        "langy-worker",
 		ShutdownHandoffDeadlineMS: defaultShutdownHandoffDeadlineMS,
 		ShutdownDrainBudgetMS:     defaultShutdownDrainBudgetMS,
@@ -304,7 +303,7 @@ func (c Config) WorkerIdle() time.Duration {
 	return time.Duration(c.WorkerIdleMS) * time.Millisecond
 }
 
-// ReadinessTimeout is how long a spawn waits for opencode to become ready.
+// ReadinessTimeout is how long a spawn waits for the worker to become ready.
 func (c Config) ReadinessTimeout() time.Duration {
 	return time.Duration(c.ReadinessTimeoutMS) * time.Millisecond
 }

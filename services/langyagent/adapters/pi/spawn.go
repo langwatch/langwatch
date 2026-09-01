@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/langwatch/langwatch/services/langyagent/adapters/opencode"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
+	"github.com/langwatch/langwatch/services/langyagent/internal/assets"
 	"github.com/langwatch/langwatch/services/langyagent/internal/workerenv"
 )
 
@@ -266,7 +266,7 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		ThinkingLevel: "medium",
 		// The ONE Langy persona, shared with the opencode provision so the
 		// persona cannot drift between harnesses.
-		PersonaPrompt:  opencode.LangyAgentPrompt,
+		PersonaPrompt:  assets.LangyAgentPrompt,
 		AgentsFilePath: agentsPath,
 		SkillsDir:      skillsDir(in.WorkspaceRoot),
 		SessionDir:     in.SessionDir,

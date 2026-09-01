@@ -29,12 +29,15 @@ const progressInterval = 5 * time.Second
 // unbounded map would grow with every tool call the wrapper never settles.
 const maxStartedInputs = 256
 
-// Agent drives ONE langy-worker subprocess over stdio, per-worker stateful,
-// unlike the opencode Agent (which talks HTTP to a port). The pool constructs
-// one per worker, Provisions + Spawns through it, and the app then drives each
-// turn through the app.CodingAgent port. The app.Endpoint parameters are
-// accepted and ignored: a pi worker has no listener, which is the point
-// (stdio isolation, nothing a sibling could dial).
+// Agent drives ONE langy-worker subprocess over stdio, per-worker stateful. The
+// pool constructs one per worker, Provisions + Spawns through it, and the app
+// then drives each turn through the app.CodingAgent port.
+//
+// A worker has no listener, which is the point: the pipes are held by this
+// adapter and the child, so there is no port, path or name a sibling could
+// dial, at any identity. The port carried an app.Endpoint on every method until
+// ADR-131, because the harness that has since been removed was driven over
+// loopback HTTP and needed an address; this adapter accepted and ignored it.
 type Agent struct {
 	readinessTimeout time.Duration
 
@@ -77,16 +80,12 @@ type postedTurn struct {
 	mb     *mailbox
 }
 
-// Compile-time proof Agent satisfies the app ports, including the optional
-// abort capability the worker type-asserts at cancel time.
-var (
-	_ app.CodingAgent  = (*Agent)(nil)
-	_ app.TurnAborter  = (*Agent)(nil)
-	_ app.TurnBoundary = (*Agent)(nil)
-)
+// Compile-time proof Agent satisfies the driven port. Abort and the turn
+// boundary are part of CodingAgent since ADR-131 — they were optional
+// capabilities only because the other harness implemented neither.
+var _ app.CodingAgent = (*Agent)(nil)
 
-// NewAgent returns a pi CodingAgent. readinessTimeout bounds WaitReady, the
-// same value the pool hands the opencode agent.
+// NewAgent returns a CodingAgent. readinessTimeout bounds WaitReady.
 func NewAgent(readinessTimeout time.Duration) *Agent {
 	return &Agent{
 		readinessTimeout: readinessTimeout,
@@ -99,7 +98,7 @@ func NewAgent(readinessTimeout time.Duration) *Agent {
 // the readiness timeout, or ctx. The timeout maps to the same
 // herr(ErrWorkerNotReady) message the opencode readiness poll returns, so the
 // customer-facing copy does not depend on the harness.
-func (a *Agent) WaitReady(ctx context.Context, _ app.Endpoint) error {
+func (a *Agent) WaitReady(ctx context.Context) error {
 	r := a.currentReader()
 	if r == nil {
 		return errors.New("pi agent: WaitReady before Spawn")
@@ -140,7 +139,7 @@ func (a *Agent) WaitReady(ctx context.Context, _ app.Endpoint) error {
 // session must not be re-seeded the transcript it already carries. The reader
 // records the flag before closing ready, and the pool calls OpenSession only
 // after WaitReady, so the read is ordered.
-func (a *Agent) OpenSession(_ context.Context, _ app.Endpoint) (string, bool, error) {
+func (a *Agent) OpenSession(_ context.Context) (string, bool, error) {
 	r := a.currentReader()
 	resumed := r != nil && r.resumed
 	return "pi-" + randomID(), resumed, nil
@@ -150,10 +149,10 @@ func (a *Agent) OpenSession(_ context.Context, _ app.Endpoint) (string, bool, er
 // turn line is written: app.go launches the Stream goroutine before
 // PostMessage with no ordering guarantee, and the wrapper can emit
 // turn_started the instant the line lands, so routing must exist first.
-func (a *Agent) Post(ctx context.Context, _ app.Endpoint, _ string, turn app.Turn) error {
+func (a *Agent) Post(ctx context.Context, _ string, turn app.Turn) error {
 	r := a.currentReader()
 	if r == nil {
-		return errors.New("pi agent: Post before Spawn")
+		return errWorkerGone(ctx, "Post before Spawn")
 	}
 	turnID := turn.TurnID
 	if turnID == "" {
@@ -217,7 +216,7 @@ func (a *Agent) TurnEnded() {
 //   - process death mid-turn (dead closes, no terminal) -> PLAIN error, so the
 //     app routes it to worker_stopped, never agent_error
 //   - ctx cancellation   -> nil
-func (a *Agent) Stream(ctx context.Context, _ app.Endpoint, _ string, sink app.ChatSink) error {
+func (a *Agent) Stream(ctx context.Context, _ string, sink app.ChatSink) error {
 	r := a.currentReader()
 	if r == nil {
 		return errors.New("pi agent: Stream before Spawn")
@@ -508,7 +507,7 @@ func (s *streamState) applyPlan(ev wireEvent) bool {
 // NotifyShutdownImminent (ADR-048) tells the wrapper the manager will kill the
 // process by deadline; an in-flight turn then terminates with a handoff event
 // carrying the conversation digest.
-func (a *Agent) NotifyShutdownImminent(ctx context.Context, _ app.Endpoint, _ string, deadline time.Time) error {
+func (a *Agent) NotifyShutdownImminent(ctx context.Context, _ string, deadline time.Time) error {
 	return a.writeCommand(ctx, command{Type: "shutdown_imminent", DeadlineMs: deadline.UnixMilli()})
 }
 
@@ -516,7 +515,7 @@ func (a *Agent) NotifyShutdownImminent(ctx context.Context, _ app.Endpoint, _ st
 // exactly the named turn. The wrapper double-checks the id against its running
 // turn, so a stale cancel can never halt the wrong generation. The aborted
 // turn still terminates with turn_done aborted, which Stream settles clean.
-func (a *Agent) AbortTurn(ctx context.Context, _ app.Endpoint, _ string, turnID string) error {
+func (a *Agent) AbortTurn(ctx context.Context, _ string, turnID string) error {
 	if turnID == "" {
 		return errors.New("pi agent: abort needs a turn id")
 	}
@@ -559,10 +558,10 @@ func (a *Agent) writeCommand(ctx context.Context, cmd command) error {
 	a.pipesMu.Lock()
 	defer a.pipesMu.Unlock()
 	if a.stdin == nil {
-		return errors.New("pi agent: worker stdin not open")
+		return errWorkerGone(ctx, "worker stdin not open")
 	}
 	if a.stdinBroken {
-		return errors.New("pi agent: worker stdin is broken, an earlier command did not write whole")
+		return errWorkerGone(ctx, "worker stdin is broken, an earlier command did not write whole")
 	}
 	if pipe, ok := any(a.stdin).(deadlineWriter); ok {
 		if err := pipe.SetWriteDeadline(deadline); err == nil {
@@ -571,9 +570,32 @@ func (a *Agent) writeCommand(ctx context.Context, cmd command) error {
 	}
 	if _, err := a.stdin.Write(append(body, '\n')); err != nil {
 		a.stdinBroken = true
-		return fmt.Errorf("pi agent: write %s command: %w", cmd.Type, err)
+		return errWorkerGone(ctx, fmt.Sprintf("write %s command: %v", cmd.Type, err))
 	}
 	return nil
+}
+
+// errWorkerGone reports that this worker can never serve another turn, in the
+// one shape the app recycles on.
+//
+// The pipe IS the session here: pi has no remote session to look up, so the
+// wrapper being unreachable is the whole of "the session vanished". Every
+// caller of this reaches it only after the worker is structurally unusable —
+// stdin never opened, or poisoned by a partial write that no later command can
+// be appended to safely.
+//
+// Returning domain.ErrSessionNotFound is what makes the comment on
+// writeCommand true. app.go recycles the conversation's worker on exactly this
+// code and falls through to a generic post failure on anything else, and a
+// generic failure leaves the dead worker in the pool for the next turn to find.
+// Under the opencode harness this code was raised by an HTTP 404 on a vanished
+// session; ADR-131 removed that harness, and without this the recovery path
+// would have had no producer left.
+func errWorkerGone(ctx context.Context, detail string) error {
+	return herr.New(ctx, domain.ErrSessionNotFound, herr.M{
+		"message": "the assistant session ended, please try again",
+		"detail":  "pi agent: " + detail,
+	})
 }
 
 // randomID returns a short random hex handle (session ids, private turn ids).
