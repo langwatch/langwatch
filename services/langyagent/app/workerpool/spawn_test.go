@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/langwatch/langwatch/services/langyagent/adapters/pi"
-	"github.com/langwatch/langwatch/services/langyagent/adapters/runner/localunsafe"
+	"github.com/langwatch/langwatch/services/langyagent/adapters/runner/sharedidentity"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
 
@@ -42,8 +42,7 @@ func tolerantTempDir(t *testing.T) string {
 
 func newHarnessPool(t *testing.T, piBinary string, rev CredentialRevoker) *Pool {
 	t.Helper()
-	runner, err := localunsafe.New("test")
-	require.NoError(t, err)
+	runner := sharedidentity.New()
 	p, err := New(context.Background(), Options{
 		MaxWorkers:       4,
 		WorkerIdle:       time.Minute,

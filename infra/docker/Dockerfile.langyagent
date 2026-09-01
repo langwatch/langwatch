@@ -12,7 +12,7 @@
 # Two-stage build: stage one compiles the Go manager binary from the
 # repo's mono-binary (services/langyagent/ is the package, dispatched via
 # cmd/service). Stage two is the runtime image with all the tooling the
-# workers shell out to (opencode, gh, langwatch CLI).
+# workers shell out to (gh, langwatch CLI).
 
 # -----------------------------------------------------------------------------
 # Stage 1: build the Go manager binary.
@@ -228,10 +228,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl git ca-certificates python3 python-is-python3 jq util-linux \
     && rm -rf /var/lib/apt/lists/*
 # NOTE: `iptables` is no longer installed. The old loopback OWNER-match DROP
-# rule (services/langyagent/iptables.go) that closed the sibling-worker
-# exfiltration path is removed under ADR-033 Fix A′ — sibling isolation is
-# now enforced by opencode's own per-worker OPENCODE_SERVER_PASSWORD, which
-# needs no netfilter (and works under gVisor, where netfilter is absent).
+# rule (services/langyagent/iptables.go) closed a sibling-worker exfiltration
+# path that no longer has a mechanism: it existed because the harness of the
+# day served an unauthenticated control port any sibling could dial. ADR-033
+# Fix A′ replaced the rule with a per-worker password, and ADR-131 removed
+# the listener entirely — a worker is driven over the stdio pipes it was
+# spawned with, so there is no port, path or name for a sibling to reach.
 
 # GitHub CLI (`gh`) is what Langy's github.md skill uses to open PRs
 # attributed to the requesting user. The user's short-lived user-to-server
@@ -251,40 +253,14 @@ RUN curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_CLI_VERSION}/
     && rm -rf /var/lib/apt/lists/* \
     && gh --version
 
-# There is no Node runtime dependency here: OpenCode is shipped as its pinned
-# standalone binary and the LangWatch CLI is the Bun-compiled binary above.
-
-# Pin opencode to a specific release artifact + verify sha256. The previous
-# `curl https://opencode.ai/install | bash` shape installed whatever was
-# `latest` at build time — every rebuild silently re-evaluated trust in
-# opencode upstream. opencode runs in every worker with the user's API
-# keys + GitHub user-to-server token in env, so it sits on the same
-# supply-chain surface as gh (already pinned above) and the npm packages.
+# There is no Node runtime dependency here: the worker runtime and the
+# LangWatch CLI are both compiled standalone binaries.
 #
-# Bump procedure when raising OPENCODE_VERSION:
-#   v=NEW_VERSION
-#   curl -fsSL "https://github.com/anomalyco/opencode/releases/download/v${v}/opencode-linux-x64.tar.gz"  | sha256sum
-#   curl -fsSL "https://github.com/anomalyco/opencode/releases/download/v${v}/opencode-linux-arm64.tar.gz" | sha256sum
-# Paste both values below. Dev-cluster nodes are arm64 (Graviton) and CI
-# builds amd64 — both must verify.
-ARG OPENCODE_VERSION=1.17.11
-ARG OPENCODE_SHA256_AMD64=6aefcbbb7f04cdb4642be5208ddbfabb3c3d274f816bf42bff72eea5c244dca2
-ARG OPENCODE_SHA256_ARM64=6c0ae8212401c78f9dcddead35d385953c7a44eb1616309365b58503dbd1b4cd
-
-RUN set -eux; \
-    arch=$(dpkg --print-architecture); \
-    case "$arch" in \
-      amd64) target=linux-x64; sha=${OPENCODE_SHA256_AMD64} ;; \
-      arm64) target=linux-arm64; sha=${OPENCODE_SHA256_ARM64} ;; \
-      *) echo "Unsupported architecture for opencode pin: $arch" >&2; exit 1 ;; \
-    esac; \
-    url="https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/opencode-${target}.tar.gz"; \
-    curl -fsSL "$url" -o /tmp/opencode.tar.gz; \
-    echo "${sha}  /tmp/opencode.tar.gz" | sha256sum -c -; \
-    tar -xzf /tmp/opencode.tar.gz -C /tmp; \
-    install -m0755 /tmp/opencode /usr/local/bin/opencode; \
-    rm -f /tmp/opencode /tmp/opencode.tar.gz; \
-    opencode --version
+# A pinned opencode release was installed here until ADR-131 removed that
+# harness — pinned rather than curl|bash so every rebuild did not silently
+# re-evaluate trust in an upstream that ran in every worker holding the
+# user's API keys and GitHub token. Nothing replaces it: the surviving
+# harness ships as part of the worker image build below.
 
 # The `langwatch` CLI as a single self-contained native binary, compiled from
 # THIS repo's sdks/typescript/ by the cli-builder stage — no longer
@@ -315,7 +291,7 @@ RUN langy-worker --version
 
 # Drop the Go mono-binary in place; it is the image ENTRYPOINT (below), invoked
 # with the `langyagent` subcommand so it runs the manager as PID 1 DIRECTLY — no
-# shell wrapper. PID 1 is required for the orphan reaper: opencode's children
+# shell wrapper. PID 1 is required for the orphan reaper: a worker's children
 # (gh/git/npm) reparent to the manager on a worker kill, and only PID 1 may reap
 # them.
 COPY --from=builder /out/langyagent /usr/local/bin/langyagent

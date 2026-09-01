@@ -5,8 +5,8 @@
 {{- fail "langyagent.replicaCount must remain 1 until conversation-sticky routing exists" }}
 {{- end }}
 {{- /* A sandboxed runtime is the posture this workload wants everywhere. The
-       agent runs LLM-driven arbitrary shell (opencode workers spawn
-       git/gh/npm), so an unset/empty runtimeClassName drops the pod onto the
+       agent runs LLM-driven arbitrary shell (workers spawn git/gh/npm), so an
+       unset/empty runtimeClassName drops the pod onto the
        node's default runtime (runc, no sandbox) and re-opens the pod->host
        escape surface. `not` catches BOTH the absent key and the empty string.
 
@@ -20,6 +20,23 @@
        and specs/langy/langy-deploy-hardening.feature. */ -}}
 {{- if and .Values.chartManaged (not .Values.runtimeClassName) (not .Values.acceptUnsandboxedRuntime) }}
 {{- fail "langyagent.runtimeClassName must be set to a sandboxed runtime (e.g. \"gvisor\") when langyagent.chartManaged=true — running this LLM-driven-shell workload without a sandbox re-opens the pod->host escape surface (see ADR-033). If your cluster has no sandboxed runtime and you accept that reduced isolation, set langyagent.acceptUnsandboxedRuntime=true. To run without the assistant entirely, set langyagent.chartManaged=false." }}
+{{- end }}
+{{- /* Per-worker identity isolation (ADR-130). Same guard family as the two
+       above, one rung down: the operator may trade it away, and must say so.
+
+       Turning it off is the only configuration that renders this pod non-root,
+       which is what makes it admissible on a cluster enforcing Pod Security
+       Admission "restricted". The cost is real — one conversation's worker can
+       then read another's live credentials from /proc/<pid>/environ and its
+       conversation content from the session directory — so the acceptance
+       value exists to keep it from being reached by accident, by a blank field
+       or by an override that replaced more than it named. */ -}}
+{{- $isolation := .Values.workerIsolation | default "per-uid" }}
+{{- if not (has $isolation (list "per-uid" "none")) }}
+{{- fail (printf "langyagent.workerIsolation must be \"per-uid\" or \"none\", got %q. Unset means \"per-uid\", the isolated default." $isolation) }}
+{{- end }}
+{{- if and .Values.chartManaged (eq $isolation "none") (not .Values.acceptWorkerIsolationDisabled) }}
+{{- fail "langyagent.workerIsolation=none removes per-worker identity isolation: every conversation's worker runs as the same user, so one worker can read another's live credentials from /proc/<pid>/environ and another conversation's content from its session directory. This is how the agent runs on a cluster that refuses root, and on such a cluster the alternative is no assistant at all — but it is a trade to make deliberately. Set langyagent.acceptWorkerIsolationDisabled=true to accept it. To run without the assistant entirely, set langyagent.chartManaged=false." }}
 {{- end }}
 apiVersion: apps/v1
 kind: Deployment
@@ -51,17 +68,53 @@ spec:
       # default-ServiceAccount token is pure attack surface: it is projected
       # at /var/run/secrets/kubernetes.io/serviceaccount/token (mode 0644),
       # readable by the worker UID, and never used. Drop it so a compromised
-      # opencode worker cannot read a namespace identity off disk.
+      # worker cannot read a namespace identity off disk.
       automountServiceAccountToken: false
+      {{- /* Under `none` the pod needs neither root nor any capability, and
+             saying so explicitly is the whole point: a policy engine reads
+             the rendered spec, not our intent. The isolated default keeps
+             the operator's own values verbatim.
+
+             The seccomp profile is part of that and not decoration: Pod
+             Security Admission "restricted" requires one, so omitting it
+             would leave this posture refused by the very admission control
+             it exists to satisfy. It is absent from the isolated default
+             because that posture is bundled with the setuid path (see
+             examples/overlays/strict-admission.yaml); with no setuid there
+             is nothing for RuntimeDefault to break. Declared at BOTH pod
+             and container level because some constraint implementations
+             read the container field directly and deny a pod carrying the
+             value only on the pod — which is how a customer's install
+             first failed (specs/security/helm-strict-admission.feature). */ -}}
+      {{- if eq $isolation "none" }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      {{- else }}
       securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- end }}
       # Give the manager time to drain workers on SIGTERM (it kills each
-      # OpenCode subprocess in its shutdown handler).
+      # worker subprocess in its shutdown handler).
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds | default 30 }}
       containers:
         - name: agent
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if eq $isolation "none" }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ["ALL"]
+          {{- else }}
           securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.manager.port }}

@@ -1,4 +1,4 @@
-package localunsafe
+package sharedidentity
 
 import (
 	"context"
@@ -41,17 +41,32 @@ func TestChownLchown_NoOp(t *testing.T) {
 	}
 }
 
-// New is a fail-closed guard, independent of the config layer: it constructs only
-// for a local-like environment and refuses everything else.
-func TestNew_RefusesNonLocalEnvironments(t *testing.T) {
-	for _, env := range []string{"local", "dev", "development", "test", "TEST", " Local "} {
-		if _, err := New(env); err != nil {
-			t.Errorf("New(%q) = %v, want ok (local-like)", env, err)
-		}
+// New refused to construct outside a local-like ENVIRONMENT until ADR-130, as a
+// second guard beyond the config layer. That is gone, and the test with it: the
+// posture is now the operator's to select, gated by an acknowledgement in their
+// values file and refused at chart render time without one. A guard here would
+// only have made the supported posture reachable by lying about ENVIRONMENT,
+// which telemetry and logging read too.
+//
+// What replaces it is asserted where it now lives: config rejects an
+// unrecognised LANGY_WORKER_ISOLATION rather than defaulting (config_test.go),
+// and the chart refuses `none` without the acknowledgement
+// (charts/langwatch/tests/e2e-overlays.sh).
+
+// The runner's whole contract is what it does NOT do: no setuid credential on
+// the child, and no filesystem ownership change. Both are what make the pod
+// runnable without root.
+//
+// @scenario "The manager does not reserve worker identities it cannot enforce"
+func TestRunner_AppliesNoIdentity(t *testing.T) {
+	attr := (Runner{}).SysProcAttr(4321)
+	if attr == nil {
+		t.Fatal("SysProcAttr must still return a process group for the reaper")
 	}
-	for _, env := range []string{"production", "prod", "staging", "prod-eu", "", "unknown"} {
-		if _, err := New(env); err == nil {
-			t.Errorf("New(%q) = nil error, want refusal (not local-like)", env)
-		}
+	if attr.Credential != nil {
+		t.Errorf("SysProcAttr set a Credential (%+v) — the child must inherit the manager's identity", attr.Credential)
+	}
+	if !attr.Setpgid {
+		t.Error("Setpgid must stay on: the orphan reaper and shutdown signal the worker's process group")
 	}
 }

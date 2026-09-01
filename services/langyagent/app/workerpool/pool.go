@@ -47,7 +47,7 @@ type Options struct {
 	// via PATH when bare).
 	PiBinaryPath string
 	// Runner is the isolation substrate for worker subprocesses — the ADR-033
-	// secure-vs-local seam (adapters/runner/sandboxed vs adapters/runner/localunsafe),
+	// secure-vs-local seam (adapters/runner/sandboxed vs adapters/runner/sharedidentity),
 	// chosen once at the composition root. nil defaults to the sandboxed (secure)
 	// runner, so a mis-wire fails closed rather than silently running without
 	// per-worker UID isolation.

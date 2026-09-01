@@ -3,7 +3,7 @@ Feature: Langy local dogfood doctor
   Running Langy locally needs five things wired at once: the Langy env block
   in platform/app/.env (agent URL, shared secret, the no-sandbox dev flag,
   writable session/workspace roots), the release flag force-enabled, the
-  opencode binary on PATH, three live services (app, AI gateway, langyagent),
+  worker binary on PATH, three live services (app, AI gateway, langyagent),
   and a model provider whose key actually works. Each missing piece fails a
   turn with a different distant symptom, so discovering them one by one costs
   an hour of log spelunking. dev/scripts/dogfood/langy-local.sh checks all of it
@@ -16,7 +16,7 @@ Feature: Langy local dogfood doctor
   Scenario: A fully wired setup passes every check
     Given the Langy env block is present in platform/app/.env
     And the release flag is force-enabled
-    And opencode is on PATH
+    And the worker binary is on PATH
     And the app, gateway, and langyagent are listening
     When the developer runs the doctor
     Then every check reports ok

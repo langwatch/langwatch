@@ -9,10 +9,11 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	langyagent "github.com/langwatch/langwatch/services/langyagent"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/controlplane"
-	"github.com/langwatch/langwatch/services/langyagent/adapters/runner/localunsafe"
 	"github.com/langwatch/langwatch/services/langyagent/adapters/runner/sandboxed"
+	"github.com/langwatch/langwatch/services/langyagent/adapters/runner/sharedidentity"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/app/workerpool"
+	"go.uber.org/zap"
 )
 
 // Root is the service entrypoint called by cmd/service. Errors returned here
@@ -44,19 +45,26 @@ func Root(ctx context.Context, _ []string) error {
 	// The pool consults it around each worker's lifecycle behind this seam.
 	mgr := startEgressAdapter(cfg, deps.Logger)
 
-	// The isolation substrate (ADR-033 secure-vs-local seam): sandboxed setuid +
-	// chown in production; the unprivileged local-dev runner ONLY when the operator
-	// armed LANGY_UNSAFE_DEV_DISABLE_ISOLATION. LoadConfig already refused that flag
-	// outside a local-like environment; localunsafe.New re-checks ENVIRONMENT as an
-	// independent second guard, so the no-isolation substrate can never be built in
-	// production even if the config guard were bypassed.
+	// The isolation substrate (ADR-033). Per-uid is the default: the sandboxed
+	// runner chowns each worker's home and setuids the subprocess into its own
+	// uid, which is what stops one conversation's worker reading another's.
+	//
+	// The operator can trade that away (ADR-130) for a pod that needs neither
+	// root nor any capability, because a cluster enforcing non-root admits no
+	// other shape. LoadConfig has already refused anything but these two
+	// values, so there is no third case to fail closed on here.
+	//
+	// The WARN is unconditional for the weaker posture and says what is
+	// actually exposed rather than that something is "unsafe": it belongs in
+	// the first support bundle, not reconstructed from a values file after an
+	// incident.
 	var runner app.Runner = sandboxed.New()
-	if cfg.UnsafeDevDisableIsolation {
-		local, lerr := localunsafe.New(cfg.Environment)
-		if lerr != nil {
-			return lerr
-		}
-		runner = local
+	if cfg.WorkerIsolation == langyagent.WorkerIsolationNone {
+		runner = sharedidentity.New()
+		deps.Logger.Warn(
+			"per-worker identity isolation is OFF: one conversation's worker can read another's live credentials from /proc/<pid>/environ and its conversation content from the session directory",
+			zap.String("worker_isolation", cfg.WorkerIsolation),
+		)
 	}
 
 	// The worker pool is the driven adapter. It wipes SESSIONS_ROOT before

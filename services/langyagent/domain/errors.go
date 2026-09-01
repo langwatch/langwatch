@@ -75,24 +75,24 @@ const (
 	// MAX_WORKERS above the slot capacity.
 	ErrNoFreeUID = herr.Code("no_free_worker_uid")
 
-	// ErrSessionNotFound signals the worker's opencode internal session
-	// vanished mid-turn. The orchestrator recycles the worker and surfaces a
-	// typed "session-not-found" event.
+	// ErrSessionNotFound signals the worker's agent session vanished mid-turn:
+	// it can never serve another one. The orchestrator recycles the worker and
+	// surfaces a typed "session-not-found" event, so the user retries onto a
+	// fresh worker rather than hitting the dead one again.
+	//
+	// The code string keeps the removed harness's name. It is WIRE FORMAT — the
+	// control plane's presentation registry is keyed by it — so renaming it is
+	// a breaking change to buy a tidier constant, exactly the trade
+	// OPENCODE_AGENT_URL declines elsewhere in ADR-131.
 	ErrSessionNotFound = herr.Code("opencode_session_not_found")
 
 	// ErrWorkerSpawn signals a worker subprocess could not be created (home
 	// setup, port allocation, process start).
 	ErrWorkerSpawn = herr.Code("worker_spawn_failed")
 
-	// ErrWorkerNotReady signals a freshly spawned worker's opencode did not
-	// become ready within LANGY_READINESS_TIMEOUT_MS.
+	// ErrWorkerNotReady signals a freshly spawned worker did not become ready
+	// within LANGY_READINESS_TIMEOUT_MS.
 	ErrWorkerNotReady = herr.Code("worker_not_ready")
-
-	// ErrOpenCodeAuthNotEnforced is the fail-closed guard verdict (ADR-033 Fix
-	// A′): opencode answered an unauthenticated control request with something
-	// other than 401, so the per-worker password is not gating the control
-	// API. The worker must not serve traffic in that state.
-	ErrOpenCodeAuthNotEnforced = herr.Code("opencode_auth_not_enforced")
 
 	// ErrInternal is the generic fallback for unexpected errors.
 	ErrInternal = herr.Code("internal_error")
@@ -112,6 +112,5 @@ func RegisterStatuses() {
 	herr.RegisterStatus(ErrSessionNotFound, http.StatusNotFound)
 	herr.RegisterStatus(ErrWorkerSpawn, http.StatusInternalServerError)
 	herr.RegisterStatus(ErrWorkerNotReady, http.StatusInternalServerError)
-	herr.RegisterStatus(ErrOpenCodeAuthNotEnforced, http.StatusInternalServerError)
 	herr.RegisterStatus(ErrInternal, http.StatusInternalServerError)
 }

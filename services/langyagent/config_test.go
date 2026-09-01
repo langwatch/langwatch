@@ -14,7 +14,7 @@ func clearLangyEnv(t *testing.T) {
 	for _, k := range []string{
 		"ENVIRONMENT", "PORT", "LANGY_INTERNAL_SECRET", "LANGY_MAX_WORKERS",
 		"LANGY_WORKER_IDLE_MS", "LANGY_REAPER_INTERVAL_MS", "LANGY_READINESS_TIMEOUT_MS", "SESSIONS_ROOT",
-		"LANGY_WORKSPACE_ROOT", "LANGY_UNSAFE_DEV_DISABLE_ISOLATION",
+		"LANGY_WORKSPACE_ROOT", "LANGY_WORKER_ISOLATION",
 		"LOG_LEVEL", "LOG_FORMAT",
 		"OTEL_OTLP_ENDPOINT", "OTEL_OTLP_HEADERS", "OTEL_SAMPLE_RATIO",
 		"OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_HEADERS",
@@ -64,8 +64,45 @@ func TestLoadConfig_DefaultsWhenOnlySecretSet(t *testing.T) {
 	if cfg.WorkspaceRoot != "/workspace" {
 		t.Errorf("WorkspaceRoot default = %q, want /workspace", cfg.WorkspaceRoot)
 	}
-	if cfg.UnsafeDevDisableIsolation {
-		t.Errorf("UnsafeDevDisableIsolation default = true, want false")
+	if cfg.WorkerIsolation != WorkerIsolationPerUID {
+		t.Errorf("WorkerIsolation default = %q, want %q", cfg.WorkerIsolation, WorkerIsolationPerUID)
+	}
+}
+
+// An unrecognised posture is refused outright rather than normalised. There is
+// no reading of a typo that should quietly run every worker under one identity,
+// so the weaker posture must never be what a mistake selects.
+//
+// @scenario "An unrecognised isolation setting fails closed"
+func TestLoadConfig_RefusesAnUnknownWorkerIsolation(t *testing.T) {
+	clearLangyEnv(t)
+	t.Setenv("LANGY_INTERNAL_SECRET", "secret")
+	t.Setenv("LANGY_WORKER_ISOLATION", "per-uidd")
+
+	if _, err := LoadConfig(context.Background()); err == nil {
+		t.Fatal("an unrecognised LANGY_WORKER_ISOLATION must refuse to boot, not fall back to a posture")
+	}
+}
+
+// Both recognised postures load. The weaker one is a supported configuration,
+// not an escape hatch, so it must not depend on ENVIRONMENT the way the flag it
+// replaced did.
+//
+// @scenario "An operator can accept the reduced isolation and render a non-root pod"
+func TestLoadConfig_AcceptsBothWorkerIsolationPostures(t *testing.T) {
+	for _, posture := range []string{WorkerIsolationPerUID, WorkerIsolationNone} {
+		clearLangyEnv(t)
+		t.Setenv("LANGY_INTERNAL_SECRET", "secret")
+		t.Setenv("ENVIRONMENT", "production")
+		t.Setenv("LANGY_WORKER_ISOLATION", posture)
+
+		cfg, err := LoadConfig(context.Background())
+		if err != nil {
+			t.Fatalf("LANGY_WORKER_ISOLATION=%q in production: %v", posture, err)
+		}
+		if cfg.WorkerIsolation != posture {
+			t.Errorf("WorkerIsolation = %q, want %q", cfg.WorkerIsolation, posture)
+		}
 	}
 }
 
@@ -186,42 +223,13 @@ func TestLoadConfig_OfficialEndpointNameIsHonoured(t *testing.T) {
 	}
 }
 
-func TestLoadConfig_UnsafeDevDisableIsolationAllowedInLocalEnvs(t *testing.T) {
-	for _, env := range []string{"local", "dev", "development", "test", "LOCAL", "  dev  "} {
-		t.Run(env, func(t *testing.T) {
-			clearLangyEnv(t)
-			t.Setenv("LANGY_INTERNAL_SECRET", "secret")
-			t.Setenv("ENVIRONMENT", env)
-			t.Setenv("LANGY_UNSAFE_DEV_DISABLE_ISOLATION", "true")
-
-			cfg, err := LoadConfig(context.Background())
-			if err != nil {
-				t.Fatalf("LoadConfig(ENVIRONMENT=%q) = %v, want nil", env, err)
-			}
-			if !cfg.UnsafeDevDisableIsolation {
-				t.Errorf("UnsafeDevDisableIsolation = false, want true for env %q", env)
-			}
-		})
-	}
-}
-
-func TestLoadConfig_UnsafeDevDisableIsolationRefusedInNonLocalEnvs(t *testing.T) {
-	// Allowlist fail-closed: production, staging, and any unknown/prod-like value
-	// must reject the bypass, so it can never be armed off a dev box.
-	for _, env := range []string{"production", "staging", "prod-eu", "preview"} {
-		t.Run(env, func(t *testing.T) {
-			clearLangyEnv(t)
-			t.Setenv("LANGY_INTERNAL_SECRET", "secret")
-			t.Setenv("ENVIRONMENT", env)
-			t.Setenv("LANGY_UNSAFE_DEV_DISABLE_ISOLATION", "true")
-
-			if _, err := LoadConfig(context.Background()); err == nil {
-				t.Fatalf("expected LoadConfig to refuse LANGY_UNSAFE_DEV_DISABLE_ISOLATION when ENVIRONMENT=%q", env)
-			}
-		})
-	}
-}
-
+// Two tests here proved the ENVIRONMENT allowlist that gated the old
+// LANGY_UNSAFE_DEV_DISABLE_ISOLATION: permitted in local-like environments,
+// refused everywhere else. ADR-130 removed that gate — the posture is the
+// operator's to select, acknowledged in their values file and refused at
+// chart render time without it — so both tests proved a rule that no longer
+// exists. What replaced them is above: an unknown posture is refused, and
+// both known ones load in production.
 func TestLoadConfig_ShutdownHandoffDefaults(t *testing.T) {
 	clearLangyEnv(t)
 	t.Setenv("LANGY_INTERNAL_SECRET", "secret")

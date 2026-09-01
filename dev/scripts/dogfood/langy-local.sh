@@ -108,11 +108,11 @@ fi
 
 # --- binaries --------------------------------------------------------------
 echo "binaries:"
-if command -v opencode >/dev/null 2>&1; then
-  ok "opencode ($(command -v opencode))"
+if command -v langy-worker >/dev/null 2>&1; then
+  ok "langy-worker ($(command -v langy-worker))"
 else
-  bad "opencode not on PATH (the langyagent spawns it per conversation)"
-  hint "npm install -g opencode-ai"
+  bad "langy-worker not on PATH (the langyagent spawns it per conversation)"
+  hint "cd services/langyworker && bun run scripts/build-binary.ts, then put out/langy-worker on PATH"
 fi
 if command -v go >/dev/null 2>&1; then
   ok "go toolchain"

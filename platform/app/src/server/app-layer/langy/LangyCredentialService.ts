@@ -12,7 +12,6 @@ import {
   mintLangySessionApiKey,
 } from "./langyApiKey";
 import { LANGY_GITHUB_ENABLED } from "./langyGithub.enabled";
-import type { LangyHarness } from "./langyHarness";
 import { provisionLangyVirtualKey } from "./langyVirtualKey";
 
 const logger = createLogger("langwatch:langy:credentials");
@@ -256,14 +255,6 @@ export type LangyCredentials = {
    * manager mirrors nothing without a destination.
    */
   mirrorTier?: LangyMirrorTier;
-  /**
-   * Which worker harness serves this turn (`release_langy_pi_harness`,
-   * resolved once per turn, see `langyHarness.ts`). Part of the worker
-   * credential signature on the Go side, where absent and "opencode" collapse
-   * so pre-flag workers never respawn on deploy; a flag flip is a probe MISS
-   * and the worker re-warms on the other harness.
-   */
-  harness?: LangyHarness;
 };
 
 /**

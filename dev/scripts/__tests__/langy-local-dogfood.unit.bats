@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # Unit tests for dev/scripts/dogfood/langy-local.sh, the Langy local dogfood
 # doctor. The script under test runs for real against a sandboxed repo
-# layout: a temp platform/app/.env, fake opencode/go shims on PATH, and real
+# layout: a temp platform/app/.env, fake langy-worker/go shims on PATH, and real
 # loopback listeners standing in for the app / gateway / langyagent.
 #
 # Spec: specs/setup/langy-local-dogfood.feature
@@ -17,9 +17,9 @@ setup() {
   : >"$ENV_FILE"
 
   # Binaries the doctor requires: fake shims are enough — it only checks PATH.
-  printf '#!/bin/sh\nexit 0\n' >"$TEST_DIR/bin/opencode"
+  printf '#!/bin/sh\nexit 0\n' >"$TEST_DIR/bin/langy-worker"
   printf '#!/bin/sh\nexit 0\n' >"$TEST_DIR/bin/go"
-  chmod +x "$TEST_DIR/bin/opencode" "$TEST_DIR/bin/go"
+  chmod +x "$TEST_DIR/bin/langy-worker" "$TEST_DIR/bin/go"
 
   # A base port slot unlikely to collide; the doctor derives gateway = base+3.
   BASE_PORT=$((20000 + (RANDOM % 20000)))

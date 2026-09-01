@@ -1,13 +1,10 @@
 import { makeAigatewayPredep } from "./aigateway.ts";
-import { makeOpencodePredep } from "./opencode.ts";
 import { clickhousePredep } from "./clickhouse.ts";
 import { goosePredep } from "./goose.ts";
 import { pnpmPredep } from "./pnpm.ts";
 import { postgresPredep } from "./postgres.ts";
 import { redisPredep } from "./redis.ts";
 import { uvPredep } from "./uv.ts";
-import { resolveEffectiveFeatures } from "../shared/features.ts";
-import { paths } from "../shared/paths.ts";
 import type { Predep } from "./types.ts";
 
 export function predepRegistry({ version }: { version: string }): Predep[] {
@@ -15,13 +12,11 @@ export function predepRegistry({ version }: { version: string }): Predep[] {
   // ensureLangwatchDeps + runMigrations call resolvePnpm(paths). uv is
   // fast/cached so its position is mostly irrelevant; everything else
   // doesn't depend on pnpm.
-  // The assistant's runtime is last: it is the only optional one, and the
-  // only one whose failure leaves a working install behind.
-  // Resolved the same way the runtime resolves them (persisted .env first,
-  // shell on top): a LANGWATCH_ENABLE_LANGY=false line in ~/.langwatch/.env
-  // must stop the assistant runtime from being downloaded, not only from
-  // being started.
-  const features = resolveEffectiveFeatures(paths.envFile);
+  //
+  // Every predep here is required. The assistant's coding-agent runtime was
+  // the one optional entry — gated on LANGWATCH_ENABLE_LANGY so a disabled
+  // assistant did not download ~45MB it would never run — and ADR-131
+  // removed the harness that binary was.
   return [
     pnpmPredep,
     uvPredep,
@@ -30,6 +25,5 @@ export function predepRegistry({ version }: { version: string }): Predep[] {
     clickhousePredep,
     goosePredep,
     makeAigatewayPredep(version),
-    makeOpencodePredep({ isEnabled: features.isLangyEnabled }),
   ];
 }
