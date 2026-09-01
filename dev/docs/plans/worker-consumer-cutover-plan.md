@@ -154,7 +154,14 @@ P1 and P2 landed as `5e8a84ba4d` and `25885235b8`; P3 as `a6844f72fb`
 presets binding is asserted structurally over the AST because end-to-end
 boot observation is blocked by the ClickHouse event store under
 BUILD_TIME, the ClickHouse runtime process singleton, and boot-leaked
-scheduler/Redis handles). A P1 finding widens
+scheduler/Redis handles). P4 landed as `d816d8bd1b`: the mapper and the
+refusing executable adapter exist under `platform/app/src/runtime/worker/`,
+the parity guard now exercises the production mapper, and one deviation is
+recorded in the commit — the mapper takes a lazy billing-usage dispatch
+because the SaaS meter's sender is produced by the composition the options
+feed. Remaining before the switch: tests 4 (cross-es dispatch, real Redis —
+datastore lane, CI-verified) and 6 (governance arming), then the atomic
+`workers.ts` flip reconciling the two stale consumer knobs. A P1 finding widens
 P3/P4's scope: two consumer knobs are not yet wired to the new option —
 `apps/worker/src/platform/config/worker.config.ts` still binds
 `WORKER_EVENTING_CONSUMERS_ENABLED` through the fail-closed producer-only
