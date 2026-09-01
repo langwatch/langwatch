@@ -90,16 +90,28 @@ function confirmedEvent({
   } as never;
 }
 
-/** One pulled observation of one provider bucket. */
+/**
+ * One pulled observation of one provider bucket.
+ *
+ * `costNanoMinor` is the money in the provider's own minor units and
+ * `currencyCode` says which currency those are. Both are required here rather
+ * than defaulted: the fold does not validate its events, so a helper that
+ * omitted the money would hand the fold `undefined` and every amount assertion
+ * downstream would compare against `NaN` while still appearing to pass.
+ */
 function observedEvent({
-  costNanoUsd,
+  costNanoMinor,
+  currencyCode = GOVERNANCE_COST_CURRENCY_USD,
+  costNanoUsd = null,
   restatementKey = "bucket-hash",
   observedAtMs,
   occurredAtMs = DAY_MS,
   costStatus = "estimate",
   id = `evt-pulled-${observedAtMs}`,
 }: {
-  costNanoUsd: number;
+  costNanoMinor: number;
+  currencyCode?: string;
+  costNanoUsd?: number | null;
   restatementKey?: string;
   observedAtMs: number;
   occurredAtMs?: number;
@@ -125,6 +137,8 @@ function observedEvent({
       tokensOutput: 200,
       tokensCacheRead: 0,
       tokensCacheWrite: 0,
+      costNanoMinor,
+      currencyCode,
       costNanoUsd,
       rateVersion: "registry@2026-08-01",
       costBasis: "computed",
@@ -216,7 +230,7 @@ describe("governanceCostRollupKey", () => {
         confirmedEvent({ costNanoUsd: 1 }),
       );
       const pulled = governanceCostRollupKey(
-        observedEvent({ costNanoUsd: 1, observedAtMs: DAY_MS }),
+        observedEvent({ costNanoMinor: 1, observedAtMs: DAY_MS }),
       );
       expect(gateway).not.toBe(pulled);
     });
@@ -312,12 +326,12 @@ describe("GovernanceCostRollupFoldProjection", () => {
     it("replaces the figure instead of adding to it", () => {
       const state = fold([
         observedEvent({
-          costNanoUsd: 12_340_000_000,
+          costNanoMinor: 12_340_000_000,
           observedAtMs: Date.parse("2026-08-02T04:00:00.000Z"),
           id: "first",
         }),
         observedEvent({
-          costNanoUsd: 9_000_000_000,
+          costNanoMinor: 9_000_000_000,
           observedAtMs: Date.parse("2026-08-03T04:00:00.000Z"),
           costStatus: "exact",
           id: "restated",
@@ -325,6 +339,10 @@ describe("GovernanceCostRollupFoldProjection", () => {
       ]);
       const totals = governanceCostRollupTotals(state);
       expect(totals.amountNanoUsd).toBe(9_000_000_000);
+      // The billed amount too, not only the dollar view of it. The dollar
+      // figure can be produced from a per-item field, so asserting it alone
+      // let a run where the billed amount was NaN report as passing.
+      expect(totals.amountNanoMinor).toBe(9_000_000_000);
       expect(state.revisionCount).toBe(1);
       expect(state.previousAmountNanoUsd).toBe(12_340_000_000);
       expect(state.exactOrEstimate).toBe("exact");
@@ -333,12 +351,12 @@ describe("GovernanceCostRollupFoldProjection", () => {
     it("keeps the newest observation when a stale one is redelivered", () => {
       const state = fold([
         observedEvent({
-          costNanoUsd: 9_000_000_000,
+          costNanoMinor: 9_000_000_000,
           observedAtMs: Date.parse("2026-08-03T04:00:00.000Z"),
           id: "restated",
         }),
         observedEvent({
-          costNanoUsd: 12_340_000_000,
+          costNanoMinor: 12_340_000_000,
           observedAtMs: Date.parse("2026-08-02T04:00:00.000Z"),
           id: "first",
         }),
@@ -351,13 +369,13 @@ describe("GovernanceCostRollupFoldProjection", () => {
     it("adds two different provider items rather than restating one", () => {
       const state = fold([
         observedEvent({
-          costNanoUsd: 1_000,
+          costNanoMinor: 1_000,
           restatementKey: "bucket-a",
           observedAtMs: DAY_MS,
           id: "a",
         }),
         observedEvent({
-          costNanoUsd: 2_000,
+          costNanoMinor: 2_000,
           restatementKey: "bucket-b",
           observedAtMs: DAY_MS,
           id: "b",
@@ -405,8 +423,13 @@ describe("GovernanceCostRollupFoldProjection", () => {
           id: "a",
         }),
       ]);
-      expect(governanceCostRollupTotals(forwards).amountNanoUsd).toBe(
-        governanceCostRollupTotals(backwards).amountNanoUsd,
+      // The value first, then the equality. `toBe` is Object.is, so NaN
+      // equals NaN — an assertion of equality alone passes for a fold that
+      // read the money field under a name the events do not carry, which is
+      // exactly how this test came to assert nothing once already.
+      expect(governanceCostRollupTotals(forwards).amountNanoUsd).toBe(1_000);
+      expect(governanceCostRollupTotals(backwards).amountNanoUsd).toBe(
+        governanceCostRollupTotals(forwards).amountNanoUsd,
       );
     });
   });
